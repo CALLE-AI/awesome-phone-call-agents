@@ -62,6 +62,14 @@ Use cases:
 
 Copy the skill folder into a host-supported skills directory, or install it using a compatible skill installer.
 
+Install `call-reminder` with the `skills` CLI, using the adapter that matches your host:
+
+```bash
+npx skills add CALLE-AI/awesome-phone-call-skill --skill call-reminder -a <agent-adapter>
+```
+
+Or copy the skill folder manually:
+
 ```text
 skills/call-reminder/
 ```
