@@ -42,6 +42,16 @@ Run:
 python3 scripts/validate_repository.py
 ```
 
+## Contribution workflow
+
+1. Choose one scoped contribution: skill, provider adapter, scheduler recipe, automation pattern, safety pattern, or reference implementation.
+2. Confirm it directly helps AI agents package, schedule, execute, or safely operate phone-call workflows.
+3. Add or update the smallest set of files needed for that contribution.
+4. Include setup, usage, side-effect, and cancellation notes when the workflow can create a call or recurring schedule.
+5. Use fictional or masked phone numbers in examples.
+6. Keep repository-facing content in English.
+7. Run repository validation before opening a pull request.
+
 ## Skill folder requirements
 
 A skill should be a directory with a required `SKILL.md` file.
@@ -51,10 +61,9 @@ Recommended structure:
 ```text
 skills/example-skill/
 ├── SKILL.md
-├── README.md
 ├── references/
 ├── scripts/
-└── examples/
+└── assets/
 ```
 
 The frontmatter should include at least:
@@ -68,6 +77,21 @@ license: MIT
 ```
 
 The directory name and `name` should match.
+
+Keep generic skills portable. Avoid host-specific frontmatter, put long host-specific details in `references/`, and keep `SKILL.md` focused on the main workflow.
+
+## Safety requirements
+
+Every skill or adapter that can place a call must include rules for:
+
+- explicit user intent
+- E.164 phone numbers
+- masking phone numbers in summaries
+- no credential exposure
+- no hidden recurring schedules
+- no duplicate jobs
+- clear cancellation behavior
+- boundaries for medical, legal, financial, or emergency content
 
 ## Awesome list entries
 
