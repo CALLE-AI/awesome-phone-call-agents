@@ -6,7 +6,7 @@
 
 Package phone-call workflows as Agent Skills that agents can install, adapt, schedule, and operate safely.
 
-[Quick start](#quick-install-and-start) · [Skills](#community-skill-list) · [CLI](#cli-reference) · [Templates](#templates) · [Safety](#safety-and-legal-guide) · [Contributing](#contributing)
+[Quick start](#quick-install-and-start) · [Skills](#skill-list) · [CLI](#cli-reference) · [Templates](#templates) · [Safety](#safety-and-legal-guide) · [Contributing](#contributing)
 
 ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-phone--call-blue)
 ![CALL-E](https://img.shields.io/badge/CALL--E-one--off%20calls-black)
@@ -27,7 +27,7 @@ Package phone-call workflows as Agent Skills that agents can install, adapt, sch
 - [Reference skill: call-reminder](#reference-skill-call-reminder)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
-- [Community skill list](#community-skill-list)
+- [Skill list](#skill-list)
 - [Repository layout](#repository-layout)
 - [Safety and legal guide](#safety-and-legal-guide)
 - [Contributing](#contributing)
@@ -316,25 +316,13 @@ notes:
 
 Keep descriptions short, specific, factual, and directly tied to packaging, scheduling, executing, or safely operating AI-agent phone-call tasks.
 
-## Community skill list
+## Skill list
 
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
 
-### Official examples
+Add new skills as a single list. The first skill in the list is:
 
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
-
-### Community skills
-
-No community-submitted skills are listed yet. New entries should follow the Agent Skills folder pattern and the README list entry template.
-
-Suggested categories for future entries:
-
-- reminder and follow-up skills
-- appointment and scheduling skills
-- provider adapter skills
-- scheduler integration skills
-- safety and compliance helper skills
 
 ### Provider adapters
 
