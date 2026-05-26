@@ -1,4 +1,4 @@
-# Awesome Phone Call Skill
+# Awesome Phone Call Agents
 
 <div align="center">
 
@@ -65,14 +65,7 @@ For most users, the simplest path is to ask an Agent Skills-compatible client to
 ```text
 Install the portable call-reminder skill for this agent.
 
-Use this command, replacing <agent-adapter> with the adapter for the current client:
-
-npx skills add CALLE-AI/awesome-phone-call-skill --skill call-reminder -a <agent-adapter>
-
-After installation:
-1. Reload or restart the agent if the client requires it.
-2. Use the skill only for explicit phone-call reminder requests.
-3. Follow the skill's scheduler, consent, cancellation, and credential-safety rules.
+npx -y skills add CALLE-AI/awesome-phone-call-agents --skill call-reminder -g
 ```
 
 Manual copy is also supported when a host does not support the CLI:
@@ -224,7 +217,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 ## Repository layout
 
 ```text
-awesome-phone-call-skill/
+awesome-phone-call-agents/
 ├── README.md
 ├── AGENTS.md
 ├── CONTRIBUTING.md

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the Awesome Phone Call Skill repository structure.
+"""Validate the Awesome Phone Call Agents repository structure.
 
 This script intentionally uses only the Python standard library.
 """
@@ -15,7 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+REPOSITORY_TITLE = "Awesome Phone Call Agents"
+REPOSITORY_SLUG = "awesome-phone-call-agents"
+OLD_REPOSITORY_TITLE = "Awesome Phone Call " + "Skill"
+OLD_REPOSITORY_SLUG = "awesome-phone-call-" + "skill"
 README_SUBTITLE = "Portable phone-call Agent Skills, apps, adapters, scheduler recipes, and safety patterns for AI agents."
+SKILLS_INSTALL_COMMAND = f"npx -y skills add CALLE-AI/{REPOSITORY_SLUG} --skill call-reminder -g"
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
@@ -52,10 +57,20 @@ def parse_frontmatter(text: str, path: Path) -> dict[str, str]:
 
 def validate_readme() -> None:
     text = read(ROOT / "README.md")
-    if not text.startswith("# Awesome Phone Call Skill"):
-        fail("README.md must start with '# Awesome Phone Call Skill'.")
+    if not text.startswith(f"# {REPOSITORY_TITLE}"):
+        fail(f"README.md must start with '# {REPOSITORY_TITLE}'.")
     if README_SUBTITLE not in text:
         fail("README.md must include the approved project subtitle near the top.")
+    if SKILLS_INSTALL_COMMAND not in text:
+        fail("README.md must include the approved skills.sh install command.")
+    forbid_text(
+        ROOT / "README.md",
+        [
+            f"CALLE-AI/{OLD_REPOSITORY_SLUG}",
+            f"{OLD_REPOSITORY_SLUG}/",
+            f"npx skills add CALLE-AI/{OLD_REPOSITORY_SLUG}",
+        ],
+    )
     for snippet in [
         "skills/",
         "apps/",
@@ -68,6 +83,39 @@ def validate_readme() -> None:
     ]:
         if snippet not in text:
             fail(f"README.md must document repository scope or migrated apps: {snippet}")
+
+
+def validate_repository_name_references() -> None:
+    checked_dirs = [
+        ROOT / ".github",
+        ROOT / "README.md",
+        ROOT / "AGENTS.md",
+        ROOT / "CONTRIBUTING.md",
+        ROOT / "SECURITY.md",
+        ROOT / "apps",
+        ROOT / "docs",
+        ROOT / "scripts",
+        ROOT / "skills",
+    ]
+    forbidden = [
+        OLD_REPOSITORY_TITLE,
+        OLD_REPOSITORY_SLUG,
+        f"CALLE-AI/{OLD_REPOSITORY_SLUG}",
+    ]
+    for item in checked_dirs:
+        if not item.exists():
+            continue
+        paths = [item] if item.is_file() else [path for path in item.rglob("*") if path.is_file()]
+        for path in paths:
+            relative_parts = set(path.relative_to(ROOT).parts)
+            if relative_parts & SKIP_TEXT_DIRS:
+                continue
+            if path.name in SKIP_TEXT_FILES or path.suffix not in TEXT_SUFFIXES:
+                continue
+            text = read(path)
+            for snippet in forbidden:
+                if snippet in text:
+                    fail(f"Old repository name found in {path.relative_to(ROOT)}: {snippet}")
 
 
 def validate_english_only() -> None:
@@ -359,6 +407,7 @@ def validate_call_reminder_acceptance_rules() -> None:
 def main() -> None:
     validate_expected_files()
     validate_readme()
+    validate_repository_name_references()
     validate_english_only()
     validate_templates()
     validate_apps()
