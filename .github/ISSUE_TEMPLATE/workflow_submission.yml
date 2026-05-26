@@ -1,5 +1,5 @@
 name: Workflow resource submission
-description: Suggest a phone-call skill, app, example, adapter, scheduler recipe, or safety resource.
+description: Suggest a phone-call skill, runnable app, adapter, scheduler recipe, or safety resource.
 title: "[Submission]: "
 labels: [submission]
 body:
@@ -7,7 +7,7 @@ body:
     id: name
     attributes:
       label: Name
-      description: Name of the skill, app, example, adapter, scheduler recipe, or resource.
+      description: Name of the skill, runnable app, adapter, scheduler recipe, or resource.
     validations:
       required: true
   - type: dropdown
@@ -17,8 +17,7 @@ body:
       description: Select the closest contribution type.
       options:
         - Agent Skill
-        - App
-        - Example
+        - Runnable app
         - Provider adapter
         - Scheduler recipe
         - Safety pattern

@@ -8,12 +8,12 @@
 - Add validation scripts.
 - Add contribution and security guidance.
 
-## Phase 2: examples and integration demos
+## Phase 2: runnable apps and integration demos
 
-- Add standard MCP OAuth client examples.
-- Add CALL-E broker login MCP client examples.
-- Add a Python batch runner example.
-- Keep default example tests on fake servers or dry-run paths.
+- Add standard MCP OAuth client apps.
+- Add CALL-E broker login MCP client apps.
+- Add a Python batch runner app.
+- Keep default app tests on fake servers or dry-run paths.
 
 ## Phase 3: adapters and recipes
 
@@ -40,10 +40,10 @@ Potential apps:
 
 Potential additions:
 
-- metadata index for listed skills, apps, and examples
+- metadata index for listed skills and apps
 - compatibility matrix
 - richer validation
-- example tests
+- app tests
 - screenshots or demos
 - curated external resources
 
