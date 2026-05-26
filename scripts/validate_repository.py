@@ -8,12 +8,17 @@ from __future__ import annotations
 
 import re
 import sys
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+README_SUBTITLE = "Portable phone-call Agent Skills, apps, adapters, scheduler recipes, and safety patterns for AI agents."
+TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
+SKIP_TEXT_FILES = {"uv.lock"}
+SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
 
 
 def fail(message: str) -> None:
@@ -49,15 +54,35 @@ def validate_readme() -> None:
     text = read(ROOT / "README.md")
     if not text.startswith("# Awesome Phone Call Skill"):
         fail("README.md must start with '# Awesome Phone Call Skill'.")
-    if "Portable phone-call skills" not in text:
-        fail("README.md must include a succinct project description near the top.")
+    if README_SUBTITLE not in text:
+        fail("README.md must include the approved project subtitle near the top.")
+    for snippet in ["skills/", "apps/", "examples/", "mcp-oauth-client", "mcp-broker-client", "python-batch-runner"]:
+        if snippet not in text:
+            fail(f"README.md must document repository scope or migrated examples: {snippet}")
 
 
 def validate_english_only() -> None:
-    checked_dirs = [ROOT / "README.md", ROOT / "AGENTS.md", ROOT / "CONTRIBUTING.md", ROOT / "SECURITY.md", ROOT / "docs", ROOT / "skills"]
+    checked_dirs = [
+        ROOT / ".github",
+        ROOT / "README.md",
+        ROOT / "AGENTS.md",
+        ROOT / "CONTRIBUTING.md",
+        ROOT / "SECURITY.md",
+        ROOT / "apps",
+        ROOT / "docs",
+        ROOT / "examples",
+        ROOT / "skills",
+    ]
     for item in checked_dirs:
-        paths = [item] if item.is_file() else list(item.rglob("*.md"))
+        if not item.exists():
+            continue
+        paths = [item] if item.is_file() else [path for path in item.rglob("*") if path.is_file()]
         for path in paths:
+            relative_parts = set(path.relative_to(ROOT).parts)
+            if relative_parts & SKIP_TEXT_DIRS:
+                continue
+            if path.name in SKIP_TEXT_FILES or path.suffix not in TEXT_SUFFIXES:
+                continue
             text = read(path)
             if CJK_RE.search(text):
                 fail(f"CJK text found in repository-facing content: {path.relative_to(ROOT)}")
@@ -97,8 +122,29 @@ def validate_expected_files() -> None:
         "AGENTS.md",
         "CONTRIBUTING.md",
         "SECURITY.md",
+        ".github/ISSUE_TEMPLATE/workflow_submission.yml",
+        ".github/pull_request_template.md",
+        ".github/workflows/validate.yml",
+        "apps/README.md",
         "docs/design-principles.md",
         "docs/codex-implementation-plan.md",
+        "examples/README.md",
+        "examples/mcp-broker-client/README.md",
+        "examples/mcp-broker-client/python/README.md",
+        "examples/mcp-broker-client/python/client.py",
+        "examples/mcp-broker-client/typescript/package.json",
+        "examples/mcp-broker-client/typescript/src/client.ts",
+        "examples/mcp-broker-client/typescript-standalone/package.json",
+        "examples/mcp-broker-client/typescript-standalone/src/client.ts",
+        "examples/mcp-oauth-client/README.md",
+        "examples/mcp-oauth-client/python/README.md",
+        "examples/mcp-oauth-client/python/client.py",
+        "examples/mcp-oauth-client/typescript/package.json",
+        "examples/mcp-oauth-client/typescript/src/client.ts",
+        "examples/python-batch-runner/README.md",
+        "examples/python-batch-runner/client.py",
+        "examples/python-batch-runner/example_market_alerts.jsonl",
+        "examples/shared/fake-mcp-broker-server.mjs",
         "scripts/validate_repository.py",
         "skills/call-reminder/SKILL.md",
         "skills/call-reminder/references/client-adapters.md",
@@ -112,6 +158,64 @@ def validate_expected_files() -> None:
     ]
     for rel in expected:
         read(ROOT / rel)
+
+
+def validate_apps() -> None:
+    apps_dir = ROOT / "apps"
+    if not apps_dir.exists():
+        fail("Missing apps/ directory.")
+    require_text(
+        apps_dir / "README.md",
+        [
+            "runnable phone-call workflow apps",
+            "AI agents schedule, monitor, administer, or safely operate phone-call workflows",
+            "dry-run or preview behavior",
+        ],
+    )
+
+
+def validate_examples() -> None:
+    examples_dir = ROOT / "examples"
+    if not examples_dir.exists():
+        fail("Missing examples/ directory.")
+    require_text(
+        examples_dir / "README.md",
+        [
+            "runnable MCP client demos",
+            "not a CALL-E SDK",
+            "local fake broker/OAuth/MCP server",
+        ],
+    )
+    for example_dir in examples_dir.iterdir():
+        if not example_dir.is_dir() or example_dir.name == "shared":
+            continue
+        read(example_dir / "README.md")
+
+    forbidden_dependency_snippets = [
+        '"@call-e/core": "file:',
+        "../../../packages/core",
+        "../../packages/core",
+        "workspace:",
+    ]
+    for path in examples_dir.rglob("*"):
+        if not path.is_file() or path.name in SKIP_TEXT_FILES or path.suffix not in TEXT_SUFFIXES:
+            continue
+        relative_parts = set(path.relative_to(ROOT).parts)
+        if relative_parts & SKIP_TEXT_DIRS:
+            continue
+        text = read(path)
+        for snippet in forbidden_dependency_snippets:
+            if snippet in text:
+                fail(f"Example depends on source-repository internals in {path.relative_to(ROOT)}: {snippet}")
+
+    for package_json in examples_dir.rglob("package.json"):
+        payload = json.loads(read(package_json))
+        dependencies = {}
+        dependencies.update(payload.get("dependencies", {}))
+        dependencies.update(payload.get("devDependencies", {}))
+        for name, spec in dependencies.items():
+            if isinstance(spec, str) and spec.startswith("file:"):
+                fail(f"Example package uses a local file dependency in {package_json.relative_to(ROOT)}: {name}")
 
 
 def require_text(path: Path, snippets: list[str]) -> None:
@@ -208,6 +312,8 @@ def main() -> None:
     validate_expected_files()
     validate_readme()
     validate_english_only()
+    validate_apps()
+    validate_examples()
     validate_skills()
     validate_call_reminder_acceptance_rules()
     print("Repository validation passed.")
