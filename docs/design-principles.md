@@ -11,7 +11,7 @@ Host scheduler handles recurrence.
 Phone-call provider handles exactly one call per scheduled run.
 ```
 
-This design makes skills, apps, and examples portable across providers. A provider does not need recurring schedule support. It only needs to place or create one call when the host scheduler triggers the workflow.
+This design makes skills and apps portable across providers. A provider does not need recurring schedule support. It only needs to place or create one call when the host scheduler triggers the workflow.
 
 ## Principle 2: require explicit intent
 
@@ -21,7 +21,7 @@ Before using a fallback scheduler, a skill or app should discover feasible alter
 
 ## Principle 3: do not guess critical values
 
-A skill, app, adapter, or example must not guess:
+A skill, app, or adapter must not guess:
 
 - phone numbers
 - country codes
@@ -60,11 +60,11 @@ A good recurring phone-call workflow should be able to:
 - disable or delete it
 - explain the provider role clearly
 
-## Principle 7: examples are not SDKs
+## Principle 7: demo apps are not SDKs
 
-Examples should demonstrate an integration pattern with the smallest useful amount of code. They should not imply a supported application API unless the repository explicitly documents that contract.
+Demo apps should demonstrate an integration pattern with the smallest useful amount of code. They should not imply a supported application API unless the repository explicitly documents that contract.
 
-Default example tests should run without live credentials or real outbound calls. Use fake servers, dry-run modes, or no-call plan-only flows by default. Live verification must be opt-in.
+Default app tests should run without live credentials or real outbound calls. Use fake servers, dry-run modes, or no-call plan-only flows by default. Live verification must be opt-in.
 
 ## Principle 8: apps need operational boundaries
 

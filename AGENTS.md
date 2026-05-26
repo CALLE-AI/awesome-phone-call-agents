@@ -14,7 +14,6 @@ Keep the repository focused on AI-agent phone-call workflows:
 
 - Agent Skills
 - apps
-- runnable examples
 - provider adapters
 - scheduler recipes
 - automation patterns
@@ -26,8 +25,7 @@ Do not turn this repository into a general voice-agent list, telephony vendor di
 ## Directory rules
 
 - Put installable Agent Skills in `skills/`.
-- Put runnable apps in `apps/`.
-- Put integration demos and runnable examples in `examples/`.
+- Put runnable apps and integration demos in `apps/`.
 - Put long-form guidance in `docs/`.
 - Keep provider-specific or host-specific details out of generic skill frontmatter.
 
@@ -60,21 +58,21 @@ For portability:
 - put host-specific details in `references/`
 - use progressive disclosure: keep `SKILL.md` focused and move long details to references
 
-## App and example design rules
+## App design rules
 
-Apps and examples must remain directly tied to AI-agent phone-call workflows.
+Apps must remain directly tied to AI-agent phone-call workflows.
 
-- Prefer local fake servers, dry runs, or preview modes for tests and examples.
+- Prefer local fake servers, dry runs, or preview modes for tests and demos.
 - Do not require live credentials or real outbound calls for default tests.
 - Do not depend on unpublished private packages.
 - Document setup, side effects, credentials, and cancellation or rollback behavior when applicable.
-- Keep examples focused. If a demo becomes a reusable tool, move it under `apps/`.
+- Keep demo apps focused. If a demo becomes a reusable tool, keep it under `apps/` and document the supported workflow boundary.
 
 ## Phone-call safety rules
 
 Phone calls are real-world side effects.
 
-Every skill, app, adapter, or example that can place a call must include rules for:
+Every skill, app, or adapter that can place a call must include rules for:
 
 - explicit user intent
 - E.164 phone numbers
