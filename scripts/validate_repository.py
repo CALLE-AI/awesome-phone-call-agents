@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the Awesome Phone Call Skill repository structure.
+"""Validate the Awesome Phone Call Agents repository structure.
 
 This script intentionally uses only the Python standard library.
 """
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-README_SUBTITLE = "Portable phone-call Agent Skills, apps, adapters, scheduler recipes, and safety patterns for AI agents."
+README_SUBTITLE = "A community hub for reusable phone-call Agent Skills, runnable apps, workflow plugins, adapters, scheduler recipes, and safety patterns."
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
@@ -52,13 +52,14 @@ def parse_frontmatter(text: str, path: Path) -> dict[str, str]:
 
 def validate_readme() -> None:
     text = read(ROOT / "README.md")
-    if not text.startswith("# Awesome Phone Call Skill"):
-        fail("README.md must start with '# Awesome Phone Call Skill'.")
+    if not text.startswith("# Awesome Phone Call Agents"):
+        fail("README.md must start with '# Awesome Phone Call Agents'.")
     if README_SUBTITLE not in text:
         fail("README.md must include the approved project subtitle near the top.")
     for snippet in [
         "skills/",
         "apps/",
+        "plugins/",
         "[`apps/python/batch-runner`](apps/python/batch-runner/)",
         "[`apps/python/broker-login-client`](apps/python/broker-login-client/)",
         "[`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/)",
@@ -79,6 +80,7 @@ def validate_english_only() -> None:
         ROOT / "SECURITY.md",
         ROOT / "apps",
         ROOT / "docs",
+        ROOT / "plugins",
         ROOT / "skills",
     ]
     for item in checked_dirs:
@@ -134,6 +136,7 @@ def validate_expected_files() -> None:
         ".github/pull_request_template.md",
         ".github/workflows/validate.yml",
         "apps/README.md",
+        "plugins/README.md",
         "docs/design-principles.md",
         "docs/codex-implementation-plan.md",
         "apps/python/broker-login-client/README.md",
@@ -174,9 +177,10 @@ def validate_templates() -> None:
     require_text(
         ROOT / ".github" / "ISSUE_TEMPLATE" / "workflow_submission.yml",
         [
-            "phone-call skill, runnable app, adapter, scheduler recipe, or safety resource",
-            "Name of the skill, runnable app, adapter, scheduler recipe, or resource",
+            "phone-call skill, runnable app, workflow plugin, adapter, scheduler recipe, or safety resource",
+            "Name of the skill, runnable app, workflow plugin, adapter, scheduler recipe, or resource",
             "- Runnable app",
+            "- Workflow plugin",
         ],
     )
     forbid_text(
@@ -190,6 +194,7 @@ def validate_templates() -> None:
         ROOT / ".github" / "pull_request_template.md",
         [
             "- [ ] New runnable app",
+            "- [ ] New workflow plugin",
             "Phone numbers are masked in documentation and test fixtures unless they are clearly fictional.",
         ],
     )
@@ -257,6 +262,22 @@ def validate_apps() -> None:
         for name, spec in dependencies.items():
             if isinstance(spec, str) and spec.startswith("file:"):
                 fail(f"App package uses a local file dependency in {package_json.relative_to(ROOT)}: {name}")
+
+
+def validate_plugins() -> None:
+    plugins_dir = ROOT / "plugins"
+    if not plugins_dir.exists():
+        fail("Missing plugins/ directory.")
+    require_text(
+        plugins_dir / "README.md",
+        [
+            "no-code and low-code workflow-platform plugins",
+            "nodes, actions, connectors, templates, or recipes",
+            "trigger, configure, monitor, or review phone-call agent workflows",
+            "preview, dry-run, or confirmation behavior",
+            "cancellation, rollback, or disable instructions",
+        ],
+    )
 
 
 def require_text(path: Path, snippets: list[str]) -> None:
@@ -362,6 +383,7 @@ def main() -> None:
     validate_english_only()
     validate_templates()
     validate_apps()
+    validate_plugins()
     validate_skills()
     validate_call_reminder_acceptance_rules()
     print("Repository validation passed.")

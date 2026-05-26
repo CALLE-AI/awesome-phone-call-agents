@@ -6,6 +6,7 @@ Describe the change and why it belongs in this repository.
 
 - [ ] New skill
 - [ ] New runnable app
+- [ ] New workflow plugin
 - [ ] New provider adapter
 - [ ] New scheduler recipe
 - [ ] README awesome-list entry

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to Awesome Phone Call Skill.
+Thanks for contributing to Awesome Phone Call Agents.
 
 This repository collects portable phone-call Agent Skills, apps, provider adapters, scheduler recipes, automation patterns, and safety references for AI agents.
 
@@ -10,10 +10,11 @@ Good contributions include:
 
 - Agent Skills for phone-call workflows
 - reference apps that help agents operate phone-call workflows
-- runnable demo apps for MCP, CLI, plugin, scheduler, or host integrations
+- runnable demo apps for MCP, CLI, scheduler, or host integrations
+- no-code and low-code workflow plugins
 - provider adapter references
 - host scheduler recipes
-- MCP or plugin integration notes
+- MCP integration notes and workflow plugin guidance
 - safe reminder and callback workflows
 - app patterns for Codex, Claude Code, Cowork-style agents, OpenClaw, Hermes, skills.sh-installed agents, and other Agent Skills-compatible environments
 
@@ -25,6 +26,18 @@ Out of scope:
 - tools that require unsafe credential handling
 - skills or apps that hide phone calls, recurring jobs, or external side effects from the user
 - apps that depend on private services without a local fake-server or dry-run path
+
+## Where to contribute
+
+| Contribution | Put it here |
+| --- | --- |
+| Agent Skill | `skills/<skill-name>/` |
+| Runnable app | `apps/<language-or-runtime>/<app-name>/` |
+| No-code or low-code plugin | `plugins/<plugin-name>/` |
+| Provider adapter reference | `docs/` or `skills/<skill-name>/references/` |
+| Scheduler recipe | `docs/` or `skills/<skill-name>/references/` |
+| Safety pattern | `docs/` or `skills/<skill-name>/references/` |
+| Awesome-list entry | `README.md` |
 
 ## Submission checklist
 
@@ -109,6 +122,30 @@ Each app should include:
 - tests or a manual verification path
 
 Demo apps are runnable demos, not SDKs or supported product APIs.
+
+## Plugin requirements
+
+Plugins belong under `plugins/` when they are nodes, actions, connectors, templates, or recipes for no-code and low-code workflow platforms.
+
+Recommended structure:
+
+```text
+plugins/plugin-name/
+├── README.md
+├── manifest-or-config-file
+└── examples/
+```
+
+Each plugin should include:
+
+- a README with setup and usage
+- supported triggers, actions, or workflow entry points
+- required inputs and expected outputs
+- clear credential handling
+- side-effect notes for outbound calls or recurring jobs
+- preview, dry-run, or confirmation behavior when possible
+- cancellation, rollback, or disable instructions when relevant
+- tests, examples, or a manual verification path
 
 ## Safety requirements
 

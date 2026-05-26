@@ -1,12 +1,12 @@
-# Awesome Phone Call Skill
+# Awesome Phone Call Agents
 
 <div align="center">
 
-**Portable phone-call Agent Skills, apps, adapters, scheduler recipes, and safety patterns for AI agents.**
+**A community hub for reusable phone-call Agent Skills, runnable apps, workflow plugins, adapters, scheduler recipes, and safety patterns.**
 
-Package phone-call workflows as Agent Skills, runnable apps, adapters, and recipes that agents can install, adapt, schedule, and operate safely.
+Maintainers provide reference skills, runnable apps, templates, validation, provider guidance, scheduler guidance, and safety rules so developers can quickly build and contribute phone-call agent workflows.
 
-[Quick start](#quick-install-and-start) · [Resources](#resource-list) · [Apps](#apps) · [CLI](#cli-reference) · [Templates](#templates) · [Safety](#safety-and-legal-guide) · [Contributing](#contributing)
+[Quick start](#quick-install-and-start) · [Community contributions](#community-contributions) · [Resources](#resource-list) · [Apps](#apps) · [Plugins](#plugins) · [CLI](#cli-reference) · [Templates](#templates) · [Roadmap](docs/roadmap.md) · [Contributing](#contributing)
 
 ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-phone--call-blue)
 ![CALL-E](https://img.shields.io/badge/CALL--E-one--off%20calls-black)
@@ -16,6 +16,21 @@ Package phone-call workflows as Agent Skills, runnable apps, adapters, and recip
 
 </div>
 
+## Community contributions
+
+Awesome Phone Call Agents is a community hub for developers and workflow builders creating safe, reusable phone-call workflows for AI agents. The foundation is maintained here, and the community equally welcomes Agent Skills, runnable apps, and no-code or low-code plugins that connect real processes to phone-call agents.
+
+> [!NOTE]
+> New here? Start with [`skills/call-reminder/`](skills/call-reminder/) for the reference skill, [`apps/`](apps/) for runnable integration examples, and [`CONTRIBUTING.md`](CONTRIBUTING.md) to add your own skill, app, or plugin.
+
+| Contribution area | Good examples | Where to contribute |
+| --- | --- | --- |
+| Agent Skills | Appointment confirmation, follow-up calls, customer callbacks, candidate availability checks | `skills/` |
+| Runnable Apps | Call monitor CLI, scheduler or admin UI, skill gallery, batch review tools | `apps/` |
+| No-code and Low-code Plugins | Workflow-platform nodes or actions that trigger, configure, or monitor phone-call agent workflows | `plugins/` |
+
+See [`docs/roadmap.md`](docs/roadmap.md) for the current community roadmap and contribution opportunities.
+
 > [!IMPORTANT]
 > Phone-call workflows can create real-world side effects. Skills, apps, and adapters in this repository must require explicit user intent, E.164 phone numbers, visible cancellation behavior, credential-safe execution, and clear boundaries around who or what the agent may call.
 
@@ -23,12 +38,14 @@ Package phone-call workflows as Agent Skills, runnable apps, adapters, and recip
 
 - [Why this repository exists](#why-this-repository-exists)
 - [Quick install and start](#quick-install-and-start)
+- [Community contributions](#community-contributions)
 - [What this repository provides](#what-this-repository-provides)
 - [Reference skill: call-reminder](#reference-skill-call-reminder)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
 - [Resource list](#resource-list)
 - [Apps](#apps)
+- [Plugins](#plugins)
 - [Repository layout](#repository-layout)
 - [Safety and legal guide](#safety-and-legal-guide)
 - [Contributing](#contributing)
@@ -54,7 +71,7 @@ This repository focuses on three principles:
 
 ### 1. Choose a workflow
 
-Start from the resource list when you want a ready-to-use phone-call workflow, from apps when you want to study or run an integration pattern, or from the templates when you want to contribute a new skill, app, adapter, scheduler recipe, or safety pattern.
+Start from the resource list when you want a ready-to-use phone-call workflow, from apps when you want to study or run an integration pattern, from plugins when you want to connect workflow platforms, or from the templates when you want to contribute a new skill, app, plugin, adapter, scheduler recipe, or safety pattern.
 
 The first reference skill is `call-reminder`, a daily reminder workflow that shows how to package one phone-call scenario as an installable skill with scheduling and safety boundaries.
 
@@ -67,7 +84,7 @@ Install the portable call-reminder skill for this agent.
 
 Use this command, replacing <agent-adapter> with the adapter for the current client:
 
-npx skills add CALLE-AI/awesome-phone-call-skill --skill call-reminder -a <agent-adapter>
+npx skills add CALLE-AI/awesome-phone-call-agents --skill call-reminder -a <agent-adapter>
 
 After installation:
 1. Reload or restart the agent if the client requires it.
@@ -106,6 +123,7 @@ If the client cannot safely create the schedule, the skill must return `status: 
 | --- | --- |
 | Agent Skills | Installable or copyable workflows that agents can use directly. |
 | Apps | Runnable Python and TypeScript tools that help agents schedule, monitor, integrate with, or operate phone-call workflows. |
+| Plugins | No-code and low-code workflow-platform nodes, actions, connectors, or recipes that trigger, configure, or monitor phone-call agent workflows. |
 | Provider adapters | Guidance for connecting skills and apps to call providers, CLIs, MCP routes, or host-native call tools. |
 | Scheduler recipes | Patterns for host-owned recurrence and one-call-per-run execution. |
 | Runtime prompt | A self-contained prompt template for scheduled executions. |
@@ -178,6 +196,20 @@ apps/
 
 Every app that can place a call or create a recurring job must document setup, side effects, cancellation, credential handling, and dry-run or preview behavior.
 
+### Plugin directory template
+
+Use `plugins/` for no-code and low-code workflow-platform plugins:
+
+```text
+plugins/
+└── plugin-name/
+    ├── README.md
+    ├── manifest-or-config-file
+    └── examples/
+```
+
+Every plugin should document supported triggers or actions, required inputs, side effects, credential handling, dry-run or preview behavior, and cancellation or rollback behavior when it can create calls or recurring jobs.
+
 ### README list entry template
 
 ```markdown
@@ -209,6 +241,12 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
+## Plugins
+
+No-code and low-code workflow plugins live under [`plugins/`](plugins/). They are for workflow-platform nodes, actions, connectors, and recipes that help operators connect business events to phone-call agent workflows without writing a full app.
+
+Plugins should be explicit about inputs, outbound call side effects, credential handling, preview or dry-run behavior, and how a workflow builder can disable or roll back the integration.
+
 ## Adapters and recipes
 
 - [`CALL-E CLI bootstrap`](skills/call-reminder/references/calle-cli-bootstrap.md) - Resolver order for repository-local, global, and pinned `npx` CALL-E CLI routes.
@@ -224,7 +262,7 @@ The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths,
 ## Repository layout
 
 ```text
-awesome-phone-call-skill/
+awesome-phone-call-agents/
 ├── README.md
 ├── AGENTS.md
 ├── CONTRIBUTING.md
@@ -245,6 +283,8 @@ awesome-phone-call-skill/
 │   ├── design-principles.md
 │   ├── codex-implementation-plan.md
 │   └── roadmap.md
+├── plugins/
+│   └── README.md
 ├── scripts/
 │   └── validate_repository.py
 └── skills/

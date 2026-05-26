@@ -1,8 +1,10 @@
 # Apps
 
-Use this directory for runnable phone-call workflow apps, including focused demo apps for MCP, CLI, plugin, scheduler, or host integration patterns.
+Use this directory for runnable phone-call workflow apps, including focused demo apps for MCP, CLI, scheduler, or host integration patterns.
 
-Apps should directly help AI agents schedule, monitor, administer, or safely operate phone-call workflows. This includes focused integration apps for MCP, CLI, plugin, scheduler, and host patterns. They are not CALL-E SDKs or supported product APIs.
+Apps should directly help AI agents schedule, monitor, administer, or safely operate phone-call workflows. This includes focused integration apps for MCP, CLI, scheduler, and host patterns. They are not CALL-E SDKs or supported product APIs.
+
+Use [`../plugins/`](../plugins/) for no-code and low-code workflow-platform nodes, actions, connectors, templates, or recipes.
 
 Current apps:
 
