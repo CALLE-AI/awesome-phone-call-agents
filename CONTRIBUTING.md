@@ -2,18 +2,20 @@
 
 Thanks for contributing to Awesome Phone Call Skill.
 
-This repository collects portable phone-call skills, provider adapters, scheduler recipes, automation patterns, and safety references for AI agents.
+This repository collects portable phone-call Agent Skills, apps, examples, provider adapters, scheduler recipes, automation patterns, and safety references for AI agents.
 
 ## What belongs here
 
 Good contributions include:
 
 - Agent Skills for phone-call workflows
+- reference apps that help agents operate phone-call workflows
+- runnable examples for MCP, CLI, plugin, scheduler, or host integrations
 - provider adapter references
 - host scheduler recipes
 - MCP or plugin integration notes
-- safe reminder workflows
-- examples for Codex, Claude Code, Cowork-style agents, OpenClaw, Hermes, skill.sh-installed agents, and other Agent Skills-compatible environments
+- safe reminder and callback workflows
+- examples for Codex, Claude Code, Cowork-style agents, OpenClaw, Hermes, skills.sh-installed agents, and other Agent Skills-compatible environments
 
 Out of scope:
 
@@ -21,7 +23,8 @@ Out of scope:
 - marketing-only pages
 - projects without clear setup instructions
 - tools that require unsafe credential handling
-- skills that hide phone calls, recurring jobs, or external side effects from the user
+- skills, apps, or examples that hide phone calls, recurring jobs, or external side effects from the user
+- examples that depend on private services without a local fake-server or dry-run path
 
 ## Submission checklist
 
@@ -32,8 +35,9 @@ Before opening a pull request, check that your contribution:
 - clearly states what host or provider it supports
 - clearly describes side effects
 - has install or usage instructions
-- masks phone numbers in examples unless they are fictional examples
+- masks phone numbers in examples unless they are fictional reserved examples
 - includes cancellation or rollback behavior for recurring workflows
+- includes a dry-run, fake-server, or no-call path when it is runnable code
 - passes repository validation
 
 Run:
@@ -51,10 +55,9 @@ Recommended structure:
 ```text
 skills/example-skill/
 ├── SKILL.md
-├── README.md
 ├── references/
 ├── scripts/
-└── examples/
+└── assets/
 ```
 
 The frontmatter should include at least:
@@ -63,11 +66,59 @@ The frontmatter should include at least:
 ---
 name: example-skill
 description: What this skill does and when to use it.
-license: MIT
 ---
 ```
 
-The directory name and `name` should match.
+The directory name and `name` should match. Keep generic skills portable. Avoid host-specific frontmatter, put long host-specific details in `references/`, and keep `SKILL.md` focused on the main workflow.
+
+## App requirements
+
+Apps belong under `apps/` when they are runnable tools rather than installable Agent Skills or narrow examples.
+
+Recommended grouping:
+
+```text
+apps/
+├── python/
+│   └── app-name/
+└── web/
+    └── app-name/
+```
+
+Each app should include:
+
+- a README with setup and usage
+- a dry-run or preview mode when the app can place calls
+- clear credential handling
+- cancellation or rollback behavior for recurring jobs
+- tests or a manual verification path
+
+## Example requirements
+
+Examples belong under `examples/` when they demonstrate a specific integration pattern.
+
+Each example should include:
+
+- a README explaining what it demonstrates
+- local test instructions
+- a fake-server, dry-run, or no-call path by default
+- opt-in live verification instructions when relevant
+- no dependency on unpublished private packages
+
+Examples are runnable demos, not SDKs or supported product APIs.
+
+## Safety requirements
+
+Every skill, app, adapter, or example that can place a call must include rules for:
+
+- explicit user intent
+- E.164 phone numbers
+- masking phone numbers in summaries
+- no credential exposure
+- no hidden recurring schedules
+- no duplicate jobs
+- clear cancellation behavior
+- boundaries for medical, legal, financial, or emergency content
 
 ## Awesome list entries
 

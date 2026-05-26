@@ -5,6 +5,8 @@ Describe the change and why it belongs in this repository.
 ## Type
 
 - [ ] New skill
+- [ ] New app
+- [ ] New example
 - [ ] New provider adapter
 - [ ] New scheduler recipe
 - [ ] README awesome-list entry
@@ -18,4 +20,5 @@ Describe the change and why it belongs in this repository.
 - [ ] Real-world side effects are clearly described.
 - [ ] Phone numbers are masked in examples unless they are clearly fictional.
 - [ ] Recurring workflows include cancellation behavior.
+- [ ] Runnable code has a dry-run, fake-server, or no-call path by default.
 - [ ] `python3 scripts/validate_repository.py` passes.

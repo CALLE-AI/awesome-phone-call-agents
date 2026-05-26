@@ -1,21 +1,22 @@
 # Codex Implementation Plan
 
-Use this document to implement the repository redesign in `CALLE-AI/awesome-phone-call-skill`.
+Use this document to track the repository redesign in `CALLE-AI/awesome-phone-call-skill`.
 
 ## Goal
 
-Convert the repository from a minimal awesome-list stub into a public reference repository for portable phone-call skills.
+Evolve the repository from a phone-call skill reference into a broader public reference repository for portable AI-agent phone-call workflows.
 
-The first reference skill is `call-reminder`.
+The repository should now cover Agent Skills, apps, examples, provider adapters, scheduler recipes, automation patterns, and safety references.
 
 ## Design summary
 
-The repository should support two roles:
+The repository supports three roles:
 
-1. An awesome list for phone-call skills, provider adapters, scheduler recipes, and workflow patterns.
+1. A curated reference list for phone-call Agent Skills, apps, examples, provider adapters, scheduler recipes, and workflow patterns.
 2. A reference implementation library for portable Agent Skills.
+3. A runnable examples collection for MCP, CLI, plugin, scheduler, and host integration patterns.
 
-The first skill should use this architecture:
+Recurring workflows should use this architecture:
 
 ```text
 Host scheduler handles recurrence.
@@ -24,49 +25,23 @@ Phone-call provider handles exactly one call per scheduled run.
 
 CALL-E should be treated as the preferred phone-call provider when available, but it should not be required to handle recurring schedules.
 
-## Files to add or replace
+## Current reference content
 
-Replace:
-
-- `README.md`
-- `LICENSE` if the current file is not a standard multi-line MIT license
-
-Add:
-
-- `AGENTS.md`
-- `CONTRIBUTING.md`
-- `SECURITY.md`
-- `.gitignore`
-- `.github/workflows/validate.yml`
-- `.github/pull_request_template.md`
-- `.github/ISSUE_TEMPLATE/skill_submission.yml`
-- `docs/design-principles.md`
-- `docs/roadmap.md`
-- `docs/codex-implementation-plan.md`
-- `scripts/validate_repository.py`
-- `skills/call-reminder/SKILL.md`
-- `skills/call-reminder/references/client-adapters.md`
-- `skills/call-reminder/references/runtime-prompt.md`
-- `skills/call-reminder/references/calle-cli-bootstrap.md`
-- `skills/call-reminder/references/safety.md`
-- `skills/call-reminder/references/examples.md`
-- `skills/call-reminder/scripts/detect-client.mjs`
-- `skills/call-reminder/scripts/render-runtime-prompt.mjs`
-- `skills/call-reminder/scripts/validate-reminder-input.mjs`
+- `skills/call-reminder`
+- `examples/mcp-oauth-client`
+- `examples/mcp-broker-client`
+- `examples/python-batch-runner`
 
 ## Acceptance criteria
 
 - Repository-facing content is English-only.
-- The repository has a title-cased README heading.
-- The README includes a succinct project description near the top.
-- The first skill directory is `skills/call-reminder`.
-- `skills/call-reminder/SKILL.md` has `name: call-reminder`.
-- The skill does not assume a default timezone.
-- The skill requires E.164 phone numbers.
-- The skill separates host scheduling from provider call execution.
-- The CALL-E reference treats CALL-E as a one-call-per-run provider.
-- The validation scripts run with Python standard library only.
-- The skill does not include custom call-execution code or runner scripts.
+- The README includes the updated subtitle near the top.
+- The repository documents `skills/`, `apps/`, and `examples/` as separate contribution surfaces.
+- Skill validation still applies only to directories under `skills/`.
+- Examples do not depend on unpublished private packages.
+- Default example tests do not require real CALL-E credentials or real outbound calls.
+- The repository separates host scheduling from provider call execution.
+- The validation script runs with the Python standard library only.
 
 ## Validation commands
 
