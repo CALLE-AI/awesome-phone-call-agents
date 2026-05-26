@@ -18,3 +18,5 @@ build/
 logs/
 apps/**/results/
 _handoffs/
+.agents/
+skills-lock.json

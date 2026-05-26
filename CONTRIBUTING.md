@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to Awesome Phone Call Skill.
+Thanks for contributing to Awesome Phone Call Agents.
 
 This repository collects portable phone-call Agent Skills, apps, provider adapters, scheduler recipes, automation patterns, and safety references for AI agents.
 
