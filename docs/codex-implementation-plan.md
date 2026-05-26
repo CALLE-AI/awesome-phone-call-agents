@@ -1,6 +1,6 @@
 # Codex Implementation Plan
 
-Use this document to track the repository redesign in `CALLE-AI/awesome-phone-call-skill`.
+Use this document to track the repository redesign in `CALLE-AI/awesome-phone-call-agents`.
 
 ## Goal
 
