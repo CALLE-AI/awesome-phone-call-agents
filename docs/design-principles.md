@@ -11,17 +11,17 @@ Host scheduler handles recurrence.
 Phone-call provider handles exactly one call per scheduled run.
 ```
 
-This design makes skills portable across providers. A provider does not need recurring schedule support. It only needs to place or create one call when the host scheduler triggers the skill.
+This design makes skills, apps, and examples portable across providers. A provider does not need recurring schedule support. It only needs to place or create one call when the host scheduler triggers the workflow.
 
 ## Principle 2: require explicit intent
 
-A skill must not place a real phone call unless the user has clearly asked for it, or unless a previously authorized scheduler job is running the skill in `run-now` mode.
+A workflow must not place a real phone call unless the user has clearly asked for it, or unless a previously authorized scheduler job is running in an explicitly configured runtime mode.
 
-Before using a fallback scheduler, a skill should discover feasible alternatives, summarize brief pros and cons, recommend the best option for the current request and environment, and ask the user to choose and confirm. This information should appear in the first user-facing response that asks the user to choose a scheduler, not only after a follow-up question. Local OS scheduling requires explicit user approval before creation.
+Before using a fallback scheduler, a skill or app should discover feasible alternatives, summarize brief pros and cons, recommend the best option for the current request and environment, and ask the user to choose and confirm. This information should appear in the first user-facing response that asks the user to choose a scheduler, not only after a follow-up question. Local OS scheduling requires explicit user approval before creation.
 
 ## Principle 3: do not guess critical values
 
-A skill must not guess:
+A skill, app, adapter, or example must not guess:
 
 - phone numbers
 - country codes
@@ -52,10 +52,28 @@ This lets agents load the main workflow first and load detailed references only 
 
 Every recurring workflow must explain how to stop it.
 
-A good recurring phone-call skill should be able to:
+A good recurring phone-call workflow should be able to:
 
 - create a scheduler job
 - verify that it exists
 - update it without duplication
 - disable or delete it
 - explain the provider role clearly
+
+## Principle 7: examples are not SDKs
+
+Examples should demonstrate an integration pattern with the smallest useful amount of code. They should not imply a supported application API unless the repository explicitly documents that contract.
+
+Default example tests should run without live credentials or real outbound calls. Use fake servers, dry-run modes, or no-call plan-only flows by default. Live verification must be opt-in.
+
+## Principle 8: apps need operational boundaries
+
+Apps belong in this repository only when they help agents schedule, monitor, administer, or safely operate phone-call workflows.
+
+Apps that can place calls, create schedules, or write back call results must document:
+
+- setup and required credentials
+- dry-run or preview behavior
+- real-world side effects
+- cancellation, rollback, or cleanup behavior
+- where generated logs or results are stored

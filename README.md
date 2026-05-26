@@ -2,11 +2,11 @@
 
 <div align="center">
 
-**Portable phone-call skills, scheduler recipes, and safety patterns for AI agents.**
+**Portable phone-call Agent Skills, apps, adapters, scheduler recipes, and safety patterns for AI agents.**
 
-Package phone-call workflows as Agent Skills that agents can install, adapt, schedule, and operate safely.
+Package phone-call workflows as Agent Skills, examples, apps, adapters, and recipes that agents can install, adapt, schedule, and operate safely.
 
-[Quick start](#quick-install-and-start) · [Skills](#skill-list) · [CLI](#cli-reference) · [Templates](#templates) · [Safety](#safety-and-legal-guide) · [Contributing](#contributing)
+[Quick start](#quick-install-and-start) · [Resources](#resource-list) · [Examples](#examples) · [Apps](#apps) · [CLI](#cli-reference) · [Templates](#templates) · [Safety](#safety-and-legal-guide) · [Contributing](#contributing)
 
 ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-phone--call-blue)
 ![CALL-E](https://img.shields.io/badge/CALL--E-one--off%20calls-black)
@@ -17,7 +17,7 @@ Package phone-call workflows as Agent Skills that agents can install, adapt, sch
 </div>
 
 > [!IMPORTANT]
-> Phone-call workflows can create real-world side effects. Skills in this repository must require explicit user intent, E.164 phone numbers, visible cancellation behavior, credential-safe execution, and clear boundaries around who or what the agent may call.
+> Phone-call workflows can create real-world side effects. Skills, apps, examples, and adapters in this repository must require explicit user intent, E.164 phone numbers, visible cancellation behavior, credential-safe execution, and clear boundaries around who or what the agent may call.
 
 ## Table of Contents
 
@@ -27,7 +27,9 @@ Package phone-call workflows as Agent Skills that agents can install, adapt, sch
 - [Reference skill: call-reminder](#reference-skill-call-reminder)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
-- [Skill list](#skill-list)
+- [Resource list](#resource-list)
+- [Examples](#examples)
+- [Apps](#apps)
 - [Repository layout](#repository-layout)
 - [Safety and legal guide](#safety-and-legal-guide)
 - [Contributing](#contributing)
@@ -37,17 +39,23 @@ Package phone-call workflows as Agent Skills that agents can install, adapt, sch
 
 ## Why this repository exists
 
-AI agents increasingly need to turn phone calls into reusable workflows: reminders, follow-ups, appointment coordination, provider-specific call adapters, scheduler integrations, safety checks, and reference implementations that other agents can install or adapt.
+AI agents increasingly need to turn phone calls into reusable workflows: reminders, follow-ups, appointment coordination, provider-specific call adapters, scheduler integrations, runnable examples, safety checks, and reference apps that other agents can install or adapt.
 
-This repository exists to collect those phone-call capabilities and scenarios in a portable Agent Skills format. Each entry should help an agent package, schedule, execute, or safely operate a real phone-call workflow.
+This repository exists to collect those phone-call capabilities and scenarios as portable Agent Skills, apps, examples, adapters, scheduler recipes, and safety patterns. Each entry should help an agent package, schedule, execute, or safely operate a real phone-call workflow.
 
 The scope is intentionally focused on AI-agent phone-call workflows, not generic voice-agent products, telephony vendor directories, or call-center software lists.
+
+This repository focuses on three principles:
+
+1. **Portability**: skills, examples, apps, and adapters should be useful across agent hosts when possible.
+2. **Provider separation**: the phone-call provider should place or create calls; the host scheduler should handle recurrence.
+3. **Safety by default**: phone numbers, consent, credentials, and medical, legal, financial, or emergency boundaries must be handled explicitly.
 
 ## Quick install and start
 
 ### 1. Choose a workflow
 
-Start from the skill list when you want a ready-to-use phone-call workflow, or start from the templates when you want to contribute a new skill, adapter, scheduler recipe, or safety pattern.
+Start from the resource list when you want a ready-to-use phone-call workflow, from examples when you want to study a runnable integration pattern, or from the templates when you want to contribute a new skill, app, adapter, scheduler recipe, or safety pattern.
 
 The official example today is `call-reminder`, a daily reminder workflow that shows how to package one phone-call scenario as an installable skill with scheduling and safety boundaries.
 
@@ -93,31 +101,17 @@ auth status -> call plan -> call run -> call status
 
 If the client cannot safely create the schedule, the skill must return `status: not created` with the exact blocker and a runtime prompt or setup instructions.
 
-### 4. Daily reminder example fields
-
-The official `call-reminder` example uses these fields. Other skills may define different inputs, but the same project safety rules still apply.
-
-| Field | Required | Notes |
-| --- | --- | --- |
-| `cadence` | Yes | Recurrence such as `daily`. |
-| `localTime` | Yes | `HH:MM` in 24-hour local time. |
-| `timezone` | Yes | IANA timezone such as `America/New_York` or `UTC`. |
-| `phoneNumber` | Yes | E.164 destination number. Mask it in user-facing summaries. |
-| `reminderMessage` | Yes | Message to say during the reminder call. |
-| `lateRunWindowMinutes` | No | Defaults to `30`; scheduled runs later than this should skip the call. |
-| `clientAdapterId` | Required for runtime prompt rendering | Adapter id from the scheduler matrix. |
-| `calleCommand` | No | Resolved CALL-E command or resolver. Defaults to the pinned `npx` placeholder for rendered prompts. |
-
 ## What this repository provides
 
 | Area | What it gives agents |
 | --- | --- |
-| Agent Skill pattern | A portable `SKILL.md` workflow with progressive-disclosure references. |
-| Scheduler recipes | Client adapter guidance for Codex App, Claude Code, OpenClaw, Cursor, external cron, MCP-only, shell-only, and related hosts. |
-| Provider adapters | Patterns for connecting skills to call providers, CLIs, MCP routes, or host-native call tools. |
+| Agent Skills | Installable or copyable workflows that agents can use directly. |
+| Apps | Runnable CLI, web, or admin tools that help agents schedule, monitor, or operate phone-call workflows. |
+| Examples | Runnable demos that show integration patterns without becoming SDKs or product APIs. |
+| Provider adapters | Guidance for connecting skills and apps to call providers, CLIs, MCP routes, or host-native call tools. |
+| Scheduler recipes | Patterns for host-owned recurrence and one-call-per-run execution. |
 | Runtime prompt | A self-contained prompt template for scheduled executions. |
-| CLI bootstrap | Resolver order for repository-local, global, and pinned `npx` CALL-E command routes. |
-| Safety contract | Rules for explicit intent, phone-number handling, duplicate jobs, credentials, sensitive domains, and cancellation. |
+| Safety patterns | Consent, E.164 handling, credential boundaries, cancellation, duplicate-job prevention, and sensitive-domain rules. |
 
 ## Reference skill: call-reminder
 
@@ -144,68 +138,6 @@ The official `call-reminder` example uses these fields. Other skills may define 
 - create recurring calls to third-party numbers unless the user explicitly states that the recipient consented
 - place a setup-time test call unless the user explicitly asks for one
 
-### Create-time workflow
-
-1. Confirm the user explicitly wants a recurring phone-call reminder.
-2. Extract cadence, local time, IANA timezone, E.164 phone number, reminder message, and any user-provided language or region.
-3. Ask for missing required fields. Do not infer them from locale, phone number, IP address, UTC offset, language, or country code.
-4. Detect or choose the client adapter from [`client-adapters.md`](skills/call-reminder/references/client-adapters.md).
-5. Resolve a CALL-E route from [`calle-cli-bootstrap.md`](skills/call-reminder/references/calle-cli-bootstrap.md), or use a safer native CALL-E skill, app, or MCP route when available.
-6. Render the scheduled runtime prompt from [`runtime-prompt.md`](skills/call-reminder/references/runtime-prompt.md).
-7. Create the scheduled task only through a scheduler that is actually available, visible, persistent, and cancellable.
-8. If the schedule cannot be created safely, return `status: not created` with the exact blocker and setup instructions.
-
-### Runtime workflow
-
-Each scheduled run attempts exactly one one-off CALL-E reminder:
-
-1. Determine whether the run is late in the configured timezone.
-2. Skip the call if the run is more than the configured late-run window late.
-3. Check CALL-E auth status.
-4. Plan exactly one call to the configured phone number.
-5. Inspect the plan before running it.
-6. Run the plan only if it targets the configured phone number and uses the configured reminder message.
-7. Check call status when the selected CALL-E route supports it.
-8. Report success, skipped, or failed without exposing credentials.
-
-### Expected setup result
-
-```text
-status: created
-schedule: daily at 09:00 America/New_York
-adapter: codex-app
-phone: +1******1234
-message: Remind me to take my medicine.
-late-run policy: skip when more than 30 minutes late
-call route: existing CALL-E one-off workflow
-cancel: use the selected scheduler's automation cancellation flow
-```
-
-### Common blocked results
-
-Missing phone number:
-
-```text
-I need the destination phone number in E.164 format before I can create the recurring phone-call reminder.
-```
-
-Missing timezone:
-
-```text
-I need the IANA timezone, such as America/New_York or Asia/Singapore, before I can create the recurring reminder.
-```
-
-No safe scheduler:
-
-```text
-status: not created
-adapter: external-cron
-blocker: no native recurring scheduler is available in this client
-next step: configure an external scheduler with the rendered runtime prompt
-```
-
-More examples: [`skills/call-reminder/references/examples.md`](skills/call-reminder/references/examples.md).
-
 ## CLI reference
 
 CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](https://github.com/CALLE-AI/call-e-integrations/blob/main/packages/cli/docs/cli-reference.md).
@@ -214,7 +146,7 @@ The project-level validation script applies to the whole repository. The current
 
 | Command | Purpose | Output |
 | --- | --- | --- |
-| `python3 scripts/validate_repository.py` | Validate required files, English-only repository content, skill frontmatter, and `call-reminder` acceptance text. | Prints `Repository validation passed.` or exits with an error. |
+| `python3 scripts/validate_repository.py` | Validate required files, English-only repository content, skill frontmatter, examples, apps, and `call-reminder` acceptance text. | Prints `Repository validation passed.` or exits with an error. |
 | `node skills/call-reminder/scripts/detect-client.mjs` | Detect a likely scheduler adapter from environment hints. | JSON with `adapterId`, `confidence`, and `reason`. |
 | `node skills/call-reminder/scripts/detect-client.mjs --plain` | Print only the detected adapter id. | Plain adapter id such as `codex-app` or `external-cron`. |
 | `node skills/call-reminder/scripts/validate-reminder-input.mjs [options]` | Validate structured reminder fields. | JSON `{ "ok": true, "value": ... }` or `{ "ok": false, "errors": ... }`. |
@@ -234,79 +166,32 @@ skill-name/
 └── assets/
 ```
 
-### `SKILL.md` template
+### App directory template
 
-```markdown
----
-name: skill-name
-description: Clear description of what the skill does and when to use it.
----
+Use `apps/` for runnable tools rather than installable Agent Skills or narrow examples:
 
-# Skill Name
-
-Use this skill when ...
-
-## When To Use
-
-- ...
-
-## When Not To Use
-
-- ...
-
-## Workflow
-
-1. ...
-
-## Safety Rules
-
-- Require explicit user intent.
-- Require E.164 phone numbers for call destinations.
-- Mask phone numbers in user-facing summaries.
-- Do not expose credentials.
-- Do not create hidden recurring schedules or duplicate jobs.
-- Explain cancellation behavior.
+```text
+apps/
+├── python/
+│   └── app-name/
+└── web/
+    └── app-name/
 ```
 
-For portability, keep `name` lowercase with hyphens, keep `description` useful for discovery, avoid host-specific frontmatter in generic skills, and move long host-specific details into `references/`.
+Every app that can place a call or create a recurring job must document setup, side effects, cancellation, credential handling, and dry-run or preview behavior.
 
-### Runtime prompt template
+### Example directory template
 
-Scheduled reminder jobs in the official `call-reminder` example should use the rendered template from [`runtime-prompt.md`](skills/call-reminder/references/runtime-prompt.md). It also acts as a project reference for future scheduled phone-call skills. Required variables:
+Use `examples/` for runnable demos of a specific integration pattern:
 
-| Variable | Meaning |
-| --- | --- |
-| `{{cadence}}` | Requested recurrence. |
-| `{{local_time}}` | Local scheduled time. |
-| `{{timezone}}` | IANA timezone. |
-| `{{phone_number}}` | Full E.164 phone number for the runtime payload. |
-| `{{reminder_message}}` | Message to deliver. |
-| `{{late_run_window_minutes}}` | Skip window for late scheduled runs. |
-| `{{calle_command}}` | Resolved CALL-E command or resolver. |
-| `{{client_adapter_id}}` | Selected scheduler adapter id. |
-
-Render it with `render-runtime-prompt.mjs`; do not hand-edit runtime variables in a scheduler job when structured fields are available.
-
-### Scheduler adapter template
-
-Adapter references use this shape in [`client-adapters.md`](skills/call-reminder/references/client-adapters.md):
-
-```yaml
-id: adapter-id
-displayName: Human-readable name
-schedulerType: native_automation | native_routine | external_cron | manual | mcp_orchestrated | shell
-schedulePersistence: persistent | session | external | unknown
-requiresMachineAwake: true | false | depends
-callERoute:
-  - existing-calle-skill
-  - calle-cli
-  - calle-mcp
-canCreateScheduleFromSkill: true | false | depends
-supportsCancel: true | false | depends
-lateRunRisk: low | medium | high
-notes:
-  - Short implementation notes.
+```text
+examples/
+└── example-name/
+    ├── README.md
+    └── ...
 ```
+
+Examples should default to fake servers, dry runs, or no-call paths. Live verification must be explicit and opt-in.
 
 ### README list entry template
 
@@ -316,28 +201,43 @@ notes:
 
 Keep descriptions short, specific, factual, and directly tied to packaging, scheduling, executing, or safely operating AI-agent phone-call tasks.
 
-## Skill list
+## Resource list
 
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
 
-Add new skills as a single list. The first skill in the list is:
+### Skills
 
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 
-### Provider adapters
+## Examples
+
+Runnable demos live under [`examples/`](examples/). They are not a CALL-E SDK and do not define a supported application API.
+
+| Example | Purpose |
+| --- | --- |
+| [`mcp-oauth-client`](examples/mcp-oauth-client/) | TypeScript and Python clients using the standard MCP OAuth flow over Streamable HTTP. |
+| [`mcp-broker-client`](examples/mcp-broker-client/) | TypeScript and Python clients using CALL-E brokered login, local token cache, and MCP HTTP calls. |
+| [`python-batch-runner`](examples/python-batch-runner/) | Python JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
+
+The default e2e tests use a local fake broker/OAuth/MCP server, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each example README.
+
+## Apps
+
+Reference apps live under [`apps/`](apps/) when they are runnable tools rather than installable Agent Skills or narrow examples.
+
+Add apps only when they directly support AI-agent phone-call workflows, such as call monitoring, reminder administration, scheduler UI flows, or skill galleries. Every app that can place a call or create a recurring job must document setup, side effects, cancellation, and credential handling.
+
+## Adapters and recipes
 
 - [`CALL-E CLI bootstrap`](skills/call-reminder/references/calle-cli-bootstrap.md) - Resolver order for repository-local, global, and pinned `npx` CALL-E CLI routes.
-
-### Scheduler recipes
-
-- [`Client adapter matrix`](skills/call-reminder/references/client-adapters.md) - Adapter guidance for Codex App, Claude Code, OpenClaw, Cursor, GitHub Copilot environments, external cron, MCP-only, and shell-only setups.
+- [`Client adapter matrix`](skills/call-reminder/references/client-adapters.md) - Multi-client adapter guidance for CALL-E scheduled reminders.
 - [`Runtime prompt template`](skills/call-reminder/references/runtime-prompt.md) - Self-contained prompt used by scheduled jobs.
 - [`Runtime prompt examples`](skills/call-reminder/references/examples.md) - Behavior checks for scheduler selection, timezone handling, region handling, and provider boundaries.
 
-### Safety patterns
+## Safety patterns
 
-- [`Safety reference`](skills/call-reminder/references/safety.md) - Consent, E.164 phone-number handling, credential boundaries, duplicate-job prevention, cancellation, and sensitive-domain rules.
-- [`Design principles`](docs/design-principles.md) - Architecture rules for portable phone-call skills.
+- [`Safety reference`](skills/call-reminder/references/safety.md) - Consent, E.164 phone-number handling, credential boundaries, cancellation, duplicate-job prevention, and medical reminder boundaries.
+- [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 
 ## Repository layout
 
@@ -347,10 +247,18 @@ awesome-phone-call-skill/
 ├── AGENTS.md
 ├── CONTRIBUTING.md
 ├── SECURITY.md
+├── apps/
+│   └── README.md
 ├── docs/
 │   ├── design-principles.md
 │   ├── codex-implementation-plan.md
 │   └── roadmap.md
+├── examples/
+│   ├── README.md
+│   ├── mcp-broker-client/
+│   ├── mcp-oauth-client/
+│   ├── python-batch-runner/
+│   └── shared/
 ├── scripts/
 │   └── validate_repository.py
 └── skills/
@@ -370,7 +278,7 @@ awesome-phone-call-skill/
 
 ## Safety and legal guide
 
-Phone calls are real-world side effects. Preserve these rules across the whole project: skills, provider adapters, scheduler recipes, automation patterns, reference implementations, and documentation.
+Phone calls are real-world side effects. Preserve these rules across the whole project: skills, apps, examples, provider adapters, scheduler recipes, automation patterns, reference implementations, and documentation.
 
 ### Safety rules
 
@@ -399,9 +307,9 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contribution guide.
 
 ### Contribution workflow
 
-1. Choose a scoped contribution: skill, provider adapter, scheduler recipe, automation pattern, safety pattern, or reference implementation.
+1. Choose a scoped contribution: skill, app, example, provider adapter, scheduler recipe, automation pattern, safety pattern, or reference implementation.
 2. Confirm it directly helps AI agents package phone-call workflows.
-3. Use the templates above for skill folders, `SKILL.md` frontmatter, adapter records, or README entries.
+3. Use the templates above for skill folders, app directories, examples, adapter records, or README entries.
 4. Add setup, usage, side-effect, and cancellation notes.
 5. Use fictional or masked phone numbers in examples.
 6. Keep repository-facing content in English.
@@ -411,9 +319,9 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contribution guide.
 python3 scripts/validate_repository.py
 ```
 
-High-quality additions should include a short description, compatibility notes, safety notes for real-world side effects, setup or install instructions, cancellation or rollback behavior for recurring workflows, and no secrets or personal data.
+High-quality additions should include a short description, compatibility notes, safety notes for real-world side effects, setup or install instructions, examples or tests, cancellation or rollback behavior for recurring workflows, and no secrets or personal data.
 
-Out of scope: generic telephony vendor directories, marketing-only pages, call-center software lists without an AI-agent workflow, tools that require unsafe credential handling, and skills that hide phone calls, recurring jobs, or external side effects from the user.
+Out of scope: generic telephony vendor directories, marketing-only pages, call-center software lists without an AI-agent workflow, tools that require unsafe credential handling, and resources that hide phone calls, recurring jobs, or external side effects from the user.
 
 ## Developer docs
 

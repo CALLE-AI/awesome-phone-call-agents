@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This repository is a public reference repository for portable phone-call skills.
+This repository is a public reference repository for portable AI-agent phone-call workflows.
 
 ## Language
 
@@ -13,6 +13,8 @@ Do not add Chinese text or other non-English prose to repository files unless it
 Keep the repository focused on AI-agent phone-call workflows:
 
 - Agent Skills
+- apps
+- runnable examples
 - provider adapters
 - scheduler recipes
 - automation patterns
@@ -20,6 +22,14 @@ Keep the repository focused on AI-agent phone-call workflows:
 - reference implementations
 
 Do not turn this repository into a general voice-agent list, telephony vendor directory, or call-center software list unless the resource directly helps AI agents package phone-call workflows.
+
+## Directory rules
+
+- Put installable Agent Skills in `skills/`.
+- Put runnable apps in `apps/`.
+- Put integration demos and runnable examples in `examples/`.
+- Put long-form guidance in `docs/`.
+- Keep provider-specific or host-specific details out of generic skill frontmatter.
 
 ## Skill design rules
 
@@ -50,11 +60,21 @@ For portability:
 - put host-specific details in `references/`
 - use progressive disclosure: keep `SKILL.md` focused and move long details to references
 
+## App and example design rules
+
+Apps and examples must remain directly tied to AI-agent phone-call workflows.
+
+- Prefer local fake servers, dry runs, or preview modes for tests and examples.
+- Do not require live credentials or real outbound calls for default tests.
+- Do not depend on unpublished private packages.
+- Document setup, side effects, credentials, and cancellation or rollback behavior when applicable.
+- Keep examples focused. If a demo becomes a reusable tool, move it under `apps/`.
+
 ## Phone-call safety rules
 
 Phone calls are real-world side effects.
 
-Every skill or adapter that can place a call must include rules for:
+Every skill, app, adapter, or example that can place a call must include rules for:
 
 - explicit user intent
 - E.164 phone numbers
