@@ -16,5 +16,5 @@ dist/
 build/
 .tmp/
 logs/
-examples/**/results/
+apps/**/results/
 _handoffs/

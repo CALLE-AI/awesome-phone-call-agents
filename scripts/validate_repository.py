@@ -56,9 +56,18 @@ def validate_readme() -> None:
         fail("README.md must start with '# Awesome Phone Call Skill'.")
     if README_SUBTITLE not in text:
         fail("README.md must include the approved project subtitle near the top.")
-    for snippet in ["skills/", "apps/", "examples/", "mcp-oauth-client", "mcp-broker-client", "python-batch-runner"]:
+    for snippet in [
+        "skills/",
+        "apps/",
+        "[`apps/python/batch-runner`](apps/python/batch-runner/)",
+        "[`apps/python/broker-login-client`](apps/python/broker-login-client/)",
+        "[`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/)",
+        "[`apps/typescript/broker-login-client-standalone`](apps/typescript/broker-login-client-standalone/)",
+        "[`apps/python/oauth-login-client`](apps/python/oauth-login-client/)",
+        "[`apps/typescript/oauth-login-client`](apps/typescript/oauth-login-client/)",
+    ]:
         if snippet not in text:
-            fail(f"README.md must document repository scope or migrated examples: {snippet}")
+            fail(f"README.md must document repository scope or migrated apps: {snippet}")
 
 
 def validate_english_only() -> None:
@@ -70,7 +79,6 @@ def validate_english_only() -> None:
         ROOT / "SECURITY.md",
         ROOT / "apps",
         ROOT / "docs",
-        ROOT / "examples",
         ROOT / "skills",
     ]
     for item in checked_dirs:
@@ -128,23 +136,25 @@ def validate_expected_files() -> None:
         "apps/README.md",
         "docs/design-principles.md",
         "docs/codex-implementation-plan.md",
-        "examples/README.md",
-        "examples/mcp-broker-client/README.md",
-        "examples/mcp-broker-client/python/README.md",
-        "examples/mcp-broker-client/python/client.py",
-        "examples/mcp-broker-client/typescript/package.json",
-        "examples/mcp-broker-client/typescript/src/client.ts",
-        "examples/mcp-broker-client/typescript-standalone/package.json",
-        "examples/mcp-broker-client/typescript-standalone/src/client.ts",
-        "examples/mcp-oauth-client/README.md",
-        "examples/mcp-oauth-client/python/README.md",
-        "examples/mcp-oauth-client/python/client.py",
-        "examples/mcp-oauth-client/typescript/package.json",
-        "examples/mcp-oauth-client/typescript/src/client.ts",
-        "examples/python-batch-runner/README.md",
-        "examples/python-batch-runner/client.py",
-        "examples/python-batch-runner/example_market_alerts.jsonl",
-        "examples/shared/fake-mcp-broker-server.mjs",
+        "apps/python/broker-login-client/README.md",
+        "apps/python/broker-login-client/client.py",
+        "apps/python/broker-login-client/uv.lock",
+        "apps/typescript/broker-login-client/README.md",
+        "apps/typescript/broker-login-client/package.json",
+        "apps/typescript/broker-login-client/src/client.ts",
+        "apps/typescript/broker-login-client-standalone/README.md",
+        "apps/typescript/broker-login-client-standalone/package.json",
+        "apps/typescript/broker-login-client-standalone/src/client.ts",
+        "apps/python/oauth-login-client/README.md",
+        "apps/python/oauth-login-client/client.py",
+        "apps/python/oauth-login-client/uv.lock",
+        "apps/typescript/oauth-login-client/README.md",
+        "apps/typescript/oauth-login-client/package.json",
+        "apps/typescript/oauth-login-client/src/client.ts",
+        "apps/python/batch-runner/README.md",
+        "apps/python/batch-runner/client.py",
+        "apps/python/batch-runner/example_market_alerts.jsonl",
+        "apps/shared/fake-mcp-broker-server.mjs",
         "scripts/validate_repository.py",
         "skills/call-reminder/SKILL.md",
         "skills/call-reminder/references/client-adapters.md",
@@ -160,36 +170,67 @@ def validate_expected_files() -> None:
         read(ROOT / rel)
 
 
+def validate_templates() -> None:
+    require_text(
+        ROOT / ".github" / "ISSUE_TEMPLATE" / "workflow_submission.yml",
+        [
+            "phone-call skill, runnable app, adapter, scheduler recipe, or safety resource",
+            "Name of the skill, runnable app, adapter, scheduler recipe, or resource",
+            "- Runnable app",
+        ],
+    )
+    forbid_text(
+        ROOT / ".github" / "ISSUE_TEMPLATE" / "workflow_submission.yml",
+        [
+            "app, example",
+            "- Example",
+        ],
+    )
+    require_text(
+        ROOT / ".github" / "pull_request_template.md",
+        [
+            "- [ ] New runnable app",
+            "Phone numbers are masked in documentation and test fixtures unless they are clearly fictional.",
+        ],
+    )
+    forbid_text(
+        ROOT / ".github" / "pull_request_template.md",
+        [
+            "- [ ] New example",
+        ],
+    )
+
+
 def validate_apps() -> None:
     apps_dir = ROOT / "apps"
     if not apps_dir.exists():
         fail("Missing apps/ directory.")
+    if (ROOT / "examples").exists():
+        fail("Top-level examples/ directory is no longer supported; put runnable demos under apps/.")
     require_text(
         apps_dir / "README.md",
         [
             "runnable phone-call workflow apps",
             "AI agents schedule, monitor, administer, or safely operate phone-call workflows",
             "dry-run or preview behavior",
+            "[`python/batch-runner`](python/batch-runner/)",
+            "[`python/broker-login-client`](python/broker-login-client/)",
+            "[`typescript/broker-login-client`](typescript/broker-login-client/)",
+            "[`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/)",
+            "[`python/oauth-login-client`](python/oauth-login-client/)",
+            "[`typescript/oauth-login-client`](typescript/oauth-login-client/)",
         ],
     )
-
-
-def validate_examples() -> None:
-    examples_dir = ROOT / "examples"
-    if not examples_dir.exists():
-        fail("Missing examples/ directory.")
-    require_text(
-        examples_dir / "README.md",
-        [
-            "runnable MCP client demos",
-            "not a CALL-E SDK",
-            "local fake broker/OAuth/MCP server",
-        ],
-    )
-    for example_dir in examples_dir.iterdir():
-        if not example_dir.is_dir() or example_dir.name == "shared":
-            continue
-        read(example_dir / "README.md")
+    app_dirs = [
+        apps_dir / "python" / "batch-runner",
+        apps_dir / "python" / "broker-login-client",
+        apps_dir / "typescript" / "broker-login-client",
+        apps_dir / "typescript" / "broker-login-client-standalone",
+        apps_dir / "python" / "oauth-login-client",
+        apps_dir / "typescript" / "oauth-login-client",
+    ]
+    for app_dir in app_dirs:
+        read(app_dir / "README.md")
 
     forbidden_dependency_snippets = [
         '"@call-e/core": "file:',
@@ -197,7 +238,7 @@ def validate_examples() -> None:
         "../../packages/core",
         "workspace:",
     ]
-    for path in examples_dir.rglob("*"):
+    for path in apps_dir.rglob("*"):
         if not path.is_file() or path.name in SKIP_TEXT_FILES or path.suffix not in TEXT_SUFFIXES:
             continue
         relative_parts = set(path.relative_to(ROOT).parts)
@@ -206,16 +247,16 @@ def validate_examples() -> None:
         text = read(path)
         for snippet in forbidden_dependency_snippets:
             if snippet in text:
-                fail(f"Example depends on source-repository internals in {path.relative_to(ROOT)}: {snippet}")
+                fail(f"App depends on source-repository internals in {path.relative_to(ROOT)}: {snippet}")
 
-    for package_json in examples_dir.rglob("package.json"):
+    for package_json in apps_dir.rglob("package.json"):
         payload = json.loads(read(package_json))
         dependencies = {}
         dependencies.update(payload.get("dependencies", {}))
         dependencies.update(payload.get("devDependencies", {}))
         for name, spec in dependencies.items():
             if isinstance(spec, str) and spec.startswith("file:"):
-                fail(f"Example package uses a local file dependency in {package_json.relative_to(ROOT)}: {name}")
+                fail(f"App package uses a local file dependency in {package_json.relative_to(ROOT)}: {name}")
 
 
 def require_text(path: Path, snippets: list[str]) -> None:
@@ -223,6 +264,13 @@ def require_text(path: Path, snippets: list[str]) -> None:
     for snippet in snippets:
         if snippet not in text:
             fail(f"Missing required text in {path.relative_to(ROOT)}: {snippet}")
+
+
+def forbid_text(path: Path, snippets: list[str]) -> None:
+    text = read(path)
+    for snippet in snippets:
+        if snippet in text:
+            fail(f"Forbidden text in {path.relative_to(ROOT)}: {snippet}")
 
 
 def validate_call_reminder_acceptance_rules() -> None:
@@ -312,8 +360,8 @@ def main() -> None:
     validate_expected_files()
     validate_readme()
     validate_english_only()
+    validate_templates()
     validate_apps()
-    validate_examples()
     validate_skills()
     validate_call_reminder_acceptance_rules()
     print("Repository validation passed.")
