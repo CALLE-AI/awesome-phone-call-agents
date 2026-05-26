@@ -5,7 +5,15 @@
 *.log
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
 node_modules/
+.pnpm-store/
+coverage/
 dist/
 build/
 .tmp/
+logs/
+examples/**/results/
