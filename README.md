@@ -24,7 +24,7 @@ Package phone-call workflows as Agent Skills, runnable apps, adapters, and recip
 - [Why this repository exists](#why-this-repository-exists)
 - [Quick install and start](#quick-install-and-start)
 - [What this repository provides](#what-this-repository-provides)
-- [Reference skill: call-reminder](#reference-skill-call-reminder)
+- [Reference skills](#reference-skills)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
 - [Resource list](#resource-list)
@@ -56,7 +56,7 @@ This repository focuses on three principles:
 
 Start from the resource list when you want a ready-to-use phone-call workflow, from apps when you want to study or run an integration pattern, or from the templates when you want to contribute a new skill, app, adapter, scheduler recipe, or safety pattern.
 
-The first reference skill is `call-reminder`, a daily reminder workflow that shows how to package one phone-call scenario as an installable skill with scheduling and safety boundaries.
+The first reference skill is `call-reminder`, a daily reminder workflow that shows how to package one phone-call scenario as an installable skill with scheduling and safety boundaries. The `google-form-callback` skill shows how to process authorized Google Form responses into reviewed one-off callback calls with optional scheduled polling.
 
 ### 2. Install a skill
 
@@ -104,11 +104,12 @@ If the client cannot safely create the schedule, the skill must return `status: 
 | Runtime prompt | A self-contained prompt template for scheduled executions. |
 | Safety patterns | Consent, E.164 handling, credential boundaries, cancellation, duplicate-job prevention, and sensitive-domain rules. |
 
-## Reference skill: call-reminder
+## Reference skills
 
-| Skill | Purpose | Status |
-| --- | --- | --- |
-| [`call-reminder`](skills/call-reminder/) | Schedules recurring CALL-E phone-call reminders by wrapping the existing one-off CALL-E call workflow in the current client's scheduler or automation system. | Reference implementation |
+| Skill | Purpose | Guide | Status |
+| --- | --- | --- | --- |
+| [`call-reminder`](skills/call-reminder/) | Schedules recurring CALL-E phone-call reminders by wrapping the existing one-off CALL-E call workflow in the current client's scheduler or automation system. | [`skills/call-reminder/`](skills/call-reminder/) | Reference implementation |
+| [`google-form-callback`](skills/google-form-callback/) | Processes authorized Google Form responses into safe one-off callback calls with dry-runs, scheduled polling plans, and Sheets writeback. | [`docs/google-form-callback/README.md`](docs/google-form-callback/README.md) | Reference implementation |
 
 `call-reminder` is a scheduler wrapper skill, not a new CALL-E backend reminder API, daemon, or provider-side recurring schedule.
 
@@ -186,6 +187,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
+- [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
 
 ## Apps
 
@@ -235,24 +237,26 @@ awesome-phone-call-agents/
 │       ├── broker-login-client-standalone/
 │       └── oauth-login-client/
 ├── docs/
+│   ├── google-form-callback/
+│   │   ├── README.md
+│   │   └── assets/
 │   ├── design-principles.md
 │   ├── codex-implementation-plan.md
 │   └── roadmap.md
+├── forms/
+│   └── callback-request/
 ├── scripts/
 │   └── validate_repository.py
 └── skills/
-    └── call-reminder/
+    ├── call-reminder/
+    │   ├── SKILL.md
+    │   ├── references/
+    │   └── scripts/
+    └── google-form-callback/
         ├── SKILL.md
         ├── references/
-        │   ├── calle-cli-bootstrap.md
-        │   ├── client-adapters.md
-        │   ├── examples.md
-        │   ├── runtime-prompt.md
-        │   └── safety.md
-        └── scripts/
-            ├── detect-client.mjs
-            ├── render-runtime-prompt.mjs
-            └── validate-reminder-input.mjs
+        ├── scripts/
+        └── template.md
 ```
 
 ## Safety and legal guide
@@ -268,6 +272,8 @@ Phone calls are real-world side effects. Preserve these rules across the whole p
 - Do not call any number except the configured E.164 phone number.
 - Do not modify user-provided call goals or messages except for safety-preserving formatting.
 - Do not create duplicate scheduled jobs or hidden recurring schedules.
+- For scheduled workflows, the visible scheduler job approval is the confirmation for future executions; runtime prompts must not require another per-run chat approval unless the job was explicitly configured as preview-only.
+- Verify required auth before creating scheduled jobs, then re-check auth at runtime before placing any call.
 - Do not create third-party recurring calls unless the user explicitly states recipient consent.
 - Do not expose API keys, OAuth tokens, access tokens, refresh tokens, session cookies, auth callback URLs, confirmation tokens, or provider credentials.
 - If auth is missing, the CLI is unavailable, the scheduler cannot access credentials, or required fields are ambiguous, skip the call or stop setup instead of guessing.
