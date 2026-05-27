@@ -19,7 +19,7 @@ REPOSITORY_TITLE = "Awesome Phone Call Agents"
 REPOSITORY_SLUG = "awesome-phone-call-agents"
 OLD_REPOSITORY_TITLE = "Awesome Phone Call " + "Skill"
 OLD_REPOSITORY_SLUG = "awesome-phone-call-" + "skill"
-README_SUBTITLE = "Portable phone-call Agent Skills, apps, adapters, scheduler recipes, and safety patterns for AI agents."
+README_SUBTITLE = "A community hub for reusable phone-call Agent Skills, runnable apps, workflow plugins, adapters, scheduler recipes, and safety patterns."
 SKILLS_INSTALL_COMMAND = f"npx -y skills add CALLE-AI/{REPOSITORY_SLUG} --skill call-reminder -g"
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
@@ -74,6 +74,7 @@ def validate_readme() -> None:
     for snippet in [
         "skills/",
         "apps/",
+        "plugins/",
         "[`apps/python/batch-runner`](apps/python/batch-runner/)",
         "[`apps/python/broker-login-client`](apps/python/broker-login-client/)",
         "[`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/)",
@@ -94,6 +95,7 @@ def validate_repository_name_references() -> None:
         ROOT / "SECURITY.md",
         ROOT / "apps",
         ROOT / "docs",
+        ROOT / "plugins",
         ROOT / "scripts",
         ROOT / "skills",
     ]
@@ -127,6 +129,7 @@ def validate_english_only() -> None:
         ROOT / "SECURITY.md",
         ROOT / "apps",
         ROOT / "docs",
+        ROOT / "plugins",
         ROOT / "skills",
     ]
     for item in checked_dirs:
@@ -182,6 +185,7 @@ def validate_expected_files() -> None:
         ".github/pull_request_template.md",
         ".github/workflows/validate.yml",
         "apps/README.md",
+        "plugins/README.md",
         "docs/design-principles.md",
         "docs/codex-implementation-plan.md",
         "apps/python/broker-login-client/README.md",
@@ -222,9 +226,10 @@ def validate_templates() -> None:
     require_text(
         ROOT / ".github" / "ISSUE_TEMPLATE" / "workflow_submission.yml",
         [
-            "phone-call skill, runnable app, adapter, scheduler recipe, or safety resource",
-            "Name of the skill, runnable app, adapter, scheduler recipe, or resource",
+            "phone-call skill, runnable app, workflow plugin, adapter, scheduler recipe, or safety resource",
+            "Name of the skill, runnable app, workflow plugin, adapter, scheduler recipe, or resource",
             "- Runnable app",
+            "- Workflow plugin",
         ],
     )
     forbid_text(
@@ -238,6 +243,7 @@ def validate_templates() -> None:
         ROOT / ".github" / "pull_request_template.md",
         [
             "- [ ] New runnable app",
+            "- [ ] New workflow plugin",
             "Phone numbers are masked in documentation and test fixtures unless they are clearly fictional.",
         ],
     )
@@ -305,6 +311,22 @@ def validate_apps() -> None:
         for name, spec in dependencies.items():
             if isinstance(spec, str) and spec.startswith("file:"):
                 fail(f"App package uses a local file dependency in {package_json.relative_to(ROOT)}: {name}")
+
+
+def validate_plugins() -> None:
+    plugins_dir = ROOT / "plugins"
+    if not plugins_dir.exists():
+        fail("Missing plugins/ directory.")
+    require_text(
+        plugins_dir / "README.md",
+        [
+            "no-code and low-code workflow-platform plugins",
+            "nodes, actions, connectors, templates, or recipes",
+            "trigger, configure, monitor, or review phone-call agent workflows",
+            "preview, dry-run, or confirmation behavior",
+            "cancellation, rollback, or disable instructions",
+        ],
+    )
 
 
 def require_text(path: Path, snippets: list[str]) -> None:
@@ -411,6 +433,7 @@ def main() -> None:
     validate_english_only()
     validate_templates()
     validate_apps()
+    validate_plugins()
     validate_skills()
     validate_call_reminder_acceptance_rules()
     print("Repository validation passed.")

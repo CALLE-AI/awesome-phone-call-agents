@@ -36,7 +36,16 @@ Potential apps:
 - `apps/web/call-scheduler-ui`
 - `apps/web/skill-gallery`
 
-## Phase 5: quality and registry readiness
+## Phase 5: workflow plugins
+
+Potential plugins:
+
+- workflow-platform nodes and actions for phone-call agent workflows
+- generic webhook and REST connector recipes
+- plugin verification examples with dry-run or preview behavior
+- reusable workflow templates for common business events
+
+## Phase 6: quality and registry readiness
 
 Potential additions:
 
@@ -47,7 +56,7 @@ Potential additions:
 - screenshots or demos
 - curated external resources
 
-## Phase 6: additional reference skills
+## Phase 7: additional reference skills
 
 Potential skills:
 

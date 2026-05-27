@@ -14,6 +14,7 @@ Keep the repository focused on AI-agent phone-call workflows:
 
 - Agent Skills
 - apps
+- workflow plugins
 - provider adapters
 - scheduler recipes
 - automation patterns
@@ -26,6 +27,7 @@ Do not turn this repository into a general voice-agent list, telephony vendor di
 
 - Put installable Agent Skills in `skills/`.
 - Put runnable apps and integration demos in `apps/`.
+- Put no-code and low-code workflow plugins in `plugins/`.
 - Put long-form guidance in `docs/`.
 - Keep provider-specific or host-specific details out of generic skill frontmatter.
 
@@ -67,6 +69,15 @@ Apps must remain directly tied to AI-agent phone-call workflows.
 - Do not depend on unpublished private packages.
 - Document setup, side effects, credentials, and cancellation or rollback behavior when applicable.
 - Keep demo apps focused. If a demo becomes a reusable tool, keep it under `apps/` and document the supported workflow boundary.
+
+## Plugin design rules
+
+Plugins must remain directly tied to AI-agent phone-call workflows.
+
+- Put no-code and low-code workflow-platform nodes, actions, connectors, templates, and recipes under `plugins/`.
+- Document supported triggers, actions, required inputs, expected outputs, credentials, side effects, and rollback or disable behavior.
+- Prefer preview, dry-run, or confirmation paths before a plugin can place calls or create recurring jobs.
+- Keep platform-specific implementation details inside the plugin directory.
 
 ## Phone-call safety rules
 
