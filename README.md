@@ -82,9 +82,7 @@ For most users, the simplest path is to ask an Agent Skills-compatible client to
 ```text
 Install the portable call-reminder skill for this agent.
 
-Use this command, replacing <agent-adapter> with the adapter for the current client:
-
-npx skills add CALLE-AI/awesome-phone-call-agents --skill call-reminder -a <agent-adapter>
+npx -y skills add CALLE-AI/awesome-phone-call-agents --skill call-reminder -g
 
 After installation:
 1. Reload or restart the agent if the client requires it.
