@@ -19,4 +19,9 @@ logs/
 apps/**/results/
 _handoffs/
 .agents/
+.callback*/
+form-export.json
+candidates.json
+callback-state.json
+callback-writeback.json
 skills-lock.json

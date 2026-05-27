@@ -1,0 +1,61 @@
+{
+  "name": "lead-quote-callback",
+  "title": "Commercial Ice Machine Quote Request",
+  "description": "Submit this form to request a quote. We may call you about this quote request.",
+  "submissionAuthorizesCallback": true,
+  "phoneField": "phone",
+  "recipientNameField": "lead_name",
+  "language": "English",
+  "resultField": "call_result",
+  "summaryField": "call_summary",
+  "requiredFields": ["lead_name", "phone", "product_interest"],
+  "fields": [
+    {
+      "slug": "lead_name",
+      "title": "Lead name",
+      "type": "short_text",
+      "required": true
+    },
+    {
+      "slug": "phone",
+      "title": "Phone",
+      "type": "short_text",
+      "required": true,
+      "validation": "^\\+[1-9]\\d{6,14}$",
+      "helpText": "Use E.164 format, for example +14045550176."
+    },
+    {
+      "slug": "product_interest",
+      "title": "Product interest",
+      "type": "short_text",
+      "required": true
+    },
+    {
+      "slug": "known_need",
+      "title": "Known need",
+      "type": "paragraph",
+      "required": false
+    }
+  ],
+  "outputFields": [
+    {
+      "slug": "call_result",
+      "title": "Call result",
+      "type": "status_column"
+    },
+    {
+      "slug": "call_summary",
+      "title": "Call summary",
+      "type": "summary_column"
+    }
+  ],
+  "goalTemplate": "Follow up with a lead who submitted an ad form, confirm their interest, collect the missing quote details.\n\nCall {{phone}} and ask to speak with {{lead_name}}.\n\nExplain that {{lead_name}} recently submitted a form asking about {{product_interest}}.\n\n{{#known_need}}\nMention the known requirement: {{known_need}}.\n{{/known_need}}\n\nCollect the missing quote details:\n- daily_ice_need\n- ice_type_preference\n- storage_bin_needed\n- water_and_drain_access\n- budget_range\n- preferred_contact_method\n\nIf the lead asks for pricing, explain that the quote depends on the missing details and that a human sales representative can follow up with the final quote.",
+  "safetyRules": [
+    "The form description must make clear that submitting the form can result in a phone follow-up.",
+    "Phone numbers must be E.164 before any provider call is planned.",
+    "Mask phone numbers in summaries.",
+    "Use response IDs for deduplication before calling.",
+    "Do not expose credentials, access tokens, confirmation tokens, or full private phone numbers in public logs.",
+    "For medical, legal, financial, or emergency content, collect details or route to a human instead of giving advice."
+  ]
+}
