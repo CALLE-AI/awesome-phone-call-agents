@@ -4,7 +4,7 @@
 
 **A community hub for reusable phone-call Agent Skills, runnable apps, workflow plugins, adapters, scheduler recipes, and safety patterns.**
 
-Maintainers provide reference skills, runnable apps, templates, validation, provider guidance, scheduler guidance, and safety rules so developers can quickly build and contribute phone-call agent workflows.
+Maintainers provide reference skills, runnable examples, templates, validation, and safety guidance so developers and workflow builders can quickly explore phone-call agent workflows.
 
 [Quick start](#quick-install-and-start) · [Community contributions](#community-contributions) · [Resources](#resource-list) · [Apps](#apps) · [Plugins](#plugins) · [CLI](#cli-reference) · [Templates](#templates) · [Roadmap](docs/roadmap.md) · [Contributing](#contributing)
 
@@ -18,21 +18,21 @@ Maintainers provide reference skills, runnable apps, templates, validation, prov
 
 ## Community contributions
 
-Awesome Phone Call Agents is a community hub for developers and workflow builders creating safe, reusable phone-call workflows for AI agents. The foundation is maintained here, and the community equally welcomes Agent Skills, runnable apps, and no-code or low-code plugins that connect real processes to phone-call agents.
+Awesome Phone Call Agents is an early community hub for developers and workflow builders creating reusable phone-call workflows for AI agents. CALL-E SDKs, provider APIs, authentication, call execution, and provider-side controls belong upstream with CALL-E itself. This repository focuses on the community artifacts around those primitives: Agent Skills, workflow plugins, user-facing apps, examples, templates, and safety patterns.
 
 > [!NOTE]
-> New here? Start with [`skills/call-reminder/`](skills/call-reminder/) for the reference skill, [`apps/`](apps/) for runnable integration examples, and [`CONTRIBUTING.md`](CONTRIBUTING.md) to add your own skill, app, or plugin.
+> New here? Start with the [`call-reminder`](skills/call-reminder/) and [`google-form-callback`](skills/google-form-callback/) skills, try the [`python/batch-runner`](apps/python/batch-runner/) app, and read [`docs/roadmap.md`](docs/roadmap.md) for open community directions.
 
 | Contribution area | Good examples | Where to contribute |
 | --- | --- | --- |
-| Agent Skills | Appointment confirmation, follow-up calls, customer callbacks, candidate availability checks | `skills/` |
-| Runnable Apps | Call monitor CLI, scheduler or admin UI, skill gallery, batch review tools | `apps/` |
-| No-code and Low-code Plugins | Workflow-platform nodes or actions that trigger, configure, or monitor phone-call agent workflows | `plugins/` |
+| Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
+| Workflow Plugins | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes | `plugins/` |
+| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | `apps/` |
 
-See [`docs/roadmap.md`](docs/roadmap.md) for the current community roadmap and contribution opportunities.
+The community roadmap is a direction guide, not a fixed release plan. Small examples, platform notes, workflow sketches, templates, and focused demos are all useful.
 
 > [!IMPORTANT]
-> Phone-call workflows can create real-world side effects. Skills, apps, and adapters in this repository must require explicit user intent, E.164 phone numbers, visible cancellation behavior, credential-safe execution, and clear boundaries around who or what the agent may call.
+> Phone-call workflows can create real-world side effects. Please keep examples explicit, easy to inspect, safe to try without a real call when possible, and clear about phone numbers, credentials, scheduling, cancellation, and result handling.
 
 ## Table of Contents
 
