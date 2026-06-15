@@ -124,6 +124,28 @@ Use `dry-run-then-batch-approval` as the default. Use `approved-direct-execution
 
 Even when direct execution is configured, the runtime request must be concrete, such as "process all June 20 records." Open-ended requests such as "run the campaign" are not enough.
 
+## Runtime Request Contract
+
+Generated skills must define what counts as a concrete runtime request.
+
+Acceptable examples:
+
+```text
+Process all June 20 submissions.
+Process yesterday's callable leads for campaign cmp_123.
+Process appointments on 2026-06-20 from /path/to/appointments.csv.
+```
+
+Insufficient examples:
+
+```text
+Run the campaign.
+Call everyone.
+Process the leads.
+```
+
+When the request is insufficient, the generated skill must ask for the missing runtime parameter, such as date window, source instance, campaign scope, CSV path, or output path. It must not infer broad processing scope.
+
 ## MCP Provider Contract
 
 Generated skills must use:
@@ -153,6 +175,24 @@ If one candidate fails, record that failure and continue with the next candidate
 
 For `per-call-approval`, each candidate must be shown with a masked phone number and compiled call goal before the provider plan is created or run. For `dry-run-then-batch-approval`, the exact pending call list must be approved once before batch execution. For `approved-direct-execution`, the generated skill must still inspect every provider plan and skip any candidate whose plan does not match the validated candidate and fixed goal contract.
 
+## Direct Execution Guardrails
+
+Generated skills that support `approved-direct-execution` must include this checklist and require every item before real calls:
+
+- concrete runtime scope is present
+- binding level is `fully-bound` or `parameterized-bound`
+- source access passed the runtime gate
+- required source fields passed the runtime gate
+- consent or outreach basis passed the runtime gate
+- E.164 phone validation passed for every ready candidate
+- dedupe key or dedupe state is trusted for the concrete run
+- writeback target is verified or session-table fallback is ready
+- MCP provider route, auth, and compatible tools are available
+- each provider plan was inspected before running
+- the call request is one-off and not provider-side recurrence
+
+If any item fails, the generated skill must skip the affected candidate or stop the batch when continuing would be unsafe.
+
 ## Writeback Contract
 
 Generated skills must support one of these writeback outcomes:
@@ -162,6 +202,26 @@ Generated skills must support one of these writeback outcomes:
 - session table output
 
 The writeback policy must be chosen at creation time. The generated skill must state whether the writeback target is fully bound or parameterized, and must define field mapping when writeback is configured. The user may specify writeback fields during creation. Runtime requests may provide a writeback target only when the selected binding level explicitly allows that parameter and the runtime gate verifies it before real calls. Generated skills must keep credentials, tokens, callback URLs, confirmation tokens, cookies, and full phone numbers out of user-facing summaries and writeback fields.
+
+Use this writeback mapping shape when writeback is configured:
+
+```yaml
+writeback:
+  policy: source-writeback | local-csv | session-table
+  target_binding: fully-bound | parameterized | session-only
+  target: fixed-value-or-runtime-parameter-name
+  fields:
+    candidate_id: target_candidate_id_field
+    source_record: target_source_record_field
+    status: target_status_field
+    skip_reason_or_result: target_result_field
+    provider_run_id: target_provider_run_id_field_when_safe
+    masked_phone_number: target_masked_phone_field
+    result_summary: target_summary_field
+    processed_timestamp: target_processed_at_field
+```
+
+For session-table output, use the same logical fields as table columns and set `target_binding` to `session-only`.
 
 Writeback records should include:
 
@@ -188,6 +248,19 @@ Generated skills must document best-effort creation-time preflight and mandatory
 - MCP provider route availability and compatible tools
 
 Creation-time preflight may be skipped or blocked when tools, permissions, or concrete runtime parameters are unavailable. The generated skill must record that blocker. Runtime gating must not be skipped before real calls.
+
+Use this runtime gate report shape during dry-runs and before real calls:
+
+| check | status | evidence | blocker | required_before_call |
+| --- | --- | --- | --- | --- |
+| source_access | `passed`, `blocked`, `not_applicable`, or `not_run` | Non-sensitive proof, such as tool name or schema version. | Missing permission, tool, parameter, or schema issue. | `true` or `false` |
+| required_fields | `passed`, `blocked`, `not_applicable`, or `not_run` | Field names or schema match. | Missing required field. | `true` |
+| consent_or_outreach_basis | `passed`, `blocked`, `not_applicable`, or `not_run` | Consent field or approved source basis. | Missing or false consent. | `true` |
+| dedupe | `passed`, `blocked`, `not_applicable`, or `not_run` | Dedupe key or state file reference. | Untrusted dedupe state. | `true` |
+| writeback_or_session_table | `passed`, `blocked`, `not_applicable`, or `not_run` | Target fields or session fallback. | Missing writeback target with no fallback. | `true` |
+| provider_route | `passed`, `blocked`, `not_applicable`, or `not_run` | Route and compatible tool names. | Missing auth or tools. | `true` |
+
+Do not put credentials, tokens, full phone numbers, confirmation tokens, or callback URLs in `evidence` or `blocker`.
 
 After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, binding level, runtime parameters, source contract, outbound goal contract, execution mode, writeback behavior, provider route, validation result, and reload or discovery step.
 

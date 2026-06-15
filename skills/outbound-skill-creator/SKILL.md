@@ -123,6 +123,17 @@ After the generated skill is written and validated, show a concise creation summ
 
 If a value is intentionally parameterized, label it as a runtime parameter instead of presenting it as already fixed. If a value is unknown, label it as a blocker and state whether the generated skill is dry-run-only until resolved.
 
+## Runtime Contract Formats
+
+Generated skills must define structured runtime contracts for:
+
+- concrete runtime request examples and insufficient request examples
+- runtime gate report rows with `check`, `status`, `evidence`, `blocker`, and `required_before_call`
+- writeback mapping with `policy`, `target_binding`, `target`, and logical result fields
+- approved direct execution guardrails
+
+Use `references/generated-skill-contract.md` as the source of truth for these formats.
+
 ## Generated Skill Requirements
 
 Every generated business skill must include:

@@ -70,6 +70,17 @@ After writing and validating a generated skill, the creator reports a short summ
 
 The summary should make fixed values and runtime parameters visually distinct, and it must not expose credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers.
 
+## Runtime Contract Formats
+
+Generated skills should use structured formats for runtime behavior:
+
+- concrete request examples and insufficient request examples
+- runtime gate reports with `check`, `status`, `evidence`, `blocker`, and `required_before_call`
+- writeback mappings with `policy`, `target_binding`, `target`, and logical result fields
+- direct execution guardrail checklists
+
+These formats make dry-runs, approvals, runtime blockers, and writeback behavior easier to audit.
+
 ## Generated Skill Contract
 
 Every generated business skill must include:
