@@ -1,6 +1,6 @@
 # Generated Skill Contract
 
-Use this reference when writing the business skill created by `outbound-skill-creator`.
+Use this reference when writing the business skill created by `outbound-call-skill-creator`.
 
 ## Folder Shape
 
@@ -291,7 +291,7 @@ The summary must distinguish fixed values from runtime parameters. Do not show c
 After generating a skill, run:
 
 ```bash
-node <path-to-outbound-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
+node <path-to-outbound-call-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
 ```
 
 Run `python3 scripts/validate_repository.py` only when the generated skill is written into this reference repository or another repository that provides that validation command.

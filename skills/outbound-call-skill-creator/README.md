@@ -1,6 +1,6 @@
 # Outbound Skill Creator
 
-`outbound-skill-creator` is a generator skill for creating focused outbound phone-call business skills. It does not process campaign data or place calls itself. Instead, it captures a reusable workflow contract and writes a directly usable Agent Skill that can later read source records, validate candidates, compile one call goal per eligible record, run one-off calls through the configured MCP provider route, and write results back or show a session table.
+`outbound-call-skill-creator` is a generator skill for creating focused outbound phone-call business skills. It does not process campaign data or place calls itself. Instead, it captures a reusable workflow contract and writes a directly usable Agent Skill that can later read source records, validate candidates, compile one call goal per eligible record, run one-off calls through the configured MCP provider route, and write results back or show a session table.
 
 ## When To Use
 
@@ -153,7 +153,7 @@ Generated skills must use only the MCP tools exposed by the host for that route.
 After generating a business skill, run:
 
 ```bash
-node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
+node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
 ```
 
 When editing this reference repository, also run:

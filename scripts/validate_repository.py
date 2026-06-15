@@ -26,7 +26,7 @@ SKILLS_INSTALL_COMMAND = f"npx -y skills add CALLE-AI/{REPOSITORY_SLUG} --skill 
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
-OUTBOUND_SKILL_CHECKER = ROOT / "skills" / "outbound-skill-creator" / "scripts" / "check-generated-skill.mjs"
+OUTBOUND_SKILL_CHECKER = ROOT / "skills" / "outbound-call-skill-creator" / "scripts" / "check-generated-skill.mjs"
 OUTBOUND_MCP_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 
 
@@ -221,18 +221,18 @@ def validate_expected_files() -> None:
         "skills/call-reminder/scripts/detect-client.mjs",
         "skills/call-reminder/scripts/render-runtime-prompt.mjs",
         "skills/call-reminder/scripts/validate-reminder-input.mjs",
-        "skills/outbound-skill-creator/SKILL.md",
-        "skills/outbound-skill-creator/README.md",
-        "skills/outbound-skill-creator/references/binding-contract.md",
-        "skills/outbound-skill-creator/references/creation-summary.md",
-        "skills/outbound-skill-creator/references/data-sources.md",
-        "skills/outbound-skill-creator/references/execution-modes.md",
-        "skills/outbound-skill-creator/references/generated-skill-contract.md",
-        "skills/outbound-skill-creator/references/mcp-provider-route.md",
-        "skills/outbound-skill-creator/references/output-targets.md",
-        "skills/outbound-skill-creator/references/safety.md",
-        "skills/outbound-skill-creator/references/examples.md",
-        "skills/outbound-skill-creator/scripts/check-generated-skill.mjs",
+        "skills/outbound-call-skill-creator/SKILL.md",
+        "skills/outbound-call-skill-creator/README.md",
+        "skills/outbound-call-skill-creator/references/binding-contract.md",
+        "skills/outbound-call-skill-creator/references/creation-summary.md",
+        "skills/outbound-call-skill-creator/references/data-sources.md",
+        "skills/outbound-call-skill-creator/references/execution-modes.md",
+        "skills/outbound-call-skill-creator/references/generated-skill-contract.md",
+        "skills/outbound-call-skill-creator/references/mcp-provider-route.md",
+        "skills/outbound-call-skill-creator/references/output-targets.md",
+        "skills/outbound-call-skill-creator/references/safety.md",
+        "skills/outbound-call-skill-creator/references/examples.md",
+        "skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs",
     ]
     for rel in expected:
         read(ROOT / rel)
@@ -443,13 +443,13 @@ def validate_call_reminder_acceptance_rules() -> None:
 
 
 def validate_outbound_skill_creator_acceptance_rules() -> None:
-    skill_dir = ROOT / "skills" / "outbound-skill-creator"
+    skill_dir = ROOT / "skills" / "outbound-call-skill-creator"
     require_text(
         skill_dir / "SKILL.md",
         [
             "scope-first output rule",
-            "If the installed `outbound-skill-creator` folder is inside a recognized user-level skills root",
-            "Never write a generated business skill into the downloaded `outbound-skill-creator` skill folder itself.",
+            "If the installed `outbound-call-skill-creator` folder is inside a recognized user-level skills root",
+            "Never write a generated business skill into the downloaded `outbound-call-skill-creator` skill folder itself.",
             "parameterized-bound",
             "approved-direct-execution",
             "Run repository validation only when the generated skill is being committed to a repository that provides a validation command.",
@@ -459,8 +459,8 @@ def validate_outbound_skill_creator_acceptance_rules() -> None:
         skill_dir / "references" / "output-targets.md",
         [
             "Scope-First Output Rule",
-            "Do not create generated business skills inside the downloaded `outbound-skill-creator` folder.",
-            "For an installed creator used from a normal project, default to the user-level root that contains the installed `outbound-skill-creator` folder",
+            "Do not create generated business skills inside the downloaded `outbound-call-skill-creator` folder.",
+            "For an installed creator used from a normal project, default to the user-level root that contains the installed `outbound-call-skill-creator` folder",
             "Do not create a top-level `skills/` directory in an ordinary project unless the repository already uses that convention or the user explicitly asks for it.",
             "If the skill was written to an explicit or nonstandard directory, do not claim it is discoverable.",
             "Run project or repository validation only when the generated skill is written into a repository that provides such a command.",
@@ -537,7 +537,7 @@ no hidden recurring schedules, no credential exposure, and clear cancellation be
 
 ## Validation Commands
 
-Run node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir <skill-dir>.
+Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --skill-dir <skill-dir>.
 """
 
     with tempfile.TemporaryDirectory() as temp_dir:
