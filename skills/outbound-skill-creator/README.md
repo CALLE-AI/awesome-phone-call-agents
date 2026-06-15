@@ -36,6 +36,32 @@ The creator should keep the setup flow explicit:
 
 Only ask for extra output-target confirmation when discoverability is unclear, the path is nonstandard, or a new user skills root must be created.
 
+## Example Creation Flow
+
+User request:
+
+```text
+Create an outbound skill named quote-request-callback. It should process Google Form quote requests, call leads who authorized phone follow-up, and write results back to the response spreadsheet.
+```
+
+Typical creator decisions:
+
+- Skill name: `quote-request-callback`
+- Output target: user-level reusable skill, unless the user asks for repository-scoped output
+- Binding level: `parameterized-bound`
+- Runtime parameters: form ID and date window
+- Source contract: Google Form responses with required `name`, `phone`, submitted time, response ID, and phone follow-up basis
+- Goal contract: confirm submitted quote interest, ask whether a sales specialist may follow up, and avoid pricing promises
+- Execution mode: `dry-run-then-batch-approval`
+- Writeback: source writeback to the linked response spreadsheet with status, result summary, safe run ID, and processed timestamp fields
+- Runtime gate: verify form schema, consent basis, dedupe key, writeback target, and provider route before real calls
+
+Future use:
+
+```text
+Use quote-request-callback to process all June 20 submissions for form <form-id>.
+```
+
 ## Execution Modes
 
 The creator asks the user to choose one execution mode for the generated skill:

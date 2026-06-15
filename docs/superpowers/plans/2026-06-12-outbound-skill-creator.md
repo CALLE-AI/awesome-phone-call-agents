@@ -4,7 +4,7 @@
 
 **Goal:** Build an `outbound-skill-creator` Agent Skill that generates directly usable outbound phone-call workflow skills for Google Form, ttmcp, local CSV, and custom data sources.
 
-**Architecture:** Add one procedural creator skill under `skills/outbound-skill-creator/`. Keep the main `SKILL.md` concise and route details into references for output target selection, data sources, generated skill contracts, MCP provider usage, safety, and examples. Add a small Node.js checker script so generated skill folders can be validated before repository validation runs.
+**Architecture:** Add one procedural creator skill under `skills/outbound-skill-creator/`. Keep the main `SKILL.md` concise and route details into references for output target selection, binding contracts, execution modes, data sources, generated skill contracts, MCP provider usage, safety, creation summaries, and examples. Add a small Node.js checker script so generated skill folders can be validated before repository validation runs.
 
 **Tech Stack:** Agent Skills markdown, repository Python validation, Node.js standard library helper scripts, MCP provider route `https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`.
 
@@ -13,7 +13,11 @@
 ## File Structure
 
 - Create `skills/outbound-skill-creator/SKILL.md`: primary skill instructions, trigger behavior, creator workflow, required generated-skill output.
+- Create `skills/outbound-skill-creator/README.md`: user-facing overview, binding model, execution modes, example creation flow, and validation commands.
+- Create `skills/outbound-skill-creator/references/binding-contract.md`: binding-level selection rules and generated skill requirements.
+- Create `skills/outbound-skill-creator/references/creation-summary.md`: creation summary shape and safety rules.
 - Create `skills/outbound-skill-creator/references/data-sources.md`: built-in `google-form`, `ttmcp`, `local-csv`, and custom source guidance.
+- Create `skills/outbound-skill-creator/references/execution-modes.md`: approval modes, runtime request standard, and direct execution guardrails.
 - Create `skills/outbound-skill-creator/references/generated-skill-contract.md`: exact generated skill folder contract, normalized candidate schema, goal contract, writeback contract, and session-table fallback.
 - Create `skills/outbound-skill-creator/references/mcp-provider-route.md`: default MCP provider route, plan/run/status expectations, auth blockers, and no-CLI rule.
 - Create `skills/outbound-skill-creator/references/output-targets.md`: scope-first, host-aware output target rules for user-level, project-local, explicit-path, and reference-repository generation.
@@ -21,6 +25,26 @@
 - Create `skills/outbound-skill-creator/references/examples.md`: concrete creation examples for Google Form, ttmcp, local CSV, and custom sources.
 - Create `skills/outbound-skill-creator/scripts/check-generated-skill.mjs`: validate a generated skill directory for required files, frontmatter, MCP route use, no `template.md`, and English-only content.
 - Modify `scripts/validate_repository.py`: require the new creator skill files in repository validation.
+
+---
+
+## Current Design Alignment
+
+The implemented creator now uses a three-level binding model:
+
+- `fully-bound`: concrete source and writeback target fixed at creation time
+- `parameterized-bound`: default; schema, consent, dedupe, goal, and writeback policy fixed while approved runtime parameters provide source or target instances
+- `unbound-generic`: dry-run-only by default until a complete runtime contract is supplied
+
+Generated skills select one execution mode:
+
+- `dry-run-then-batch-approval`
+- `per-call-approval`
+- `approved-direct-execution`
+
+`approved-direct-execution` is valid only for `fully-bound` or runtime-verified `parameterized-bound` workflows. It is not valid for `unbound-generic`.
+
+Creation-time preflight is best effort. Runtime gating is mandatory before real calls. The checker now requires generated skills to declare a selected binding level, selected execution mode, the default MCP provider route, runtime gate requirements, and the required safety sections.
 
 ---
 
@@ -35,7 +59,11 @@ In `validate_expected_files()`, add these entries after the existing `skills/cal
 
 ```python
         "skills/outbound-skill-creator/SKILL.md",
+        "skills/outbound-skill-creator/README.md",
+        "skills/outbound-skill-creator/references/binding-contract.md",
+        "skills/outbound-skill-creator/references/creation-summary.md",
         "skills/outbound-skill-creator/references/data-sources.md",
+        "skills/outbound-skill-creator/references/execution-modes.md",
         "skills/outbound-skill-creator/references/generated-skill-contract.md",
         "skills/outbound-skill-creator/references/mcp-provider-route.md",
         "skills/outbound-skill-creator/references/output-targets.md",
