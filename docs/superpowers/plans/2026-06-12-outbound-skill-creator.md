@@ -4,7 +4,7 @@
 
 **Goal:** Build an `outbound-skill-creator` Agent Skill that generates directly usable outbound phone-call workflow skills for Google Form, ttmcp, local CSV, and custom data sources.
 
-**Architecture:** Add one procedural creator skill under `skills/outbound-skill-creator/`. Keep the main `SKILL.md` concise and route details into references for data sources, generated skill contracts, MCP provider usage, safety, and examples. Add a small Node.js checker script so generated skill folders can be validated before repository validation runs.
+**Architecture:** Add one procedural creator skill under `skills/outbound-skill-creator/`. Keep the main `SKILL.md` concise and route details into references for output target selection, data sources, generated skill contracts, MCP provider usage, safety, and examples. Add a small Node.js checker script so generated skill folders can be validated before repository validation runs.
 
 **Tech Stack:** Agent Skills markdown, repository Python validation, Node.js standard library helper scripts, MCP provider route `https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`.
 
@@ -16,6 +16,7 @@
 - Create `skills/outbound-skill-creator/references/data-sources.md`: built-in `google-form`, `ttmcp`, `local-csv`, and custom source guidance.
 - Create `skills/outbound-skill-creator/references/generated-skill-contract.md`: exact generated skill folder contract, normalized candidate schema, goal contract, writeback contract, and session-table fallback.
 - Create `skills/outbound-skill-creator/references/mcp-provider-route.md`: default MCP provider route, plan/run/status expectations, auth blockers, and no-CLI rule.
+- Create `skills/outbound-skill-creator/references/output-targets.md`: scope-first, host-aware output target rules for user-level, project-local, explicit-path, and reference-repository generation.
 - Create `skills/outbound-skill-creator/references/safety.md`: safety rules that the creator must apply and copy into generated business skills.
 - Create `skills/outbound-skill-creator/references/examples.md`: concrete creation examples for Google Form, ttmcp, local CSV, and custom sources.
 - Create `skills/outbound-skill-creator/scripts/check-generated-skill.mjs`: validate a generated skill directory for required files, frontmatter, MCP route use, no `template.md`, and English-only content.
@@ -37,6 +38,7 @@ In `validate_expected_files()`, add these entries after the existing `skills/cal
         "skills/outbound-skill-creator/references/data-sources.md",
         "skills/outbound-skill-creator/references/generated-skill-contract.md",
         "skills/outbound-skill-creator/references/mcp-provider-route.md",
+        "skills/outbound-skill-creator/references/output-targets.md",
         "skills/outbound-skill-creator/references/safety.md",
         "skills/outbound-skill-creator/references/examples.md",
         "skills/outbound-skill-creator/scripts/check-generated-skill.mjs",
@@ -89,7 +91,11 @@ Use this skill when the user wants to create a new outbound phone-call workflow 
 
 ## Core Rule
 
-Generate a directly usable business skill under `skills/<business-skill-name>/`.
+Generate a directly usable business skill using the scope-first output rule in `references/output-targets.md`. Do not assume the current project has a usable `skills/` directory.
+
+When this creator is used from a normal project after being installed by a skill installer, default to a user-level reusable skill unless the workflow depends on project-local files or the user asks for repository-scoped output. If the installed `outbound-skill-creator` folder is inside a recognized user-level skills root, create the generated business skill as a sibling of this creator. Otherwise choose a host-compatible skills root from `references/output-targets.md`, or ask the user when discoverability is unclear.
+
+Use a project-local skills directory only when the user explicitly wants the generated skill versioned with the current project, when the skill depends on project files, or when working inside this reference repository. Never write a generated business skill into the downloaded `outbound-skill-creator` skill folder itself.
 
 The generated skill must let a future user make a concrete request such as "process all June 20 records" and have the skill handle source access, filtering, candidate validation, outbound goal compilation, approved MCP execution, dedupe, and writeback or session-table output.
 
@@ -99,17 +105,18 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 
 1. Confirm that the user wants to create a new outbound phone-call workflow skill.
 2. Ask for or derive a lowercase hyphenated business skill name.
-3. Ask which source family to use: `google-form`, `ttmcp`, `local-csv`, or `other`.
-4. Read `references/data-sources.md` for the selected source family.
-5. Capture the source fields for phone number, recipient label, dedupe key, date filtering, and goal inputs.
-6. Capture the outbound goal contract: call purpose, required context, allowed questions, completion criteria, result values, and escalation cases.
-7. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
-8. Capture execution policy: dry-run first or approved direct execution after a concrete processing request.
-9. Capture writeback policy: source writeback, local CSV writeback, or session table fallback.
-10. Read `references/safety.md` and include the required safety boundaries in the generated skill.
-11. Generate the business skill folder and files using `references/generated-skill-contract.md`.
-12. Run `node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir skills/<business-skill-name>`.
-13. Run `python3 scripts/validate_repository.py`.
+3. Read `references/output-targets.md`, choose the scope, and choose a host-compatible output parent.
+4. Ask which source family to use: `google-form`, `ttmcp`, `local-csv`, or `other`.
+5. Read `references/data-sources.md` for the selected source family.
+6. Capture the source fields for phone number, recipient label, dedupe key, date filtering, and goal inputs.
+7. Capture the outbound goal contract: call purpose, required context, allowed questions, completion criteria, result values, and escalation cases.
+8. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
+9. Capture execution policy: dry-run first or approved direct execution after a concrete processing request, including serial processing after approval.
+10. Capture writeback policy: source writeback, local CSV writeback, or session table fallback.
+11. Read `references/safety.md` and include the required safety boundaries in the generated skill.
+12. Generate the business skill folder and files in the selected output parent using `references/generated-skill-contract.md`.
+13. Run this skill's bundled checker script with `--skill-dir <generated-business-skill-dir>`.
+14. Run repository validation only when the generated skill is being committed to a repository that provides a validation command.
 
 ## Built-In Choices
 
@@ -181,9 +188,10 @@ If writeback is not configured, generated skills must output a table with one ro
 After generating a business skill, run:
 
 ```bash
-node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir skills/<business-skill-name>
-python3 scripts/validate_repository.py
+node <path-to-outbound-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
 ```
+
+When developing inside this reference repository, the checker path is `skills/outbound-skill-creator/scripts/check-generated-skill.mjs`; after editing this repository, also run `python3 scripts/validate_repository.py`.
 ```
 
 - [ ] **Step 3: Run repository validation**
@@ -326,7 +334,7 @@ Use this reference when writing the business skill created by `outbound-skill-cr
 Generate this minimum folder shape:
 
 ```text
-skills/<business-skill-name>/
+<selected-output-parent>/<business-skill-name>/
 ├── SKILL.md
 └── references/
     ├── safety.md
@@ -336,6 +344,8 @@ skills/<business-skill-name>/
 Add source, goal, writeback, and script files only when the workflow needs them.
 
 Do not create `template.md`. The business contract belongs in `SKILL.md` and focused reference files.
+
+Use `references/output-targets.md` before creating the folder. Apply the scope-first output rule before choosing a path. Repository-local `skills/<business-skill-name>/` is appropriate only when the user explicitly wants project-local output and the repository uses that convention, or when contributing to this reference repository. For an installed creator used from a normal project, create the generated skill in a host-compatible user-level skills root unless the workflow depends on project files or the user chooses a project-local target.
 
 ## Frontmatter
 
@@ -365,6 +375,7 @@ The generated `SKILL.md` must include:
 - outbound goal contract
 - MCP provider route
 - execution modes
+- serial candidate execution
 - writeback behavior
 - safety summary
 - validation commands
@@ -445,9 +456,10 @@ Do not write credentials, tokens, cookies, confirmation tokens, callback URLs, o
 After generating a skill, run:
 
 ```bash
-node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir skills/<business-skill-name>
-python3 scripts/validate_repository.py
+node <path-to-outbound-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
 ```
+
+Run `python3 scripts/validate_repository.py` only when the generated skill is written into this reference repository or another repository that provides that validation command.
 ```
 
 - [ ] **Step 3: Run repository validation**
@@ -889,13 +901,52 @@ description: Process authorized sample records into outbound phone-call tasks th
 
 # Sample Callback
 
+## Purpose and When to Use
+
 Use this generated skill for authorized sample outbound phone-call records.
 
-Provider route:
+## When Not to Use
+
+Do not use this skill for emergency, medical, legal, or financial advice workflows.
+Do not use a CLI bootstrap path.
+
+## Source Contract
+
+The source contract defines the approved data source and row ownership boundary.
+
+## Candidate Fields
+
+Candidate fields include candidate_id, name, phone_e164, timezone, and callback_reason.
+
+## Outbound Goal Contract
+
+The outbound goal contract defines the single-call goal and allowed conversation boundary.
+
+## MCP Provider Route
 
 ```text
 https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth
 ```
+
+## Execution Modes
+
+Supported execution modes are dry run, preview, and confirmed one-off run.
+
+## Serial Candidate Execution
+
+After approval, serially process all ready candidates. For each candidate, plan, inspect, run, check status when available, record the result, and continue to the next candidate without another per-candidate confirmation.
+
+## Writeback Behavior
+
+Writeback behavior records call status, timestamps, summaries, and masked phone numbers.
+
+## Safety Summary
+
+Safety summary: require explicit user intent, E.164 phone numbers, no duplicate jobs, no hidden recurring schedules, no credential exposure, and clear cancellation behavior.
+
+## Validation Commands
+
+Run node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir <skill-dir>.
 EOF
 cat > "$tmpdir/sample-callback/references/safety.md" <<'EOF'
 # Safety
@@ -951,6 +1002,7 @@ Expected: command exits with status `0`.
 - Created: `skills/outbound-skill-creator/references/data-sources.md`
 - Created: `skills/outbound-skill-creator/references/generated-skill-contract.md`
 - Created: `skills/outbound-skill-creator/references/mcp-provider-route.md`
+- Created: `skills/outbound-skill-creator/references/output-targets.md`
 - Created: `skills/outbound-skill-creator/references/safety.md`
 - Created: `skills/outbound-skill-creator/references/examples.md`
 - Created: `skills/outbound-skill-creator/scripts/check-generated-skill.mjs`
