@@ -487,7 +487,7 @@ Do not use a CLI bootstrap path.
 
 ## Binding Level and Runtime Parameters
 
-Binding level is parameterized-bound. Runtime parameters include date window and
+Binding level: parameterized-bound. Runtime parameters include date window and
 approved source instance identifiers allowed by the source contract.
 
 ## Source Contract
@@ -508,7 +508,13 @@ Use the default MCP provider route: {OUTBOUND_MCP_ROUTE}
 
 ## Execution Modes
 
-Supported execution modes are dry run, preview, and confirmed one-off run.
+Execution mode: dry-run-then-batch-approval. Supported alternatives are per-call-approval
+and approved-direct-execution when the binding level and runtime gate allow them.
+
+## Runtime Gate
+
+Runtime gate requirements include source access, required fields, consent, dedupe,
+writeback or session-table readiness, and provider route availability before real calls.
 
 ## Serial Candidate Execution
 
@@ -666,6 +672,37 @@ candidates finish, write configured results or output one final session table.
             not in missing_serial_execution_output
         ):
             fail("Generated outbound skill checker missing-serial-execution message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        unsafe_direct_md = valid_skill_md.replace(
+            "Binding level: parameterized-bound.",
+            "Binding level: unbound-generic.",
+        ).replace(
+            "Execution mode: dry-run-then-batch-approval.",
+            "Execution mode: approved-direct-execution.",
+        )
+        (skill_dir / "SKILL.md").write_text(unsafe_direct_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        unsafe_direct_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        unsafe_direct_output = unsafe_direct_failure.stdout + unsafe_direct_failure.stderr
+        if unsafe_direct_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unbound direct execution.")
+        if (
+            "Generated skill cannot use approved-direct-execution with unbound-generic"
+            not in unsafe_direct_output
+        ):
+            fail("Generated outbound skill checker unbound-direct failure message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
