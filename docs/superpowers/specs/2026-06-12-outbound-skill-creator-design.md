@@ -6,7 +6,7 @@ Create an `outbound-skill-creator` Agent Skill that helps an agent generate a di
 
 The generated business skill should behave like `google-form-callback`: after it is created, a user can invoke it with a concrete request such as "process all June 20 submissions" and the generated skill can handle the selected data source, compile outbound call goals, run the approved execution path through the configured MCP provider route, deduplicate work, and write results back or display a tabular session summary.
 
-`outbound-skill-creator` is not a generic outbound runtime platform. It is a skill-generation workflow for creating focused, installable business skills under `skills/`.
+`outbound-skill-creator` is not a generic outbound runtime platform. It is a skill-generation workflow for creating focused, installable business skills in a selected output target.
 
 ## Scope
 
@@ -25,6 +25,7 @@ Generated skills must remain directly tied to AI-agent phone-call workflows and 
 When a user asks to create an outbound workflow skill, `outbound-skill-creator` collects the minimum information needed to generate a usable skill:
 
 - business purpose and recipient type
+- output scope and target: user-level reusable skill, project-local skill, explicit path, or this reference repository `skills/`
 - data source type and access method
 - required source fields
 - E.164 phone-number field
@@ -39,12 +40,14 @@ When a user asks to create an outbound workflow skill, `outbound-skill-creator` 
 
 The creator should present `google-form`, `ttmcp`, and `local-csv` as default integration choices. Choosing `other` starts a multi-turn clarification flow for source access, record shape, date filtering, dedupe keys, and writeback capability.
 
+The creator must choose the generated skill output scope before creating files. Use a scope-first, host-aware rule: user-level reusable skills go to a recognized user skills root, project-local skills go to a host-compatible repository skills root, explicit paths win when the user provides them, and maintained generated workflows in this reference repository use this repository's `skills/` directory. When the creator is installed by a skill installer and invoked from a different project, the default should be user-level reusable output unless the workflow depends on project-local files or the user asks to version it with the project.
+
 ## Generated Skill Shape
 
 The generated skill uses the normal Agent Skills folder pattern:
 
 ```text
-skills/<business-skill-name>/
+<selected-output-parent>/<business-skill-name>/
 ├── SKILL.md
 ├── references/
 └── scripts/
@@ -165,6 +168,8 @@ Phone-call provider handles exactly one call per scheduled run.
 
 Generated skills must run a dry-run preview before real calls unless the generated skill was explicitly configured for direct execution after a user gives a concrete processing request. Even in direct mode, the generated skill must validate candidates, mask phone numbers in summaries, and skip unsafe or ambiguous records.
 
+After the user approves the exact pending call list, generated skills must process ready candidates serially. The agent should plan, inspect, run, check status when available, record the result, and then continue to the next candidate without another per-candidate confirmation. Candidate-level failures should be recorded and the batch should continue when safe. The generated skill should stop the batch only when authentication is missing, the MCP provider route is unavailable, required provider tools are unavailable, dedupe state cannot be trusted, or continuing would be unsafe. After all candidates complete or skip, the generated skill must write configured results or output the session table and report one final batch summary.
+
 ## Writeback Policy
 
 Generated skills support three writeback outcomes:
@@ -217,7 +222,7 @@ The implementation should also include focused tests or script fixtures when gen
 
 ## First-Version Defaults
 
-The first implementation should create a procedural creator skill rather than a broad shared runtime. The creator skill should guide the agent through the source, goal, execution, and writeback contract, then generate a focused business skill under `skills/`.
+The first implementation should create a procedural creator skill rather than a broad shared runtime. The creator skill should guide the agent through the scope-first output target, source, goal, execution, and writeback contract, then generate a focused business skill in that selected target.
 
 Generated skills should always include:
 

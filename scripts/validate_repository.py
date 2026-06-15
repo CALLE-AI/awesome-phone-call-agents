@@ -9,6 +9,8 @@ from __future__ import annotations
 import re
 import sys
 import json
+import subprocess
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +26,8 @@ SKILLS_INSTALL_COMMAND = f"npx -y skills add CALLE-AI/{REPOSITORY_SLUG} --skill 
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
+OUTBOUND_SKILL_CHECKER = ROOT / "skills" / "outbound-skill-creator" / "scripts" / "check-generated-skill.mjs"
+OUTBOUND_MCP_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 
 
 def fail(message: str) -> None:
@@ -217,6 +221,14 @@ def validate_expected_files() -> None:
         "skills/call-reminder/scripts/detect-client.mjs",
         "skills/call-reminder/scripts/render-runtime-prompt.mjs",
         "skills/call-reminder/scripts/validate-reminder-input.mjs",
+        "skills/outbound-skill-creator/SKILL.md",
+        "skills/outbound-skill-creator/references/data-sources.md",
+        "skills/outbound-skill-creator/references/generated-skill-contract.md",
+        "skills/outbound-skill-creator/references/mcp-provider-route.md",
+        "skills/outbound-skill-creator/references/output-targets.md",
+        "skills/outbound-skill-creator/references/safety.md",
+        "skills/outbound-skill-creator/references/examples.md",
+        "skills/outbound-skill-creator/scripts/check-generated-skill.mjs",
     ]
     for rel in expected:
         read(ROOT / rel)
@@ -426,6 +438,252 @@ def validate_call_reminder_acceptance_rules() -> None:
     )
 
 
+def validate_outbound_skill_creator_acceptance_rules() -> None:
+    skill_dir = ROOT / "skills" / "outbound-skill-creator"
+    require_text(
+        skill_dir / "SKILL.md",
+        [
+            "scope-first output rule",
+            "If the installed `outbound-skill-creator` folder is inside a recognized user-level skills root",
+            "Never write a generated business skill into the downloaded `outbound-skill-creator` skill folder itself.",
+            "Run repository validation only when the generated skill is being committed to a repository that provides a validation command.",
+        ],
+    )
+    require_text(
+        skill_dir / "references" / "output-targets.md",
+        [
+            "Scope-First Output Rule",
+            "Do not create generated business skills inside the downloaded `outbound-skill-creator` folder.",
+            "For an installed creator used from a normal project, default to the user-level root that contains the installed `outbound-skill-creator` folder",
+            "Do not create a top-level `skills/` directory in an ordinary project unless the repository already uses that convention or the user explicitly asks for it.",
+            "If the skill was written to an explicit or nonstandard directory, do not claim it is discoverable.",
+            "Run project or repository validation only when the generated skill is written into a repository that provides such a command.",
+        ],
+    )
+
+
+def validate_outbound_generated_skill_checker() -> None:
+    checker = OUTBOUND_SKILL_CHECKER
+    read(checker)
+
+    valid_skill_md = f"""---
+name: generated-callback-skill
+description: Generated phone call workflow skill for outbound candidate callback operations.
+---
+
+# Generated Callback Skill
+
+## Purpose and When to Use
+
+Use this generated business skill for user-authorized outbound phone call workflows.
+
+## When Not to Use
+
+Do not use this skill for emergency, medical, legal, or financial advice workflows.
+Do not use a CLI bootstrap path.
+
+## Source Contract
+
+The source contract defines the approved data source and row ownership boundary.
+
+## Candidate Fields
+
+Candidate fields include candidate_id, name, phone_e164, timezone, and callback_reason.
+
+## Outbound Goal Contract
+
+The outbound goal contract defines the single-call goal and allowed conversation boundary.
+
+## MCP Provider Route
+
+Use the default MCP provider route: {OUTBOUND_MCP_ROUTE}
+
+## Execution Modes
+
+Supported execution modes are dry run, preview, and confirmed one-off run.
+
+## Serial Candidate Execution
+
+After approval, serially process all ready candidates. For each candidate, plan,
+inspect, run, check status when available, record the result, and continue to
+the next candidate without another per-candidate confirmation. After all
+candidates finish, write configured results or output one final session table.
+
+## Writeback Behavior
+
+Writeback behavior records call status, timestamps, summaries, and masked phone numbers.
+
+## Safety Summary
+
+Safety summary: require explicit user intent, E.164 phone numbers, no duplicate jobs,
+no hidden recurring schedules, no credential exposure, and clear cancellation behavior.
+
+## Validation Commands
+
+Run node skills/outbound-skill-creator/scripts/check-generated-skill.mjs --skill-dir <skill-dir>.
+"""
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(valid_skill_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text(
+            "# Safety\n\nMask phone numbers and require explicit user intent.\n",
+            encoding="utf-8",
+        )
+        (references_dir / "examples.md").write_text(
+            "# Examples\n\nUse fictional E.164 numbers in examples.\n",
+            encoding="utf-8",
+        )
+
+        success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if success.returncode != 0:
+            fail(
+                "Generated outbound skill checker smoke test failed: "
+                + (success.stderr or success.stdout).strip()
+            )
+
+        (skill_dir / "template.md").write_text("Do not use templates.\n", encoding="utf-8")
+        template_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        template_output = template_failure.stdout + template_failure.stderr
+        if template_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject template.md.")
+        if "Generated outbound skills must not use template.md" not in template_output:
+            fail("Generated outbound skill checker template.md failure message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        extra_frontmatter_md = valid_skill_md.replace(
+            "description: Generated phone call workflow skill for outbound candidate callback operations.\n",
+            "description: Generated phone call workflow skill for outbound candidate callback operations.\nhost: codex\n",
+        )
+        (skill_dir / "SKILL.md").write_text(extra_frontmatter_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        extra_frontmatter_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        extra_frontmatter_output = extra_frontmatter_failure.stdout + extra_frontmatter_failure.stderr
+        if extra_frontmatter_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject extra frontmatter fields.")
+        if (
+            "Generated skill frontmatter must include only name and description"
+            not in extra_frontmatter_output
+        ):
+            fail("Generated outbound skill checker extra-frontmatter failure message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        missing_section_md = valid_skill_md.replace(
+            """## Safety Summary
+
+Safety summary: require explicit user intent, E.164 phone numbers, no duplicate jobs,
+no hidden recurring schedules, no credential exposure, and clear cancellation behavior.
+
+""",
+            "",
+        )
+        (skill_dir / "SKILL.md").write_text(missing_section_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        missing_section_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        missing_section_output = missing_section_failure.stdout + missing_section_failure.stderr
+        if missing_section_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject missing required sections.")
+        if "Generated skill SKILL.md must include safety summary" not in missing_section_output:
+            fail("Generated outbound skill checker missing-section failure message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        missing_serial_execution_md = valid_skill_md.replace(
+            """## Serial Candidate Execution
+
+After approval, serially process all ready candidates. For each candidate, plan,
+inspect, run, check status when available, record the result, and continue to
+the next candidate without another per-candidate confirmation. After all
+candidates finish, write configured results or output one final session table.
+
+""",
+            "",
+        )
+        (skill_dir / "SKILL.md").write_text(missing_serial_execution_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        missing_serial_execution_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        missing_serial_execution_output = (
+            missing_serial_execution_failure.stdout + missing_serial_execution_failure.stderr
+        )
+        if missing_serial_execution_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject missing serial execution.")
+        if (
+            "Generated skill SKILL.md must include serial candidate execution"
+            not in missing_serial_execution_output
+        ):
+            fail("Generated outbound skill checker missing-serial-execution message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            valid_skill_md + "\n" + chr(0x20000) + "\n",
+            encoding="utf-8",
+        )
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        supplementary_han_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        supplementary_han_output = supplementary_han_failure.stdout + supplementary_han_failure.stderr
+        if supplementary_han_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject supplementary Han script.")
+        if "Non-English CJK, Japanese, or Korean script found" not in supplementary_han_output:
+            fail("Generated outbound skill checker supplementary-Han failure message changed.")
+
+
 def main() -> None:
     validate_expected_files()
     validate_readme()
@@ -436,6 +694,8 @@ def main() -> None:
     validate_plugins()
     validate_skills()
     validate_call_reminder_acceptance_rules()
+    validate_outbound_skill_creator_acceptance_rules()
+    validate_outbound_generated_skill_checker()
     print("Repository validation passed.")
 
 
