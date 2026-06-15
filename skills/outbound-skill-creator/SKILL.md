@@ -30,17 +30,17 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 3. Read `references/output-targets.md`, choose the scope, and choose a host-compatible output parent.
 4. Ask which source family to use: `google-form`, `ttmcp`, `local-csv`, or `other`.
 5. Read `references/data-sources.md` for the selected source family.
-6. Ask the user to choose a binding level, defaulting to `parameterized-bound` when they do not choose: `fully-bound`, `parameterized-bound`, or `unbound-generic`.
+6. Read `references/binding-contract.md` and ask the user to choose a binding level, defaulting to `parameterized-bound` when they do not choose: `fully-bound`, `parameterized-bound`, or `unbound-generic`.
 7. Capture the source fields for phone number, recipient label, dedupe key, date filtering, outreach basis or consent, goal inputs, and any runtime parameters allowed by the binding level.
 8. Capture the outbound goal contract: call purpose, required context, allowed questions, prohibited claims, completion criteria, result values, summary format, and escalation cases.
 9. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
-10. Ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`: `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`.
+10. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`: `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`.
 11. Capture writeback policy at creation time and capture field mapping or allowed runtime writeback parameters: source writeback, local CSV writeback, or session table fallback.
 12. Run best-effort creation-time preflight checks when tools and permissions are available: read-only source auth/schema checks, non-mutating writeback target or field checks, and MCP route/tool readiness. If preflight cannot run, record the blocker in the generated skill and require a runtime mandatory gate before real calls.
 13. Read `references/safety.md` and include the required safety boundaries in the generated skill.
 14. Generate the business skill folder and files in the selected output parent using `references/generated-skill-contract.md`.
 15. Run this skill's bundled checker script with `--skill-dir <generated-business-skill-dir>`.
-16. Show the user a creation summary covering skill name, path, binding level, source contract, goal contract, execution mode, writeback target, provider route, validation result, and reload or discovery note.
+16. Read `references/creation-summary.md` and show the user a creation summary covering skill name, path, binding level, source contract, goal contract, execution mode, writeback target, provider route, validation result, and reload or discovery note.
 17. Run repository validation only when the generated skill is being committed to a repository that provides a validation command.
 
 ## Built-In Choices
@@ -76,6 +76,8 @@ Present the three execution modes after the binding level is known. Recommend `d
 
 Ask the user to choose a binding level before writing the generated skill. If the user has no preference, use `parameterized-bound`.
 
+Use `references/binding-contract.md` for full binding-level selection rules and generated skill requirements.
+
 | Binding level | Creation-time contract | Runtime parameters | Maximum automation |
 | --- | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field mapping, consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
@@ -87,6 +89,8 @@ Do not create a real-call skill with no phone field, no outreach basis or consen
 ## Execution Modes
 
 Ask the user to choose the generated skill's execution mode after choosing the binding level. If the user does not choose, use `dry-run-then-batch-approval`.
+
+Use `references/execution-modes.md` for full mode selection rules, concrete runtime request examples, and direct execution guardrails.
 
 - `dry-run-then-batch-approval`: preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval.
 - `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
@@ -104,7 +108,9 @@ Do not perform a real writeback or place a real call during preflight unless the
 
 ## Creation Summary
 
-After the generated skill is written and validated, show a concise creation summary. Include:
+After the generated skill is written and validated, show a concise creation summary. Use `references/creation-summary.md` for the full summary shape and safety rules.
+
+Include:
 
 - skill name
 - generated skill directory

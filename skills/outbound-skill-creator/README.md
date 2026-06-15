@@ -81,6 +81,20 @@ Generated skills should use structured formats for runtime behavior:
 
 These formats make dry-runs, approvals, runtime blockers, and writeback behavior easier to audit.
 
+## Reference Layout
+
+The creator keeps detailed rules in focused reference files:
+
+- `references/output-targets.md`: where generated skills should be written
+- `references/data-sources.md`: source-family contracts and runtime gate requirements
+- `references/binding-contract.md`: binding-level selection rules
+- `references/execution-modes.md`: approval and direct-execution behavior
+- `references/generated-skill-contract.md`: required generated skill structure
+- `references/mcp-provider-route.md`: default provider route and one-off call flow
+- `references/safety.md`: phone-call safety rules
+- `references/creation-summary.md`: user-facing creation summary shape
+- `references/examples.md`: concrete creation examples
+
 ## Generated Skill Contract
 
 Every generated business skill must include:
