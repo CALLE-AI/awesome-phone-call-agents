@@ -519,6 +519,11 @@ and approved-direct-execution when the binding level and runtime gate allow them
 Runtime gate requirements include source access, required fields, consent, dedupe,
 writeback or session-table readiness, and provider route availability before real calls.
 
+## Preflight and Creation Summary
+
+Preflight and creation summary records completed source checks, blockers, runtime
+parameters, and validation results before real calls.
+
 ## Serial Candidate Execution
 
 After approval, serially process all ready candidates. For each candidate, plan,
@@ -643,6 +648,39 @@ no hidden recurring schedules, no credential exposure, and clear cancellation be
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
+        missing_preflight_md = valid_skill_md.replace(
+            """## Preflight and Creation Summary
+
+Preflight and creation summary records completed source checks, blockers, runtime
+parameters, and validation results before real calls.
+
+""",
+            "",
+        )
+        (skill_dir / "SKILL.md").write_text(missing_preflight_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        missing_preflight_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        missing_preflight_output = missing_preflight_failure.stdout + missing_preflight_failure.stderr
+        if missing_preflight_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject missing preflight summary.")
+        if (
+            "Generated skill SKILL.md must include preflight and creation summary"
+            not in missing_preflight_output
+        ):
+            fail("Generated outbound skill checker missing-preflight-summary message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
         missing_serial_execution_md = valid_skill_md.replace(
             """## Serial Candidate Execution
 
@@ -675,6 +713,36 @@ candidates finish, write configured results or output one final session table.
             not in missing_serial_execution_output
         ):
             fail("Generated outbound skill checker missing-serial-execution message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        maximum_only_execution_md = valid_skill_md.replace(
+            "Execution mode: dry-run-then-batch-approval.",
+            "Maximum execution mode: approved-direct-execution.",
+        )
+        (skill_dir / "SKILL.md").write_text(maximum_only_execution_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        maximum_only_execution_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        maximum_only_execution_output = (
+            maximum_only_execution_failure.stdout + maximum_only_execution_failure.stderr
+        )
+        if maximum_only_execution_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject missing selected execution mode.")
+        if (
+            "Generated skill SKILL.md must declare a selected execution mode"
+            not in maximum_only_execution_output
+        ):
+            fail("Generated outbound skill checker missing-selected-execution message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"

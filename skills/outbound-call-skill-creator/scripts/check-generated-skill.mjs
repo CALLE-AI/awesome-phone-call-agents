@@ -8,7 +8,7 @@ const NON_ENGLISH_SCRIPT_RE =
   /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
 const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound|unbound-generic)`?/iu;
 const EXECUTION_MODE_RE =
-  /\bexecution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|per-call-approval|approved-direct-execution)`?/iu;
+  /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|per-call-approval|approved-direct-execution)`?/imu;
 const REQUIRED_SKILL_MARKERS = [
   {
     label: "purpose and when to use",
@@ -49,6 +49,10 @@ const REQUIRED_SKILL_MARKERS = [
   {
     label: "writeback behavior",
     patterns: [/writeback behavior/iu],
+  },
+  {
+    label: "preflight and creation summary",
+    patterns: [/preflight and creation summary/iu],
   },
   {
     label: "safety summary",
