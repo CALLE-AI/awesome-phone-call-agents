@@ -25,6 +25,17 @@ Generated skills use one of three binding levels:
 
 The default recommendation is `parameterized-bound`. It avoids a brittle single-source skill while still fixing the important safety and automation contract.
 
+## Creation Prompt Flow
+
+The creator should keep the setup flow explicit:
+
+1. Recommend one to three lowercase hyphenated skill names when the user has not provided one, then ask for confirmation.
+2. State the proposed output scope and directory before writing files, including why that target was selected and whether reload or add-location is needed.
+3. Ask for the binding level, defaulting to `parameterized-bound`.
+4. Ask for the execution mode, defaulting to `dry-run-then-batch-approval`.
+
+Only ask for extra output-target confirmation when discoverability is unclear, the path is nonstandard, or a new user skills root must be created.
+
 ## Execution Modes
 
 The creator asks the user to choose one execution mode for the generated skill:

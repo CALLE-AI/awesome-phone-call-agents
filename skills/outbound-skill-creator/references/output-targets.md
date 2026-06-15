@@ -73,6 +73,19 @@ After writing the generated skill:
 - If the host supports a reload command, such as `/skills reload`, tell the user or run it only when the current interface supports it.
 - If the skill was written to an explicit or nonstandard directory, do not claim it is discoverable. Record the add-location step, such as adding a skill path in host configuration or using a host command like `/skills add`.
 
+## User-Facing Output Prompt
+
+Before creating files, tell the user the proposed target:
+
+- scope
+- output parent directory
+- generated skill directory
+- reason this target was selected
+- whether the target is expected to be discoverable by the host
+- whether reload, restart, or add-location is likely required
+
+Ask for confirmation only when the selected target is not clearly discoverable, the user provided a nonstandard explicit path, or the creator would need to create a new user-level skills root. Do not ask for routine confirmation when the repository or user-level skills root is clear and writable.
+
 ## Required Capture
 
 Record the selected output target in the generated skill creation notes:

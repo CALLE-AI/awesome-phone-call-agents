@@ -54,6 +54,24 @@ Present these source families by default:
 
 If the user selects `other`, do not guess API schemas, credentials, identifiers, date filters, writeback behavior, or MCP tool names. Ask for the missing contract details one at a time.
 
+## Creation Prompts
+
+Use short, explicit prompts during creation. Prefer recommending a safe default instead of leaving the user to infer it.
+
+### Skill Name
+
+When the user has not provided a name, derive one to three lowercase hyphenated candidates from the business context and ask the user to confirm one. Put the best candidate first.
+
+When the user has already provided a name, validate that it is a lowercase hyphenated slug. If it is not valid, suggest the closest valid slug and ask for confirmation before writing files.
+
+### Output Target
+
+Before writing files, state the selected scope, output parent, generated skill directory, why that target was chosen, and whether the host may need a reload or add-location step. Ask the user only when discoverability is unclear, the output path is explicit but not a known skills parent, or a new user skills root would need to be created.
+
+### Execution Mode
+
+Present the three execution modes after the binding level is known. Recommend `dry-run-then-batch-approval` first, then briefly explain `per-call-approval` and `approved-direct-execution`. Do not offer `approved-direct-execution` as an available option for `unbound-generic`; state that the workflow must be bound first.
+
 ## Binding Levels
 
 Ask the user to choose a binding level before writing the generated skill. If the user has no preference, use `parameterized-bound`.
