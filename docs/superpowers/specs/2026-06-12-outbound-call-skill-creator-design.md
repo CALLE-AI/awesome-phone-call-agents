@@ -26,6 +26,7 @@ When a user asks to create an outbound workflow skill, `outbound-call-skill-crea
 
 - business purpose and recipient type
 - output scope and target: user-level reusable skill, project-local skill, explicit path, or this reference repository `skills/`
+- binding level: `fully-bound`, `parameterized-bound`, or `unbound-generic`
 - data source type and access method
 - required source fields
 - E.164 phone-number field
@@ -34,13 +35,17 @@ When a user asks to create an outbound workflow skill, `outbound-call-skill-crea
 - submitted or updated time field, when date-window processing is needed
 - outbound call goal behavior for each row or record
 - language and region handling rules
-- execution policy, including dry-run and real-call approval behavior
+- execution mode: `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`
 - writeback destination and result fields
 - fallback output format when writeback is not configured
+- best-effort creation-time preflight result or blocker
+- mandatory runtime gate requirements before real calls
 
 The creator should present `google-form`, `ttmcp`, and `local-csv` as default integration choices. Choosing `other` starts a multi-turn clarification flow for source access, record shape, date filtering, dedupe keys, and writeback capability.
 
 The creator must choose the generated skill output scope before creating files. Use a scope-first, host-aware rule: user-level reusable skills go to a recognized user skills root, project-local skills go to a host-compatible repository skills root, explicit paths win when the user provides them, and maintained generated workflows in this reference repository use this repository's `skills/` directory. When the creator is installed by a skill installer and invoked from a different project, the default should be user-level reusable output unless the workflow depends on project-local files or the user asks to version it with the project.
+
+The default binding level should be `parameterized-bound`: source family, field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time, while runtime requests provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. `fully-bound` is appropriate for stable production or scheduled workflows. `unbound-generic` is dry-run-only by default.
 
 ## Generated Skill Shape
 
@@ -60,6 +65,7 @@ For simple workflows, the generated `SKILL.md` can contain the full source, goal
 - `references/source-contract.md`
 - `references/goal-contract.md`
 - `references/writeback-contract.md`
+- `references/binding-contract.md`
 - `references/safety.md`
 - `references/examples.md`
 
@@ -70,7 +76,7 @@ The generated skill should include scripts only when deterministic handling is v
 Generated skills follow this flow:
 
 ```text
-source records -> normalized candidates -> safety validation -> outbound goal compilation -> MCP dry-run or execution -> dedupe state -> writeback or session table
+source records -> normalized candidates -> runtime gate -> safety validation -> outbound goal compilation -> MCP dry-run or execution -> dedupe state -> writeback or session table
 ```
 
 Each normalized candidate should include:
@@ -154,10 +160,11 @@ Generated skills must not provide medical, legal, financial, or emergency advice
 
 ## Execution Policy
 
-Generated skills should support two execution modes:
+Generated skills should support three approval modes:
 
-- one-off processing for user-requested batches, such as a specific date
-- scheduled processing only when the host scheduler is explicitly configured by the user
+- `dry-run-then-batch-approval`
+- `per-call-approval`
+- `approved-direct-execution`
 
 The default architecture remains:
 
@@ -166,7 +173,9 @@ Host scheduler handles recurrence.
 Phone-call provider handles exactly one call per scheduled run.
 ```
 
-Generated skills must run a dry-run preview before real calls unless the generated skill was explicitly configured for direct execution after a user gives a concrete processing request. Even in direct mode, the generated skill must validate candidates, mask phone numbers in summaries, and skip unsafe or ambiguous records.
+Generated skills must run a dry-run preview before real calls unless the generated skill was explicitly configured for direct execution after a user gives a concrete processing request. `approved-direct-execution` is allowed only for `fully-bound` or `parameterized-bound` workflows whose concrete runtime request passes the runtime gate. It is not allowed for `unbound-generic`.
+
+Even in direct mode, the generated skill must validate candidates, mask phone numbers in summaries, inspect the provider plan, and skip unsafe or ambiguous records.
 
 After the user approves the exact pending call list, generated skills must process ready candidates serially. The agent should plan, inspect, run, check status when available, record the result, and then continue to the next candidate without another per-candidate confirmation. Candidate-level failures should be recorded and the batch should continue when safe. The generated skill should stop the batch only when authentication is missing, the MCP provider route is unavailable, required provider tools are unavailable, dedupe state cannot be trusted, or continuing would be unsafe. After all candidates complete or skip, the generated skill must write configured results or output the session table and report one final batch summary.
 
@@ -180,6 +189,8 @@ Generated skills support three writeback outcomes:
 
 Session table output is the default fallback and should contain one task per row with masked phone numbers.
 
+The writeback policy is chosen at creation time. The concrete writeback target may be fixed for `fully-bound` workflows or parameterized for `parameterized-bound` workflows. Runtime targets must pass the runtime gate before real calls.
+
 Writeback records should include:
 
 - source record ID or row reference
@@ -192,6 +203,10 @@ Writeback records should include:
 - processed timestamp
 
 The generated skill must not write credentials, tokens, confirmation tokens, cookies, or full phone numbers to user-facing summaries.
+
+## Creation Summary
+
+After writing and validating a generated business skill, the creator should show a concise creation summary with skill name, generated directory, discoverability or reload note, binding level, runtime parameters, source contract, consent rule, dedupe rule, goal summary, execution mode, writeback policy, preflight result or blocker, runtime gate, provider route, and validation result.
 
 ## Safety Requirements
 
@@ -218,7 +233,7 @@ After implementing `outbound-call-skill-creator`, repository validation must pas
 python3 scripts/validate_repository.py
 ```
 
-The implementation should also include focused tests or script fixtures when generator scripts are added. At minimum, validate that a generated skill has valid frontmatter, English repository-facing content, expected folder structure, and the required safety sections.
+The implementation should also include focused tests or script fixtures when generator scripts are added. At minimum, validate that a generated skill has valid frontmatter, English repository-facing content, expected folder structure, selected binding level, selected execution mode, runtime gate requirements, and the required safety sections.
 
 ## First-Version Defaults
 

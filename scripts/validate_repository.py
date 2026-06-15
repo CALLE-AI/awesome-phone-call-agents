@@ -79,10 +79,6 @@ def validate_readme() -> None:
         "skills/",
         "apps/",
         "plugins/",
-        "[`outbound-call-skill-creator`](skills/outbound-call-skill-creator/)",
-        "npx -y skills add CALLE-AI/awesome-phone-call-agents --skill outbound-call-skill-creator -g",
-        "`node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --skill-dir <path>`",
-        "[`skills/outbound-call-skill-creator/references/output-targets.md`](skills/outbound-call-skill-creator/references/output-targets.md)",
         "[`apps/python/batch-runner`](apps/python/batch-runner/)",
         "[`apps/python/broker-login-client`](apps/python/broker-login-client/)",
         "[`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/)",
@@ -226,7 +222,11 @@ def validate_expected_files() -> None:
         "skills/call-reminder/scripts/render-runtime-prompt.mjs",
         "skills/call-reminder/scripts/validate-reminder-input.mjs",
         "skills/outbound-call-skill-creator/SKILL.md",
+        "skills/outbound-call-skill-creator/README.md",
+        "skills/outbound-call-skill-creator/references/binding-contract.md",
+        "skills/outbound-call-skill-creator/references/creation-summary.md",
         "skills/outbound-call-skill-creator/references/data-sources.md",
+        "skills/outbound-call-skill-creator/references/execution-modes.md",
         "skills/outbound-call-skill-creator/references/generated-skill-contract.md",
         "skills/outbound-call-skill-creator/references/mcp-provider-route.md",
         "skills/outbound-call-skill-creator/references/output-targets.md",
@@ -450,6 +450,8 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "scope-first output rule",
             "If the installed `outbound-call-skill-creator` folder is inside a recognized user-level skills root",
             "Never write a generated business skill into the downloaded `outbound-call-skill-creator` skill folder itself.",
+            "parameterized-bound",
+            "approved-direct-execution",
             "Run repository validation only when the generated skill is being committed to a repository that provides a validation command.",
         ],
     )
@@ -486,6 +488,11 @@ Use this generated business skill for user-authorized outbound phone call workfl
 Do not use this skill for emergency, medical, legal, or financial advice workflows.
 Do not use a CLI bootstrap path.
 
+## Binding Level and Runtime Parameters
+
+Binding level: parameterized-bound. Runtime parameters include date window and
+approved source instance identifiers allowed by the source contract.
+
 ## Source Contract
 
 The source contract defines the approved data source and row ownership boundary.
@@ -504,7 +511,18 @@ Use the default MCP provider route: {OUTBOUND_MCP_ROUTE}
 
 ## Execution Modes
 
-Supported execution modes are dry run, preview, and confirmed one-off run.
+Execution mode: dry-run-then-batch-approval. Supported alternatives are per-call-approval
+and approved-direct-execution when the binding level and runtime gate allow them.
+
+## Runtime Gate
+
+Runtime gate requirements include source access, required fields, consent, dedupe,
+writeback or session-table readiness, and provider route availability before real calls.
+
+## Preflight and Creation Summary
+
+Preflight and creation summary records completed source checks, blockers, runtime
+parameters, and validation results before real calls.
 
 ## Serial Candidate Execution
 
@@ -630,6 +648,39 @@ no hidden recurring schedules, no credential exposure, and clear cancellation be
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
+        missing_preflight_md = valid_skill_md.replace(
+            """## Preflight and Creation Summary
+
+Preflight and creation summary records completed source checks, blockers, runtime
+parameters, and validation results before real calls.
+
+""",
+            "",
+        )
+        (skill_dir / "SKILL.md").write_text(missing_preflight_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        missing_preflight_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        missing_preflight_output = missing_preflight_failure.stdout + missing_preflight_failure.stderr
+        if missing_preflight_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject missing preflight summary.")
+        if (
+            "Generated skill SKILL.md must include preflight and creation summary"
+            not in missing_preflight_output
+        ):
+            fail("Generated outbound skill checker missing-preflight-summary message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
         missing_serial_execution_md = valid_skill_md.replace(
             """## Serial Candidate Execution
 
@@ -662,6 +713,67 @@ candidates finish, write configured results or output one final session table.
             not in missing_serial_execution_output
         ):
             fail("Generated outbound skill checker missing-serial-execution message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        maximum_only_execution_md = valid_skill_md.replace(
+            "Execution mode: dry-run-then-batch-approval.",
+            "Maximum execution mode: approved-direct-execution.",
+        )
+        (skill_dir / "SKILL.md").write_text(maximum_only_execution_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        maximum_only_execution_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        maximum_only_execution_output = (
+            maximum_only_execution_failure.stdout + maximum_only_execution_failure.stderr
+        )
+        if maximum_only_execution_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject missing selected execution mode.")
+        if (
+            "Generated skill SKILL.md must declare a selected execution mode"
+            not in maximum_only_execution_output
+        ):
+            fail("Generated outbound skill checker missing-selected-execution message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        unsafe_direct_md = valid_skill_md.replace(
+            "Binding level: parameterized-bound.",
+            "Binding level: unbound-generic.",
+        ).replace(
+            "Execution mode: dry-run-then-batch-approval.",
+            "Execution mode: approved-direct-execution.",
+        )
+        (skill_dir / "SKILL.md").write_text(unsafe_direct_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        unsafe_direct_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        unsafe_direct_output = unsafe_direct_failure.stdout + unsafe_direct_failure.stderr
+        if unsafe_direct_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unbound direct execution.")
+        if (
+            "Generated skill cannot use approved-direct-execution with unbound-generic"
+            not in unsafe_direct_output
+        ):
+            fail("Generated outbound skill checker unbound-direct failure message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"

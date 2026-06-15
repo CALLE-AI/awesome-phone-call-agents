@@ -13,6 +13,7 @@ Create an outbound skill named quote-request-callback. It should process Google 
 Captured contract:
 
 - output scope: user-level reusable skill, or this repository's `skills/` directory when contributing the workflow here
+- binding level: `parameterized-bound` by default; `fully-bound` when a concrete form and linked response spreadsheet are fixed at creation time
 - source family: `google-form`
 - phone field: `phone`
 - recipient label field: `name`
@@ -21,7 +22,8 @@ Captured contract:
 - outreach basis: form description states that submission authorizes a phone follow-up
 - provider route: `https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`
 - writeback: linked response spreadsheet
-- execution: dry-run first unless the generated skill is configured for approved direct execution; after approval, process all ready candidates serially and report one final batch summary
+- execution: `dry-run-then-batch-approval` by default; `approved-direct-execution` only when the binding level supports it and the concrete runtime request passes the runtime gate; after approval or direct-mode validation, process all ready candidates serially and report one final batch summary
+- preflight and runtime gate: best-effort creation-time preflight verifies form access, required questions, linked response spreadsheet columns, and provider route/tool readiness when available; runtime gate is mandatory before real calls
 
 Generated future use:
 
@@ -40,6 +42,7 @@ Create an outbound skill named tiktok-lead-followup. It should read callable lea
 Captured contract:
 
 - output scope: user-level reusable skill unless the user explicitly asks for project-local output
+- binding level: `parameterized-bound` by default, with runtime account or campaign parameters allowed only after runtime schema verification
 - source family: `ttmcp`
 - MCP tool names: captured from the host before generation
 - phone field: captured from returned lead records
@@ -48,7 +51,7 @@ Captured contract:
 - date filtering: record creation time in the source account timezone
 - outreach basis: lead form includes phone follow-up consent
 - writeback: approved ttmcp writeback tool or session table fallback
-- execution: after approval, process all ready candidates serially, record each terminal result, then write back or output one final session table
+- execution: `dry-run-then-batch-approval` or `approved-direct-execution` only after concrete runtime scope passes the runtime gate; record each terminal result, then write back or output one final session table
 
 Generated future use:
 
@@ -67,6 +70,7 @@ Create an outbound skill named appointment-confirmation-calls. It should read a 
 Captured contract:
 
 - output scope: project-local only when the CSV workflow should be versioned with the current project; otherwise user-level reusable skill
+- binding level: `parameterized-bound` when the CSV path is supplied at runtime but columns are fixed; `fully-bound` when the CSV path and result CSV path are fixed
 - source family: `local-csv`
 - CSV path: provided at runtime
 - phone column: `phone_e164`
@@ -95,3 +99,44 @@ Create an outbound skill for records from our internal API.
 Creator behavior:
 
 Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and writeback capability. If any critical value is unknown, generate a dry-run-only skill or stop before generation.
+
+## Binding Mode Selection
+
+User request:
+
+```text
+Create a skill for quote request callbacks. I want to reuse it across multiple forms with the same questions.
+```
+
+Recommended creator response:
+
+- recommend `parameterized-bound`
+- fix the required Google Form questions, consent basis, dedupe rule, goal contract, provider route, and writeback field schema
+- allow the runtime request to provide the concrete form ID and date window
+- run best-effort creation-time preflight when available and require form schema and writeback runtime gate checks before real calls
+- default execution mode to `dry-run-then-batch-approval`
+
+User request:
+
+```text
+Create a skill that automatically processes the same lead form every morning.
+```
+
+Recommended creator response:
+
+- recommend `fully-bound`
+- fix the concrete form, linked response spreadsheet, writeback columns, and host scheduler boundary
+- allow only narrow runtime controls such as date window
+- require the runtime gate before every scheduled or approved direct execution run
+
+User request:
+
+```text
+Create a generic callback skill. I will tell it the data source later.
+```
+
+Recommended creator response:
+
+- use `unbound-generic`
+- keep the skill dry-run-only by default
+- require runtime collection of source fields, consent evidence, dedupe key, and writeback behavior before any real calls

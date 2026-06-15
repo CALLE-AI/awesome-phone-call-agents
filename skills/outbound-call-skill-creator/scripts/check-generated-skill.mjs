@@ -6,6 +6,9 @@ const REQUIRED_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NON_ENGLISH_SCRIPT_RE =
   /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
+const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound|unbound-generic)`?/iu;
+const EXECUTION_MODE_RE =
+  /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|per-call-approval|approved-direct-execution)`?/imu;
 const REQUIRED_SKILL_MARKERS = [
   {
     label: "purpose and when to use",
@@ -14,6 +17,10 @@ const REQUIRED_SKILL_MARKERS = [
   {
     label: "when not to use",
     patterns: [/when not to use/iu, /do not use/iu],
+  },
+  {
+    label: "binding level and runtime parameters",
+    patterns: [/binding level/iu, /runtime parameters/iu],
   },
   {
     label: "source contract",
@@ -42,6 +49,10 @@ const REQUIRED_SKILL_MARKERS = [
   {
     label: "writeback behavior",
     patterns: [/writeback behavior/iu],
+  },
+  {
+    label: "preflight and creation summary",
+    patterns: [/preflight and creation summary/iu],
   },
   {
     label: "safety summary",
@@ -123,6 +134,15 @@ function parseArgs(argv) {
   return args;
 }
 
+function extractRequiredValue(text, pattern, label) {
+  const match = pattern.exec(text);
+  if (!match) {
+    fail(`Generated skill SKILL.md must declare a selected ${label}`);
+    return "";
+  }
+  return match[1].toLowerCase();
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (!args.skillDir) {
   fail("Usage: check-generated-skill.mjs --skill-dir <path>");
@@ -167,6 +187,28 @@ for (const marker of REQUIRED_SKILL_MARKERS) {
   if (!marker.patterns.some((pattern) => pattern.test(skillText))) {
     fail(`Generated skill SKILL.md must include ${marker.label}`);
   }
+}
+
+const selectedBindingLevel = extractRequiredValue(
+  skillText,
+  BINDING_LEVEL_RE,
+  "binding level",
+);
+const selectedExecutionMode = extractRequiredValue(
+  skillText,
+  EXECUTION_MODE_RE,
+  "execution mode",
+);
+
+if (
+  selectedBindingLevel === "unbound-generic" &&
+  selectedExecutionMode === "approved-direct-execution"
+) {
+  fail("Generated skill cannot use approved-direct-execution with unbound-generic");
+}
+
+if (!/runtime gate/iu.test(skillText)) {
+  fail("Generated skill SKILL.md must mention runtime gate requirements");
 }
 
 if (
