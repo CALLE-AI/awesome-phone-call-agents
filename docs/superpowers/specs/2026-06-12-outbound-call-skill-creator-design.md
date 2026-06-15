@@ -1,4 +1,4 @@
-# Outbound Skill Creator Design
+# Outbound Call Skill Creator Design
 
 ## Goal
 

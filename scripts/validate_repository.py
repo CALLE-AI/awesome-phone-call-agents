@@ -26,7 +26,7 @@ SKILLS_INSTALL_COMMAND = f"npx -y skills add CALLE-AI/{REPOSITORY_SLUG} --skill 
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
-OUTBOUND_SKILL_CHECKER = ROOT / "skills" / "outbound-call-skill-creator" / "scripts" / "check-generated-skill.mjs"
+OUTBOUND_CALL_SKILL_CHECKER = ROOT / "skills" / "outbound-call-skill-creator" / "scripts" / "check-generated-skill.mjs"
 OUTBOUND_MCP_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 
 
@@ -442,7 +442,7 @@ def validate_call_reminder_acceptance_rules() -> None:
     )
 
 
-def validate_outbound_skill_creator_acceptance_rules() -> None:
+def validate_outbound_call_skill_creator_acceptance_rules() -> None:
     skill_dir = ROOT / "skills" / "outbound-call-skill-creator"
     require_text(
         skill_dir / "SKILL.md",
@@ -469,7 +469,7 @@ def validate_outbound_skill_creator_acceptance_rules() -> None:
 
 
 def validate_outbound_generated_skill_checker() -> None:
-    checker = OUTBOUND_SKILL_CHECKER
+    checker = OUTBOUND_CALL_SKILL_CHECKER
     read(checker)
 
     valid_skill_md = f"""---
@@ -742,7 +742,7 @@ def main() -> None:
     validate_plugins()
     validate_skills()
     validate_call_reminder_acceptance_rules()
-    validate_outbound_skill_creator_acceptance_rules()
+    validate_outbound_call_skill_creator_acceptance_rules()
     validate_outbound_generated_skill_checker()
     print("Repository validation passed.")
 

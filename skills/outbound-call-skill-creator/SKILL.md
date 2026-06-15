@@ -3,7 +3,7 @@ name: outbound-call-skill-creator
 description: Create directly usable outbound phone-call Agent Skills that bind source and writeback contracts at the right level, connect data such as Google Forms, ttmcp, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
 ---
 
-# Outbound Skill Creator
+# Outbound Call Skill Creator
 
 Use this skill when the user wants to create a new outbound phone-call workflow skill that can later process source records directly, compile one call goal per eligible record, run calls through the configured MCP provider route, and write results back or display a session table.
 

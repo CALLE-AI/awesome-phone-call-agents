@@ -1,4 +1,4 @@
-# Outbound Skill Creator Implementation Plan
+# Outbound Call Skill Creator Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -111,7 +111,7 @@ name: outbound-call-skill-creator
 description: Create directly usable outbound phone-call Agent Skills that connect data sources such as Google Forms, ttmcp, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
 ---
 
-# Outbound Skill Creator
+# Outbound Call Skill Creator
 
 Use this skill when the user wants to create a new outbound phone-call workflow skill that can later process source records directly, compile one call goal per eligible record, run calls through the configured MCP provider route, and write results back or display a session table.
 
@@ -1065,7 +1065,7 @@ Run:
 
 ```bash
 git add scripts/validate_repository.py skills/outbound-call-skill-creator
-git commit -m "feat: add outbound skill creator"
+git commit -m "feat: add outbound call skill creator"
 ```
 
 Expected: commit succeeds with the new skill files.
