@@ -64,6 +64,12 @@ The writeback policy is chosen at creation time:
 
 The writeback target depends on the binding level. `fully-bound` skills fix the target and fields at creation time. `parameterized-bound` skills fix the policy and field schema, while allowing an approved runtime target such as an output CSV path or verified source instance. `unbound-generic` skills collect writeback details at runtime and are dry-run-only by default.
 
+## Creation Summary
+
+After writing and validating a generated skill, the creator reports a short summary with the skill name, directory, discovery or reload note, binding level, runtime parameters, source contract, consent rule, dedupe rule, goal summary, execution mode, writeback policy, preflight result or blocker, runtime gate, provider route, and validation result.
+
+The summary should make fixed values and runtime parameters visually distinct, and it must not expose credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers.
+
 ## Generated Skill Contract
 
 Every generated business skill must include:

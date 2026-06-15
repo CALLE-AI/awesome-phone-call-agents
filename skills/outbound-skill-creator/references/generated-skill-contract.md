@@ -191,6 +191,28 @@ Creation-time preflight may be skipped or blocked when tools, permissions, or co
 
 After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, binding level, runtime parameters, source contract, outbound goal contract, execution mode, writeback behavior, provider route, validation result, and reload or discovery step.
 
+Use this summary shape:
+
+```text
+Skill: <business-skill-name>
+Directory: <generated-skill-directory>
+Discovery: <known-active-root | reload-needed | add-location-needed | nonstandard-path>
+Binding level: <fully-bound | parameterized-bound | unbound-generic>
+Runtime parameters: <allowed parameters or none>
+Source: <source family, access method, required fields>
+Consent: <field or approved source basis>
+Dedupe: <key or state rule>
+Goal: <one-sentence call purpose and completion criteria>
+Execution mode: <selected mode and any unavailable modes>
+Writeback: <policy, target binding, and field mapping>
+Preflight: <passed | blocked | not run, with reason>
+Runtime gate: <checks that must pass before real calls>
+Provider route: https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth
+Validation: <command and result>
+```
+
+The summary must distinguish fixed values from runtime parameters. Do not show credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers in the summary.
+
 ## Validation Commands
 
 After generating a skill, run:

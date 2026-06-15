@@ -102,6 +102,27 @@ Runtime gating is mandatory before any real call. A generated skill must stop be
 
 Do not perform a real writeback or place a real call during preflight unless the user explicitly approved that side effect.
 
+## Creation Summary
+
+After the generated skill is written and validated, show a concise creation summary. Include:
+
+- skill name
+- generated skill directory
+- output scope and discoverability or reload note
+- binding level and allowed runtime parameters
+- source family, access method, and required fields
+- consent or outreach basis
+- dedupe key or dedupe state rule
+- outbound goal contract summary
+- execution mode and unavailable modes, if any
+- writeback policy, target binding, and field mapping
+- creation-time preflight result or blocker
+- mandatory runtime gate checks before real calls
+- MCP provider route
+- validation command and result
+
+If a value is intentionally parameterized, label it as a runtime parameter instead of presenting it as already fixed. If a value is unknown, label it as a blocker and state whether the generated skill is dry-run-only until resolved.
+
 ## Generated Skill Requirements
 
 Every generated business skill must include:
