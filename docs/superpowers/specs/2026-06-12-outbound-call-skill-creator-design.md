@@ -1,12 +1,12 @@
-# Outbound Skill Creator Design
+# Outbound Call Skill Creator Design
 
 ## Goal
 
-Create an `outbound-skill-creator` Agent Skill that helps an agent generate a directly usable outbound phone-call workflow skill.
+Create an `outbound-call-skill-creator` Agent Skill that helps an agent generate a directly usable outbound phone-call workflow skill.
 
 The generated business skill should behave like `google-form-callback`: after it is created, a user can invoke it with a concrete request such as "process all June 20 submissions" and the generated skill can handle the selected data source, compile outbound call goals, run the approved execution path through the configured MCP provider route, deduplicate work, and write results back or display a tabular session summary.
 
-`outbound-skill-creator` is not a generic outbound runtime platform. It is a skill-generation workflow for creating focused, installable business skills in a selected output target.
+`outbound-call-skill-creator` is not a generic outbound runtime platform. It is a skill-generation workflow for creating focused, installable business skills in a selected output target.
 
 ## Scope
 
@@ -22,7 +22,7 @@ Generated skills must remain directly tied to AI-agent phone-call workflows and 
 
 ## User Experience
 
-When a user asks to create an outbound workflow skill, `outbound-skill-creator` collects the minimum information needed to generate a usable skill:
+When a user asks to create an outbound workflow skill, `outbound-call-skill-creator` collects the minimum information needed to generate a usable skill:
 
 - business purpose and recipient type
 - output scope and target: user-level reusable skill, project-local skill, explicit path, or this reference repository `skills/`
@@ -212,7 +212,7 @@ Generated skills must not guess country codes, regions, phone numbers, timezones
 
 ## Validation
 
-After implementing `outbound-skill-creator`, repository validation must pass:
+After implementing `outbound-call-skill-creator`, repository validation must pass:
 
 ```bash
 python3 scripts/validate_repository.py
@@ -234,4 +234,4 @@ Generated skills may include source, goal, and writeback reference files when th
 
 The first version should not extract or share runtime code from `google-form-callback`. It may reference the pattern, but code reuse should wait until two or more generated skills show the same deterministic script need.
 
-The first version should not add sample generated skills as committed fixtures. Examples should live inside `outbound-skill-creator` references unless a real, maintained workflow is added later.
+The first version should not add sample generated skills as committed fixtures. Examples should live inside `outbound-call-skill-creator` references unless a real, maintained workflow is added later.

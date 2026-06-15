@@ -17,7 +17,7 @@ Follow that same scope split for generated outbound skills.
 
 Choose the scope first, then choose one host-compatible output parent directory, then create `<output-parent>/<business-skill-name>/`.
 
-Do not create generated business skills inside the downloaded `outbound-skill-creator` folder. That folder is the generator, not the output location.
+Do not create generated business skills inside the downloaded `outbound-call-skill-creator` folder. That folder is the generator, not the output location.
 
 If the user provides an explicit output path, use that path after confirming it is a skills parent directory and that the generated skill will be discoverable or clearly documented as not yet discoverable.
 
@@ -32,7 +32,7 @@ If the user provides an explicit output path, use that path after confirming it 
 
 ## User-Level Selection
 
-For an installed creator used from a normal project, default to the user-level root that contains the installed `outbound-skill-creator` folder when that root is clearly a user skills directory, such as:
+For an installed creator used from a normal project, default to the user-level root that contains the installed `outbound-call-skill-creator` folder when that root is clearly a user skills directory, such as:
 
 - `~/.agents/skills`
 - `~/.codex/skills`
@@ -89,7 +89,7 @@ Record the selected output target in the generated skill creation notes:
 Always run the bundled generated-skill checker against the actual generated directory:
 
 ```bash
-node <path-to-outbound-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
+node <path-to-outbound-call-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
 ```
 
 Run project or repository validation only when the generated skill is written into a repository that provides such a command. For this reference repository, run:
