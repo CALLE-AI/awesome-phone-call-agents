@@ -71,46 +71,59 @@ This repository focuses on three principles:
 
 ### 1. Choose a workflow
 
-Start from the resource list when you want a ready-to-use phone-call workflow, from apps when you want to study or run an integration pattern, from plugins when you want to connect workflow platforms, or from the templates when you want to contribute a new skill, app, plugin, adapter, scheduler recipe, or safety pattern.
+Start with the maintained skill that matches the job:
 
-The first reference skill is `call-reminder`, a daily reminder workflow that shows how to package one phone-call scenario as an installable skill with scheduling and safety boundaries. The `google-form-callback` skill shows how to process authorized Google Form responses into reviewed one-off callback calls with optional scheduled polling. The `outbound-call-skill-creator` skill helps generate directly usable business-specific outbound workflow skills from sources such as Google Forms, ttmcp, local CSV files, or custom systems.
+| Need | Start with | What it does |
+| --- | --- | --- |
+| Recurring or scheduled phone-call reminders | [`call-reminder`](skills/call-reminder/) | Wraps one-off CALL-E calls in a host-owned scheduler with explicit cancellation and safety boundaries. |
+| Callback calls from authorized Google Form responses | [`google-form-callback`](skills/google-form-callback/) | Reviews form responses, supports dry runs, creates scheduled polling plans, and writes results back. |
+| A business-specific outbound calling skill | [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates a focused skill from sources such as Google Forms, ttmcp, local CSV files, or custom systems. |
+
+Use the [resource list](#resource-list) for broader examples, [apps](#apps) for runnable integration patterns, [plugins](#plugins) for workflow-platform connectors, and [templates](#templates) when contributing a new artifact.
 
 ### 2. Install a skill
 
-For most users, the simplest path is to ask an Agent Skills-compatible client to install the specific skill you want. To try the official daily reminder workflow, install `call-reminder`:
+For most users, the simplest path is to ask an Agent Skills-compatible client to install only the skill needed for the workflow:
 
-```text
-Install the portable call-reminder skill for this agent.
-
+```bash
 npx -y skills add CALLE-AI/awesome-phone-call-agents --skill call-reminder -g
-
-After installation:
-1. Reload or restart the agent if the client requires it.
-2. Use the skill only for explicit phone-call reminder requests.
-3. Follow the skill's scheduler, consent, cancellation, and credential-safety rules.
-```
-
-Manual copy is also supported when a host does not support the CLI:
-
-```text
-skills/call-reminder/
-```
-
-To create a new outbound phone-call workflow skill, install `outbound-call-skill-creator`:
-
-```text
+npx -y skills add CALLE-AI/awesome-phone-call-agents --skill google-form-callback -g
 npx -y skills add CALLE-AI/awesome-phone-call-agents --skill outbound-call-skill-creator -g
 ```
 
-### 3. Run the daily reminder workflow
+Manual copy is also supported when a host does not support the CLI. Copy the matching folder:
+
+```text
+skills/call-reminder/
+skills/google-form-callback/
+skills/outbound-call-skill-creator/
+```
+
+### 3. Start with a safe request
 
 Use a fictional reserved number in demos and a real E.164 number only for your own authorized workflow.
+
+For `call-reminder`:
 
 ```text
 Set up a daily phone-call reminder at 09:00 America/New_York.
 Use CALL-E when available.
 My phone number is +15550101234.
 The call should remind me to take my medicine according to my doctor instructions or the medication label.
+```
+
+For `google-form-callback`:
+
+```text
+Use google-form-callback to review authorized responses from FORM_ID.
+Start with a dry run and show pending, skipped, and blocked records before any real calls.
+```
+
+For `outbound-call-skill-creator`:
+
+```text
+Use outbound-call-skill-creator to create a project-local callback skill from a local CSV file.
+Start by collecting the source fields, consent basis, call goal, provider route, execution mode, and writeback target.
 ```
 
 The agent should create or update a visible scheduler job only when the current client can persist, run, and cancel it safely. The scheduled job then executes the runtime prompt and attempts exactly one one-off CALL-E call.
