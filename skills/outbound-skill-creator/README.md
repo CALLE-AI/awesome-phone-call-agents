@@ -19,8 +19,8 @@ Generated skills use one of three binding levels:
 
 | Binding level | What is fixed at creation time | What is supplied at runtime | Automation level |
 | --- | --- | --- | --- |
-| `fully-bound` | Concrete source instance, field mapping, consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and narrow processing controls. | Highest automation; suitable for scheduled host runs after preflight. |
-| `parameterized-bound` | Source family, access method, required schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved parameters such as form ID, CSV path, campaign ID, date window, or output path. | Recommended default; balances reuse and automation. |
+| `fully-bound` | Concrete source instance, field mapping, consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and narrow processing controls. | Highest automation; suitable for scheduled host runs after the runtime gate passes. |
+| `parameterized-bound` | Source family, access method, required schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Recommended default; balances reuse and automation. |
 | `unbound-generic` | Goal contract and safety rules. | Source access, field mapping, consent evidence, dedupe key, filters, and writeback target. | Dry-run-only by default; not suitable for automatic real calls. |
 
 The default recommendation is `parameterized-bound`. It avoids a brittle single-source skill while still fixing the important safety and automation contract.
@@ -31,9 +31,27 @@ The creator asks the user to choose one execution mode for the generated skill:
 
 - `dry-run-then-batch-approval`: preview all eligible calls and compiled goals, then process the approved list serially after one explicit approval.
 - `per-call-approval`: show one candidate and compiled goal at a time, then let the user approve, modify, or skip that call.
-- `approved-direct-execution`: after a concrete processing request, validate and preflight candidates, inspect provider plans, and run eligible one-off calls serially without another approval step.
+- `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, inspect provider plans, and run eligible one-off calls serially without another approval step.
 
-`approved-direct-execution` is allowed only for `fully-bound` or `parameterized-bound` skills with passing preflight checks. It is not allowed for `unbound-generic` workflows.
+`approved-direct-execution` is allowed only for `fully-bound` or `parameterized-bound` skills whose concrete runtime request passes the runtime gate. It is not allowed for `unbound-generic` workflows.
+
+## Preflight And Runtime Gate
+
+Creation-time preflight is best effort. The creator should run non-mutating source, writeback, and provider checks when the required tools, permissions, and concrete parameters are available, but a blocked creation-time preflight does not always prevent generating the skill.
+
+Runtime gating is mandatory before real calls. A generated skill must stop before calling when the concrete runtime request cannot verify source access, required fields, consent or outreach basis, dedupe reliability, writeback behavior or session-table fallback, provider authentication, and compatible MCP tools.
+
+Do not perform a real writeback or place a real call during preflight unless the user explicitly approved that side effect.
+
+## Writeback Binding
+
+The writeback policy is chosen at creation time:
+
+- source writeback
+- local CSV writeback
+- session table output
+
+The writeback target depends on the binding level. `fully-bound` skills fix the target and fields at creation time. `parameterized-bound` skills fix the policy and field schema, while allowing an approved runtime target such as an output CSV path or verified source instance. `unbound-generic` skills collect writeback details at runtime and are dry-run-only by default.
 
 ## Generated Skill Contract
 
@@ -50,7 +68,7 @@ Generated skills may also include focused reference files such as:
 - `references/writeback-contract.md`
 - `references/binding-contract.md`
 
-The generated `SKILL.md` must describe the source contract, binding level, runtime parameters, candidate fields, outbound goal contract, MCP provider route, execution mode, serial candidate processing, writeback behavior, preflight requirements, safety summary, and validation commands.
+The generated `SKILL.md` must describe the source contract, binding level, runtime parameters, candidate fields, outbound goal contract, MCP provider route, execution mode, serial candidate processing, writeback behavior, best-effort creation-time preflight, mandatory runtime gate requirements, safety summary, and validation commands.
 
 ## Provider Route
 

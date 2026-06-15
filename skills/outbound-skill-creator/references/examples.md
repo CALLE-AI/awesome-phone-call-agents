@@ -22,8 +22,8 @@ Captured contract:
 - outreach basis: form description states that submission authorizes a phone follow-up
 - provider route: `https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`
 - writeback: linked response spreadsheet
-- execution: `dry-run-then-batch-approval` by default; `approved-direct-execution` only when the binding level and preflight support it; after approval or direct-mode validation, process all ready candidates serially and report one final batch summary
-- preflight: verify form access, required questions, linked response spreadsheet columns, and provider route/tool readiness when available
+- execution: `dry-run-then-batch-approval` by default; `approved-direct-execution` only when the binding level supports it and the concrete runtime request passes the runtime gate; after approval or direct-mode validation, process all ready candidates serially and report one final batch summary
+- preflight and runtime gate: best-effort creation-time preflight verifies form access, required questions, linked response spreadsheet columns, and provider route/tool readiness when available; runtime gate is mandatory before real calls
 
 Generated future use:
 
@@ -42,7 +42,7 @@ Create an outbound skill named tiktok-lead-followup. It should read callable lea
 Captured contract:
 
 - output scope: user-level reusable skill unless the user explicitly asks for project-local output
-- binding level: `parameterized-bound` by default, with runtime account or campaign parameters allowed only after schema preflight
+- binding level: `parameterized-bound` by default, with runtime account or campaign parameters allowed only after runtime schema verification
 - source family: `ttmcp`
 - MCP tool names: captured from the host before generation
 - phone field: captured from returned lead records
@@ -51,7 +51,7 @@ Captured contract:
 - date filtering: record creation time in the source account timezone
 - outreach basis: lead form includes phone follow-up consent
 - writeback: approved ttmcp writeback tool or session table fallback
-- execution: `dry-run-then-batch-approval` or `approved-direct-execution` only after concrete runtime scope and preflight; record each terminal result, then write back or output one final session table
+- execution: `dry-run-then-batch-approval` or `approved-direct-execution` only after concrete runtime scope passes the runtime gate; record each terminal result, then write back or output one final session table
 
 Generated future use:
 
@@ -113,7 +113,7 @@ Recommended creator response:
 - recommend `parameterized-bound`
 - fix the required Google Form questions, consent basis, dedupe rule, goal contract, provider route, and writeback field schema
 - allow the runtime request to provide the concrete form ID and date window
-- require form schema and writeback preflight before real calls
+- run best-effort creation-time preflight when available and require form schema and writeback runtime gate checks before real calls
 - default execution mode to `dry-run-then-batch-approval`
 
 User request:
@@ -127,7 +127,7 @@ Recommended creator response:
 - recommend `fully-bound`
 - fix the concrete form, linked response spreadsheet, writeback columns, and host scheduler boundary
 - allow only narrow runtime controls such as date window
-- require preflight before enabling scheduled or approved direct execution
+- require the runtime gate before every scheduled or approved direct execution run
 
 User request:
 

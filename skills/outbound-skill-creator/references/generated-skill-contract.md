@@ -60,7 +60,7 @@ The generated `SKILL.md` must include:
 The generated skill must declare one of these binding levels:
 
 - `fully-bound`: a concrete source instance and concrete writeback target are fixed at creation time. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
-- `parameterized-bound`: the source family, access method, required field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, or output path.
+- `parameterized-bound`: the source family, access method, required field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path.
 - `unbound-generic`: the skill only fixes the goal contract and safety rules. Source access, field mapping, consent evidence, dedupe key, filters, and writeback target must be collected at runtime.
 
 Default generated skills should be `parameterized-bound`. `unbound-generic` generated skills must be dry-run-only by default and must not support approved direct execution or scheduled real calls until they are converted to `fully-bound` or `parameterized-bound`, or until the user approves an exact runtime source and writeback contract.
@@ -70,7 +70,8 @@ The generated skill must state:
 - which values are fixed at creation time
 - which runtime parameters are allowed
 - which runtime parameters are required
-- which preflight checks must pass before real calls
+- which creation-time preflight checks were completed or blocked
+- which runtime gate checks must pass before real calls
 - the maximum supported execution mode for the binding level
 
 ## Normalized Candidate Schema
@@ -117,9 +118,9 @@ The generated skill must define one execution mode:
 
 - `dry-run-then-batch-approval`: preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval.
 - `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
-- `approved-direct-execution`: after a concrete processing request, validate and preflight the candidates, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
+- `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
 
-Use `dry-run-then-batch-approval` as the default. Use `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound` and the creation-time contract explicitly allows it. Do not use `approved-direct-execution` for `unbound-generic` workflows.
+Use `dry-run-then-batch-approval` as the default. Use `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows it, and the concrete runtime request passes the runtime gate. Do not use `approved-direct-execution` for `unbound-generic` workflows.
 
 Even when direct execution is configured, the runtime request must be concrete, such as "process all June 20 records." Open-ended requests such as "run the campaign" are not enough.
 
@@ -160,7 +161,7 @@ Generated skills must support one of these writeback outcomes:
 - local CSV writeback
 - session table output
 
-The generated skill must state whether the writeback target is fully bound or parameterized, and must define field mapping when writeback is configured. The user may specify writeback fields during creation, but generated skills must keep credentials, tokens, callback URLs, confirmation tokens, cookies, and full phone numbers out of user-facing summaries and writeback fields.
+The writeback policy must be chosen at creation time. The generated skill must state whether the writeback target is fully bound or parameterized, and must define field mapping when writeback is configured. The user may specify writeback fields during creation. Runtime requests may provide a writeback target only when the selected binding level explicitly allows that parameter and the runtime gate verifies it before real calls. Generated skills must keep credentials, tokens, callback URLs, confirmation tokens, cookies, and full phone numbers out of user-facing summaries and writeback fields.
 
 Writeback records should include:
 
@@ -177,13 +178,16 @@ Do not write credentials, tokens, cookies, confirmation tokens, callback URLs, o
 
 ## Preflight and Creation Summary
 
-Generated skills must document preflight requirements for the selected binding level:
+Generated skills must document best-effort creation-time preflight and mandatory runtime gate requirements for the selected binding level:
 
 - source authentication or connectivity
 - source schema and required fields
+- consent or outreach basis validation
 - writeback target and fields, unless session-table fallback is configured
 - dedupe state or stable dedupe key
 - MCP provider route availability and compatible tools
+
+Creation-time preflight may be skipped or blocked when tools, permissions, or concrete runtime parameters are unavailable. The generated skill must record that blocker. Runtime gating must not be skipped before real calls.
 
 After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, binding level, runtime parameters, source contract, outbound goal contract, execution mode, writeback behavior, provider route, validation result, and reload or discovery step.
 

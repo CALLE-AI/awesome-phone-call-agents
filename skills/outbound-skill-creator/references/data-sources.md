@@ -20,7 +20,8 @@ Capture these values before generating a business skill:
 - outreach basis or consent field
 - writeback capability
 - writeback policy and field mapping
-- preflight result or documented preflight blocker
+- creation-time preflight result or documented preflight blocker
+- runtime gate requirements before real calls
 
 Do not guess missing identifiers, credentials, field names, date filters, or country codes.
 
@@ -31,14 +32,14 @@ Choose one binding level before writing the generated skill:
 | Binding level | What must be fixed at creation time | What may be supplied at runtime |
 | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field names, consent rule, dedupe key, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. |
-| `parameterized-bound` | Source family, access method, required schema, consent rule, dedupe key, writeback policy, and writeback field schema. | Approved instance parameters such as form ID, CSV path, campaign ID, date window, or output path. |
+| `parameterized-bound` | Source family, access method, required schema, consent rule, dedupe key, writeback policy, and writeback field schema. | Approved instance parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. |
 | `unbound-generic` | Goal contract, safety rules, and the requirement to collect source and writeback details at runtime. | Source access, all field mappings, consent evidence, dedupe key, filters, and writeback target. |
 
 Default to `parameterized-bound`. Use `fully-bound` for stable production or scheduled workflows. Use `unbound-generic` only for exploratory or dry-run-only workflows unless the user later supplies an exact runtime source and writeback contract for approval.
 
-## Preflight
+## Preflight and Runtime Gate
 
-Run non-mutating preflight checks when tools and permissions are available:
+Creation-time preflight is best effort. Run non-mutating checks when tools and permissions are available:
 
 - verify source authentication or connectivity
 - inspect source schema or a small metadata/sample response without placing calls
@@ -46,7 +47,9 @@ Run non-mutating preflight checks when tools and permissions are available:
 - confirm writeback target and fields exist, or confirm that session-table fallback will be used
 - confirm the MCP provider route and compatible plan, run, or status tools are available
 
-Do not perform a real writeback or place a real call during preflight unless the user explicitly approved that side effect. If preflight cannot run, record the blocker and require the generated skill to stop before real calls when the missing capability is still unavailable.
+Do not perform a real writeback or place a real call during preflight unless the user explicitly approved that side effect. If creation-time preflight cannot run, record the blocker and require the generated skill to stop before real calls when the missing capability is still unavailable for the concrete runtime request.
+
+Runtime gating is mandatory before real calls. The generated skill must verify source access, required fields, consent or outreach basis, dedupe reliability, writeback behavior or session-table fallback, and provider route/tool readiness for the concrete request.
 
 ## Google Form
 
@@ -69,7 +72,7 @@ Generated Google Form skills must require a clear basis for phone follow-up. The
 
 If the form has no linked response spreadsheet and the user wants writeback, require an Apps Script fallback or ask the user to link a response spreadsheet before real writeback.
 
-For `fully-bound`, capture the concrete form or response spreadsheet and writeback columns. For `parameterized-bound`, capture the required question names and allow the runtime request to provide the form ID only when preflight can verify that the form matches the schema. For `unbound-generic`, keep the skill dry-run-only until form access, field mapping, consent basis, and writeback behavior are supplied.
+For `fully-bound`, capture the concrete form or response spreadsheet and writeback columns. For `parameterized-bound`, capture the required question names and allow the runtime request to provide the form ID only when the runtime gate verifies that the form matches the schema. For `unbound-generic`, keep the skill dry-run-only until form access, field mapping, consent basis, and writeback behavior are supplied.
 
 ## ttmcp
 
@@ -93,7 +96,7 @@ Generated ttmcp skills must not assume every record is callable. They must valid
 
 Do not invent ttmcp tools or schemas. If the host does not expose a writeback-capable tool, use session-table output or local CSV output.
 
-For `fully-bound`, capture the concrete account, advertiser, campaign, or lead scope and writeback tool. For `parameterized-bound`, capture the exact MCP tools and required returned fields, then allow runtime account or campaign identifiers only when preflight confirms the returned schema. For `unbound-generic`, do not permit approved direct execution.
+For `fully-bound`, capture the concrete account, advertiser, campaign, or lead scope and writeback tool. For `parameterized-bound`, capture the exact MCP tools and required returned fields, then allow runtime account or campaign identifiers only when the runtime gate confirms the returned schema. For `unbound-generic`, do not permit approved direct execution.
 
 ## Local CSV
 

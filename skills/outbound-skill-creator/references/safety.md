@@ -25,21 +25,21 @@ Every generated business skill must include rules for:
 - dedupe by stable candidate ID or source record ID
 - clear cancellation behavior for scheduled workflows
 - dry-run or approved direct execution policy
-- preflight requirements before real calls
+- best-effort creation-time preflight and mandatory runtime gate requirements before real calls
 - sensitive-domain boundaries
 
 ## Direct Execution
 
 Direct execution is allowed only when the generated skill's creation-time contract explicitly says that a concrete request such as "process all June 20 records" authorizes real calls after validation.
 
-Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass preflight. It is not allowed for `unbound-generic` workflows.
+Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass the runtime gate. It is not allowed for `unbound-generic` workflows.
 
 Direct execution still requires:
 
 - candidate validation
 - outreach basis validation
 - dedupe checks
-- source and writeback preflight when the workflow is parameterized
+- source and writeback runtime gate checks when the workflow is parameterized
 - masked summaries
 - skipping unsafe records
 - writeback or session-table output
