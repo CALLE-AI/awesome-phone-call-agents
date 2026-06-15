@@ -222,6 +222,7 @@ def validate_expected_files() -> None:
         "skills/call-reminder/scripts/render-runtime-prompt.mjs",
         "skills/call-reminder/scripts/validate-reminder-input.mjs",
         "skills/outbound-skill-creator/SKILL.md",
+        "skills/outbound-skill-creator/README.md",
         "skills/outbound-skill-creator/references/data-sources.md",
         "skills/outbound-skill-creator/references/generated-skill-contract.md",
         "skills/outbound-skill-creator/references/mcp-provider-route.md",
@@ -446,6 +447,8 @@ def validate_outbound_skill_creator_acceptance_rules() -> None:
             "scope-first output rule",
             "If the installed `outbound-skill-creator` folder is inside a recognized user-level skills root",
             "Never write a generated business skill into the downloaded `outbound-skill-creator` skill folder itself.",
+            "parameterized-bound",
+            "approved-direct-execution",
             "Run repository validation only when the generated skill is being committed to a repository that provides a validation command.",
         ],
     )
@@ -481,6 +484,11 @@ Use this generated business skill for user-authorized outbound phone call workfl
 
 Do not use this skill for emergency, medical, legal, or financial advice workflows.
 Do not use a CLI bootstrap path.
+
+## Binding Level and Runtime Parameters
+
+Binding level is parameterized-bound. Runtime parameters include date window and
+approved source instance identifiers allowed by the source contract.
 
 ## Source Contract
 

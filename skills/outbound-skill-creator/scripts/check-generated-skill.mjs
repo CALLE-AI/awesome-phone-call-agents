@@ -16,6 +16,10 @@ const REQUIRED_SKILL_MARKERS = [
     patterns: [/when not to use/iu, /do not use/iu],
   },
   {
+    label: "binding level and runtime parameters",
+    patterns: [/binding level/iu, /runtime parameters/iu],
+  },
+  {
     label: "source contract",
     patterns: [/source contract/iu],
   },

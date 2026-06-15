@@ -4,15 +4,18 @@ Use this reference when creating a generated outbound phone-call business skill.
 
 ## Creator Safety
 
-The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and writeback behavior.
+The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a binding level, source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and writeback behavior.
 
 If the user cannot explain why records are authorized for phone follow-up, generate a dry-run-only skill or stop and ask for a consent field or approved source basis.
+
+Default to a `parameterized-bound` skill when the user wants reuse but has not asked for a single fixed source instance. Use `fully-bound` for stable production or scheduled workflows. Use `unbound-generic` only for exploratory or dry-run-only workflows unless the user later approves a complete runtime source and writeback contract.
 
 ## Generated Skill Safety
 
 Every generated business skill must include rules for:
 
 - explicit user intent before processing records for calls
+- binding-level compatibility with the selected execution mode
 - E.164 phone numbers
 - no country-code guessing
 - masked phone numbers in summaries
@@ -22,17 +25,21 @@ Every generated business skill must include rules for:
 - dedupe by stable candidate ID or source record ID
 - clear cancellation behavior for scheduled workflows
 - dry-run or approved direct execution policy
+- preflight requirements before real calls
 - sensitive-domain boundaries
 
 ## Direct Execution
 
 Direct execution is allowed only when the generated skill's creation-time contract explicitly says that a concrete request such as "process all June 20 records" authorizes real calls after validation.
 
+Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass preflight. It is not allowed for `unbound-generic` workflows.
+
 Direct execution still requires:
 
 - candidate validation
 - outreach basis validation
 - dedupe checks
+- source and writeback preflight when the workflow is parameterized
 - masked summaries
 - skipping unsafe records
 - writeback or session-table output

@@ -1,6 +1,6 @@
 ---
 name: outbound-skill-creator
-description: Create directly usable outbound phone-call Agent Skills that connect data sources such as Google Forms, ttmcp, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
+description: Create directly usable outbound phone-call Agent Skills that bind source and writeback contracts at the right level, connect data such as Google Forms, ttmcp, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
 ---
 
 # Outbound Skill Creator
@@ -8,6 +8,8 @@ description: Create directly usable outbound phone-call Agent Skills that connec
 Use this skill when the user wants to create a new outbound phone-call workflow skill that can later process source records directly, compile one call goal per eligible record, run calls through the configured MCP provider route, and write results back or display a session table.
 
 `outbound-skill-creator` creates focused business skills. It does not process campaign data itself, does not create a generic outbound runtime platform, and does not use a CLI bootstrap path.
+
+Generated skills should bind enough source, writeback, and safety detail to make later runs predictable. Default to a parameterized-bound workflow: the source family, field schema, consent rule, dedupe rule, goal contract, and writeback policy are fixed at creation time, while runtime requests can still provide approved parameters such as a date window, form ID, CSV path, campaign ID, or output file path.
 
 ## Core Rule
 
@@ -28,15 +30,18 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 3. Read `references/output-targets.md`, choose the scope, and choose a host-compatible output parent.
 4. Ask which source family to use: `google-form`, `ttmcp`, `local-csv`, or `other`.
 5. Read `references/data-sources.md` for the selected source family.
-6. Capture the source fields for phone number, recipient label, dedupe key, date filtering, and goal inputs.
-7. Capture the outbound goal contract: call purpose, required context, allowed questions, completion criteria, result values, and escalation cases.
-8. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
-9. Capture execution policy: dry-run first or approved direct execution after a concrete processing request, including serial processing after approval.
-10. Capture writeback policy: source writeback, local CSV writeback, or session table fallback.
-11. Read `references/safety.md` and include the required safety boundaries in the generated skill.
-12. Generate the business skill folder and files in the selected output parent using `references/generated-skill-contract.md`.
-13. Run this skill's bundled checker script with `--skill-dir <generated-business-skill-dir>`.
-14. Run repository validation only when the generated skill is being committed to a repository that provides a validation command.
+6. Ask the user to choose a binding level, defaulting to `parameterized-bound` when they do not choose: `fully-bound`, `parameterized-bound`, or `unbound-generic`.
+7. Capture the source fields for phone number, recipient label, dedupe key, date filtering, outreach basis or consent, goal inputs, and any runtime parameters allowed by the binding level.
+8. Capture the outbound goal contract: call purpose, required context, allowed questions, prohibited claims, completion criteria, result values, summary format, and escalation cases.
+9. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
+10. Ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`: `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`.
+11. Capture writeback policy and field mapping: source writeback, local CSV writeback, or session table fallback.
+12. Run feasible preflight checks before generation when tools and permissions are available: read-only source auth/schema checks, non-mutating writeback target and field checks, and MCP route/tool readiness. If preflight cannot run, record the blocker in the generated skill.
+13. Read `references/safety.md` and include the required safety boundaries in the generated skill.
+14. Generate the business skill folder and files in the selected output parent using `references/generated-skill-contract.md`.
+15. Run this skill's bundled checker script with `--skill-dir <generated-business-skill-dir>`.
+16. Show the user a creation summary covering skill name, path, binding level, source contract, goal contract, execution mode, writeback target, provider route, validation result, and reload or discovery note.
+17. Run repository validation only when the generated skill is being committed to a repository that provides a validation command.
 
 ## Built-In Choices
 
@@ -48,6 +53,28 @@ Present these source families by default:
 - `other`: a custom source that requires multi-turn clarification before generating the skill.
 
 If the user selects `other`, do not guess API schemas, credentials, identifiers, date filters, writeback behavior, or MCP tool names. Ask for the missing contract details one at a time.
+
+## Binding Levels
+
+Ask the user to choose a binding level before writing the generated skill. If the user has no preference, use `parameterized-bound`.
+
+| Binding level | Creation-time contract | Runtime parameters | Maximum automation |
+| --- | --- | --- | --- |
+| `fully-bound` | Concrete source instance, field mapping, consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after preflight passes. |
+| `parameterized-bound` | Source family, access method, required field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, or output path. | Default. Eligible for dry-run batch approval, per-call approval, and approved direct execution only after concrete runtime parameters pass preflight. |
+| `unbound-generic` | Goal contract and safety rules only; source and writeback details are collected at runtime. | Source access, fields, filters, consent evidence, dedupe key, and writeback target must be supplied each run. | Dry-run only by default. Do not allow real direct execution or scheduled runs until the workflow is converted to a bound skill or an exact runtime contract is approved. |
+
+Do not create a real-call skill with no phone field, no outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path. If those values are unavailable, generate a dry-run-only `unbound-generic` skill or keep asking for the missing contract.
+
+## Execution Modes
+
+Ask the user to choose the generated skill's execution mode after choosing the binding level. If the user does not choose, use `dry-run-then-batch-approval`.
+
+- `dry-run-then-batch-approval`: preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval.
+- `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
+- `approved-direct-execution`: after a concrete processing request, validate and preflight the candidates, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
+
+Use `approved-direct-execution` only for `fully-bound` or `parameterized-bound` generated skills. Do not use it for `unbound-generic` workflows.
 
 ## Generated Skill Requirements
 
@@ -62,6 +89,7 @@ Generate additional reference files when the workflow is too detailed for the ma
 - `references/source-contract.md`
 - `references/goal-contract.md`
 - `references/writeback-contract.md`
+- `references/binding-contract.md`
 
 Generate scripts only when deterministic handling is valuable, such as CSV parsing, candidate validation, dedupe state checks, dry-run rendering, or writeback payload generation.
 
@@ -78,6 +106,8 @@ The generated skill must use the MCP tools exposed by the host for that route. I
 ## Direct Execution Policy
 
 A generated skill may support approved direct execution when the user gives a concrete processing request such as "process all June 20 records" and the creation-time contract explicitly allowed direct execution.
+
+Approved direct execution requires a `fully-bound` generated skill or a `parameterized-bound` generated skill whose concrete runtime parameters pass source, writeback, dedupe, and provider preflight checks. It is not allowed for `unbound-generic` workflows.
 
 Even in direct execution mode, the generated skill must:
 
