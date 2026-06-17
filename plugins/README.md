@@ -23,3 +23,9 @@ Each plugin should document:
 - preview, dry-run, or confirmation behavior when possible
 - cancellation, rollback, or disable instructions when relevant
 - tests, examples, or a manual verification path
+
+## Available plugins
+
+| Plugin | Platform | Purpose |
+| --- | --- | --- |
+| [`n8n-calle-api`](n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |

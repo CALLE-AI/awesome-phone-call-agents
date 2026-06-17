@@ -1,0 +1,22 @@
+{
+  "name": "n8n-calle-api",
+  "title": "n8n CALL-E API workflow template",
+  "platform": "n8n",
+  "type": "workflow-template",
+  "description": "Importable n8n workflow that calls the CALL-E API directly, waits for completion, and returns metadata, status, transcript, summary, and structured results.",
+  "entrypoints": [
+    {
+      "name": "CALL-E API createAndWait - IVR quality sample",
+      "path": "examples/calle-ivr-quality-create-and-wait.workflow.json"
+    }
+  ],
+  "side_effects": [
+    "Creates outbound phone calls when a valid CALL-E API key and reachable phone numbers are configured."
+  ],
+  "credentials": [
+    "CALL-E API key stored in the n8n CALL-E Config code node before execution."
+  ],
+  "tested_with": {
+    "n8n": "2.26.4"
+  }
+}

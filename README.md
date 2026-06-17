@@ -269,6 +269,10 @@ No-code and low-code workflow plugins live under [`plugins/`](plugins/). They ar
 
 Plugins should be explicit about inputs, outbound call side effects, credential handling, preview or dry-run behavior, and how a workflow builder can disable or roll back the integration.
 
+| Plugin | Platform | Purpose |
+| --- | --- | --- |
+| [`plugins/n8n-calle-api`](plugins/n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
+
 ## Adapters and recipes
 
 - [`CALL-E CLI bootstrap`](skills/call-reminder/references/calle-cli-bootstrap.md) - Resolver order for repository-local, global, and pinned `npx` CALL-E CLI routes.

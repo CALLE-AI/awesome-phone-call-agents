@@ -1,0 +1,302 @@
+{
+  "id": "calleApiIvrQualityCreateAndWaitSample",
+  "name": "CALL-E API createAndWait - IVR quality sample",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## CALL-E API IVR quality sample\nManual trigger sample with two public Brazil IVR/contact-center rows. Each row has `phone`, `task`, and `metadata`. `Loop Over Calls` runs with batch size 1, so CALL-E createAndWait is executed one phone at a time before the loop advances to the next row.",
+        "height": 200,
+        "width": 620,
+        "color": 4
+      },
+      "id": "sticky-overview",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -760,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Configure before running\n1. Fill `apiKey` in CALL-E Config. The workflow fails fast if it is missing.\n2. The default rows use public Brazil IVR/contact-center numbers from official pages and may trigger real calls. Replace them with owned or authorized test numbers for live runs.\n3. Edit each IVR QA task and metadata as needed.\n\nNo Form Trigger, Notion node, npm SDK, Execute Command, or external dependency is used. The visible loop node controls one-by-one dialing.",
+        "height": 220,
+        "width": 520,
+        "color": 5
+      },
+      "id": "sticky-config",
+      "name": "Config note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -360
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -760,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [\n  {\n    json: {\n      calleConfig: {\n        apiKey: \"replace_with_calle_api_key\",\n        baseUrl: \"https://api.heycall-e.com\",\n        pollIntervalSeconds: 5,\n        waitTimeoutMinutes: 30\n      }\n    }\n  }\n];"
+      },
+      "id": "calle-config",
+      "name": "CALL-E Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst config = items[0]?.json?.calleConfig || {};\n\nif (!config.apiKey || config.apiKey === \"replace_with_calle_api_key\") {\n  throw new Error(\"CALL-E API key is missing. Open the CALL-E Config node and replace apiKey before running this workflow.\");\n}\n\nif (!config.baseUrl) {\n  throw new Error(\"CALL-E baseUrl is missing. Open the CALL-E Config node and set baseUrl.\");\n}\n\nreturn items;"
+      },
+      "id": "validate-config",
+      "name": "Validate CALL-E Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const config = $input.first().json.calleConfig;\n\nconst callTasks = [\n  {\n    callItemId: \"ivr_azul_001\",\n    ivrName: \"Azul customer service IVR\",\n    phone: \"+551140031118\",\n    region: \"BR\",\n    locale: \"pt-BR\",\n    task: \"Call the public Azul customer service IVR in Brazil. This is an IVR quality recording sample. Do not enter personal data, do not attempt authentication, do not make purchases, and do not request a human agent. Listen to the opening IVR/menu for up to 90 seconds. Record whether the IVR connected, detected language, menu clarity, audio quality, latency, interruptions, DTMF or speech prompts, and any transfer or retry prompts. Return a concise summary and structured IVR quality result.\",\n    metadata: {\n      lead_id: \"ivr_azul_001\",\n      notion_page_id: \"ivr_demo_azul\",\n      company: \"Azul\",\n      property: \"Public customer service IVR\",\n      campaign: \"Brazil IVR QA\",\n      source_url: \"https://www.voeazul.com.br/br/pt/ajuda/acompanhamento-de-solicitacao\"\n    }\n  },\n  {\n    callItemId: \"ivr_correios_002\",\n    ivrName: \"Correios customer service IVR\",\n    phone: \"40038212\",\n    region: \"BR\",\n    locale: \"pt-BR\",\n    task: \"Call the public Correios customer service IVR in Brazil. This is an IVR quality recording sample. Do not enter personal data, do not attempt authentication, do not open a customer case, and do not request a human agent. Listen to the opening IVR/menu for up to 90 seconds. Record whether the IVR connected, detected language, menu clarity, audio quality, latency, interruptions, DTMF or speech prompts, and any transfer or retry prompts. Return a concise summary and structured IVR quality result.\",\n    metadata: {\n      lead_id: \"ivr_correios_002\",\n      notion_page_id: \"ivr_demo_correios\",\n      company: \"Correios\",\n      property: \"Public customer service IVR\",\n      campaign: \"Brazil IVR QA\",\n      source_url: \"https://www.correios.com.br/falecomoscorreios\"\n    }\n  }\n];\n\nreturn callTasks.map((callTask) => ({\n  json: {\n    ...callTask,\n    metadataSent: callTask.metadata,\n    calleConfig: config\n  }\n}));"
+      },
+      "id": "phone-task-list",
+      "name": "2 Phone/Task List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        60,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-over-calls",
+      "name": "Loop Over Calls",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        340,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const resultSchema = {\n  type: \"object\",\n  required: [\"ivr_reachable\", \"call_quality\", \"summary\", \"next_action\"],\n  properties: {\n    ivr_reachable: {\n      type: \"string\",\n      enum: [\"yes\", \"no\", \"unknown\"]\n    },\n    call_quality: {\n      type: \"string\",\n      enum: [\"good\", \"fair\", \"poor\", \"unknown\"]\n    },\n    summary: { type: \"string\" },\n    next_action: {\n      type: \"string\",\n      enum: [\"pass\", \"retry_later\", \"manual_review\"]\n    },\n    language_detected: { type: \"string\" },\n    menu_summary: { type: \"string\" },\n    audio_issues: { type: \"string\" },\n    latency_or_interruption_notes: { type: \"string\" },\n    dtmf_or_speech_prompt_notes: { type: \"string\" }\n  }\n};\n\nconst recipientResultSchema = {\n  type: \"object\",\n  required: [\"ivr_reachable\", \"call_quality\", \"summary\", \"next_action\"],\n  properties: resultSchema.properties\n};\n\nreturn $input.all().map((item) => {\n  const { calleConfig, metadata, metadataSent, ...callTask } = item.json;\n  const metadataPayload = metadataSent || metadata || {};\n  const createInput = {\n    task: callTask.task,\n    recipients: [\n      {\n        phones: [callTask.phone],\n        region: callTask.region || \"BR\",\n        locale: callTask.locale || \"pt-BR\"\n      }\n    ],\n    result_schema: resultSchema,\n    recipient_result_schema: recipientResultSchema,\n    metadata: {\n      ...metadataPayload,\n      source: \"n8n_two_call_task_list_sample\"\n    }\n  };\n\n  const idempotencyKey = [\n    \"n8n_list\",\n    metadataPayload.campaign || \"campaign\",\n    metadataPayload.lead_id || callTask.phone,\n    callTask.callItemId\n  ].join(\"_\").replace(/[^a-zA-Z0-9_-]/g, \"_\");\n\n  return {\n    json: {\n      ...callTask,\n      calleConfig,\n      metadataSent: createInput.metadata,\n      createInput,\n      idempotencyKey\n    }\n  };\n});"
+      },
+      "id": "build-api-input",
+      "name": "Build CALL-E API Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const terminalStatuses = new Set([\"completed\", \"failed\", \"canceled\"]);\n\nfunction sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nasync function requestJson(url, options) {\n  const response = await helpers.httpRequest({\n    url,\n    method: options.method,\n    headers: options.headers,\n    body: options.body,\n    json: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n\n  const statusCode = response.statusCode;\n  const body = response.body;\n\n  if (statusCode < 200 || statusCode >= 300) {\n    throw new Error(`CALL-E API request failed: ${statusCode} ${response.statusMessage || \"\"} ${JSON.stringify(body)}`);\n  }\n\n  return body;\n}\n\nasync function createAndWaitForCurrentItem(item) {\n  const { calleConfig, createInput, idempotencyKey, ...callTask } = item.json;\n  const apiKey = calleConfig?.apiKey;\n\n  if (!apiKey || apiKey === \"replace_with_calle_api_key\") {\n    throw new Error(\"CALL-E API key is missing. Open the CALL-E Config node and replace apiKey before running this workflow.\");\n  }\n\n  const baseUrl = (calleConfig?.baseUrl || \"https://api.heycall-e.com\").replace(/\\/$/, \"\");\n  const pollIntervalMs = Math.max(1, Number(calleConfig?.pollIntervalSeconds || 5)) * 1000;\n  const timeoutMs = Math.max(1, Number(calleConfig?.waitTimeoutMinutes || 30)) * 60 * 1000;\n  const startedAtMs = Date.now();\n  let pollCount = 0;\n\n  const headers = {\n    \"Accept\": \"application/json\",\n    \"Authorization\": `Bearer ${apiKey}`,\n    \"Content-Type\": \"application/json\"\n  };\n\n  if (idempotencyKey) {\n    headers[\"Idempotency-Key\"] = idempotencyKey;\n  }\n\n  try {\n    let call = await requestJson(`${baseUrl}/v1/calls`, {\n      method: \"POST\",\n      headers,\n      body: createInput\n    });\n\n    while (!terminalStatuses.has(call.status)) {\n      if (Date.now() - startedAtMs >= timeoutMs) {\n        throw new Error(`Timed out waiting for CALL-E call ${call.id} after ${timeoutMs}ms.`);\n      }\n\n      await sleep(pollIntervalMs);\n      pollCount += 1;\n      call = await requestJson(`${baseUrl}/v1/calls/${call.id}`, {\n        method: \"GET\",\n        headers\n      });\n    }\n\n    return {\n      json: {\n        ...callTask,\n        createInput,\n        ok: true,\n        idempotencyKey,\n        pollCount,\n        rawCallResult: call,\n        apiError: null\n      }\n    };\n  } catch (error) {\n    return {\n      json: {\n        ...callTask,\n        createInput,\n        ok: false,\n        idempotencyKey,\n        pollCount,\n        rawCallResult: null,\n        apiError: {\n          message: error.message,\n          name: error.name || \"Error\"\n        }\n      }\n    };\n  }\n}\n\nreturn await Promise.all($input.all().map((item) => createAndWaitForCurrentItem(item)));"
+      },
+      "id": "api-create-and-wait",
+      "name": "CALL-E API createAndWait",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "function asArray(value) {\n  return Array.isArray(value) ? value : [];\n}\n\nfunction asObject(value) {\n  return value && typeof value === \"object\" && !Array.isArray(value) ? value : null;\n}\n\nfunction normalizeCode(value) {\n  return String(value || \"\").trim().toLowerCase().replace(/[\\s-]+/g, \"_\");\n}\n\nfunction latest(values) {\n  return values.length > 0 ? values[values.length - 1] : null;\n}\n\nreturn $input.all().map((item) => {\n  const call = asObject(item.json.rawCallResult);\n  const recipient = latest(asArray(call?.recipients));\n  const attempts = asArray(recipient?.attempts);\n  const latestAttempt = latest(attempts);\n  const transcriptTurns = attempts.flatMap((attempt) => asArray(attempt.transcript_turns));\n  const structuredResult = asObject(recipient?.structured_result) || asObject(call?.structured_result) || null;\n  const rawFailureCode = latestAttempt?.failure_code || call?.failure_code || null;\n  const failureCode = normalizeCode(rawFailureCode);\n  const callStatus = call?.status || null;\n  const recipientStatus = recipient?.status || null;\n  const latestAttemptStatus = latestAttempt?.status || null;\n  const answered = latestAttemptStatus === \"completed\" || recipientStatus === \"completed\";\n  const noAnswer = failureCode === \"no_answer\";\n  const busy = failureCode === \"busy\";\n  const failed = Boolean(item.json.apiError) || callStatus === \"failed\" || recipientStatus === \"failed\" || latestAttemptStatus === \"failed\";\n\n  return {\n    json: {\n      ...item.json,\n      callId: call?.id || null,\n      callStatus,\n      recipientStatus,\n      latestAttemptStatus,\n      failureCode: rawFailureCode,\n      failureMessage: latestAttempt?.failure_message || call?.failure_message || null,\n      metadataReturned: asObject(call?.metadata) || {},\n      summary: structuredResult?.summary || recipient?.summary || call?.summary || latestAttempt?.summary || null,\n      transcriptTurns,\n      structuredResult,\n      statusSignals: {\n        answered,\n        no_answer: noAnswer,\n        busy,\n        failed\n      },\n      taskCompleted: call?.task_completed ?? null,\n      completionConfidence: call?.completion_confidence ?? null,\n      evidence: asArray(call?.evidence)\n    }\n  };\n});"
+      },
+      "id": "parse-api-result",
+      "name": "Parse CALL-E Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const metadataKeys = [\"lead_id\", \"notion_page_id\", \"company\", \"property\", \"campaign\"];\n\nreturn $input.all().map((item) => {\n  const result = item.json;\n  const metadataSent = result.metadataSent || {};\n  const metadataReturned = result.metadataReturned || {};\n  const missingReturnedMetadata = metadataKeys.filter((key) => metadataSent[key] !== metadataReturned[key]);\n\n  return {\n    json: {\n      callItemId: result.callItemId,\n      phone: result.phone,\n      task: result.task,\n      metadataSent,\n      metadataReturned,\n      metadataRoundTrip: {\n        requestedKeys: metadataKeys,\n        allRequestedKeysReturned: missingReturnedMetadata.length === 0,\n        missingOrDifferentKeys: missingReturnedMetadata\n      },\n      callStatus: {\n        ok: result.ok,\n        callId: result.callId,\n        call_status: result.callStatus,\n        recipient_status: result.recipientStatus,\n        latest_attempt_status: result.latestAttemptStatus,\n        failure_code: result.failureCode,\n        failure_message: result.failureMessage,\n        answered: result.statusSignals?.answered || false,\n        no_answer: result.statusSignals?.no_answer || false,\n        busy: result.statusSignals?.busy || false,\n        failed: result.statusSignals?.failed || false\n      },\n      returnedData: {\n        summary: result.summary,\n        transcript: result.transcriptTurns,\n        structuredResult: result.structuredResult\n      },\n      rawCallResult: result.rawCallResult,\n      apiError: result.apiError\n    }\n  };\n});"
+      },
+      "id": "demo-result-view",
+      "name": "Demo Result View",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\n\nreturn [\n  {\n    json: {\n      processedCount: items.length,\n      successfulCount: items.filter((item) => item.json.callStatus?.ok).length,\n      failedCount: items.filter((item) => !item.json.callStatus?.ok).length,\n      results: items.map((item) => ({\n        callItemId: item.json.callItemId,\n        phone: item.json.phone,\n        task: item.json.task,\n        metadataSent: item.json.metadataSent,\n        metadataReturned: item.json.metadataReturned,\n        metadataRoundTrip: item.json.metadataRoundTrip,\n        callStatus: item.json.callStatus,\n        returnedData: item.json.returnedData\n      }))\n    }\n  }\n];"
+      },
+      "id": "execution-summary",
+      "name": "Execution Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -120
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "CALL-E Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CALL-E Config": {
+      "main": [
+        [
+          {
+            "node": "Validate CALL-E Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate CALL-E Config": {
+      "main": [
+        [
+          {
+            "node": "2 Phone/Task List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 Phone/Task List": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Calls": {
+      "main": [
+        [
+          {
+            "node": "Execution Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build CALL-E API Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build CALL-E API Input": {
+      "main": [
+        [
+          {
+            "node": "CALL-E API createAndWait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CALL-E API createAndWait": {
+      "main": [
+        [
+          {
+            "node": "Parse CALL-E Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CALL-E Result": {
+      "main": [
+        [
+          {
+            "node": "Demo Result View",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demo Result View": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "active": false,
+  "versionId": "calle-api-two-call-list-sample-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
