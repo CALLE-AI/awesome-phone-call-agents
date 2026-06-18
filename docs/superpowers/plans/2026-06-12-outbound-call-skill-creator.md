@@ -30,19 +30,17 @@
 
 ## Current Design Alignment
 
-The implemented creator now uses a three-level binding model:
+The implemented creator now uses a two-level binding model:
 
 - `fully-bound`: concrete source and writeback target fixed at creation time
-- `parameterized-bound`: default; schema, consent, dedupe, goal, and writeback policy fixed while approved runtime parameters provide source or target instances
-- `unbound-generic`: dry-run-only by default until a complete runtime contract is supplied
+- `parameterized-bound`: minimum and default; schema, consent, dedupe, goal, and writeback policy fixed while approved runtime parameters provide source or target instances
 
 Generated skills select one execution mode:
 
 - `dry-run-then-batch-approval`
-- `per-call-approval`
 - `approved-direct-execution`
 
-`approved-direct-execution` is valid only for `fully-bound` or runtime-verified `parameterized-bound` workflows. It is not valid for `unbound-generic`.
+`approved-direct-execution` is valid only for `fully-bound` or runtime-verified `parameterized-bound` workflows.
 
 Creation-time preflight is best effort. Runtime gating is mandatory before real calls. The checker now requires generated skills to declare a selected binding level, selected execution mode, the default MCP provider route, runtime gate requirements, and the required safety sections.
 
@@ -960,7 +958,7 @@ https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth
 
 ## Execution Modes
 
-Supported execution modes are dry run, preview, and confirmed one-off run.
+Supported execution modes are dry-run batch approval and approved direct execution.
 
 ## Serial Candidate Execution
 

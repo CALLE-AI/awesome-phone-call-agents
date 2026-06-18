@@ -18,7 +18,7 @@
 - Modify `skills/outbound-call-skill-creator/references/creation-summary.md`: add source onboarding status to the user-facing summary contract.
 - Modify `skills/outbound-call-skill-creator/references/examples.md`: update examples to show auth, sample fetch, and default goal definition during creation.
 - Modify `docs/outbound-call-skill-creator/README.md`: reflect the new creation-time onboarding flow for humans.
-- Modify `skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs`: reject generated skills that omit source onboarding markers or unsafe unbound-generic blocker handling.
+- Modify `skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs`: reject generated skills that omit source onboarding markers or use unsupported binding levels.
 - Modify `scripts/validate_repository.py`: add checker smoke tests for source onboarding acceptance and rejection.
 
 ## Task 1: Add Failing Validator Coverage For Source Onboarding
@@ -187,18 +187,13 @@ if (["fully-bound", "parameterized-bound"].includes(selectedBindingLevel)) {
 }
 ```
 
-- [ ] **Step 4: Require dry-run-only blockers for unbound generic onboarding**
+- [ ] **Step 4: Reject unsupported binding levels**
 
 Immediately after the bound onboarding block, add:
 
 ```javascript
-if (selectedBindingLevel === "unbound-generic") {
-  if (!/dry-run-only/iu.test(skillText)) {
-    fail("Unbound generic generated skill must declare dry-run-only behavior");
-  }
-  if (!/onboarding blocker/iu.test(skillText)) {
-    fail("Unbound generic generated skill must record a source onboarding blocker");
-  }
+if (UNSUPPORTED_BINDING_LEVEL_RE.test(skillText)) {
+  fail("Generated skill must use fully-bound or parameterized-bound");
 }
 ```
 
@@ -236,12 +231,12 @@ Replace steps 7 through 12 under `## Required Creator Workflow` with:
 7. Run creation-time source onboarding for the selected binding level:
    - `fully-bound`: authenticate or verify the concrete source, fetch a representative sample from that source, confirm schema and writeback readiness, and stop before generating a real-call skill if onboarding cannot complete.
    - `parameterized-bound`: authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and record which runtime parameters may vary later.
-   - `unbound-generic`: collect or record the missing source onboarding blockers and keep the generated skill dry-run-only until an exact runtime contract is approved.
+   If source onboarding cannot satisfy the minimum `parameterized-bound` contract, do not write the generated skill yet; continue onboarding or stop with the missing contract details.
 8. Capture the source fields from the sampled schema for phone number, recipient label, dedupe key, date filtering, outreach basis or consent, goal inputs, and any runtime parameters allowed by the binding level.
 9. Show a small redacted sample summary and prompt the user to confirm or adjust field mapping.
 10. Prompt the user to define the default outbound goal from the sampled fields: call purpose, required context, allowed questions, prohibited claims, completion criteria, result values, summary format, and escalation cases.
 11. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
-12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`: `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`.
+12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`: `dry-run-then-batch-approval` or `approved-direct-execution`.
 13. Capture writeback policy at creation time and capture field mapping or allowed runtime writeback parameters: source writeback, local CSV writeback, or session table fallback.
 14. Run best-effort creation-time preflight checks when tools and permissions are available: read-only source auth/schema checks, non-mutating writeback target or field checks, and MCP route/tool readiness. If preflight cannot run for a bound workflow, record the blocker and do not generate a real-call skill until runtime onboarding requirements are satisfied.
 15. Read `references/safety.md` and include the required safety boundaries in the generated skill.
@@ -264,7 +259,7 @@ For `fully-bound` generated skills, authenticate or verify the concrete source, 
 
 For `parameterized-bound` generated skills, authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and allow runtime instances only when the runtime gate verifies the same schema and source contract.
 
-For `unbound-generic` generated skills, source onboarding may be incomplete only when the missing values are recorded as onboarding blockers and the generated skill is dry-run-only until an exact runtime source, schema, consent, dedupe, and writeback contract is approved.
+If source onboarding cannot produce enough source, schema, consent, dedupe, and writeback detail for the minimum `parameterized-bound` contract, stop before writing the generated skill and ask for the missing contract details.
 
 During onboarding, show the user a small redacted sample summary, never full private phone numbers, credentials, tokens, cookies, callback URLs, or provider confirmation tokens. Use the sampled fields to help the user define the default outbound goal.
 ```
@@ -353,7 +348,7 @@ During creation-time onboarding, read a small sample from the concrete or repres
 ```
 
 ```markdown
-For custom sources, do not generate a bound real-call skill until the source can be authenticated or accessed, sampled safely, and mapped to the required phone-call fields. If that cannot happen, generate only a dry-run-only `unbound-generic` skill with an onboarding blocker.
+For custom sources, do not generate a skill until the source can be authenticated or accessed, sampled safely, and mapped to the required phone-call fields.
 ```
 
 - [ ] **Step 5: Run repository validation**
@@ -398,9 +393,8 @@ Generated bound skills must record creation-time source onboarding:
 - redaction policy for sample summaries
 - default goal contract derived from sampled fields
 - runtime parameters still allowed
-- onboarding blocker, when the workflow is `unbound-generic`
 
-For `fully-bound` and `parameterized-bound`, missing source onboarding blocks real-call skill generation. For `unbound-generic`, missing onboarding is allowed only when the generated skill is dry-run-only and records the onboarding blocker.
+Missing source onboarding blocks skill generation until the source contract is complete enough for at least `parameterized-bound`.
 ```
 
 - [ ] **Step 3: Update creation summary shape**
@@ -426,7 +420,7 @@ In `examples.md`, update each captured contract list to include:
 For the Custom Source example, add:
 
 ```markdown
-If source onboarding cannot authenticate or sample the source safely, generate only a dry-run-only `unbound-generic` skill with an onboarding blocker.
+If source onboarding cannot authenticate or sample the source safely, stop before generation and explain the missing contract detail.
 ```
 
 - [ ] **Step 5: Update human docs**
@@ -438,7 +432,7 @@ In `docs/outbound-call-skill-creator/README.md`, add a new section after `## Cre
 
 For bound workflows, creation includes a source onboarding pass before the generated skill is written. The creator verifies or repairs source access, fetches a small representative sample, confirms the schema, and uses the sampled fields to help define the default outbound goal. This lets a later runtime request provide only the intended processing scope, such as a date window, instead of rebuilding the source and goal contract.
 
-For `unbound-generic` workflows, missing onboarding is allowed only when the generated skill is dry-run-only and records the blocker.
+If source onboarding cannot satisfy the minimum `parameterized-bound` contract, stop before generation and record the blocker in the creation conversation.
 ```
 
 - [ ] **Step 6: Run repository validation**
@@ -456,41 +450,38 @@ Expected: validation passes or fails only on explicit acceptance text added in T
 **Files:**
 - Modify: `scripts/validate_repository.py`
 
-- [ ] **Step 1: Add an unbound generic positive fixture**
+- [ ] **Step 1: Add an unsupported binding negative fixture**
 
-After the unsafe-direct fixture, add a positive fixture that ensures `unbound-generic` can pass when it is dry-run-only and records an onboarding blocker:
+After the selected-execution fixture, add a negative fixture that ensures unsupported binding levels fail:
 
 ```python
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
-        unbound_dry_run_md = valid_skill_md.replace(
+        unsupported_binding_level = "un" + "bound-" + "generic"
+        unsupported_binding_md = valid_skill_md.replace(
             "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
-            "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.",
-        ).replace(
-            "Source onboarding completed for this parameterized-bound workflow.",
-            "Source onboarding recorded an onboarding blocker for this unbound-generic workflow.",
+            f"Binding level: {unsupported_binding_level}.",
         )
-        (skill_dir / "SKILL.md").write_text(unbound_dry_run_md, encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(unsupported_binding_md, encoding="utf-8")
         (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
         (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
 
-        unbound_dry_run_success = subprocess.run(
+        unsupported_binding_failure = subprocess.run(
             ["node", str(checker), "--skill-dir", str(skill_dir)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        if unbound_dry_run_success.returncode != 0:
-            fail(
-                "Generated outbound skill checker must allow dry-run-only unbound onboarding blockers: "
-                + (unbound_dry_run_success.stderr or unbound_dry_run_success.stdout).strip()
-            )
+        unsupported_binding_output = (
+            unsupported_binding_failure.stdout + unsupported_binding_failure.stderr
+        )
+        if unsupported_binding_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported binding levels.")
+        if "unsupported binding levels are not allowed" not in unsupported_binding_output:
+            fail("Generated outbound skill checker unsupported-binding message changed.")
 ```
 
 - [ ] **Step 2: Run repository validation**
@@ -516,7 +507,7 @@ In `validate_outbound_call_skill_creator_acceptance_rules()`, add these strings 
             "Creation-Time Source Onboarding",
             "source onboarding",
             "sampled fields",
-            "dry-run-only until an exact runtime source, schema, consent, dedupe, and writeback contract is approved",
+            "stop before writing the generated skill and ask for the missing contract details",
 ```
 
 - [ ] **Step 2: Add data source acceptance strings**

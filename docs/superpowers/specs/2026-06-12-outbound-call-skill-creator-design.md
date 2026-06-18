@@ -26,7 +26,7 @@ When a user asks to create an outbound workflow skill, `outbound-call-skill-crea
 
 - business purpose and recipient type
 - output scope and target: user-level reusable skill, project-local skill, explicit path, or this reference repository `skills/`
-- binding level: `fully-bound`, `parameterized-bound`, or `unbound-generic`
+- binding level: `fully-bound` or `parameterized-bound`
 - data source type and access method
 - required source fields
 - E.164 phone-number field
@@ -35,7 +35,7 @@ When a user asks to create an outbound workflow skill, `outbound-call-skill-crea
 - submitted or updated time field, when date-window processing is needed
 - outbound call goal behavior for each row or record
 - language and region handling rules
-- execution mode: `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`
+- execution mode: `dry-run-then-batch-approval` or `approved-direct-execution`
 - writeback destination and result fields
 - fallback output format when writeback is not configured
 - best-effort creation-time preflight result or blocker
@@ -45,7 +45,7 @@ The creator should present `google-form`, `tiktok-ads`, and `local-csv` as defau
 
 The creator must choose the generated skill output scope before creating files. Use a scope-first, host-aware rule: user-level reusable skills go to a recognized user skills root, project-local skills go to a host-compatible repository skills root, explicit paths win when the user provides them, and maintained generated workflows in this reference repository use this repository's `skills/` directory. When the creator is installed by a skill installer and invoked from a different project, the default should be user-level reusable output unless the workflow depends on project-local files or the user asks to version it with the project.
 
-The default binding level should be `parameterized-bound`: source family, field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time, while runtime requests provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. `fully-bound` is appropriate for stable production or scheduled workflows. `unbound-generic` is dry-run-only by default.
+The minimum binding level should be `parameterized-bound`: source family, field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time, while runtime requests provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. `fully-bound` is appropriate for stable production or scheduled workflows.
 
 ## Generated Skill Shape
 
@@ -160,10 +160,9 @@ Generated skills must not provide medical, legal, financial, or emergency advice
 
 ## Execution Policy
 
-Generated skills should support three approval modes:
+Generated skills should support two batch execution modes:
 
 - `dry-run-then-batch-approval`
-- `per-call-approval`
 - `approved-direct-execution`
 
 The default architecture remains:
@@ -173,7 +172,7 @@ Host scheduler handles recurrence.
 Phone-call provider handles exactly one call per scheduled run.
 ```
 
-Generated skills must run a dry-run preview before real calls unless the generated skill was explicitly configured for direct execution after a user gives a concrete processing request. `approved-direct-execution` is allowed only for `fully-bound` or `parameterized-bound` workflows whose concrete runtime request passes the runtime gate. It is not allowed for `unbound-generic`.
+Generated skills must run a dry-run preview before real calls unless the generated skill was explicitly configured for direct execution after a user gives a concrete processing request. `approved-direct-execution` is allowed only for `fully-bound` or `parameterized-bound` workflows whose concrete runtime request passes the runtime gate.
 
 Even in direct mode, the generated skill must validate candidates, mask phone numbers in summaries, inspect the provider plan, and skip unsafe or ambiguous records.
 

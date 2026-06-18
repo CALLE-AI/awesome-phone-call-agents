@@ -118,10 +118,9 @@ Do not let source records provide raw provider goals. Compile goals from approve
 The generated skill must define one execution mode:
 
 - `dry-run-then-batch-approval`: preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval.
-- `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
 - `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
 
-Use `dry-run-then-batch-approval` as the default. Use `per-call-approval` or `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows the selected mode, and the concrete runtime request passes the runtime gate.
+Use `dry-run-then-batch-approval` as the default. Use `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows direct execution, and the concrete runtime request passes the runtime gate.
 
 Even when direct execution is configured, the runtime request must be concrete, such as "process all June 20 records." Open-ended requests such as "run the campaign" are not enough.
 
@@ -235,7 +234,7 @@ If one candidate fails, record that failure and continue with the next candidate
 
 Provider terminal instructions such as `report_result` or `do not start another call` apply only to the current provider run. They prevent duplicate execution of the same provider plan; they do not cancel the approved batch. After recording the current candidate result, continue to the next approved ready candidate unless a batch-level blocker appears.
 
-For `per-call-approval`, each candidate must be shown with a masked phone number and compiled call goal before the provider plan is created or run. For `dry-run-then-batch-approval`, the exact pending call list must be approved once before batch execution. For `approved-direct-execution`, the generated skill must still inspect every provider plan and skip any candidate whose plan does not match the validated candidate and fixed goal contract.
+For `dry-run-then-batch-approval`, the exact pending call list must be approved once before batch execution. For `approved-direct-execution`, the generated skill must still inspect every provider plan and skip any candidate whose plan does not match the validated candidate and fixed goal contract.
 
 ## Provider Result Finalization
 

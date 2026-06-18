@@ -9,7 +9,8 @@ const NON_ENGLISH_SCRIPT_RE =
 const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound)`?/iu;
 const UNSUPPORTED_BINDING_LEVEL_RE = new RegExp("\\b" + "un" + "bound-" + "generic\\b", "iu");
 const EXECUTION_MODE_RE =
-  /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|per-call-approval|approved-direct-execution)`?/imu;
+  /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|approved-direct-execution)`?/imu;
+const UNSUPPORTED_EXECUTION_MODE_RE = new RegExp("\\bper-" + "call-approval\\b", "iu");
 const REQUIRED_SKILL_MARKERS = [
   {
     label: "purpose and when to use",
@@ -359,6 +360,12 @@ const allText = textFiles.map((filePath) => readText(filePath)).join("\n");
 if (UNSUPPORTED_BINDING_LEVEL_RE.test(allText)) {
   fail(
     "Generated skill files must use fully-bound or parameterized-bound; unsupported binding levels are not allowed",
+  );
+}
+
+if (UNSUPPORTED_EXECUTION_MODE_RE.test(allText)) {
+  fail(
+    "Generated skill files must use dry-run-then-batch-approval or approved-direct-execution; unsupported execution modes are not allowed",
   );
 }
 

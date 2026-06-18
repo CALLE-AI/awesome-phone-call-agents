@@ -7,7 +7,6 @@ Use this reference when selecting the generated skill's approval and execution b
 | Execution mode | Behavior | Best fit |
 | --- | --- | --- |
 | `dry-run-then-batch-approval` | Preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval. | Default for most generated skills. |
-| `per-call-approval` | Preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it. | Higher-control workflows, sensitive edge cases, or early pilots. |
 | `approved-direct-execution` | After a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step. | Stable `fully-bound` or verified `parameterized-bound` workflows. |
 
 ## Selection Rules

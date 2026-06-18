@@ -15,15 +15,14 @@ Do not use it for one-off calls, generic voice-agent lists, telephony vendor dir
 
 ## Binding Model
 
-Generated skills use one of three binding levels:
+Generated skills use one of two binding levels. The minimum source binding contract is `parameterized-bound`:
 
 | Binding level | What is fixed at creation time | What is supplied at runtime | Automation level |
 | --- | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field mapping, source-level outreach basis or consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and narrow processing controls. | Highest automation; suitable for scheduled host runs after the runtime gate passes. |
 | `parameterized-bound` | Source family, access method, required schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Recommended default; balances reuse and automation. |
-| `unbound-generic` | Goal contract and safety rules. | Source access, field mapping, source-level outreach basis or consent evidence, dedupe key, filters, and writeback target. | Dry-run-only by default; not suitable for automatic real calls. |
 
-The default recommendation is `parameterized-bound`. It avoids a brittle single-source skill while still fixing the important safety and automation contract.
+The default recommendation is `parameterized-bound`. It avoids a brittle single-source skill while still fixing the important safety and automation contract. Use `fully-bound` only when the workflow should fix one concrete source and writeback target at creation time.
 
 ## Creation Prompt Flow
 
@@ -31,7 +30,7 @@ The creator should keep the setup flow explicit:
 
 1. Recommend one to three lowercase hyphenated skill names when the user has not provided one, then ask for confirmation.
 2. State the proposed output scope and directory before writing files, including why that target was selected and whether reload or add-location is needed.
-3. Ask for the binding level, defaulting to `parameterized-bound`.
+3. Choose whether the workflow should stay at the minimum `parameterized-bound` level or upgrade to `fully-bound`.
 4. Ask for the execution mode, defaulting to `dry-run-then-batch-approval`.
 
 Only ask for extra output-target confirmation when discoverability is unclear, the path is nonstandard, or a new user skills root must be created.
@@ -44,7 +43,7 @@ For authenticated or connector-backed sources such as Google Forms, TikTok Ads, 
 
 If the user only names an authenticated source family such as `google-form` or `tiktok-ads`, the next step is source access onboarding, not goal drafting. The creator should proactively inspect host-local adapters, connectors, MCP tools, MCP resources, or helper scripts before asking the user to choose an access route. When a safe source authorization or auth-readiness action is available, start it before asking the user for another confirmation; do not ask the user to say `start auth`, choose a discovered route, or refresh a session before attempting the available non-mutating auth path. For Google Forms, when `google-form-callback` helpers are available, check `google-auth.mjs status`, run or request `preflight-auth.mjs --repair-google` if auth is missing, and use `google-local-api-client.mjs --action list-forms` before asking for a Form ID. For TikTok Ads in Codex, inspect exposed MCP tools and resources first; when no TikTok Ads MCP server is configured, run `codex mcp add tiktok-ads --url https://business-api.tiktok.com/open_mcp/tt-ads-mcp-layer-tmp`, then `codex mcp get tiktok-ads` and `codex mcp list` before asking the user for a route choice. Treat Codex `Auth: Unsupported` as missing Codex-managed OAuth only. If the route is configured but tools are not exposed, run `codex mcp login tiktok-ads` or the host's equivalent source MCP login before asking for a different route or session refresh. If TikTok Ads tools or resources are exposed, run a source-native read-only auth or inventory probe such as `auth_advertiser_get` before declaring a blocker; only ask for a supported token, managed connector, host-specific login path, or another approved route when no tools are exposed after the available auth path has been attempted or the source-native probe cannot authenticate. Ask the user only for the minimum locator or user-completed authorization step that remains necessary, and wait until the sample is available before asking for the default outbound goal, writeback mapping, or full field mapping.
 
-For `unbound-generic` workflows, missing onboarding is allowed only when the generated skill is dry-run-only and records the blocker.
+If source onboarding cannot confirm at least the `parameterized-bound` source and writeback contract, the creator stops before generating the skill and reports the missing contract details.
 
 ## Provider Onboarding
 
@@ -82,13 +81,12 @@ Use quote-request-callback to process all June 20 submissions for form <form-id>
 
 ## Execution Modes
 
-The creator asks the user to choose one execution mode for the generated skill after the binding level is known. For `fully-bound` and `parameterized-bound`, available modes are:
+The creator asks the user to choose one execution mode for the generated skill after the binding level is known. Available modes are:
 
 - `dry-run-then-batch-approval`: preview all eligible calls and compiled goals, then process the approved list serially after one explicit approval.
-- `per-call-approval`: show one candidate and compiled goal at a time, then let the user approve, modify, or skip that call.
 - `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, inspect provider plans, and run eligible one-off calls serially without another approval step.
 
-For `unbound-generic`, the only available mode is `dry-run-then-batch-approval` with dry-run-only behavior until onboarding is complete.
+Execution mode selection happens only after the source and writeback contract satisfies at least the `parameterized-bound` minimum.
 
 ## Preflight And Runtime Gate
 
@@ -110,11 +108,11 @@ The writeback policy is chosen at creation time:
 
 For local CSV writeback, the creator records supported writeback target modes and the generated skill chooses the concrete mode during the runtime dry-run or approval step. Use `source-csv-in-place` only when the runtime request explicitly asks to update the original CSV and execution approval covers that mutation. Use `result-csv-file` when results should be written to a separate CSV or the request does not explicitly ask to mutate the original CSV. Do not describe a separate results file as original CSV writeback.
 
-The writeback target depends on the binding level. `fully-bound` skills fix the target and fields at creation time. `parameterized-bound` skills fix the policy and field schema, while allowing an approved runtime target mode or target such as source CSV update, output CSV path, or verified source instance. `unbound-generic` skills collect writeback details at runtime and are dry-run-only by default.
+The writeback target depends on the binding level. `fully-bound` skills fix the target and fields at creation time. `parameterized-bound` skills fix the policy and field schema, while allowing an approved runtime target mode or target such as source CSV update, output CSV path, or verified source instance.
 
 ## Creation Summary
 
-After writing and validating a generated skill, the creator reports a short summary with the skill name, directory, discovery or reload note, binding level, source onboarding status, sampled source instance, sample fetch result, default goal source, onboarding blocker if any, provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, provider blocker if any, runtime parameters, source contract, source-level outreach basis or consent rule, dedupe rule, goal summary, execution mode, writeback policy, preflight result or blocker, runtime gate, provider route, and validation result.
+After writing and validating a generated skill, the creator reports a short summary with the skill name, directory, discovery or reload note, binding level, source onboarding status, sampled source instance, sample fetch result, default goal source, provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, provider blocker if any, runtime parameters, source contract, source-level outreach basis or consent rule, dedupe rule, goal summary, execution mode, writeback policy, preflight result or blocker, runtime gate, provider route, and validation result.
 
 The summary should make fixed values and runtime parameters visually distinct, and it must not expose credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers.
 
@@ -123,7 +121,7 @@ The summary should make fixed values and runtime parameters visually distinct, a
 Generated skills should use structured formats for runtime behavior:
 
 - concrete request examples and insufficient request examples
-- source onboarding reports with access check status, sampled source instance, sample fetch result, redaction policy, default goal source, and blocker fields
+- source onboarding reports with access check status, sampled source instance, sample fetch result, redaction policy, and default goal source
 - provider onboarding reports with provider route, provider host runtime, MCP route setup check, auth readiness, compatible MCP tools, one-off call capability, and blocker fields
 - provider result finalization reports with `run_id`, `terminal_status_seen`, `full_history_rechecked`, `negative_terminal_stability_checked`, `writeback_allowed`, and `blocker`
 - runtime gate reports with `check`, `status`, `evidence`, `blocker`, and `required_before_call`
@@ -161,7 +159,7 @@ Generated skills may also include focused reference files such as:
 - `references/writeback-contract.md`
 - `references/binding-contract.md`
 
-The generated `SKILL.md` must describe the source contract, source onboarding status and blocker if any, provider onboarding status with host MCP route setup and authentication evidence, provider blocker if any, binding level, runtime parameters, candidate fields, outbound goal contract, MCP provider route, execution mode, serial candidate processing, writeback behavior, best-effort creation-time preflight, mandatory runtime gate requirements, safety summary, and validation commands.
+The generated `SKILL.md` must describe the source contract, source onboarding status, provider onboarding status with host MCP route setup and authentication evidence, provider blocker if any, binding level, runtime parameters, candidate fields, outbound goal contract, MCP provider route, execution mode, serial candidate processing, writeback behavior, best-effort creation-time preflight, mandatory runtime gate requirements, safety summary, and validation commands.
 
 ## Provider Route
 

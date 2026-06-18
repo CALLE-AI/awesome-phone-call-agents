@@ -42,7 +42,7 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 9. Show a small redacted sample summary and prompt the user to confirm or adjust field mapping.
 10. Prompt the user to define the default outbound goal from the sampled fields: call purpose, required context, allowed questions, prohibited claims, completion criteria, result values, summary format, and escalation cases.
 11. Read `references/mcp-provider-route.md` and run creation-time provider onboarding for the default CALL-E MCP provider route in the current host runtime: configure or verify the MCP route, complete or verify provider authentication, and confirm compatible plan/run/status tools without placing a real call. For Codex, use the `codex mcp` adapter commands in the reference. For Claude, Antigravity, Cursor, or another MCP host, use that host's connector or MCP server setup and authorization flow. Do not treat app connector tools, plugin tools, or similarly named non-MCP tools as proof that this provider route is authenticated. If provider onboarding still cannot complete, record a provider onboarding blocker and keep the generated skill dry-run-only.
-12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`. For both supported binding levels, available modes are `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`.
+12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`. For both supported binding levels, available modes are `dry-run-then-batch-approval` or `approved-direct-execution`.
 13. Capture writeback policy at creation time and capture field mapping, supported target modes, or allowed runtime writeback parameters: source writeback, local CSV writeback, or session table fallback. For local CSV, record supported target modes (`source-csv-in-place` and `result-csv-file`) and choose the concrete target mode during the runtime dry-run or approval step based on the user's requested output behavior.
 14. Run best-effort creation-time preflight checks when tools and permissions are available: read-only source auth/schema checks, non-mutating writeback target or field checks, and MCP route/tool readiness. If preflight cannot run for a bound workflow, record the blocker and do not generate a real-call skill until source and provider onboarding requirements are satisfied.
 15. Read `references/safety.md` and include the required safety boundaries in the generated skill.
@@ -126,7 +126,7 @@ Before writing files, state the selected scope, output parent, generated skill d
 
 ### Execution Mode
 
-Present execution modes after the binding level is known. For both supported binding levels, recommend `dry-run-then-batch-approval` first, then briefly explain `per-call-approval` and `approved-direct-execution`.
+Present execution modes after the binding level is known. For both supported binding levels, recommend `dry-run-then-batch-approval` first, then briefly explain `approved-direct-execution`.
 
 ## Binding Levels
 
@@ -137,7 +137,7 @@ Use `references/binding-contract.md` for full binding-level selection rules and 
 | Binding level | Creation-time contract | Runtime parameters | Maximum automation |
 | --- | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field mapping, source-level outreach basis or consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
-| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Default. Eligible for dry-run batch approval, per-call approval, and approved direct execution only after concrete runtime parameters pass the runtime gate. |
+| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Default. Eligible for dry-run batch approval and approved direct execution only after concrete runtime parameters pass the runtime gate. |
 
 Do not create a business skill with no phone field, no source-level outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path. If those values are unavailable, keep asking for the missing contract or stop before generation.
 
@@ -148,10 +148,9 @@ Ask the user to choose the generated skill's execution mode after choosing the b
 Use `references/execution-modes.md` for full mode selection rules, concrete runtime request examples, and direct execution guardrails.
 
 - `dry-run-then-batch-approval`: preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval.
-- `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
 - `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
 
-Use `per-call-approval` or `approved-direct-execution` only after the generated skill's supported binding level and concrete runtime request pass the required gates.
+Use `approved-direct-execution` only after the generated skill's supported binding level and concrete runtime request pass the required gates.
 
 ## Preflight and Runtime Gate
 

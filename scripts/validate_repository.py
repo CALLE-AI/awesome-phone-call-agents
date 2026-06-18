@@ -707,8 +707,8 @@ Provider onboarding blocker: none.
 
 ## Execution Modes
 
-Execution mode: dry-run-then-batch-approval. Supported alternatives are per-call-approval
-and approved-direct-execution when the binding level and runtime gate allow them.
+Execution mode: dry-run-then-batch-approval. Supported alternative is approved-direct-execution
+when the binding level and runtime gate allow it.
 
 ## Runtime Gate
 
@@ -1497,6 +1497,35 @@ Runtime parameters still allowed: date window and approved source instance ident
             not in maximum_only_execution_output
         ):
             fail("Generated outbound skill checker missing-selected-execution message changed.")
+
+    unsupported_execution_mode = "per-" + "call-approval"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        unsupported_execution_md = valid_skill_md.replace(
+            "Execution mode: dry-run-then-batch-approval.",
+            f"Execution mode: {unsupported_execution_mode}.",
+        )
+        (skill_dir / "SKILL.md").write_text(unsupported_execution_md, encoding="utf-8")
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        unsupported_execution_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        unsupported_execution_output = (
+            unsupported_execution_failure.stdout + unsupported_execution_failure.stderr
+        )
+        if unsupported_execution_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported execution modes.")
+        if "unsupported execution modes are not allowed" not in unsupported_execution_output:
+            fail("Generated outbound skill checker unsupported-execution message changed.")
 
     unsupported_binding_level = "un" + "bound-" + "generic"
 
