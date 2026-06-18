@@ -23,7 +23,7 @@ Include:
 - dedupe key or dedupe state rule
 - outbound goal contract summary
 - selected execution mode and unavailable modes
-- writeback policy, fixed or runtime-resolved writeback target mode, target binding, and field mapping
+- result-output policy, fixed or runtime-resolved target mode, target binding, and field mapping
 - creation-time preflight result or blocker
 - mandatory runtime gate checks before real calls
 - MCP provider route
@@ -46,7 +46,7 @@ Outreach basis: <source-level basis, consent field, or approved source basis>
 Dedupe: <key or state rule>
 Goal: <one-sentence call purpose and completion criteria>
 Execution mode: <selected mode and any unavailable modes>
-Writeback: <policy, fixed or runtime-resolved target mode, target binding, and field mapping>
+Result output: <policy, fixed or runtime-resolved target mode, target binding, and field mapping>
 Preflight: <passed | blocked | not run, with reason>
 Runtime gate: <checks that must pass before real calls>
 Provider route: https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth
@@ -57,4 +57,4 @@ Validation: <command and result>
 
 The summary must distinguish fixed values from runtime parameters. Do not show credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers.
 
-If a required source or writeback value is unknown, report it as a creation blocker and stop before generating the skill.
+If a required source or durable result-output value is unknown, report it as a creation blocker and stop before generating the skill.

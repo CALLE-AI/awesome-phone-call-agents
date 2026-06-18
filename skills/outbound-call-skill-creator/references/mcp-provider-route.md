@@ -86,7 +86,7 @@ Do not write negative terminal results such as `no_answer`, `failed`, or `no con
 
 If a candidate-level plan, run, or status check fails, record the failure and continue with the next ready candidate when it is safe to continue. Stop the batch only when the MCP route is unavailable, authentication is missing, required provider tools are unavailable, or continuing would create unsafe or duplicate calls.
 
-After the final candidate is processed, generated skills must write configured results or output the session table, then report one final batch summary.
+After the final candidate is processed, generated skills must write configured source results, a source-adjacent result artifact, or a local result CSV, then report one final batch summary. Output a session table only as a last-resort non-persistent fallback when durable result output is blocked and the run is attended.
 
 ## Scheduled Runs
 

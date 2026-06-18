@@ -543,7 +543,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "`codex mcp login tiktok-ads`",
             "Do not present a blank manual mapping form",
             "Ask the user to fill only fields that cannot be inferred from the sample.",
-            "Do not ask for the default outbound goal, writeback mapping, or full field mapping before the access check and sample fetch have been attempted.",
+            "Do not ask for the default outbound goal, result-output mapping, or full field mapping before the access check and sample fetch have been attempted.",
             "Proactively inspect available host routes before asking the user for access details.",
             "`google-auth.mjs status`",
             "`google-local-api-client.mjs --action list-forms`",
@@ -565,9 +565,10 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "default outbound goal contract",
             "Do not ask for Google Form field mapping before Google access has been verified and a representative response sample has been fetched.",
             "Do not ask for TikTok Ads field mapping before the exact MCP tool or resource access has been verified and a representative record sample has been fetched.",
-            "For local CSV workflows, capture supported writeback target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step.",
+            "For local CSV workflows, capture supported result-output target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step.",
             "source-csv-in-place",
             "result-csv-file",
+            "source-adjacent-result-artifact",
             "Do not require a per-row consent column when the user confirms the CSV source only contains records collected from people who requested or agreed to phone follow-up.",
             "Use the existing `google-form-callback` local OAuth and export scripts as the preferred reference pattern when available.",
         ],
@@ -584,6 +585,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "## TikTok Ads Lead Follow-Up Skill",
             "If this host has no TikTok Ads MCP server configured, I will add the default route first and then inspect it",
             "- source family: `tiktok-ads`",
+            "source-adjacent result artifact",
         ],
     )
     require_text(
@@ -618,10 +620,11 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "Provider terminal instructions such as `report_result` or `do not start another call` apply only to the current provider run",
             "After execution approval, do not ask the user to continue, confirm the next candidate, or approve additional provider runs.",
             "Provider Result Finalization",
-            "Terminal provider status is not writeback-ready until the generated skill performs a full-history provider reconciliation.",
+            "Terminal provider status is not result-output-ready until the generated skill performs a full-history provider reconciliation.",
             "Do not write `no_answer`, `failed`, or `no conversation captured` results until a negative terminal stability check passes.",
-            "Writeback target mode may be fixed at creation time or selected from approved runtime parameters before execution approval.",
-            "writeback target mode",
+            "Result target mode may be fixed at creation time or selected from approved runtime parameters before execution approval.",
+            "result target mode",
+            "source-adjacent-result-artifact",
             "sample fetch result",
             "default goal contract derived from sampled fields",
             "Do not define the default goal from user prose alone before the representative sample is fetched.",
@@ -713,7 +716,8 @@ when the binding level and runtime gate allow it.
 ## Runtime Gate
 
 Runtime gate requirements include source access, required fields, consent, dedupe,
-writeback or session-table readiness, and provider route availability before real calls.
+source writeback, source-adjacent artifact, or local result CSV readiness,
+and provider route availability before real calls.
 
 ## Preflight and Creation Summary
 
@@ -725,7 +729,9 @@ parameters, and validation results before real calls.
 After approval, serially process all ready candidates. For each candidate, plan,
 inspect, run, check status when available, record the result, and continue to
 the next candidate without another per-candidate confirmation. After all
-candidates finish, write configured results or output one final session table.
+candidates finish, write source results, a source-adjacent artifact, or a local
+result CSV. Use a session table only as a last-resort attended fallback when
+durable output is blocked.
 Provider terminal instructions such as `report_result` or `do not start another call`
 apply only to the current provider run. After execution approval, do not ask the
 user to continue, confirm the next candidate, or approve additional provider runs.
@@ -734,16 +740,21 @@ result or skip state unless a batch-level blocker appears.
 
 ## Provider Result Finalization
 
-Provider result finalization runs before writeback. Terminal provider status is
-not writeback-ready until the generated skill performs a full-history provider
+Provider result finalization runs before result output. Terminal provider status is
+not result-output-ready until the generated skill performs a full-history provider
 reconciliation without a cursor. Do not write `no_answer`, `failed`, or
 `no conversation captured` results until a negative terminal stability check
 passes.
 
-## Writeback Behavior
+## Result-Output Behavior
 
-Writeback behavior records call status, timestamps, summaries, and masked phone numbers.
-Runtime writeback target mode: resolved before execution approval from fixed creation values or approved runtime parameters.
+Result-output behavior records call status, timestamps, summaries, and masked phone numbers.
+Prefer source writeback when verified. Use `source-adjacent-result-artifact`
+when results should stay in the source system without mutating source records.
+Otherwise use `result-csv-file` to write a new local result CSV. Use
+session-table output only as a last-resort attended fallback when durable result
+output is blocked.
+Runtime result target mode: source-adjacent-artifact resolved before execution approval from fixed creation values or approved runtime parameters.
 
 ## Safety Summary
 
@@ -1037,8 +1048,8 @@ result or skip state unless a batch-level blocker appears.
         missing_provider_result_finalization_md = valid_skill_md.replace(
             """## Provider Result Finalization
 
-Provider result finalization runs before writeback. Terminal provider status is
-not writeback-ready until the generated skill performs a full-history provider
+Provider result finalization runs before result output. Terminal provider status is
+not result-output-ready until the generated skill performs a full-history provider
 reconciliation without a cursor. Do not write `no_answer`, `failed`, or
 `no conversation captured` results until a negative terminal stability check
 passes.
@@ -1074,7 +1085,7 @@ passes.
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
         missing_writeback_target_mode_md = valid_skill_md.replace(
-            "Runtime writeback target mode: resolved before execution approval from fixed creation values or approved runtime parameters.\n",
+            "Runtime result target mode: source-adjacent-artifact resolved before execution approval from fixed creation values or approved runtime parameters.\n",
             "",
         )
         (skill_dir / "SKILL.md").write_text(missing_writeback_target_mode_md, encoding="utf-8")
@@ -1093,12 +1104,12 @@ passes.
             + missing_writeback_target_mode_failure.stderr
         )
         if missing_writeback_target_mode_failure.returncode == 0:
-            fail("Generated outbound skill checker must reject missing writeback target mode.")
+            fail("Generated outbound skill checker must reject missing result target mode.")
         if (
-            "Generated skill SKILL.md must include writeback target mode"
+            "Generated skill SKILL.md must include result target mode"
             not in missing_writeback_target_mode_output
         ):
-            fail("Generated outbound skill checker missing-writeback-target-mode message changed.")
+            fail("Generated outbound skill checker missing-result-target-mode message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
@@ -1206,7 +1217,9 @@ passes.
 After approval, serially process all ready candidates. For each candidate, plan,
 inspect, run, check status when available, record the result, and continue to
 the next candidate without another per-candidate confirmation. After all
-candidates finish, write configured results or output one final session table.
+candidates finish, write source results, a source-adjacent artifact, or a local
+result CSV. Use a session table only as a last-resort attended fallback when
+durable output is blocked.
 Provider terminal instructions such as `report_result` or `do not start another call`
 apply only to the current provider run. After execution approval, do not ask the
 user to continue, confirm the next candidate, or approve additional provider runs.

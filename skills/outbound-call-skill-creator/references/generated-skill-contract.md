@@ -14,7 +14,7 @@ Generate this minimum folder shape:
     └── examples.md
 ```
 
-Add source, goal, writeback, and script files only when the workflow needs them.
+Add source, goal, result-output, and script files only when the workflow needs them.
 
 Do not create `template.md`. The business contract belongs in `SKILL.md` and focused reference files.
 
@@ -26,7 +26,7 @@ The generated `SKILL.md` frontmatter must include only `name` and `description`.
 
 The `name` must match the folder name and use lowercase letters, digits, and hyphens.
 
-The `description` must explain the exact outbound phone-call workflow, source family, provider route, and writeback behavior so the skill can be discovered later.
+The `description` must explain the exact outbound phone-call workflow, source family, provider route, and durable result-output behavior so the skill can be discovered later.
 
 Example:
 
@@ -52,7 +52,7 @@ The generated `SKILL.md` must include:
 - provider onboarding
 - execution modes
 - serial candidate execution
-- writeback behavior
+- result-output behavior
 - preflight and creation summary
 - safety summary
 - validation commands
@@ -61,10 +61,10 @@ The generated `SKILL.md` must include:
 
 The generated skill must declare one of these binding levels:
 
-- `fully-bound`: a concrete source instance and concrete writeback target are fixed at creation time. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
-- `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path.
+- `fully-bound`: a concrete source instance and concrete durable result target are fixed at creation time. The result target can be source writeback to the bound source instance or canonical source record store, a source-adjacent result artifact, or a local result CSV. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
+- `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path.
 
-Default generated skills should use the minimum `parameterized-bound` contract. If the creator cannot capture enough source, outreach-basis, dedupe, and writeback detail to satisfy that minimum, it must stop before generating the business skill.
+Default generated skills should use the minimum `parameterized-bound` contract. If the creator cannot capture enough source, outreach-basis, dedupe, and durable result-output detail to satisfy that minimum, it must stop before generating the business skill.
 
 The generated skill must state:
 
@@ -168,7 +168,7 @@ Generated bound skills must record creation-time source onboarding:
 Source onboarding must be read-only and non-mutating:
 
 - do not place real calls
-- do not write back to source systems or result stores
+- do not write back to source systems or write result files
 - do not mutate source data, credentials, permissions, integrations, or scheduler state
 - do not expose credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers
 - fetch the smallest practical representative sample needed to confirm access, schema, and goal fields
@@ -219,7 +219,7 @@ For `fully-bound` and `parameterized-bound`, missing MCP configuration, missing 
 
 Generated skills must define the approved batch behavior. After the user approves the exact pending call list, the agent must serially process all ready candidates until every candidate reaches a terminal result or skip state.
 
-After execution approval, do not ask the user to continue, confirm the next candidate, or approve additional provider runs. The final user-facing result comes only after all approved candidates are terminal and configured writeback or session-table output is complete, unless a batch-level blocker makes continuing unsafe or impossible.
+After execution approval, do not ask the user to continue, confirm the next candidate, or approve additional provider runs. The final user-facing result comes only after all approved candidates are terminal and configured source writeback, source-adjacent result artifact output, local result CSV output, or last-resort session-table output is complete, unless a batch-level blocker makes continuing unsafe or impossible.
 
 For each ready candidate, the generated skill should:
 
@@ -230,7 +230,7 @@ For each ready candidate, the generated skill should:
 5. Record the terminal result or failure.
 6. Continue to the next ready candidate without asking for another per-candidate confirmation or post-approval continuation prompt.
 
-If one candidate fails, record that failure and continue with the next candidate unless the provider route is unavailable, authentication is missing, or continuing would be unsafe. After all candidates finish, perform configured writeback or produce the session table, then report one final batch summary to the user.
+If one candidate fails, record that failure and continue with the next candidate unless the provider route is unavailable, authentication is missing, or continuing would be unsafe. After all candidates finish, perform configured source writeback, source-adjacent result artifact output, or local result CSV output, then report one final batch summary to the user. Produce a session table only when durable result output is blocked and the run is attended.
 
 Provider terminal instructions such as `report_result` or `do not start another call` apply only to the current provider run. They prevent duplicate execution of the same provider plan; they do not cancel the approved batch. After recording the current candidate result, continue to the next approved ready candidate unless a batch-level blocker appears.
 
@@ -238,15 +238,15 @@ For `dry-run-then-batch-approval`, the exact pending call list must be approved 
 
 ## Provider Result Finalization
 
-Generated skills must finalize provider results before writeback or final user-facing summaries. Terminal provider status is not writeback-ready until the generated skill performs a full-history provider reconciliation.
+Generated skills must finalize provider results before source writeback, source-adjacent result artifact output, local result CSV output, session-table fallback, or final user-facing summaries. Terminal provider status is not result-output-ready until the generated skill performs a full-history provider reconciliation.
 
-Cursor-based polling is useful for progress updates, but a cursor-limited page must not be the only evidence used for final writeback. After terminal status is seen, re-check the full provider run history without a cursor, using a high enough limit to include call lifecycle events and conversation content when the provider supports it. Treat provider terminal instructions such as `report_result` or `do not start another call` as duplicate-run protection, not as proof that the provider run history has fully synchronized.
+Cursor-based polling is useful for progress updates, but a cursor-limited page must not be the only evidence used for final result output. After terminal status is seen, re-check the full provider run history without a cursor, using a high enough limit to include call lifecycle events and conversation content when the provider supports it. Treat provider terminal instructions such as `report_result` or `do not start another call` as duplicate-run protection, not as proof that the provider run history has fully synchronized.
 
-Do not write `no_answer`, `failed`, or `no conversation captured` results until a negative terminal stability check passes. For these negative terminal outcomes, perform at least one full-history recheck after the terminal status is observed and confirm that no later answer, transcript, collected field, or stronger result appears. If the full history has changed, use the latest stronger evidence before writeback.
+Do not write `no_answer`, `failed`, or `no conversation captured` results until a negative terminal stability check passes. For these negative terminal outcomes, perform at least one full-history recheck after the terminal status is observed and confirm that no later answer, transcript, collected field, or stronger result appears. If the full history has changed, use the latest stronger evidence before source writeback, source-adjacent result artifact output, local result CSV output, or session-table fallback.
 
-Before the final batch summary, reconcile every provider run ID against the latest full-history provider result. If reconciliation changes a candidate result, update the pending writeback payload before writing. If reconciliation is blocked by missing auth, missing tools, or provider unavailability, stop before writeback unless the generated skill explicitly supports session-only partial reporting with a blocker.
+Before the final batch summary, reconcile every provider run ID against the latest full-history provider result. If reconciliation changes a candidate result, update the pending result-output payload before writing. If reconciliation is blocked by missing auth, missing tools, or provider unavailability, stop before durable output unless the generated skill explicitly supports session-only partial reporting with a blocker.
 
-Use this provider result finalization report shape before writeback:
+Use this provider result finalization report shape before result output:
 
 ```yaml
 provider_result_finalization:
@@ -254,7 +254,7 @@ provider_result_finalization:
   terminal_status_seen: true
   full_history_rechecked: true
   negative_terminal_stability_checked: true
-  writeback_allowed: true
+  result_output_allowed: true
   blocker: none
 ```
 
@@ -269,36 +269,44 @@ Generated skills that support `approved-direct-execution` must include this chec
 - consent or outreach basis passed the runtime gate
 - E.164 phone validation passed for every ready candidate
 - dedupe key or dedupe state is trusted for the concrete run
-- writeback target is verified or session-table fallback is ready
+- source writeback target, source-adjacent result artifact, or local result CSV output is verified; session-table fallback is ready only as a last-resort attended fallback
 - MCP provider route, auth, compatible tools, and provider onboarding passed
 - each provider plan was inspected before running
 - the call request is one-off and not provider-side recurrence
 
 If any item fails, the generated skill must skip the affected candidate or stop the batch when continuing would be unsafe.
 
-## Writeback Contract
+## Result Output Contract
 
-Generated skills must support one of these writeback outcomes:
+Generated skills must support a durable result-output outcome:
 
 - source writeback
-- local CSV writeback
-- session table output
+- source-adjacent result artifact
+- new local result CSV output
+- source CSV in-place update only when the runtime request explicitly asks to mutate the source CSV
+- session table output only as a last-resort non-persistent fallback
 
-The writeback policy must be chosen at creation time. Writeback target mode may be fixed at creation time or selected from approved runtime parameters before execution approval. The generated skill must still declare a writeback target mode in its writeback behavior section, even when that mode is resolved during runtime approval. The generated skill must state whether the writeback target is fully bound or parameterized, and must define field mapping when writeback is configured. The user may specify writeback fields during creation. Runtime requests may provide a writeback target or target mode only when the selected binding level explicitly allows that parameter and the runtime gate verifies it before real calls. Generated skills must keep credentials, tokens, callback URLs, confirmation tokens, cookies, and full phone numbers out of user-facing summaries and writeback fields.
+The result-output policy must be chosen at creation time. Prefer verified source writeback when the source exposes a safe writeback path to the bound source instance or canonical source record store. If the result should stay in the same source system without mutating source records, configure `source-adjacent-result-artifact` instead. If source writeback and source-adjacent output are unavailable, not requested, or cannot be verified, configure a new local result CSV as the durable fallback. Keep session-table output as a last-resort non-persistent fallback only when durable output validation is blocked; do not proactively present session-table output as a normal user-facing option.
 
-For local CSV workflows, use one of these target modes:
+Result target mode may be fixed at creation time or selected from approved runtime parameters before execution approval. The generated skill must still declare a result target mode in its result-output behavior section, even when that mode is resolved during runtime approval. The generated skill must state whether the result target is fully bound, parameterized, or last-resort session-only, and must define field mapping for durable output. The user may specify result fields during creation. Runtime requests may provide a result target or target mode only when the selected binding level explicitly allows that parameter and the runtime gate verifies it before real calls. Generated skills must keep credentials, tokens, callback URLs, confirmation tokens, cookies, and full phone numbers out of user-facing summaries and result outputs.
+
+Treat `source-writeback` narrowly. It updates the bound source instance or canonical source record store. Do not use it for a same-system side file, new sheet, new tab, result table, or export. Use `source-adjacent-result-artifact` for results stored beside the source in the same provider, account, workspace, folder, or campaign context. For `fully-bound`, the generated skill must fix the artifact ID/path or fix the creation policy, container, schema, and append or upsert behavior at creation time. Creating a new source-adjacent artifact is a durable side effect and must be covered by execution approval or by the approved direct-execution contract.
+
+For local CSV result output, use one of these target modes:
 
 - `source-csv-in-place`: update the original CSV only when the runtime request explicitly asks for source CSV writeback and execution approval covers that mutation. Define exact result columns, preserve existing rows and columns, verify writability, and create or recommend a backup or atomic write plan before writing.
-- `result-csv-file`: write a separate result CSV. Use this safer mode when the user asks for a results file or does not explicitly request original CSV mutation.
+- `result-csv-file`: write a separate new result CSV. Use this safer durable fallback when the user asks for a results file, when source writeback is unavailable, or when the request does not explicitly require original CSV mutation.
 
 Do not claim that `result-csv-file` writes back to the original CSV.
 
-Use this writeback mapping shape when writeback is configured:
+Before writing a source-adjacent artifact or local result CSV, verify that the container or output directory exists or can be safely created, the artifact or file can be written without overwriting unrelated data, exact result columns are defined, source rows and columns are preserved when applicable, and full phone numbers are excluded unless the contract explicitly allows private storage.
+
+Use this result-output mapping shape when durable output or last-resort session-table output is configured:
 
 ```yaml
-writeback:
-  policy: source-writeback | local-csv | session-table
-  target_mode: source-csv-in-place | result-csv-file | source-writeback | session-table | runtime-parameter-name
+result_output:
+  policy: source-writeback | source-adjacent-result-artifact | local-result-csv | source-csv-in-place | session-table-fallback
+  target_mode: source-csv-in-place | result-csv-file | source-writeback | source-adjacent-artifact | session-table | runtime-parameter-name
   target_binding: fully-bound | parameterized | session-only
   target: fixed-value-or-runtime-parameter-name
   fields:
@@ -312,9 +320,9 @@ writeback:
     processed_timestamp: target_processed_at_field
 ```
 
-For session-table output, use the same logical fields as table columns and set `target_binding` to `session-only`.
+For session-table output, use the same logical fields as table columns and set `target_binding` to `session-only`. State that the session table is non-persistent and unsuitable for unattended scheduled automation unless the user explicitly accepts the host session transcript as the record.
 
-Writeback records should include:
+Durable result records and last-resort session tables should include:
 
 - candidate ID
 - source record
@@ -325,7 +333,7 @@ Writeback records should include:
 - result summary
 - processed timestamp
 
-Do not write credentials, tokens, cookies, confirmation tokens, callback URLs, or full phone numbers into user-facing summaries.
+Do not write credentials, tokens, cookies, confirmation tokens, callback URLs, or full phone numbers into user-facing summaries or result outputs.
 
 ## Preflight and Creation Summary
 
@@ -334,7 +342,7 @@ Generated skills must document best-effort creation-time preflight and mandatory
 - source authentication or connectivity
 - source schema and required fields
 - consent or outreach basis validation
-- writeback target and fields, unless session-table fallback is configured
+- source writeback target, source-adjacent artifact target, or local result CSV path and fields
 - dedupe state or stable dedupe key
 - MCP provider route availability, authentication readiness, compatible tools, and provider onboarding blocker
 
@@ -348,12 +356,12 @@ Use this runtime gate report shape during dry-runs and before real calls:
 | required_fields | `passed`, `blocked`, `not_applicable`, or `not_run` | Field names or schema match. | Missing required field. | `true` |
 | consent_or_outreach_basis | `passed`, `blocked`, `not_applicable`, or `not_run` | Source-level outreach basis, consent field, or approved source basis. | Missing outreach basis or false consent. | `true` |
 | dedupe | `passed`, `blocked`, `not_applicable`, or `not_run` | Dedupe key or state file reference. | Untrusted dedupe state. | `true` |
-| writeback_or_session_table | `passed`, `blocked`, `not_applicable`, or `not_run` | Target fields or session fallback. | Missing writeback target with no fallback. | `true` |
+| result_output | `passed`, `blocked`, `not_applicable`, or `not_run` | Source writeback target, source-adjacent artifact target, or local result CSV path and fields. | Missing durable output target; session table may be used only as an attended last-resort fallback. | `true` |
 | provider_route | `passed`, `blocked`, `not_applicable`, or `not_run` | Route and compatible tool names. | Missing auth or tools. | `true` |
 
 Do not put credentials, tokens, full phone numbers, confirmation tokens, or callback URLs in `evidence` or `blocker`.
 
-After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, reload or discovery step, binding level, source onboarding status, sampled source instance, sample fetch result, default goal source, provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, provider blocker if any, runtime parameters, source contract, outbound goal contract, execution mode, writeback behavior, preflight result, runtime gate, provider route, and validation result.
+After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, reload or discovery step, binding level, source onboarding status, sampled source instance, sample fetch result, default goal source, provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, provider blocker if any, runtime parameters, source contract, outbound goal contract, execution mode, result-output behavior, preflight result, runtime gate, provider route, and validation result.
 
 Use this summary shape:
 
@@ -370,7 +378,7 @@ Outreach basis: <source-level basis, consent field, or approved source basis>
 Dedupe: <key or state rule>
 Goal: <one-sentence call purpose and completion criteria>
 Execution mode: <selected mode and any unavailable modes>
-Writeback: <policy, target binding, and field mapping>
+Result output: <policy, target binding, and field mapping>
 Preflight: <passed | blocked | not run, with reason>
 Runtime gate: <checks that must pass before real calls>
 Provider route: https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth

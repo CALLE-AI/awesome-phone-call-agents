@@ -54,7 +54,7 @@ Generated skills that support `approved-direct-execution` must require:
 - consent or outreach basis runtime gate
 - E.164 validation for every ready candidate
 - trusted dedupe key or dedupe state
-- verified writeback target or ready session-table fallback
+- verified source writeback target, source-adjacent result artifact, or local result CSV output; session-table fallback may be ready only as a last-resort attended fallback
 - available MCP provider route, auth, and compatible tools
 - inspected provider plan before each call run
 - one-off provider request with no provider-side recurrence

@@ -71,19 +71,31 @@ const REQUIRED_SKILL_MARKERS = [
     patterns: [
       /provider result finalization[\s\S]*full-history provider\s+reconciliation[\s\S]*negative terminal stability check/iu,
       /terminal provider status is\s+not writeback-ready[\s\S]*full-history provider\s+reconciliation/iu,
+      /terminal provider status is\s+not result-output-ready[\s\S]*full-history provider\s+reconciliation/iu,
     ],
   },
   {
-    label: "writeback behavior",
-    patterns: [/writeback behavior/iu],
+    label: "result-output behavior",
+    patterns: [/result-output behavior/iu, /result output behavior/iu, /writeback behavior/iu],
   },
   {
-    label: "writeback target mode",
+    label: "result target mode",
     patterns: [
+      /runtime result target mode\s*:/iu,
+      /runtime output target mode\s*:/iu,
       /runtime writeback target mode\s*:/iu,
+      /result target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-artifact|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+      /output target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-artifact|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
       /writeback target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
       /writeback target mode\s*:\s*(?:source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
-      /target mode\s*:\s*(?:source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
+      /target mode\s*:\s*(?:source-writeback|source-adjacent-artifact|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+    ],
+  },
+  {
+    label: "durable result output fallback",
+    patterns: [
+      /result-csv-file[\s\S]*(?:last-resort|session-table)/iu,
+      /durable result output[\s\S]*session-table/iu,
     ],
   },
   {
