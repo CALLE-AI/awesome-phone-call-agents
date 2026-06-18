@@ -14,7 +14,7 @@ Use this reference when selecting the generated skill's approval and execution b
 
 Ask the user to choose the generated skill's execution mode after the binding level is known. If the user does not choose, use `dry-run-then-batch-approval`.
 
-If source onboarding cannot support either binding level, do not choose an execution mode yet; complete the source and writeback contract first.
+If source onboarding cannot satisfy the minimum `parameterized-bound` contract, do not choose an execution mode yet; complete the source and writeback contract first.
 
 Use `approved-direct-execution` only when:
 

@@ -9,7 +9,7 @@ Use this skill when the user wants to create a new outbound phone-call workflow 
 
 `outbound-call-skill-creator` creates focused business skills. It does not process campaign data itself, does not create a generic outbound runtime platform, and does not use a CLI bootstrap path.
 
-Generated skills should bind enough source, writeback, and safety detail to make later runs predictable. Default to a parameterized-bound workflow: the source family, field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, and writeback policy are fixed at creation time, while runtime requests can still provide approved parameters such as a date window, form ID, CSV path, campaign ID, writeback target, or output file path.
+Generated skills should bind enough source, writeback, and safety detail to make later runs predictable. The minimum source binding level is `parameterized-bound`: the source family, field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, and writeback policy are fixed at creation time, while runtime requests can still provide approved parameters such as a date window, form ID, CSV path, campaign ID, writeback target, or output file path.
 
 ## Core Rule
 
@@ -21,6 +21,8 @@ Use a project-local skills directory only when the user explicitly wants the gen
 
 The generated skill must let a future user make a concrete request such as "process all June 20 records" and have the skill handle source access, filtering, candidate validation, outbound goal compilation, approved MCP execution, dedupe, and writeback or session-table output.
 
+Minimum source binding is mandatory. If creation-time onboarding cannot reach a `parameterized-bound` source and writeback contract, do not generate a business skill.
+
 Do not create `template.md`. The creator captures the source, goal, execution, and writeback contract during skill creation and writes that contract into the generated skill instructions and reference files.
 
 ## Required Creator Workflow
@@ -30,11 +32,11 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 3. Read `references/output-targets.md`, choose the scope, and choose a host-compatible output parent.
 4. Ask which source family to use: `google-form`, `tiktok-ads`, `local-csv`, or `other`.
 5. Read `references/data-sources.md` for the selected source family.
-6. Read `references/binding-contract.md` and ask the user to choose a binding level, defaulting to `parameterized-bound` when they do not choose: `fully-bound` or `parameterized-bound`.
+6. Read `references/binding-contract.md` and choose whether the workflow should remain at the minimum `parameterized-bound` level or be upgraded to `fully-bound` when the user wants a concrete fixed source instance.
 7. Run creation-time source onboarding for the selected binding level:
    - `fully-bound`: authenticate or verify the concrete source, fetch a representative sample from that source, confirm schema and writeback readiness, and stop before generating a real-call skill if onboarding cannot complete.
    - `parameterized-bound`: authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and record which runtime parameters may vary later.
-   If neither binding level can be supported because the source or writeback contract is still unknown, do not write the generated skill yet; continue source onboarding or stop with the missing contract details.
+   If source onboarding cannot support the minimum `parameterized-bound` contract because the source or writeback contract is still unknown, do not write the generated skill yet; continue source onboarding or stop with the missing contract details.
    For any authenticated or connector-backed source family, ask only for the minimum connection details needed to authorize or locate the source before source access and sample fetch complete. Do not ask the user to manually provide the full field mapping before source access has been checked and a representative sample has been fetched.
 8. Capture the source fields from the sampled schema for phone number, recipient label, dedupe key, date filtering, source-level outreach basis or optional consent field, goal inputs, and any runtime parameters allowed by the binding level.
 9. Show a small redacted sample summary and prompt the user to confirm or adjust field mapping.
@@ -68,7 +70,7 @@ For `fully-bound` generated skills, authenticate or verify the concrete source, 
 
 For `parameterized-bound` generated skills, authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and allow runtime instances only when the runtime gate verifies the same schema and source contract.
 
-If source onboarding cannot produce enough source, schema, outreach-basis or consent, dedupe, and writeback detail for either supported binding level, stop before writing the generated skill and ask for the missing contract details.
+If source onboarding cannot produce enough source, schema, outreach-basis or consent, dedupe, and writeback detail for the minimum `parameterized-bound` contract, stop before writing the generated skill and ask for the missing contract details.
 
 During onboarding, show the user a small redacted sample summary, never full private phone numbers, credentials, tokens, cookies, callback URLs, or provider confirmation tokens. Use the sampled fields to help the user define the default outbound goal.
 
@@ -128,7 +130,7 @@ Present execution modes after the binding level is known. For both supported bin
 
 ## Binding Levels
 
-Ask the user to choose a binding level before writing the generated skill. If the user has no preference, use `parameterized-bound`.
+Treat `parameterized-bound` as the minimum binding level before writing the generated skill. If the user has no preference, use `parameterized-bound`; use `fully-bound` only when the workflow should fix a concrete source and writeback target at creation time.
 
 Use `references/binding-contract.md` for full binding-level selection rules and generated skill requirements.
 

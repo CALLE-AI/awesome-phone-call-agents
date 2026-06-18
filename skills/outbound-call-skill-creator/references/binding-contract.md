@@ -1,6 +1,8 @@
 # Binding Contract
 
-Use this reference when choosing how tightly the generated outbound phone-call business skill should bind its data source and writeback behavior.
+Use this reference when choosing whether the generated outbound phone-call business skill should use the minimum source binding contract or fix a concrete source and writeback target.
+
+The minimum supported source binding level is `parameterized-bound`. Do not generate a business skill whose source, schema, outreach basis, dedupe rule, and writeback policy are less specific than this minimum contract.
 
 ## Binding Levels
 
@@ -11,7 +13,7 @@ Use this reference when choosing how tightly the generated outbound phone-call b
 
 ## Selection Rules
 
-Default to `parameterized-bound` when the user wants a reusable workflow and has not asked for a single fixed source instance.
+Default to the minimum `parameterized-bound` contract when the user wants a reusable workflow and has not asked for a single fixed source instance.
 
 Use `fully-bound` when:
 
@@ -27,7 +29,7 @@ Use `parameterized-bound` when:
 - runtime requests can provide approved source or writeback parameters
 - the runtime gate can verify those parameters before real calls
 
-Do not create a generated business skill when the data source, writeback behavior, source-level outreach basis or consent evidence, or dedupe rule is still unknown. Continue onboarding or stop with the missing contract details instead.
+Do not create a generated business skill when the data source, writeback behavior, source-level outreach basis or consent evidence, or dedupe rule is too vague to satisfy the minimum `parameterized-bound` contract. Continue onboarding or stop with the missing contract details instead.
 
 Do not create a skill with no phone field, no source-level outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path.
 

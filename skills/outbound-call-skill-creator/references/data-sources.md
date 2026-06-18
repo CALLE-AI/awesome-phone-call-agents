@@ -4,7 +4,7 @@ Use this reference when selecting and documenting the generated business skill's
 
 ## Required Source Contract
 
-Capture these values before generating a business skill:
+Capture these values before generating a business skill. The source contract must satisfy at least the `parameterized-bound` minimum:
 
 - binding level: `fully-bound` or `parameterized-bound`
 - source family
@@ -31,18 +31,18 @@ Do not guess missing identifiers, credentials, field names, date filters, or cou
 
 ## Binding Levels
 
-Choose one binding level before writing the generated skill:
+Choose whether the workflow stays at the minimum binding level or upgrades to a fixed source instance before writing the generated skill:
 
 | Binding level | What must be fixed at creation time | What may be supplied at runtime |
 | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field names, source-level outreach basis or consent rule, dedupe key, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. |
 | `parameterized-bound` | Source family, access method, required schema, source-level outreach basis or consent rule, dedupe key, writeback policy, and writeback field schema. | Approved instance parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. |
 
-Default to `parameterized-bound`. Use `fully-bound` for stable production or scheduled workflows. If the workflow cannot support either binding level, continue onboarding or stop before generating the skill.
+Default to the minimum `parameterized-bound` contract. Use `fully-bound` for stable production or scheduled workflows that should fix a concrete source and writeback target. If the workflow cannot support the minimum contract, continue onboarding or stop before generating the skill.
 
 ## Preflight and Runtime Gate
 
-Creation-time source onboarding is required for `fully-bound` and `parameterized-bound` real-call skills. Run non-mutating checks when tools and permissions are available:
+Creation-time source onboarding is required to reach the minimum `parameterized-bound` contract, and `fully-bound` adds concrete instance verification. Run non-mutating checks when tools and permissions are available:
 
 - verify source authentication, connector availability, or local file access
 - fetch a small representative sample from the concrete or representative source instance
@@ -79,7 +79,7 @@ When a safe source authorization or auth-readiness action is available, start it
 
 When the user names only an authenticated source family such as `google-form` or `tiktok-ads`, treat that as enough to enter source access onboarding. First inspect available host routes and run any safe auth-readiness or discovery check. The next prompt should ask only for the minimum locator or user-completed authorization step that remains necessary to fetch a representative sample, while confirming the recommended binding level if needed. Do not ask for the default outbound goal, writeback mapping, or full field mapping before the access check and sample fetch have been attempted.
 
-Do not present a blank manual mapping form for phone, recipient, consent, dedupe, goal inputs, or writeback fields before authentication and sample fetch have been attempted. If access or sample fetch is blocked before a minimum source contract can be confirmed, record the blocker and stop before generating the skill.
+Do not present a blank manual mapping form for phone, recipient, consent, dedupe, goal inputs, or writeback fields before authentication and sample fetch have been attempted. If access or sample fetch is blocked before the minimum source contract can be confirmed, record the blocker and stop before generating the skill.
 
 ## Google Form
 

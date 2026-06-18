@@ -139,7 +139,7 @@ Creator behavior:
 
 Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and writeback capability. If any critical value is unknown, stop before generation and explain the missing contract detail.
 
-If source onboarding cannot authenticate or sample the source safely, do not generate the skill yet. Record the blocker in the creation conversation and continue only after the user provides an access route or representative source sample that supports one of the supported binding levels.
+If source onboarding cannot authenticate or sample the source safely, do not generate the skill yet. Record the blocker in the creation conversation and continue only after the user provides an access route or representative source sample that supports the minimum `parameterized-bound` contract.
 
 ## Binding Mode Selection
 

@@ -514,6 +514,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "Creation-Time Source Onboarding",
             "source onboarding",
             "sampled fields",
+            "Minimum source binding is mandatory.",
             "stop before writing the generated skill and ask for the missing contract details",
             "scope-first output rule",
             "If the installed `outbound-call-skill-creator` folder is inside a recognized user-level skills root",
@@ -533,6 +534,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
         skill_dir / "references" / "data-sources.md",
         [
             "creation-time source onboarding",
+            "The source contract must satisfy at least the `parameterized-bound` minimum",
             "Authenticated Source Onboarding",
             "For any authenticated or connector-backed source family, do not ask the user to manually provide the full field mapping before source access has been checked and a representative sample has been fetched.",
             "Collect only the minimum connection details needed to authorize or locate the source.",

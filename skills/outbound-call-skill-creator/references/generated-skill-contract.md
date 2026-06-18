@@ -64,7 +64,7 @@ The generated skill must declare one of these binding levels:
 - `fully-bound`: a concrete source instance and concrete writeback target are fixed at creation time. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
 - `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path.
 
-Default generated skills should be `parameterized-bound`. If the creator cannot capture enough source, outreach-basis, dedupe, and writeback detail for either supported binding level, it must stop before generating the business skill.
+Default generated skills should use the minimum `parameterized-bound` contract. If the creator cannot capture enough source, outreach-basis, dedupe, and writeback detail to satisfy that minimum, it must stop before generating the business skill.
 
 The generated skill must state:
 
@@ -178,7 +178,7 @@ Source onboarding must be read-only and non-mutating:
 - Do not define the default goal from user prose alone before the representative sample is fetched.
 - redact user-facing sample summaries, including full phone numbers and sensitive source values
 
-For both supported binding levels, missing source onboarding blocks skill generation until the source contract is complete enough for the selected level.
+Missing source onboarding blocks skill generation until the source contract is complete enough for at least `parameterized-bound`.
 
 ## MCP Provider Contract
 
