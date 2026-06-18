@@ -63,9 +63,8 @@ The generated skill must declare one of these binding levels:
 
 - `fully-bound`: a concrete source instance and concrete writeback target are fixed at creation time. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
 - `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path.
-- `unbound-generic`: the skill only fixes the goal contract and safety rules. Source access, field mapping, source-level outreach basis or consent evidence, dedupe key, filters, and writeback target must be collected at runtime.
 
-Default generated skills should be `parameterized-bound`. `unbound-generic` generated skills must be dry-run-only by default and must not support approved direct execution or scheduled real calls until they are converted to `fully-bound` or `parameterized-bound`, or until the user approves an exact runtime source and writeback contract.
+Default generated skills should be `parameterized-bound`. If the creator cannot capture enough source, outreach-basis, dedupe, and writeback detail for either supported binding level, it must stop before generating the business skill.
 
 The generated skill must state:
 
@@ -122,7 +121,7 @@ The generated skill must define one execution mode:
 - `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
 - `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
 
-Use `dry-run-then-batch-approval` as the default. For `unbound-generic` workflows, it is the only allowed mode and must remain dry-run-only until onboarding is complete. Use `per-call-approval` or `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows the selected mode, and the concrete runtime request passes the runtime gate.
+Use `dry-run-then-batch-approval` as the default. Use `per-call-approval` or `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows the selected mode, and the concrete runtime request passes the runtime gate.
 
 Even when direct execution is configured, the runtime request must be concrete, such as "process all June 20 records." Open-ended requests such as "run the campaign" are not enough.
 
@@ -166,7 +165,6 @@ Generated bound skills must record creation-time source onboarding:
 - redaction policy for sample summaries
 - default goal contract derived from sampled fields
 - runtime parameters still allowed
-- onboarding blocker, when the workflow is `unbound-generic`
 
 Source onboarding must be read-only and non-mutating:
 
@@ -180,7 +178,7 @@ Source onboarding must be read-only and non-mutating:
 - Do not define the default goal from user prose alone before the representative sample is fetched.
 - redact user-facing sample summaries, including full phone numbers and sensitive source values
 
-For `fully-bound` and `parameterized-bound`, missing source onboarding blocks real-call skill generation. For `unbound-generic`, missing onboarding is allowed only when the generated skill is dry-run-only and records the onboarding blocker.
+For both supported binding levels, missing source onboarding blocks skill generation until the source contract is complete enough for the selected level.
 
 ## MCP Provider Contract
 
@@ -356,7 +354,7 @@ Use this runtime gate report shape during dry-runs and before real calls:
 
 Do not put credentials, tokens, full phone numbers, confirmation tokens, or callback URLs in `evidence` or `blocker`.
 
-After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, reload or discovery step, binding level, source onboarding status, sampled source instance, sample fetch result, default goal source, onboarding blocker if any, provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, provider blocker if any, runtime parameters, source contract, outbound goal contract, execution mode, writeback behavior, preflight result, runtime gate, provider route, and validation result.
+After the creator writes the generated skill, it should show the user a creation summary with the skill name, output path, reload or discovery step, binding level, source onboarding status, sampled source instance, sample fetch result, default goal source, provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, provider blocker if any, runtime parameters, source contract, outbound goal contract, execution mode, writeback behavior, preflight result, runtime gate, provider route, and validation result.
 
 Use this summary shape:
 
@@ -364,8 +362,8 @@ Use this summary shape:
 Skill: <business-skill-name>
 Directory: <generated-skill-directory>
 Discovery: <known-active-root | reload-needed | add-location-needed | nonstandard-path>
-Binding level: <fully-bound | parameterized-bound | unbound-generic>
-Source onboarding: <auth/access check, sampled source instance, sample fetch result, and blocker if any>
+Binding level: <fully-bound | parameterized-bound>
+Source onboarding: <auth/access check, sampled source instance, and sample fetch result>
 Provider onboarding: <provider host runtime, MCP route setup check, auth readiness, compatible MCP tools, one-off capability, and blocker if any>
 Runtime parameters: <allowed parameters or none>
 Source: <source family, access method, required fields>

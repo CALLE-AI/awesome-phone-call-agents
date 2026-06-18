@@ -30,17 +30,17 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 3. Read `references/output-targets.md`, choose the scope, and choose a host-compatible output parent.
 4. Ask which source family to use: `google-form`, `tiktok-ads`, `local-csv`, or `other`.
 5. Read `references/data-sources.md` for the selected source family.
-6. Read `references/binding-contract.md` and ask the user to choose a binding level, defaulting to `parameterized-bound` when they do not choose: `fully-bound`, `parameterized-bound`, or `unbound-generic`.
+6. Read `references/binding-contract.md` and ask the user to choose a binding level, defaulting to `parameterized-bound` when they do not choose: `fully-bound` or `parameterized-bound`.
 7. Run creation-time source onboarding for the selected binding level:
    - `fully-bound`: authenticate or verify the concrete source, fetch a representative sample from that source, confirm schema and writeback readiness, and stop before generating a real-call skill if onboarding cannot complete.
    - `parameterized-bound`: authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and record which runtime parameters may vary later.
-   - `unbound-generic`: collect or record the missing source onboarding blockers and keep the generated skill dry-run-only until an exact runtime contract is approved.
+   If neither binding level can be supported because the source or writeback contract is still unknown, do not write the generated skill yet; continue source onboarding or stop with the missing contract details.
    For any authenticated or connector-backed source family, ask only for the minimum connection details needed to authorize or locate the source before source access and sample fetch complete. Do not ask the user to manually provide the full field mapping before source access has been checked and a representative sample has been fetched.
 8. Capture the source fields from the sampled schema for phone number, recipient label, dedupe key, date filtering, source-level outreach basis or optional consent field, goal inputs, and any runtime parameters allowed by the binding level.
 9. Show a small redacted sample summary and prompt the user to confirm or adjust field mapping.
 10. Prompt the user to define the default outbound goal from the sampled fields: call purpose, required context, allowed questions, prohibited claims, completion criteria, result values, summary format, and escalation cases.
 11. Read `references/mcp-provider-route.md` and run creation-time provider onboarding for the default CALL-E MCP provider route in the current host runtime: configure or verify the MCP route, complete or verify provider authentication, and confirm compatible plan/run/status tools without placing a real call. For Codex, use the `codex mcp` adapter commands in the reference. For Claude, Antigravity, Cursor, or another MCP host, use that host's connector or MCP server setup and authorization flow. Do not treat app connector tools, plugin tools, or similarly named non-MCP tools as proof that this provider route is authenticated. If provider onboarding still cannot complete, record a provider onboarding blocker and keep the generated skill dry-run-only.
-12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`. For `fully-bound` and `parameterized-bound`, available modes are `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`. For `unbound-generic`, the only available mode is `dry-run-then-batch-approval` with dry-run-only behavior until onboarding is complete.
+12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`. For both supported binding levels, available modes are `dry-run-then-batch-approval`, `per-call-approval`, or `approved-direct-execution`.
 13. Capture writeback policy at creation time and capture field mapping, supported target modes, or allowed runtime writeback parameters: source writeback, local CSV writeback, or session table fallback. For local CSV, record supported target modes (`source-csv-in-place` and `result-csv-file`) and choose the concrete target mode during the runtime dry-run or approval step based on the user's requested output behavior.
 14. Run best-effort creation-time preflight checks when tools and permissions are available: read-only source auth/schema checks, non-mutating writeback target or field checks, and MCP route/tool readiness. If preflight cannot run for a bound workflow, record the blocker and do not generate a real-call skill until source and provider onboarding requirements are satisfied.
 15. Read `references/safety.md` and include the required safety boundaries in the generated skill.
@@ -68,7 +68,7 @@ For `fully-bound` generated skills, authenticate or verify the concrete source, 
 
 For `parameterized-bound` generated skills, authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and allow runtime instances only when the runtime gate verifies the same schema and source contract.
 
-For `unbound-generic` generated skills, source onboarding may be incomplete only when the missing values are recorded as onboarding blockers and the generated skill is dry-run-only until an exact runtime source, schema, source-level outreach basis or consent, dedupe, and writeback contract is approved.
+If source onboarding cannot produce enough source, schema, outreach-basis or consent, dedupe, and writeback detail for either supported binding level, stop before writing the generated skill and ask for the missing contract details.
 
 During onboarding, show the user a small redacted sample summary, never full private phone numbers, credentials, tokens, cookies, callback URLs, or provider confirmation tokens. Use the sampled fields to help the user define the default outbound goal.
 
@@ -124,7 +124,7 @@ Before writing files, state the selected scope, output parent, generated skill d
 
 ### Execution Mode
 
-Present execution modes after the binding level is known. For `fully-bound` and `parameterized-bound`, recommend `dry-run-then-batch-approval` first, then briefly explain `per-call-approval` and `approved-direct-execution`. For `unbound-generic`, offer only `dry-run-then-batch-approval` with dry-run-only behavior until onboarding is complete; state that the workflow must be bound before `per-call-approval` or `approved-direct-execution` can be selected.
+Present execution modes after the binding level is known. For both supported binding levels, recommend `dry-run-then-batch-approval` first, then briefly explain `per-call-approval` and `approved-direct-execution`.
 
 ## Binding Levels
 
@@ -136,9 +136,8 @@ Use `references/binding-contract.md` for full binding-level selection rules and 
 | --- | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field mapping, source-level outreach basis or consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
 | `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Default. Eligible for dry-run batch approval, per-call approval, and approved direct execution only after concrete runtime parameters pass the runtime gate. |
-| `unbound-generic` | Goal contract and safety rules only; source and writeback details are collected at runtime. | Source access, fields, filters, source-level outreach basis or consent evidence, dedupe key, and writeback target must be supplied each run. | Dry-run only by default. Do not allow real direct execution or scheduled runs until the workflow is converted to a bound skill or an exact runtime contract is approved. |
 
-Do not create a real-call skill with no phone field, no source-level outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path. If those values are unavailable, generate a dry-run-only `unbound-generic` skill or keep asking for the missing contract.
+Do not create a business skill with no phone field, no source-level outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path. If those values are unavailable, keep asking for the missing contract or stop before generation.
 
 ## Execution Modes
 
@@ -150,7 +149,7 @@ Use `references/execution-modes.md` for full mode selection rules, concrete runt
 - `per-call-approval`: preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it.
 - `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
 
-Use `per-call-approval` or `approved-direct-execution` only for `fully-bound` or `parameterized-bound` generated skills. Do not use either mode for `unbound-generic` workflows.
+Use `per-call-approval` or `approved-direct-execution` only after the generated skill's supported binding level and concrete runtime request pass the required gates.
 
 ## Preflight and Runtime Gate
 
@@ -183,7 +182,7 @@ Include:
 - MCP provider route
 - validation command and result
 
-If a value is intentionally parameterized, label it as a runtime parameter instead of presenting it as already fixed. If a value is unknown, label it as a blocker and state whether the generated skill is dry-run-only until resolved.
+If a value is intentionally parameterized, label it as a runtime parameter instead of presenting it as already fixed. If a required source or writeback value is unknown, report it as a creation blocker and do not generate the skill until the contract is complete.
 
 ## Runtime Contract Formats
 
@@ -230,7 +229,7 @@ During creation, configure and authenticate this route in the selected host runt
 
 A generated skill may support approved direct execution when the user gives a concrete processing request such as "process all June 20 records" and the creation-time contract explicitly allowed direct execution.
 
-Approved direct execution requires a `fully-bound` generated skill or a `parameterized-bound` generated skill whose concrete runtime parameters pass the source, writeback, dedupe, and provider runtime gate. It is not allowed for `unbound-generic` workflows.
+Approved direct execution requires a `fully-bound` generated skill or a `parameterized-bound` generated skill whose concrete runtime parameters pass the source, writeback, dedupe, and provider runtime gate.
 
 Even in direct execution mode, the generated skill must:
 

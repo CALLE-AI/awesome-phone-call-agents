@@ -37,8 +37,8 @@ Use this shape:
 Skill: <business-skill-name>
 Directory: <generated-skill-directory>
 Discovery: <known-active-root | reload-needed | add-location-needed | nonstandard-path>
-Binding level: <fully-bound | parameterized-bound | unbound-generic>
-Source onboarding: <auth/access check, sampled source instance, sample fetch result, and blocker if any>
+Binding level: <fully-bound | parameterized-bound>
+Source onboarding: <auth/access check, sampled source instance, and sample fetch result>
 Provider onboarding: <provider host runtime, MCP route setup check, auth readiness, compatible MCP tools, one-off capability, and blocker if any>
 Runtime parameters: <allowed parameters or none>
 Source: <source family, access method, required fields>
@@ -57,4 +57,4 @@ Validation: <command and result>
 
 The summary must distinguish fixed values from runtime parameters. Do not show credentials, tokens, cookies, callback URLs, confirmation tokens, or full phone numbers.
 
-If a value is unknown, label it as a blocker and state whether the generated skill is dry-run-only until resolved.
+If a required source or writeback value is unknown, report it as a creation blocker and stop before generating the skill.

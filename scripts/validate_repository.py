@@ -514,7 +514,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "Creation-Time Source Onboarding",
             "source onboarding",
             "sampled fields",
-            "dry-run-only until an exact runtime source, schema, source-level outreach basis or consent, dedupe, and writeback contract is approved",
+            "stop before writing the generated skill and ask for the missing contract details",
             "scope-first output rule",
             "If the installed `outbound-call-skill-creator` folder is inside a recognized user-level skills root",
             "Never write a generated business skill into the downloaded `outbound-call-skill-creator` skill folder itself.",
@@ -1496,153 +1496,60 @@ Runtime parameters still allowed: date window and approved source instance ident
         ):
             fail("Generated outbound skill checker missing-selected-execution message changed.")
 
+    unsupported_binding_level = "un" + "bound-" + "generic"
+
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
-        unsafe_direct_md = valid_skill_md.replace(
+        unsupported_binding_md = valid_skill_md.replace(
             "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
-            "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: approved-direct-execution.",
+            f"Binding level: {unsupported_binding_level}.",
         )
-        (skill_dir / "SKILL.md").write_text(unsafe_direct_md, encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(unsupported_binding_md, encoding="utf-8")
         (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
         (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
 
-        unsafe_direct_failure = subprocess.run(
+        unsupported_binding_failure = subprocess.run(
             ["node", str(checker), "--skill-dir", str(skill_dir)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        unsafe_direct_output = unsafe_direct_failure.stdout + unsafe_direct_failure.stderr
-        if unsafe_direct_failure.returncode == 0:
-            fail("Generated outbound skill checker must reject unbound direct execution.")
-        if (
-            "Generated skill cannot use approved-direct-execution with unbound-generic"
-            not in unsafe_direct_output
-        ):
-            fail("Generated outbound skill checker unbound-direct failure message changed.")
+        unsupported_binding_output = (
+            unsupported_binding_failure.stdout + unsupported_binding_failure.stderr
+        )
+        if unsupported_binding_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported binding levels.")
+        if "unsupported binding levels are not allowed" not in unsupported_binding_output:
+            fail("Generated outbound skill checker unsupported-binding message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
-        unsafe_per_call_md = valid_skill_md.replace(
-            "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
-            "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: per-call-approval. This workflow is dry-run-only until onboarding is complete.",
-        ).replace(
-            """## Source Onboarding
-
-Source onboarding completed for this parameterized-bound workflow.
-Access route: local source credentials.
-Source access route discovery result: host-local route discovery completed before user route selection.
-Authentication or access check result: passed with local source credentials.
-Sample fetch result: passed with a representative source instance.
-Sampled source instance: representative-callback-source.
-Discovered field mapping: candidate_id, phone_e164, name, submitted_at, consent, and callback_reason.
-User-confirmed field mapping: confirmed after the representative sample was shown.
-Redaction policy for sample summaries: mask phone numbers and omit credentials.
-Default goal contract derived from sampled fields: call the respondent about callback_reason and summarize the result.
-Runtime parameters still allowed: date window and approved source instance identifiers.
-
-""",
-            """## Source Onboarding
-
-Source onboarding recorded an onboarding blocker for this unbound-generic workflow.
-Onboarding blocker: no approved source instance has been bound yet; keep this workflow dry-run-only until onboarding is complete.
-
-""",
-        )
-        (skill_dir / "SKILL.md").write_text(unsafe_per_call_md, encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(valid_skill_md, encoding="utf-8")
         (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
-        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text(
+            f"# Examples\nBinding level: {unsupported_binding_level}.\n",
+            encoding="utf-8",
+        )
 
-        unsafe_per_call_failure = subprocess.run(
+        unsupported_reference_failure = subprocess.run(
             ["node", str(checker), "--skill-dir", str(skill_dir)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        unsafe_per_call_output = unsafe_per_call_failure.stdout + unsafe_per_call_failure.stderr
-        if unsafe_per_call_failure.returncode == 0:
-            fail("Generated outbound skill checker must reject unbound per-call approval.")
-        if (
-            "Generated skill cannot use per-call-approval with unbound-generic"
-            not in unsafe_per_call_output
-        ):
-            fail("Generated outbound skill checker unbound-per-call failure message changed.")
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        skill_dir = Path(temp_dir) / "generated-callback-skill"
-        references_dir = skill_dir / "references"
-        references_dir.mkdir(parents=True)
-        unbound_dry_run_md = valid_skill_md.replace(
-            "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
-            "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.",
-        ).replace(
-            """## Source Onboarding
-
-Source onboarding completed for this parameterized-bound workflow.
-Access route: local source credentials.
-Source access route discovery result: host-local route discovery completed before user route selection.
-Authentication or access check result: passed with local source credentials.
-Sample fetch result: passed with a representative source instance.
-Sampled source instance: representative-callback-source.
-Discovered field mapping: candidate_id, phone_e164, name, submitted_at, consent, and callback_reason.
-User-confirmed field mapping: confirmed after the representative sample was shown.
-Redaction policy for sample summaries: mask phone numbers and omit credentials.
-Default goal contract derived from sampled fields: call the respondent about callback_reason and summarize the result.
-Runtime parameters still allowed: date window and approved source instance identifiers.
-
-""",
-            """## Source Onboarding
-
-Source onboarding recorded an onboarding blocker for this unbound-generic workflow.
-Onboarding blocker: no approved source instance has been bound yet; keep this workflow dry-run-only until onboarding is complete.
-
-""",
+        unsupported_reference_output = (
+            unsupported_reference_failure.stdout + unsupported_reference_failure.stderr
         )
-        for required_snippet in [
-            "Binding level: unbound-generic.",
-            "dry-run-only",
-            "onboarding blocker",
-        ]:
-            if required_snippet not in unbound_dry_run_md:
-                fail(f"Unbound dry-run fixture drifted; missing {required_snippet!r}.")
-        for bound_only_snippet in [
-            "Authentication or access check result: passed",
-            "Sample fetch result: passed",
-            "Default goal contract derived from sampled fields",
-        ]:
-            if bound_only_snippet in unbound_dry_run_md:
-                fail(f"Unbound dry-run fixture must not include {bound_only_snippet!r}.")
-        (skill_dir / "SKILL.md").write_text(unbound_dry_run_md, encoding="utf-8")
-        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
-        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
-
-        unbound_dry_run_success = subprocess.run(
-            ["node", str(checker), "--skill-dir", str(skill_dir)],
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if unbound_dry_run_success.returncode != 0:
-            fail(
-                "Generated outbound skill checker must allow dry-run-only unbound onboarding blockers: "
-                + (unbound_dry_run_success.stderr or unbound_dry_run_success.stdout).strip()
-            )
+        if unsupported_reference_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported binding references.")
+        if "unsupported binding levels are not allowed" not in unsupported_reference_output:
+            fail("Generated outbound skill checker unsupported-reference message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"

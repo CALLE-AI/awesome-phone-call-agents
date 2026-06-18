@@ -6,9 +6,9 @@ Use this reference when creating a generated outbound phone-call business skill.
 
 The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a binding level, source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and writeback behavior.
 
-If the user cannot explain why records are authorized for phone follow-up, generate a dry-run-only skill or stop and ask for a consent field or approved source basis.
+If the user cannot explain why records are authorized for phone follow-up, stop and ask for a consent field or approved source basis before generating a skill.
 
-Default to a `parameterized-bound` skill when the user wants reuse but has not asked for a single fixed source instance. Use `fully-bound` for stable production or scheduled workflows. Use `unbound-generic` only for exploratory or dry-run-only workflows unless the user later approves a complete runtime source and writeback contract.
+Default to a `parameterized-bound` skill when the user wants reuse but has not asked for a single fixed source instance. Use `fully-bound` for stable production or scheduled workflows.
 
 ## Generated Skill Safety
 
@@ -32,7 +32,7 @@ Every generated business skill must include rules for:
 
 Direct execution is allowed only when the generated skill's creation-time contract explicitly says that a concrete request such as "process all June 20 records" authorizes real calls after validation.
 
-Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass the runtime gate. It is not allowed for `unbound-generic` workflows.
+Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass the runtime gate.
 
 Direct execution still requires:
 

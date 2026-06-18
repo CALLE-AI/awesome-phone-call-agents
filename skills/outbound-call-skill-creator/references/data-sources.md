@@ -6,7 +6,7 @@ Use this reference when selecting and documenting the generated business skill's
 
 Capture these values before generating a business skill:
 
-- binding level: `fully-bound`, `parameterized-bound`, or `unbound-generic`
+- binding level: `fully-bound` or `parameterized-bound`
 - source family
 - access method
 - authentication or access check method
@@ -37,9 +37,8 @@ Choose one binding level before writing the generated skill:
 | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field names, source-level outreach basis or consent rule, dedupe key, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. |
 | `parameterized-bound` | Source family, access method, required schema, source-level outreach basis or consent rule, dedupe key, writeback policy, and writeback field schema. | Approved instance parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. |
-| `unbound-generic` | Goal contract, safety rules, and the requirement to collect source and writeback details at runtime. | Source access, all field mappings, source-level outreach basis or consent evidence, dedupe key, filters, and writeback target. |
 
-Default to `parameterized-bound`. Use `fully-bound` for stable production or scheduled workflows. Use `unbound-generic` only for exploratory or dry-run-only workflows unless the user later supplies an exact runtime source and writeback contract for approval.
+Default to `parameterized-bound`. Use `fully-bound` for stable production or scheduled workflows. If the workflow cannot support either binding level, continue onboarding or stop before generating the skill.
 
 ## Preflight and Runtime Gate
 
@@ -80,7 +79,7 @@ When a safe source authorization or auth-readiness action is available, start it
 
 When the user names only an authenticated source family such as `google-form` or `tiktok-ads`, treat that as enough to enter source access onboarding. First inspect available host routes and run any safe auth-readiness or discovery check. The next prompt should ask only for the minimum locator or user-completed authorization step that remains necessary to fetch a representative sample, while confirming the recommended binding level if needed. Do not ask for the default outbound goal, writeback mapping, or full field mapping before the access check and sample fetch have been attempted.
 
-Do not present a blank manual mapping form for phone, recipient, consent, dedupe, goal inputs, or writeback fields before authentication and sample fetch have been attempted. If access or sample fetch is blocked, record an onboarding blocker and keep the generated skill dry-run-only until the blocker is resolved.
+Do not present a blank manual mapping form for phone, recipient, consent, dedupe, goal inputs, or writeback fields before authentication and sample fetch have been attempted. If access or sample fetch is blocked before a minimum source contract can be confirmed, record the blocker and stop before generating the skill.
 
 ## Google Form
 
@@ -113,7 +112,7 @@ For `fully-bound`, creation must verify access to the concrete form and fetch a 
 
 When `google-form-callback` helper scripts are available, do not ask the user whether to use local OAuth before checking them. Run or direct the host to run `google-auth.mjs status` first. If authenticated, run `google-local-api-client.mjs --action list-forms` before asking for a Form ID, then fetch metadata or a small response sample from the selected or representative form. If auth is missing, directly run or request `preflight-auth.mjs --repair-google`, wait for the user to complete browser authorization when required, re-check `google-auth.mjs status`, and then list forms. Only ask for an Apps Script fallback endpoint, manual Form ID, or account scope when local OAuth helpers are unavailable, auth cannot be completed, or listing forms is not permitted.
 
-For `fully-bound`, capture the concrete form or response spreadsheet and writeback columns. For `parameterized-bound`, capture the required question names and allow the runtime request to provide the form ID only when the runtime gate verifies that the form matches the schema. For `unbound-generic`, keep the skill dry-run-only until form access, field mapping, source-level outreach basis or consent basis, and writeback behavior are supplied.
+For `fully-bound`, capture the concrete form or response spreadsheet and writeback columns. For `parameterized-bound`, capture the required question names and allow the runtime request to provide the form ID only when the runtime gate verifies that the form matches the schema.
 
 ## TikTok Ads
 
@@ -162,7 +161,7 @@ During creation-time onboarding, fetch a small sample through the exact MCP tool
 
 Do not invent TikTok Ads MCP tools or schemas. If the host does not expose a writeback-capable tool, use session-table output or local CSV output.
 
-For `fully-bound`, capture the concrete account, advertiser, campaign, or lead scope and writeback tool. For `parameterized-bound`, capture the exact MCP tools and required returned fields, then allow runtime account or campaign identifiers only when the runtime gate confirms the returned schema. For `unbound-generic`, do not permit approved direct execution.
+For `fully-bound`, capture the concrete account, advertiser, campaign, or lead scope and writeback tool. For `parameterized-bound`, capture the exact MCP tools and required returned fields, then allow runtime account or campaign identifiers only when the runtime gate confirms the returned schema.
 
 ## Local CSV
 
@@ -196,7 +195,7 @@ Do not require a per-row consent column when the user confirms the CSV source on
 
 If writeback is not configured, output the session table described in the generated skill.
 
-For `fully-bound`, capture the concrete CSV path and output CSV path. For `parameterized-bound`, capture the required column schema and allow runtime CSV and output paths. For `unbound-generic`, require the user to map columns at runtime and keep the workflow dry-run-only until the mapping, source-level outreach basis or consent field, and dedupe rule are approved.
+For `fully-bound`, capture the concrete CSV path and output CSV path. For `parameterized-bound`, capture the required column schema and allow runtime CSV and output paths.
 
 ## Other Sources
 
@@ -213,6 +212,6 @@ Ask one question at a time until the source contract is complete:
 - Can results be written back?
 - If writeback is possible, what exact action and fields should be used?
 
-If the user cannot provide enough detail for safe access, generate a skill that can produce a dry-run from manually supplied records and states the missing integration blocker.
+If the user cannot provide enough detail for safe access, stop before generation and state the missing integration blocker.
 
-For custom sources, do not generate a bound real-call skill until the source can be authenticated or accessed, sampled safely, and mapped to the required phone-call fields. If that cannot happen, generate only a dry-run-only `unbound-generic` skill with an onboarding blocker.
+For custom sources, do not generate a skill until the source can be authenticated or accessed, sampled safely, and mapped to the required phone-call fields.

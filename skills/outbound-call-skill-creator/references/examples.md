@@ -137,9 +137,9 @@ Create an outbound skill for records from our internal API.
 
 Creator behavior:
 
-Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and writeback capability. If any critical value is unknown, generate a dry-run-only skill or stop before generation.
+Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and writeback capability. If any critical value is unknown, stop before generation and explain the missing contract detail.
 
-If source onboarding cannot authenticate or sample the source safely, generate only a dry-run-only `unbound-generic` skill with an onboarding blocker.
+If source onboarding cannot authenticate or sample the source safely, do not generate the skill yet. Record the blocker in the creation conversation and continue only after the user provides an access route or representative source sample that supports one of the supported binding levels.
 
 ## Binding Mode Selection
 
@@ -178,6 +178,6 @@ Create a generic callback skill. I will tell it the data source later.
 
 Recommended creator response:
 
-- use `unbound-generic`
-- keep the skill dry-run-only by default
-- require runtime collection of source fields, source-level outreach basis or consent evidence, dedupe key, and writeback behavior before any real calls
+- explain that this creator generates directly usable batch-call skills, so the source family and minimum source contract must be known before generation
+- ask for the source family and enough access detail to run source onboarding
+- recommend `parameterized-bound` once the source family, required schema, outreach basis, dedupe rule, and writeback policy are known

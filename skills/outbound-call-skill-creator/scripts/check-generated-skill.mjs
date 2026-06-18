@@ -6,7 +6,8 @@ const REQUIRED_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NON_ENGLISH_SCRIPT_RE =
   /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
-const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound|unbound-generic)`?/iu;
+const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound)`?/iu;
+const UNSUPPORTED_BINDING_LEVEL_RE = new RegExp("\\b" + "un" + "bound-" + "generic\\b", "iu");
 const EXECUTION_MODE_RE =
   /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|per-call-approval|approved-direct-execution)`?/imu;
 const REQUIRED_SKILL_MARKERS = [
@@ -332,22 +333,6 @@ if (["fully-bound", "parameterized-bound"].includes(selectedBindingLevel)) {
   }
 }
 
-if (selectedBindingLevel === "unbound-generic") {
-  if (!/dry-run-only/iu.test(skillText)) {
-    fail("Unbound generic generated skill must declare dry-run-only behavior");
-  }
-  if (!/onboarding blocker/iu.test(skillText)) {
-    fail("Unbound generic generated skill must record a source onboarding blocker");
-  }
-}
-
-if (
-  selectedBindingLevel === "unbound-generic" &&
-  selectedExecutionMode !== "dry-run-then-batch-approval"
-) {
-  fail(`Generated skill cannot use ${selectedExecutionMode} with unbound-generic`);
-}
-
 if (!/runtime gate/iu.test(skillText)) {
   fail("Generated skill SKILL.md must mention runtime gate requirements");
 }
@@ -370,6 +355,12 @@ if (fs.existsSync(path.join(skillDir, "template.md"))) {
 
 const textFiles = fs.existsSync(skillDir) ? walkTextFiles(skillDir) : [];
 const allText = textFiles.map((filePath) => readText(filePath)).join("\n");
+
+if (UNSUPPORTED_BINDING_LEVEL_RE.test(allText)) {
+  fail(
+    "Generated skill files must use fully-bound or parameterized-bound; unsupported binding levels are not allowed",
+  );
+}
 
 if (!allText.includes(REQUIRED_ROUTE)) {
   fail(`Generated skill must mention MCP provider route ${REQUIRED_ROUTE}`);
