@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an `outbound-call-skill-creator` Agent Skill that generates directly usable outbound phone-call workflow skills for Google Form, ttmcp, local CSV, and custom data sources.
+**Goal:** Build an `outbound-call-skill-creator` Agent Skill that generates directly usable outbound phone-call workflow skills for Google Form, TikTok Ads, local CSV, and custom data sources.
 
 **Architecture:** Add one procedural creator skill under `skills/outbound-call-skill-creator/`. Keep the main `SKILL.md` concise and route details into references for output target selection, binding contracts, execution modes, data sources, generated skill contracts, MCP provider usage, safety, creation summaries, and examples. Add a small Node.js checker script so generated skill folders can be validated before repository validation runs.
 
@@ -16,13 +16,13 @@
 - Create `skills/outbound-call-skill-creator/README.md`: user-facing overview, binding model, execution modes, example creation flow, and validation commands.
 - Create `skills/outbound-call-skill-creator/references/binding-contract.md`: binding-level selection rules and generated skill requirements.
 - Create `skills/outbound-call-skill-creator/references/creation-summary.md`: creation summary shape and safety rules.
-- Create `skills/outbound-call-skill-creator/references/data-sources.md`: built-in `google-form`, `ttmcp`, `local-csv`, and custom source guidance.
+- Create `skills/outbound-call-skill-creator/references/data-sources.md`: built-in `google-form`, `tiktok-ads`, `local-csv`, and custom source guidance.
 - Create `skills/outbound-call-skill-creator/references/execution-modes.md`: approval modes, runtime request standard, and direct execution guardrails.
 - Create `skills/outbound-call-skill-creator/references/generated-skill-contract.md`: exact generated skill folder contract, normalized candidate schema, goal contract, writeback contract, and session-table fallback.
 - Create `skills/outbound-call-skill-creator/references/mcp-provider-route.md`: default MCP provider route, plan/run/status expectations, auth blockers, and no-CLI rule.
 - Create `skills/outbound-call-skill-creator/references/output-targets.md`: scope-first, host-aware output target rules for user-level, project-local, explicit-path, and reference-repository generation.
 - Create `skills/outbound-call-skill-creator/references/safety.md`: safety rules that the creator must apply and copy into generated business skills.
-- Create `skills/outbound-call-skill-creator/references/examples.md`: concrete creation examples for Google Form, ttmcp, local CSV, and custom sources.
+- Create `skills/outbound-call-skill-creator/references/examples.md`: concrete creation examples for Google Form, TikTok Ads, local CSV, and custom sources.
 - Create `skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs`: validate a generated skill directory for required files, frontmatter, MCP route use, no `template.md`, and English-only content.
 - Modify `scripts/validate_repository.py`: require the new creator skill files in repository validation.
 
@@ -108,7 +108,7 @@ Write `skills/outbound-call-skill-creator/SKILL.md` with this content:
 ```markdown
 ---
 name: outbound-call-skill-creator
-description: Create directly usable outbound phone-call Agent Skills that connect data sources such as Google Forms, ttmcp, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
+description: Create directly usable outbound phone-call Agent Skills that connect data sources such as Google Forms, TikTok Ads, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
 ---
 
 # Outbound Call Skill Creator
@@ -134,7 +134,7 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 1. Confirm that the user wants to create a new outbound phone-call workflow skill.
 2. Ask for or derive a lowercase hyphenated business skill name.
 3. Read `references/output-targets.md`, choose the scope, and choose a host-compatible output parent.
-4. Ask which source family to use: `google-form`, `ttmcp`, `local-csv`, or `other`.
+4. Ask which source family to use: `google-form`, `tiktok-ads`, `local-csv`, or `other`.
 5. Read `references/data-sources.md` for the selected source family.
 6. Capture the source fields for phone number, recipient label, dedupe key, date filtering, and goal inputs.
 7. Capture the outbound goal contract: call purpose, required context, allowed questions, completion criteria, result values, and escalation cases.
@@ -151,7 +151,7 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 Present these source families by default:
 
 - `google-form`: Google Forms responses with local OAuth or an explicitly configured Apps Script fallback.
-- `ttmcp`: records obtained through known ttmcp MCP tools or resources.
+- `tiktok-ads`: records obtained from TikTok Ads through exposed MCP tools, resources, or approved connectors.
 - `local-csv`: records from a user-provided CSV file.
 - `other`: a custom source that requires multi-turn clarification before generating the skill.
 
@@ -287,9 +287,9 @@ Generated Google Form skills must require a clear basis for phone follow-up. The
 
 If the form has no linked response spreadsheet and the user wants writeback, require an Apps Script fallback or ask the user to link a response spreadsheet before real writeback.
 
-## ttmcp
+## TikTok Ads
 
-Use `ttmcp` when records come from TikTok or related MCP tools exposed by the host.
+Use `tiktok-ads` when records come from TikTok Ads through exposed MCP tools, resources, or approved connectors. The source family is `tiktok-ads`; MCP is the access method. Use `https://business-api.tiktok.com/open_mcp/tt-ads-mcp-layer-tmp` as the default MCP access route when the host has not already exposed a TikTok Ads connector.
 
 Capture:
 
@@ -305,9 +305,9 @@ Capture:
 - outreach basis or consent evidence
 - approved writeback tool or the decision to use session-table output
 
-Generated ttmcp skills must not assume every record is callable. They must validate outreach basis and E.164 phone numbers before creating call candidates.
+Generated TikTok Ads skills must not assume every record is callable. They must validate outreach basis and E.164 phone numbers before creating call candidates.
 
-Do not invent ttmcp tools or schemas. If the host does not expose a writeback-capable tool, use session-table output or local CSV output.
+Do not invent TikTok Ads MCP tools or schemas. If the host does not expose a writeback-capable tool, use session-table output or local CSV output.
 
 ## Local CSV
 
@@ -666,24 +666,26 @@ Generated future use:
 Use quote-request-callback to process all June 20 submissions.
 ```
 
-## ttmcp Lead Follow-Up Skill
+## TikTok Ads Lead Follow-Up Skill
 
 User request:
 
 ```text
-Create an outbound skill named tiktok-lead-followup. It should read callable lead records from ttmcp, call leads about their submitted product interest, and write status back only if an approved ttmcp writeback tool exists.
+Create an outbound skill named tiktok-lead-followup. It should read callable lead records from TikTok Ads, call leads about their submitted product interest, and write status back only if an approved TikTok Ads MCP writeback tool or connector action exists.
 ```
 
 Captured contract:
 
-- source family: `ttmcp`
+- source family: `tiktok-ads`
+- access method: MCP
+- source route: `https://business-api.tiktok.com/open_mcp/tt-ads-mcp-layer-tmp`
 - MCP tool names: captured from the host before generation
 - phone field: captured from returned lead records
 - recipient label field: captured from returned lead records
 - dedupe key: lead record ID
 - date filtering: record creation time in the source account timezone
 - outreach basis: lead form includes phone follow-up consent
-- writeback: approved ttmcp writeback tool or session table fallback
+- writeback: approved TikTok Ads MCP writeback tool, approved connector action, or session table fallback
 
 Generated future use:
 

@@ -14,7 +14,7 @@ Use this reference when selecting the generated skill's approval and execution b
 
 Ask the user to choose the generated skill's execution mode after the binding level is known. If the user does not choose, use `dry-run-then-batch-approval`.
 
-Do not offer `approved-direct-execution` for `unbound-generic` workflows. State that the workflow must first become `fully-bound` or `parameterized-bound`.
+For `unbound-generic` workflows, offer only `dry-run-then-batch-approval` with dry-run-only behavior until onboarding is complete. State that the workflow must first become `fully-bound` or `parameterized-bound` before `per-call-approval` or `approved-direct-execution` can be selected.
 
 Use `approved-direct-execution` only when:
 

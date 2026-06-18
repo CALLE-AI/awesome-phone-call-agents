@@ -39,6 +39,10 @@ const REQUIRED_SKILL_MARKERS = [
     patterns: [/mcp provider route/iu],
   },
   {
+    label: "provider onboarding",
+    patterns: [/provider onboarding/iu],
+  },
+  {
     label: "execution modes",
     patterns: [/execution modes/iu],
   },
@@ -47,8 +51,38 @@ const REQUIRED_SKILL_MARKERS = [
     patterns: [/serial candidate execution/iu, /serially process all ready candidates/iu],
   },
   {
+    label: "provider terminal instruction scope",
+    patterns: [
+      /provider terminal instructions such as `?report_result`? or `?do not start another call`?\s+apply only to the current provider run/iu,
+      /provider terminal instruction[\s\S]*current provider run/iu,
+    ],
+  },
+  {
+    label: "post-approval batch autonomy",
+    patterns: [
+      /after execution approval,\s*do not ask the\s+user to continue,\s*confirm the next candidate,\s*or approve additional provider runs/iu,
+      /do not ask the\s+user to continue,\s*confirm the next candidate,\s*or approve additional provider runs/iu,
+    ],
+  },
+  {
+    label: "provider result finalization",
+    patterns: [
+      /provider result finalization[\s\S]*full-history provider\s+reconciliation[\s\S]*negative terminal stability check/iu,
+      /terminal provider status is\s+not writeback-ready[\s\S]*full-history provider\s+reconciliation/iu,
+    ],
+  },
+  {
     label: "writeback behavior",
     patterns: [/writeback behavior/iu],
+  },
+  {
+    label: "writeback target mode",
+    patterns: [
+      /runtime writeback target mode\s*:/iu,
+      /writeback target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
+      /writeback target mode\s*:\s*(?:source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
+      /target mode\s*:\s*(?:source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
+    ],
   },
   {
     label: "preflight and creation summary",
@@ -61,6 +95,78 @@ const REQUIRED_SKILL_MARKERS = [
   {
     label: "validation commands",
     patterns: [/validation commands/iu],
+  },
+];
+const BOUND_ONBOARDING_MARKERS = [
+  {
+    label: "passed authentication or access check result",
+    patterns: [
+      /^\s*(?:source\s+)?authentication or access check result\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/imu,
+      /^\s*(?:source\s+)?auth(?:entication)? check result\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/imu,
+    ],
+  },
+  {
+    label: "source access route",
+    patterns: [/^\s*(?:source\s+)?access route\s*:/imu],
+  },
+  {
+    label: "source access route discovery result",
+    patterns: [/^\s*source access route discovery result\s*:/imu],
+  },
+  {
+    label: "passed sample fetch result",
+    patterns: [/sample fetch result\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/iu],
+  },
+  {
+    label: "sampled source instance",
+    patterns: [/sampled source instance\s*:/iu],
+  },
+  {
+    label: "discovered field mapping",
+    patterns: [/discovered field mapping\s*:/iu],
+  },
+  {
+    label: "user-confirmed field mapping",
+    patterns: [
+      /user-confirmed field mapping\s*:/iu,
+      /field mapping confirmed after (?:the )?(?:representative )?sample/iu,
+    ],
+  },
+  {
+    label: "redaction policy for sample summaries",
+    patterns: [/redaction policy(?: for sample summaries)?\s*:/iu],
+  },
+  {
+    label: "default goal contract derived from sampled fields",
+    patterns: [/default goal contract derived from sampled fields\s*:/iu],
+  },
+  {
+    label: "runtime parameters still allowed",
+    patterns: [/runtime parameters still allowed\s*:/iu],
+  },
+];
+const BOUND_PROVIDER_ONBOARDING_MARKERS = [
+  {
+    label: "configured provider host runtime",
+    patterns: [/provider host runtime\s*:/iu, /host runtime\s*:/iu],
+  },
+  {
+    label: "passed MCP route setup check result",
+    patterns: [
+      /mcp route setup check result\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/iu,
+      /provider route setup check result\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/iu,
+    ],
+  },
+  {
+    label: "passed provider authentication or auth readiness check result",
+    patterns: [
+      /provider (?:authentication|auth readiness) check result\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/iu,
+      /provider auth(?:entication)?\s*:\s*(?:passed|verified|confirmed|completed|succeeded)\b/iu,
+    ],
+  },
+  {
+    label: "compatible MCP provider tools",
+    patterns: [/compatible MCP provider tools\s*:/iu, /compatible provider tools\s*:/iu],
   },
 ];
 
@@ -189,6 +295,10 @@ for (const marker of REQUIRED_SKILL_MARKERS) {
   }
 }
 
+if (!/source onboarding/iu.test(skillText)) {
+  fail("Generated skill SKILL.md must include source onboarding");
+}
+
 const selectedBindingLevel = extractRequiredValue(
   skillText,
   BINDING_LEVEL_RE,
@@ -199,12 +309,43 @@ const selectedExecutionMode = extractRequiredValue(
   EXECUTION_MODE_RE,
   "execution mode",
 );
+const providerOnboardingMatch = /##\s+Provider Onboarding\s*([\s\S]*?)(?:\n##\s+|$)/iu.exec(
+  skillText,
+);
+const providerOnboardingText = providerOnboardingMatch ? providerOnboardingMatch[1] : "";
+
+if (["fully-bound", "parameterized-bound"].includes(selectedBindingLevel)) {
+  for (const marker of BOUND_ONBOARDING_MARKERS) {
+    if (!marker.patterns.some((pattern) => pattern.test(skillText))) {
+      fail(`Bound generated skill SKILL.md must include ${marker.label}`);
+    }
+  }
+  if (/inferred|mcp__codex_apps__|call_e_zhiwen|botlab/iu.test(providerOnboardingText)) {
+    fail(
+      "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools",
+    );
+  }
+  for (const marker of BOUND_PROVIDER_ONBOARDING_MARKERS) {
+    if (!marker.patterns.some((pattern) => pattern.test(skillText))) {
+      fail(`Bound generated skill SKILL.md must include ${marker.label}`);
+    }
+  }
+}
+
+if (selectedBindingLevel === "unbound-generic") {
+  if (!/dry-run-only/iu.test(skillText)) {
+    fail("Unbound generic generated skill must declare dry-run-only behavior");
+  }
+  if (!/onboarding blocker/iu.test(skillText)) {
+    fail("Unbound generic generated skill must record a source onboarding blocker");
+  }
+}
 
 if (
   selectedBindingLevel === "unbound-generic" &&
-  selectedExecutionMode === "approved-direct-execution"
+  selectedExecutionMode !== "dry-run-then-batch-approval"
 ) {
-  fail("Generated skill cannot use approved-direct-execution with unbound-generic");
+  fail(`Generated skill cannot use ${selectedExecutionMode} with unbound-generic`);
 }
 
 if (!/runtime gate/iu.test(skillText)) {

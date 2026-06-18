@@ -13,7 +13,7 @@ The generated business skill should behave like `google-form-callback`: after it
 The first version supports three built-in source and writeback families:
 
 - `google-form`
-- `ttmcp`
+- `tiktok-ads`
 - `local-csv`
 
 If the user chooses another source or destination, the creator enters a requirements-gathering workflow and generates a custom adapter contract for the resulting business skill. The custom path should not guess API details, credentials, identifiers, or writeback behavior.
@@ -41,7 +41,7 @@ When a user asks to create an outbound workflow skill, `outbound-call-skill-crea
 - best-effort creation-time preflight result or blocker
 - mandatory runtime gate requirements before real calls
 
-The creator should present `google-form`, `ttmcp`, and `local-csv` as default integration choices. Choosing `other` starts a multi-turn clarification flow for source access, record shape, date filtering, dedupe keys, and writeback capability.
+The creator should present `google-form`, `tiktok-ads`, and `local-csv` as default integration choices. Choosing `other` starts a multi-turn clarification flow for source access, record shape, date filtering, dedupe keys, and writeback capability.
 
 The creator must choose the generated skill output scope before creating files. Use a scope-first, host-aware rule: user-level reusable skills go to a recognized user skills root, project-local skills go to a host-compatible repository skills root, explicit paths win when the user provides them, and maintained generated workflows in this reference repository use this repository's `skills/` directory. When the creator is installed by a skill installer and invoked from a different project, the default should be user-level reusable output unless the workflow depends on project-local files or the user asks to version it with the project.
 
@@ -103,9 +103,9 @@ Generated Google Form skills should follow the existing `google-form-callback` p
 - use the linked response spreadsheet for writeback when available
 - avoid exposing OAuth tokens, callback URLs, or full phone numbers
 
-### ttmcp
+### TikTok Ads
 
-Generated ttmcp skills should describe the exact MCP tool or query path selected during creation.
+Generated TikTok Ads skills should describe the exact MCP tool or query path selected during creation. The source family is `tiktok-ads`; MCP is the access method. Use `https://business-api.tiktok.com/open_mcp/tt-ads-mcp-layer-tmp` as the default MCP route when the host has not already exposed a TikTok Ads connector.
 
 The creator must capture:
 
@@ -115,7 +115,7 @@ The creator must capture:
 - field mapping for phone number, name, dedupe key, and goal inputs
 - allowed writeback action, if one exists
 
-The generated skill must not assume that every ttmcp record is callable. It must validate explicit outreach basis and phone-number format before creating call candidates.
+The generated skill must not assume that every TikTok Ads record is callable. It must validate explicit outreach basis and phone-number format before creating call candidates.
 
 ### Local CSV
 
@@ -183,7 +183,7 @@ After the user approves the exact pending call list, generated skills must proce
 
 Generated skills support three writeback outcomes:
 
-- source writeback, such as Google Sheets or an approved ttmcp writeback action
+- source writeback, such as Google Sheets or an approved TikTok Ads writeback action
 - local file writeback, such as CSV output
 - session table output when writeback is not configured
 
