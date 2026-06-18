@@ -123,7 +123,7 @@ For `outbound-call-skill-creator`:
 
 ```text
 Use outbound-call-skill-creator to create a project-local callback skill from a local CSV file.
-Start by collecting the source fields, consent basis, call goal, provider route, execution mode, and writeback target.
+Start by collecting the source fields, consent basis, call goal, provider route, execution mode, and durable result-output target.
 ```
 
 The agent should create or update a visible scheduler job only when the current client can persist, run, and cancel it safely. The scheduled job then executes the runtime prompt and attempts exactly one one-off CALL-E call.
@@ -152,7 +152,7 @@ If the client cannot safely create the schedule, the skill must return `status: 
 | --- | --- | --- | --- |
 | [`call-reminder`](skills/call-reminder/) | Schedules recurring CALL-E phone-call reminders by wrapping the existing one-off CALL-E call workflow in the current client's scheduler or automation system. | [`skills/call-reminder/`](skills/call-reminder/) | Reference implementation |
 | [`google-form-callback`](skills/google-form-callback/) | Processes authorized Google Form responses into safe one-off callback calls with dry-runs, scheduled polling plans, and Sheets writeback. | [`docs/google-form-callback/README.md`](docs/google-form-callback/README.md) | Reference implementation |
-| [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates directly usable outbound phone-call workflow skills with source mapping, goal contracts, MCP provider routing, serial execution policy, safety rules, and writeback behavior. | [`skills/outbound-call-skill-creator/`](skills/outbound-call-skill-creator/) | Creator skill |
+| [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates directly usable outbound phone-call workflow skills with source mapping, goal contracts, MCP provider routing, serial execution policy, safety rules, and durable result-output behavior. | [`skills/outbound-call-skill-creator/`](skills/outbound-call-skill-creator/) | Creator skill |
 
 `call-reminder` is a scheduler wrapper skill, not a new CALL-E backend reminder API, daemon, or provider-side recurring schedule.
 

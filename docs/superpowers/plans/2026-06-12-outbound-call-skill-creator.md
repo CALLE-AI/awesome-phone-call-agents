@@ -18,7 +18,7 @@
 - Create `skills/outbound-call-skill-creator/references/creation-summary.md`: creation summary shape and safety rules.
 - Create `skills/outbound-call-skill-creator/references/data-sources.md`: built-in `google-form`, `tiktok-ads`, `local-csv`, and custom source guidance.
 - Create `skills/outbound-call-skill-creator/references/execution-modes.md`: approval modes, runtime request standard, and direct execution guardrails.
-- Create `skills/outbound-call-skill-creator/references/generated-skill-contract.md`: exact generated skill folder contract, normalized candidate schema, goal contract, writeback contract, and session-table fallback.
+- Create `skills/outbound-call-skill-creator/references/generated-skill-contract.md`: exact generated skill folder contract, normalized candidate schema, goal contract, durable result-output contract, and last-resort session-table fallback.
 - Create `skills/outbound-call-skill-creator/references/mcp-provider-route.md`: default MCP provider route, plan/run/status expectations, auth blockers, and no-CLI rule.
 - Create `skills/outbound-call-skill-creator/references/output-targets.md`: scope-first, host-aware output target rules for user-level, project-local, explicit-path, and reference-repository generation.
 - Create `skills/outbound-call-skill-creator/references/safety.md`: safety rules that the creator must apply and copy into generated business skills.
@@ -32,8 +32,8 @@
 
 The implemented creator now uses a two-level binding model:
 
-- `fully-bound`: concrete source and writeback target fixed at creation time
-- `parameterized-bound`: minimum and default; schema, consent, dedupe, goal, and writeback policy fixed while approved runtime parameters provide source or target instances
+- `fully-bound`: concrete source and durable result-output target fixed at creation time
+- `parameterized-bound`: minimum and default; schema, consent, dedupe, goal, and result-output policy fixed while approved runtime parameters provide source or target instances
 
 Generated skills select one execution mode:
 
@@ -106,12 +106,12 @@ Write `skills/outbound-call-skill-creator/SKILL.md` with this content:
 ```markdown
 ---
 name: outbound-call-skill-creator
-description: Create directly usable outbound phone-call Agent Skills that connect data sources such as Google Forms, TikTok Ads, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure writeback or session-table output.
+description: Create directly usable outbound phone-call Agent Skills that connect data sources such as Google Forms, TikTok Ads, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure source writeback, source-adjacent result artifacts, or new local result CSV output.
 ---
 
 # Outbound Call Skill Creator
 
-Use this skill when the user wants to create a new outbound phone-call workflow skill that can later process source records directly, compile one call goal per eligible record, run calls through the configured MCP provider route, and write results back or display a session table.
+Use this skill when the user wants to create a new outbound phone-call workflow skill that can later process source records directly, compile one call goal per eligible record, run calls through the configured MCP provider route, and write durable results through source writeback, a source-adjacent result artifact, or a new local result CSV.
 
 `outbound-call-skill-creator` creates focused business skills. It does not process campaign data itself, does not create a generic outbound runtime platform, and does not use a CLI bootstrap path.
 
@@ -123,9 +123,9 @@ When this creator is used from a normal project after being installed by a skill
 
 Use a project-local skills directory only when the user explicitly wants the generated skill versioned with the current project, when the skill depends on project files, or when working inside this reference repository. Never write a generated business skill into the downloaded `outbound-call-skill-creator` skill folder itself.
 
-The generated skill must let a future user make a concrete request such as "process all June 20 records" and have the skill handle source access, filtering, candidate validation, outbound goal compilation, approved MCP execution, dedupe, and writeback or session-table output.
+The generated skill must let a future user make a concrete request such as "process all June 20 records" and have the skill handle source access, filtering, candidate validation, outbound goal compilation, approved MCP execution, dedupe, and durable result output.
 
-Do not create `template.md`. The creator captures the source, goal, execution, and writeback contract during skill creation and writes that contract into the generated skill instructions and reference files.
+Do not create `template.md`. The creator captures the source, goal, execution, and result-output contract during skill creation and writes that contract into the generated skill instructions and reference files.
 
 ## Required Creator Workflow
 
@@ -138,7 +138,7 @@ Do not create `template.md`. The creator captures the source, goal, execution, a
 7. Capture the outbound goal contract: call purpose, required context, allowed questions, completion criteria, result values, and escalation cases.
 8. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
 9. Capture execution policy: dry-run first or approved direct execution after a concrete processing request, including serial processing after approval.
-10. Capture writeback policy: source writeback, local CSV writeback, or session table fallback.
+10. Capture result-output policy: source writeback, source-adjacent result artifact, local result CSV, or last-resort session table fallback.
 11. Read `references/safety.md` and include the required safety boundaries in the generated skill.
 12. Generate the business skill folder and files in the selected output parent using `references/generated-skill-contract.md`.
 13. Run this skill's bundled checker script with `--skill-dir <generated-business-skill-dir>`.
@@ -153,7 +153,7 @@ Present these source families by default:
 - `local-csv`: records from a user-provided CSV file.
 - `other`: a custom source that requires multi-turn clarification before generating the skill.
 
-If the user selects `other`, do not guess API schemas, credentials, identifiers, date filters, writeback behavior, or MCP tool names. Ask for the missing contract details one at a time.
+If the user selects `other`, do not guess API schemas, credentials, identifiers, date filters, result-output behavior, or MCP tool names. Ask for the missing contract details one at a time.
 
 ## Generated Skill Requirements
 
@@ -260,7 +260,7 @@ Capture these values before generating a business skill:
 - dedupe key
 - goal input fields
 - outreach basis or consent field
-- writeback capability
+- durable result-output capability
 
 Do not guess missing identifiers, credentials, field names, date filters, or country codes.
 
@@ -379,7 +379,7 @@ The generated `SKILL.md` frontmatter must include only `name` and `description`.
 
 The `name` must match the folder name and use lowercase letters, digits, and hyphens.
 
-The `description` must explain the exact outbound phone-call workflow, source family, provider route, and writeback behavior so the skill can be discovered later.
+The `description` must explain the exact outbound phone-call workflow, source family, provider route, and durable result-output behavior so the skill can be discovered later.
 
 Example:
 
@@ -402,7 +402,7 @@ The generated `SKILL.md` must include:
 - MCP provider route
 - execution modes
 - serial candidate execution
-- writeback behavior
+- result-output behavior
 - safety summary
 - validation commands
 
@@ -456,15 +456,16 @@ Generated skills must not use a CLI bootstrap path.
 
 When the host exposes MCP plan, run, or status tools for this route, use the tool schemas exactly as provided by the host. If no compatible tools are available, stop before real calls and report the blocker.
 
-## Writeback Contract
+## Result Output Contract
 
-Generated skills must support one of these writeback outcomes:
+Generated skills must support durable result-output outcomes:
 
 - source writeback
-- local CSV writeback
-- session table output
+- source-adjacent result artifact
+- new local result CSV
+- session table output only as a last-resort non-persistent fallback
 
-Writeback records should include:
+Result records should include:
 
 - candidate ID
 - source record
@@ -569,7 +570,7 @@ Use this reference when creating a generated outbound phone-call business skill.
 
 ## Creator Safety
 
-The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and writeback behavior.
+The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and durable result-output behavior.
 
 If the user cannot explain why records are authorized for phone follow-up, generate a dry-run-only skill or stop and ask for a consent field or approved source basis.
 
@@ -600,7 +601,7 @@ Direct execution still requires:
 - dedupe checks
 - masked summaries
 - skipping unsafe records
-- writeback or session-table output
+- source writeback, source-adjacent result artifact, or local result CSV output, with session table only as a last-resort attended fallback
 
 If direct execution is not configured, generated skills must dry-run first and ask the user to approve the exact pending call list.
 
@@ -683,7 +684,7 @@ Captured contract:
 - dedupe key: lead record ID
 - date filtering: record creation time in the source account timezone
 - outreach basis: lead form includes phone follow-up consent
-- writeback: approved TikTok Ads MCP writeback tool, approved connector action, or session table fallback
+- result output: approved TikTok Ads MCP writeback tool, approved connector action, approved source-adjacent result artifact, or new local result CSV; session table is only a last-resort non-persistent fallback
 
 Generated future use:
 
@@ -727,7 +728,7 @@ Create an outbound skill for records from our internal API.
 
 Creator behavior:
 
-Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and writeback capability. If any critical value is unknown, generate a dry-run-only skill or stop before generation.
+Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and durable result-output capability. If any critical value is unknown, generate a dry-run-only skill or stop before generation.
 ```
 
 - [ ] **Step 4: Run repository validation**

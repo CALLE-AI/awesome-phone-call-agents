@@ -229,7 +229,7 @@ Replace steps 7 through 12 under `## Required Creator Workflow` with:
 
 ```markdown
 7. Run creation-time source onboarding for the selected binding level:
-   - `fully-bound`: authenticate or verify the concrete source, fetch a representative sample from that source, confirm schema and writeback readiness, and stop before generating a real-call skill if onboarding cannot complete.
+   - `fully-bound`: authenticate or verify the concrete source, fetch a representative sample from that source, confirm schema and durable result-output readiness, and stop before generating a real-call skill if onboarding cannot complete.
    - `parameterized-bound`: authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and record which runtime parameters may vary later.
    If source onboarding cannot satisfy the minimum `parameterized-bound` contract, do not write the generated skill yet; continue onboarding or stop with the missing contract details.
 8. Capture the source fields from the sampled schema for phone number, recipient label, dedupe key, date filtering, outreach basis or consent, goal inputs, and any runtime parameters allowed by the binding level.
@@ -237,12 +237,12 @@ Replace steps 7 through 12 under `## Required Creator Workflow` with:
 10. Prompt the user to define the default outbound goal from the sampled fields: call purpose, required context, allowed questions, prohibited claims, completion criteria, result values, summary format, and escalation cases.
 11. Read `references/mcp-provider-route.md` and use the default MCP provider route in the generated skill.
 12. Read `references/execution-modes.md` and ask the user to choose an execution mode, defaulting to `dry-run-then-batch-approval`: `dry-run-then-batch-approval` or `approved-direct-execution`.
-13. Capture writeback policy at creation time and capture field mapping or allowed runtime writeback parameters: source writeback, local CSV writeback, or session table fallback.
-14. Run best-effort creation-time preflight checks when tools and permissions are available: read-only source auth/schema checks, non-mutating writeback target or field checks, and MCP route/tool readiness. If preflight cannot run for a bound workflow, record the blocker and do not generate a real-call skill until runtime onboarding requirements are satisfied.
+13. Capture result-output policy at creation time and capture field mapping or allowed runtime output parameters: source writeback, source-adjacent result artifact, local result CSV, or last-resort session table fallback.
+14. Run best-effort creation-time preflight checks when tools and permissions are available: read-only source auth/schema checks, non-mutating result-output target or field checks, and MCP route/tool readiness. If preflight cannot run for a bound workflow, record the blocker and do not generate a real-call skill until runtime onboarding requirements are satisfied.
 15. Read `references/safety.md` and include the required safety boundaries in the generated skill.
 16. Generate the business skill folder and files in the selected output parent using `references/generated-skill-contract.md`.
 17. Run this skill's bundled checker script with `--skill-dir <generated-business-skill-dir>`.
-18. Read `references/creation-summary.md` and show the user a creation summary covering skill name, path, binding level, source onboarding, source contract, goal contract, execution mode, writeback target, provider route, validation result, and reload or discovery note.
+18. Read `references/creation-summary.md` and show the user a creation summary covering skill name, path, binding level, source onboarding, source contract, goal contract, execution mode, result-output target, provider route, validation result, and reload or discovery note.
 19. Run repository validation only when the generated skill is being committed to a repository that provides a validation command.
 ```
 
@@ -253,13 +253,13 @@ Add this section after `## Built-In Choices`:
 ```markdown
 ## Creation-Time Source Onboarding
 
-Creation-time source onboarding happens after source family and binding level selection, and before final goal and writeback contract generation.
+Creation-time source onboarding happens after source family and binding level selection, and before final goal and result-output contract generation.
 
-For `fully-bound` generated skills, authenticate or verify the concrete source, fetch a representative sample from that exact source, confirm schema and writeback readiness, and stop before generating a real-call skill when onboarding cannot complete.
+For `fully-bound` generated skills, authenticate or verify the concrete source, fetch a representative sample from that exact source, confirm schema and durable result-output readiness, and stop before generating a real-call skill when onboarding cannot complete.
 
 For `parameterized-bound` generated skills, authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and allow runtime instances only when the runtime gate verifies the same schema and source contract.
 
-If source onboarding cannot produce enough source, schema, consent, dedupe, and writeback detail for the minimum `parameterized-bound` contract, stop before writing the generated skill and ask for the missing contract details.
+If source onboarding cannot produce enough source, schema, consent, dedupe, and durable result-output detail for the minimum `parameterized-bound` contract, stop before writing the generated skill and ask for the missing contract details.
 
 During onboarding, show the user a small redacted sample summary, never full private phone numbers, credentials, tokens, cookies, callback URLs, or provider confirmation tokens. Use the sampled fields to help the user define the default outbound goal.
 ```
@@ -314,7 +314,7 @@ Creation-time source onboarding is required for `fully-bound` and `parameterized
 - inspect source schema or sample rows without placing calls
 - confirm the phone, recipient, date, consent, dedupe, and goal input fields exist
 - confirm the sample can support the default outbound goal contract
-- confirm writeback target and fields exist, or confirm that session-table fallback will be used
+- confirm source writeback target and fields exist, configure a source-adjacent result artifact, or configure a local result CSV target; session table is only a last-resort non-persistent fallback
 - confirm the MCP provider route and compatible plan, run, or status tools are available
 ```
 

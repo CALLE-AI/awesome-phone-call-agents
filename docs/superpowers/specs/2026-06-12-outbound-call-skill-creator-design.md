@@ -4,19 +4,19 @@
 
 Create an `outbound-call-skill-creator` Agent Skill that helps an agent generate a directly usable outbound phone-call workflow skill.
 
-The generated business skill should behave like `google-form-callback`: after it is created, a user can invoke it with a concrete request such as "process all June 20 submissions" and the generated skill can handle the selected data source, compile outbound call goals, run the approved execution path through the configured MCP provider route, deduplicate work, and write results back or display a tabular session summary.
+The generated business skill should behave like `google-form-callback`: after it is created, a user can invoke it with a concrete request such as "process all June 20 submissions" and the generated skill can handle the selected data source, compile outbound call goals, run the approved execution path through the configured MCP provider route, deduplicate work, and write durable results through source writeback, a source-adjacent result artifact, or a new local result CSV.
 
 `outbound-call-skill-creator` is not a generic outbound runtime platform. It is a skill-generation workflow for creating focused, installable business skills in a selected output target.
 
 ## Scope
 
-The first version supports three built-in source and writeback families:
+The first version supports three built-in source and durable result-output families:
 
 - `google-form`
 - `tiktok-ads`
 - `local-csv`
 
-If the user chooses another source or destination, the creator enters a requirements-gathering workflow and generates a custom adapter contract for the resulting business skill. The custom path should not guess API details, credentials, identifiers, or writeback behavior.
+If the user chooses another source or destination, the creator enters a requirements-gathering workflow and generates a custom adapter contract for the resulting business skill. The custom path should not guess API details, credentials, identifiers, or result-output behavior.
 
 Generated skills must remain directly tied to AI-agent phone-call workflows and follow this repository's safety rules.
 
@@ -36,16 +36,16 @@ When a user asks to create an outbound workflow skill, `outbound-call-skill-crea
 - outbound call goal behavior for each row or record
 - language and region handling rules
 - execution mode: `dry-run-then-batch-approval` or `approved-direct-execution`
-- writeback destination and result fields
-- fallback output format when writeback is not configured
+- durable result-output destination and result fields
+- source-adjacent or local result output fallback when source writeback is not configured
 - best-effort creation-time preflight result or blocker
 - mandatory runtime gate requirements before real calls
 
-The creator should present `google-form`, `tiktok-ads`, and `local-csv` as default integration choices. Choosing `other` starts a multi-turn clarification flow for source access, record shape, date filtering, dedupe keys, and writeback capability.
+The creator should present `google-form`, `tiktok-ads`, and `local-csv` as default integration choices. Choosing `other` starts a multi-turn clarification flow for source access, record shape, date filtering, dedupe keys, and durable result-output capability.
 
 The creator must choose the generated skill output scope before creating files. Use a scope-first, host-aware rule: user-level reusable skills go to a recognized user skills root, project-local skills go to a host-compatible repository skills root, explicit paths win when the user provides them, and maintained generated workflows in this reference repository use this repository's `skills/` directory. When the creator is installed by a skill installer and invoked from a different project, the default should be user-level reusable output unless the workflow depends on project-local files or the user asks to version it with the project.
 
-The minimum binding level should be `parameterized-bound`: source family, field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema are fixed at creation time, while runtime requests provide approved parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. `fully-bound` is appropriate for stable production or scheduled workflows.
+The minimum binding level should be `parameterized-bound`: source family, field schema, consent rule, dedupe rule, goal contract, result-output policy, and result field schema are fixed at creation time, while runtime requests provide approved parameters such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path. `fully-bound` is appropriate for stable production or scheduled workflows that fix a concrete source and durable result target.
 
 ## Generated Skill Shape
 
@@ -58,25 +58,25 @@ The generated skill uses the normal Agent Skills folder pattern:
 └── scripts/
 ```
 
-The generated skill does not use `template.md` as a user-editable runtime contract. Instead, the creator writes the selected source, goal, execution, safety, and writeback behavior directly into the generated skill instructions and reference files.
+The generated skill does not use `template.md` as a user-editable runtime contract. Instead, the creator writes the selected source, goal, execution, safety, and result-output behavior directly into the generated skill instructions and reference files.
 
-For simple workflows, the generated `SKILL.md` can contain the full source, goal, and writeback contract. For more complex workflows, the creator may generate focused reference files such as:
+For simple workflows, the generated `SKILL.md` can contain the full source, goal, and result-output contract. For more complex workflows, the creator may generate focused reference files such as:
 
 - `references/source-contract.md`
 - `references/goal-contract.md`
-- `references/writeback-contract.md`
+- `references/result-output-contract.md`
 - `references/binding-contract.md`
 - `references/safety.md`
 - `references/examples.md`
 
-The generated skill should include scripts only when deterministic handling is valuable, such as CSV parsing, candidate validation, dedupe state management, dry-run rendering, or writeback payload generation.
+The generated skill should include scripts only when deterministic handling is valuable, such as CSV parsing, candidate validation, dedupe state management, dry-run rendering, source writeback payload generation, source-adjacent artifact output, or result CSV writing.
 
 ## Data Flow
 
 Generated skills follow this flow:
 
 ```text
-source records -> normalized candidates -> runtime gate -> safety validation -> outbound goal compilation -> MCP dry-run or execution -> dedupe state -> writeback or session table
+source records -> normalized candidates -> runtime gate -> safety validation -> outbound goal compilation -> MCP dry-run or execution -> dedupe state -> durable result output
 ```
 
 Each normalized candidate should include:
@@ -176,21 +176,22 @@ Generated skills must run a dry-run preview before real calls unless the generat
 
 Even in direct mode, the generated skill must validate candidates, mask phone numbers in summaries, inspect the provider plan, and skip unsafe or ambiguous records.
 
-After the user approves the exact pending call list, generated skills must process ready candidates serially. The agent should plan, inspect, run, check status when available, record the result, and then continue to the next candidate without another per-candidate confirmation. Candidate-level failures should be recorded and the batch should continue when safe. The generated skill should stop the batch only when authentication is missing, the MCP provider route is unavailable, required provider tools are unavailable, dedupe state cannot be trusted, or continuing would be unsafe. After all candidates complete or skip, the generated skill must write configured results or output the session table and report one final batch summary.
+After the user approves the exact pending call list, generated skills must process ready candidates serially. The agent should plan, inspect, run, check status when available, record the result, and then continue to the next candidate without another per-candidate confirmation. Candidate-level failures should be recorded and the batch should continue when safe. The generated skill should stop the batch only when authentication is missing, the MCP provider route is unavailable, required provider tools are unavailable, dedupe state cannot be trusted, or continuing would be unsafe. After all candidates complete or skip, the generated skill must write configured source results, a source-adjacent result artifact, or a local result CSV and report one final batch summary. Session table output is only a last-resort non-persistent fallback when durable output validation is blocked.
 
-## Writeback Policy
+## Result Output Policy
 
-Generated skills support three writeback outcomes:
+Generated skills support durable result-output outcomes:
 
-- source writeback, such as Google Sheets or an approved TikTok Ads writeback action
-- local file writeback, such as CSV output
-- session table output when writeback is not configured
+- source writeback to the bound source instance or canonical source record store
+- source-adjacent result artifact in the same provider, account, workspace, folder, or campaign context
+- new local result CSV output
+- session table output only as a last-resort non-persistent fallback
 
-Session table output is the default fallback and should contain one task per row with masked phone numbers.
+Treat source writeback narrowly. A same-system side file, new sheet, new tab, result table, or export beside the source is `source-adjacent-result-artifact`, not source writeback. Session table output is not the default fallback; prefer a source-adjacent artifact or local result CSV first.
 
-The writeback policy is chosen at creation time. The concrete writeback target may be fixed for `fully-bound` workflows or parameterized for `parameterized-bound` workflows. Runtime targets must pass the runtime gate before real calls.
+The result-output policy is chosen at creation time. The concrete result target may be fixed for `fully-bound` workflows or parameterized for `parameterized-bound` workflows. Runtime targets must pass the runtime gate before real calls.
 
-Writeback records should include:
+Result records should include:
 
 - source record ID or row reference
 - candidate ID
@@ -201,11 +202,11 @@ Writeback records should include:
 - result summary
 - processed timestamp
 
-The generated skill must not write credentials, tokens, confirmation tokens, cookies, or full phone numbers to user-facing summaries.
+The generated skill must not write credentials, tokens, confirmation tokens, cookies, or full phone numbers to user-facing summaries or result outputs.
 
 ## Creation Summary
 
-After writing and validating a generated business skill, the creator should show a concise creation summary with skill name, generated directory, discoverability or reload note, binding level, runtime parameters, source contract, consent rule, dedupe rule, goal summary, execution mode, writeback policy, preflight result or blocker, runtime gate, provider route, and validation result.
+After writing and validating a generated business skill, the creator should show a concise creation summary with skill name, generated directory, discoverability or reload note, binding level, runtime parameters, source contract, consent rule, dedupe rule, goal summary, execution mode, result-output policy, preflight result or blocker, runtime gate, provider route, and validation result.
 
 ## Safety Requirements
 
@@ -236,7 +237,7 @@ The implementation should also include focused tests or script fixtures when gen
 
 ## First-Version Defaults
 
-The first implementation should create a procedural creator skill rather than a broad shared runtime. The creator skill should guide the agent through the scope-first output target, source, goal, execution, and writeback contract, then generate a focused business skill in that selected target.
+The first implementation should create a procedural creator skill rather than a broad shared runtime. The creator skill should guide the agent through the scope-first output target, source, goal, execution, and result-output contract, then generate a focused business skill in that selected target.
 
 Generated skills should always include:
 

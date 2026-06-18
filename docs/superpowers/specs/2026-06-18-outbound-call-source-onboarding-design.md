@@ -35,14 +35,14 @@ Creation-time source onboarding depends on binding level:
 
 | Binding level | Required creator behavior |
 | --- | --- |
-| `fully-bound` | Authenticate or verify the concrete source, fetch a representative sample from that exact source, confirm schema and writeback readiness, and block real-call skill generation if this cannot complete. |
+| `fully-bound` | Authenticate or verify the concrete source, fetch a representative sample from that exact source, confirm schema and durable result-output readiness, and block real-call skill generation if this cannot complete. |
 | `parameterized-bound` | Authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and allow only runtime instances that pass the same runtime gate. |
 
 `parameterized-bound` is the minimum source binding contract. If onboarding cannot satisfy it, the creator stops before generating the business skill.
 
 ## Creator Workflow
 
-Add a new required phase named **Creation-Time Source Onboarding** after source family and binding level selection, and before final goal and writeback contract generation.
+Add a new required phase named **Creation-Time Source Onboarding** after source family and binding level selection, and before final goal and result-output contract generation.
 
 The phase should run in this order:
 
@@ -57,7 +57,7 @@ The phase should run in this order:
    - date-window field and timezone semantics
    - consent or outreach basis
    - goal input fields
-   - writeback target or session-table fallback
+   - durable result-output target: source writeback, source-adjacent result artifact, or local result CSV, with session table only as last-resort fallback
 6. Show the user the discovered fields and a small redacted sample summary.
 7. Prompt the user to confirm or adjust field mapping.
 8. Prompt the user to define the default outbound goal using the sampled fields.
@@ -161,7 +161,7 @@ After this feature, a generated bound skill should accept a concrete runtime req
 Process data for 2026-05-25.
 ```
 
-The skill should already know the source family, field mapping, consent rule, dedupe rule, default goal, writeback policy, and provider route. It may ask only for required runtime parameters that were intentionally left parameterized, such as:
+The skill should already know the source family, field mapping, consent rule, dedupe rule, default goal, result-output policy, and provider route. It may ask only for required runtime parameters that were intentionally left parameterized, such as:
 
 - date window
 - runtime form ID
@@ -169,7 +169,7 @@ The skill should already know the source family, field mapping, consent rule, de
 - CSV path
 - output path
 
-The runtime gate still reruns source access, required field, consent, dedupe, writeback or session-table, and provider route checks before real calls.
+The runtime gate still reruns source access, required field, consent, dedupe, durable result-output, and provider route checks before real calls.
 
 ## Checker Updates
 
