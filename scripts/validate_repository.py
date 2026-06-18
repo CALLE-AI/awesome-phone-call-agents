@@ -190,6 +190,7 @@ def validate_expected_files() -> None:
         "AGENTS.md",
         "CONTRIBUTING.md",
         "SECURITY.md",
+        ".githooks/pre-push",
         ".github/ISSUE_TEMPLATE/workflow_submission.yml",
         ".github/pull_request_template.md",
         ".github/workflows/validate.yml",
@@ -197,6 +198,7 @@ def validate_expected_files() -> None:
         "plugins/README.md",
         "docs/design-principles.md",
         "docs/codex-implementation-plan.md",
+        "docs/git-naming-conventions.md",
         "docs/outbound-call-skill-creator/README.md",
         "apps/python/broker-login-client/README.md",
         "apps/python/broker-login-client/client.py",
@@ -217,6 +219,8 @@ def validate_expected_files() -> None:
         "apps/python/batch-runner/client.py",
         "apps/python/batch-runner/example_market_alerts.jsonl",
         "apps/shared/fake-mcp-broker-server.mjs",
+        "scripts/check_branch_name.py",
+        "scripts/create_branch.py",
         "scripts/validate_repository.py",
         "skills/call-reminder/SKILL.md",
         "skills/call-reminder/references/client-adapters.md",
@@ -265,6 +269,7 @@ def validate_templates() -> None:
         [
             "- [ ] New runnable app",
             "- [ ] New workflow plugin",
+            "Branch name, commit messages, and PR title follow `docs/git-naming-conventions.md`.",
             "Phone numbers are masked in documentation and test fixtures unless they are clearly fictional.",
         ],
     )
@@ -274,6 +279,51 @@ def validate_templates() -> None:
             "- [ ] New example",
         ],
     )
+
+
+def validate_git_naming_conventions() -> None:
+    require_text(
+        ROOT / "docs" / "git-naming-conventions.md",
+        [
+            "<type>/<short-kebab-summary>",
+            "feat/google-form-callback-writeback",
+            "python3 scripts/check_branch_name.py --branch docs/git-naming-conventions",
+            "python3 scripts/create_branch.py docs/git-naming-conventions",
+            "git config core.hooksPath .githooks",
+        ],
+    )
+    require_text(
+        ROOT / "AGENTS.md",
+        [
+            "docs/git-naming-conventions.md",
+            "python3 scripts/check_branch_name.py --branch <type>/<short-kebab-summary>",
+            "python3 scripts/create_branch.py <type>/<short-kebab-summary>",
+        ],
+    )
+    require_text(
+        ROOT / "CONTRIBUTING.md",
+        [
+            "docs/git-naming-conventions.md",
+            "python3 scripts/check_branch_name.py --branch docs/git-naming-conventions",
+            "python3 scripts/create_branch.py docs/git-naming-conventions",
+        ],
+    )
+    require_text(
+        ROOT / ".githooks" / "pre-push",
+        [
+            "python3 scripts/check_branch_name.py",
+        ],
+    )
+
+    from check_branch_name import validate_branch_name
+
+    valid_branch = validate_branch_name("docs/git-naming-conventions")
+    if not valid_branch.ok:
+        fail(f"Branch name checker rejected a valid branch: {valid_branch.message}")
+
+    invalid_branch = validate_branch_name("bad_name")
+    if invalid_branch.ok:
+        fail("Branch name checker accepted invalid branch name: bad_name")
 
 
 def validate_apps() -> None:
@@ -811,6 +861,7 @@ def main() -> None:
     validate_repository_name_references()
     validate_english_only()
     validate_templates()
+    validate_git_naming_conventions()
     validate_apps()
     validate_plugins()
     validate_skills()

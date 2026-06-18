@@ -69,6 +69,28 @@ python3 scripts/validate_repository.py
 6. Keep repository-facing content in English.
 7. Run repository validation before opening a pull request.
 
+## Git naming
+
+Follow [`docs/git-naming-conventions.md`](docs/git-naming-conventions.md) for branch names, commit messages, tags, pull request titles, remotes, and stashes.
+
+Use this branch format for regular work:
+
+```text
+<type>/<short-kebab-summary>
+```
+
+Validate a branch name before creating it:
+
+```bash
+python3 scripts/check_branch_name.py --branch docs/git-naming-conventions
+```
+
+Or create the branch through the helper:
+
+```bash
+python3 scripts/create_branch.py docs/git-naming-conventions
+```
+
 ## Skill folder requirements
 
 A skill should be a directory with a required `SKILL.md` file.

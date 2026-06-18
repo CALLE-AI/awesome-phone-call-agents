@@ -110,6 +110,16 @@ Phone-call provider handles exactly one call per scheduled run.
 
 Do not make provider-side recurrence mandatory. Many providers only support one-time calls or one-time scheduled calls.
 
+## Repository conventions
+
+- Follow [docs/git-naming-conventions.md](./docs/git-naming-conventions.md)
+  when naming branches, commits, release tags, PR titles, remotes, and stash
+  entries.
+- Before creating a new branch, validate the candidate with
+  `python3 scripts/check_branch_name.py --branch <type>/<short-kebab-summary>`
+  or create it through
+  `python3 scripts/create_branch.py <type>/<short-kebab-summary>`.
+
 ## Validation
 
 After editing, run:
