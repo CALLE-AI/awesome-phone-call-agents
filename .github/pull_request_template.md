@@ -16,6 +16,7 @@ Describe the change and why it belongs in this repository.
 ## Checklist
 
 - [ ] Repository-facing content is written in English.
+- [ ] Branch name, commit messages, and PR title follow `docs/git-naming-conventions.md`.
 - [ ] No secrets, tokens, private phone numbers, call recordings, or private transcripts are included.
 - [ ] Real-world side effects are clearly described.
 - [ ] Phone numbers are masked in documentation and test fixtures unless they are clearly fictional.

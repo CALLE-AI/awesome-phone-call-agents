@@ -182,6 +182,8 @@ The project-level validation script applies to the whole repository. Node.js hel
 | Command | Purpose | Output |
 | --- | --- | --- |
 | `python3 scripts/validate_repository.py` | Validate required files, English-only repository content, skill frontmatter, apps, and reference-skill acceptance text. | Prints `Repository validation passed.` or exits with an error. |
+| `python3 scripts/check_branch_name.py --branch docs/git-naming-conventions` | Validate a candidate branch name against the repository Git naming convention. | Prints a success message or explains the expected format. |
+| `python3 scripts/create_branch.py docs/git-naming-conventions` | Validate a candidate branch, check local and fetched `origin` branches, then create it with `git switch -c`. | Switches to the new branch or exits with an error. |
 | `node skills/call-reminder/scripts/detect-client.mjs` | Detect a likely scheduler adapter from environment hints. | JSON with `adapterId`, `confidence`, and `reason`. |
 | `node skills/call-reminder/scripts/detect-client.mjs --plain` | Print only the detected adapter id. | Plain adapter id such as `codex-app` or `external-cron`. |
 | `node skills/call-reminder/scripts/validate-reminder-input.mjs [options]` | Validate structured reminder fields. | JSON `{ "ok": true, "value": ... }` or `{ "ok": false, "errors": ... }`. |
@@ -311,12 +313,15 @@ awesome-phone-call-agents/
 │   │   └── assets/
 │   ├── design-principles.md
 │   ├── codex-implementation-plan.md
+│   ├── git-naming-conventions.md
 │   └── roadmap.md
 ├── forms/
 │   └── callback-request/
 ├── plugins/
 │   └── README.md
 ├── scripts/
+│   ├── check_branch_name.py
+│   ├── create_branch.py
 │   └── validate_repository.py
 └── skills/
     ├── call-reminder/
@@ -373,7 +378,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contribution guide.
 4. Add setup, usage, side-effect, and cancellation notes.
 5. Use fictional or masked phone numbers in samples.
 6. Keep repository-facing content in English.
-7. Run validation before opening a pull request.
+7. Follow [`docs/git-naming-conventions.md`](docs/git-naming-conventions.md) for branch names, commit messages, and pull request titles.
+8. Run validation before opening a pull request.
 
 ```bash
 python3 scripts/validate_repository.py
@@ -397,6 +403,7 @@ Out of scope: generic telephony vendor directories, marketing-only pages, call-c
 | [`skills/outbound-call-skill-creator/references/output-targets.md`](skills/outbound-call-skill-creator/references/output-targets.md) | Scope-first, host-aware output target rules for generated skills. |
 | [`skills/outbound-call-skill-creator/references/generated-skill-contract.md`](skills/outbound-call-skill-creator/references/generated-skill-contract.md) | Required shape and behavior for generated outbound skills. |
 | [`docs/design-principles.md`](docs/design-principles.md) | Repository-wide architecture principles. |
+| [`docs/git-naming-conventions.md`](docs/git-naming-conventions.md) | Branch, commit, tag, pull request title, remote, and stash naming conventions. |
 | [`docs/superpowers/specs/2026-06-12-outbound-call-skill-creator-design.md`](docs/superpowers/specs/2026-06-12-outbound-call-skill-creator-design.md) | Design notes for `outbound-call-skill-creator`. |
 | [`docs/superpowers/plans/2026-06-12-outbound-call-skill-creator.md`](docs/superpowers/plans/2026-06-12-outbound-call-skill-creator.md) | Implementation plan for `outbound-call-skill-creator`. |
 | [`docs/codex-implementation-plan.md`](docs/codex-implementation-plan.md) | Codex-oriented implementation notes. |
