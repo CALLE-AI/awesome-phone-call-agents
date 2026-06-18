@@ -77,7 +77,7 @@ Start with the maintained skill that matches the job:
 | --- | --- | --- |
 | Recurring or scheduled phone-call reminders | [`call-reminder`](skills/call-reminder/) | Wraps one-off CALL-E calls in a host-owned scheduler with explicit cancellation and safety boundaries. |
 | Callback calls from authorized Google Form responses | [`google-form-callback`](skills/google-form-callback/) | Reviews form responses, supports dry runs, creates scheduled polling plans, and writes results back. |
-| A business-specific outbound calling skill | [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates a focused skill from sources such as Google Forms, ttmcp, local CSV files, or custom systems. |
+| A business-specific outbound calling skill | [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates a focused skill from sources such as Google Forms, TikTok Ads, local CSV files, or custom systems. |
 
 Use the [resource list](#resource-list) for broader examples, [apps](#apps) for runnable integration patterns, [plugins](#plugins) for workflow-platform connectors, and [templates](#templates) when contributing a new artifact.
 
@@ -248,7 +248,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
-- [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, ttmcp, local CSV files, or custom sources.
+- [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, TikTok Ads, local CSV files, or custom sources.
 
 ## Apps
 

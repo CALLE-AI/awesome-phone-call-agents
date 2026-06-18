@@ -6,9 +6,9 @@ Use this reference when choosing how tightly the generated outbound phone-call b
 
 | Binding level | Creation-time contract | Runtime parameters | Maximum automation |
 | --- | --- | --- | --- |
-| `fully-bound` | Concrete source instance, field mapping, consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
-| `parameterized-bound` | Source family, access method, required field schema, consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Default. Eligible for dry-run batch approval, per-call approval, and approved direct execution only after concrete runtime parameters pass the runtime gate. |
-| `unbound-generic` | Goal contract and safety rules only; source and writeback details are collected at runtime. | Source access, fields, filters, consent evidence, dedupe key, and writeback target must be supplied each run. | Dry-run only by default. Do not allow real direct execution or scheduled runs until the workflow is converted to a bound skill or an exact runtime contract is approved. |
+| `fully-bound` | Concrete source instance, field mapping, source-level outreach basis or consent rule, dedupe rule, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
+| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, writeback policy, and writeback field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, writeback target, or output path. | Default. Eligible for dry-run batch approval, per-call approval, and approved direct execution only after concrete runtime parameters pass the runtime gate. |
+| `unbound-generic` | Goal contract and safety rules only; source and writeback details are collected at runtime. | Source access, fields, filters, source-level outreach basis or consent evidence, dedupe key, and writeback target must be supplied each run. | Dry-run only by default. Do not allow real direct execution or scheduled runs until the workflow is converted to a bound skill or an exact runtime contract is approved. |
 
 ## Selection Rules
 
@@ -31,10 +31,10 @@ Use `parameterized-bound` when:
 Use `unbound-generic` when:
 
 - the user is exploring the workflow
-- the data source, writeback behavior, consent evidence, or dedupe rule is not yet known
+- the data source, writeback behavior, source-level outreach basis or consent evidence, or dedupe rule is not yet known
 - the skill should produce dry-runs from manually supplied or runtime-specified records
 
-Do not create a real-call skill with no phone field, no outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path.
+Do not create a real-call skill with no phone field, no source-level outreach basis or consent rule, no stable dedupe key, or no writeback or session-table result path.
 
 ## Generated Skill Requirements
 

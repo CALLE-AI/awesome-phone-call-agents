@@ -48,9 +48,13 @@ If direct execution is not configured, generated skills must dry-run first and a
 
 ## Serial Candidate Execution
 
-After the user approves the exact pending call list, generated skills should serially process all ready candidates and should not ask for another per-candidate confirmation. Each candidate must reach a terminal result or skip state before the next candidate starts.
+After the user approves the exact pending call list, generated skills should serially process all ready candidates. After execution approval, do not ask the user to continue, confirm the next candidate, or approve additional provider runs. Each candidate must reach a terminal result or skip state before the next candidate starts.
 
 If one candidate fails, record the failure and continue with the next candidate when it is safe to continue. Stop the batch when authentication is missing, the MCP route is unavailable, required provider tools are unavailable, dedupe state cannot be trusted, or continuing would be unsafe.
+
+Provider terminal instructions such as `report_result` or `do not start another call` apply only to the current provider run. After recording the current candidate result, continue the approved batch unless a batch-level safety blocker appears.
+
+Do not write call results before provider result finalization. Terminal provider status must pass full-history provider reconciliation before writeback, and negative terminal outcomes such as `no_answer`, `failed`, or `no conversation captured` must pass a negative terminal stability check.
 
 After all candidates are complete, write configured results or output the session table, then report one final batch summary.
 

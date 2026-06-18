@@ -15,13 +15,15 @@ Include:
 - output scope
 - discoverability or reload note
 - binding level
+- source onboarding status, sampled source instance, sample fetch result, and default goal source
+- provider onboarding status, provider host runtime, MCP route setup and provider auth check results, compatible MCP tools, one-off capability, and blocker if any
 - allowed and required runtime parameters
 - source family, access method, and required fields
 - consent or outreach basis
 - dedupe key or dedupe state rule
 - outbound goal contract summary
 - selected execution mode and unavailable modes
-- writeback policy, target binding, and field mapping
+- writeback policy, fixed or runtime-resolved writeback target mode, target binding, and field mapping
 - creation-time preflight result or blocker
 - mandatory runtime gate checks before real calls
 - MCP provider route
@@ -36,13 +38,15 @@ Skill: <business-skill-name>
 Directory: <generated-skill-directory>
 Discovery: <known-active-root | reload-needed | add-location-needed | nonstandard-path>
 Binding level: <fully-bound | parameterized-bound | unbound-generic>
+Source onboarding: <auth/access check, sampled source instance, sample fetch result, and blocker if any>
+Provider onboarding: <provider host runtime, MCP route setup check, auth readiness, compatible MCP tools, one-off capability, and blocker if any>
 Runtime parameters: <allowed parameters or none>
 Source: <source family, access method, required fields>
-Consent: <field or approved source basis>
+Outreach basis: <source-level basis, consent field, or approved source basis>
 Dedupe: <key or state rule>
 Goal: <one-sentence call purpose and completion criteria>
 Execution mode: <selected mode and any unavailable modes>
-Writeback: <policy, target binding, and field mapping>
+Writeback: <policy, fixed or runtime-resolved target mode, target binding, and field mapping>
 Preflight: <passed | blocked | not run, with reason>
 Runtime gate: <checks that must pass before real calls>
 Provider route: https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth

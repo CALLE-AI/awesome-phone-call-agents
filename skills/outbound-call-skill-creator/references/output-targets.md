@@ -25,7 +25,7 @@ If the user provides an explicit output path, use that path after confirming it 
 
 | Scope | Use when | Output parent |
 | --- | --- | --- |
-| User-level reusable skill | The workflow should be available across projects, the source is an external system such as Google Forms or ttmcp, or the creator was installed by `skills.sh` and the user did not ask for project-local output. | A recognized user skills root |
+| User-level reusable skill | The workflow should be available across projects, the source is an external system such as Google Forms or TikTok Ads, or the creator was installed by `skills.sh` and the user did not ask for project-local output. | A recognized user skills root |
 | Project-local skill | The workflow depends on project files, project-local schemas, checked-in scripts, or should be shared with this repository's team. | A host-compatible project skills root |
 | Reference repository contribution | The workflow is being added as a maintained public reference in this repository. | `<repo>/skills` |
 | Explicit path | The user gives an exact parent directory. | The user-provided directory |
