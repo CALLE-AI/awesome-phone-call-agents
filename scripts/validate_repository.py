@@ -161,6 +161,11 @@ def validate_skills() -> None:
     for skill_dir in skill_dirs:
         if not SLUG_RE.match(skill_dir.name):
             fail(f"Skill directory is not a lowercase slug: {skill_dir.name}")
+        if (skill_dir / "README.md").exists():
+            fail(
+                f"Skill directory must not include README.md; move long-form guidance to docs/: "
+                f"{(skill_dir / 'README.md').relative_to(ROOT)}"
+            )
         skill_md = skill_dir / "SKILL.md"
         text = read(skill_md)
         fm = parse_frontmatter(text, skill_md)
@@ -192,6 +197,7 @@ def validate_expected_files() -> None:
         "plugins/README.md",
         "docs/design-principles.md",
         "docs/codex-implementation-plan.md",
+        "docs/outbound-call-skill-creator/README.md",
         "apps/python/broker-login-client/README.md",
         "apps/python/broker-login-client/client.py",
         "apps/python/broker-login-client/uv.lock",
@@ -222,7 +228,6 @@ def validate_expected_files() -> None:
         "skills/call-reminder/scripts/render-runtime-prompt.mjs",
         "skills/call-reminder/scripts/validate-reminder-input.mjs",
         "skills/outbound-call-skill-creator/SKILL.md",
-        "skills/outbound-call-skill-creator/README.md",
         "skills/outbound-call-skill-creator/references/binding-contract.md",
         "skills/outbound-call-skill-creator/references/creation-summary.md",
         "skills/outbound-call-skill-creator/references/data-sources.md",

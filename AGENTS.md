@@ -43,6 +43,11 @@ skill-name/
 └── assets/
 ```
 
+Do not put `README.md` files inside installable skill directories. Keep skill folders limited to
+runtime-facing skill resources. Put human-facing or long-form guidance under `docs/`, preferably
+`docs/<skill-name>/README.md`, and keep reusable operational details in `references/` so agents can
+load them through progressive disclosure.
+
 Every `SKILL.md` must include YAML frontmatter with at least:
 
 ```yaml

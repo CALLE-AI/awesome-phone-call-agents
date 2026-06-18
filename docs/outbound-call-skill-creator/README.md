@@ -111,15 +111,15 @@ These formats make dry-runs, approvals, runtime blockers, and writeback behavior
 
 The creator keeps detailed rules in focused reference files:
 
-- `references/output-targets.md`: where generated skills should be written
-- `references/data-sources.md`: source-family contracts and runtime gate requirements
-- `references/binding-contract.md`: binding-level selection rules
-- `references/execution-modes.md`: approval and direct-execution behavior
-- `references/generated-skill-contract.md`: required generated skill structure
-- `references/mcp-provider-route.md`: default provider route and one-off call flow
-- `references/safety.md`: phone-call safety rules
-- `references/creation-summary.md`: user-facing creation summary shape
-- `references/examples.md`: concrete creation examples
+- `skills/outbound-call-skill-creator/references/output-targets.md`: where generated skills should be written
+- `skills/outbound-call-skill-creator/references/data-sources.md`: source-family contracts and runtime gate requirements
+- `skills/outbound-call-skill-creator/references/binding-contract.md`: binding-level selection rules
+- `skills/outbound-call-skill-creator/references/execution-modes.md`: approval and direct-execution behavior
+- `skills/outbound-call-skill-creator/references/generated-skill-contract.md`: required generated skill structure
+- `skills/outbound-call-skill-creator/references/mcp-provider-route.md`: default provider route and one-off call flow
+- `skills/outbound-call-skill-creator/references/safety.md`: phone-call safety rules
+- `skills/outbound-call-skill-creator/references/creation-summary.md`: user-facing creation summary shape
+- `skills/outbound-call-skill-creator/references/examples.md`: concrete creation examples
 
 ## Generated Skill Contract
 
