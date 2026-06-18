@@ -62,7 +62,7 @@ Provider onboarding must remain non-mutating for phone-call side effects. Do not
 Generated skills should follow this provider flow when compatible tools are available:
 
 ```text
-auth readiness -> call plan -> plan inspection -> call run -> status check -> writeback
+auth readiness -> call plan -> plan inspection -> call run -> status check -> result output
 ```
 
 The plan inspection step must confirm:
@@ -82,7 +82,7 @@ Provider terminal instructions such as `report_result` or `do not start another 
 
 Terminal seen is not terminal stable. Generated skills must run full-history provider reconciliation before writing results or reporting the final batch summary. Cursor-based polling may drive progress updates, but after terminal status appears, re-check the full provider run history without a cursor and with a high enough limit to include lifecycle events and conversation content when available.
 
-Do not write negative terminal results such as `no_answer`, `failed`, or `no conversation captured` until a negative terminal stability check passes. If a later full-history recheck shows an answer, transcript, collected field, or stronger result, use that latest evidence for writeback.
+Do not write negative terminal results such as `no_answer`, `failed`, or `no conversation captured` until a negative terminal stability check passes. If a later full-history recheck shows an answer, transcript, collected field, or stronger result, use that latest evidence for durable result output.
 
 If a candidate-level plan, run, or status check fails, record the failure and continue with the next ready candidate when it is safe to continue. Stop the batch only when the MCP route is unavailable, authentication is missing, required provider tools are unavailable, or continuing would create unsafe or duplicate calls.
 
