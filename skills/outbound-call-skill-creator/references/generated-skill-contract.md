@@ -283,7 +283,6 @@ Generated skills must support a durable result-output outcome:
 - source writeback
 - source-adjacent result artifact
 - new local result CSV output
-- source CSV in-place update only when the runtime request explicitly asks to mutate the source CSV
 - session table output only as a last-resort non-persistent fallback
 
 The result-output policy must be chosen at creation time. Prefer verified source writeback when the source exposes a safe writeback path to the bound source instance or canonical source record store. If the result should stay in the same source system without mutating source records, configure `source-adjacent-result-artifact` instead. If source writeback and source-adjacent output are unavailable, not requested, or cannot be verified, configure a new local result CSV as the durable fallback. Keep session-table output as a last-resort non-persistent fallback only when durable output validation is blocked; do not proactively present session-table output as a normal user-facing option.
@@ -305,7 +304,7 @@ Use this result-output mapping shape when durable output or last-resort session-
 
 ```yaml
 result_output:
-  policy: source-writeback | source-adjacent-result-artifact | local-result-csv | source-csv-in-place | session-table-fallback
+  policy: source-writeback | source-adjacent-result-artifact | local-result-csv | session-table-fallback
   target_mode: source-csv-in-place | result-csv-file | source-writeback | source-adjacent-result-artifact | session-table | runtime-parameter-name
   target_binding: fully-bound | parameterized | session-only
   target: fixed-value-or-runtime-parameter-name
