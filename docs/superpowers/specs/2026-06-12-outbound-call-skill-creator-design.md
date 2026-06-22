@@ -125,9 +125,9 @@ Generated CSV skills should require:
 - column mapping
 - date parsing rules when date-window processing is supported
 - a dedupe key column or deterministic row key
-- an output CSV path when writeback is configured
+- a result-output target, such as an explicit source CSV in-place update, source-adjacent result artifact, or new local result CSV path
 
-If writeback is not configured, the generated skill outputs a session table with one row per candidate and includes skip or execution status.
+When source CSV in-place update is not explicitly configured, generated CSV skills should use a source-adjacent result artifact when available or write a new local result CSV. Session-table output is only a last-resort non-persistent fallback when durable result output cannot be verified.
 
 ## Call Provider Route
 

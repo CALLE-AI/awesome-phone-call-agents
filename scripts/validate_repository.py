@@ -754,7 +754,7 @@ when results should stay in the source system without mutating source records.
 Otherwise use `result-csv-file` to write a new local result CSV. Use
 session-table output only as a last-resort attended fallback when durable result
 output is blocked.
-Runtime result target mode: source-adjacent-artifact resolved before execution approval from fixed creation values or approved runtime parameters.
+Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.
 
 ## Safety Summary
 
@@ -1085,7 +1085,7 @@ passes.
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
         missing_writeback_target_mode_md = valid_skill_md.replace(
-            "Runtime result target mode: source-adjacent-artifact resolved before execution approval from fixed creation values or approved runtime parameters.\n",
+            "Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.\n",
             "",
         )
         (skill_dir / "SKILL.md").write_text(missing_writeback_target_mode_md, encoding="utf-8")

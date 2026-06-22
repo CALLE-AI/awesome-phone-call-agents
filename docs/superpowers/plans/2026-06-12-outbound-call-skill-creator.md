@@ -193,13 +193,13 @@ Even in direct execution mode, the generated skill must:
 - mask phone numbers in summaries
 - skip unsafe or ambiguous records
 - avoid hidden recurring schedules
-- report writeback status or produce a session table
+- report durable result-output status for source writeback, source-adjacent result artifacts, or local result CSV output; use session-table output only as a last-resort attended fallback
 
 If direct execution was not configured, the generated skill must dry-run first and ask the user to approve the exact pending call list before real calls.
 
-## Session Table Fallback
+## Durable Result Output
 
-If writeback is not configured, generated skills must output a table with one row per task and these columns:
+Generated skills must prefer durable result output. Use verified source writeback when available, a source-adjacent result artifact when results should stay beside the source without mutating it, or a new local result CSV when source-system durable output is unavailable. Session-table output is only a last-resort non-persistent fallback when durable output validation is blocked. Result records or last-resort session tables use these logical fields:
 
 - candidate ID
 - source record
@@ -322,11 +322,11 @@ Capture:
 - dedupe key column or deterministic row key rule
 - goal input columns
 - outreach basis or consent column
-- output CSV path when local writeback is configured
+- result-output target, such as explicit source CSV in-place update, source-adjacent result artifact, or new local result CSV path
 
 Generated CSV skills should use deterministic scripts when parsing, validating, deduplicating, or writing output would otherwise be fragile.
 
-If writeback is not configured, output the session table described in the generated skill.
+If source CSV in-place update is not explicitly configured, prefer a source-adjacent result artifact when available or write a new local result CSV. Use session-table output only as a last-resort non-persistent fallback when durable output cannot be verified.
 
 ## Other Sources
 
@@ -925,7 +925,7 @@ mkdir -p "$tmpdir/sample-callback/references"
 cat > "$tmpdir/sample-callback/SKILL.md" <<'EOF'
 ---
 name: sample-callback
-description: Process authorized sample records into outbound phone-call tasks through the configured MCP provider route and output a session table.
+description: Process authorized sample records into outbound phone-call tasks through the configured MCP provider route and durable result output.
 ---
 
 # Sample Callback

@@ -306,7 +306,7 @@ Use this result-output mapping shape when durable output or last-resort session-
 ```yaml
 result_output:
   policy: source-writeback | source-adjacent-result-artifact | local-result-csv | source-csv-in-place | session-table-fallback
-  target_mode: source-csv-in-place | result-csv-file | source-writeback | source-adjacent-artifact | session-table | runtime-parameter-name
+  target_mode: source-csv-in-place | result-csv-file | source-writeback | source-adjacent-result-artifact | session-table | runtime-parameter-name
   target_binding: fully-bound | parameterized | session-only
   target: fixed-value-or-runtime-parameter-name
   fields:

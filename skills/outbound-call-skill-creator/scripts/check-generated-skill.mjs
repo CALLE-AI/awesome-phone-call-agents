@@ -80,11 +80,9 @@ const REQUIRED_SKILL_MARKERS = [
   {
     label: "result target mode",
     patterns: [
-      /runtime result target mode\s*:/iu,
-      /runtime output target mode\s*:/iu,
-      /result target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-artifact|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
-      /output target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-artifact|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
-      /target mode\s*:\s*(?:source-writeback|source-adjacent-artifact|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+      /result target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+      /output target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+      /target mode\s*:\s*(?:source-writeback|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
     ],
   },
   {

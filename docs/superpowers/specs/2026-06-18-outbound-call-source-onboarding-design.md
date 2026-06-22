@@ -126,7 +126,7 @@ For bound CSV workflows:
 - read a small sample from the concrete or representative CSV path
 - confirm delimiter and header behavior
 - map phone, recipient, dedupe, date, consent, and goal input columns
-- confirm output CSV path when local writeback is configured
+- confirm the durable result-output target, such as explicit source CSV in-place update, source-adjacent result artifact, or new local result CSV path
 
 For `parameterized-bound`, runtime CSV files must pass the same header and field contract before real calls.
 
