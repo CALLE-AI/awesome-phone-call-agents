@@ -35,15 +35,14 @@ Creation-time source onboarding depends on binding level:
 
 | Binding level | Required creator behavior |
 | --- | --- |
-| `fully-bound` | Authenticate or verify the concrete source, fetch a representative sample from that exact source, confirm schema and writeback readiness, and block real-call skill generation if this cannot complete. |
+| `fully-bound` | Authenticate or verify the concrete source, fetch a representative sample from that exact source, confirm schema and durable result-output readiness, and block real-call skill generation if this cannot complete. |
 | `parameterized-bound` | Authenticate or verify the source family, fetch a representative sample from one approved source instance, confirm the schema contract, and allow only runtime instances that pass the same runtime gate. |
-| `unbound-generic` | May skip authentication or sample fetch only when the missing values are recorded as blockers. The generated skill remains dry-run-only until an exact runtime source, schema, consent, dedupe, and writeback contract is approved. |
 
-This keeps reusable bound skills smooth at runtime while leaving a safe exploratory path for custom or incomplete workflows.
+`parameterized-bound` is the minimum source binding contract. If onboarding cannot satisfy it, the creator stops before generating the business skill.
 
 ## Creator Workflow
 
-Add a new required phase named **Creation-Time Source Onboarding** after source family and binding level selection, and before final goal and writeback contract generation.
+Add a new required phase named **Creation-Time Source Onboarding** after source family and binding level selection, and before final goal and result-output contract generation.
 
 The phase should run in this order:
 
@@ -58,7 +57,7 @@ The phase should run in this order:
    - date-window field and timezone semantics
    - consent or outreach basis
    - goal input fields
-   - writeback target or session-table fallback
+   - durable result-output target: source writeback, source-adjacent result artifact, or local result CSV, with session table only as last-resort fallback
 6. Show the user the discovered fields and a small redacted sample summary.
 7. Prompt the user to confirm or adjust field mapping.
 8. Prompt the user to define the default outbound goal using the sampled fields.
@@ -127,13 +126,13 @@ For bound CSV workflows:
 - read a small sample from the concrete or representative CSV path
 - confirm delimiter and header behavior
 - map phone, recipient, dedupe, date, consent, and goal input columns
-- confirm output CSV path when local writeback is configured
+- confirm the durable result-output target, such as explicit source CSV in-place update, source-adjacent result artifact, or new local result CSV path
 
 For `parameterized-bound`, runtime CSV files must pass the same header and field contract before real calls.
 
 ### Other Sources
 
-For custom sources, ask for exact access and schema details one at a time. If the source cannot be authenticated or sampled safely, generate only a dry-run-only `unbound-generic` skill or stop before generation.
+For custom sources, ask for exact access and schema details one at a time. If the source cannot be authenticated or sampled safely enough to satisfy the minimum `parameterized-bound` contract, stop before generation.
 
 ## Generated Skill Requirements
 
@@ -152,7 +151,7 @@ Every generated bound skill must include a source onboarding section or referenc
 - runtime parameters still allowed
 - runtime gate checks required before real calls
 
-For `fully-bound` and `parameterized-bound`, missing source onboarding is a blocker for real-call skill generation. For `unbound-generic`, missing onboarding is allowed only when the generated skill is dry-run-only and clearly records the blocker.
+Missing source onboarding is a blocker for skill generation until the source contract is complete enough for at least `parameterized-bound`.
 
 ## Runtime Behavior
 
@@ -162,7 +161,7 @@ After this feature, a generated bound skill should accept a concrete runtime req
 Process data for 2026-05-25.
 ```
 
-The skill should already know the source family, field mapping, consent rule, dedupe rule, default goal, writeback policy, and provider route. It may ask only for required runtime parameters that were intentionally left parameterized, such as:
+The skill should already know the source family, field mapping, consent rule, dedupe rule, default goal, result-output policy, and provider route. It may ask only for required runtime parameters that were intentionally left parameterized, such as:
 
 - date window
 - runtime form ID
@@ -170,7 +169,7 @@ The skill should already know the source family, field mapping, consent rule, de
 - CSV path
 - output path
 
-The runtime gate still reruns source access, required field, consent, dedupe, writeback or session-table, and provider route checks before real calls.
+The runtime gate still reruns source access, required field, consent, dedupe, durable result-output, and provider route checks before real calls.
 
 ## Checker Updates
 
@@ -180,7 +179,7 @@ Update `check-generated-skill.mjs` so generated skills must declare source onboa
 - bound generated skills with no authentication or access check result
 - bound generated skills with no sample fetch result
 - bound generated skills with no default goal contract derived from sampled fields
-- `unbound-generic` skills that skip onboarding but do not declare dry-run-only behavior and the blocker
+- generated skills that use an unsupported binding level or skip required source onboarding
 
 The checker can remain text-based for now, but the required markers should be precise enough to prevent silent regressions.
 
@@ -196,7 +195,7 @@ The validation smoke tests should include at least one valid generated skill fix
 
 ## Risks
 
-The main risk is over-promising automation for source families that do not have stable tools in every host. The design avoids that by making onboarding mandatory for bound real-call skills while preserving a dry-run-only custom path for incomplete sources.
+The main risk is over-promising automation for source families that do not have stable tools in every host. The design avoids that by making onboarding mandatory before any generated business skill can be written.
 
 Another risk is exposing private sample data. The creator and generated skills must summarize samples with redacted phone numbers and non-sensitive field names, never raw tokens or full private phone numbers.
 

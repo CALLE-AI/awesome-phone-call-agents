@@ -6,9 +6,11 @@ const REQUIRED_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NON_ENGLISH_SCRIPT_RE =
   /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
-const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound|unbound-generic)`?/iu;
+const BINDING_LEVEL_RE = /\bbinding level\s*(?:is|:)\s*`?(fully-bound|parameterized-bound)`?/iu;
+const UNSUPPORTED_BINDING_LEVEL_RE = new RegExp("\\b" + "un" + "bound-" + "generic\\b", "iu");
 const EXECUTION_MODE_RE =
-  /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|per-call-approval|approved-direct-execution)`?/imu;
+  /^\s*(?:selected\s+)?execution mode\s*(?:is|:)\s*`?(dry-run-then-batch-approval|approved-direct-execution)`?/imu;
+const UNSUPPORTED_EXECUTION_MODE_RE = new RegExp("\\bper-" + "call-approval\\b", "iu");
 const REQUIRED_SKILL_MARKERS = [
   {
     label: "purpose and when to use",
@@ -68,20 +70,26 @@ const REQUIRED_SKILL_MARKERS = [
     label: "provider result finalization",
     patterns: [
       /provider result finalization[\s\S]*full-history provider\s+reconciliation[\s\S]*negative terminal stability check/iu,
-      /terminal provider status is\s+not writeback-ready[\s\S]*full-history provider\s+reconciliation/iu,
+      /terminal provider status is\s+not result-output-ready[\s\S]*full-history provider\s+reconciliation/iu,
     ],
   },
   {
-    label: "writeback behavior",
-    patterns: [/writeback behavior/iu],
+    label: "result-output behavior",
+    patterns: [/result-output behavior/iu, /result output behavior/iu],
   },
   {
-    label: "writeback target mode",
+    label: "result target mode",
     patterns: [
-      /runtime writeback target mode\s*:/iu,
-      /writeback target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
-      /writeback target mode\s*:\s*(?:source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
-      /target mode\s*:\s*(?:source-writeback|source-csv-in-place|result-csv-file|session-table)/iu,
+      /result target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+      /output target mode\s*:\s*(?:resolved|fixed|runtime|parameterized|source-writeback|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+      /target mode\s*:\s*(?:source-writeback|source-adjacent-result-artifact|source-csv-in-place|result-csv-file|session-table|local-result-csv|session-table-fallback)/iu,
+    ],
+  },
+  {
+    label: "durable result output fallback",
+    patterns: [
+      /result-csv-file[\s\S]*(?:last-resort|session-table)/iu,
+      /durable result output[\s\S]*session-table/iu,
     ],
   },
   {
@@ -332,22 +340,6 @@ if (["fully-bound", "parameterized-bound"].includes(selectedBindingLevel)) {
   }
 }
 
-if (selectedBindingLevel === "unbound-generic") {
-  if (!/dry-run-only/iu.test(skillText)) {
-    fail("Unbound generic generated skill must declare dry-run-only behavior");
-  }
-  if (!/onboarding blocker/iu.test(skillText)) {
-    fail("Unbound generic generated skill must record a source onboarding blocker");
-  }
-}
-
-if (
-  selectedBindingLevel === "unbound-generic" &&
-  selectedExecutionMode !== "dry-run-then-batch-approval"
-) {
-  fail(`Generated skill cannot use ${selectedExecutionMode} with unbound-generic`);
-}
-
 if (!/runtime gate/iu.test(skillText)) {
   fail("Generated skill SKILL.md must mention runtime gate requirements");
 }
@@ -370,6 +362,18 @@ if (fs.existsSync(path.join(skillDir, "template.md"))) {
 
 const textFiles = fs.existsSync(skillDir) ? walkTextFiles(skillDir) : [];
 const allText = textFiles.map((filePath) => readText(filePath)).join("\n");
+
+if (UNSUPPORTED_BINDING_LEVEL_RE.test(allText)) {
+  fail(
+    "Generated skill files must use fully-bound or parameterized-bound; unsupported binding levels are not allowed",
+  );
+}
+
+if (UNSUPPORTED_EXECUTION_MODE_RE.test(allText)) {
+  fail(
+    "Generated skill files must use dry-run-then-batch-approval or approved-direct-execution; unsupported execution modes are not allowed",
+  );
+}
 
 if (!allText.includes(REQUIRED_ROUTE)) {
   fail(`Generated skill must mention MCP provider route ${REQUIRED_ROUTE}`);

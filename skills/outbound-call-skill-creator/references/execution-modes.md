@@ -7,14 +7,13 @@ Use this reference when selecting the generated skill's approval and execution b
 | Execution mode | Behavior | Best fit |
 | --- | --- | --- |
 | `dry-run-then-batch-approval` | Preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval. | Default for most generated skills. |
-| `per-call-approval` | Preview one candidate and compiled call goal at a time, then let the user approve, modify, or skip each call before planning and running it. | Higher-control workflows, sensitive edge cases, or early pilots. |
 | `approved-direct-execution` | After a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step. | Stable `fully-bound` or verified `parameterized-bound` workflows. |
 
 ## Selection Rules
 
 Ask the user to choose the generated skill's execution mode after the binding level is known. If the user does not choose, use `dry-run-then-batch-approval`.
 
-For `unbound-generic` workflows, offer only `dry-run-then-batch-approval` with dry-run-only behavior until onboarding is complete. State that the workflow must first become `fully-bound` or `parameterized-bound` before `per-call-approval` or `approved-direct-execution` can be selected.
+If source onboarding cannot satisfy the minimum `parameterized-bound` contract, do not choose an execution mode yet; complete the source and durable result-output contract first.
 
 Use `approved-direct-execution` only when:
 
@@ -55,7 +54,7 @@ Generated skills that support `approved-direct-execution` must require:
 - consent or outreach basis runtime gate
 - E.164 validation for every ready candidate
 - trusted dedupe key or dedupe state
-- verified writeback target or ready session-table fallback
+- verified source writeback target, source-adjacent result artifact, or local result CSV output; session-table fallback may be ready only as a last-resort attended fallback
 - available MCP provider route, auth, and compatible tools
 - inspected provider plan before each call run
 - one-off provider request with no provider-side recurrence

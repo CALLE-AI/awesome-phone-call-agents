@@ -4,9 +4,9 @@ Use this reference when selecting and documenting the generated business skill's
 
 ## Required Source Contract
 
-Capture these values before generating a business skill:
+Capture these values before generating a business skill. The source contract must satisfy at least the `parameterized-bound` minimum:
 
-- binding level: `fully-bound`, `parameterized-bound`, or `unbound-generic`
+- binding level: `fully-bound` or `parameterized-bound`
 - source family
 - access method
 - authentication or access check method
@@ -22,8 +22,8 @@ Capture these values before generating a business skill:
 - dedupe key
 - goal input fields
 - source-level outreach basis or optional consent field
-- writeback capability
-- writeback policy and field mapping
+- durable result-output capability
+- result-output policy and field mapping
 - creation-time preflight result or documented preflight blocker
 - runtime gate requirements before real calls
 
@@ -31,31 +31,32 @@ Do not guess missing identifiers, credentials, field names, date filters, or cou
 
 ## Binding Levels
 
-Choose one binding level before writing the generated skill:
+Choose whether the workflow stays at the minimum binding level or upgrades to a fixed source instance before writing the generated skill:
 
 | Binding level | What must be fixed at creation time | What may be supplied at runtime |
 | --- | --- | --- |
-| `fully-bound` | Concrete source instance, field names, source-level outreach basis or consent rule, dedupe key, writeback target, and writeback fields. | Date window, subset filters, and other narrow processing controls. |
-| `parameterized-bound` | Source family, access method, required schema, source-level outreach basis or consent rule, dedupe key, writeback policy, and writeback field schema. | Approved instance parameters such as form ID, CSV path, campaign ID, date window, writeback target, or output path. |
-| `unbound-generic` | Goal contract, safety rules, and the requirement to collect source and writeback details at runtime. | Source access, all field mappings, source-level outreach basis or consent evidence, dedupe key, filters, and writeback target. |
+| `fully-bound` | Concrete source instance, field names, source-level outreach basis or consent rule, dedupe key, fixed result target, and result fields. The result target can be source writeback, a source-adjacent result artifact, or a local result CSV. | Date window, subset filters, and other narrow processing controls. |
+| `parameterized-bound` | Source family, access method, required schema, source-level outreach basis or consent rule, dedupe key, result-output policy, and result field schema. | Approved instance parameters such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path. |
 
-Default to `parameterized-bound`. Use `fully-bound` for stable production or scheduled workflows. Use `unbound-generic` only for exploratory or dry-run-only workflows unless the user later supplies an exact runtime source and writeback contract for approval.
+Default to the minimum `parameterized-bound` contract. Use `fully-bound` for stable production or scheduled workflows that should fix a concrete source and durable result-output target. If the workflow cannot support the minimum contract, continue onboarding or stop before generating the skill.
 
 ## Preflight and Runtime Gate
 
-Creation-time source onboarding is required for `fully-bound` and `parameterized-bound` real-call skills. Run non-mutating checks when tools and permissions are available:
+Creation-time source onboarding is required to reach the minimum `parameterized-bound` contract, and `fully-bound` adds concrete instance verification. Run non-mutating checks when tools and permissions are available:
 
 - verify source authentication, connector availability, or local file access
 - fetch a small representative sample from the concrete or representative source instance
 - inspect source schema or sample rows without placing calls
 - confirm the phone, recipient, date, source-level outreach basis or consent field, dedupe, and goal input fields exist
 - confirm the sample can support the default outbound goal contract
-- confirm writeback target and fields exist, or confirm that session-table fallback will be used
+- confirm a source writeback target and fields exist, configure a source-adjacent result artifact, or configure a new local result CSV target or approved runtime output path
 - confirm the MCP provider route and compatible plan, run, or status tools are available
 
-Creation-time source onboarding and preflight must not mutate source records, source permissions, source integrations, scheduler state, writeback targets, or phone-call provider state. Explicit user-approved authentication setup may create or refresh local host credentials, OAuth tokens, connector sessions, or MCP authorization state so the source can be accessed later. Do not perform a real writeback or place a real call during onboarding or preflight. If creation-time source onboarding cannot run, record the blocker and require the generated skill to stop before real calls when the missing capability is still unavailable for the concrete runtime request.
+Creation-time source onboarding and preflight must not mutate source records, source permissions, source integrations, scheduler state, source writeback targets, source-adjacent result artifacts, result files, or phone-call provider state. Explicit user-approved authentication setup may create or refresh local host credentials, OAuth tokens, connector sessions, or MCP authorization state so the source can be accessed later. Do not perform a real writeback, create or write a source-adjacent result artifact, write a result CSV, or place a real call during onboarding or preflight. If creation-time source onboarding cannot run, record the blocker and require the generated skill to stop before real calls when the missing capability is still unavailable for the concrete runtime request.
 
-Runtime gating is mandatory before real calls. The generated skill must verify source access, required fields, consent or outreach basis, dedupe reliability, writeback behavior or session-table fallback, and provider route/tool readiness for the concrete request. Approved side effects can happen only after the runtime gate passes, in the selected execution flow.
+Runtime gating is mandatory before real calls. The generated skill must verify source access, required fields, consent or outreach basis, dedupe reliability, source writeback, source-adjacent result artifact output, or local result CSV output, and provider route/tool readiness for the concrete request. Session-table output is a last-resort non-persistent fallback only when durable output validation is blocked and the run is attended; do not use it as the primary result path for unattended scheduled automation. Approved side effects can happen only after the runtime gate passes, in the selected execution flow.
+
+Treat source writeback narrowly: it updates the bound source instance or canonical source record store. A same-system side file, new sheet, new tab, result table, or export created beside the source is `source-adjacent-result-artifact`, not source writeback. For fully bound workflows, capture the fixed artifact ID/path or the exact creation policy, container, schema, and append or upsert behavior.
 
 ## Authenticated Source Onboarding
 
@@ -74,13 +75,13 @@ When a safe source authorization or auth-readiness action is available, start it
 3. Record the discovered or user-supplied source locator such as form ID or account scope, and access route such as OAuth, Apps Script fallback, MCP tool, MCP resource, API adapter, or managed connector.
 4. Verify authentication, connector availability, MCP resource access, API access, or workspace permission.
 5. Fetch a small representative sample through a read-only path.
-6. Infer the phone field, recipient field, dedupe key, outreach basis or consent field, goal inputs, and writeback capability from source metadata and the sample.
+6. Infer the phone field, recipient field, dedupe key, outreach basis or consent field, goal inputs, and durable result-output capability from source metadata and the sample.
 7. Show a redacted sample summary and proposed field mapping for user confirmation.
 8. Ask the user to fill only fields that cannot be inferred from the sample.
 
-When the user names only an authenticated source family such as `google-form` or `tiktok-ads`, treat that as enough to enter source access onboarding. First inspect available host routes and run any safe auth-readiness or discovery check. The next prompt should ask only for the minimum locator or user-completed authorization step that remains necessary to fetch a representative sample, while confirming the recommended binding level if needed. Do not ask for the default outbound goal, writeback mapping, or full field mapping before the access check and sample fetch have been attempted.
+When the user names only an authenticated source family such as `google-form` or `tiktok-ads`, treat that as enough to enter source access onboarding. First inspect available host routes and run any safe auth-readiness or discovery check. The next prompt should ask only for the minimum locator or user-completed authorization step that remains necessary to fetch a representative sample, while confirming the recommended binding level if needed. Do not ask for the default outbound goal, result-output mapping, or full field mapping before the access check and sample fetch have been attempted.
 
-Do not present a blank manual mapping form for phone, recipient, consent, dedupe, goal inputs, or writeback fields before authentication and sample fetch have been attempted. If access or sample fetch is blocked, record an onboarding blocker and keep the generated skill dry-run-only until the blocker is resolved.
+Do not present a blank manual mapping form for phone, recipient, consent, dedupe, goal inputs, or result-output fields before authentication and sample fetch have been attempted. If access or sample fetch is blocked before the minimum source contract can be confirmed, record the blocker and stop before generating the skill.
 
 ## Google Form
 
@@ -101,11 +102,11 @@ Capture:
 - dedupe key, normally response ID
 - fields to include in the outbound goal
 - form-level phone follow-up basis or per-response consent field
-- writeback columns for status, result summary, call run ID, and processed timestamp
+- source writeback columns, source-adjacent artifact fields, or local result CSV fields for status, result summary, call run ID, and processed timestamp
 
 Generated Google Form skills must require a clear basis for phone follow-up. The basis can come from the form description, ad copy, terms, or an explicit per-response consent field.
 
-If the form has no linked response spreadsheet and the user wants writeback, require an Apps Script fallback or ask the user to link a response spreadsheet before real writeback.
+If the form has no linked response spreadsheet and the user wants source writeback, require an Apps Script fallback or ask the user to link a response spreadsheet before real source writeback. If the user wants a result file in the same Google Drive context without mutating the response store, configure `source-adjacent-result-artifact` with a fixed spreadsheet, tab, folder, schema, and append or upsert rule. If source writeback and source-adjacent output are unavailable or not requested, configure a new local result CSV instead of making session-table output the normal path.
 
 Do not ask for Google Form field mapping before Google access has been verified and a representative response sample has been fetched.
 
@@ -113,7 +114,7 @@ For `fully-bound`, creation must verify access to the concrete form and fetch a 
 
 When `google-form-callback` helper scripts are available, do not ask the user whether to use local OAuth before checking them. Run or direct the host to run `google-auth.mjs status` first. If authenticated, run `google-local-api-client.mjs --action list-forms` before asking for a Form ID, then fetch metadata or a small response sample from the selected or representative form. If auth is missing, directly run or request `preflight-auth.mjs --repair-google`, wait for the user to complete browser authorization when required, re-check `google-auth.mjs status`, and then list forms. Only ask for an Apps Script fallback endpoint, manual Form ID, or account scope when local OAuth helpers are unavailable, auth cannot be completed, or listing forms is not permitted.
 
-For `fully-bound`, capture the concrete form or response spreadsheet and writeback columns. For `parameterized-bound`, capture the required question names and allow the runtime request to provide the form ID only when the runtime gate verifies that the form matches the schema. For `unbound-generic`, keep the skill dry-run-only until form access, field mapping, source-level outreach basis or consent basis, and writeback behavior are supplied.
+For `fully-bound`, capture the concrete form or response spreadsheet and source writeback columns, capture a source-adjacent result artifact target, or capture the concrete local result CSV target. For `parameterized-bound`, capture the required question names and result field schema, then allow the runtime request to provide the form ID only when the runtime gate verifies that the form matches the schema.
 
 ## TikTok Ads
 
@@ -140,7 +141,7 @@ Capture:
 - dedupe key
 - goal input fields
 - outreach basis or consent evidence
-- approved writeback tool or connector action, or the decision to use session-table output
+- approved writeback tool or connector action, approved source-adjacent artifact action, or a new local result CSV output policy when source-system durable output is unavailable
 
 Generated TikTok Ads skills must not assume every record is callable. They must validate outreach basis and E.164 phone numbers before creating call candidates.
 
@@ -160,9 +161,9 @@ After adding or discovering the server, inspect its configured auth state and th
 
 During creation-time onboarding, fetch a small sample through the exact MCP tool or resource names exposed by the host. Record the tool names, sampled scope, returned fields, and redaction rule in the generated skill.
 
-Do not invent TikTok Ads MCP tools or schemas. If the host does not expose a writeback-capable tool, use session-table output or local CSV output.
+Do not invent TikTok Ads MCP tools or schemas. If the host does not expose a writeback-capable tool but does expose a same-account or same-workspace artifact action, configure `source-adjacent-result-artifact` and record the artifact container, schema, and append or upsert behavior. If neither source writeback nor source-adjacent output is available, configure a new local result CSV output path. Use session-table output only as a last-resort non-persistent fallback when durable output cannot be verified.
 
-For `fully-bound`, capture the concrete account, advertiser, campaign, or lead scope and writeback tool. For `parameterized-bound`, capture the exact MCP tools and required returned fields, then allow runtime account or campaign identifiers only when the runtime gate confirms the returned schema. For `unbound-generic`, do not permit approved direct execution.
+For `fully-bound`, capture the concrete account, advertiser, campaign, or lead scope and source writeback tool, source-adjacent artifact target, or local result CSV target. For `parameterized-bound`, capture the exact MCP tools, required returned fields, and result field schema, then allow runtime account or campaign identifiers only when the runtime gate confirms the returned schema.
 
 ## Local CSV
 
@@ -179,24 +180,24 @@ Capture:
 - dedupe key column or deterministic row key rule
 - goal input columns
 - source-level outreach basis, or an optional consent column when the CSV does not guarantee authorized records
-- output CSV path when local writeback is configured
+- output CSV path when local result output is configured
 
 Generated CSV skills should use deterministic scripts when parsing, validating, deduplicating, or writing output would otherwise be fragile.
 
 During creation-time onboarding, read a small sample from the concrete or representative CSV path. Confirm headers, delimiter, date parsing, source-level outreach basis or consent column, dedupe, goal input columns, and output path behavior before generating a bound real-call skill.
 
-For local CSV workflows, capture supported writeback target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step. Record the supported modes as:
+For local CSV workflows, capture supported result-output target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step. Record the supported modes as:
 
 - `source-csv-in-place`: update the original CSV only when the runtime request explicitly asks to update the source CSV and the execution approval covers that mutation. Before real calls, verify the file is writable, define the exact appended or updated result columns, preserve existing rows and columns, and create or recommend a backup or atomic write plan.
-- `result-csv-file`: write a separate result CSV. This is the safer default when the runtime request asks for a results file or does not explicitly request original CSV mutation.
+- `result-csv-file`: write a separate new result CSV. This is the safer default when the runtime request asks for a results file or does not explicitly request original CSV mutation.
 
-Do not describe a separate result CSV as "writeback to the original CSV." If the runtime request asks to update the original CSV, select `source-csv-in-place` during dry-run or approval and do not create a separate result CSV while calling it source writeback. If the request does not specify original CSV mutation, use `result-csv-file` or stop for clarification before real calls.
+Do not describe a separate result CSV as "writeback to the original CSV." If the runtime request asks to update the original CSV, select `source-csv-in-place` during dry-run or approval and do not create a separate result CSV while calling it source writeback. If the request does not specify original CSV mutation, use `result-csv-file` as the durable fallback. Before real calls, verify that the output path is writable, define exact result columns, avoid full phone numbers in output, and preserve source rows and columns.
 
 Do not require a per-row consent column when the user confirms the CSV source only contains records collected from people who requested or agreed to phone follow-up. Record that as the source-level outreach basis in the generated skill and runtime gate. At runtime, verify the request uses the same approved source class or schema; if it does not, ask for a new source-level basis or consent field before real calls.
 
-If writeback is not configured, output the session table described in the generated skill.
+If source CSV in-place update is not configured, use a new local result CSV as the default durable output. Output a session table only when durable output validation is blocked; treat it as non-persistent and do not proactively offer it as a normal option.
 
-For `fully-bound`, capture the concrete CSV path and output CSV path. For `parameterized-bound`, capture the required column schema and allow runtime CSV and output paths. For `unbound-generic`, require the user to map columns at runtime and keep the workflow dry-run-only until the mapping, source-level outreach basis or consent field, and dedupe rule are approved.
+For `fully-bound`, capture the concrete CSV path and output CSV path. For `parameterized-bound`, capture the required column schema and allow runtime CSV and output paths.
 
 ## Other Sources
 
@@ -210,9 +211,11 @@ Ask one question at a time until the source contract is complete:
 - Which field proves phone follow-up is authorized?
 - Which field is stable enough for dedupe?
 - How should date-window filtering work?
-- Can results be written back?
-- If writeback is possible, what exact action and fields should be used?
+- Can results be written back to the source?
+- If source writeback is possible, what exact action and fields should be used?
+- If source writeback is unavailable or should not mutate the source records, should results go to a source-adjacent artifact in the same system?
+- If source-system durable output is unavailable, what local result CSV path or approved runtime output path should be used?
 
-If the user cannot provide enough detail for safe access, generate a skill that can produce a dry-run from manually supplied records and states the missing integration blocker.
+If the user cannot provide enough detail for safe access, stop before generation and state the missing integration blocker.
 
-For custom sources, do not generate a bound real-call skill until the source can be authenticated or accessed, sampled safely, and mapped to the required phone-call fields. If that cannot happen, generate only a dry-run-only `unbound-generic` skill with an onboarding blocker.
+For custom sources, do not generate a skill until the source can be authenticated or accessed, sampled safely, and mapped to the required phone-call fields.

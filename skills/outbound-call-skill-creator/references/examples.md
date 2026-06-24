@@ -50,7 +50,7 @@ Recommended binding level is `parameterized-bound`.
 
 I will first check whether this host already exposes Google Forms access. If local OAuth is available, I will run its auth check and list accessible forms before asking you for a Form ID. If auth requires a browser step, I will pause for you to complete it, re-check auth, then list forms.
 
-After access is verified and a sample is fetched, I will propose the phone, recipient, dedupe, outreach-basis, goal-input, and writeback fields for confirmation.
+After access is verified and a sample is fetched, I will propose the phone, recipient, dedupe, outreach-basis, goal-input, and result-output fields for confirmation.
 ```
 
 If no Google route can be discovered, ask for only the missing route detail:
@@ -87,8 +87,8 @@ Captured contract:
 - dedupe key: lead record ID
 - date filtering: record creation time in the source account timezone
 - outreach basis: lead form includes phone follow-up consent
-- writeback: approved TikTok Ads MCP writeback tool, approved connector action, or session table fallback
-- execution: `dry-run-then-batch-approval` or `approved-direct-execution` only after concrete runtime scope passes the runtime gate; finalize provider results with full-history reconciliation, record each stable terminal result, then write back or output one final session table
+- result output: approved TikTok Ads MCP writeback tool or approved connector action when available; otherwise use an approved source-adjacent result artifact in the same account or workspace when available; otherwise write a new local result CSV; use session-table output only as a last-resort non-persistent fallback when durable output cannot be verified
+- execution: `dry-run-then-batch-approval` or `approved-direct-execution` only after concrete runtime scope passes the runtime gate; finalize provider results with full-history reconciliation, record each stable terminal result, then write back to the source, write a source-adjacent result artifact, or write one result CSV
 
 Generated future use:
 
@@ -117,9 +117,9 @@ Captured contract:
 - dedupe key column: `appointment_id`
 - date filtering: `appointment_date` in `YYYY-MM-DD`
 - outreach basis: source-level; this CSV is exported only from records whose owners requested or agreed to phone follow-up, so no per-row consent column is required
-- writeback: local CSV with supported target modes `result-csv-file` and `source-csv-in-place`; resolve the concrete target mode during runtime dry-run or approval, using `source-csv-in-place` only when the runtime request explicitly asks to update the original CSV and target result columns are defined
+- result output: local CSV with supported target modes `result-csv-file` and `source-csv-in-place`; resolve the concrete target mode during runtime dry-run or approval, using `result-csv-file` as the default durable output and `source-csv-in-place` only when the runtime request explicitly asks to update the original CSV and target result columns are defined
 - sensitive boundary: logistics only, no medical advice
-- execution: after approval, call eligible rows serially, continue past candidate-level failures when safe, run provider result finalization before CSV writeback, and summarize all results after the batch ends
+- execution: after approval, call eligible rows serially, continue past candidate-level failures when safe, run provider result finalization before local result CSV output, and summarize all results after the batch ends
 
 Generated future use:
 
@@ -137,9 +137,9 @@ Create an outbound skill for records from our internal API.
 
 Creator behavior:
 
-Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and writeback capability. If any critical value is unknown, generate a dry-run-only skill or stop before generation.
+Ask for source access, returned fields, phone field, outreach basis, dedupe key, date filtering, and durable result-output capability. If any critical value is unknown, stop before generation and explain the missing contract detail.
 
-If source onboarding cannot authenticate or sample the source safely, generate only a dry-run-only `unbound-generic` skill with an onboarding blocker.
+If source onboarding cannot authenticate or sample the source safely, do not generate the skill yet. Record the blocker in the creation conversation and continue only after the user provides an access route or representative source sample that supports the minimum `parameterized-bound` contract.
 
 ## Binding Mode Selection
 
@@ -152,9 +152,9 @@ Create a skill for quote request callbacks. I want to reuse it across multiple f
 Recommended creator response:
 
 - recommend `parameterized-bound`
-- fix the required Google Form questions, source-level phone follow-up basis or consent basis, dedupe rule, goal contract, provider route, and writeback field schema
-- allow the runtime request to provide the concrete form ID and date window
-- run best-effort creation-time preflight when available and require form schema and writeback runtime gate checks before real calls
+- fix the required Google Form questions, source-level phone follow-up basis or consent basis, dedupe rule, goal contract, provider route, and result-output field schema
+- allow the runtime request to provide the concrete form ID, date window, and approved output path or source-adjacent artifact target when source writeback is not fixed
+- run best-effort creation-time preflight when available and require form schema and durable result-output runtime gate checks before real calls
 - default execution mode to `dry-run-then-batch-approval`
 
 User request:
@@ -166,7 +166,7 @@ Create a skill that automatically processes the same lead form every morning.
 Recommended creator response:
 
 - recommend `fully-bound`
-- fix the concrete form, linked response spreadsheet, writeback columns, and host scheduler boundary
+- fix the concrete form, linked response spreadsheet, source-adjacent result artifact, or local result CSV target, result columns, and host scheduler boundary
 - allow only narrow runtime controls such as date window
 - require the runtime gate before every scheduled or approved direct execution run
 
@@ -178,6 +178,6 @@ Create a generic callback skill. I will tell it the data source later.
 
 Recommended creator response:
 
-- use `unbound-generic`
-- keep the skill dry-run-only by default
-- require runtime collection of source fields, source-level outreach basis or consent evidence, dedupe key, and writeback behavior before any real calls
+- explain that this creator generates directly usable batch-call skills, so the source family and minimum source contract must be known before generation
+- ask for the source family and enough access detail to run source onboarding
+- recommend `parameterized-bound` once the source family, required schema, outreach basis, dedupe rule, and durable result-output policy are known

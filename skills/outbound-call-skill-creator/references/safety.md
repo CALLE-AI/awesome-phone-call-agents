@@ -4,11 +4,11 @@ Use this reference when creating a generated outbound phone-call business skill.
 
 ## Creator Safety
 
-The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a binding level, source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and writeback behavior.
+The creator must not generate a business skill that calls arbitrary phone-looking values. It must capture a binding level, source contract, outreach basis, E.164 phone-number field, dedupe key, execution policy, and durable result-output behavior.
 
-If the user cannot explain why records are authorized for phone follow-up, generate a dry-run-only skill or stop and ask for a consent field or approved source basis.
+If the user cannot explain why records are authorized for phone follow-up, stop and ask for a consent field or approved source basis before generating a skill.
 
-Default to a `parameterized-bound` skill when the user wants reuse but has not asked for a single fixed source instance. Use `fully-bound` for stable production or scheduled workflows. Use `unbound-generic` only for exploratory or dry-run-only workflows unless the user later approves a complete runtime source and writeback contract.
+Default to a `parameterized-bound` skill when the user wants reuse but has not asked for a single fixed source instance. Use `fully-bound` for stable production or scheduled workflows.
 
 ## Generated Skill Safety
 
@@ -32,17 +32,17 @@ Every generated business skill must include rules for:
 
 Direct execution is allowed only when the generated skill's creation-time contract explicitly says that a concrete request such as "process all June 20 records" authorizes real calls after validation.
 
-Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass the runtime gate. It is not allowed for `unbound-generic` workflows.
+Direct execution requires a `fully-bound` skill or a `parameterized-bound` skill whose concrete runtime parameters pass the runtime gate.
 
 Direct execution still requires:
 
 - candidate validation
 - outreach basis validation
 - dedupe checks
-- source and writeback runtime gate checks when the workflow is parameterized
+- source and durable result-output runtime gate checks when the workflow is parameterized
 - masked summaries
 - skipping unsafe records
-- writeback or session-table output
+- source writeback, source-adjacent result artifact output, or local result CSV output, with session-table output only as a last-resort attended fallback
 
 If direct execution is not configured, generated skills must dry-run first and ask the user to approve the exact pending call list.
 
@@ -54,9 +54,9 @@ If one candidate fails, record the failure and continue with the next candidate 
 
 Provider terminal instructions such as `report_result` or `do not start another call` apply only to the current provider run. After recording the current candidate result, continue the approved batch unless a batch-level safety blocker appears.
 
-Do not write call results before provider result finalization. Terminal provider status must pass full-history provider reconciliation before writeback, and negative terminal outcomes such as `no_answer`, `failed`, or `no conversation captured` must pass a negative terminal stability check.
+Do not write call results before provider result finalization. Terminal provider status must pass full-history provider reconciliation before source writeback, source-adjacent result artifact output, local result CSV output, or session-table fallback, and negative terminal outcomes such as `no_answer`, `failed`, or `no conversation captured` must pass a negative terminal stability check.
 
-After all candidates are complete, write configured results or output the session table, then report one final batch summary.
+After all candidates are complete, write configured source results, a source-adjacent result artifact, or a local result CSV, then report one final batch summary. Output a session table only when durable output validation is blocked and the run is attended; treat it as non-persistent and unsuitable for unattended scheduled automation unless the user explicitly accepts the host session transcript as the record.
 
 ## Sensitive Domains
 

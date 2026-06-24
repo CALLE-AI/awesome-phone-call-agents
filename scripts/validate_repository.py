@@ -514,7 +514,8 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "Creation-Time Source Onboarding",
             "source onboarding",
             "sampled fields",
-            "dry-run-only until an exact runtime source, schema, source-level outreach basis or consent, dedupe, and writeback contract is approved",
+            "Minimum source binding is mandatory.",
+            "stop before writing the generated skill and ask for the missing contract details",
             "scope-first output rule",
             "If the installed `outbound-call-skill-creator` folder is inside a recognized user-level skills root",
             "Never write a generated business skill into the downloaded `outbound-call-skill-creator` skill folder itself.",
@@ -533,6 +534,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
         skill_dir / "references" / "data-sources.md",
         [
             "creation-time source onboarding",
+            "The source contract must satisfy at least the `parameterized-bound` minimum",
             "Authenticated Source Onboarding",
             "For any authenticated or connector-backed source family, do not ask the user to manually provide the full field mapping before source access has been checked and a representative sample has been fetched.",
             "Collect only the minimum connection details needed to authorize or locate the source.",
@@ -541,7 +543,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "`codex mcp login tiktok-ads`",
             "Do not present a blank manual mapping form",
             "Ask the user to fill only fields that cannot be inferred from the sample.",
-            "Do not ask for the default outbound goal, writeback mapping, or full field mapping before the access check and sample fetch have been attempted.",
+            "Do not ask for the default outbound goal, result-output mapping, or full field mapping before the access check and sample fetch have been attempted.",
             "Proactively inspect available host routes before asking the user for access details.",
             "`google-auth.mjs status`",
             "`google-local-api-client.mjs --action list-forms`",
@@ -563,9 +565,10 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "default outbound goal contract",
             "Do not ask for Google Form field mapping before Google access has been verified and a representative response sample has been fetched.",
             "Do not ask for TikTok Ads field mapping before the exact MCP tool or resource access has been verified and a representative record sample has been fetched.",
-            "For local CSV workflows, capture supported writeback target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step.",
+            "For local CSV workflows, capture supported result-output target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step.",
             "source-csv-in-place",
             "result-csv-file",
+            "source-adjacent-result-artifact",
             "Do not require a per-row consent column when the user confirms the CSV source only contains records collected from people who requested or agreed to phone follow-up.",
             "Use the existing `google-form-callback` local OAuth and export scripts as the preferred reference pattern when available.",
         ],
@@ -582,6 +585,7 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "## TikTok Ads Lead Follow-Up Skill",
             "If this host has no TikTok Ads MCP server configured, I will add the default route first and then inspect it",
             "- source family: `tiktok-ads`",
+            "source-adjacent result artifact",
         ],
     )
     require_text(
@@ -616,10 +620,11 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "Provider terminal instructions such as `report_result` or `do not start another call` apply only to the current provider run",
             "After execution approval, do not ask the user to continue, confirm the next candidate, or approve additional provider runs.",
             "Provider Result Finalization",
-            "Terminal provider status is not writeback-ready until the generated skill performs a full-history provider reconciliation.",
+            "Terminal provider status is not result-output-ready until the generated skill performs a full-history provider reconciliation.",
             "Do not write `no_answer`, `failed`, or `no conversation captured` results until a negative terminal stability check passes.",
-            "Writeback target mode may be fixed at creation time or selected from approved runtime parameters before execution approval.",
-            "writeback target mode",
+            "Result target mode may be fixed at creation time or selected from approved runtime parameters before execution approval.",
+            "result target mode",
+            "source-adjacent-result-artifact",
             "sample fetch result",
             "default goal contract derived from sampled fields",
             "Do not define the default goal from user prose alone before the representative sample is fetched.",
@@ -705,13 +710,14 @@ Provider onboarding blocker: none.
 
 ## Execution Modes
 
-Execution mode: dry-run-then-batch-approval. Supported alternatives are per-call-approval
-and approved-direct-execution when the binding level and runtime gate allow them.
+Execution mode: dry-run-then-batch-approval. Supported alternative is approved-direct-execution
+when the binding level and runtime gate allow it.
 
 ## Runtime Gate
 
 Runtime gate requirements include source access, required fields, consent, dedupe,
-writeback or session-table readiness, and provider route availability before real calls.
+source writeback, source-adjacent artifact, or local result CSV readiness,
+and provider route availability before real calls.
 
 ## Preflight and Creation Summary
 
@@ -723,7 +729,9 @@ parameters, and validation results before real calls.
 After approval, serially process all ready candidates. For each candidate, plan,
 inspect, run, check status when available, record the result, and continue to
 the next candidate without another per-candidate confirmation. After all
-candidates finish, write configured results or output one final session table.
+candidates finish, write source results, a source-adjacent artifact, or a local
+result CSV. Use a session table only as a last-resort attended fallback when
+durable output is blocked.
 Provider terminal instructions such as `report_result` or `do not start another call`
 apply only to the current provider run. After execution approval, do not ask the
 user to continue, confirm the next candidate, or approve additional provider runs.
@@ -732,16 +740,21 @@ result or skip state unless a batch-level blocker appears.
 
 ## Provider Result Finalization
 
-Provider result finalization runs before writeback. Terminal provider status is
-not writeback-ready until the generated skill performs a full-history provider
+Provider result finalization runs before result output. Terminal provider status is
+not result-output-ready until the generated skill performs a full-history provider
 reconciliation without a cursor. Do not write `no_answer`, `failed`, or
 `no conversation captured` results until a negative terminal stability check
 passes.
 
-## Writeback Behavior
+## Result-Output Behavior
 
-Writeback behavior records call status, timestamps, summaries, and masked phone numbers.
-Runtime writeback target mode: resolved before execution approval from fixed creation values or approved runtime parameters.
+Result-output behavior records call status, timestamps, summaries, and masked phone numbers.
+Prefer source writeback when verified. Use `source-adjacent-result-artifact`
+when results should stay in the source system without mutating source records.
+Otherwise use `result-csv-file` to write a new local result CSV. Use
+session-table output only as a last-resort attended fallback when durable result
+output is blocked.
+Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.
 
 ## Safety Summary
 
@@ -1035,8 +1048,8 @@ result or skip state unless a batch-level blocker appears.
         missing_provider_result_finalization_md = valid_skill_md.replace(
             """## Provider Result Finalization
 
-Provider result finalization runs before writeback. Terminal provider status is
-not writeback-ready until the generated skill performs a full-history provider
+Provider result finalization runs before result output. Terminal provider status is
+not result-output-ready until the generated skill performs a full-history provider
 reconciliation without a cursor. Do not write `no_answer`, `failed`, or
 `no conversation captured` results until a negative terminal stability check
 passes.
@@ -1072,7 +1085,7 @@ passes.
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
         missing_writeback_target_mode_md = valid_skill_md.replace(
-            "Runtime writeback target mode: resolved before execution approval from fixed creation values or approved runtime parameters.\n",
+            "Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.\n",
             "",
         )
         (skill_dir / "SKILL.md").write_text(missing_writeback_target_mode_md, encoding="utf-8")
@@ -1091,12 +1104,12 @@ passes.
             + missing_writeback_target_mode_failure.stderr
         )
         if missing_writeback_target_mode_failure.returncode == 0:
-            fail("Generated outbound skill checker must reject missing writeback target mode.")
+            fail("Generated outbound skill checker must reject missing result target mode.")
         if (
-            "Generated skill SKILL.md must include writeback target mode"
+            "Generated skill SKILL.md must include result target mode"
             not in missing_writeback_target_mode_output
         ):
-            fail("Generated outbound skill checker missing-writeback-target-mode message changed.")
+            fail("Generated outbound skill checker missing-result-target-mode message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
@@ -1204,7 +1217,9 @@ passes.
 After approval, serially process all ready candidates. For each candidate, plan,
 inspect, run, check status when available, record the result, and continue to
 the next candidate without another per-candidate confirmation. After all
-candidates finish, write configured results or output one final session table.
+candidates finish, write source results, a source-adjacent artifact, or a local
+result CSV. Use a session table only as a last-resort attended fallback when
+durable output is blocked.
 Provider terminal instructions such as `report_result` or `do not start another call`
 apply only to the current provider run. After execution approval, do not ask the
 user to continue, confirm the next candidate, or approve additional provider runs.
@@ -1496,153 +1511,89 @@ Runtime parameters still allowed: date window and approved source instance ident
         ):
             fail("Generated outbound skill checker missing-selected-execution message changed.")
 
+    unsupported_execution_mode = "per-" + "call-approval"
+
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
-        unsafe_direct_md = valid_skill_md.replace(
-            "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
+        unsupported_execution_md = valid_skill_md.replace(
             "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: approved-direct-execution.",
+            f"Execution mode: {unsupported_execution_mode}.",
         )
-        (skill_dir / "SKILL.md").write_text(unsafe_direct_md, encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(unsupported_execution_md, encoding="utf-8")
         (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
         (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
 
-        unsafe_direct_failure = subprocess.run(
+        unsupported_execution_failure = subprocess.run(
             ["node", str(checker), "--skill-dir", str(skill_dir)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        unsafe_direct_output = unsafe_direct_failure.stdout + unsafe_direct_failure.stderr
-        if unsafe_direct_failure.returncode == 0:
-            fail("Generated outbound skill checker must reject unbound direct execution.")
-        if (
-            "Generated skill cannot use approved-direct-execution with unbound-generic"
-            not in unsafe_direct_output
-        ):
-            fail("Generated outbound skill checker unbound-direct failure message changed.")
+        unsupported_execution_output = (
+            unsupported_execution_failure.stdout + unsupported_execution_failure.stderr
+        )
+        if unsupported_execution_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported execution modes.")
+        if "unsupported execution modes are not allowed" not in unsupported_execution_output:
+            fail("Generated outbound skill checker unsupported-execution message changed.")
+
+    unsupported_binding_level = "un" + "bound-" + "generic"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
-        unsafe_per_call_md = valid_skill_md.replace(
+        unsupported_binding_md = valid_skill_md.replace(
             "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
-            "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: per-call-approval. This workflow is dry-run-only until onboarding is complete.",
-        ).replace(
-            """## Source Onboarding
-
-Source onboarding completed for this parameterized-bound workflow.
-Access route: local source credentials.
-Source access route discovery result: host-local route discovery completed before user route selection.
-Authentication or access check result: passed with local source credentials.
-Sample fetch result: passed with a representative source instance.
-Sampled source instance: representative-callback-source.
-Discovered field mapping: candidate_id, phone_e164, name, submitted_at, consent, and callback_reason.
-User-confirmed field mapping: confirmed after the representative sample was shown.
-Redaction policy for sample summaries: mask phone numbers and omit credentials.
-Default goal contract derived from sampled fields: call the respondent about callback_reason and summarize the result.
-Runtime parameters still allowed: date window and approved source instance identifiers.
-
-""",
-            """## Source Onboarding
-
-Source onboarding recorded an onboarding blocker for this unbound-generic workflow.
-Onboarding blocker: no approved source instance has been bound yet; keep this workflow dry-run-only until onboarding is complete.
-
-""",
+            f"Binding level: {unsupported_binding_level}.",
         )
-        (skill_dir / "SKILL.md").write_text(unsafe_per_call_md, encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(unsupported_binding_md, encoding="utf-8")
         (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
         (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
 
-        unsafe_per_call_failure = subprocess.run(
+        unsupported_binding_failure = subprocess.run(
             ["node", str(checker), "--skill-dir", str(skill_dir)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        unsafe_per_call_output = unsafe_per_call_failure.stdout + unsafe_per_call_failure.stderr
-        if unsafe_per_call_failure.returncode == 0:
-            fail("Generated outbound skill checker must reject unbound per-call approval.")
-        if (
-            "Generated skill cannot use per-call-approval with unbound-generic"
-            not in unsafe_per_call_output
-        ):
-            fail("Generated outbound skill checker unbound-per-call failure message changed.")
+        unsupported_binding_output = (
+            unsupported_binding_failure.stdout + unsupported_binding_failure.stderr
+        )
+        if unsupported_binding_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported binding levels.")
+        if "unsupported binding levels are not allowed" not in unsupported_binding_output:
+            fail("Generated outbound skill checker unsupported-binding message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
         references_dir = skill_dir / "references"
         references_dir.mkdir(parents=True)
-        unbound_dry_run_md = valid_skill_md.replace(
-            "Binding level: parameterized-bound.",
-            "Binding level: unbound-generic.",
-        ).replace(
-            "Execution mode: dry-run-then-batch-approval.",
-            "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.",
-        ).replace(
-            """## Source Onboarding
-
-Source onboarding completed for this parameterized-bound workflow.
-Access route: local source credentials.
-Source access route discovery result: host-local route discovery completed before user route selection.
-Authentication or access check result: passed with local source credentials.
-Sample fetch result: passed with a representative source instance.
-Sampled source instance: representative-callback-source.
-Discovered field mapping: candidate_id, phone_e164, name, submitted_at, consent, and callback_reason.
-User-confirmed field mapping: confirmed after the representative sample was shown.
-Redaction policy for sample summaries: mask phone numbers and omit credentials.
-Default goal contract derived from sampled fields: call the respondent about callback_reason and summarize the result.
-Runtime parameters still allowed: date window and approved source instance identifiers.
-
-""",
-            """## Source Onboarding
-
-Source onboarding recorded an onboarding blocker for this unbound-generic workflow.
-Onboarding blocker: no approved source instance has been bound yet; keep this workflow dry-run-only until onboarding is complete.
-
-""",
-        )
-        for required_snippet in [
-            "Binding level: unbound-generic.",
-            "dry-run-only",
-            "onboarding blocker",
-        ]:
-            if required_snippet not in unbound_dry_run_md:
-                fail(f"Unbound dry-run fixture drifted; missing {required_snippet!r}.")
-        for bound_only_snippet in [
-            "Authentication or access check result: passed",
-            "Sample fetch result: passed",
-            "Default goal contract derived from sampled fields",
-        ]:
-            if bound_only_snippet in unbound_dry_run_md:
-                fail(f"Unbound dry-run fixture must not include {bound_only_snippet!r}.")
-        (skill_dir / "SKILL.md").write_text(unbound_dry_run_md, encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(valid_skill_md, encoding="utf-8")
         (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
-        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text(
+            f"# Examples\nBinding level: {unsupported_binding_level}.\n",
+            encoding="utf-8",
+        )
 
-        unbound_dry_run_success = subprocess.run(
+        unsupported_reference_failure = subprocess.run(
             ["node", str(checker), "--skill-dir", str(skill_dir)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        if unbound_dry_run_success.returncode != 0:
-            fail(
-                "Generated outbound skill checker must allow dry-run-only unbound onboarding blockers: "
-                + (unbound_dry_run_success.stderr or unbound_dry_run_success.stdout).strip()
-            )
+        unsupported_reference_output = (
+            unsupported_reference_failure.stdout + unsupported_reference_failure.stderr
+        )
+        if unsupported_reference_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unsupported binding references.")
+        if "unsupported binding levels are not allowed" not in unsupported_reference_output:
+            fail("Generated outbound skill checker unsupported-reference message changed.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         skill_dir = Path(temp_dir) / "generated-callback-skill"
