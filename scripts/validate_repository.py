@@ -153,6 +153,9 @@ def validate_english_only() -> None:
 
 def validate_skills() -> None:
     skills_dir = ROOT / "skills"
+    allowed_skill_readmes = {
+        ROOT / "skills" / "outbound-call-skill-creator" / "README.md",
+    }
     if not skills_dir.exists():
         fail("Missing skills/ directory.")
     skill_dirs = [p for p in skills_dir.iterdir() if p.is_dir()]
@@ -161,10 +164,11 @@ def validate_skills() -> None:
     for skill_dir in skill_dirs:
         if not SLUG_RE.match(skill_dir.name):
             fail(f"Skill directory is not a lowercase slug: {skill_dir.name}")
-        if (skill_dir / "README.md").exists():
+        skill_readme = skill_dir / "README.md"
+        if skill_readme.exists() and skill_readme not in allowed_skill_readmes:
             fail(
                 f"Skill directory must not include README.md; move long-form guidance to docs/: "
-                f"{(skill_dir / 'README.md').relative_to(ROOT)}"
+                f"{skill_readme.relative_to(ROOT)}"
             )
         skill_md = skill_dir / "SKILL.md"
         text = read(skill_md)
@@ -232,6 +236,7 @@ def validate_expected_files() -> None:
         "skills/call-reminder/scripts/render-runtime-prompt.mjs",
         "skills/call-reminder/scripts/validate-reminder-input.mjs",
         "skills/outbound-call-skill-creator/SKILL.md",
+        "skills/outbound-call-skill-creator/README.md",
         "skills/outbound-call-skill-creator/references/binding-contract.md",
         "skills/outbound-call-skill-creator/references/creation-summary.md",
         "skills/outbound-call-skill-creator/references/data-sources.md",
