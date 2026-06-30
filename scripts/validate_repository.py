@@ -18,11 +18,10 @@ ROOT = Path(__file__).resolve().parents[1]
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 REPOSITORY_TITLE = "Awesome Phone Call Agents"
-REPOSITORY_SLUG = "awesome-phone-call-agents"
 OLD_REPOSITORY_TITLE = "Awesome Phone Call " + "Skill"
 OLD_REPOSITORY_SLUG = "awesome-phone-call-" + "skill"
 README_SUBTITLE = "A community hub for reusable phone-call Agent Skills, runnable apps, workflow plugins, adapters, scheduler recipes, and safety patterns."
-SKILLS_INSTALL_COMMAND = f"npx -y skills add CALLE-AI/{REPOSITORY_SLUG} --skill call-reminder -g"
+CLI_REFERENCE_SENTENCE = "CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](https://github.com/CALLE-AI/call-e-integrations/blob/main/packages/cli/docs/cli-reference.md)."
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
@@ -65,8 +64,8 @@ def validate_readme() -> None:
         fail(f"README.md must start with '# {REPOSITORY_TITLE}'.")
     if README_SUBTITLE not in text:
         fail("README.md must include the approved project subtitle near the top.")
-    if SKILLS_INSTALL_COMMAND not in text:
-        fail("README.md must include the approved skills.sh install command.")
+    if CLI_REFERENCE_SENTENCE not in text:
+        fail("README.md must include the approved CALL-E CLI reference sentence.")
     forbid_text(
         ROOT / "README.md",
         [
@@ -201,7 +200,6 @@ def validate_expected_files() -> None:
         "apps/README.md",
         "plugins/README.md",
         "docs/design-principles.md",
-        "docs/codex-implementation-plan.md",
         "docs/git-naming-conventions.md",
         "docs/outbound-call-skill-creator/README.md",
         "apps/python/broker-login-client/README.md",

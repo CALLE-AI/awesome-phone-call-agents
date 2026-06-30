@@ -25,3 +25,5 @@ candidates.json
 callback-state.json
 callback-writeback.json
 skills-lock.json
+docs/codex-implementation-plan.md
+docs/superpowers/

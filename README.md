@@ -6,7 +6,7 @@
 
 Maintainers provide reference skills, runnable examples, templates, validation, and safety guidance so developers and workflow builders can quickly explore phone-call agent workflows.
 
-[Quick start](#quick-install-and-start) · [Community contributions](#community-contributions) · [Resources](#resource-list) · [Apps](#apps) · [Plugins](#plugins) · [CLI](#cli-reference) · [Templates](#templates) · [Roadmap](docs/roadmap.md) · [Contributing](#contributing)
+[Community contributions](#community-contributions) · [Resources](#resource-list) · [CLI](#cli-reference) · [Templates](#templates) · [Roadmap](docs/roadmap.md) · [Contributing](#contributing)
 
 ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-phone--call-blue)
 ![CALL-E](https://img.shields.io/badge/CALL--E-one--off%20calls-black)
@@ -37,19 +37,11 @@ The community roadmap is a direction guide, not a fixed release plan. Small exam
 ## Table of Contents
 
 - [Why this repository exists](#why-this-repository-exists)
-- [Quick install and start](#quick-install-and-start)
 - [Community contributions](#community-contributions)
-- [What this repository provides](#what-this-repository-provides)
-- [Reference skills](#reference-skills)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
 - [Resource list](#resource-list)
-- [Apps](#apps)
-- [Plugins](#plugins)
-- [Repository layout](#repository-layout)
-- [Safety and legal guide](#safety-and-legal-guide)
 - [Contributing](#contributing)
-- [Developer docs](#developer-docs)
 - [Community](#community)
 - [License](#license)
 
@@ -67,128 +59,9 @@ This repository focuses on three principles:
 2. **Provider separation**: the phone-call provider should place or create calls; the host scheduler should handle recurrence.
 3. **Safety by default**: phone numbers, consent, credentials, and medical, legal, financial, or emergency boundaries must be handled explicitly.
 
-## Quick install and start
-
-### 1. Choose a workflow
-
-Start with the maintained skill that matches the job:
-
-| Need | Start with | What it does |
-| --- | --- | --- |
-| Recurring or scheduled phone-call reminders | [`call-reminder`](skills/call-reminder/) | Wraps one-off CALL-E calls in a host-owned scheduler with explicit cancellation and safety boundaries. |
-| Callback calls from authorized Google Form responses | [`google-form-callback`](skills/google-form-callback/) | Reviews form responses, supports dry runs, creates scheduled polling plans, and writes results back. |
-| A business-specific outbound calling skill | [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates a focused skill from sources such as Google Forms, TikTok Ads, local CSV files, or custom systems. |
-
-Use the [resource list](#resource-list) for broader examples, [apps](#apps) for runnable integration patterns, [plugins](#plugins) for workflow-platform connectors, and [templates](#templates) when contributing a new artifact.
-
-### 2. Install a skill
-
-For most users, the simplest path is to ask an Agent Skills-compatible client to install only the skill needed for the workflow:
-
-```bash
-npx -y skills add CALLE-AI/awesome-phone-call-agents --skill call-reminder -g
-npx -y skills add CALLE-AI/awesome-phone-call-agents --skill google-form-callback -g
-npx -y skills add CALLE-AI/awesome-phone-call-agents --skill outbound-call-skill-creator -g
-```
-
-Manual copy is also supported when a host does not support the CLI. Copy the matching folder:
-
-```text
-skills/call-reminder/
-skills/google-form-callback/
-skills/outbound-call-skill-creator/
-```
-
-### 3. Start with a safe request
-
-Use a fictional reserved number in demos and a real E.164 number only for your own authorized workflow.
-
-For `call-reminder`:
-
-```text
-Set up a daily phone-call reminder at 09:00 America/New_York.
-Use CALL-E when available.
-My phone number is +15550101234.
-The call should remind me to take my medicine according to my doctor instructions or the medication label.
-```
-
-For `google-form-callback`:
-
-```text
-Use google-form-callback to review authorized responses from FORM_ID.
-Start with a dry run and show pending, skipped, and blocked records before any real calls.
-```
-
-For `outbound-call-skill-creator`:
-
-```text
-Use outbound-call-skill-creator to create a project-local callback skill from a local CSV file.
-Start by collecting the source fields, consent basis, call goal, provider route, execution mode, and durable result-output target.
-```
-
-The agent should create or update a visible scheduler job only when the current client can persist, run, and cancel it safely. The scheduled job then executes the runtime prompt and attempts exactly one one-off CALL-E call.
-
-```text
-auth status -> call plan -> call run -> call status
-```
-
-If the client cannot safely create the schedule, the skill must return `status: not created` with the exact blocker and a runtime prompt or setup instructions.
-
-## What this repository provides
-
-| Area | What it gives agents |
-| --- | --- |
-| Agent Skills | Installable or copyable workflows that agents can use directly. |
-| Apps | Runnable Python and TypeScript tools that help agents schedule, monitor, integrate with, or operate phone-call workflows. |
-| Plugins | No-code and low-code workflow-platform nodes, actions, connectors, or recipes that trigger, configure, or monitor phone-call agent workflows. |
-| Provider adapters | Guidance for connecting skills and apps to call providers, CLIs, MCP routes, or host-native call tools. |
-| Scheduler recipes | Patterns for host-owned recurrence and one-call-per-run execution. |
-| Runtime prompt | A self-contained prompt template for scheduled executions. |
-| Safety patterns | Consent, E.164 handling, credential boundaries, cancellation, duplicate-job prevention, and sensitive-domain rules. |
-
-## Reference skills
-
-| Skill | Purpose | Guide | Status |
-| --- | --- | --- | --- |
-| [`call-reminder`](skills/call-reminder/) | Schedules recurring CALL-E phone-call reminders by wrapping the existing one-off CALL-E call workflow in the current client's scheduler or automation system. | [`skills/call-reminder/`](skills/call-reminder/) | Reference implementation |
-| [`google-form-callback`](skills/google-form-callback/) | Processes authorized Google Form responses into safe one-off callback calls with dry-runs, scheduled polling plans, and Sheets writeback. | [`docs/google-form-callback/README.md`](docs/google-form-callback/README.md) | Reference implementation |
-| [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) | Generates directly usable outbound phone-call workflow skills with source mapping, goal contracts, MCP provider routing, serial execution policy, safety rules, and durable result-output behavior. | [`skills/outbound-call-skill-creator/`](skills/outbound-call-skill-creator/) | Creator skill |
-
-`call-reminder` is a scheduler wrapper skill, not a new CALL-E backend reminder API, daemon, or provider-side recurring schedule.
-
-### Use it for
-
-- daily or recurring CALL-E phone reminders
-- scheduled CALL-E calls where the scheduler belongs to the client, host, cron, or automation system
-- "call me at a time" and "remind me by phone" workflows
-- runtime prompt generation for scheduled one-off calls
-- choosing the safest available scheduler adapter for the current client
-
-### Do not use it to
-
-- create CALL-E backend reminder APIs such as `create_call_reminder`, `list_call_reminders`, `update_call_reminder`, or `cancel_call_reminder`
-- make provider-side recurrence mandatory
-- install `calle` globally without explicit user approval
-- guess phone numbers, country codes, timezones, languages, or regions
-- create recurring calls to third-party numbers unless the user explicitly states that the recipient consented
-- place a setup-time test call unless the user explicitly asks for one
-
 ## CLI reference
 
 CALL-E CLI parameters and command flags are documented in [`cli-reference.md`](https://github.com/CALLE-AI/call-e-integrations/blob/main/packages/cli/docs/cli-reference.md).
-
-The project-level validation script applies to the whole repository. Node.js helper scripts belong to individual skills and show the expected shape for focused skill-specific utilities.
-
-| Command | Purpose | Output |
-| --- | --- | --- |
-| `python3 scripts/validate_repository.py` | Validate required files, English-only repository content, skill frontmatter, apps, and reference-skill acceptance text. | Prints `Repository validation passed.` or exits with an error. |
-| `python3 scripts/check_branch_name.py --branch docs/git-naming-conventions` | Validate a candidate branch name against the repository Git naming convention. | Prints a success message or explains the expected format. |
-| `python3 scripts/create_branch.py docs/git-naming-conventions` | Validate a candidate branch, check local and fetched `origin` branches, then create it with `git switch -c`. | Switches to the new branch or exits with an error. |
-| `node skills/call-reminder/scripts/detect-client.mjs` | Detect a likely scheduler adapter from environment hints. | JSON with `adapterId`, `confidence`, and `reason`. |
-| `node skills/call-reminder/scripts/detect-client.mjs --plain` | Print only the detected adapter id. | Plain adapter id such as `codex-app` or `external-cron`. |
-| `node skills/call-reminder/scripts/validate-reminder-input.mjs [options]` | Validate structured reminder fields. | JSON `{ "ok": true, "value": ... }` or `{ "ok": false, "errors": ... }`. |
-| `node skills/call-reminder/scripts/render-runtime-prompt.mjs [options]` | Render the self-contained scheduled-run prompt. | Runtime prompt text. |
-| `node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --skill-dir <path>` | Validate an outbound skill generated by `outbound-call-skill-creator`. | Prints `Generated skill validation passed: <path>` or exits with an error. |
 
 ## Templates
 
@@ -250,7 +123,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
 - [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, TikTok Ads, local CSV files, or custom sources.
 
-## Apps
+### Apps
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
@@ -265,7 +138,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
-## Plugins
+### Plugins
 
 No-code and low-code workflow plugins live under [`plugins/`](plugins/). They are for workflow-platform nodes, actions, connectors, and recipes that help operators connect business events to phone-call agent workflows without writing a full app.
 
@@ -275,96 +148,10 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | --- | --- | --- |
 | [`plugins/n8n-calle-api`](plugins/n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
 
-## Adapters and recipes
-
-- [`CALL-E CLI bootstrap`](skills/call-reminder/references/calle-cli-bootstrap.md) - Resolver order for repository-local, global, and pinned `npx` CALL-E CLI routes.
-- [`Client adapter matrix`](skills/call-reminder/references/client-adapters.md) - Multi-client adapter guidance for CALL-E scheduled reminders.
-- [`Runtime prompt template`](skills/call-reminder/references/runtime-prompt.md) - Self-contained prompt used by scheduled jobs.
-- [`Runtime prompt behavior checks`](skills/call-reminder/references/examples.md) - Behavior checks for scheduler selection, timezone handling, region handling, and provider boundaries.
-
-## Safety patterns
+### Safety patterns
 
 - [`Safety reference`](skills/call-reminder/references/safety.md) - Consent, E.164 phone-number handling, credential boundaries, cancellation, duplicate-job prevention, and medical reminder boundaries.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
-
-## Repository layout
-
-```text
-awesome-phone-call-agents/
-├── README.md
-├── AGENTS.md
-├── CONTRIBUTING.md
-├── SECURITY.md
-├── apps/
-│   ├── README.md
-│   ├── python/
-│   │   ├── batch-runner/
-│   │   ├── broker-login-client/
-│   │   └── oauth-login-client/
-│   ├── shared/
-│   │   └── fake-mcp-broker-server.mjs
-│   └── typescript/
-│       ├── broker-login-client/
-│       ├── broker-login-client-standalone/
-│       └── oauth-login-client/
-├── docs/
-│   ├── google-form-callback/
-│   │   ├── README.md
-│   │   └── assets/
-│   ├── design-principles.md
-│   ├── codex-implementation-plan.md
-│   ├── git-naming-conventions.md
-│   └── roadmap.md
-├── forms/
-│   └── callback-request/
-├── plugins/
-│   └── README.md
-├── scripts/
-│   ├── check_branch_name.py
-│   ├── create_branch.py
-│   └── validate_repository.py
-└── skills/
-    ├── call-reminder/
-    │   ├── SKILL.md
-    │   ├── references/
-    │   └── scripts/
-    ├── google-form-callback/
-    │   ├── SKILL.md
-    │   ├── references/
-    │   ├── scripts/
-    │   └── template.md
-    └── outbound-call-skill-creator/
-        ├── SKILL.md
-        ├── references/
-        └── scripts/
-```
-
-## Safety and legal guide
-
-Phone calls are real-world side effects. Preserve these rules across the whole project: skills, apps, provider adapters, scheduler recipes, automation patterns, reference implementations, and documentation.
-
-### Safety rules
-
-- Require explicit user intent before setup or execution.
-- Collect the required destination, timing, task, and consent details before creating a call workflow.
-- Do not infer critical call details from phone number, locale, IP address, UTC offset, language, or country code.
-- Mask phone numbers in user-facing summaries. Documentation examples should use reserved fictional numbers such as `+15550101234`.
-- Do not call any number except the configured E.164 phone number.
-- Do not modify user-provided call goals or messages except for safety-preserving formatting.
-- Do not create duplicate scheduled jobs or hidden recurring schedules.
-- For scheduled workflows, the visible scheduler job approval is the confirmation for future executions; runtime prompts must not require another per-run chat approval unless the job was explicitly configured as preview-only.
-- Verify required auth before creating scheduled jobs, then re-check auth at runtime before placing any call.
-- Do not create third-party recurring calls unless the user explicitly states recipient consent.
-- Do not expose API keys, OAuth tokens, access tokens, refresh tokens, session cookies, auth callback URLs, confirmation tokens, or provider credentials.
-- If auth is missing, the CLI is unavailable, the scheduler cannot access credentials, or required fields are ambiguous, skip the call or stop setup instead of guessing.
-- Treat medical, legal, financial, and emergency reminders as logistics only.
-- Every successful setup summary must include cancellation or update instructions when the selected adapter supports them.
-
-### Legal and compliance notes
-
-This repository does not provide legal advice. Contributors and users are responsible for complying with laws, platform rules, consent requirements, call-recording rules, telemarketing restrictions, emergency-service boundaries, and provider terms that apply to their workflow and jurisdiction.
-
-Do not submit resources that hide calls from users, hide recurring jobs, bypass consent, expose credentials, or encourage contacting people who did not authorize the workflow.
 
 ## Contributing
 
@@ -388,28 +175,6 @@ python3 scripts/validate_repository.py
 High-quality additions should include a short description, compatibility notes, safety notes for real-world side effects, setup or install instructions, tests, cancellation or rollback behavior for recurring workflows, and no secrets or personal data.
 
 Out of scope: generic telephony vendor directories, marketing-only pages, call-center software lists without an AI-agent workflow, tools that require unsafe credential handling, and resources that hide phone calls, recurring jobs, or external side effects from the user.
-
-## Developer docs
-
-| Path | Role |
-| --- | --- |
-| [`skills/call-reminder/SKILL.md`](skills/call-reminder/SKILL.md) | Main progressive-disclosure skill entry point. |
-| [`skills/call-reminder/references/client-adapters.md`](skills/call-reminder/references/client-adapters.md) | Scheduler adapter matrix and selection logic. |
-| [`skills/call-reminder/references/calle-cli-bootstrap.md`](skills/call-reminder/references/calle-cli-bootstrap.md) | CALL-E CLI route resolution and scheduled-run rules. |
-| [`skills/call-reminder/references/runtime-prompt.md`](skills/call-reminder/references/runtime-prompt.md) | Runtime prompt template for scheduler jobs. |
-| [`skills/call-reminder/references/examples.md`](skills/call-reminder/references/examples.md) | Setup, validation, and failure scenarios. |
-| [`skills/call-reminder/references/safety.md`](skills/call-reminder/references/safety.md) | Full safety contract. |
-| [`skills/outbound-call-skill-creator/SKILL.md`](skills/outbound-call-skill-creator/SKILL.md) | Creator workflow for generating focused outbound phone-call skills. |
-| [`skills/outbound-call-skill-creator/references/output-targets.md`](skills/outbound-call-skill-creator/references/output-targets.md) | Scope-first, host-aware output target rules for generated skills. |
-| [`skills/outbound-call-skill-creator/references/generated-skill-contract.md`](skills/outbound-call-skill-creator/references/generated-skill-contract.md) | Required shape and behavior for generated outbound skills. |
-| [`docs/design-principles.md`](docs/design-principles.md) | Repository-wide architecture principles. |
-| [`docs/git-naming-conventions.md`](docs/git-naming-conventions.md) | Branch, commit, tag, pull request title, remote, and stash naming conventions. |
-| [`docs/superpowers/specs/2026-06-12-outbound-call-skill-creator-design.md`](docs/superpowers/specs/2026-06-12-outbound-call-skill-creator-design.md) | Design notes for `outbound-call-skill-creator`. |
-| [`docs/superpowers/plans/2026-06-12-outbound-call-skill-creator.md`](docs/superpowers/plans/2026-06-12-outbound-call-skill-creator.md) | Implementation plan for `outbound-call-skill-creator`. |
-| [`docs/codex-implementation-plan.md`](docs/codex-implementation-plan.md) | Codex-oriented implementation notes. |
-| [`docs/roadmap.md`](docs/roadmap.md) | Planned improvements and open areas. |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution scope and checklist. |
-| [`SECURITY.md`](SECURITY.md) | Security reporting and credential-handling expectations. |
 
 ## Community
 
