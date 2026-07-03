@@ -19,7 +19,7 @@ const CONTRADICTORY_STATUS_RESULT_RE =
 const REQUIRED_ACTION_STATUS_RESULT_RE =
   /\b(?:requires|needs?)\b|\b(?:auth(?:entication)?|authorization|oauth|login|setup|configuration|action)\s+required\b|\brequired\s+(?:before|to)\b/iu;
 const NO_REQUIRED_ACTION_STATUS_RESULT_RE =
-  /\bno\s+(?:extra|additional|separate\s+)?(?:auth(?:entication)?|authorization|oauth|login|setup|configuration|action)\s+(?:is\s+)?required\b|\b(?:auth(?:entication)?|authorization|oauth|login|setup|configuration|action)\s+(?:is\s+)?not\s+required\b|\bno\s+need\s+(?:for|to)\b/giu;
+  /\bno\s+(?:(?:extra|additional|separate|source|provider|route|mcp|connector|host|local|managed)\s+)*(?:auth(?:entication)?|authorization|oauth|login|setup|configuration|action)\s+(?:is\s+)?required\b|\b(?:(?:source|provider|route|mcp|connector|host|local|managed)\s+)*(?:auth(?:entication)?|authorization|oauth|login|setup|configuration|action)\s+(?:is\s+)?not\s+required\b|\bno\s+need\s+(?:for|to)\b/giu;
 const BLOCKING_EVIDENCE_RESULT_RE =
   /\b(?:failed|missing|incomplete|unavailable|not available|unsupported|not run|not ready|not configured|pending|blocked)\b/iu;
 const EMPTY_EVIDENCE_RESULT_RE = /^(?:none|n\/a|na|not applicable|no)[.;]*$/iu;
@@ -275,6 +275,9 @@ const BOUND_PROVIDER_COMPATIBLE_TOOLS_MARKER = {
     /^\s*compatible_tools\s*:\s*([^\n]*)/imu,
   ],
   evidenceLine: true,
+  requireConcreteEvidence: true,
+  concreteEvidencePattern:
+    /\b(?:plan[_ -]?call|run[_ -]?call|get[_ -]?call[_ -]?run|get[_ -]?run|status[_ -]?check|call[_ -]?status)\b/iu,
 };
 const BOUND_PROVIDER_READY_MARKERS = [
   BOUND_PROVIDER_COMPATIBLE_TOOLS_MARKER,
@@ -467,6 +470,12 @@ function classifyEvidenceValueLine(evidenceValue, allowBlockedStatus, marker = {
     return "";
   }
   if (
+    marker.requireConcreteEvidence &&
+    !marker.concreteEvidencePattern?.test(normalizedEvidenceValue)
+  ) {
+    return allowBlockedStatus ? "blocked" : "";
+  }
+  if (
     !marker.allowNone &&
     !NO_EXTRA_EVIDENCE_REQUIRED_RE.test(normalizedEvidenceValue) &&
     (EMPTY_EVIDENCE_RESULT_RE.test(normalizedEvidenceValue) ||
@@ -621,6 +630,14 @@ function validateBoundProviderOnboarding(providerOnboardingText, allowsBlockedOn
     if (!hasNonEmptyBlocker(providerOnboardingText, PROVIDER_BLOCKER_PATTERNS)) {
       fail(
         "Dry-run-only blocked provider onboarding must include a non-empty provider onboarding blocker",
+      );
+    }
+    const passedReadyMarker = BOUND_PROVIDER_READY_MARKERS.find(
+      (marker) => getOnboardingStatus(providerOnboardingText, marker, true) === "passed",
+    );
+    if (passedReadyMarker) {
+      fail(
+        `Dry-run-only blocked provider onboarding must not include passed ${passedReadyMarker.label}`,
       );
     }
     return;

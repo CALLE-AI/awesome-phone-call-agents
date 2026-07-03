@@ -941,6 +941,16 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                 ),
             ),
             (
+                "no scoped source authentication required wording",
+                valid_skill_md.replace(
+                    "Authentication or access check result: passed with local source credentials.",
+                    (
+                        "Authentication or access check result: passed; no source "
+                        "authentication required for local CSV."
+                    ),
+                ),
+            ),
+            (
                 "no separate provider OAuth required wording",
                 valid_skill_md.replace(
                     (
@@ -951,6 +961,26 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                         "Provider authentication check result: passed; no separate OAuth "
                         "required for the managed connector."
                     ),
+                ),
+            ),
+            (
+                "no scoped provider OAuth required wording",
+                valid_skill_md.replace(
+                    (
+                        "Provider authentication check result: passed with `codex mcp list` "
+                        "reporting OAuth for calle-prod."
+                    ),
+                    (
+                        "Provider authentication check result: passed; no provider OAuth "
+                        "required for the managed connector."
+                    ),
+                ),
+            ),
+            (
+                "no scoped route setup required wording",
+                valid_skill_md.replace(
+                    "MCP route setup check result: passed with `codex mcp get calle-prod` for the required route.",
+                    "MCP route setup check result: passed; no route setup required for the managed connector.",
                 ),
             ),
             (
@@ -1718,14 +1748,18 @@ Provider host runtime: Codex.
 MCP route setup check result: passed with `codex mcp get calle-prod` for the required route.
 Provider authentication check result: passed with `codex mcp list` reporting OAuth for calle-prod.
 Compatible MCP provider tools: plan_call, run_call, and get_call_run are exposed by the configured MCP route for one-off calls.
+One-off call capability: passed with the configured MCP route.
 Provider onboarding blocker: none.""",
             """Provider onboarding completed for the CALL-E MCP provider route.
 Provider host runtime: example-agent.
 MCP route setup check result: passed with example-agent MCP connector configured for the required route.
 Provider authentication check result: passed with example-agent OAuth connection verified for the required route.
 Compatible MCP provider tools: plan_call, run_call, and get_call_run are exposed by the configured MCP route for one-off calls.
+One-off call capability: passed with the configured MCP route.
 Provider onboarding blocker: none.""",
         )
+        if "Provider host runtime: example-agent." not in other_agent_provider_onboarding_md:
+            fail("Generated outbound skill checker non-Codex provider fixture must be substituted.")
         (skill_dir / "SKILL.md").write_text(
             other_agent_provider_onboarding_md,
             encoding="utf-8",
@@ -3665,11 +3699,19 @@ Runtime parameters still allowed: date window and approved source instance ident
         "Compatible MCP provider tools: plan_call, run_call, and get_call_run are exposed by the configured MCP route for one-off calls.\n",
         "",
     ).replace(
+        "One-off call capability: passed with the configured MCP route.",
+        "One-off call capability: blocked until the CALL-E MCP route is configured.",
+    ).replace(
         "Provider onboarding blocker: none.",
         "Provider onboarding blocker: CALL-E MCP route auth is not ready.",
     ).replace(
         "Execution mode: dry-run-then-batch-approval.",
         "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.",
+    )
+
+    stale_ready_provider_blocker_md = dry_run_only_provider_blocker_md.replace(
+        "One-off call capability: blocked until the CALL-E MCP route is configured.",
+        "One-off call capability: passed with the configured MCP route.",
     )
 
     provider_section_dry_run_only_blocker_md = dry_run_only_provider_blocker_md.replace(
@@ -3709,6 +3751,33 @@ Runtime parameters still allowed: date window and approved source instance ident
                     or provider_section_dry_run_only_blocker_success.stdout
                 ).strip()
             )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            stale_ready_provider_blocker_md,
+            encoding="utf-8",
+        )
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        stale_ready_provider_blocker_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        stale_ready_provider_blocker_output = (
+            stale_ready_provider_blocker_failure.stdout
+            + stale_ready_provider_blocker_failure.stderr
+        )
+        if stale_ready_provider_blocker_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject blocked provider with ready evidence.")
+        if "blocked provider onboarding must not include passed" not in stale_ready_provider_blocker_output:
+            fail("Generated outbound skill checker stale provider-ready evidence message changed.")
 
     contradictory_provider_dry_run_only_blocker_md = provider_section_dry_run_only_blocker_md.replace(
         "Source onboarding completed for this parameterized-bound workflow.",
@@ -3922,6 +3991,17 @@ Runtime parameters still allowed: date window and approved source instance ident
                 ),
             ),
             "Generated skill SKILL.md has conflicting compatible MCP provider tools lines",
+        ),
+        (
+            "compatible MCP provider tools without concrete evidence",
+            valid_skill_md.replace(
+                (
+                    "Compatible MCP provider tools: plan_call, run_call, and get_call_run "
+                    "are exposed by the configured MCP route for one-off calls."
+                ),
+                "Compatible MCP provider tools: no extra tools needed.",
+            ),
+            "Bound generated skill SKILL.md must include compatible MCP provider tools",
         ),
         (
             "conflicting one-off call capability evidence",
