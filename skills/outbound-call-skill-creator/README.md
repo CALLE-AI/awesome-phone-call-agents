@@ -9,8 +9,8 @@ records to safe, one-off AI-agent phone-call workflows.
 for outbound callback, lead follow-up, appointment, reminder, or similar
 phone-call workflows. It does not place calls during setup. Instead, it captures
 the source contract, field mapping, outreach basis, dedupe rule, call goal,
-provider route, execution mode, result-output policy, and runtime safety checks
-that the generated skill must enforce later.
+provider route, execution preference, verified result-output policy, and runtime
+safety checks that the generated skill must enforce later.
 
 The generated skill can later read source records, validate eligible candidates,
 compile one call goal per record, run calls through an authenticated one-off MCP
@@ -85,9 +85,9 @@ The creator captures these workflow choices during skill generation:
 | --- | --- | --- |
 | Source family | User-selected | Built-in choices are `google-form`, `tiktok-ads`, `local-csv`, and `other`. |
 | Binding level | `parameterized-bound` | Use `fully-bound` only when one fixed source and result target should be locked at creation time. |
-| Execution mode | `dry-run-then-batch-approval` | `approved-direct-execution` is available only after required gates pass. |
+| Execution preference | `dry-run-then-batch-approval` | The selected execution mode is finalized only after source, result-output, and provider evidence are known. |
 | Provider route | CALL-E MCP route | Real-call skills must verify route setup, authentication, and compatible tools before calls. |
-| Result output | Durable target required | Prefer source writeback when verified; otherwise use source-adjacent artifacts or local result CSV. |
+| Result output | Durable target required | Early writeback input is a preference until source sampling verifies source writeback, source-adjacent artifacts, or local result CSV output. |
 | Session-table output | Last-resort fallback | Not suitable for unattended automation unless explicitly accepted by the user. |
 
 ## Common Errors And Handling
@@ -97,7 +97,7 @@ The creator captures these workflow choices during skill generation:
 | Source access fails | Verify the selected source route, OAuth or connector state, and the minimum source locator. |
 | No callable candidates appear | Check phone field mapping, outreach basis, consent field, date filters, and dedupe state. |
 | Provider is not ready | Verify the MCP provider route is configured, authenticated, and exposes compatible one-off call tools. |
-| Result output is blocked | Confirm the writeback target, source-adjacent artifact, or local CSV path is writable and durable. |
+| Result output is blocked | Confirm the verified writeback target, source-adjacent artifact, or local CSV path is writable and durable. |
 | Runtime request is too vague | Provide the approved runtime parameters, such as form ID, CSV path, campaign ID, date window, or output path. |
 
 ## Limitations And Safety Notes

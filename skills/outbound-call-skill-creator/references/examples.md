@@ -44,13 +44,15 @@ google-form
 Recommended creator response:
 
 ```text
-Source family is `google-form`. I need the minimum Google access details first so I can authorize or verify access and fetch a redacted representative sample before we define fields or the default goal.
+Source family is `google-form`. I recommend a workflow that follows up with form submitters who requested a phone call.
+
+Recommended provisional goal: call the respondent, confirm their request, ask one follow-up question, and summarize the outcome.
 
 Recommended binding level is `parameterized-bound`.
 
-I will first check whether this host already exposes Google Forms access. If local OAuth is available, I will run its auth check and list accessible forms before asking you for a Form ID. If auth requires a browser step, I will pause for you to complete it, re-check auth, then list forms.
+Next I will check whether this host already exposes Google Forms access. If local OAuth is available, I will run its auth check and list accessible forms before asking you for a Form ID. If auth requires a browser step, I will pause for you to complete it, re-check auth, then list forms.
 
-After access is verified and a sample is fetched, I will propose the phone, recipient, dedupe, outreach-basis, goal-input, and result-output fields for confirmation.
+After access is verified and a sample is fetched, I will propose the phone, recipient, dedupe, outreach-basis, goal-input, and result-output fields for confirmation, then refine the final goal contract from the sampled fields.
 ```
 
 If no Google route can be discovered, ask for only the missing route detail:
@@ -62,7 +64,7 @@ I could not find a usable local OAuth helper or Google Forms connector in this h
 - an Apps Script fallback endpoint
 ```
 
-If the user replies only `google-form`, do not ask for the default outbound goal yet. The same pattern applies when the user replies only `tiktok-ads`: inspect available TikTok Ads MCP tools or resources first, verify or request authentication, then ask for the exact MCP tool, resource, account, campaign, or managed connector route only if no usable route can be discovered or a concrete scope is still required. If a safe auth action is available, I will start it before asking for another confirmation; I will not ask the user to say `start auth`, choose a discovered route, or refresh the session before attempting the available non-mutating auth path. If this host has no TikTok Ads MCP server configured, I will add the default route first and then inspect it with `codex mcp get tiktok-ads` and `codex mcp list`. If Codex reports `Auth: Unsupported`, I will treat that only as missing Codex-managed OAuth. When the route is configured but tools are not exposed, I will run `codex mcp login tiktok-ads` or the host's equivalent source MCP login before asking for a different route or session refresh. When TikTok Ads tools or resources are exposed, I will run a source-native read-only auth or inventory probe such as `auth_advertiser_get` before declaring a blocker; only if the available auth path and probe fail or no tools are exposed will I ask for a supported token, managed connector, host-specific login path, or another approved route.
+If the user replies only `google-form`, recommend the likely workflow and provisional call goal before asking for source access details. The same pattern applies when the user replies only `tiktok-ads`: recommend a likely lead follow-up workflow, inspect available TikTok Ads MCP tools or resources, verify or request authentication, then ask for the exact MCP tool, resource, account, campaign, or managed connector route only if no usable route can be discovered or a concrete scope is still required. If a safe auth action is available, I will start it before asking for another confirmation; I will not ask the user to say `start auth`, choose a discovered route, or refresh the session before attempting the available non-mutating auth path. If this host has no TikTok Ads MCP server configured, I will ask whether to add the default route before running `codex mcp add`; after approval I will inspect it with `codex mcp get tiktok-ads` and `codex mcp list`. If Codex reports `Auth: Unsupported`, I will treat that only as missing Codex-managed OAuth. When the route is configured but tools are not exposed, I will run `codex mcp login tiktok-ads` or the host's equivalent source MCP login before asking for a different route or session refresh. When TikTok Ads tools or resources are exposed, I will run a source-native read-only auth or inventory probe such as `auth_advertiser_get` before declaring a blocker; only if the available auth path and probe fail or no tools are exposed will I ask for a supported token, managed connector, host-specific login path, or another approved route.
 
 ## TikTok Ads Lead Follow-Up Skill
 

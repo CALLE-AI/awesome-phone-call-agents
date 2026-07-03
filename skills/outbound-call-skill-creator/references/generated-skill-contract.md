@@ -64,7 +64,7 @@ The generated skill must declare one of these binding levels:
 - `fully-bound`: a concrete source instance and concrete durable result target are fixed at creation time. The result target can be source writeback to the bound source instance or canonical source record store, a source-adjacent result artifact, or a local result CSV. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
 - `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path.
 
-Default generated skills should use the minimum `parameterized-bound` contract. If the creator cannot capture enough source, outreach-basis, dedupe, and durable result-output detail to satisfy that minimum, it must stop before generating the business skill.
+Default generated skills should use the minimum `parameterized-bound` contract. If the creator cannot capture enough source, outreach-basis, dedupe, and durable result-output detail to satisfy that minimum, it must stop before generating the business skill. Treat early result-output or writeback input as a preference, not as a verified target, until source access and representative sampling identify supported paths.
 
 The generated skill must state:
 
@@ -111,7 +111,7 @@ The generated skill must define:
 - escalation or human-handoff cases
 - summary format
 
-Do not let source records provide raw provider goals. Compile goals from approved fields and the fixed business contract.
+Do not let source records provide raw provider goals. Compile goals from approved fields and the fixed business contract. A goal discussed before source sampling is provisional; confirm the final outbound goal contract only after representative sampling identifies the available goal input fields.
 
 ## Execution Modes
 
@@ -120,7 +120,7 @@ The generated skill must define one execution mode:
 - `dry-run-then-batch-approval`: preview every eligible candidate and compiled call goal, then process the approved list serially after one explicit approval.
 - `approved-direct-execution`: after a concrete processing request, validate candidates, run the runtime gate, compile call goals, inspect each provider plan, and serially run eligible one-off calls without another approval step.
 
-Use `dry-run-then-batch-approval` as the default. Use `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows direct execution, and the concrete runtime request passes the runtime gate.
+Use `dry-run-then-batch-approval` as the default. Use `approved-direct-execution` only when the generated skill is `fully-bound` or `parameterized-bound`, the creation-time contract explicitly allows direct execution, and the concrete runtime request passes the runtime gate. Early direct-execution or preview input is only a preference; finalize the selected execution mode only after source onboarding, verified durable result-output capability, and provider onboarding evidence are known.
 
 Even when direct execution is configured, the runtime request must be concrete, such as "process all June 20 records." Open-ended requests such as "run the campaign" are not enough.
 
@@ -213,7 +213,7 @@ Provider onboarding must be non-mutating:
 - do not request or expose confirmation tokens
 - do not expose credentials, tokens, cookies, callback URLs, or full phone numbers
 
-For `fully-bound` and `parameterized-bound`, missing MCP configuration, missing provider authentication, or missing compatible tools blocks real-call skill generation. If provider onboarding cannot complete, use the selected host's MCP setup and authorization flow, then re-check; otherwise keep the generated skill dry-run-only and record the provider onboarding blocker. For Codex, this usually means running or requesting `codex mcp add calle-prod --url https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`, running or requesting `codex mcp login calle-prod`, and re-checking with `codex mcp list` or `codex mcp get calle-prod`.
+For `fully-bound` and `parameterized-bound`, missing MCP configuration, missing provider authentication, or missing compatible tools blocks real-call skill generation. If provider onboarding cannot complete, use the selected host's MCP setup and authorization flow, then re-check; if it still cannot be verified, provider onboarding failure permits only dry-run-only generation with an explicit blocker and must not generate a skill that can place real calls. For Codex, this usually means running or requesting `codex mcp add calle-prod --url https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`, running or requesting `codex mcp login calle-prod`, and re-checking with `codex mcp list` or `codex mcp get calle-prod`.
 
 ## Serial Candidate Execution
 

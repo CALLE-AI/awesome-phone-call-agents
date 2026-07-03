@@ -53,7 +53,7 @@ Configure the MCP server or connector using that host's MCP UI, config file, CLI
 
 Use a managed connector only when the host documents that the connector is the MCP route setup and exposes authorization state for the route. Callable app tools or plugin namespaces alone are not proof that the MCP route is installed or authorized.
 
-If no authenticated MCP route is available, stop and ask the user to connect or authorize it, then re-check. If provider auth or compatible tools still cannot be verified, record a provider onboarding blocker and keep the generated skill dry-run-only until the blocker is resolved.
+If no authenticated MCP route is available, stop and ask the user to connect or authorize it, then re-check. If provider auth or compatible tools still cannot be verified, record the blocker. Provider onboarding failure permits only dry-run-only generation with an explicit blocker. Then keep the generated skill dry-run-only until the blocker is resolved, and do not generate a skill that can place real calls.
 
 Provider onboarding must remain non-mutating for phone-call side effects. Do not create provider plans, run calls, write results, expose credentials, or request confirmation tokens during onboarding.
 
