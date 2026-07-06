@@ -29,3 +29,4 @@ Each plugin should document:
 | Plugin | Platform | Purpose |
 | --- | --- | --- |
 | [`n8n-calle-api`](n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
+| [`n8n-nodes-calle`](n8n-nodes-calle/) | n8n | Community node package for creating, waiting on, retrieving, and listing events for CALL-E AI-agent phone-call tasks. |
