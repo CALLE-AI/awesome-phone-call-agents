@@ -27,9 +27,9 @@
 		"dev": "n8n-node dev",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
-		"test": "node --test test/*.test.mjs",
+		"test": "npm run build && node --test test/*.test.mjs",
 		"release": "n8n-node release",
-		"prepublishOnly": "npm run lint && npm test && npm run build"
+		"prepublishOnly": "npm run lint && npm test"
 	},
 	"files": [
 		"dist",
