@@ -62,6 +62,17 @@ The first release focuses on the `Call` resource:
 - `Polling Interval (MS)`: How often n8n polls CALL-E for the current call status.
 - `Timeout (MS)`: Maximum total wait time before the node fails.
 
+## Outputs
+
+The node returns the raw CALL-E API response for the selected operation:
+
+- `Create` returns the created call task.
+- `Get` returns the current call task.
+- `Create and Wait` returns the final call task after a terminal status.
+- `List Events` returns the CALL-E events response.
+
+If n8n `Continue On Fail` is enabled, the node returns an item with an `error` field instead of stopping the workflow.
+
 ## Safety
 
 Phone calls are real-world side effects. Use this node only when the workflow has explicit user intent to place the call.
@@ -72,8 +83,12 @@ Operational safeguards:
 - Use stable idempotency keys to prevent duplicate call tasks.
 - Keep API keys in n8n credentials only.
 - Avoid logging full phone numbers or secrets in workflow outputs.
-- Do not use this node for emergency, medical, legal, or financial advice workflows without an appropriate human-reviewed safety process.
 - For recurring reminders, let the n8n workflow or host scheduler manage recurrence. CALL-E should handle one call task per scheduled workflow run.
+- Keep workflows inactive until credentials, recipient numbers, task wording, and test paths are reviewed.
+- Stop a running n8n execution from the n8n execution view if a call workflow needs cancellation.
+- Do not use this node for emergency, medical, legal, or financial advice workflows without an appropriate human-reviewed safety process.
+
+`Create and Wait` has a node-level timeout. If the timeout expires, the n8n execution fails or returns an error item when `Continue On Fail` is enabled. A timeout does not guarantee that the provider-side call has been canceled; check CALL-E for the latest call status.
 
 ## Compatibility
 

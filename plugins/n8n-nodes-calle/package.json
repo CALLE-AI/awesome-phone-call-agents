@@ -4,6 +4,7 @@
 	"description": "n8n community node for creating and monitoring CALL-E AI-agent phone-call tasks.",
 	"license": "MIT",
 	"homepage": "https://docs.heycall-e.com/",
+	"main": "dist/nodes/Calle/Calle.node.js",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n",
