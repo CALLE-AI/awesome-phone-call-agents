@@ -4,9 +4,11 @@ import { describe, it } from 'node:test';
 import {
 	assertValidE164PhoneNumber,
 	buildCreateCallBody,
+	getPollingSleepMs,
 	isTerminalCallStatus,
 	maskPhoneNumber,
 	parseJsonObject,
+	validateCalleBaseUrl,
 } from '../dist/nodes/Calle/shared/utils.js';
 
 describe('CALL-E utility helpers', () => {
@@ -73,5 +75,39 @@ describe('CALL-E utility helpers', () => {
 	it('masks phone numbers for errors and summaries', () => {
 		assert.equal(maskPhoneNumber('+14155550100'), '+1415***0100');
 		assert.equal(maskPhoneNumber('1234'), '***');
+	});
+
+	it('requires HTTPS base URLs except for loopback local development hosts', () => {
+		assert.deepEqual(validateCalleBaseUrl('https://api.heycall-e.com/'), {
+			ok: true,
+			baseUrl: 'https://api.heycall-e.com',
+		});
+		assert.deepEqual(validateCalleBaseUrl('http://localhost:5678/'), {
+			ok: true,
+			baseUrl: 'http://localhost:5678',
+		});
+		assert.deepEqual(validateCalleBaseUrl('http://127.0.0.1:5678/'), {
+			ok: true,
+			baseUrl: 'http://127.0.0.1:5678',
+		});
+		assert.deepEqual(validateCalleBaseUrl('http://[::1]:5678/'), {
+			ok: true,
+			baseUrl: 'http://[::1]:5678',
+		});
+		assert.deepEqual(validateCalleBaseUrl('http://api.heycall-e.com'), {
+			ok: false,
+			message: 'Base URL must use HTTPS unless it points to localhost, 127.0.0.1, or ::1.',
+		});
+		assert.deepEqual(validateCalleBaseUrl('ftp://api.heycall-e.com'), {
+			ok: false,
+			message: 'Base URL must use HTTPS unless it points to localhost, 127.0.0.1, or ::1.',
+		});
+	});
+
+	it('caps create-and-wait sleep duration to the remaining timeout', () => {
+		assert.equal(getPollingSleepMs(2000, 10_000, 9_250), 750);
+		assert.equal(getPollingSleepMs(2000, 10_000, 8_000), 2000);
+		assert.equal(getPollingSleepMs(2000, 10_000, 10_000), 0);
+		assert.equal(getPollingSleepMs(2000, 10_000, 10_500), 0);
 	});
 });

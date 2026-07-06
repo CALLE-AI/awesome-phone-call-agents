@@ -33,7 +33,19 @@ export interface CreateCallBody {
 	webhook_url?: string;
 }
 
+export type CalleBaseUrlValidationResult =
+	| {
+			ok: true;
+			baseUrl: string;
+	  }
+	| {
+			ok: false;
+			message: string;
+	  };
+
+const DEFAULT_BASE_URL = 'https://api.heycall-e.com';
 const E164_PATTERN = /^\+[1-9]\d{1,14}$/;
+const LOOPBACK_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 export function assertValidE164PhoneNumber(phoneNumber: string): string {
 	const trimmed = phoneNumber.trim();
@@ -110,10 +122,50 @@ export function maskPhoneNumber(phoneNumber: string): string {
 	return `${phoneNumber.slice(0, 5)}***${phoneNumber.slice(-4)}`;
 }
 
+export function validateCalleBaseUrl(baseUrl: unknown): CalleBaseUrlValidationResult {
+	const rawBaseUrl = typeof baseUrl === 'string' && baseUrl.trim() ? baseUrl.trim() : DEFAULT_BASE_URL;
+	let url: URL;
+
+	try {
+		url = new URL(rawBaseUrl);
+	} catch {
+		return {
+			ok: false,
+			message: 'Base URL must be a valid URL.',
+		};
+	}
+
+	if (url.protocol !== 'https:' && !isAllowedLoopbackHttpUrl(url)) {
+		return {
+			ok: false,
+			message: 'Base URL must use HTTPS unless it points to localhost, 127.0.0.1, or ::1.',
+		};
+	}
+
+	return {
+		ok: true,
+		baseUrl: rawBaseUrl.replace(/\/+$/, ''),
+	};
+}
+
+export function getPollingSleepMs(pollingInterval: number, deadline: number, now = Date.now()): number {
+	const remaining = deadline - now;
+
+	if (remaining <= 0) {
+		return 0;
+	}
+
+	return Math.min(pollingInterval, remaining);
+}
+
 function parseJson(value: string, fieldName: string): unknown {
 	return jsonParse(value, { errorMessage: `${fieldName} must contain valid JSON.` });
 }
 
 function isJsonObject(value: unknown): value is JsonObject {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAllowedLoopbackHttpUrl(url: URL): boolean {
+	return url.protocol === 'http:' && LOOPBACK_HTTP_HOSTS.has(url.hostname.toLowerCase());
 }

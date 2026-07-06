@@ -4,8 +4,9 @@ import type {
 	IHttpRequestMethods,
 	IHttpRequestOptions,
 } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { validateCalleBaseUrl } from './utils';
 
-const DEFAULT_BASE_URL = 'https://api.heycall-e.com';
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
 export async function calleApiRequest(
@@ -17,7 +18,13 @@ export async function calleApiRequest(
 	headers: IDataObject = {},
 ) {
 	const credentials = await this.getCredentials('calleApi');
-	const baseUrl = String(credentials.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '');
+	const baseUrlValidation = validateCalleBaseUrl(credentials.baseUrl);
+
+	if (!baseUrlValidation.ok) {
+		throw new NodeOperationError(this.getNode(), baseUrlValidation.message);
+	}
+
+	const baseUrl = baseUrlValidation.baseUrl;
 	const timeout = Number(credentials.timeout || DEFAULT_REQUEST_TIMEOUT_MS);
 
 	const options: IHttpRequestOptions = {

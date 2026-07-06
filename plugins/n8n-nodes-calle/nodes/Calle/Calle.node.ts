@@ -18,8 +18,10 @@ import {
 import { calleApiRequest } from './shared/transport';
 import {
 	buildCreateCallBody,
+	getPollingSleepMs,
 	isTerminalCallStatus,
 	parseJsonObject,
+	validateCalleBaseUrl,
 } from './shared/utils';
 
 const callOperations: INodeProperties[] = [
@@ -343,10 +345,6 @@ async function calleApiCredentialTest(
 ): Promise<INodeCredentialTestResult> {
 	const data = credential.data ?? {};
 	const apiKey = typeof data.apiKey === 'string' ? data.apiKey.trim() : '';
-	const baseUrl =
-		typeof data.baseUrl === 'string' && data.baseUrl.trim()
-			? data.baseUrl.trim()
-			: 'https://api.heycall-e.com';
 
 	if (!apiKey) {
 		return {
@@ -355,19 +353,12 @@ async function calleApiCredentialTest(
 		};
 	}
 
-	try {
-		const url = new URL(baseUrl);
+	const baseUrlValidation = validateCalleBaseUrl(data.baseUrl);
 
-		if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-			return {
-				status: 'Error',
-				message: 'Base URL must use HTTP or HTTPS.',
-			};
-		}
-	} catch {
+	if (!baseUrlValidation.ok) {
 		return {
 			status: 'Error',
-			message: 'Base URL must be a valid URL.',
+			message: baseUrlValidation.message,
 		};
 	}
 
@@ -427,7 +418,13 @@ async function createCallAndWait(this: IExecuteFunctions, itemIndex: number): Pr
 			return call;
 		}
 
-		await sleep(pollingInterval);
+		const sleepMs = getPollingSleepMs(pollingInterval, deadline);
+
+		if (sleepMs <= 0) {
+			break;
+		}
+
+		await sleep(sleepMs);
 	}
 
 	throw new NodeOperationError(
