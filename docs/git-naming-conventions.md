@@ -170,12 +170,12 @@ If a future artifact-specific release process is introduced, document its tag fo
 
 Artifact-specific release tags:
 
-- `n8n-nodes-calle-v<major>.<minor>.<patch>` publishes the `plugins/n8n-nodes-calle` npm package.
+- `call-e-n8n-nodes-calle-v<major>.<minor>.<patch>` publishes the `plugins/n8n-nodes-calle` npm package as `@call-e/n8n-nodes-calle`.
 
 Recommended example:
 
 ```text
-n8n-nodes-calle-v0.1.0
+call-e-n8n-nodes-calle-v0.1.0
 ```
 
 ## Remotes

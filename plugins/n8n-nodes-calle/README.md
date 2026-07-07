@@ -1,4 +1,4 @@
-# n8n-nodes-calle
+# @call-e/n8n-nodes-calle
 
 This package provides an n8n community node for CALL-E AI-agent phone-call workflows. It lets n8n workflows create CALL-E call tasks, fetch their status, wait for completion, and read developer events.
 
@@ -9,7 +9,7 @@ This package provides an n8n community node for CALL-E AI-agent phone-call workf
 Install this package as an n8n community node:
 
 ```bash
-npm install n8n-nodes-calle
+npm install @call-e/n8n-nodes-calle
 ```
 
 For local development, run:
@@ -101,8 +101,8 @@ This package is published from the repository root through `.github/workflows/pu
 To publish `0.1.0`, make sure `plugins/n8n-nodes-calle/package.json` has `"version": "0.1.0"`, then push this tag:
 
 ```bash
-git tag n8n-nodes-calle-v0.1.0
-git push origin n8n-nodes-calle-v0.1.0
+git tag call-e-n8n-nodes-calle-v0.1.0
+git push origin call-e-n8n-nodes-calle-v0.1.0
 ```
 
 The workflow validates that the tag version matches `package.json`, runs lint, tests, build, and publishes with npm provenance.
