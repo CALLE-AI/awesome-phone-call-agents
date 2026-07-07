@@ -45,6 +45,8 @@ codex mcp list
 
 Skip `add` when `calle-prod` already exists with the required route. Skip `login` only when OAuth is already authenticated. If login requires browser completion, stop and wait for the user to finish it, then re-check.
 
+`codex mcp list` showing `calle-prod` as enabled with OAuth is route and auth evidence, but it is not enough by itself for real-call readiness. The current agent session must also expose compatible tools from the configured `calle-prod` MCP route, such as plan, run, and status tools. If the route and OAuth are configured but tools are not visible, refresh the Codex session or MCP tools and re-check active-session tool visibility before enabling real calls.
+
 ### Claude, Antigravity, Cursor, or another MCP host adapter
 
 Configure the MCP server or connector using that host's MCP UI, config file, CLI, or connector API. The route must be the CALL-E provider URL above, with the transport and authentication settings required by that host. Complete OAuth or managed authorization through the host's normal flow, then start a fresh agent session or refresh tools so compatible plan, run, and status tools are visible.

@@ -62,7 +62,7 @@ The generated `SKILL.md` must include:
 The generated skill must declare one of these binding levels:
 
 - `fully-bound`: a concrete source instance and concrete durable result target are fixed at creation time. The result target can be source writeback to the bound source instance or canonical source record store, a source-adjacent result artifact, or a local result CSV. Runtime requests may provide only date windows, subset filters, and other narrow processing controls.
-- `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path.
+- `parameterized-bound`: the source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema are fixed at creation time. Runtime requests may provide approved parameters such as form ID, Notion database or data source ID, Airtable base/table/view locator, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path.
 
 Default generated skills should use the minimum `parameterized-bound` contract. If the creator cannot capture enough source, outreach-basis, dedupe, and durable result-output detail to satisfy that minimum, it must stop before generating the business skill. Treat early result-output or writeback input as a preference, not as a verified target, until source access and representative sampling identify supported paths.
 
@@ -154,6 +154,7 @@ Generated bound skills must record creation-time source onboarding:
 - source family
 - access method
 - access route
+- source host runtime or connector host, using the actual MCP-capable host or agent runtime selected by the user rather than assuming Codex
 - source access route discovery result
 - sampled source instance or representative runtime instance
 - authentication or access check result
@@ -178,6 +179,12 @@ Source onboarding must be read-only and non-mutating:
 - redact user-facing sample summaries, including full phone numbers and sensitive source values
 
 Missing source onboarding blocks skill generation until the source contract is complete enough for at least `parameterized-bound`.
+
+For source MCP routes, generated skills must use the selected host's documented MCP server, connector, plugin, and OAuth flow. Codex commands may appear only as Codex adapter examples, not as universal setup instructions. For Claude, Antigravity, Cursor, or another MCP-capable host, record that host's setup and authorization evidence instead.
+
+For Notion skills, distinguish read access from writeback readiness. Prefer hosted Notion MCP at `https://mcp.notion.com/mcp` for new users because it uses OAuth and avoids user-managed integration tokens. Public shared-page routes may support read-only discovery and representative sampling, but they do not prove authenticated source writeback. Do not mark `source-writeback` as the result-output policy or target mode when the only Notion access route is public shared-page data, anonymous browser state, public page metadata, or internal shared-page endpoints such as `saveTransactions`. Keep Notion source writeback blocked until hosted Notion MCP or another authenticated Notion route can update the target page property and pass an explicitly approved canary writeback/readback preflight. Until that passes, use a source-adjacent result artifact or local result CSV as the durable output target.
+
+For Airtable skills, distinguish read access from writeback readiness. Prefer hosted Airtable MCP at `https://mcp.airtable.com/mcp` for new users because it uses OAuth and avoids user-managed personal access tokens. Do not ask the user to create an Airtable personal access token before checking or offering hosted Airtable MCP. Do not mark `source-writeback` as the result-output policy or target mode when the only Airtable access route is read-only API access, sampled record export, anonymous browser state, or an MCP route that has not exposed non-destructive record update capability for the target table. Keep Airtable source writeback blocked until hosted Airtable MCP or another authenticated Airtable route can update only the configured fields on existing record IDs and pass an explicitly approved canary writeback/readback preflight. Until that passes, use a source-adjacent result artifact or local result CSV as the durable output target.
 
 ## MCP Provider Contract
 
