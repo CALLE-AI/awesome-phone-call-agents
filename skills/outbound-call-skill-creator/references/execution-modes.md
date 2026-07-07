@@ -29,6 +29,8 @@ Accept concrete requests such as:
 
 ```text
 Process all June 20 submissions.
+Process approved callback requests from the Sales CRM Notion database for 2026-06-20.
+Process approved records from the Customer Follow-up Airtable view for 2026-06-20.
 Process yesterday's callable leads for campaign cmp_123.
 Process appointments on 2026-06-20 from /path/to/appointments.csv.
 ```
@@ -41,7 +43,7 @@ Call everyone.
 Process the leads.
 ```
 
-When a request is insufficient, ask for the missing date window, source instance, campaign scope, CSV path, output path, or other runtime parameter.
+When a request is insufficient, ask for the missing date window, source instance, Notion database or data source locator, Airtable base/table/view locator, campaign scope, CSV path, output path, or other runtime parameter.
 
 ## Direct Execution Guardrails
 

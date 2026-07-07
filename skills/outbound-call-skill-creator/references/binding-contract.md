@@ -9,7 +9,7 @@ The minimum supported source binding level is `parameterized-bound`. Do not gene
 | Binding level | Creation-time contract | Runtime parameters | Maximum automation |
 | --- | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field mapping, source-level outreach basis or consent rule, dedupe rule, fixed result target, and result fields. The result target can be source writeback to the source instance or canonical record store, a source-adjacent result artifact, or a local result CSV. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
-| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path. | Default. Eligible for dry-run batch approval and approved direct execution only after concrete runtime parameters pass the runtime gate. |
+| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema. | Approved instance values such as form ID, Notion database or data source ID, Airtable base/table/view locator, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path. | Default. Eligible for dry-run batch approval and approved direct execution only after concrete runtime parameters pass the runtime gate. |
 
 ## Selection Rules
 
@@ -24,7 +24,7 @@ Use `fully-bound` when:
 
 Use `parameterized-bound` when:
 
-- the workflow should be reusable across similar forms, CSV files, accounts, campaigns, or source instances
+- the workflow should be reusable across similar forms, Notion data sources, Airtable tables or views, CSV files, accounts, campaigns, or source instances
 - the required schema is stable
 - runtime requests can provide approved source or result-output parameters
 - the runtime gate can verify those parameters before real calls

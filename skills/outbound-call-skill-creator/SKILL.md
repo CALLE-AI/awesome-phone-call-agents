@@ -1,6 +1,6 @@
 ---
 name: outbound-call-skill-creator
-description: Create directly usable outbound phone-call Agent Skills that bind source and durable result-output contracts at the right level, connect data such as Google Forms, TikTok Ads, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure source writeback, source-adjacent result artifacts, or new local result CSV output.
+description: Create directly usable outbound phone-call Agent Skills that bind source and durable result-output contracts at the right level, connect data such as Google Forms, TikTok Ads, Notion, Airtable, local CSV, or custom systems to an MCP one-off call provider route, compile per-record call goals, enforce safety rules, and configure source writeback, source-adjacent result artifacts, or new local result CSV output.
 ---
 
 # Outbound Call Skill Creator
@@ -9,7 +9,7 @@ Use this skill when the user wants to create a new outbound phone-call workflow 
 
 `outbound-call-skill-creator` creates focused business skills. It does not process campaign data itself, does not create a generic outbound runtime platform, and does not use a CLI bootstrap path.
 
-Generated skills should bind enough source, durable result-output, and safety detail to make later runs predictable. The minimum source binding level is `parameterized-bound`: the source family, field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, and result-output policy are fixed at creation time, while runtime requests can still provide approved parameters such as a date window, form ID, CSV path, campaign ID, source writeback target, source-adjacent artifact target, or output file path.
+Generated skills should bind enough source, durable result-output, and safety detail to make later runs predictable. The minimum source binding level is `parameterized-bound`: the source family, field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, and result-output policy are fixed at creation time, while runtime requests can still provide approved parameters such as a date window, form ID, Notion database or data source ID, Airtable base/table/view locator, CSV path, campaign ID, source writeback target, source-adjacent artifact target, or output file path.
 
 Before asking creation questions, read `references/interaction-flow.md` and use its recommendation-first prompt order and user-facing language boundary. Start with the user's workflow or data source, not with skill naming, output paths, binding levels, execution modes, field mapping, or writeback configuration unless the user already provided those values. In prompts, lead with plain labels such as "Reusable workflow," "Preview before calling," "Call provider connection," and "Checks before real calls"; keep internal terms as secondary detail for contracts, summaries, and advanced users.
 
@@ -61,10 +61,14 @@ Present these source families by default:
 
 - `google-form`: Google Forms responses with local OAuth or an explicitly configured Apps Script fallback.
 - `tiktok-ads`: records obtained from TikTok Ads through exposed MCP tools, resources, or approved connectors.
+- `notion`: records from a Notion database or data source with an approved Notion API, MCP, or connector route.
+- `airtable`: records from an Airtable base table or view with an approved Airtable API, MCP, or connector route.
 - `local-csv`: records from a user-provided CSV file.
 - `other`: a custom source that requires multi-turn clarification before generating the skill.
 
 If the user selects `other`, do not guess API schemas, credentials, identifiers, date filters, result-output behavior, or MCP tool names. Ask for the missing contract details one at a time.
+
+When adding a new built-in source family, use `references/source-family-extension.md` to keep the source-family list, onboarding reference, interaction prompts, examples, README, and optional checker rules synchronized.
 
 ## Creation-Time Source Onboarding
 
@@ -80,7 +84,9 @@ During onboarding, show the user a small redacted sample summary, never full pri
 
 For any authenticated or connector-backed source family, inspect available host-local access routes before asking the user to choose an access route. When a host-local source adapter, connector, MCP tool, or helper script is available, inspect it before asking the user to choose an access route. When a safe source authorization or auth-readiness action is available, start it before asking the user for another confirmation; do not ask the user to say `start auth`, choose a discovered route, or refresh a session before attempting the available non-mutating auth path. For source MCP servers, do not treat a host CLI status such as Codex `Auth: Unsupported` as proof that source access is unavailable when source-native MCP tools or resources are exposed; run the source's read-only auth or inventory probe first. Collect only minimum connection details before access is verified: skill name, binding level, source family, source locator such as form ID or account scope only when no usable route can be discovered or the discovered route needs a concrete locator, and access route such as OAuth, Apps Script fallback, MCP tool, MCP resource, or managed connector. After access verification and representative sample fetch, infer the phone field, recipient field, dedupe key, outreach basis or consent field, goal inputs, and durable result-output capability from the sample. Ask the user to fill or correct only fields that cannot be inferred.
 
-When the user names only an authenticated source family such as `google-form` or `tiktok-ads`, first use `references/interaction-flow.md` to recommend a likely workflow and provisional call goal. Then discover available host access routes, run or request authorization, and attempt a read-only sample fetch before asking for detailed field mapping, final goal-field selection, or result-output mapping. Do not ask the user to choose `use local OAuth to list accessible forms` when a local OAuth helper can be checked directly. If the user has not provided a skill name yet, derive a temporary candidate name from the source context, but do not use a missing skill name as a reason to collect detailed mapping first.
+Do not assume the user is running Codex. For source MCP setup, identify the actual MCP-capable host or agent runtime first, then use that host's documented MCP server, connector, plugin, and OAuth flow. Treat Codex commands as Codex adapter examples only.
+
+When the user names only an authenticated source family such as `google-form` or `tiktok-ads`, first use `references/interaction-flow.md` to recommend a likely workflow and provisional call goal. Apply the same flow when the user names only `notion` or `airtable`: recommend a likely workflow for approved Notion database or data source records, or approved Airtable table or view records, before asking for source access details. Then discover available host access routes, run or request authorization, and attempt a read-only sample fetch before asking for detailed field mapping, final goal-field selection, or result-output mapping. Do not ask the user to choose `use local OAuth to list accessible forms` when a local OAuth helper can be checked directly. If the user has not provided a skill name yet, derive a temporary candidate name from the source context, but do not use a missing skill name as a reason to collect detailed mapping first.
 
 ## Creation-Time Provider Onboarding
 
@@ -157,7 +163,7 @@ Use `references/binding-contract.md` for full binding-level selection rules and 
 | Binding level | Creation-time contract | Runtime parameters | Maximum automation |
 | --- | --- | --- | --- |
 | `fully-bound` | Concrete source instance, field mapping, source-level outreach basis or consent rule, dedupe rule, fixed result target, and result fields. The result target can be source writeback to the source instance or canonical record store, a source-adjacent result artifact, or a local result CSV. | Date window, subset filters, and other narrow processing controls. | Eligible for approved direct execution and scheduled host runs after the runtime gate passes. |
-| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema. | Approved instance values such as form ID, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path. | Default. Eligible for dry-run batch approval and approved direct execution only after concrete runtime parameters pass the runtime gate. |
+| `parameterized-bound` | Source family, access method, required field schema, source-level outreach basis or consent rule, dedupe rule, goal contract, result-output policy, and result field schema. | Approved instance values such as form ID, Notion database or data source ID, Airtable base/table/view locator, CSV path, campaign ID, date window, source writeback target, source-adjacent artifact target, or output path. | Default. Eligible for dry-run batch approval and approved direct execution only after concrete runtime parameters pass the runtime gate. |
 
 Do not create a business skill with no phone field, no source-level outreach basis or consent rule, no stable dedupe key, or no durable result path such as verified source writeback, a source-adjacent result artifact, or a new local result CSV. Session-table output is only a last-resort non-persistent fallback when durable output validation is blocked, not the primary result path. If those values are unavailable, keep asking for the missing contract or stop before generation.
 
@@ -307,4 +313,4 @@ After generating a business skill, run:
 node <path-to-outbound-call-skill-creator>/scripts/check-generated-skill.mjs --skill-dir <generated-business-skill-dir>
 ```
 
-When developing inside this reference repository, the checker path is `skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs`; after editing this repository, also run `python3 scripts/validate_repository.py`.
+When developing inside this reference repository, the checker path is `skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs`; after editing this repository, also run the repository validation command from `AGENTS.md`.

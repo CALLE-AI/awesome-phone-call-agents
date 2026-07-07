@@ -17,7 +17,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-SKILL_SCRIPT_REFERENCE_RE = re.compile(r"(?<![A-Za-z0-9_./-])(scripts/[A-Za-z0-9][A-Za-z0-9._/-]*)")
+SKILL_LOCAL_REFERENCE_RE = re.compile(r"(?<![A-Za-z0-9_./-])(?:\./)?((?:scripts|references)/[A-Za-z0-9][A-Za-z0-9._/-]*)")
+ACTIONABLE_REFERENCE_LINE_RE = re.compile(
+    r"\b(?:read|use|using|see|open|load|follow|check|consult|refer to|source of truth)\b",
+    re.IGNORECASE,
+)
 REPOSITORY_TITLE = "Awesome Phone Call Agents"
 OLD_REPOSITORY_TITLE = "Awesome Phone Call " + "Skill"
 OLD_REPOSITORY_SLUG = "awesome-phone-call-" + "skill"
@@ -28,6 +32,14 @@ SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
 OUTBOUND_CALL_SKILL_CHECKER = ROOT / "skills" / "outbound-call-skill-creator" / "scripts" / "check-generated-skill.mjs"
 OUTBOUND_MCP_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
+OUTBOUND_SOURCE_FAMILY_README_TERMS = {
+    "google-form": "Google Forms",
+    "tiktok-ads": "TikTok Ads",
+    "notion": "Notion",
+    "airtable": "Airtable",
+    "local-csv": "local CSV",
+    "other": "custom sources",
+}
 
 
 def fail(message: str) -> None:
@@ -59,28 +71,87 @@ def parse_frontmatter(text: str, path: Path) -> dict[str, str]:
     return result
 
 
-def extract_referenced_skill_script_paths(text: str) -> set[Path]:
+def extract_referenced_skill_local_paths(text: str) -> set[Path]:
     paths: set[Path] = set()
-    for match in SKILL_SCRIPT_REFERENCE_RE.finditer(text):
-        raw_path = match.group(1).rstrip(".,;:)]}`'\"")
-        path = Path(raw_path)
-        if len(path.parts) < 2 or path.parts[0] != "scripts":
-            continue
-        if any(part in {"", ".", ".."} for part in path.parts):
-            continue
-        paths.add(path)
+    for line in text.splitlines():
+        for match in SKILL_LOCAL_REFERENCE_RE.finditer(line):
+            raw_path = match.group(1).rstrip(".,;:)]}`'\"")
+            path = Path(raw_path)
+            if len(path.parts) < 2 or path.parts[0] not in {"scripts", "references"}:
+                continue
+            if any(part in {"", ".", ".."} for part in path.parts):
+                continue
+            if path.parts[0] == "references" and not is_actionable_reference_line(line, match.end()):
+                continue
+            paths.add(path)
     return paths
 
 
-def missing_referenced_skill_script_paths(skill_dir: Path, text: str) -> list[Path]:
+def is_actionable_reference_line(line: str, match_end: int) -> bool:
+    return bool(
+        ACTIONABLE_REFERENCE_LINE_RE.search(line)
+        or re.match(r"\s*:", line[match_end:].lstrip("`'\" )]"))
+    )
+
+
+def missing_referenced_skill_local_paths(skill_dir: Path, text: str) -> list[Path]:
     return sorted(
         (
             relative_path
-            for relative_path in extract_referenced_skill_script_paths(text)
-            if not (skill_dir / relative_path).is_file() and not (ROOT / relative_path).is_file()
+            for relative_path in extract_referenced_skill_local_paths(text)
+            if not (skill_dir / relative_path).is_file()
         ),
         key=str,
     )
+
+
+def extract_outbound_source_family_slugs(skill_text: str) -> list[str]:
+    marker = "Present these source families by default:"
+    start = skill_text.find(marker)
+    if start == -1:
+        fail("outbound-call-skill-creator SKILL.md must list built-in source families.")
+    slugs: list[str] = []
+    for line in skill_text[start + len(marker) :].splitlines():
+        match = re.match(r"^- `([^`]+)`:", line)
+        if match:
+            slugs.append(match.group(1))
+        elif slugs and not line.strip():
+            break
+    if not slugs:
+        fail("outbound-call-skill-creator SKILL.md must include source family slugs.")
+    return slugs
+
+
+def validate_outbound_source_families_in_readme(readme_text: str, skill_text: str) -> None:
+    entry_match = re.search(
+        r"^- \[`outbound-call-skill-creator`\]\(skills/outbound-call-skill-creator/\) - (?P<description>.+)$",
+        readme_text,
+        re.MULTILINE,
+    )
+    if not entry_match:
+        fail("README.md must include the outbound-call-skill-creator resource list entry.")
+
+    entry = entry_match.group("description")
+    slugs = extract_outbound_source_family_slugs(skill_text)
+    missing_term_mappings = sorted(
+        slug for slug in slugs if slug not in OUTBOUND_SOURCE_FAMILY_README_TERMS
+    )
+    if missing_term_mappings:
+        fail(
+            "Add README validation display terms for outbound source families: "
+            + ", ".join(missing_term_mappings)
+        )
+
+    missing_terms = [
+        OUTBOUND_SOURCE_FAMILY_README_TERMS[slug]
+        for slug in slugs
+        if OUTBOUND_SOURCE_FAMILY_README_TERMS[slug] not in entry
+    ]
+    if missing_terms:
+        fail(
+            "README.md outbound-call-skill-creator entry must mention built-in source families: "
+            + ", ".join(missing_terms)
+        )
 
 
 def iter_skill_dirs() -> list[Path]:
@@ -186,21 +257,53 @@ def validate_english_only() -> None:
 
 
 def validate_skill_reference_path_checker() -> None:
-    sample = "Use `scripts/render-runtime-prompt.mjs`, then run scripts/validate-reminder-input.mjs."
+    sample = (
+        "Use `scripts/render-runtime-prompt.mjs`, read references/runtime-prompt.md, "
+        "then run scripts/validate-reminder-input.mjs."
+    )
     expected = {
+        Path("references/runtime-prompt.md"),
         Path("scripts/render-runtime-prompt.mjs"),
         Path("scripts/validate-reminder-input.mjs"),
     }
-    actual = extract_referenced_skill_script_paths(sample)
+    actual = extract_referenced_skill_local_paths(sample)
     if expected - actual:
-        fail("Skill helper-script reference checker must find local scripts/ references.")
+        fail("Skill local reference checker must find local scripts/ and references/ paths.")
 
-    missing = missing_referenced_skill_script_paths(
+    missing = missing_referenced_skill_local_paths(
         ROOT / "skills" / "call-reminder",
         "Use scripts/does-not-exist.mjs for this workflow.",
     )
     if missing != [Path("scripts/does-not-exist.mjs")]:
         fail("Skill helper-script reference checker must report missing local scripts.")
+
+    root_backed_missing = missing_referenced_skill_local_paths(
+        ROOT / "skills" / "call-reminder",
+        "Use scripts/validate_repository.py for this workflow.",
+    )
+    if root_backed_missing != [Path("scripts/validate_repository.py")]:
+        fail("Skill local reference checker must not accept repository-root fallback files.")
+
+    dot_prefixed_missing = missing_referenced_skill_local_paths(
+        ROOT / "skills" / "call-reminder",
+        "Use ./scripts/does-not-exist.mjs and read ./references/missing.md.",
+    )
+    if dot_prefixed_missing != [
+        Path("references/missing.md"),
+        Path("scripts/does-not-exist.mjs"),
+    ]:
+        fail("Skill local reference checker must normalize ./-prefixed local paths.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "missing-reference-skill"
+        (skill_dir / "references").mkdir(parents=True)
+        (skill_dir / "references" / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        missing_reference = missing_referenced_skill_local_paths(
+            skill_dir,
+            "Read references/binding-contract.md before creating the workflow.",
+        )
+        if missing_reference != [Path("references/binding-contract.md")]:
+            fail("Skill local reference checker must report missing referenced references.")
 
 
 def validate_skills() -> None:
@@ -238,9 +341,9 @@ def validate_skills() -> None:
             fail(f"Skill must include references/ directory: {references_dir.relative_to(ROOT)}")
         read(references_dir / "safety.md")
         read(references_dir / "examples.md")
-        for missing_script in missing_referenced_skill_script_paths(skill_dir, text):
+        for missing_script in missing_referenced_skill_local_paths(skill_dir, text):
             fail(
-                f"Skill references missing helper script: "
+                f"Skill references missing local file: "
                 f"{(skill_dir / missing_script).relative_to(ROOT)}"
             )
 
@@ -553,6 +656,10 @@ def validate_call_reminder_acceptance_rules() -> None:
 
 def validate_outbound_call_skill_creator_acceptance_rules() -> None:
     skill_dir = ROOT / "skills" / "outbound-call-skill-creator"
+    validate_outbound_source_families_in_readme(
+        read(ROOT / "README.md"),
+        read(skill_dir / "SKILL.md"),
+    )
     for path in [
         ROOT / "README.md",
         ROOT / "docs" / "outbound-call-skill-creator" / "README.md",
@@ -563,6 +670,15 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
         skill_dir / "references" / "output-targets.md",
     ]:
         forbid_text(path, ["ttmcp"])
+    require_text(
+        ROOT / "docs" / "outbound-call-skill-creator" / "README.md",
+        [
+            "ask the user for explicit permission before adding the hosted Notion MCP route",
+            "explain that `codex mcp add` changes host MCP configuration",
+            "ask the user for explicit permission before installing the Airtable plugin or adding the hosted Airtable MCP route",
+            "explain that `codex plugin add` and `codex mcp add` change host configuration",
+        ],
+    )
     require_text(
         skill_dir / "SKILL.md",
         [
@@ -615,6 +731,9 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "recommend a likely workflow and provisional call goal, then enter source access onboarding",
             "Do not ask for detailed field mapping, final goal-field selection, or result-output mapping before the access check and sample fetch have been attempted.",
             "Proactively inspect available host routes before asking the user for access details.",
+            "Use the actual MCP-capable host or agent runtime selected by the user; do not assume Codex.",
+            "Host-specific commands are adapter examples, not universal instructions.",
+            "For Claude, Antigravity, Cursor, or another MCP-capable host, use that host's documented MCP server or connector setup and OAuth flow.",
             "`google-auth.mjs status`",
             "`google-local-api-client.mjs --action list-forms`",
             "`preflight-auth.mjs --repair-google`",
@@ -635,6 +754,23 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "default outbound goal contract",
             "Do not ask for Google Form field mapping before Google access has been verified and a representative response sample has been fetched.",
             "Do not ask for TikTok Ads field mapping before the exact MCP tool or resource access has been verified and a representative record sample has been fetched.",
+            "Recommended Notion access route: hosted Notion MCP",
+            "https://mcp.notion.com/mcp",
+            "Codex adapter example for hosted Notion MCP",
+            "codex mcp add notion --url https://mcp.notion.com/mcp",
+            "codex mcp login notion",
+            "ask the user for explicit permission before adding the hosted Notion MCP route",
+            "Do not ask the user to create a Notion integration token before checking or offering hosted Notion MCP.",
+            "Do not mark Notion source writeback ready until hosted Notion MCP or another authenticated Notion route exposes page update capability",
+            "Recommended Airtable access route: hosted Airtable MCP",
+            "https://mcp.airtable.com/mcp",
+            "Codex adapter example for hosted Airtable MCP",
+            "codex plugin add airtable@openai-curated",
+            "codex mcp add airtable --url https://mcp.airtable.com/mcp",
+            "codex mcp login airtable",
+            "ask the user for explicit permission before installing the Airtable plugin or adding the hosted Airtable MCP route",
+            "Do not ask the user to create an Airtable personal access token before checking or offering hosted Airtable MCP.",
+            "Do not mark Airtable source writeback ready until hosted Airtable MCP or another authenticated Airtable route exposes non-destructive record update capability",
             "For local CSV workflows, capture supported result-output target modes at creation time and choose the concrete target mode during the runtime dry-run or approval step.",
             "source-csv-in-place",
             "result-csv-file",
@@ -653,8 +789,14 @@ def validate_outbound_call_skill_creator_acceptance_rules() -> None:
             "Next I will check whether this host already exposes Google Forms access.",
             "If local OAuth is available, I will run its auth check and list accessible forms before asking you for a Form ID.",
             "## TikTok Ads Lead Follow-Up Skill",
-            "If this host has no TikTok Ads MCP server configured, I will ask whether to add the default route before running `codex mcp add`",
+            "If the selected host is Codex and this host has no TikTok Ads MCP server configured, I will ask whether to add the default route before running `codex mcp add`",
             "- source family: `tiktok-ads`",
+            "I will first identify the current or target MCP-capable host and use that host's documented connector or MCP setup.",
+            "For Notion, I will recommend hosted Notion MCP first because it uses OAuth and avoids user-managed integration tokens.",
+            "If the selected host is Codex and no existing `notion` MCP route points to hosted Notion MCP, I will ask whether to add it before running `codex mcp add notion`",
+            "For Airtable, I will recommend hosted Airtable MCP first because it uses OAuth and avoids user-managed personal access tokens.",
+            "If the selected host is Codex and neither the Airtable plugin nor a hosted Airtable MCP route is configured, I will ask whether to install the plugin or add the route before running `codex plugin add` or `codex mcp add airtable`",
+            "If the selected host is Codex",
             "source-adjacent result artifact",
         ],
     )
@@ -909,6 +1051,194 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                 + (success.stderr or success.stdout).strip()
             )
 
+        wrapped_compatible_tools_md = valid_skill_md.replace(
+            (
+                "Compatible MCP provider tools: plan_call, run_call, and get_call_run "
+                "are exposed by the configured MCP route for one-off calls."
+            ),
+            (
+                "Compatible MCP provider tools: plan_call, run_call, and\n"
+                "get_call_run are exposed by the configured MCP route for one-off calls."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            wrapped_compatible_tools_md,
+            encoding="utf-8",
+        )
+        wrapped_compatible_tools_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if wrapped_compatible_tools_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow hard-wrapped "
+                "compatible provider tools evidence: "
+                + (
+                    wrapped_compatible_tools_success.stderr
+                    or wrapped_compatible_tools_success.stdout
+                ).strip()
+            )
+
+        structured_result_output_md = valid_skill_md.replace(
+            (
+                "Runtime result target mode: source-adjacent-result-artifact resolved before execution "
+                "approval from fixed creation values or approved runtime parameters."
+            ),
+            (
+                "result_output:\n"
+                "  policy: source-adjacent-result-artifact\n"
+                "  target_mode: source-adjacent-result-artifact\n"
+                "  target_binding: parameterized\n"
+                "  target: approved runtime result artifact\n"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            structured_result_output_md,
+            encoding="utf-8",
+        )
+        structured_result_output_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if structured_result_output_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow structured result-output target modes: "
+                + (
+                    structured_result_output_success.stderr
+                    or structured_result_output_success.stdout
+                ).strip()
+            )
+
+        runtime_parameter_result_output_md = valid_skill_md.replace(
+            (
+                "Runtime result target mode: source-adjacent-result-artifact resolved before execution "
+                "approval from fixed creation values or approved runtime parameters."
+            ),
+            (
+                "result_output:\n"
+                "  policy: source-adjacent-result-artifact\n"
+                "  target_mode: result_target_mode_parameter\n"
+                "  target_binding: runtime_parameter\n"
+                "  target: approved runtime result-output target\n"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            runtime_parameter_result_output_md,
+            encoding="utf-8",
+        )
+        runtime_parameter_result_output_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if runtime_parameter_result_output_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow runtime-parameter result-output "
+                "target modes: "
+                + (
+                    runtime_parameter_result_output_success.stderr
+                    or runtime_parameter_result_output_success.stdout
+                ).strip()
+            )
+
+        unknown_structured_result_output_md = valid_skill_md.replace(
+            (
+                "Runtime result target mode: source-adjacent-result-artifact resolved before execution "
+                "approval from fixed creation values or approved runtime parameters."
+            ),
+            (
+                "result_output:\n"
+                "  policy: source-adjacent-result-artifact\n"
+                "  target_mode: totally-unknown-mode\n"
+                "  target_binding: parameterized\n"
+                "  target: approved runtime result artifact\n"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            unknown_structured_result_output_md,
+            encoding="utf-8",
+        )
+        unknown_structured_result_output_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        unknown_structured_result_output_output = (
+            unknown_structured_result_output_failure.stdout
+            + unknown_structured_result_output_failure.stderr
+        )
+        if unknown_structured_result_output_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unknown structured target modes.")
+        if (
+            "Generated skill SKILL.md must include result target mode"
+            not in unknown_structured_result_output_output
+        ):
+            fail("Generated outbound skill checker unknown-structured-target-mode message changed.")
+
+        templated_structured_result_output_md = structured_result_output_md.replace(
+            "  target_mode: source-adjacent-result-artifact\n",
+            "  target_mode: source-csv-in-place | result-csv-file | source-writeback | session-table\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            templated_structured_result_output_md,
+            encoding="utf-8",
+        )
+        templated_structured_result_output_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        templated_structured_result_output_output = (
+            templated_structured_result_output_failure.stdout
+            + templated_structured_result_output_failure.stderr
+        )
+        if templated_structured_result_output_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject templated target-mode option lists.")
+        if (
+            "Generated skill SKILL.md must include result target mode"
+            not in templated_structured_result_output_output
+        ):
+            fail("Generated outbound skill checker templated-target-mode message changed.")
+
+        unresolved_structured_result_output_md = structured_result_output_md.replace(
+            "  target_mode: source-adjacent-result-artifact\n",
+            "  target_mode: runtime\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            unresolved_structured_result_output_md,
+            encoding="utf-8",
+        )
+        unresolved_structured_result_output_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        unresolved_structured_result_output_output = (
+            unresolved_structured_result_output_failure.stdout
+            + unresolved_structured_result_output_failure.stderr
+        )
+        if unresolved_structured_result_output_failure.returncode == 0:
+            fail("Generated outbound skill checker must reject unresolved target-mode modifiers.")
+        if (
+            "Generated skill SKILL.md must include result target mode"
+            not in unresolved_structured_result_output_output
+        ):
+            fail("Generated outbound skill checker unresolved-target-mode message changed.")
+
         valid_evidence_wording_cases = [
             (
                 "required redaction policy wording",
@@ -1030,6 +1360,88 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                     ),
                 ),
             ),
+            (
+                "namespaced compatible tools wording",
+                valid_skill_md.replace(
+                    (
+                        "Compatible MCP provider tools: plan_call, run_call, and get_call_run "
+                        "are exposed by the configured MCP route for one-off calls."
+                    ),
+                    (
+                        "Compatible MCP provider tools: `mcp__calle_prod__plan_call`, "
+                        "`mcp__calle_prod__run_call`, and "
+                        "`mcp__calle_prod__get_call_run` are exposed by the "
+                        "configured MCP route for one-off calls."
+                    ),
+                ),
+            ),
+            (
+                "pending source name wording",
+                valid_skill_md.replace(
+                    "Authentication or access check result: passed with local source credentials.",
+                    (
+                        "Authentication or access check result: passed with access to "
+                        "`Pending Callbacks` Airtable table."
+                    ),
+                ).replace(
+                    "Sampled source instance: representative-callback-source.",
+                    "Sampled source instance: pending-callbacks.",
+                ),
+            ),
+            (
+                "blocked source name wording",
+                valid_skill_md.replace(
+                    "Sampled source instance: representative-callback-source.",
+                    "Sampled source instance: blocked-leads-view.",
+                ).replace(
+                    "Source access route discovery result: host-local route discovery completed before user route selection.",
+                    (
+                        "Source access route discovery result: discovered "
+                        "`Blocked Leads` managed connector view."
+                    ),
+                ),
+            ),
+            (
+                "needs source name wording",
+                valid_skill_md.replace(
+                    "Authentication or access check result: passed with local source credentials.",
+                    (
+                        "Authentication or access check result: passed with access to "
+                        "`Needs Outreach` CRM view."
+                    ),
+                ),
+            ),
+            (
+                "requires source name wording",
+                valid_skill_md.replace(
+                    "Authentication or access check result: passed with local source credentials.",
+                    (
+                        "Authentication or access check result: passed with access to "
+                        "`Requires Follow-up` Airtable view."
+                    ),
+                ),
+            ),
+            (
+                "no-change field mapping confirmation wording",
+                valid_skill_md.replace(
+                    "User-confirmed field mapping: confirmed after the representative sample was shown.",
+                    "User-confirmed field mapping: no changes needed after sample review.",
+                ),
+            ),
+            (
+                "Codex App provider host runtime wording",
+                valid_skill_md.replace(
+                    "Provider host runtime: Codex.",
+                    "Provider host runtime: Codex App.",
+                ),
+            ),
+            (
+                "Codex App Automation provider host runtime wording",
+                valid_skill_md.replace(
+                    "Provider host runtime: Codex.",
+                    "Provider host runtime: Codex App Automation.",
+                ),
+            ),
         ]
         for case_name, skill_md in valid_evidence_wording_cases:
             (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
@@ -1047,6 +1459,56 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                         valid_evidence_wording_success.stderr
                         or valid_evidence_wording_success.stdout
                     ).strip()
+                )
+
+        blank_required_evidence_cases = [
+            (
+                "source access route",
+                valid_skill_md.replace(
+                    "Access route: local source credentials.\n",
+                    "Access route:\n",
+                ),
+                "Bound generated skill SKILL.md must include source access route",
+            ),
+            (
+                "sampled source instance",
+                valid_skill_md.replace(
+                    "Sampled source instance: representative-callback-source.\n",
+                    "Sampled source instance:\n",
+                ),
+                "Bound generated skill SKILL.md must include sampled source instance",
+            ),
+            (
+                "provider host runtime",
+                valid_skill_md.replace(
+                    "Provider host runtime: Codex.\n",
+                    "Provider host runtime:\n",
+                ),
+                "Bound generated skill SKILL.md must include configured provider host runtime",
+            ),
+        ]
+        for case_name, skill_md, expected_message in blank_required_evidence_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            blank_required_evidence_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            blank_required_evidence_output = (
+                blank_required_evidence_failure.stdout
+                + blank_required_evidence_failure.stderr
+            )
+            if blank_required_evidence_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject blank "
+                    f"{case_name} evidence."
+                )
+            if expected_message not in blank_required_evidence_output:
+                fail(
+                    "Generated outbound skill checker blank "
+                    f"{case_name} message changed."
                 )
 
         temporal_execution_modes_md = valid_skill_md.replace(
@@ -1246,6 +1708,311 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
         ):
             fail("Generated outbound skill checker unavailable-one-off-capability message changed.")
 
+        inline_unavailable_one_off_capability_md = valid_skill_md.replace(
+            "One-off call capability: passed with the configured MCP route.",
+            "One-off call capability: passed with no run tool is exposed.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            inline_unavailable_one_off_capability_md,
+            encoding="utf-8",
+        )
+        inline_unavailable_one_off_capability_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        inline_unavailable_one_off_capability_output = (
+            inline_unavailable_one_off_capability_failure.stdout
+            + inline_unavailable_one_off_capability_failure.stderr
+        )
+        if inline_unavailable_one_off_capability_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject inline unavailable one-off call capability."
+            )
+        if (
+            "Generated skill SKILL.md has contradictory one-off call capability line"
+            not in inline_unavailable_one_off_capability_output
+        ):
+            fail(
+                "Generated outbound skill checker inline-unavailable-one-off-capability message changed."
+            )
+
+        noun_unavailable_one_off_capability_md = valid_skill_md.replace(
+            "One-off call capability: passed with the configured MCP route.",
+            "One-off call capability: passed with run tool not available.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            noun_unavailable_one_off_capability_md,
+            encoding="utf-8",
+        )
+        noun_unavailable_one_off_capability_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        noun_unavailable_one_off_capability_output = (
+            noun_unavailable_one_off_capability_failure.stdout
+            + noun_unavailable_one_off_capability_failure.stderr
+        )
+        if noun_unavailable_one_off_capability_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject noun-form unavailable "
+                "one-off call capability."
+            )
+        if (
+            "Generated skill SKILL.md has contradictory one-off call capability line"
+            not in noun_unavailable_one_off_capability_output
+        ):
+            fail(
+                "Generated outbound skill checker noun-unavailable-one-off-capability "
+                "message changed."
+            )
+
+        noun_unavailable_provider_auth_md = valid_skill_md.replace(
+            (
+                "Provider authentication check result: passed with `codex mcp list` "
+                "reporting OAuth for calle-prod."
+            ),
+            "Provider authentication check result: passed with OAuth not configured.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            noun_unavailable_provider_auth_md,
+            encoding="utf-8",
+        )
+        noun_unavailable_provider_auth_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        noun_unavailable_provider_auth_output = (
+            noun_unavailable_provider_auth_failure.stdout
+            + noun_unavailable_provider_auth_failure.stderr
+        )
+        if noun_unavailable_provider_auth_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject noun-form unavailable "
+                "provider authentication."
+            )
+        if (
+            "Generated skill SKILL.md has contradictory passed provider authentication or auth readiness check result line"
+            not in noun_unavailable_provider_auth_output
+        ):
+            fail(
+                "Generated outbound skill checker noun-unavailable-provider-auth "
+                "message changed."
+            )
+
+        post_pass_negative_status_cases = [
+            (
+                "route configured",
+                valid_skill_md.replace(
+                    "MCP route setup check result: passed with `codex mcp get calle-prod` for the required route.",
+                    "MCP route setup check result: passed; no route configured.",
+                ),
+                "Generated skill SKILL.md has contradictory passed MCP route setup check result line",
+            ),
+            (
+                "oauth configured",
+                valid_skill_md.replace(
+                    (
+                        "Provider authentication check result: passed with `codex mcp list` "
+                        "reporting OAuth for calle-prod."
+                    ),
+                    "Provider authentication check result: passed; no OAuth configured.",
+                ),
+                "Generated skill SKILL.md has contradictory passed provider authentication or auth readiness check result line",
+            ),
+            (
+                "run tool exposed",
+                valid_skill_md.replace(
+                    "One-off call capability: passed with the configured MCP route.",
+                    "One-off call capability: passed; no run tool is exposed.",
+                ),
+                "Generated skill SKILL.md has contradictory one-off call capability line",
+            ),
+        ]
+        for case_name, skill_md, expected_error in post_pass_negative_status_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            post_pass_negative_status_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            post_pass_negative_status_output = (
+                post_pass_negative_status_failure.stdout
+                + post_pass_negative_status_failure.stderr
+            )
+            if post_pass_negative_status_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject post-pass "
+                    f"negative {case_name} evidence."
+                )
+            if expected_error not in post_pass_negative_status_output:
+                fail(
+                    "Generated outbound skill checker post-pass negative "
+                    f"{case_name} message changed."
+                )
+
+        negated_inferred_provider_readiness_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Provider readiness was not inferred; it was verified with the "
+                "configured host MCP route.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            negated_inferred_provider_readiness_md,
+            encoding="utf-8",
+        )
+        negated_inferred_provider_readiness_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if negated_inferred_provider_readiness_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow negated inferred provider "
+                "readiness when host MCP route evidence is verified: "
+                + (
+                    negated_inferred_provider_readiness_success.stderr
+                    or negated_inferred_provider_readiness_success.stdout
+                ).strip()
+            )
+
+        blocked_app_connector_provider_md = valid_skill_md.replace(
+            """Provider onboarding completed for the CALL-E MCP provider route.
+Provider host runtime: Codex.
+MCP route setup check result: passed with `codex mcp get calle-prod` for the required route.
+Provider authentication check result: passed with `codex mcp list` reporting OAuth for calle-prod.
+Compatible MCP provider tools: plan_call, run_call, and get_call_run are exposed by the configured MCP route for one-off calls.
+One-off call capability: passed with the configured MCP route.
+Provider onboarding blocker: none.""",
+            """Provider onboarding is blocked until the CALL-E MCP provider route is configured.
+Provider host runtime: Codex.
+MCP route setup check result: missing because only Codex Apps connector tools are available.
+Provider authentication check result: missing because only Codex Apps connector tools are available.
+Compatible MCP provider tools: missing because only Codex Apps connector tools are available.
+One-off call capability: missing because the provider MCP route is unavailable.
+Provider onboarding blocker: host only exposes Codex Apps connector tools; CALL-E MCP route is not configured.""",
+        ).replace(
+            "Execution mode: dry-run-then-batch-approval. Supported alternative is approved-direct-execution\n"
+            "when the binding level and runtime gate allow it.",
+            "Execution mode: dry-run-then-batch-approval. Supported alternative is approved-direct-execution\n"
+            "when the binding level and runtime gate allow it.\n"
+            "The workflow remains dry-run-only until provider onboarding is verified.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            blocked_app_connector_provider_md,
+            encoding="utf-8",
+        )
+        blocked_app_connector_provider_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if blocked_app_connector_provider_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow dry-run-only provider "
+                "blockers that mention unavailable Codex Apps connector tools: "
+                + (
+                    blocked_app_connector_provider_success.stderr
+                    or blocked_app_connector_provider_success.stdout
+                ).strip()
+            )
+
+        blocked_app_connector_provider_label_only_md = blocked_app_connector_provider_md.replace(
+            "Provider onboarding blocker: host only exposes Codex Apps connector tools; CALL-E MCP route is not configured.",
+            "Provider onboarding blocker: host only exposes Codex Apps connector tools.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            blocked_app_connector_provider_label_only_md,
+            encoding="utf-8",
+        )
+        blocked_app_connector_provider_label_only_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if blocked_app_connector_provider_label_only_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow provider onboarding "
+                "blocker labels that mention Codex Apps connector tools: "
+                + (
+                    blocked_app_connector_provider_label_only_success.stderr
+                    or blocked_app_connector_provider_label_only_success.stdout
+                ).strip()
+            )
+
+        blocked_app_connector_provider_structured_md = (
+            blocked_app_connector_provider_label_only_md.replace(
+                "Provider onboarding blocker: host only exposes Codex Apps connector tools.",
+                "provider_onboarding_blocker: host only exposes Codex Apps connector tools.",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            blocked_app_connector_provider_structured_md,
+            encoding="utf-8",
+        )
+        blocked_app_connector_provider_structured_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if blocked_app_connector_provider_structured_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow structured "
+                "provider_onboarding_blocker labels that mention Codex Apps "
+                "connector tools: "
+                + (
+                    blocked_app_connector_provider_structured_success.stderr
+                    or blocked_app_connector_provider_structured_success.stdout
+                ).strip()
+            )
+
+        blocked_app_connector_provider_bullet_md = blocked_app_connector_provider_md.replace(
+            "Compatible MCP provider tools: missing because only Codex Apps connector tools are available.",
+            "Compatible MCP provider tools:\n- missing because only Codex Apps connector tools are available.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            blocked_app_connector_provider_bullet_md,
+            encoding="utf-8",
+        )
+        blocked_app_connector_provider_bullet_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if blocked_app_connector_provider_bullet_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow dry-run-only provider "
+                "blockers with nested missing app-connector tool bullets: "
+                + (
+                    blocked_app_connector_provider_bullet_success.stderr
+                    or blocked_app_connector_provider_bullet_success.stdout
+                ).strip()
+            )
+
         unavailable_compatible_tools_md = valid_skill_md.replace(
             "Compatible MCP provider tools: plan_call, run_call, and get_call_run are exposed by the configured MCP route for one-off calls.",
             "Compatible MCP provider tools: missing because no compatible MCP provider tools are exposed.",
@@ -1300,6 +2067,173 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
         ):
             fail("Generated outbound skill checker no-compatible-tools message changed.")
 
+        incomplete_compatible_tools_md = valid_skill_md.replace(
+            "Compatible MCP provider tools: plan_call, run_call, and get_call_run are exposed by the configured MCP route for one-off calls.",
+            "Compatible MCP provider tools: plan_call and get_call_run are exposed; run_call unavailable.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            incomplete_compatible_tools_md,
+            encoding="utf-8",
+        )
+        incomplete_compatible_tools_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        incomplete_compatible_tools_output = (
+            incomplete_compatible_tools_failure.stdout
+            + incomplete_compatible_tools_failure.stderr
+        )
+        if incomplete_compatible_tools_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject incomplete compatible "
+                "MCP provider tool evidence."
+            )
+        if (
+            "Bound generated skill SKILL.md must include compatible MCP provider tools"
+            not in incomplete_compatible_tools_output
+        ):
+            fail("Generated outbound skill checker incomplete-compatible-tools message changed.")
+
+        app_connector_provider_evidence_cases = [
+            (
+                "app connector authorization",
+                valid_skill_md.replace(
+                    (
+                        "Provider authentication check result: passed with `codex mcp list` "
+                        "reporting OAuth for calle-prod."
+                    ),
+                    "Provider authentication check result: passed with app connector authorization ready.",
+                ),
+            ),
+            (
+                "app connector tools",
+                valid_skill_md.replace(
+                    (
+                        "Compatible MCP provider tools: plan_call, run_call, and get_call_run "
+                        "are exposed by the configured MCP route for one-off calls."
+                    ),
+                    (
+                        "Compatible MCP provider tools: app connector tools plan_call, "
+                        "run_call, and get_call_run are available."
+                    ),
+                ),
+            ),
+            (
+                "plugin tools",
+                valid_skill_md.replace(
+                    (
+                        "Compatible MCP provider tools: plan_call, run_call, and get_call_run "
+                        "are exposed by the configured MCP route for one-off calls."
+                    ),
+                    (
+                        "Compatible MCP provider tools: plugin tools plan_call, "
+                        "run_call, and get_call_run are available."
+                    ),
+                ),
+            ),
+        ]
+        for case_name, skill_md in app_connector_provider_evidence_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            app_connector_provider_evidence_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            app_connector_provider_evidence_output = (
+                app_connector_provider_evidence_failure.stdout
+                + app_connector_provider_evidence_failure.stderr
+            )
+            if app_connector_provider_evidence_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject generic "
+                    f"{case_name} provider evidence."
+                )
+            if (
+                "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+                not in app_connector_provider_evidence_output
+            ):
+                fail(
+                    "Generated outbound skill checker generic app-connector "
+                    f"{case_name} message changed."
+                )
+
+        explicit_provider_blocker_with_passed_ready_md = valid_skill_md.replace(
+            "Execution mode: dry-run-then-batch-approval. Supported alternative is approved-direct-execution\n"
+            "when the binding level and runtime gate allow it.",
+            "Execution mode: approved-direct-execution. Runtime gate permits real calls only when onboarding is ready.",
+        ).replace(
+            "Provider onboarding blocker: none.",
+            "Provider onboarding blocker: CALL-E MCP route auth is not ready.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            explicit_provider_blocker_with_passed_ready_md,
+            encoding="utf-8",
+        )
+        explicit_provider_blocker_with_passed_ready_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        explicit_provider_blocker_with_passed_ready_output = (
+            explicit_provider_blocker_with_passed_ready_failure.stdout
+            + explicit_provider_blocker_with_passed_ready_failure.stderr
+        )
+        if explicit_provider_blocker_with_passed_ready_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject explicit provider blockers "
+                "when provider readiness markers still pass."
+            )
+        if (
+            "Provider onboarding blocker conflicts with real-call-ready provider onboarding"
+            not in explicit_provider_blocker_with_passed_ready_output
+        ):
+            fail(
+                "Generated outbound skill checker explicit-provider-blocker message changed."
+            )
+
+        explicit_provider_none_then_blocker_md = (
+            explicit_provider_blocker_with_passed_ready_md.replace(
+                "Provider onboarding blocker: CALL-E MCP route auth is not ready.",
+                "Provider onboarding blocker: none.\n"
+                "Provider onboarding blocker: CALL-E MCP route auth is not ready.",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            explicit_provider_none_then_blocker_md,
+            encoding="utf-8",
+        )
+        explicit_provider_none_then_blocker_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        explicit_provider_none_then_blocker_output = (
+            explicit_provider_none_then_blocker_failure.stdout
+            + explicit_provider_none_then_blocker_failure.stderr
+        )
+        if explicit_provider_none_then_blocker_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject a provider blocker "
+                "appended after a default none blocker."
+            )
+        if (
+            "Provider onboarding blocker conflicts with real-call-ready provider onboarding"
+            not in explicit_provider_none_then_blocker_output
+        ):
+            fail(
+                "Generated outbound skill checker none-then-provider-blocker "
+                "message changed."
+            )
+
         provider_contract_policy_md = valid_skill_md.replace(
             "Provider onboarding blocker: none.\n\n## Execution Modes",
             (
@@ -1325,6 +2259,575 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                     provider_contract_policy_success.stderr
                     or provider_contract_policy_success.stdout
                 ).strip()
+            )
+
+        provider_contract_policy_then_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence; provider onboarding "
+                "completed based on `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_then_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_then_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_then_bad_evidence_output = (
+            provider_contract_policy_then_bad_evidence_failure.stdout
+            + provider_contract_policy_then_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_then_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider app-tool evidence "
+                "after a policy caveat in the same line."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_then_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-then-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_comma_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence, provider onboarding "
+                "completed based on `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_comma_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_comma_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_comma_bad_evidence_output = (
+            provider_contract_policy_comma_bad_evidence_failure.stdout
+            + provider_contract_policy_comma_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_comma_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider app-tool evidence "
+                "after a policy caveat joined with a comma."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_comma_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-comma-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_but_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence but provider onboarding "
+                "completed based on `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_but_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_but_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_but_bad_evidence_output = (
+            provider_contract_policy_but_bad_evidence_failure.stdout
+            + provider_contract_policy_but_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_but_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider app-tool evidence "
+                "after a policy caveat joined with but."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_but_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-but-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_and_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence and provider onboarding "
+                "completed based on `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_and_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_and_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_and_bad_evidence_output = (
+            provider_contract_policy_and_bad_evidence_failure.stdout
+            + provider_contract_policy_and_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_and_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider app-tool evidence "
+                "after a policy caveat joined with and."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_and_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-and-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_and_completed_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence and completed provider "
+                "onboarding based on `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_and_completed_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_and_completed_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_and_completed_bad_evidence_output = (
+            provider_contract_policy_and_completed_bad_evidence_failure.stdout
+            + provider_contract_policy_and_completed_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_and_completed_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject completed provider "
+                "onboarding based on app-tool evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_and_completed_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-and-completed-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_and_auth_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence and provider auth passed "
+                "using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_and_auth_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_and_auth_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_and_auth_bad_evidence_output = (
+            provider_contract_policy_and_auth_bad_evidence_failure.stdout
+            + provider_contract_policy_and_auth_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_and_auth_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider auth app-tool "
+                "evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_and_auth_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-and-auth-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_and_route_setup_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence and provider route setup "
+                "passed using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_and_route_setup_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_and_route_setup_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_and_route_setup_bad_evidence_output = (
+            provider_contract_policy_and_route_setup_bad_evidence_failure.stdout
+            + provider_contract_policy_and_route_setup_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_and_route_setup_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider route setup "
+                "app-tool evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_and_route_setup_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-and-route-setup-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_route_bad_evidence_cases = [
+            (
+                "provider route",
+                "Do not use app connector tools as evidence and provider route "
+                "passed using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.",
+            ),
+            (
+                "MCP route",
+                "Do not use app connector tools as evidence and MCP route passed "
+                "using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.",
+            ),
+            (
+                "bare route",
+                "Do not use app connector tools as evidence and route passed "
+                "using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.",
+            ),
+        ]
+        for label, bad_evidence_line in provider_contract_policy_route_bad_evidence_cases:
+            provider_contract_policy_route_bad_evidence_md = valid_skill_md.replace(
+                "Provider onboarding blocker: none.\n\n## Execution Modes",
+                (
+                    "Provider onboarding blocker: none.\n\n"
+                    "## Provider Onboarding Contract\n\n"
+                    f"{bad_evidence_line}\n\n"
+                    "## Execution Modes"
+                ),
+            )
+            (skill_dir / "SKILL.md").write_text(
+                provider_contract_policy_route_bad_evidence_md,
+                encoding="utf-8",
+            )
+            provider_contract_policy_route_bad_evidence_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            provider_contract_policy_route_bad_evidence_output = (
+                provider_contract_policy_route_bad_evidence_failure.stdout
+                + provider_contract_policy_route_bad_evidence_failure.stderr
+            )
+            if provider_contract_policy_route_bad_evidence_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject "
+                    f"{label} app-tool evidence after a policy caveat."
+                )
+            if (
+                "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+                not in provider_contract_policy_route_bad_evidence_output
+            ):
+                fail(
+                    "Generated outbound skill checker provider-policy-route-bad-evidence "
+                    f"message changed for {label}."
+                )
+
+        provider_contract_policy_because_check_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence because the provider check "
+                "passed using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_because_check_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_because_check_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_because_check_bad_evidence_output = (
+            provider_contract_policy_because_check_bad_evidence_failure.stdout
+            + provider_contract_policy_because_check_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_because_check_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject provider check app-tool "
+                "evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_because_check_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-because-check-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_generic_check_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence and the check passed "
+                "using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_generic_check_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_generic_check_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_generic_check_bad_evidence_output = (
+            provider_contract_policy_generic_check_bad_evidence_failure.stdout
+            + provider_contract_policy_generic_check_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_generic_check_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject generic check app-tool "
+                "evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_generic_check_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-generic-check-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_while_auth_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence while auth passed "
+                "using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_while_auth_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_while_auth_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_while_auth_bad_evidence_output = (
+            provider_contract_policy_while_auth_bad_evidence_failure.stdout
+            + provider_contract_policy_while_auth_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_while_auth_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject bare auth app-tool "
+                "evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_while_auth_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-while-auth-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_and_call_provider_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Do not use app connector tools as evidence and call provider connection "
+                "passed using `mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_and_call_provider_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_and_call_provider_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_and_call_provider_bad_evidence_output = (
+            provider_contract_policy_and_call_provider_bad_evidence_failure.stdout
+            + provider_contract_policy_and_call_provider_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_and_call_provider_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject call-provider app-tool "
+                "evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_and_call_provider_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-call-provider-bad-evidence "
+                "message changed."
+            )
+
+        provider_contract_policy_and_hyphenated_call_provider_bad_evidence_md = (
+            valid_skill_md.replace(
+                "Provider onboarding blocker: none.\n\n## Execution Modes",
+                (
+                    "Provider onboarding blocker: none.\n\n"
+                    "## Provider Onboarding Contract\n\n"
+                    "Do not use app connector tools as evidence and call-provider "
+                    "connection passed using "
+                    "`mcp__codex_apps__call_e_zhiwen_dev._plan_call`.\n\n"
+                    "## Execution Modes"
+                ),
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            provider_contract_policy_and_hyphenated_call_provider_bad_evidence_md,
+            encoding="utf-8",
+        )
+        provider_contract_policy_and_hyphenated_call_provider_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        provider_contract_policy_and_hyphenated_call_provider_bad_evidence_output = (
+            provider_contract_policy_and_hyphenated_call_provider_bad_evidence_failure.stdout
+            + provider_contract_policy_and_hyphenated_call_provider_bad_evidence_failure.stderr
+        )
+        if provider_contract_policy_and_hyphenated_call_provider_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject hyphenated "
+                "call-provider app-tool evidence after a policy caveat."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in provider_contract_policy_and_hyphenated_call_provider_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker provider-policy-hyphenated-call-provider-bad-evidence "
+                "message changed."
+            )
+
+        codex_apps_provider_evidence_md = valid_skill_md.replace(
+            (
+                "MCP route setup check result: passed after `codex mcp list` "
+                "confirmed the required route."
+            ),
+            "MCP route setup check result: passed based on Codex Apps CALL-E connector plan_call.",
+        ).replace(
+            (
+                "Provider authentication check result: passed with `codex mcp list` "
+                "reporting OAuth for calle-prod."
+            ),
+            "Provider authentication check result: passed via Codex Apps connector session.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            codex_apps_provider_evidence_md,
+            encoding="utf-8",
+        )
+        codex_apps_provider_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        codex_apps_provider_evidence_output = (
+            codex_apps_provider_evidence_failure.stdout
+            + codex_apps_provider_evidence_failure.stderr
+        )
+        if codex_apps_provider_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Codex Apps connector "
+                "provider evidence."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in codex_apps_provider_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker Codex-Apps provider evidence "
+                "message changed."
             )
 
         wrapped_provider_contract_policy_md = valid_skill_md.replace(
@@ -1355,6 +2858,38 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
                 + (
                     wrapped_provider_contract_policy_success.stderr
                     or wrapped_provider_contract_policy_success.stdout
+                ).strip()
+            )
+
+        preceding_wrapped_provider_contract_policy_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Provider onboarding contract: Do not treat app connector tools such as\n"
+                "`mcp__codex_apps__call_e_zhiwen_dev._plan_call` as provider evidence; "
+                "use configured host MCP route evidence only.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            preceding_wrapped_provider_contract_policy_md,
+            encoding="utf-8",
+        )
+        preceding_wrapped_provider_contract_policy_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if preceding_wrapped_provider_contract_policy_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow provider policy prose "
+                "when the app-tool mention wraps after the negated policy line: "
+                + (
+                    preceding_wrapped_provider_contract_policy_success.stderr
+                    or preceding_wrapped_provider_contract_policy_success.stdout
                 ).strip()
             )
 
@@ -1394,6 +2929,82 @@ Run node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --
         ):
             fail(
                 "Generated outbound skill checker provider-contract-bad-evidence message changed."
+            )
+
+        preceding_wrapped_provider_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Provider onboarding completed based on app connector tools such as\n"
+                "`mcp__codex_apps__call_e_zhiwen_dev._plan_call` for route evidence.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            preceding_wrapped_provider_bad_evidence_md,
+            encoding="utf-8",
+        )
+        preceding_wrapped_provider_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        preceding_wrapped_provider_bad_evidence_output = (
+            preceding_wrapped_provider_bad_evidence_failure.stdout
+            + preceding_wrapped_provider_bad_evidence_failure.stderr
+        )
+        if preceding_wrapped_provider_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject wrapped provider app-tool evidence "
+                "when the previous line is not policy prose."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in preceding_wrapped_provider_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker wrapped provider bad-evidence message changed."
+            )
+
+        unrelated_not_wrapped_provider_bad_evidence_md = valid_skill_md.replace(
+            "Provider onboarding blocker: none.\n\n## Execution Modes",
+            (
+                "Provider onboarding blocker: none.\n\n"
+                "## Provider Onboarding Contract\n\n"
+                "Provider onboarding was not configured from host evidence yet; app connector tools such as\n"
+                "`mcp__codex_apps__call_e_zhiwen_dev._plan_call` were recorded for route evidence.\n\n"
+                "## Execution Modes"
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            unrelated_not_wrapped_provider_bad_evidence_md,
+            encoding="utf-8",
+        )
+        unrelated_not_wrapped_provider_bad_evidence_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        unrelated_not_wrapped_provider_bad_evidence_output = (
+            unrelated_not_wrapped_provider_bad_evidence_failure.stdout
+            + unrelated_not_wrapped_provider_bad_evidence_failure.stderr
+        )
+        if unrelated_not_wrapped_provider_bad_evidence_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject wrapped provider app-tool evidence "
+                "when the previous-line negation is not provider policy prose."
+            )
+        if (
+            "Provider onboarding must use host MCP route setup and authentication evidence, not app connector tools"
+            not in unrelated_not_wrapped_provider_bad_evidence_output
+        ):
+            fail(
+                "Generated outbound skill checker unrelated-not provider bad-evidence message changed."
             )
 
         provider_contract_only_policy_md = valid_skill_md.replace(
@@ -1680,6 +3291,62 @@ Provider onboarding blocker: none.""",
                 ).strip()
             )
 
+        structured_provider_tool_list_md = structured_contract_md.replace(
+            "  compatible_tools: plan_call, run_call, and get_call_run",
+            "  compatible_tools:\n"
+            "    - plan_call\n"
+            "    - run_call\n"
+            "    - get_call_run",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            structured_provider_tool_list_md,
+            encoding="utf-8",
+        )
+        structured_provider_tool_list_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if structured_provider_tool_list_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow structured provider "
+                "compatible_tools YAML lists: "
+                + (
+                    structured_provider_tool_list_success.stderr
+                    or structured_provider_tool_list_success.stdout
+                ).strip()
+            )
+
+        structured_provider_punctuated_tool_list_md = structured_contract_md.replace(
+            "  compatible_tools: plan_call, run_call, and get_call_run",
+            "  compatible_tools:\n"
+            "    - plan_call.\n"
+            "    - run_call.\n"
+            "    - get_call_run.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            structured_provider_punctuated_tool_list_md,
+            encoding="utf-8",
+        )
+        structured_provider_punctuated_tool_list_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if structured_provider_punctuated_tool_list_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow punctuated "
+                "compatible_tools YAML lists: "
+                + (
+                    structured_provider_punctuated_tool_list_success.stderr
+                    or structured_provider_punctuated_tool_list_success.stdout
+                ).strip()
+            )
+
         structured_missing_user_confirmed_md = structured_contract_md.replace(
             "  user_confirmed_field_mapping: confirmed after the representative sample was shown\n",
             "",
@@ -1775,6 +3442,2494 @@ Provider onboarding blocker: none.""",
             fail(
                 "Generated outbound skill checker must allow non-Codex MCP provider onboarding evidence: "
                 + (other_agent_success.stderr or other_agent_success.stdout).strip()
+            )
+
+        notion_hosted_writeback_md = valid_skill_md.replace(
+            "The source contract defines the approved data source and row ownership boundary.",
+            "Source family: notion.\nThe source contract defines the approved data source and row ownership boundary.",
+        ).replace(
+            "Access route: local source credentials.",
+            "Access route: hosted Notion MCP at https://mcp.notion.com/mcp.",
+        ).replace(
+            "Source access route discovery result: host-local route discovery completed before user route selection.",
+            "Source access route discovery result: hosted Notion MCP OAuth route discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with local source credentials.",
+            "Authentication or access check result: passed with hosted Notion MCP OAuth.",
+        ).replace(
+            "Sample fetch result: passed with a representative source instance.",
+            "Sample fetch result: passed with hosted Notion MCP database records.",
+        ).replace(
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Prefer source writeback when verified. Use `source-adjacent-result-artifact`\n"
+            "when results should stay in the source system without mutating source records.\n"
+            "Otherwise use `result-csv-file` to write a new local result CSV. Use\n"
+            "session-table output only as a last-resort attended fallback when durable result\n"
+            "output is blocked.\n"
+            "Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.",
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property update verified through hosted Notion MCP.\n"
+            "Durable result output fallback: result-csv-file is available only if source writeback fails later; "
+            "session-table output is a last-resort attended fallback.",
+        )
+        notion_hosted_unverified_writeback_md = notion_hosted_writeback_md.replace(
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+            "Target: Notion `result` page property update configured through hosted Notion MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_hosted_unverified_writeback_md,
+            encoding="utf-8",
+        )
+        notion_hosted_unverified_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_hosted_unverified_writeback_output = (
+            notion_hosted_unverified_writeback_failure.stdout
+            + notion_hosted_unverified_writeback_failure.stderr
+        )
+        if notion_hosted_unverified_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject hosted Notion "
+                "source writeback without verified page-update evidence."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready without verified authenticated Notion writeback evidence"
+            not in notion_hosted_unverified_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion hosted-unverified message changed.")
+
+        notion_hosted_split_writeback_md = notion_hosted_writeback_md.replace(
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+            "Target: Notion `result` page property update verified.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_hosted_split_writeback_md,
+            encoding="utf-8",
+        )
+        notion_hosted_split_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_hosted_split_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow hosted Notion source "
+                "writeback when route and writeback evidence are split across "
+                "documented fields: "
+                + (
+                    notion_hosted_split_writeback_success.stderr
+                    or notion_hosted_split_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_hosted_confirmed_writeback_md = notion_hosted_writeback_md.replace(
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+            "Target: Notion `result` page property update confirmed through hosted Notion MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_hosted_confirmed_writeback_md,
+            encoding="utf-8",
+        )
+        notion_hosted_confirmed_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_hosted_confirmed_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow confirmed hosted Notion "
+                "source writeback evidence: "
+                + (
+                    notion_hosted_confirmed_writeback_success.stderr
+                    or notion_hosted_confirmed_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_hosted_documented_writeback_md = notion_hosted_writeback_md.replace(
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+            "Target: Notion page update capability and canary writeback/readback passes through hosted Notion MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_hosted_documented_writeback_md,
+            encoding="utf-8",
+        )
+        notion_hosted_documented_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_hosted_documented_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow documented hosted Notion "
+                "page-update canary writeback/readback pass evidence: "
+                + (
+                    notion_hosted_documented_writeback_success.stderr
+                    or notion_hosted_documented_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_hosted_policy_writeback_md = notion_hosted_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property update verified through hosted Notion MCP.\n",
+            "Result output policy: source-writeback with page property update verified through hosted Notion MCP.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property update target.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_hosted_policy_writeback_md,
+            encoding="utf-8",
+        )
+        notion_hosted_policy_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_hosted_policy_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow verified hosted "
+                "Notion writeback evidence on result-output policy lines: "
+                + (
+                    notion_hosted_policy_writeback_success.stderr
+                    or notion_hosted_policy_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_managed_connector_writeback_md = notion_hosted_writeback_md.replace(
+            "Access route: hosted Notion MCP at https://mcp.notion.com/mcp.",
+            "Access route: managed Notion connector route.",
+        ).replace(
+            "Source access route discovery result: hosted Notion MCP OAuth route discovery completed.",
+            "Source access route discovery result: managed Notion connector route discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with hosted Notion MCP OAuth.",
+            "Authentication or access check result: passed with managed Notion connector OAuth.",
+        ).replace(
+            "Sample fetch result: passed with hosted Notion MCP database records.",
+            "Sample fetch result: passed with managed Notion connector records.",
+        ).replace(
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+            "Target: Notion `result` page property update verified through managed Notion connector writeback route.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_managed_connector_writeback_md,
+            encoding="utf-8",
+        )
+        notion_managed_connector_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_managed_connector_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow verified managed Notion "
+                "connector source writeback evidence: "
+                + (
+                    notion_managed_connector_writeback_success.stderr
+                    or notion_managed_connector_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_integration_token_writeback_md = notion_hosted_writeback_md.replace(
+            "Access route: hosted Notion MCP at https://mcp.notion.com/mcp.",
+            "Access route: Notion API integration token (redacted).",
+        ).replace(
+            "Source access route discovery result: hosted Notion MCP OAuth route discovery completed.",
+            "Source access route discovery result: Notion API integration token route checked.",
+        ).replace(
+            "Authentication or access check result: passed with hosted Notion MCP OAuth.",
+            "Authentication or access check result: passed with Notion integration token (redacted).",
+        ).replace(
+            "Sample fetch result: passed with hosted Notion MCP database records.",
+            "Sample fetch result: passed with Notion API records.",
+        ).replace(
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+            "Target: Notion `result` page property update verified through Notion integration token (redacted).",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_integration_token_writeback_md,
+            encoding="utf-8",
+        )
+        notion_integration_token_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_integration_token_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow verified redacted "
+                "Notion integration-token source writeback evidence: "
+                + (
+                    notion_integration_token_writeback_success.stderr
+                    or notion_integration_token_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_option_template_result_output_md = notion_hosted_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property update verified through hosted Notion MCP.\n",
+            "policy: source-writeback | source-adjacent-result-artifact | local-result-csv\n"
+            "Result target mode: source-adjacent-result-artifact.\n"
+            "Target: source-adjacent result artifact.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_option_template_result_output_md,
+            encoding="utf-8",
+        )
+        notion_option_template_result_output_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_option_template_result_output_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must not treat result-output option "
+                "templates as active source writeback declarations: "
+                + (
+                    notion_option_template_result_output_success.stderr
+                    or notion_option_template_result_output_success.stdout
+                ).strip()
+            )
+
+        notion_fenced_example_result_output_md = notion_hosted_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property update verified through hosted Notion MCP.\n",
+            "```yaml\n"
+            "result_output:\n"
+            "  target_mode: source-writeback\n"
+            "```\n"
+            "Result target mode: source-adjacent-result-artifact.\n"
+            "Target: source-adjacent result artifact.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_fenced_example_result_output_md,
+            encoding="utf-8",
+        )
+        notion_fenced_example_result_output_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_fenced_example_result_output_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must not treat fenced "
+                "result-output examples as active source writeback declarations: "
+                + (
+                    notion_fenced_example_result_output_success.stderr
+                    or notion_fenced_example_result_output_success.stdout
+                ).strip()
+            )
+
+        notion_hosted_negated_public_route_cases = [
+            (
+                "free-form negated public route note",
+                notion_hosted_writeback_md.replace(
+                    "Source onboarding completed for this parameterized-bound workflow.\n",
+                    (
+                        "Source onboarding completed for this parameterized-bound workflow.\n"
+                        "Public shared-page route was not used.\n"
+                    ),
+                ),
+            ),
+            (
+                "structured negated public route evidence",
+                notion_hosted_writeback_md.replace(
+                    "Access route: hosted Notion MCP at https://mcp.notion.com/mcp.",
+                    (
+                        "Access route: hosted Notion MCP at https://mcp.notion.com/mcp; "
+                        "public shared-page route was not used."
+                    ),
+                ).replace(
+                    "Source access route discovery result: hosted Notion MCP OAuth route discovery completed.",
+                    (
+                        "Source access route discovery result: hosted Notion MCP OAuth route discovery completed; "
+                        "no public shared-page route selected."
+                    ),
+                ).replace(
+                    "Authentication or access check result: passed with hosted Notion MCP OAuth.",
+                    (
+                        "Authentication or access check result: passed with hosted Notion MCP OAuth; "
+                        "anonymous public shared-page access was not used."
+                    ),
+                ).replace(
+                    "Sample fetch result: passed with hosted Notion MCP database records.",
+                    (
+                        "Sample fetch result: passed with hosted Notion MCP database records; "
+                        "saveTransactions was not used."
+                    ),
+                ),
+            ),
+            (
+                "hosted public OAuth route evidence",
+                notion_hosted_writeback_md.replace(
+                    "Access route: hosted Notion MCP at https://mcp.notion.com/mcp.",
+                    "Access route: hosted Notion MCP public OAuth route at https://mcp.notion.com/mcp.",
+                ).replace(
+                    "Source access route discovery result: hosted Notion MCP OAuth route discovery completed.",
+                    "Source access route discovery result: hosted Notion MCP public OAuth route discovery completed.",
+                ),
+            ),
+        ]
+        for case_name, skill_md in notion_hosted_negated_public_route_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            notion_hosted_negated_public_route_success = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if notion_hosted_negated_public_route_success.returncode != 0:
+                fail(
+                    f"Generated outbound skill checker must allow hosted Notion writeback with {case_name}: "
+                    + (
+                        notion_hosted_negated_public_route_success.stderr
+                        or notion_hosted_negated_public_route_success.stdout
+                    ).strip()
+                )
+
+        airtable_read_only_writeback_md = valid_skill_md.replace(
+            "The source contract defines the approved data source and row ownership boundary.",
+            "Source family: airtable.\nThe source contract defines the approved data source and row ownership boundary.",
+        ).replace(
+            "Access route: local source credentials.",
+            "Access route: read-only API sample export.",
+        ).replace(
+            "Source access route discovery result: host-local route discovery completed before user route selection.",
+            "Source access route discovery result: read-only API sample export completed.",
+        ).replace(
+            "Authentication or access check result: passed with local source credentials.",
+            "Authentication or access check result: passed with read-only API access.",
+        ).replace(
+            "Sample fetch result: passed with a representative source instance.",
+            "Sample fetch result: passed with read-only records.",
+        ).replace(
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Prefer source writeback when verified. Use `source-adjacent-result-artifact`\n"
+            "when results should stay in the source system without mutating source records.\n"
+            "Otherwise use `result-csv-file` to write a new local result CSV. Use\n"
+            "session-table output only as a last-resort attended fallback when durable result\n"
+            "output is blocked.\n"
+            "Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.",
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Airtable `result` field update from the sampled records.\n"
+            "Durable result output fallback: result-csv-file is available until Airtable "
+            "writeback is verified; session-table output remains last-resort only.",
+        )
+        airtable_hosted_unverified_writeback_md = valid_skill_md.replace(
+            "The source contract defines the approved data source and row ownership boundary.",
+            "Source family: airtable.\nThe source contract defines the approved data source and row ownership boundary.",
+        ).replace(
+            "Access route: local source credentials.",
+            "Access route: hosted Airtable MCP.",
+        ).replace(
+            "Source access route discovery result: host-local route discovery completed before user route selection.",
+            "Source access route discovery result: hosted Airtable MCP route discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with local source credentials.",
+            "Authentication or access check result: passed with hosted Airtable MCP OAuth.",
+        ).replace(
+            "Sample fetch result: passed with a representative source instance.",
+            "Sample fetch result: passed with hosted Airtable MCP records.",
+        ).replace(
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Prefer source writeback when verified. Use `source-adjacent-result-artifact`\n"
+            "when results should stay in the source system without mutating source records.\n"
+            "Otherwise use `result-csv-file` to write a new local result CSV. Use\n"
+            "session-table output only as a last-resort attended fallback when durable result\n"
+            "output is blocked.\n"
+            "Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.",
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Airtable `result` field update configured through hosted Airtable MCP.\n"
+            "Durable result output fallback: result-csv-file is available only if source writeback fails later.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_hosted_unverified_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_hosted_unverified_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_hosted_unverified_writeback_output = (
+            airtable_hosted_unverified_writeback_failure.stdout
+            + airtable_hosted_unverified_writeback_failure.stderr
+        )
+        if airtable_hosted_unverified_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject hosted Airtable "
+                "source writeback without verified record-update evidence."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready without verified Airtable record-update evidence"
+            not in airtable_hosted_unverified_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable hosted-unverified message changed.")
+
+        (skill_dir / "SKILL.md").write_text(airtable_read_only_writeback_md, encoding="utf-8")
+        airtable_read_only_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_writeback_output = (
+            airtable_read_only_writeback_failure.stdout
+            + airtable_read_only_writeback_failure.stderr
+        )
+        if airtable_read_only_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source writeback "
+                "when onboarding used read-only Airtable access."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable read-only writeback message changed.")
+
+        airtable_read_only_no_writeback_md = airtable_read_only_writeback_md.replace(
+            "Access route: read-only API sample export.",
+            "Access route: read-only API sample export; no writeback capability is available.",
+        ).replace(
+            "Source access route discovery result: read-only API sample export completed.",
+            "Source access route discovery result: read-only API sample export completed; "
+            "writeback unavailable.",
+        ).replace(
+            "Authentication or access check result: passed with read-only API access.",
+            "Authentication or access check result: passed with read-only API access; "
+            "no writeback capability is available.",
+        ).replace(
+            "Sample fetch result: passed with read-only records.",
+            "Sample fetch result: passed with read-only records; no record update capability is available.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_no_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_no_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_no_writeback_output = (
+            airtable_read_only_no_writeback_failure.stdout
+            + airtable_read_only_no_writeback_failure.stderr
+        )
+        if airtable_read_only_no_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when read-only access explicitly says writeback is "
+                "unavailable."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_no_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable no-writeback message changed.")
+
+        airtable_read_only_unrelated_not_used_writeback_md = (
+            airtable_read_only_writeback_md.replace(
+                "Result target mode: source-writeback.",
+                "Result target mode: source-writeback, session-table output is not used.",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_unrelated_not_used_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_unrelated_not_used_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_unrelated_not_used_writeback_output = (
+            airtable_read_only_unrelated_not_used_writeback_failure.stdout
+            + airtable_read_only_unrelated_not_used_writeback_failure.stderr
+        )
+        if airtable_read_only_unrelated_not_used_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback even when unrelated session-table output is not used."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_unrelated_not_used_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Airtable unrelated-not-used "
+                "writeback message changed."
+            )
+
+        airtable_read_only_policy_only_writeback_md = airtable_read_only_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            "Source onboarding completed for this parameterized-bound workflow.\n"
+            "Do not mark Airtable source writeback ready until hosted Airtable MCP "
+            "record update is verified.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_policy_only_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_policy_only_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_policy_only_writeback_output = (
+            airtable_read_only_policy_only_writeback_failure.stdout
+            + airtable_read_only_policy_only_writeback_failure.stderr
+        )
+        if airtable_read_only_policy_only_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when read-only onboarding only documents a future "
+                "writeback policy."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_policy_only_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable policy-only message changed.")
+
+        airtable_read_only_required_writeback_md = airtable_read_only_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            "Source onboarding completed for this parameterized-bound workflow.\n"
+            "Source writeback requires hosted Airtable MCP record update capability.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_required_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_required_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_required_writeback_output = (
+            airtable_read_only_required_writeback_failure.stdout
+            + airtable_read_only_required_writeback_failure.stderr
+        )
+        if airtable_read_only_required_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when onboarding only documents required future "
+                "record-update capability."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_required_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable required-writeback message changed.")
+
+        airtable_read_only_pending_writeback_md = airtable_read_only_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            "Source onboarding completed for this parameterized-bound workflow.\n"
+            "Writeback is pending until verified through hosted Airtable MCP "
+            "record update.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_pending_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_pending_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_pending_writeback_output = (
+            airtable_read_only_pending_writeback_failure.stdout
+            + airtable_read_only_pending_writeback_failure.stderr
+        )
+        if airtable_read_only_pending_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when writeback verification is only pending."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_pending_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable pending-writeback message changed.")
+
+        airtable_read_only_configured_writeback_md = airtable_read_only_writeback_md.replace(
+            "Source access route discovery result: read-only API sample export completed.",
+            "Source access route discovery result: read-only API sample export completed; "
+            "hosted Airtable MCP record update route configured.",
+        ).replace(
+            "Authentication or access check result: passed with read-only API access.",
+            "Authentication or access check result: passed with read-only API access; "
+            "hosted Airtable MCP record update access configured.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_configured_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_configured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_configured_writeback_output = (
+            airtable_read_only_configured_writeback_failure.stdout
+            + airtable_read_only_configured_writeback_failure.stderr
+        )
+        if airtable_read_only_configured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when update access is only configured."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_configured_writeback_output
+        ):
+            fail("Generated outbound skill checker Airtable configured-writeback message changed.")
+
+        airtable_read_only_inline_configured_update_md = (
+            airtable_read_only_writeback_md.replace(
+                "Access route: read-only API sample export.",
+                "Access route: read-only API sample export; record update route configured.",
+            )
+            .replace(
+                "Source access route discovery result: read-only API sample export completed.",
+                "Source access route discovery result: read-only API sample export completed; "
+                "record update route configured.",
+            )
+            .replace(
+                "Authentication or access check result: passed with read-only API access.",
+                "Authentication or access check result: passed with read-only API access; "
+                "record update access configured.",
+            )
+            .replace(
+                "Sample fetch result: passed with read-only records.",
+                "Sample fetch result: passed with read-only records; record update route configured.",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_inline_configured_update_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_inline_configured_update_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_inline_configured_update_output = (
+            airtable_read_only_inline_configured_update_failure.stdout
+            + airtable_read_only_inline_configured_update_failure.stderr
+        )
+        if airtable_read_only_inline_configured_update_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when read-only evidence only has configured update paths."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_inline_configured_update_output
+        ):
+            fail(
+                "Generated outbound skill checker Airtable inline-configured-update "
+                "message changed."
+            )
+
+        airtable_read_only_non_destructive_configured_md = (
+            airtable_read_only_writeback_md.replace(
+                "Sample fetch result: passed with read-only records.",
+                (
+                    "Sample fetch result: passed with read-only records and "
+                    "non-destructive record update configured."
+                ),
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_non_destructive_configured_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_non_destructive_configured_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_non_destructive_configured_output = (
+            airtable_read_only_non_destructive_configured_failure.stdout
+            + airtable_read_only_non_destructive_configured_failure.stderr
+        )
+        if airtable_read_only_non_destructive_configured_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when non-destructive update evidence is only configured."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_non_destructive_configured_output
+        ):
+            fail(
+                "Generated outbound skill checker Airtable non-destructive-configured "
+                "message changed."
+            )
+
+        airtable_read_only_required_update_md = airtable_read_only_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            (
+                "Source onboarding completed for this parameterized-bound workflow.\n"
+                "Source writeback requires verified hosted Airtable MCP record update access."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_required_update_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_required_update_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_required_update_output = (
+            airtable_read_only_required_update_failure.stdout
+            + airtable_read_only_required_update_failure.stderr
+        )
+        if airtable_read_only_required_update_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when onboarding only documents required future update access."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_required_update_output
+        ):
+            fail("Generated outbound skill checker Airtable required-update message changed.")
+
+        airtable_read_only_readiness_criterion_md = airtable_read_only_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            (
+                "Source onboarding completed for this parameterized-bound workflow.\n"
+                "Readiness criterion: hosted Airtable MCP record update route "
+                "verified before source-writeback."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_readiness_criterion_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_readiness_criterion_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_readiness_criterion_output = (
+            airtable_read_only_readiness_criterion_failure.stdout
+            + airtable_read_only_readiness_criterion_failure.stderr
+        )
+        if airtable_read_only_readiness_criterion_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when onboarding only documents a readiness criterion."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_readiness_criterion_output
+        ):
+            fail("Generated outbound skill checker Airtable readiness-criterion message changed.")
+
+        airtable_read_only_requested_update_md = airtable_read_only_writeback_md.replace(
+            "Authentication or access check result: passed with read-only API access.",
+            (
+                "Authentication or access check result: passed with read-only API access "
+                "and record update access requested."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_requested_update_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_requested_update_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_requested_update_output = (
+            airtable_read_only_requested_update_failure.stdout
+            + airtable_read_only_requested_update_failure.stderr
+        )
+        if airtable_read_only_requested_update_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Airtable source "
+                "writeback when update access is only requested."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_requested_update_output
+        ):
+            fail("Generated outbound skill checker Airtable requested-update message changed.")
+
+        airtable_read_only_configured_and_verified_update_md = (
+            airtable_read_only_writeback_md.replace(
+                "Sample fetch result: passed with read-only records.",
+                (
+                    "Sample fetch result: passed with read-only records; hosted "
+                    "Airtable MCP record update route configured and verified."
+                ),
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_configured_and_verified_update_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_configured_and_verified_update_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_read_only_configured_and_verified_update_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow Airtable source writeback "
+                "when configured update access is also verified: "
+                + (
+                    airtable_read_only_configured_and_verified_update_success.stderr
+                    or airtable_read_only_configured_and_verified_update_success.stdout
+                ).strip()
+            )
+
+        airtable_read_only_configured_and_passed_update_md = (
+            airtable_read_only_writeback_md.replace(
+                "Sample fetch result: passed with read-only records.",
+                (
+                    "Sample fetch result: passed with read-only records; hosted "
+                    "Airtable MCP record update route configured and passed."
+                ),
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_configured_and_passed_update_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_configured_and_passed_update_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_read_only_configured_and_passed_update_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow Airtable source writeback "
+                "when configured update access also passed verification: "
+                + (
+                    airtable_read_only_configured_and_passed_update_success.stderr
+                    or airtable_read_only_configured_and_passed_update_success.stdout
+                ).strip()
+            )
+
+        airtable_read_only_with_update_writeback_md = airtable_read_only_writeback_md.replace(
+            "Source access route discovery result: read-only API sample export completed.",
+            "Source access route discovery result: read-only API sample export completed; "
+            "hosted Airtable MCP record update route verified.",
+        ).replace(
+            "Authentication or access check result: passed with read-only API access.",
+            "Authentication or access check result: passed with read-only API access; "
+            "hosted Airtable MCP record update access verified.",
+        ).replace(
+            "Sample fetch result: passed with read-only records.",
+            "Sample fetch result: passed with read-only records; canary writeback verified "
+            "through hosted Airtable MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_with_update_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_with_update_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_read_only_with_update_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow Airtable source writeback "
+                "when read-only sampling has separate verified update access: "
+                + (
+                    airtable_read_only_with_update_writeback_success.stderr
+                    or airtable_read_only_with_update_writeback_success.stdout
+                ).strip()
+            )
+
+        airtable_read_update_writeback_md = airtable_read_only_writeback_md.replace(
+            "Access route: read-only API sample export.",
+            "Access route: hosted Airtable MCP verified for read and update access.",
+        ).replace(
+            "Source access route discovery result: read-only API sample export completed.",
+            "Source access route discovery result: hosted Airtable MCP read and update route discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with read-only API access.",
+            "Authentication or access check result: passed with read access and record update access.",
+        ).replace(
+            "Sample fetch result: passed with read-only records.",
+            "Sample fetch result: passed with Airtable records and record update capability verified.",
+        )
+        (skill_dir / "SKILL.md").write_text(airtable_read_update_writeback_md, encoding="utf-8")
+        airtable_read_update_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_read_update_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow Airtable source writeback "
+                "when read and record update access are verified: "
+                + (
+                    airtable_read_update_writeback_success.stderr
+                    or airtable_read_update_writeback_success.stdout
+                ).strip()
+            )
+
+        airtable_documented_canary_writeback_md = airtable_read_only_writeback_md.replace(
+            "Access route: read-only API sample export.",
+            "Access route: hosted Airtable MCP.",
+        ).replace(
+            "Source access route discovery result: read-only API sample export completed.",
+            "Source access route discovery result: hosted Airtable MCP route discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with read-only API access.",
+            "Authentication or access check result: passed with hosted Airtable MCP.",
+        ).replace(
+            "Sample fetch result: passed with read-only records.",
+            "Sample fetch result: passed with Airtable records.",
+        ).replace(
+            "Target: Airtable `result` field update from the sampled records.",
+            "Target: Airtable record update capability and canary writeback/readback passes through hosted Airtable MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_documented_canary_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_documented_canary_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_documented_canary_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow documented Airtable "
+                "canary writeback/readback pass evidence: "
+                + (
+                    airtable_documented_canary_writeback_success.stderr
+                    or airtable_documented_canary_writeback_success.stdout
+                ).strip()
+            )
+
+        airtable_policy_verified_writeback_md = (
+            airtable_read_update_writeback_md.replace(
+                "Sample fetch result: passed with Airtable records and record update capability verified.",
+                "Sample fetch result: passed with Airtable records.",
+            ).replace(
+                "Result output policy: source-writeback.\n"
+                "Result target mode: source-writeback.\n"
+                "Target: Airtable `result` field update from the sampled records.\n",
+                "Result output policy: source-writeback with record update verified through hosted Airtable MCP.\n"
+                "Result target mode: source-writeback.\n"
+                "Target: Airtable `result` field update target.\n",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_policy_verified_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_policy_verified_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_policy_verified_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow verified Airtable "
+                "writeback evidence on result-output policy lines: "
+                + (
+                    airtable_policy_verified_writeback_success.stderr
+                    or airtable_policy_verified_writeback_success.stdout
+                ).strip()
+            )
+
+        airtable_patch_writeback_md = airtable_read_only_writeback_md.replace(
+            "Access route: read-only API sample export.",
+            "Access route: Airtable Web API personal access token.",
+        ).replace(
+            "Source access route discovery result: read-only API sample export completed.",
+            "Source access route discovery result: Airtable Web API route discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with read-only API access.",
+            "Authentication or access check result: passed with Airtable Web API personal access token.",
+        ).replace(
+            "Sample fetch result: passed with read-only records.",
+            "Sample fetch result: passed with Airtable records and PATCH writeback verified.",
+        ).replace(
+            "Target: Airtable `result` field update from the sampled records.",
+            "Target: Airtable `result` field PATCH verified through Airtable Web API.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_patch_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_patch_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if airtable_patch_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow verified Airtable "
+                "PATCH source writeback evidence: "
+                + (
+                    airtable_patch_writeback_success.stderr
+                    or airtable_patch_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_public_writeback_md = valid_skill_md.replace(
+            "The source contract defines the approved data source and row ownership boundary.",
+            "Source family: notion.\nThe source contract defines the approved data source and row ownership boundary.",
+        ).replace(
+            "Access route: local source credentials.",
+            "Access route: public Notion shared page data API.",
+        ).replace(
+            "Source access route discovery result: host-local route discovery completed before user route selection.",
+            "Source access route discovery result: public shared-page read discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with local source credentials.",
+            "Authentication or access check result: passed with anonymous public shared-page read access.",
+        ).replace(
+            "Sample fetch result: passed with a representative source instance.",
+            "Sample fetch result: passed with public Notion shared-page record data.",
+        ).replace(
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Prefer source writeback when verified. Use `source-adjacent-result-artifact`\n"
+            "when results should stay in the source system without mutating source records.\n"
+            "Otherwise use `result-csv-file` to write a new local result CSV. Use\n"
+            "session-table output only as a last-resort attended fallback when durable result\n"
+            "output is blocked.\n"
+            "Runtime result target mode: source-adjacent-result-artifact resolved before execution approval from fixed creation values or approved runtime parameters.",
+            "Result-output behavior records call status, timestamps, summaries, and masked phone numbers.\n"
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n"
+            "Durable result output fallback: result-csv-file is available only if source writeback fails later; "
+            "session-table output is a last-resort attended fallback.",
+        )
+        (skill_dir / "SKILL.md").write_text(notion_public_writeback_md, encoding="utf-8")
+        notion_public_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_writeback_output = (
+            notion_public_writeback_failure.stdout
+            + notion_public_writeback_failure.stderr
+        )
+        if notion_public_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when onboarding used public shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion public-writeback message changed.")
+
+        notion_public_with_hosted_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data "
+                "and canary writeback verified through hosted Notion MCP."
+            ),
+        ).replace(
+            "Target: Notion `result` page property discovered through the public shared-page route.",
+            "Target: Notion `result` page property update verified through hosted Notion MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_with_hosted_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_with_hosted_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_public_with_hosted_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow public Notion sampling "
+                "with hosted MCP writeback verification in the same evidence line: "
+                + (
+                    notion_public_with_hosted_writeback_success.stderr
+                    or notion_public_with_hosted_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_public_page_metadata_writeback_md = notion_public_writeback_md.replace(
+            "Access route: public Notion shared page data API.",
+            "Access route: public Notion page metadata route.",
+        ).replace(
+            "Source access route discovery result: public shared-page read discovery completed.",
+            "Source access route discovery result: public page metadata discovery completed.",
+        ).replace(
+            "Authentication or access check result: passed with anonymous public shared-page read access.",
+            "Authentication or access check result: passed with public page metadata access.",
+        ).replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            "Sample fetch result: passed with public page metadata.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_page_metadata_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_page_metadata_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_page_metadata_writeback_output = (
+            notion_public_page_metadata_writeback_failure.stdout
+            + notion_public_page_metadata_writeback_failure.stderr
+        )
+        if notion_public_page_metadata_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when onboarding used public page metadata access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_page_metadata_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion public page metadata message changed.")
+
+        notion_public_plain_page_writeback_cases = [
+            (
+                "public Notion page",
+                notion_public_writeback_md.replace(
+                    "Access route: public Notion shared page data API.",
+                    "Access route: public Notion page.",
+                ).replace(
+                    "Source access route discovery result: public shared-page read discovery completed.",
+                    "Source access route discovery result: public Notion page read discovery completed.",
+                ).replace(
+                    "Authentication or access check result: passed with anonymous public shared-page read access.",
+                    "Authentication or access check result: passed with public Notion page read access.",
+                ).replace(
+                    "Sample fetch result: passed with public Notion shared-page record data.",
+                    "Sample fetch result: passed with public Notion page record data.",
+                ),
+            ),
+            (
+                "shared Notion page",
+                notion_public_writeback_md.replace(
+                    "Access route: public Notion shared page data API.",
+                    "Access route: shared Notion page.",
+                ).replace(
+                    "Source access route discovery result: public shared-page read discovery completed.",
+                    "Source access route discovery result: shared Notion page read discovery completed.",
+                ).replace(
+                    "Authentication or access check result: passed with anonymous public shared-page read access.",
+                    "Authentication or access check result: passed with shared Notion page read access.",
+                ).replace(
+                    "Sample fetch result: passed with public Notion shared-page record data.",
+                    "Sample fetch result: passed with shared Notion page record data.",
+                ),
+            ),
+        ]
+        for case_name, skill_md in notion_public_plain_page_writeback_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            notion_public_plain_page_writeback_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            notion_public_plain_page_writeback_output = (
+                notion_public_plain_page_writeback_failure.stdout
+                + notion_public_plain_page_writeback_failure.stderr
+            )
+            if notion_public_plain_page_writeback_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject Notion source "
+                    f"writeback when onboarding used {case_name} access only."
+                )
+            if (
+                "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+                not in notion_public_plain_page_writeback_output
+            ):
+                fail(
+                    "Generated outbound skill checker Notion "
+                    f"{case_name} message changed."
+                )
+
+        notion_public_writeback_with_unavailable_fallback_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "Result target mode: source-writeback.\n"
+            "Durable result output fallback: session-table is unavailable "
+            "because attended output is blocked.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_writeback_with_unavailable_fallback_md,
+            encoding="utf-8",
+        )
+        notion_public_writeback_with_unavailable_fallback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_writeback_with_unavailable_fallback_output = (
+            notion_public_writeback_with_unavailable_fallback_failure.stdout
+            + notion_public_writeback_with_unavailable_fallback_failure.stderr
+        )
+        if notion_public_writeback_with_unavailable_fallback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject public Notion source "
+                "writeback even when an unrelated fallback is unavailable."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_writeback_with_unavailable_fallback_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion public-writeback unavailable "
+                "fallback message changed."
+            )
+
+        notion_public_policy_only_writeback_md = notion_public_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            "Source onboarding completed for this parameterized-bound workflow.\n"
+            "Do not mark Notion source writeback ready until hosted Notion MCP "
+            "writeback is verified.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_policy_only_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_policy_only_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_policy_only_writeback_output = (
+            notion_public_policy_only_writeback_failure.stdout
+            + notion_public_policy_only_writeback_failure.stderr
+        )
+        if notion_public_policy_only_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source "
+                "writeback when public onboarding only documents a future "
+                "writeback policy."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_policy_only_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion policy-only message changed.")
+
+        notion_public_required_writeback_md = notion_public_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            "Source onboarding completed for this parameterized-bound workflow.\n"
+            "Source writeback requires hosted Notion MCP page property update capability.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_required_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_required_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_required_writeback_output = (
+            notion_public_required_writeback_failure.stdout
+            + notion_public_required_writeback_failure.stderr
+        )
+        if notion_public_required_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source "
+                "writeback when onboarding only documents required future "
+                "page-property update capability."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_required_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion required-writeback message changed.")
+
+        notion_public_pending_writeback_md = notion_public_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            "Source onboarding completed for this parameterized-bound workflow.\n"
+            "Writeback is pending until verified through hosted Notion MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_pending_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_pending_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_pending_writeback_output = (
+            notion_public_pending_writeback_failure.stdout
+            + notion_public_pending_writeback_failure.stderr
+        )
+        if notion_public_pending_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source "
+                "writeback when writeback verification is only pending."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_pending_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion pending-writeback message changed.")
+
+        notion_public_configured_writeback_md = notion_public_writeback_md.replace(
+            "Source access route discovery result: public shared-page read discovery completed.",
+            "Source access route discovery result: public shared-page read discovery completed; "
+            "hosted Notion MCP writeback route configured.",
+        ).replace(
+            "Authentication or access check result: passed with anonymous public shared-page read access.",
+            "Authentication or access check result: passed with anonymous public shared-page read access; "
+            "hosted Notion MCP writeback access configured.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_configured_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_configured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_configured_writeback_output = (
+            notion_public_configured_writeback_failure.stdout
+            + notion_public_configured_writeback_failure.stderr
+        )
+        if notion_public_configured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source "
+                "writeback when hosted writeback is only configured."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_configured_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion configured-writeback message changed.")
+
+        notion_public_save_transactions_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page data; "
+                "canary writeback verified through saveTransactions."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_save_transactions_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_save_transactions_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_save_transactions_writeback_output = (
+            notion_public_save_transactions_writeback_failure.stdout
+            + notion_public_save_transactions_writeback_failure.stderr
+        )
+        if notion_public_save_transactions_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when canary writeback evidence uses public saveTransactions access."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_save_transactions_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion saveTransactions-writeback message changed.")
+
+        notion_public_configured_save_transactions_writeback_md = (
+            notion_public_configured_writeback_md.replace(
+                "Sample fetch result: passed with public Notion shared-page record data.",
+                (
+                    "Sample fetch result: passed with public Notion shared-page data; "
+                    "canary writeback verified through saveTransactions."
+                ),
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_configured_save_transactions_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_configured_save_transactions_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_configured_save_transactions_writeback_output = (
+            notion_public_configured_save_transactions_writeback_failure.stdout
+            + notion_public_configured_save_transactions_writeback_failure.stderr
+        )
+        if notion_public_configured_save_transactions_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when configured hosted-route evidence is paired with public "
+                "saveTransactions writeback evidence."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_configured_save_transactions_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion configured "
+                "saveTransactions-writeback message changed."
+            )
+
+        notion_public_configured_result_save_transactions_writeback_md = (
+            notion_public_configured_writeback_md.replace(
+                "Target: Notion `result` page property discovered through the public shared-page route.",
+                "Target: canary writeback verified through saveTransactions.",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_configured_result_save_transactions_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_configured_result_save_transactions_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_configured_result_save_transactions_writeback_output = (
+            notion_public_configured_result_save_transactions_writeback_failure.stdout
+            + notion_public_configured_result_save_transactions_writeback_failure.stderr
+        )
+        if notion_public_configured_result_save_transactions_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when configured hosted-route evidence is paired with result-output "
+                "saveTransactions writeback evidence."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_configured_result_save_transactions_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion configured result-output "
+                "saveTransactions-writeback message changed."
+            )
+
+        notion_public_token_warning_writeback_md = notion_public_writeback_md.replace(
+            "Source onboarding completed for this parameterized-bound workflow.",
+            (
+                "Source onboarding completed for this parameterized-bound workflow.\n"
+                "Token handling: do not expose the Notion integration token."
+            ),
+        ).replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page data; "
+                "canary writeback verified through saveTransactions."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_token_warning_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_token_warning_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_token_warning_writeback_output = (
+            notion_public_token_warning_writeback_failure.stdout
+            + notion_public_token_warning_writeback_failure.stderr
+        )
+        if notion_public_token_warning_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when token-handling safety text is the only authenticated route evidence."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_token_warning_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion token-warning-writeback message changed.")
+
+        notion_public_token_omission_unqualified_writeback_md = (
+            notion_public_writeback_md.replace(
+                "Source onboarding completed for this parameterized-bound workflow.",
+                (
+                    "Source onboarding completed for this parameterized-bound workflow.\n"
+                    "Token handling: omit Notion integration token from summaries."
+                ),
+            ).replace(
+                "Target: Notion `result` page property discovered through the public shared-page route.",
+                "Target: Notion `result` page property update verified.",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_token_omission_unqualified_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_token_omission_unqualified_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_token_omission_unqualified_writeback_output = (
+            notion_public_token_omission_unqualified_writeback_failure.stdout
+            + notion_public_token_omission_unqualified_writeback_failure.stderr
+        )
+        if notion_public_token_omission_unqualified_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject public Notion source "
+                "writeback when token-omission safety text is the only authenticated "
+                "route evidence."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_token_omission_unqualified_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion token-omission-writeback message changed.")
+
+        notion_public_future_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback will be verified through hosted Notion MCP before launch."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_future_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_future_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_future_writeback_output = (
+            notion_public_future_writeback_failure.stdout
+            + notion_public_future_writeback_failure.stderr
+        )
+        if notion_public_future_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback verification is future-tense."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_future_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion future-writeback message changed.")
+
+        notion_public_negated_auth_route_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified without Notion integration token."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_negated_auth_route_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_negated_auth_route_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_negated_auth_route_writeback_output = (
+            notion_public_negated_auth_route_writeback_failure.stdout
+            + notion_public_negated_auth_route_writeback_failure.stderr
+        )
+        if notion_public_negated_auth_route_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when authenticated writeback evidence only negates an auth route."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_negated_auth_route_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion negated-auth-route message changed.")
+
+        notion_public_conditional_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data.\n"
+                "Hosted Notion MCP must be used after canary writeback is verified."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_conditional_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_conditional_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_conditional_writeback_output = (
+            notion_public_conditional_writeback_failure.stdout
+            + notion_public_conditional_writeback_failure.stderr
+        )
+        if notion_public_conditional_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback evidence is conditional requirement prose."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_conditional_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion conditional-writeback message changed.")
+
+        notion_public_conditional_credentials_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified through hosted Notion MCP if integration "
+                "credentials are later added."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_conditional_credentials_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_conditional_credentials_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_conditional_credentials_writeback_output = (
+            notion_public_conditional_credentials_writeback_failure.stdout
+            + notion_public_conditional_credentials_writeback_failure.stderr
+        )
+        if notion_public_conditional_credentials_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback depends on later credentials."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_conditional_credentials_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion conditional-credentials-writeback message changed.")
+
+        notion_public_after_later_credentials_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified through hosted Notion MCP after integration "
+                "credentials are later added."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_after_later_credentials_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_after_later_credentials_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_after_later_credentials_writeback_output = (
+            notion_public_after_later_credentials_writeback_failure.stdout
+            + notion_public_after_later_credentials_writeback_failure.stderr
+        )
+        if notion_public_after_later_credentials_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback waits for later credentials."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_after_later_credentials_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion after-later-credentials message changed.")
+
+        notion_public_credentials_to_add_later_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified through hosted Notion MCP with integration "
+                "credentials to be added later."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_credentials_to_add_later_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_credentials_to_add_later_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_credentials_to_add_later_writeback_output = (
+            notion_public_credentials_to_add_later_writeback_failure.stdout
+            + notion_public_credentials_to_add_later_writeback_failure.stderr
+        )
+        if notion_public_credentials_to_add_later_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback credentials are to be added later."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_credentials_to_add_later_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion credentials-to-add-later message changed.")
+
+        notion_public_conditional_permission_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified through hosted Notion MCP if write "
+                "permission is granted."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_conditional_permission_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_conditional_permission_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_conditional_permission_writeback_output = (
+            notion_public_conditional_permission_writeback_failure.stdout
+            + notion_public_conditional_permission_writeback_failure.stderr
+        )
+        if notion_public_conditional_permission_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback depends on conditional write permission."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_conditional_permission_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion conditional-permission message changed.")
+
+        notion_public_without_credentials_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified through hosted Notion MCP without "
+                "integration credentials."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_without_credentials_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_without_credentials_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_without_credentials_writeback_output = (
+            notion_public_without_credentials_writeback_failure.stdout
+            + notion_public_without_credentials_writeback_failure.stderr
+        )
+        if notion_public_without_credentials_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback lacks integration credentials."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_without_credentials_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion without-credentials message changed.")
+
+        notion_public_not_through_hosted_writeback_md = notion_public_writeback_md.replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            (
+                "Sample fetch result: passed with public Notion shared-page record data; "
+                "canary writeback verified not through hosted Notion MCP."
+            ),
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_not_through_hosted_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_not_through_hosted_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_not_through_hosted_writeback_output = (
+            notion_public_not_through_hosted_writeback_failure.stdout
+            + notion_public_not_through_hosted_writeback_failure.stderr
+        )
+        if notion_public_not_through_hosted_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion source writeback "
+                "when hosted writeback route evidence is negated with not through."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_not_through_hosted_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion not-through-hosted message changed.")
+
+        notion_public_with_hosted_writeback_md = notion_public_writeback_md.replace(
+            "Source access route discovery result: public shared-page read discovery completed.",
+            "Source access route discovery result: public shared-page read discovery completed; "
+            "hosted Notion MCP writeback route verified.",
+        ).replace(
+            "Authentication or access check result: passed with anonymous public shared-page read access.",
+            "Authentication or access check result: passed with anonymous public shared-page read access; "
+            "hosted Notion MCP OAuth writeback verified.",
+        ).replace(
+            "Sample fetch result: passed with public Notion shared-page record data.",
+            "Sample fetch result: passed with public Notion shared-page record data; "
+            "canary writeback verified through hosted Notion MCP.",
+        ).replace(
+            "Target: Notion `result` page property discovered through the public shared-page route.",
+            "Target: Notion `result` page property verified through hosted Notion MCP.",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_with_hosted_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_with_hosted_writeback_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_public_with_hosted_writeback_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow Notion source writeback "
+                "when public sampling has separate hosted MCP writeback verification: "
+                + (
+                    notion_public_with_hosted_writeback_success.stderr
+                    or notion_public_with_hosted_writeback_success.stdout
+                ).strip()
+            )
+
+        notion_public_source_family_format_cases = [
+            ("source_family YAML key", 'source_family: "notion"'),
+            ("source family prose", "Source family is notion."),
+        ]
+        for case_name, source_family_line in notion_public_source_family_format_cases:
+            notion_public_source_family_format_md = notion_public_writeback_md.replace(
+                "Source family: notion.",
+                source_family_line,
+            )
+            (skill_dir / "SKILL.md").write_text(
+                notion_public_source_family_format_md,
+                encoding="utf-8",
+            )
+            notion_public_source_family_format_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            notion_public_source_family_format_output = (
+                notion_public_source_family_format_failure.stdout
+                + notion_public_source_family_format_failure.stderr
+            )
+            if notion_public_source_family_format_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject Notion public source writeback "
+                    f"when source family is recorded as {case_name}."
+                )
+            if (
+                "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+                not in notion_public_source_family_format_output
+            ):
+                fail(
+                    "Generated outbound skill checker Notion source-family-format "
+                    f"message changed for {case_name}."
+                )
+
+        notion_public_access_route_without_family_md = notion_public_writeback_md.replace(
+            "Source family: notion.\n",
+            "",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_access_route_without_family_md,
+            encoding="utf-8",
+        )
+        notion_public_access_route_without_family_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_access_route_without_family_output = (
+            notion_public_access_route_without_family_failure.stdout
+            + notion_public_access_route_without_family_failure.stderr
+        )
+        if notion_public_access_route_without_family_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion public source writeback "
+                "when the Notion access route is present without a source-family line."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_access_route_without_family_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion access-route-without-family message changed."
+            )
+
+        notion_public_outside_result_writeback_base_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "Target: local result CSV fallback until authenticated Notion writeback is verified.\n",
+        )
+        notion_public_outside_result_writeback_cases = [
+            (
+                "Source Onboarding",
+                notion_public_outside_result_writeback_base_md.replace(
+                    "Source onboarding completed for this parameterized-bound workflow.\n",
+                    (
+                        "Source onboarding completed for this parameterized-bound workflow.\n"
+                        "Result target mode: source-writeback.\n"
+                    ),
+                ),
+            ),
+            (
+                "Source Contract",
+                notion_public_outside_result_writeback_base_md.replace(
+                    "## Source Contract\n\n",
+                    (
+                        "## Source Contract\n\n"
+                        "target_mode: source-writeback\n"
+                    ),
+                ),
+            ),
+        ]
+        for section_name, skill_md in notion_public_outside_result_writeback_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            missing_active_result_target_failure = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            missing_active_result_target_output = (
+                missing_active_result_target_failure.stdout
+                + missing_active_result_target_failure.stderr
+            )
+            if missing_active_result_target_failure.returncode == 0:
+                fail(
+                    "Generated outbound skill checker must reject generated skills whose "
+                    f"only result target mode is declared in {section_name}."
+                )
+            if (
+                "Generated skill result-output section must include result target mode"
+                not in missing_active_result_target_output
+            ):
+                fail(
+                    "Generated outbound skill checker missing active result-target "
+                    f"message changed for {section_name}."
+                )
+
+        notion_public_outside_result_writeback_with_active_local_output_md = (
+            notion_public_outside_result_writeback_base_md.replace(
+                "Target: local result CSV fallback until authenticated Notion writeback is verified.\n",
+                "Result target mode: result-csv-file.\n"
+                "Target: local result CSV fallback until authenticated Notion writeback is verified.\n",
+            )
+        )
+        notion_public_outside_result_note_cases = [
+            (
+                "Source Onboarding",
+                notion_public_outside_result_writeback_with_active_local_output_md.replace(
+                    "Source onboarding completed for this parameterized-bound workflow.\n",
+                    (
+                        "Source onboarding completed for this parameterized-bound workflow.\n"
+                        "target_mode: source-writeback\n"
+                    ),
+                ),
+            ),
+            (
+                "Source Contract",
+                notion_public_outside_result_writeback_with_active_local_output_md.replace(
+                    "## Source Contract\n\n",
+                    (
+                        "## Source Contract\n\n"
+                        "target_mode: source-writeback\n"
+                    ),
+                ),
+            ),
+        ]
+        for section_name, skill_md in notion_public_outside_result_note_cases:
+            (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+            notion_public_outside_result_note_success = subprocess.run(
+                ["node", str(checker), "--skill-dir", str(skill_dir)],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if notion_public_outside_result_note_success.returncode != 0:
+                fail(
+                    "Generated outbound skill checker must allow public Notion skills "
+                    "with an active local result target and an outside result-output "
+                    f"source-writeback note in {section_name}: "
+                    + (
+                        notion_public_outside_result_note_success.stderr
+                        or notion_public_outside_result_note_success.stdout
+                    ).strip()
+                )
+
+        notion_public_blocked_writeback_request_md = (
+            notion_public_outside_result_writeback_base_md.replace(
+                "Source onboarding completed for this parameterized-bound workflow.\n",
+                (
+                    "Source onboarding completed for this parameterized-bound workflow.\n"
+                    "target_mode: source-writeback is blocked until authenticated "
+                    "Notion writeback is verified.\n"
+                ),
+            ).replace(
+                "Target: local result CSV fallback until authenticated Notion writeback is verified.\n",
+                "Result target mode: result-csv-file.\n"
+                "Target: local result CSV fallback until authenticated Notion writeback is verified.\n",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_blocked_writeback_request_md,
+            encoding="utf-8",
+        )
+        notion_public_blocked_writeback_request_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if notion_public_blocked_writeback_request_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow public Notion skills that block "
+                "source-writeback and use an active local result target: "
+                + (
+                    notion_public_blocked_writeback_request_success.stderr
+                    or notion_public_blocked_writeback_request_success.stdout
+                ).strip()
+            )
+
+        notion_public_runtime_writeback_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "Runtime result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_runtime_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_runtime_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_runtime_writeback_output = (
+            notion_public_runtime_writeback_failure.stdout
+            + notion_public_runtime_writeback_failure.stderr
+        )
+        if notion_public_runtime_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject Notion runtime source writeback "
+                "when onboarding used public shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_runtime_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion runtime public-writeback message changed.")
+
+        notion_public_prefixed_writeback_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "Runtime result target mode: fixed source-writeback target resolved during creation.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_prefixed_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_prefixed_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_prefixed_writeback_output = (
+            notion_public_prefixed_writeback_failure.stdout
+            + notion_public_prefixed_writeback_failure.stderr
+        )
+        if notion_public_prefixed_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject prefixed Notion source writeback "
+                "when onboarding used public shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_prefixed_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion prefixed public-writeback message changed.")
+
+        notion_public_structured_writeback_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "result_output:\n"
+            "  policy: source-writeback\n"
+            "  target_mode: source-adjacent-result-artifact\n"
+            "  target: Notion `result` page property discovered through the public shared-page route.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_structured_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_structured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_structured_writeback_output = (
+            notion_public_structured_writeback_failure.stdout
+            + notion_public_structured_writeback_failure.stderr
+        )
+        if notion_public_structured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject structured Notion source writeback "
+                "when onboarding used public shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_structured_writeback_output
+        ):
+            fail("Generated outbound skill checker Notion structured public-writeback message changed.")
+
+        notion_public_structured_target_writeback_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "result_output:\n"
+            "  policy: source-adjacent-result-artifact\n"
+            "  target_mode: source-writeback\n"
+            "  target: Notion `result` page property discovered through the public shared-page route.\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_structured_target_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_structured_target_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_structured_target_writeback_output = (
+            notion_public_structured_target_writeback_failure.stdout
+            + notion_public_structured_target_writeback_failure.stderr
+        )
+        if notion_public_structured_target_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject structured Notion target-mode writeback "
+                "when onboarding used public shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_structured_target_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion structured target-mode public-writeback message changed."
+            )
+
+        notion_public_fenced_structured_writeback_md = notion_public_writeback_md.replace(
+            "Result output policy: source-writeback.\n"
+            "Result target mode: source-writeback.\n"
+            "Target: Notion `result` page property discovered through the public shared-page route.\n",
+            "```yaml\n"
+            "result_output:\n"
+            "  policy: source-adjacent-result-artifact\n"
+            "  target_mode: source-writeback\n"
+            "  target: Notion `result` page property discovered through the public shared-page route.\n"
+            "```\n",
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_fenced_structured_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_fenced_structured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_fenced_structured_writeback_output = (
+            notion_public_fenced_structured_writeback_failure.stdout
+            + notion_public_fenced_structured_writeback_failure.stderr
+        )
+        if notion_public_fenced_structured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject fenced structured "
+                "Notion target-mode writeback when onboarding used public "
+                "shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_fenced_structured_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion fenced structured "
+                "public-writeback message changed."
+            )
+
+        notion_public_labeled_fenced_structured_writeback_md = (
+            notion_public_fenced_structured_writeback_md.replace(
+                "```yaml\n",
+                "Result output policy:\n```yaml\n",
+                1,
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            notion_public_labeled_fenced_structured_writeback_md,
+            encoding="utf-8",
+        )
+        notion_public_labeled_fenced_structured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        notion_public_labeled_fenced_structured_writeback_output = (
+            notion_public_labeled_fenced_structured_writeback_failure.stdout
+            + notion_public_labeled_fenced_structured_writeback_failure.stderr
+        )
+        if notion_public_labeled_fenced_structured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject labeled fenced "
+                "structured Notion target-mode writeback when onboarding used public "
+                "shared-page access only."
+            )
+        if (
+            "Generated Notion skills cannot mark source writeback ready from public shared-page access"
+            not in notion_public_labeled_fenced_structured_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Notion labeled fenced structured "
+                "public-writeback message changed."
+            )
+
+        airtable_read_only_fenced_structured_writeback_md = (
+            airtable_read_only_writeback_md.replace(
+                "Result output policy: source-writeback.\n"
+                "Result target mode: source-writeback.\n"
+                "Target: Airtable `result` field update from the sampled records.\n",
+                "```yaml\n"
+                "result_output:\n"
+                "  policy: source-adjacent-result-artifact\n"
+                "  target_mode: source-writeback\n"
+                "  target: Airtable `result` field update from the sampled records.\n"
+                "```\n",
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_fenced_structured_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_fenced_structured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_fenced_structured_writeback_output = (
+            airtable_read_only_fenced_structured_writeback_failure.stdout
+            + airtable_read_only_fenced_structured_writeback_failure.stderr
+        )
+        if airtable_read_only_fenced_structured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject fenced structured "
+                "Airtable target-mode writeback when onboarding used read-only "
+                "Airtable access."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_fenced_structured_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Airtable fenced structured "
+                "read-only writeback message changed."
+            )
+
+        airtable_read_only_labeled_fenced_structured_writeback_md = (
+            airtable_read_only_fenced_structured_writeback_md.replace(
+                "```yaml\n",
+                "Result output policy:\n```yaml\n",
+                1,
+            )
+        )
+        (skill_dir / "SKILL.md").write_text(
+            airtable_read_only_labeled_fenced_structured_writeback_md,
+            encoding="utf-8",
+        )
+        airtable_read_only_labeled_fenced_structured_writeback_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        airtable_read_only_labeled_fenced_structured_writeback_output = (
+            airtable_read_only_labeled_fenced_structured_writeback_failure.stdout
+            + airtable_read_only_labeled_fenced_structured_writeback_failure.stderr
+        )
+        if airtable_read_only_labeled_fenced_structured_writeback_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject labeled fenced "
+                "structured Airtable target-mode writeback when onboarding used "
+                "read-only access."
+            )
+        if (
+            "Generated Airtable skills cannot mark source writeback ready from read-only Airtable access"
+            not in airtable_read_only_labeled_fenced_structured_writeback_output
+        ):
+            fail(
+                "Generated outbound skill checker Airtable labeled fenced "
+                "structured read-only writeback message changed."
             )
 
         (skill_dir / "template.md").write_text("Do not use templates.\n", encoding="utf-8")
@@ -3714,6 +7869,20 @@ Runtime parameters still allowed: date window and approved source instance ident
         "One-off call capability: passed with the configured MCP route.",
     )
 
+    missing_provider_runtime_ready_markers_md = valid_skill_md.replace(
+        "Provider onboarding completed for the CALL-E MCP provider route.",
+        "Provider onboarding recorded a provider onboarding blocker for this dry-run-only workflow.",
+    ).replace(
+        "Provider host runtime: Codex.",
+        "Provider host runtime: missing because no MCP-capable host runtime is configured.",
+    ).replace(
+        "Provider onboarding blocker: none.",
+        "Provider onboarding blocker: no MCP-capable host runtime is configured.",
+    ).replace(
+        "Execution mode: dry-run-then-batch-approval.",
+        "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.",
+    )
+
     provider_section_dry_run_only_blocker_md = dry_run_only_provider_blocker_md.replace(
         "Provider onboarding recorded a provider onboarding blocker for this dry-run-only workflow.",
         (
@@ -3778,6 +7947,42 @@ Runtime parameters still allowed: date window and approved source instance ident
             fail("Generated outbound skill checker must reject blocked provider with ready evidence.")
         if "blocked provider onboarding must not include passed" not in stale_ready_provider_blocker_output:
             fail("Generated outbound skill checker stale provider-ready evidence message changed.")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            missing_provider_runtime_ready_markers_md,
+            encoding="utf-8",
+        )
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        missing_provider_runtime_ready_markers_failure = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        missing_provider_runtime_ready_markers_output = (
+            missing_provider_runtime_ready_markers_failure.stdout
+            + missing_provider_runtime_ready_markers_failure.stderr
+        )
+        if missing_provider_runtime_ready_markers_failure.returncode == 0:
+            fail(
+                "Generated outbound skill checker must reject missing provider runtime "
+                "with passed ready evidence."
+            )
+        if (
+            "blocked provider onboarding must not include passed"
+            not in missing_provider_runtime_ready_markers_output
+        ):
+            fail(
+                "Generated outbound skill checker missing-provider-runtime ready-evidence "
+                "message changed."
+            )
 
     contradictory_provider_dry_run_only_blocker_md = provider_section_dry_run_only_blocker_md.replace(
         "Source onboarding completed for this parameterized-bound workflow.",
@@ -3873,6 +8078,42 @@ Runtime parameters still allowed: date window and approved source instance ident
                 + (
                     dry_run_only_provider_blocker_success.stderr
                     or dry_run_only_provider_blocker_success.stdout
+                ).strip()
+            )
+
+    dry_run_only_provider_post_resolution_md = dry_run_only_provider_blocker_md.replace(
+        "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.",
+        (
+            "Execution mode: dry-run-then-batch-approval. This workflow is dry-run-only until onboarding is complete.\n"
+            "This workflow is not dry-run-only after provider onboarding is verified and the runtime gate passes."
+        ),
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        skill_dir = Path(temp_dir) / "generated-callback-skill"
+        references_dir = skill_dir / "references"
+        references_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            dry_run_only_provider_post_resolution_md,
+            encoding="utf-8",
+        )
+        (references_dir / "safety.md").write_text("# Safety\n", encoding="utf-8")
+        (references_dir / "examples.md").write_text("# Examples\n", encoding="utf-8")
+
+        dry_run_only_provider_post_resolution_success = subprocess.run(
+            ["node", str(checker), "--skill-dir", str(skill_dir)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if dry_run_only_provider_post_resolution_success.returncode != 0:
+            fail(
+                "Generated outbound skill checker must allow post-resolution "
+                "dry-run-only provider blocker wording: "
+                + (
+                    dry_run_only_provider_post_resolution_success.stderr
+                    or dry_run_only_provider_post_resolution_success.stdout
                 ).strip()
             )
 

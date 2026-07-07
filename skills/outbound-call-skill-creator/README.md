@@ -56,7 +56,7 @@ platforms.
 
 - An Agent Skills-compatible host that can load this skill.
 - Access to a supported source family when creating a generated business skill:
-  Google Forms, TikTok Ads, local CSV, or a custom approved source.
+  Google Forms, TikTok Ads, Notion, Airtable, local CSV, or a custom approved source.
 - A verified outreach basis or consent rule for every callable record.
 - E.164 formatted phone numbers for real calls.
 - A stable dedupe key or dedupe state rule.
@@ -68,6 +68,34 @@ For TikTok Ads workflows, the creator may use the TikTok for Business MCP server
 or another approved TikTok Ads access route if it is available in the host. The
 skill itself does not require TikTok Ads access unless the generated workflow is
 for TikTok Ads records.
+
+Host setup is adapter-specific. The creator should first identify the actual
+MCP-capable host or agent runtime selected by the user, then use that host's
+documented MCP server, connector, plugin, and OAuth flow. Codex commands in
+this repository are adapter examples only, not universal setup instructions.
+
+For Notion workflows, the creator should recommend hosted Notion MCP at
+`https://mcp.notion.com/mcp` first because it uses OAuth and avoids
+user-managed integration tokens. It may fall back to another approved Notion MCP
+server, Notion API connection, integration token, or managed connector route
+when hosted Notion MCP is unavailable or insufficient. The skill itself does not
+require Notion access unless the generated workflow is for Notion records.
+
+For Airtable workflows, the creator should recommend hosted Airtable MCP at
+`https://mcp.airtable.com/mcp` first because it uses OAuth and avoids
+user-managed personal access tokens. When the selected host is Codex, first
+check whether `airtable@openai-curated` is installed and whether an `airtable`
+MCP route already points to hosted Airtable MCP. If neither path is configured,
+ask the user for explicit permission before installing the plugin or adding the
+route, explain that `codex plugin add` and `codex mcp add` change host
+configuration, then use `codex plugin add airtable@openai-curated` when plugin
+installation is approved or configure the route directly with
+`codex mcp add airtable --url https://mcp.airtable.com/mcp`. Run
+`codex mcp login airtable` and refresh the session before sampling. It may fall
+back to another approved Airtable MCP server, Airtable Web API OAuth or personal
+access token route, or managed connector route when hosted Airtable MCP is
+unavailable or insufficient. The skill itself does not require Airtable access
+unless the generated workflow is for Airtable records.
 
 For real outbound calls, generated skills use the default CALL-E MCP provider
 route unless the generated skill explicitly documents another approved one-off
@@ -83,12 +111,19 @@ The creator captures these workflow choices during skill generation:
 
 | Option | Default | Notes |
 | --- | --- | --- |
-| Source family | User-selected | Built-in choices are `google-form`, `tiktok-ads`, `local-csv`, and `other`. |
+| Source family | User-selected | Built-in choices are `google-form`, `tiktok-ads`, `notion`, `airtable`, `local-csv`, and `other`. |
 | Binding level | `parameterized-bound` | Use `fully-bound` only when one fixed source and result target should be locked at creation time. |
 | Execution preference | `dry-run-then-batch-approval` | The selected execution mode is finalized only after source, result-output, and provider evidence are known. |
 | Provider route | CALL-E MCP route | Real-call skills must verify route setup, authentication, and compatible tools before calls. |
 | Result output | Durable target required | Early writeback input is a preference until source sampling verifies source writeback, source-adjacent artifacts, or local result CSV output. |
 | Session-table output | Last-resort fallback | Not suitable for unattended automation unless explicitly accepted by the user. |
+
+## Maintaining Source Families
+
+When adding a built-in source family, follow
+`references/source-family-extension.md`. It lists every file that must stay in
+sync, the required `references/data-sources.md` section shape, and when the
+generated-skill checker should or should not change.
 
 ## Common Errors And Handling
 
@@ -98,7 +133,7 @@ The creator captures these workflow choices during skill generation:
 | No callable candidates appear | Check phone field mapping, outreach basis, consent field, date filters, and dedupe state. |
 | Provider is not ready | Verify the MCP provider route is configured, authenticated, and exposes compatible one-off call tools. |
 | Result output is blocked | Confirm the verified writeback target, source-adjacent artifact, or local CSV path is writable and durable. |
-| Runtime request is too vague | Provide the approved runtime parameters, such as form ID, CSV path, campaign ID, date window, or output path. |
+| Runtime request is too vague | Provide the approved runtime parameters, such as form ID, Notion database or data source ID, Airtable base/table/view locator, CSV path, campaign ID, date window, or output path. |
 
 ## Limitations And Safety Notes
 

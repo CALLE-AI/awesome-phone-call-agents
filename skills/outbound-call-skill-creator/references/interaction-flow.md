@@ -82,6 +82,8 @@ Data source:
 ```text
 google-form
 tiktok-ads
+notion
+airtable
 local-csv
 other
 ```
@@ -116,6 +118,8 @@ When the user provides only a source family, recommend a likely workflow before 
 
 - `google-form`: follow up with form submitters who requested or authorized a phone call.
 - `tiktok-ads`: call leads who submitted product interest through TikTok Ads and authorized phone follow-up.
+- `notion`: call approved records from a Notion database or data source for callbacks, reminders, confirmations, or follow-up tasks.
+- `airtable`: call approved records from an Airtable table or view for callbacks, reminders, confirmations, or follow-up tasks.
 - `local-csv`: call approved rows from a CSV for confirmations, reminders, callbacks, or follow-up tasks.
 - `other`: ask how records are accessed, then ask one missing contract question at a time.
 
@@ -135,7 +139,7 @@ Recommend workflow reuse and call-preview preference together after workflow, so
 ```text
 Recommended: Reusable workflow (`parameterized-bound`) with preview before calling (`dry-run-then-batch-approval`).
 
-Why: the skill can be reused for matching forms, CSV files, campaigns, or source instances, while every real run still shows the candidate list before calls.
+Why: the skill can be reused for matching forms, Notion data sources, Airtable tables or views, CSV files, campaigns, or source instances, while every real run still shows the candidate list before calls.
 
 Other option: Fixed source workflow (`fully-bound`) when one source and writeback target should be fixed at creation time.
 Advanced option: Direct execution after checks (`approved-direct-execution`) only for stable workflows whose checks before real calls can pass for each concrete request.
@@ -152,6 +156,8 @@ Use this prompt only after source access and representative sampling have identi
 
 - Google Form: linked response spreadsheet writeback only when the linked spreadsheet or approved writeback route is discovered.
 - TikTok Ads: approved MCP writeback tool or approved connector action only when the source route exposes it.
+- Notion: update page properties only when an authenticated route exposes verified non-destructive writeback; otherwise use a Notion source-adjacent result artifact or local result CSV.
+- Airtable: update record fields only when an authenticated route exposes verified non-destructive writeback; otherwise use an Airtable source-adjacent result artifact or local result CSV.
 - Local CSV: separate result CSV by default; source CSV update only when explicitly requested.
 - Custom source: source writeback only when an exact approved writeback action and field mapping are known.
 
