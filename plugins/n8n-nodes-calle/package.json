@@ -1,6 +1,6 @@
 {
 	"name": "@call-e/n8n-nodes-calle",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "n8n community node for creating and monitoring CALL-E AI-agent phone-call tasks.",
 	"license": "MIT",
 	"homepage": "https://docs.heycall-e.com/",
