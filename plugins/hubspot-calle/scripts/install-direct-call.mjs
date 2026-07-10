@@ -15,6 +15,8 @@ const workflowActionPath = join(
 );
 const workflowEndpointPath = "/hs/serverless/calle/create-call";
 const defaultCallEBaseUrl = "https://api.heycall-e.com";
+export const minimumNodeVersion = "20.0.0";
+export const minimumHubSpotCliVersion = "8.4.0";
 const secretNames = [
   "CALL_E_API_KEY",
   "CALL_E_BASE_URL",
@@ -204,6 +206,14 @@ export function assertMinimumVersion(actual, minimum, label) {
   if (firstDifference !== -1 && actualParts[firstDifference] < minimumParts[firstDifference]) {
     throw new Error(`${label} must be at least ${minimum}; found ${actual}.`);
   }
+}
+
+function extractVersion(output, label) {
+  const match = String(output).trim().match(/\bv?\d+(?:\.\d+){0,2}\b/);
+  if (!match) {
+    throw new Error(`${label} version output did not contain a dotted numeric version.`);
+  }
+  return String(match[0]).replace(/^v/i, "");
 }
 
 export function normalizeEndpointUrl(options) {
@@ -479,6 +489,7 @@ function reportState(state, account, log) {
 export async function runInstaller(options, dependencies = {}) {
   const log = dependencies.log || console.log;
   const env = dependencies.env || process.env;
+  const nodeVersion = dependencies.nodeVersion || process.version;
   const command = dependencies.command || ((executable, args, commandOptions) =>
     executeCommand(executable, args, { ...commandOptions, env, spawn: dependencies.spawn })
   );
@@ -491,6 +502,14 @@ export async function runInstaller(options, dependencies = {}) {
   );
   const tokenFactory = dependencies.tokenFactory || (() => randomBytes(24).toString("hex"));
   const configure = dependencies.configureWorkflowAction || configureWorkflowAction;
+
+  assertMinimumVersion(nodeVersion, minimumNodeVersion, "Node.js");
+  const cliVersionResult = await successfulCommand("hs", ["--version"]);
+  const cliVersion = extractVersion(
+    `${cliVersionResult.stdout}\n${cliVersionResult.stderr}`,
+    "HubSpot CLI"
+  );
+  assertMinimumVersion(cliVersion, minimumHubSpotCliVersion, "HubSpot CLI");
 
   const accountResult = await successfulCommand("hs", ["account", "info", options.account]);
   const account = parseAccountInfo(accountResult.stdout);

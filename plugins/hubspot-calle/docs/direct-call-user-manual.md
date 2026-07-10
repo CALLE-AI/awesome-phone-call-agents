@@ -16,8 +16,8 @@ Keep these permission boundaries separate.
 
 | Area | Who needs it | Requirement |
 | --- | --- | --- |
-| HubSpot CLI deployment | Administrator or deployer | A HubSpot CLI personal access key authenticated to the target account, with access to developer projects and serverless secrets. The deployment permissions include project upload and secret read/write operations; they are not the app's installed CRM scopes. |
-| Installed static app | HubSpot account | The app requests only the scopes in `hubspot-project/src/app/app-hsmeta.json`: `oauth`, `crm.objects.contacts.read`, `crm.objects.companies.read`, `crm.objects.deals.read`, and `crm.objects.owners.read`. It does not request CRM write scopes. |
+| HubSpot CLI deployment | Administrator or deployer | Node.js `20.0.0` or newer and a HubSpot CLI personal access key authenticated to the target account, with HubSpot CLI `8.4.0` or newer for developer projects and serverless secrets. The deployment permissions include project upload and secret read/write operations; they are not the app's installed CRM scopes. |
+| Installed static app | HubSpot account | The app requests only the scopes in `hubspot-project/src/app/app-hsmeta.json`: `oauth`, `crm.objects.contacts.read`, and `crm.objects.deals.read`. It does not request CRM write scopes. |
 | HubSpot product | Customer account | Content Hub Enterprise for the public workflow endpoint. The account must also support the administrator's project-app installation and CRM record customization work. |
 | HubSpot administration | Administrator | Permission to install or reinstall the app, manage serverless secrets, configure workflows, and customize Contact or Deal record layouts to add App Cards. |
 | CALL-E | Administrator | A CALL-E API key and access to CALL-E-supported dashboard or API controls for call review and accepted-call cancellation. |
@@ -51,7 +51,7 @@ unset CALL_E_API_KEY
 
 ### What The Installer Does
 
-After it validates the requested account and preflights secrets, the installer writes the target account's public workflow endpoint into the local workflow-action metadata, optionally adds or updates HubSpot secrets, builds, validates, uploads, and checks static app installation status.
+After it validates the local Node.js and HubSpot CLI versions, the requested account, and the preflight secret state, the installer writes the target account's public workflow endpoint into the local workflow-action metadata, optionally adds or updates HubSpot secrets, builds, validates, uploads, and checks static app installation status.
 
 When `--set-secrets-from-env` is used and `CALLE_WORKFLOW_ENDPOINT_TOKEN` is absent, the installer generates a token and prints it once before any mutation. Store it in an administrator-controlled secret store. It is needed only when an administrator configures the workflow action; do not give it to ordinary sales or operations users.
 
@@ -126,7 +126,9 @@ Ordinary sales and operations users do not deploy the app, manage secrets, confi
 1. Manually enroll an eligible record in an already-configured workflow.
 2. Open an eligible Contact or Deal with an E.164 phone number, review the call task in the `CALL-E` or `CALL-E Quick Call` card, and select `Start CALL-E Call` followed by the confirmation control.
 
-The Card supports HubSpot Contact (`0-1`) and Deal (`0-3`) record contexts only. It requests only the selected `phone` or `mobilephone` field through HubSpot's private-function `propertiesToSend` contract and uses the server-provided account ID. It does not send or trust a parameter phone value, fetch a CRM record by a client-supplied ID, or expose the CALL-E API key. If the selected property has no valid E.164 phone, it reports a safe `missing_phone` or `invalid_phone` result without creating a CALL-E task.
+The Card supports HubSpot Contact (`0-1`) and Deal (`0-3`) record contexts only. It requests both allowlisted fields through HubSpot's private-function `propertiesToSend` contract, uses only the selected `phone` or `mobilephone` value, and uses the server-provided account ID. It does not send or trust a parameter phone value, fetch a CRM record by a client-supplied ID, or expose the CALL-E API key. If the selected property has no valid E.164 phone, it reports a safe `missing_phone` or `invalid_phone` result without creating a CALL-E task. A network, response-read, or response-parse failure keeps the same Card request ID and confirmation for an explicit retry; success, deterministic rejection, and cancellation clear the intent.
+
+The integration trims the validated E.164 value before sending it and does not force a region or locale. CALL-E uses the number and provider defaults for routing and language inference.
 
 ## Consent, Cancellation, And Rollback
 

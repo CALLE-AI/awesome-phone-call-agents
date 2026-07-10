@@ -4,12 +4,13 @@ This is an administrator deployment and local-verification reference for the pri
 
 ## Prerequisites
 
+- Node.js `20.0.0` or newer.
 - HubSpot CLI `8.4.0` or newer, authenticated with a deployer's personal access key that can upload developer projects and read or write serverless secrets for the target standard account.
 - Content Hub Enterprise for the public serverless endpoint used by the workflow action.
 - A CALL-E API key and authorized E.164 test phone number.
 - Administrator access to install or reinstall the static app and customize Contact or Deal record layouts.
 
-The installed static app's scopes are separate from CLI deployment permissions. It separately requests `oauth`; its four `crm.objects.*` scopes in `hubspot-project/src/app/app-hsmeta.json` are read-only access to contacts, companies, deals, and owners.
+The installed static app's scopes are separate from CLI deployment permissions. It separately requests `oauth`; its two `crm.objects.*` scopes in `hubspot-project/src/app/app-hsmeta.json` are read-only access to contacts and deals.
 
 ## Deploy Or Recover
 
@@ -34,7 +35,7 @@ node scripts/install-direct-call.mjs \
 unset CALL_E_API_KEY
 ```
 
-The installer validates the account before local metadata or remote mutation, configures the account-specific action URL, writes secrets when requested, builds, validates, uploads, and reports `installed`, `reinstall_required`, `manual_install_required`, or `upload_skipped`.
+The installer validates the local Node.js version, detected HubSpot CLI version, and requested account before local metadata or remote mutation, configures the account-specific action URL, writes secrets when requested, builds, validates, uploads, and reports `installed`, `reinstall_required`, `manual_install_required`, or `upload_skipped`.
 
 If it generates `CALLE_WORKFLOW_ENDPOINT_TOKEN`, it prints the value once before mutation. Store it with administrator secrets. For a recovery rerun, prompt for the saved value instead of allowing a new one to replace it:
 

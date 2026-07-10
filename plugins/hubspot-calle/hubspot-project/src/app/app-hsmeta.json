@@ -10,9 +10,7 @@
       "requiredScopes": [
         "oauth",
         "crm.objects.contacts.read",
-        "crm.objects.companies.read",
-        "crm.objects.deals.read",
-        "crm.objects.owners.read"
+        "crm.objects.deals.read"
       ],
       "optionalScopes": [],
       "conditionallyRequiredScopes": []

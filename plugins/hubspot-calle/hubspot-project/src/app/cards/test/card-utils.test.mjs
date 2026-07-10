@@ -11,6 +11,7 @@ const {
   nextCardRequestId,
   readObjectContext,
   readServerlessBody,
+  reduceCardIntentState,
 } = cardUtils;
 
 test("reads object body from HubSpot serverless result", () => {
@@ -115,7 +116,7 @@ test("builds the HubSpot private serverless invocation contract", () => {
         request_id: "intent-1",
         confirmed: true,
       },
-      propertiesToSend: ["mobilephone"],
+      propertiesToSend: ["phone", "mobilephone"],
     }
   );
 });
@@ -143,6 +144,38 @@ test("keeps a request ID for an ambiguous retry and rotates for a new intent", (
   assert.equal(completed, "");
   assert.equal(secondIntent, "intent-2");
   assert.equal(cancelled, "");
+});
+
+test("reduces Card intent state for every terminal and retry outcome", () => {
+  assert.equal(typeof reduceCardIntentState, "function");
+  const active = { requestId: "intent-1", confirming: true };
+
+  assert.deepEqual(
+    reduceCardIntentState(active, {
+      type: "result",
+      result: { success: true, retry_same_intent: false },
+    }),
+    { requestId: "", confirming: false }
+  );
+  assert.deepEqual(
+    reduceCardIntentState(active, {
+      type: "result",
+      result: { success: false, retry_same_intent: false },
+    }),
+    { requestId: "", confirming: false }
+  );
+  assert.deepEqual(
+    reduceCardIntentState(active, {
+      type: "result",
+      result: { success: false, retry_same_intent: true },
+    }),
+    active
+  );
+  assert.deepEqual(reduceCardIntentState(active, { type: "transport_error" }), active);
+  assert.deepEqual(
+    reduceCardIntentState(active, { type: "cancel" }),
+    { requestId: "", confirming: false }
+  );
 });
 
 test("formats safe card call summaries", () => {

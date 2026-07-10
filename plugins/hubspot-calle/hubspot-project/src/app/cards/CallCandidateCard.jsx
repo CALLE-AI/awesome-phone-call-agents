@@ -13,9 +13,9 @@ import {
   PHONE_PROPERTY_OPTIONS,
   buildCallSummary,
   buildCardServerlessRequest,
-  nextCardRequestId,
   readObjectContext,
   readServerlessBody,
+  reduceCardIntentState,
 } from "./card-utils.mjs";
 
 const DEFAULT_CALL_TASK = "Call this record and qualify whether they want a product demo. Ask whether they want human follow-up. Keep the call concise.";
@@ -33,14 +33,24 @@ function CallCandidateCard({ context, addAlert }) {
   const [requestId, setRequestId] = useState("");
   const [result, setResult] = useState(null);
 
+  const applyIntentState = (nextState) => {
+    setRequestId(nextState.requestId);
+    setConfirming(nextState.confirming);
+  };
+
   const startCall = async () => {
     if (!confirming) {
-      setRequestId(nextCardRequestId(requestId, "begin"));
-      setConfirming(true);
+      applyIntentState(reduceCardIntentState(
+        { requestId, confirming },
+        { type: "begin" }
+      ));
       return;
     }
 
-    const activeRequestId = nextCardRequestId(requestId, "begin");
+    const activeIntent = reduceCardIntentState(
+      { requestId, confirming },
+      { type: "begin" }
+    );
     setLoading(true);
     setResult(null);
     try {
@@ -50,7 +60,7 @@ function CallCandidateCard({ context, addAlert }) {
           objectContext,
           callTask,
           phoneProperty,
-          requestId: activeRequestId,
+          requestId: activeIntent.requestId,
         })
       );
       const body = readServerlessBody(response);
@@ -63,12 +73,15 @@ function CallCandidateCard({ context, addAlert }) {
         message: buildCallSummary(body),
         type: body.success ? "success" : "danger",
       });
-      setRequestId(nextCardRequestId(activeRequestId, "terminal"));
-      setConfirming(false);
+      applyIntentState(reduceCardIntentState(
+        activeIntent,
+        { type: "result", result: body }
+      ));
     } catch (error) {
       const body = {
         success: false,
         status: "failed",
+        retry_same_intent: true,
         error: error.message,
       };
       setResult(body);
@@ -77,16 +90,20 @@ function CallCandidateCard({ context, addAlert }) {
         message: buildCallSummary(body),
         type: "danger",
       });
-      setRequestId(nextCardRequestId(activeRequestId, "ambiguous_error"));
-      setConfirming(true);
+      applyIntentState(reduceCardIntentState(
+        activeIntent,
+        { type: "transport_error" }
+      ));
     } finally {
       setLoading(false);
     }
   };
 
   const cancelConfirmation = () => {
-    setRequestId(nextCardRequestId(requestId, "cancel"));
-    setConfirming(false);
+    applyIntentState(reduceCardIntentState(
+      { requestId, confirming },
+      { type: "cancel" }
+    ));
   };
 
   return (
@@ -117,7 +134,13 @@ function CallCandidateCard({ context, addAlert }) {
         onClick={startCall}
         disabled={loading || !objectContext.objectId || !objectContext.objectType || !String(callTask || "").trim()}
       >
-        {loading ? "Starting..." : confirming ? "Confirm and start CALL-E call" : "Start CALL-E Call"}
+        {loading
+          ? "Starting..."
+          : result && result.retry_same_intent
+            ? "Retry CALL-E call"
+            : confirming
+              ? "Confirm and start CALL-E call"
+              : "Start CALL-E Call"}
       </Button>
       {confirming && (
         <Button onClick={cancelConfirmation} disabled={loading}>

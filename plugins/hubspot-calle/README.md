@@ -21,11 +21,13 @@ The [CALL-E for HubSpot Direct-Call User Manual](docs/direct-call-user-manual.md
 - `CALL-E Quick Call` right-sidebar App Card for Contact and Deal records.
 - `scripts/install-direct-call.mjs` installer for endpoint configuration, secret handling, validation, upload, and install-state reporting.
 
-The App Cards map HubSpot `crm.objectTypeId` values `0-1` and `0-3` to Contact and Deal, let the user select only `phone` or `mobilephone`, and require an explicit confirmation click. They pass only the selected field through HubSpot's private-function `propertiesToSend` contract; the function uses `accountId` without fetching a client-supplied CRM object or trusting a parameter phone value. Each confirmation intent gets a new request ID; an ambiguous transport retry keeps that ID so CALL-E receives the same idempotency key. The Cards do not expose the CALL-E API key to the browser.
+The App Cards map HubSpot `crm.objectTypeId` values `0-1` and `0-3` to Contact and Deal, let the user select only `phone` or `mobilephone`, and require an explicit confirmation click. They request both allowlisted fields through HubSpot's private-function `propertiesToSend` contract; the function uses `accountId` and only the selected returned property, without fetching a client-supplied CRM object or trusting a parameter phone value. Each confirmation intent gets a new request ID. A network, response-read, or response-parse failure preserves that ID and confirmation so an explicit retry reuses the same CALL-E idempotency key; success, deterministic rejection, and cancellation clear it. The Cards do not expose the CALL-E API key to the browser.
 
 ## Workflow Inputs And Outputs
 
 The action receives the source object type and ID, an E.164 phone value and property name, a call task, static consent and do-not-call selections, and an administrator-configured endpoint token. It returns `call_id`, `status`, `masked_phone`, and `error`.
+
+CALL-E receives the trimmed E.164 value without a forced region or locale. Provider routing and language inference use the number and CALL-E defaults.
 
 The workflow handler creates a call only when `Phone contact allowed` is explicitly `Yes` and `Do not call` is explicitly `No`; missing, malformed, or opposite values fail closed. These static action selections do not inspect each enrolled record, so administrators must also enforce consent and do-not-call conditions in workflow enrollment filters.
 

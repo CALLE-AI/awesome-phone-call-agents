@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   assertRequiredSecrets,
@@ -17,11 +20,31 @@ import {
   runInstaller,
 } from "../install-direct-call.mjs";
 
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const pluginDir = join(scriptDir, "..", "..");
+
 test("fails closed when required HubSpot secrets are missing", () => {
   assert.throws(
     () => assertRequiredSecrets(new Set(["CALL_E_API_KEY"])),
     /CALL_E_BASE_URL, CALLE_WORKFLOW_ENDPOINT_TOKEN/
   );
+});
+
+test("installed app metadata keeps only the direct-call read scopes used by App Cards", async () => {
+  const metadata = JSON.parse(
+    await readFile(join(pluginDir, "hubspot-project/src/app/app-hsmeta.json"), "utf8")
+  );
+  const scopes = metadata.config.auth.requiredScopes;
+
+  assert.deepEqual(scopes, [
+    "oauth",
+    "crm.objects.contacts.read",
+    "crm.objects.deals.read",
+  ]);
+  assert.ok(scopes.includes("crm.objects.contacts.read"));
+  assert.ok(scopes.includes("crm.objects.deals.read"));
+  assert.equal(scopes.includes("crm.objects.companies.read"), false);
+  assert.equal(scopes.includes("crm.objects.owners.read"), false);
 });
 
 test("treats an uninstalled static app as a required manual step", () => {
@@ -89,6 +112,9 @@ test("orchestration resolves account identity before metadata and secret writes"
   const events = [];
   const command = (name, args) => {
     events.push(["command", name, ...args]);
+    if (name === "hs" && args[0] === "--version") {
+      return { status: 0, stdout: "8.4.0\n", stderr: "" };
+    }
     if (name === "hs" && args[0] === "account") {
       return { status: 0, stdout: resolvedAccount, stderr: "" };
     }
@@ -108,7 +134,8 @@ test("orchestration resolves account identity before metadata and secret writes"
     }
   );
 
-  assert.equal(events[0][2], "account");
+  assert.equal(events[0][2], "--version");
+  assert.equal(events[1][2], "account");
   assert.ok(events.findIndex((event) => event[0] === "metadata") > 0);
   assert.ok(events.findIndex((event) => event.includes("secret") && event.includes("add")) > 0);
 });
@@ -118,6 +145,7 @@ test("orchestration rejects an unknown account before any mutation", async () =>
   await assert.rejects(
     () => runInstaller(installerOptions(), {
       command: successfulCommand(calls, {
+        "hs --version": { status: 0, stdout: "8.4.0\n", stderr: "" },
         "hs account info 123456789": {
           status: 0,
           stdout: "Account name: another-account\nAccount ID: 999999999\n",
@@ -129,7 +157,10 @@ test("orchestration rejects an unknown account before any mutation", async () =>
     }),
     /resolved to another-account \(999999999\)/
   );
-  assert.deepEqual(calls, [["hs", "account", "info", "123456789"]]);
+  assert.deepEqual(calls, [
+    ["hs", "--version"],
+    ["hs", "account", "info", "123456789"],
+  ]);
 });
 
 test("orchestration stops for missing secrets before upload", async () => {
@@ -137,6 +168,7 @@ test("orchestration stops for missing secrets before upload", async () => {
   await assert.rejects(
     () => runInstaller(installerOptions({ skipUpload: false }), {
       command: successfulCommand(calls, {
+        "hs --version": { status: 0, stdout: "8.4.0\n", stderr: "" },
         "hs account info 123456789": { status: 0, stdout: resolvedAccount, stderr: "" },
         "hs secret list -a 123456789": { status: 0, stdout: "CALL_E_API_KEY\n", stderr: "" },
       }),
@@ -152,6 +184,9 @@ test("logs a generated token before a later build failure", async () => {
   const events = [];
   const command = (name, args) => {
     events.push(["command", name, ...args]);
+    if (name === "hs" && args[0] === "--version") {
+      return { status: 0, stdout: "8.4.0\n", stderr: "" };
+    }
     if (name === "hs" && args[0] === "account") {
       return { status: 0, stdout: resolvedAccount, stderr: "" };
     }
@@ -185,6 +220,7 @@ test("dry run logs a placeholder without generating a usable token", async () =>
   const logs = [];
   await runInstaller(installerOptions({ setSecretsFromEnv: true, dryRun: true }), {
     command: successfulCommand(calls, {
+      "hs --version": { status: 0, stdout: "8.4.0\n", stderr: "" },
       "hs account info 123456789": { status: 0, stdout: resolvedAccount, stderr: "" },
       "hs secret list -a 123456789": { status: 0, stdout: "", stderr: "" },
     }),
@@ -204,6 +240,7 @@ test("orchestration reports manual installation guidance after a first upload", 
   const logs = [];
   const result = await runInstaller(installerOptions({ skipSecrets: true, skipUpload: false }), {
     command: successfulCommand(calls, {
+      "hs --version": { status: 0, stdout: "8.4.0\n", stderr: "" },
       "hs account info 123456789": { status: 0, stdout: resolvedAccount, stderr: "" },
       "hs project upload -a 123456789 --force-create --message Test upload": { status: 0, stdout: "", stderr: "" },
       "hs project app-install-status -a 123456789 --json": {
@@ -224,7 +261,12 @@ test("orchestration reports manual installation guidance after a first upload", 
 test("skip upload does not claim remote setup is finished", async () => {
   const logs = [];
   const result = await runInstaller(installerOptions({ skipSecrets: true }), {
-    command: () => ({ status: 0, stdout: resolvedAccount, stderr: "" }),
+    command: (name, args) => {
+      if (name === "hs" && args[0] === "--version") {
+        return { status: 0, stdout: "8.4.0\n", stderr: "" };
+      }
+      return { status: 0, stdout: resolvedAccount, stderr: "" };
+    },
     configureWorkflowAction: async () => {},
     log: (message) => logs.push(message),
   });
@@ -239,6 +281,9 @@ test("production command failures include safe stderr diagnostics", async () => 
   await assert.rejects(
     () => runInstaller(installerOptions({ setSecretsFromEnv: true }), {
       spawn: (command, args) => {
+        if (command === "hs" && args[0] === "--version") {
+          return { status: 0, stdout: "8.4.0\n", stderr: "" };
+        }
         if (command === "hs" && args[0] === "account") {
           return { status: 0, stdout: resolvedAccount, stderr: "" };
         }
@@ -269,6 +314,9 @@ test("production command failures redact known secrets from stdout and stderr", 
   await assert.rejects(
     () => runInstaller(installerOptions({ setSecretsFromEnv: true, build: true }), {
       spawn: (command, args) => {
+        if (command === "hs" && args[0] === "--version") {
+          return { status: 0, stdout: "8.4.0\n", stderr: "" };
+        }
         if (command === "hs" && args[0] === "account") {
           return { status: 0, stdout: resolvedAccount, stderr: "" };
         }
@@ -326,12 +374,17 @@ test("production command failures include spawn errors when no status is availab
   const endpointToken = "known-endpoint-token-value";
   await assert.rejects(
     () => runInstaller(installerOptions(), {
-      spawn: () => ({
-        status: null,
-        stdout: "",
-        stderr: "",
-        error: new Error(`spawn hs ${apiKey} ${endpointToken} ENOENT`),
-      }),
+      spawn: (command, args) => {
+        if (command === "hs" && args[0] === "--version") {
+          return { status: 0, stdout: "8.4.0\n", stderr: "" };
+        }
+        return {
+          status: null,
+          stdout: "",
+          stderr: "",
+          error: new Error(`spawn hs ${apiKey} ${endpointToken} ENOENT`),
+        };
+      },
       env: {
         CALL_E_API_KEY: apiKey,
         CALLE_WORKFLOW_ENDPOINT_TOKEN: endpointToken,
@@ -345,6 +398,39 @@ test("production command failures include spawn errors when no status is availab
       return true;
     }
   );
+});
+
+test("installer rejects an unsupported Node.js version before any command or mutation", async () => {
+  const calls = [];
+
+  await assert.rejects(
+    () => runInstaller(installerOptions(), {
+      command: successfulCommand(calls),
+      configureWorkflowAction: async () => assert.fail("metadata must not be written"),
+      log: () => {},
+      nodeVersion: "19.9.9",
+    }),
+    /Node\.js.*20\.0\.0.*19\.9\.9/
+  );
+
+  assert.deepEqual(calls, []);
+});
+
+test("installer rejects an unsupported HubSpot CLI version before account lookup or mutation", async () => {
+  const calls = [];
+
+  await assert.rejects(
+    () => runInstaller(installerOptions(), {
+      command: successfulCommand(calls, {
+        "hs --version": { status: 0, stdout: "8.3.9\n", stderr: "" },
+      }),
+      configureWorkflowAction: async () => assert.fail("metadata must not be written"),
+      log: () => {},
+    }),
+    /HubSpot CLI.*8\.4\.0.*8\.3\.9/
+  );
+
+  assert.deepEqual(calls, [["hs", "--version"]]);
 });
 
 test("parses HubSpot account identity output", () => {

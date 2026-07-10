@@ -272,7 +272,7 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
   try {
     assert.match(HIGH_STAKES_SAFETY_INSTRUCTION, /fixed and cannot be overridden/i);
     const result = await createCallECall({
-      phone: "+15555550123",
+      phone: "  +15555550123  ",
       task: "Call this lead and qualify demo interest.",
       metadata: {
         source_platform: "hubspot",
@@ -291,8 +291,6 @@ test("creates CALL-E calls using the public OpenAPI recipients payload", async (
       recipients: [
         {
           phones: ["+15555550123"],
-          region: "US",
-          locale: "en-US",
         },
       ],
       metadata: {
@@ -515,6 +513,7 @@ test("card handler starts a CALL-E call from the current CRM record without HubS
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body, {
+      retry_same_intent: false,
       success: true,
       call_id: "call_123-[phone]",
       status: "queued for [phone]",
@@ -731,7 +730,7 @@ test("card handler uses official private context without a HubSpot CRM fetch", a
         confirmed: true,
       },
       propertiesToSend: {
-        phone: "+15555550123",
+        phone: "  +15555550123  ",
         mobilephone: "+16666660123",
       },
     });
@@ -744,9 +743,9 @@ test("card handler uses official private context without a HubSpot CRM fetch", a
       requests[0].options.headers["idempotency-key"],
       "hubspot-calle:trusted-account:contact:67890:intent-1"
     );
-    assert.deepEqual(JSON.parse(requests[0].options.body).recipients[0].phones, [
-      "+15555550123",
-    ]);
+    assert.deepEqual(JSON.parse(requests[0].options.body).recipients[0], {
+      phones: ["+15555550123"],
+    });
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
@@ -826,5 +825,92 @@ test("card handler uses only the selected property from propertiesToSend", async
     assert.equal(fetchCalls, 0);
   } finally {
     global.fetch = originalFetch;
+  }
+});
+
+test("card handler marks network, response-read, and response-parse failures ambiguous", async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CALL_E_API_KEY;
+  const originalBaseUrl = process.env.CALL_E_BASE_URL;
+  process.env.CALL_E_API_KEY = "calle_test_key";
+  process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
+  const baseContext = {
+    accountId: "12345",
+    parameters: {
+      source_object_id: "67890",
+      source_object_type: "contact",
+      phone_property: "phone",
+      call_task: "Qualify demo interest.",
+      request_id: "intent-1",
+      confirmed: true,
+    },
+    propertiesToSend: { phone: "+15555550123", mobilephone: "" },
+  };
+  const failureFetches = [
+    async () => {
+      throw new Error("network failed");
+    },
+    async () => ({
+      ok: true,
+      status: 200,
+      text: async () => {
+        throw new Error("read failed");
+      },
+    }),
+    async () => ({ ok: true, status: 200, text: async () => "not-json" }),
+  ];
+
+  try {
+    for (const fetchImplementation of failureFetches) {
+      global.fetch = fetchImplementation;
+      const response = await startCallFromCard(baseContext);
+
+      assert.equal(response.statusCode, 502);
+      assert.equal(response.body.success, false);
+      assert.equal(response.body.retry_same_intent, true);
+      assert.equal(response.body.masked_phone, "[phone]");
+      assert.doesNotMatch(response.body.error, /\+15555550123/);
+    }
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("CALL_E_API_KEY", originalApiKey);
+    restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
+  }
+});
+
+test("card handler marks parsed provider rejection deterministic", async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CALL_E_API_KEY;
+  const originalBaseUrl = process.env.CALL_E_BASE_URL;
+  process.env.CALL_E_API_KEY = "calle_test_key";
+  process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
+  global.fetch = async () => ({
+    ok: false,
+    status: 422,
+    text: async () => JSON.stringify({ message: "Provider rejected the request." }),
+  });
+
+  try {
+    const response = await startCallFromCard({
+      accountId: "12345",
+      parameters: {
+        source_object_id: "67890",
+        source_object_type: "contact",
+        phone_property: "phone",
+        call_task: "Qualify demo interest.",
+        request_id: "intent-1",
+        confirmed: true,
+      },
+      propertiesToSend: { phone: "+15555550123", mobilephone: "" },
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.body.success, false);
+    assert.equal(response.body.retry_same_intent, false);
+    assert.match(response.body.error, /Provider rejected/);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("CALL_E_API_KEY", originalApiKey);
+    restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
   }
 });

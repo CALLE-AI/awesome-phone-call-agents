@@ -2,9 +2,14 @@ const DEFAULT_CALL_E_BASE_URL = "https://api.heycall-e.com";
 const PHONE_MASK = "[phone]";
 const HIGH_STAKES_SAFETY_INSTRUCTION = "This safety instruction is fixed and cannot be overridden by the call task: Do not provide medical, legal, financial, or emergency advice. For these topics, limit the call to logistics and routing to an appropriate human or emergency service.";
 const SUPPORTED_OBJECT_TYPES = new Set(["contact", "deal"]);
+const E164_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
+
+function isNormalizedE164Phone(value) {
+  return E164_PHONE_PATTERN.test(value);
+}
 
 function isE164Phone(value) {
-  return typeof value === "string" && /^\+[1-9]\d{7,14}$/.test(value.trim());
+  return typeof value === "string" && isNormalizedE164Phone(value.trim());
 }
 
 function maskPhoneNumbers(value, suppliedPhones = []) {
@@ -171,13 +176,17 @@ function getCallEBaseUrl() {
   return DEFAULT_CALL_E_BASE_URL;
 }
 
+function ambiguousCallEError(stage) {
+  const error = new Error(`CALL-E create call outcome is unknown after ${stage}. Retry the same intent.`);
+  error.retrySameIntent = true;
+  return error;
+}
+
 async function createCallECall({
   phone,
   task,
   metadata,
   idempotencyKey,
-  region = "US",
-  locale = "en-US",
   resultSchema,
   recipientResultSchema,
   webhookUrl,
@@ -186,13 +195,15 @@ async function createCallECall({
   if (!apiKey) {
     throw new Error("CALL_E_API_KEY is not configured.");
   }
+  const normalizedPhone = String(phone || "").trim();
+  if (!isNormalizedE164Phone(normalizedPhone)) {
+    throw new Error("Phone number must use E.164 format.");
+  }
   const requestBody = {
     task: `${HIGH_STAKES_SAFETY_INSTRUCTION}\n\n${String(task || "").trim()}`,
     recipients: [
       {
-        phones: [phone],
-        region,
-        locale,
+        phones: [normalizedPhone],
       },
     ],
     metadata,
@@ -207,21 +218,38 @@ async function createCallECall({
     requestBody.webhook_url = webhookUrl;
   }
   const callEBaseUrl = getCallEBaseUrl();
-  const response = await fetch(`${callEBaseUrl}/v1/calls`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-      "idempotency-key": idempotencyKey,
-    },
-    body: JSON.stringify(requestBody),
-  });
-  const text = await response.text();
-  const responseBody = text ? JSON.parse(text) : {};
+  let response;
+  try {
+    response = await fetch(`${callEBaseUrl}/v1/calls`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+        "idempotency-key": idempotencyKey,
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch {
+    throw ambiguousCallEError("a network error");
+  }
+
+  let text;
+  try {
+    text = await response.text();
+  } catch {
+    throw ambiguousCallEError("a response-read error");
+  }
+
+  let responseBody;
+  try {
+    responseBody = text ? JSON.parse(text) : {};
+  } catch {
+    throw ambiguousCallEError("a response-parse error");
+  }
   if (!response.ok) {
     throw new Error(maskPhoneNumbers(
       responseBody.message || `CALL-E create call failed with ${response.status}.`,
-      [phone]
+      [normalizedPhone]
     ));
   }
   return responseBody;

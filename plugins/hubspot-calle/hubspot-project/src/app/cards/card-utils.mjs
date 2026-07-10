@@ -33,10 +33,9 @@ export function buildCardCallParameters({ objectContext, callTask, phoneProperty
 }
 
 export function buildCardServerlessRequest(input) {
-  const parameters = buildCardCallParameters(input);
   return {
-    parameters,
-    propertiesToSend: [parameters.phone_property],
+    parameters: buildCardCallParameters(input),
+    propertiesToSend: PHONE_PROPERTY_OPTIONS.map(({ value }) => value),
   };
 }
 
@@ -58,6 +57,32 @@ export function nextCardRequestId(currentRequestId, event, requestIdFactory = cr
   if (event === "ambiguous_error") return current;
   if (event === "cancel" || event === "terminal") return "";
   throw new Error(`Unsupported Card request ID event: ${event}.`);
+}
+
+export function reduceCardIntentState(state = {}, event = {}, requestIdFactory = createCardRequestId) {
+  const current = {
+    requestId: String(state.requestId || "").trim(),
+    confirming: state.confirming === true,
+  };
+
+  if (event.type === "begin") {
+    return {
+      requestId: nextCardRequestId(current.requestId, "begin", requestIdFactory),
+      confirming: true,
+    };
+  }
+  if (event.type === "result") {
+    return event.result && event.result.retry_same_intent === true
+      ? { ...current, confirming: true }
+      : { requestId: "", confirming: false };
+  }
+  if (event.type === "transport_error") {
+    return { ...current, confirming: true };
+  }
+  if (event.type === "cancel") {
+    return { requestId: "", confirming: false };
+  }
+  throw new Error(`Unsupported Card intent event: ${event.type}.`);
 }
 
 export function buildCallSummary(result = {}) {
