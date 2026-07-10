@@ -6,7 +6,7 @@
   "description": "Importable n8n workflow that calls the CALL-E API directly, waits for completion, and returns metadata, status, transcript, summary, and structured results.",
   "entrypoints": [
     {
-      "name": "CALL-E API createAndWait - IVR quality sample",
+      "name": "Run IVR call quality checks with CALL-E phone calls in n8n",
       "path": "examples/calle-ivr-quality-create-and-wait.workflow.json"
     }
   ],
