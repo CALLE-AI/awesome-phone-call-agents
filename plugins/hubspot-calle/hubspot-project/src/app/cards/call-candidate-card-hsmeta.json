@@ -1,0 +1,14 @@
+{
+  "uid": "calle_call_candidate_card",
+  "type": "card",
+  "config": {
+    "name": "CALL-E",
+    "description": "Displays low-permission CALL-E direct workflow mode on CRM records.",
+    "entrypoint": "/app/cards/CallCandidateCard.jsx",
+    "location": "crm.record.tab",
+    "objectTypes": [
+      "CONTACT",
+      "DEAL"
+    ]
+  }
+}

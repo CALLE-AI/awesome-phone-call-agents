@@ -1,0 +1,18 @@
+{
+  "uid": "calle_create_call_candidate_public",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/createCallCandidate.bundle.js",
+    "endpoint": {
+      "path": "calle/create-call",
+      "methods": [
+        "POST"
+      ]
+    },
+    "secretKeys": [
+      "CALLE_WORKFLOW_ENDPOINT_TOKEN",
+      "CALL_E_API_KEY",
+      "CALL_E_BASE_URL"
+    ]
+  }
+}

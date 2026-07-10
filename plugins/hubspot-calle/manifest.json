@@ -1,0 +1,47 @@
+{
+  "name": "hubspot-calle",
+  "title": "HubSpot CALL-E private serverless direct-call scaffold",
+  "platform": "HubSpot",
+  "type": "private-serverless-crm-plugin-scaffold",
+  "description": "Serverless-only private HubSpot Projects 2026.03 scaffold that creates CALL-E call tasks directly from HubSpot workflows without HubSpot CRM write permissions.",
+  "entrypoints": [
+    {
+      "name": "HubSpot private serverless project",
+      "path": "hubspot-project/hsproject.json"
+    },
+    {
+      "name": "Direct-call installer helper",
+      "path": "scripts/install-direct-call.mjs"
+    },
+    {
+      "name": "Direct-call user manual",
+      "path": "docs/direct-call-user-manual.md"
+    },
+    {
+      "name": "Private pilot setup guide",
+      "path": "docs/setup.md"
+    }
+  ],
+  "side_effects": [
+    "The direct-call workflow action creates a CALL-E call task after validating workflow inputs.",
+    "The Contact and Deal App Cards create a CALL-E call task only after an explicit confirmation.",
+    "The integration does not create HubSpot CRM properties, tasks, notes, or custom objects in low-permission mode.",
+    "CALL-E status and results remain in CALL-E unless a higher-permission HubSpot mode is implemented."
+  ],
+  "credentials": [
+    "Private workflow endpoint token stored as the HubSpot secret CALLE_WORKFLOW_ENDPOINT_TOKEN.",
+    "CALL-E API key stored in HubSpot serverless secrets.",
+    "No credentials or live customer records should be committed to this repository."
+  ],
+  "safety": [
+    "Use workflow triggers that represent explicit call intent before direct CALL-E call creation.",
+    "Requires E.164 phone numbers.",
+    "Masks phone numbers in summaries, examples, logs, and workflow output.",
+    "Uses stable idempotency keys to avoid duplicate calls.",
+    "Does not create hidden recurring schedules.",
+    "The workflow endpoint creates a call only when consent is explicitly true and do-not-call is explicitly false; enrollment filters must also exclude non-consenting and do-not-call records.",
+    "Canceling an App Card confirmation prevents only that pending submission. Once CALL-E accepts a call, use CALL-E-supported dashboard or API controls; disabling workflows or rotating secrets prevents new calls only.",
+    "Prepends every CALL-E task with a fixed, non-overridable instruction that prohibits medical, legal, financial, and emergency advice and limits those topics to logistics or routing."
+  ],
+  "template_version": "0.1.0"
+}
