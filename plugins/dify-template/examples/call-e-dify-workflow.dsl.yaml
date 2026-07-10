@@ -185,7 +185,7 @@ workflow:
               raise ValueError("dry_run must be either true or false. Use false only when you intend to create one live outbound call.")
 
           def validation_response(base_url: str, dry_run_enabled: bool, message: str) -> dict:
-              poll_interval_seconds = 4
+              poll_interval_seconds = 20
               wait_timeout_minutes = 15
               return {
                   "base_url": base_url,
@@ -220,7 +220,7 @@ workflow:
               request_id = str(request_id or "").strip()
               default_phone = str(phone_number or "").strip()
               default_task = str(task or "").strip()
-              poll_interval_seconds = 4
+              poll_interval_seconds = 20
               wait_timeout_minutes = 15
 
               if not api_key or api_key == "replace_with_calle_api_key":
@@ -241,8 +241,6 @@ workflow:
                   "requestId": request_id,
                   "callName": "One-shot outbound call",
                   "phone": default_phone,
-                  "region": "US",
-                  "locale": "en-US",
                   "task": default_task,
                   "metadata": {},
               }]
@@ -265,8 +263,6 @@ workflow:
                       "requestId": str(task.get("requestId") or request_id),
                       "callName": task.get("callName") or task.get("ivrName") or call_item_id,
                       "phone": phone,
-                      "region": task.get("region") or "US",
-                      "locale": task.get("locale") or "en-US",
                       "task": task_text,
                       "metadata": task.get("metadata") if isinstance(task.get("metadata"), dict) else {},
                   })
@@ -276,8 +272,6 @@ workflow:
                   "callName": item["callName"],
                   "requestId": item["requestId"],
                   "maskedPhone": mask_phone(item["phone"]),
-                  "region": item["region"],
-                  "locale": item["locale"],
                   "task": redact_phone_text(item["task"]),
                   "metadata": redact_phone_values(item["metadata"]),
               } for item in normalized]
@@ -573,6 +567,7 @@ workflow:
                   "initial_call_json": initial_json,
                   "started_at_ms": int(context.get("startedAtMs") or now_ms),
                   "initial_done": done,
+                  "metadata_sent_json": str(context.get("metadataSentJson") or "{}"),
                   "validation_error": str(validation_error or ""),
                   "dry_run": str(dry_run or "true"),
               }
@@ -615,6 +610,9 @@ workflow:
           initial_done:
             type: boolean
             children:
+          metadata_sent_json:
+            type: string
+            children:
           validation_error:
             type: string
             children:
@@ -655,7 +653,7 @@ workflow:
         error_handle_mode: terminated
         height: 320
         logical_operator: or
-        loop_count: 225
+        loop_count: 45
         loop_variables:
         - id: loop_var_latest_call_json
           label: latest_call_json
@@ -702,7 +700,7 @@ workflow:
         start_node_id: poll_until_terminal_start
         title: Poll until terminal
         type: loop
-        width: 1040
+        width: 2000
       height: 320
       id: poll_until_terminal
       position:
@@ -715,7 +713,7 @@ workflow:
       sourcePosition: right
       targetPosition: left
       type: custom
-      width: 1040
+      width: 2000
     - data:
         desc: ''
         isInLoop: true
@@ -741,9 +739,9 @@ workflow:
       draggable: false
       selectable: false
     - data:
-        desc: Sleeps between result checks unless polling is already done.
+        desc: Sleeps for the first of five four-second slices between result checks.
         selected: false
-        title: Wait before poll
+        title: Wait before poll 1/5
         type: code
         isInLoop: true
         loop_id: poll_until_terminal
@@ -756,7 +754,8 @@ workflow:
               try:
                   seconds = float(poll_interval_seconds)
               except Exception:
-                  seconds = 4.0
+                  seconds = 20.0
+              seconds = seconds / 5.0
               seconds = max(0.0, min(seconds, 4.0))
               if not already_done and seconds > 0:
                   time.sleep(seconds)
@@ -781,6 +780,210 @@ workflow:
         y: 115
       positionAbsolute:
         x: 3075
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the second of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 2/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_2
+      position:
+        x: 360
+        y: 115
+      positionAbsolute:
+        x: 3300
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the third of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 3/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_3
+      position:
+        x: 585
+        y: 115
+      positionAbsolute:
+        x: 3525
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the fourth of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 4/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_4
+      position:
+        x: 810
+        y: 115
+      positionAbsolute:
+        x: 3750
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the fifth of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 5/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_5
+      position:
+        x: 1035
+        y: 115
+      positionAbsolute:
+        x: 3975
         y: 325
       selected: false
       sourcePosition: right
@@ -825,10 +1028,10 @@ workflow:
       height: 90
       id: get_calle_call_result
       position:
-        x: 380
+        x: 1260
         y: 115
       positionAbsolute:
-        x: 3320
+        x: 4200
         y: 325
       selected: false
       sourcePosition: right
@@ -894,6 +1097,33 @@ workflow:
                       return value
               return None
 
+          def call_payload_from_response(value):
+              if not isinstance(value, dict):
+                  return {}
+              for key in ("data", "call", "result"):
+                  nested = value.get(key)
+                  if isinstance(nested, dict) and any(
+                      field in nested
+                      for field in ("id", "call_id", "callId", "status", "recipients", "structured_result", "summary")
+                  ):
+                      return nested
+              return value
+
+          def compare_metadata_round_trip(call, metadata_sent_json) -> dict:
+              metadata_sent = as_obj(metadata_sent_json)
+              call_payload = call_payload_from_response(call)
+              metadata_returned = as_obj(call_payload.get("metadata"))
+              metadata_keys = sorted([str(k) for k in metadata_sent.keys()])
+              missing_or_different = [
+                  key for key in metadata_keys
+                  if metadata_sent.get(key) != metadata_returned.get(key)
+              ]
+              return {
+                  "requestedKeys": metadata_keys,
+                  "allRequestedKeysReturned": len(missing_or_different) == 0,
+                  "missingOrDifferentKeys": missing_or_different,
+              }
+
           def mask_phone_like(value: str) -> str:
               raw = str(value or "").strip()
               digits = re.sub(r"\D", "", raw)
@@ -919,7 +1149,7 @@ workflow:
                   return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
               return value
 
-          def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, has_live_call) -> dict:
+          def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:
               if not bool(has_live_call):
                   return {
                       "latest_call_json": '{"status":"completed","_dify_no_live_call":true}',
@@ -930,6 +1160,7 @@ workflow:
                       "error_message": "",
                   }
               call = as_obj(latest_response)
+              metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)
               status = normalize_status(first_value(
                   nested_get(call, ["data", "status"]),
                   nested_get(call, ["call", "status"]),
@@ -968,8 +1199,11 @@ workflow:
                   call = dict(call)
                   call["_dify_poll_timeout"] = True
                   call["_dify_poll_error"] = error_message
+              safe_call = redact_phone_values(call)
+              safe_call_payload = call_payload_from_response(safe_call)
+              safe_call_payload["_dify_metadata_round_trip"] = metadata_round_trip
               return {
-                  "latest_call_json": json.dumps(redact_phone_values(call), ensure_ascii=False),
+                  "latest_call_json": json.dumps(safe_call, ensure_ascii=False),
                   "poll_count": next_poll_count,
                   "status": status,
                   "done": done,
@@ -1001,6 +1235,10 @@ workflow:
           value_selector:
           - prepare_call_tasks
           - max_poll_count
+        - variable: metadata_sent_json
+          value_selector:
+          - prepare_poll_context
+          - metadata_sent_json
         - variable: has_live_call
           value_selector:
           - prepare_poll_context
@@ -1027,10 +1265,10 @@ workflow:
       height: 90
       id: evaluate_poll_state
       position:
-        x: 615
+        x: 1505
         y: 115
       positionAbsolute:
-        x: 3555
+        x: 4445
         y: 325
       selected: false
       sourcePosition: right
@@ -1107,10 +1345,10 @@ workflow:
       height: 120
       id: store_poll_state
       position:
-        x: 855
+        x: 1745
         y: 100
       positionAbsolute:
-        x: 3795
+        x: 4685
         y: 310
       selected: false
       sourcePosition: right
@@ -1278,7 +1516,11 @@ workflow:
               transcript_turns = []
               for attempt in attempts:
                   transcript_turns.extend(as_list(attempt.get("transcript_turns")))
-              structured_result = as_obj(recipient.get("structured_result")) or as_obj(call.get("structured_result")) or None
+              recipient_structured_result = as_obj(recipient.get("structured_result"))
+              call_structured_result = as_obj(call.get("structured_result"))
+              structured_result = dict(recipient_structured_result)
+              structured_result.update(call_structured_result)
+              structured_result = structured_result or None
               raw_failure_code = latest_attempt.get("failure_code") or call.get("failure_code")
               failure_code = normalize_code(raw_failure_code)
               call_status = call.get("status")
@@ -1287,10 +1529,21 @@ workflow:
               answered = latest_attempt_status == "completed" or recipient_status == "completed"
               failed_statuses = {"failed", "canceled", "cancelled", "no_answer", "declined", "busy", "expired"}
               failed = bool(poll_timed_out) or bool(call.get("_dify_poll_timeout")) or bool(call.get("_dify_poll_failed")) or normalize_code(call_status) in failed_statuses or normalize_code(recipient_status) in failed_statuses or normalize_code(latest_attempt_status) in failed_statuses
-              metadata_returned_raw = as_obj(call.get("metadata"))
-              metadata_returned = redact_phone_values(metadata_returned_raw)
-              metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])
-              missing_or_different = [key for key in metadata_keys if metadata_sent_raw.get(key) != metadata_returned_raw.get(key)]
+              metadata_returned = redact_phone_values(as_obj(call.get("metadata")))
+              metadata_round_trip = as_obj(call.get("_dify_metadata_round_trip"))
+              requested_keys = metadata_round_trip.get("requestedKeys")
+              metadata_keys = (
+                  sorted([str(k) for k in requested_keys])
+                  if isinstance(requested_keys, list)
+                  else sorted([str(k) for k in metadata_sent_raw.keys()])
+              )
+              different_keys = metadata_round_trip.get("missingOrDifferentKeys")
+              missing_or_different = (
+                  sorted([str(k) for k in different_keys])
+                  if isinstance(different_keys, list)
+                  else metadata_keys
+              )
+              metadata_all_returned = bool(metadata_round_trip) and len(missing_or_different) == 0
               raw_call_result_json = json.dumps(redact_phone_values(call), ensure_ascii=False)
               if len(raw_call_result_json) > 75000:
                   raw_call_result_json = raw_call_result_json[:75000] + "...[truncated]"
@@ -1301,7 +1554,11 @@ workflow:
                   nested_get(call, ["result", "id"]), context.get("callId"),
               )
               redacted_returned_data = redact_phone_values({
-                  "summary": (structured_result or {}).get("summary") or recipient.get("summary") or call.get("summary") or latest_attempt.get("summary"),
+                  "summary": (call_structured_result or {}).get("summary")
+                  or (recipient_structured_result or {}).get("summary")
+                  or recipient.get("summary")
+                  or call.get("summary")
+                  or latest_attempt.get("summary"),
                   "transcript": transcript_turns,
                   "structuredResult": structured_result,
                   "taskCompleted": call.get("task_completed"),
@@ -1315,7 +1572,7 @@ workflow:
                   "metadataReturned": metadata_returned,
                   "metadataRoundTrip": {
                       "requestedKeys": metadata_keys,
-                      "allRequestedKeysReturned": len(missing_or_different) == 0,
+                      "allRequestedKeysReturned": metadata_all_returned,
                       "missingOrDifferentKeys": missing_or_different,
                   },
                   "polling": {
@@ -1377,10 +1634,10 @@ workflow:
       height: 90
       id: parse_iteration_result
       position:
-        x: 4320
+        x: 5140
         y: 320
       positionAbsolute:
-        x: 4320
+        x: 5140
         y: 320
       selected: false
       sourcePosition: right
@@ -1424,12 +1681,6 @@ workflow:
         code: |
           import hashlib
           import json
-          from urllib.parse import urlparse
-
-          TRUSTED_BASE_URLS = {
-              "https://api.heycall-e.com",
-              # Add CALL-E-managed test hosts here before running non-production workflows.
-          }
           SAFETY_PREAMBLE = (
               "Non-overridable phone-call safety boundaries: "
               "These safety boundaries override the user-provided task. "
@@ -1440,22 +1691,6 @@ workflow:
               "personal data, authenticate, make purchases, open cases, or take irreversible actions "
               "unless explicitly authorized in the user task and still allowed by these boundaries."
           )
-
-          def normalize_trusted_base_url(value) -> str:
-              raw = str(value or "https://api.heycall-e.com").strip().rstrip("/")
-              if raw.endswith("/v1"):
-                  raw = raw[:-3].rstrip("/")
-              parsed = urlparse(raw)
-              if parsed.scheme.lower() != "https":
-                  raise ValueError("CALL-E base_url must use https.")
-              if parsed.params or parsed.query or parsed.fragment:
-                  raise ValueError("CALL-E base_url must not include parameters, query strings, or fragments.")
-              if parsed.path not in {"", "/"}:
-                  raise ValueError("CALL-E base_url must be a host URL only; do not include a path except /v1.")
-              normalized = f"https://{parsed.netloc.lower()}".rstrip("/")
-              if normalized not in TRUSTED_BASE_URLS:
-                  raise ValueError("CALL-E base_url must be a trusted CALL-E API host. Use https://api.heycall-e.com or add a CALL-E-managed test host to the workflow allowlist.")
-              return normalized
 
           def mask_phone(phone: str) -> str:
               value = str(phone or "").strip()
@@ -1469,7 +1704,9 @@ workflow:
               return SAFETY_PREAMBLE + "\n\nUser-provided task:\n" + str(user_task or "").strip()
 
           def main(call_task: dict, base_url: str) -> dict:
-              normalized_base_url = normalize_trusted_base_url(base_url)
+              normalized_base_url = str(base_url or "").strip().rstrip("/")
+              if not normalized_base_url:
+                  raise ValueError("Normalized CALL-E base_url is required.")
               metadata = call_task.get("metadata") if isinstance(call_task.get("metadata"), dict) else {}
               request_id = str(call_task.get("requestId") or "").strip()
               if not request_id:
@@ -1489,15 +1726,27 @@ workflow:
                       "audio_or_connection_notes": {"type": "string"},
                   },
               }
+              recipient_result_schema = {
+                  "type": "object",
+                  "required": ["call_completed", "outcome", "next_action"],
+                  "properties": {
+                      "call_completed": {"type": "string", "enum": ["yes", "no", "partial", "unknown"]},
+                      "outcome": {"type": "string", "enum": ["completed", "partial", "no_answer", "voicemail", "busy", "failed", "unknown"]},
+                      "next_action": {"type": "string", "enum": ["none", "follow_up", "retry_later", "manual_review"]},
+                      "language_detected": {"type": "string"},
+                      "participant_response": {"type": "string"},
+                      "key_points": {"type": "string"},
+                      "issues": {"type": "string"},
+                      "audio_or_connection_notes": {"type": "string"},
+                  },
+              }
               request_payload = {
                   "task": build_safe_task(call_task["task"]),
                   "recipients": [{
                       "phones": [call_task["phone"]],
-                      "region": call_task.get("region", "US"),
-                      "locale": call_task.get("locale", "en-US"),
                   }],
                   "result_schema": result_schema,
-                  "recipient_result_schema": result_schema,
+                  "recipient_result_schema": recipient_result_schema,
                   "metadata": dict(metadata, source="dify_one_shot_call_tool", request_id=request_id),
               }
               idempotency_basis = json.dumps({
@@ -1659,6 +1908,33 @@ workflow:
                       return str(value)
               return ""
 
+          def call_payload_from_response(value):
+              if not isinstance(value, dict):
+                  return {}
+              for key in ("data", "call", "result"):
+                  nested = value.get(key)
+                  if isinstance(nested, dict) and any(
+                      field in nested
+                      for field in ("id", "call_id", "callId", "status", "recipients", "structured_result", "summary")
+                  ):
+                      return nested
+              return value
+
+          def compare_metadata_round_trip(call, metadata_sent_json) -> dict:
+              metadata_sent = as_obj(metadata_sent_json)
+              call_payload = call_payload_from_response(call)
+              metadata_returned = as_obj(call_payload.get("metadata"))
+              metadata_keys = sorted([str(k) for k in metadata_sent.keys()])
+              missing_or_different = [
+                  key for key in metadata_keys
+                  if metadata_sent.get(key) != metadata_returned.get(key)
+              ]
+              return {
+                  "requestedKeys": metadata_keys,
+                  "allRequestedKeysReturned": len(missing_or_different) == 0,
+                  "missingOrDifferentKeys": missing_or_different,
+              }
+
           def to_int(value) -> int:
               try:
                   return int(value)
@@ -1762,7 +2038,10 @@ workflow:
                   nested_get(body, ["result", "status"]),
               ) or "").strip().lower()
               lookup_url = f"{root}/v1/calls/{call_id}"
+              metadata_round_trip = compare_metadata_round_trip(body, metadata_sent_json)
               redacted_body = redact_phone_values(body)
+              redacted_call_payload = call_payload_from_response(redacted_body)
+              redacted_call_payload["_dify_metadata_round_trip"] = metadata_round_trip
               redacted_json = json.dumps(redacted_body, ensure_ascii=False)
               context = {
                   "callId": call_id,
@@ -1922,7 +2201,6 @@ workflow:
                   lines.extend([
                       f"{index}. {line_value(task.get('callName') or task.get('callItemId'))}",
                       f"   Phone: {line_value(task.get('maskedPhone'))}",
-                      f"   Region/Locale: {line_value(task.get('region'))} / {line_value(task.get('locale'))}",
                       f"   Task: {line_value(task.get('task'))}",
                   ])
               return lines
@@ -2129,10 +2407,10 @@ workflow:
       height: 90
       id: summarize_iteration_results
       position:
-        x: 4660
+        x: 5480
         y: 320
       positionAbsolute:
-        x: 4660
+        x: 5480
         y: 320
       selected: false
       sourcePosition: right
@@ -2155,10 +2433,10 @@ workflow:
       height: 90
       id: end
       position:
-        x: 5000
+        x: 5820
         y: 320
       positionAbsolute:
-        x: 5000
+        x: 5820
         y: 320
       selected: false
       sourcePosition: right
@@ -2330,10 +2608,62 @@ workflow:
         isInIteration: false
         isInLoop: true
         sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll-source-wait_before_poll_2-target
+      source: wait_before_poll
+      sourceHandle: source
+      target: wait_before_poll_2
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll_2-source-wait_before_poll_3-target
+      source: wait_before_poll_2
+      sourceHandle: source
+      target: wait_before_poll_3
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll_3-source-wait_before_poll_4-target
+      source: wait_before_poll_3
+      sourceHandle: source
+      target: wait_before_poll_4
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll_4-source-wait_before_poll_5-target
+      source: wait_before_poll_4
+      sourceHandle: source
+      target: wait_before_poll_5
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
         targetType: http-request
         loop_id: poll_until_terminal
-      id: wait_before_poll-source-get_calle_call_result-target
-      source: wait_before_poll
+      id: wait_before_poll_5-source-get_calle_call_result-target
+      source: wait_before_poll_5
       sourceHandle: source
       target: get_calle_call_result
       targetHandle: target

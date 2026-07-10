@@ -438,7 +438,6 @@ def validate_dify_template() -> None:
             "| `report` | Human-readable final answer returned by the End node. |",
             "`summary_json` remains available inside the `Summarize iteration results` node for debugging.",
             "Only `https://api.heycall-e.com` is enabled by default.",
-            "Add a CALL-E-managed test host to the workflow allowlist before using a non-production base URL.",
             "The workflow accepts only exact `true` or `false` for `dry_run`.",
             "`Gate live calls after health` allows live-call creation only when `GET /health` returns a 2xx status code.",
             "only after `GET /health` returns a 2xx status code",
@@ -481,8 +480,8 @@ def validate_dify_template() -> None:
             "if normalized == \"false\":",
             "raise ValueError(\"dry_run must be either true or false. Use false only when you intend to create one live outbound call.\")",
             "\"+15555550123\"",
-            "poll_interval_seconds = 4",
-            "loop_count: 225",
+            "poll_interval_seconds = 20",
+            "wait_timeout_minutes = 15",
             "seconds = max(0.0, min(seconds, 4.0))",
             "name: CALL_E_API_KEY",
             "value_type: secret",
@@ -500,7 +499,9 @@ def validate_dify_template() -> None:
             "metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])",
             "rawLookupJson\": json.dumps(redact_phone_values(final_body), ensure_ascii=False)",
             "raw_call_result_json = json.dumps(redact_phone_values(call), ensure_ascii=False)",
-            "\"latest_call_json\": json.dumps(redact_phone_values(call), ensure_ascii=False)",
+            "safe_call = redact_phone_values(call)",
+            "safe_call_payload[\"_dify_metadata_round_trip\"] = metadata_round_trip",
+            "\"latest_call_json\": json.dumps(safe_call, ensure_ascii=False)",
             "\"initialCallJson\": redacted_json",
             "\"createResponseJson\": redacted_json",
             "context.get(\"createFailed\")",
@@ -548,9 +549,149 @@ def validate_dify_template() -> None:
     prepare_poll_section = text_between(dsl_path, dsl_text, "title: Prepare poll context", "outputs:")
     poll_http_section = text_between(dsl_path, dsl_text, "title: Poll CALL-E call status", "height: 90")
     poll_section = text_between(dsl_path, dsl_text, "title: Evaluate poll state", "variables:")
+    parse_result_section = text_between(dsl_path, dsl_text, "title: Parse final call result", "variables:")
     create_http_section = text_between(dsl_path, dsl_text, "title: Create CALL-E call", "height: 90")
     extract_section = text_between(dsl_path, dsl_text, "title: Extract call lookup id", "variables:")
     iteration_section = text_between(dsl_path, dsl_text, "title: Run one-shot call", "output_selector:")
+    nodes_section = text_between(dsl_path, dsl_text, "nodes:", "edges:")
+
+    review_regressions = []
+    if (
+        "recipient_result_schema = {" not in build_payload_section
+        or '"recipient_result_schema": recipient_result_schema' not in build_payload_section
+        or '"recipient_result_schema": result_schema' in build_payload_section
+    ):
+        review_regressions.append(
+            "Build per-call payload must use a separate recipient_result_schema instead of reusing result_schema."
+        )
+    else:
+        recipient_schema_section = build_payload_section.split("recipient_result_schema = {", 1)[1].split(
+            "request_payload = {", 1
+        )[0]
+        if '"summary"' in recipient_schema_section:
+            review_regressions.append(
+                "recipient_result_schema must not declare CALL-E's reserved summary response field."
+            )
+
+    loop_count_match = re.search(r"^\s*loop_count:\s*(\d+)\s*$", nodes_section, re.MULTILINE)
+    loop_count = int(loop_count_match.group(1)) if loop_count_match else 0
+    poll_loop_child_count = len(
+        re.findall(r"^\s*parentId:\s*poll_until_terminal\s*$", nodes_section, re.MULTILINE)
+    )
+    total_node_count = len(re.findall(r"^\s{6}id:\s*[^\s]+\s*$", nodes_section, re.MULTILINE))
+    non_poll_node_count = total_node_count - poll_loop_child_count
+    if not loop_count_match or loop_count > 100:
+        review_regressions.append("Poll until terminal must stay within Dify's default 100-loop limit.")
+    if (
+        not poll_loop_child_count
+        or non_poll_node_count + loop_count * poll_loop_child_count > 500
+    ):
+        review_regressions.append(
+            "Polling child-node executions must stay within Dify's default 500-step workflow limit."
+        )
+    polling_cadence_snippets = [
+        "loop_count: 45",
+        "id: wait_before_poll",
+        "id: wait_before_poll_2",
+        "id: wait_before_poll_3",
+        "id: wait_before_poll_4",
+        "id: wait_before_poll_5",
+        "wait_before_poll-source-wait_before_poll_2-target",
+        "wait_before_poll_2-source-wait_before_poll_3-target",
+        "wait_before_poll_3-source-wait_before_poll_4-target",
+        "wait_before_poll_4-source-wait_before_poll_5-target",
+        "wait_before_poll_5-source-get_calle_call_result-target",
+    ]
+    if any(snippet not in dsl_text for snippet in polling_cadence_snippets):
+        review_regressions.append(
+            "Polling must use five serial four-second wait slices across 45 rounds."
+        )
+    if (
+        dsl_text.count("seconds = seconds / 5.0") != 5
+        or dsl_text.count("seconds = max(0.0, min(seconds, 4.0))") != 5
+    ):
+        review_regressions.append("Each polling wait slice must cap its sleep at four seconds.")
+
+    if any(snippet in prepare_section for snippet in ['"region":', '"locale":']) or any(
+        snippet in build_payload_section for snippet in ['"region":', '"locale":']
+    ) or "Region/Locale:" in dsl_text:
+        review_regressions.append(
+            "The one-shot template must omit optional region and locale routing hints unless Start collects them."
+        )
+
+    cancellation_boundary_snippets = [
+        "After `POST /v1/calls` succeeds, stopping the Dify execution stops only this workflow's polling; it does not cancel the outbound call.",
+        "The CALL-E API used by this template does not provide a call-cancel action, so cancellation is available only before call creation.",
+    ]
+    if any(snippet not in read(readme_path) for snippet in cancellation_boundary_snippets):
+        review_regressions.append(
+            "Dify documentation must state the post-create cancellation boundary and lack of a call-cancel action."
+        )
+
+    metadata_round_trip_helper = "def compare_metadata_round_trip(call, metadata_sent_json) -> dict:"
+    if any(metadata_round_trip_helper not in section for section in [poll_section, extract_section]):
+        review_regressions.append(
+            "Create and poll handlers must compare raw metadata before redacting stored response copies."
+        )
+    if "_dify_metadata_round_trip" not in parse_result_section:
+        review_regressions.append(
+            "Parse final call result must consume the safe raw-metadata comparison recorded upstream."
+        )
+    if "metadata_sent_raw.get(key) != metadata_returned_raw.get(key)" in parse_result_section:
+        review_regressions.append(
+            "Parse final call result must not compare raw sent metadata with an already-redacted response."
+        )
+    structured_result_snippets = [
+        'recipient_structured_result = as_obj(recipient.get("structured_result"))',
+        'call_structured_result = as_obj(call.get("structured_result"))',
+        "structured_result = dict(recipient_structured_result)",
+        "structured_result.update(call_structured_result)",
+        '"summary": (call_structured_result or {}).get("summary")',
+    ]
+    if any(snippet not in parse_result_section for snippet in structured_result_snippets):
+        review_regressions.append(
+            "Parse final call result must preserve task-level structured fields when recipient results omit reserved fields."
+        )
+    for section_name, section, compare_call, redact_call in [
+        (
+            "Evaluate poll state",
+            poll_section,
+            "metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)",
+            "safe_call = redact_phone_values(call)",
+        ),
+        (
+            "Extract call lookup id",
+            extract_section,
+            "metadata_round_trip = compare_metadata_round_trip(body, metadata_sent_json)",
+            "redacted_body = redact_phone_values(body)",
+        ),
+    ]:
+        if compare_call not in section or redact_call not in section or section.find(compare_call) > section.rfind(redact_call):
+            review_regressions.append(
+                f"{section_name} must compare raw metadata before redacting the response."
+            )
+
+    if any(
+        snippet in build_payload_section
+        for snippet in ["from urllib.parse import urlparse", "TRUSTED_BASE_URLS", "normalize_trusted_base_url"]
+    ):
+        review_regressions.append(
+            "Build per-call payload must consume the preflight-normalized base URL without a second host allowlist."
+        )
+    if (
+        dsl_text.count("TRUSTED_BASE_URLS = {") != 1
+        or dsl_text.count("def normalize_trusted_base_url(value) -> str:") != 1
+    ):
+        review_regressions.append(
+            "Dify template must define base URL trust policy exactly once in Prepare one-shot call."
+        )
+    if "`TRUSTED_BASE_URLS` set in `Prepare one-shot call`" not in read(readme_path):
+        review_regressions.append(
+            "Dify setup instructions must identify the single non-production host allowlist location."
+        )
+
+    if review_regressions:
+        fail("Dify template review regressions:\n- " + "\n- ".join(review_regressions))
     for snippet in ["name: CALL_E_API_KEY", "- env", "- CALL_E_API_KEY", "value_type: secret"]:
         if snippet not in env_section:
             fail(f"Dify template must declare CALL_E_API_KEY as a secret environment variable: {snippet}")
@@ -607,7 +748,7 @@ def validate_dify_template() -> None:
     if "- variable: validation_error\n          value_selector:\n          - gate_live_calls_after_health\n          - validation_error" not in prepare_poll_section:
         fail("Prepare poll context must receive the health-gated validation_error.")
     for snippet in [
-        "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, has_live_call) -> dict:",
+        "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:",
         "status = normalize_status(first_value(\n                  nested_get(call, [\"data\", \"status\"])",
         "poll_status = int(as_number(poll_status_code, 0))",
         "if poll_status and not (200 <= poll_status < 300):",

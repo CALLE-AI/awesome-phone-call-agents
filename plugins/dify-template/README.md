@@ -30,7 +30,7 @@ The workflow is intentionally small and visible:
 1. Open Dify and import `examples/call-e-dify-workflow.dsl.yaml`.
 2. Open the workflow app environment variables and set `CALL_E_API_KEY` as a Dify secret environment variable.
 3. Keep `CALL-E API base URL` as `https://api.heycall-e.com` for production. Only `https://api.heycall-e.com` is enabled by default.
-4. Add a CALL-E-managed test host to the workflow allowlist before using a non-production base URL. Do not run this template with arbitrary hosts because the workflow sends the Bearer API key from `CALL_E_API_KEY` to `GET /health` and `POST /v1/calls`.
+4. Add a CALL-E-managed test host to the `TRUSTED_BASE_URLS` set in `Prepare one-shot call` before using a non-production base URL. This is the workflow's single host allowlist. Do not run this template with arbitrary hosts because the workflow sends the Bearer API key from `CALL_E_API_KEY` to `GET /health` and `POST /v1/calls`.
 5. Keep `Dry run?` set to `true` for the first run.
 6. Fill `request_id` with a stable value for this intended call. Reuse the same value only when replaying the same call after an ambiguous create result; use a new value for a new live call.
 7. Fill one owned or explicitly authorized destination number in E.164 format, for example `+15555550123`.
@@ -70,16 +70,20 @@ With `dry_run=true`, the workflow checks CALL-E API connectivity with `GET /heal
 
 With `dry_run=false`, the workflow creates one outbound phone call through CALL-E only after `GET /health` returns a 2xx status code, then polls for the result. It does not create recurring schedules or provider-side recurrence.
 
-The polling sleep is capped below Dify's default 5-second code-node timeout, and the loop cap is aligned with the advertised 15-minute timeout so long-running calls are reported as timed out instead of in-progress.
+The polling sleep is capped below Dify's default 5-second code-node timeout. Each polling round uses five serial four-second wait slices, and the workflow runs at most 45 rounds over approximately 15 minutes. Counting the loop-start node conservatively, the graph uses at most 419 workflow steps, below Dify's default limits of 100 loop rounds and 500 workflow steps.
 
 The live create request uses a stable idempotency key derived from `request_id`, the call item, destination phone number, and task. This protects replay after an ambiguous `POST /v1/calls` result from creating a duplicate outbound call.
 
-To disable or roll back the sample:
+To prevent future live calls:
 
 - keep `dry_run=true`
+- stop the Dify execution before it reaches `Create CALL-E call`
 - remove or rotate the `CALL_E_API_KEY` secret in Dify
-- stop a running Dify execution from the Dify workflow run view
 - delete the imported workflow app from Dify when it is no longer needed
+
+After `POST /v1/calls` succeeds, stopping the Dify execution stops only this workflow's polling; it does not cancel the outbound call. Removing or rotating the API key and deleting the app also affect only polling or future executions after that boundary.
+
+The CALL-E API used by this template does not provide a call-cancel action, so cancellation is available only before call creation.
 
 ## Manual Verification
 
