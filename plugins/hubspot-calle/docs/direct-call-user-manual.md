@@ -20,11 +20,19 @@ Keep these permission boundaries separate.
 | Installed static app | HubSpot account | The app requests only the scopes in `hubspot-project/src/app/app-hsmeta.json`: `oauth`, `crm.objects.contacts.read`, and `crm.objects.deals.read`. It does not request CRM write scopes. |
 | HubSpot product | Customer account | Content Hub Enterprise for the public workflow endpoint. The account must also support the administrator's project-app installation and CRM record customization work. |
 | HubSpot administration | Administrator | Permission to install or reinstall the app, manage serverless secrets, configure workflows, and customize Contact or Deal record layouts to add App Cards. |
-| CALL-E | Administrator | A CALL-E API key and access to CALL-E-supported dashboard or API controls for call review and accepted-call cancellation. |
+| CALL-E | Administrator | Create or select a CALL-E API key at https://dashboard.heycall-e.com/account/api-keys, and retain CALL-E dashboard or API access for call review and accepted-call cancellation. |
 
 Before the first deployment, confirm that the test phone number is authorized for outbound contact and stored in E.164 format, for example `+15555550123`.
 
+## Administrator: Agent-Assisted Installation
+
+Administrators who want Agent assistance should start with the [Administrator Agent Prompt](./admin-agent-prompt.md). It begins with a read-only preflight, keeps this manual authoritative for deployment behavior, and stops for explicit approval before secret entry, uploads, permission grants, record-layout saves, workflow activation, or real calls.
+
+Browser automation is optional in that workflow. When browser control is unavailable or not approved, the administrator follows the same HubSpot steps manually.
+
 ## Administrator: First-Time Installation
+
+Before running the installer, create or select the CALL-E API key at https://dashboard.heycall-e.com/account/api-keys. Enter it only through hidden local terminal input. Never paste it into Agent chat.
 
 Use a configured standard-account alias and verify it before any deployment. The installer resolves the alias through the HubSpot CLI and refuses an unknown or mismatched account before changing local workflow metadata, secrets, or the remote project.
 
@@ -34,7 +42,7 @@ hs account list
 hs account info <configured-standard-account>
 ```
 
-From the repository checkout, use a hidden shell prompt for the CALL-E key. Do not place the API key directly in command history.
+From the repository checkout, use a hidden shell prompt for the CALL-E key. Do not place the API key in Agent chat or command history.
 
 ```bash
 cd plugins/hubspot-calle
@@ -54,6 +62,8 @@ unset CALL_E_API_KEY
 After it validates the local Node.js and HubSpot CLI versions, the requested account, and the preflight secret state, the installer writes the target account's public workflow endpoint into the local workflow-action metadata, optionally adds or updates HubSpot secrets, builds, validates, uploads, and checks static app installation status.
 
 When `--set-secrets-from-env` is used and `CALLE_WORKFLOW_ENDPOINT_TOKEN` is absent, the installer generates a token and prints it once before any mutation. Store it in an administrator-controlled secret store. It is needed only when an administrator configures the workflow action; do not give it to ordinary sales or operations users.
+
+Human or other administrator-controlled manual terminal runs may use that installer-generated one-time token path, but the administrator must save the token immediately. Agent-assisted runs intentionally must not use installer generation because tool output may be retained; they must pre-create and store `CALLE_WORKFLOW_ENDPOINT_TOKEN`, then supply it through the hidden same-session path in the [Administrator Agent Prompt](./admin-agent-prompt.md). This stricter Agent safety path does not change installer behavior.
 
 Without `--set-secrets-from-env`, the installer checks that all three HubSpot secrets already exist and fails before mutation when any are missing. `--skip-secrets` is the explicit bypass: it neither checks nor writes secrets and is appropriate only when an administrator has independently verified the deployed secrets.
 

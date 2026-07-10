@@ -1,13 +1,14 @@
 # HubSpot CALL-E Direct-Call Setup
 
 This is an administrator deployment and local-verification reference for the private static HubSpot Projects app. The [direct-call user manual](direct-call-user-manual.md) is authoritative for installation roles, distribution, workflow configuration, App Card setup, consent, cancellation, and ordinary-user operation.
+Administrators who want an approval-gated operator flow can use the [Administrator Agent Prompt](./admin-agent-prompt.md). It starts with read-only preflight work and stops for approval before remote mutations or real calls.
 
 ## Prerequisites
 
 - Node.js `20.0.0` or newer.
 - HubSpot CLI `8.4.0` or newer, authenticated with a deployer's personal access key that can upload developer projects and read or write serverless secrets for the target standard account.
 - Content Hub Enterprise for the public serverless endpoint used by the workflow action.
-- A CALL-E API key and authorized E.164 test phone number.
+- A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
 - Administrator access to install or reinstall the static app and customize Contact or Deal record layouts.
 
 The installed static app's scopes are separate from CLI deployment permissions. It separately requests `oauth`; its two `crm.objects.*` scopes in `hubspot-project/src/app/app-hsmeta.json` are read-only access to contacts and deals.
@@ -38,6 +39,8 @@ unset CALL_E_API_KEY
 The installer validates the local Node.js version, detected HubSpot CLI version, and requested account before local metadata or remote mutation, configures the account-specific action URL, writes secrets when requested, builds, validates, uploads, and reports `installed`, `reinstall_required`, `manual_install_required`, or `upload_skipped`.
 
 If it generates `CALLE_WORKFLOW_ENDPOINT_TOKEN`, it prints the value once before mutation. Store it with administrator secrets. For a recovery rerun, prompt for the saved value instead of allowing a new one to replace it:
+
+Human or other administrator-controlled manual terminal runs may use that installer-generated one-time token path, but the administrator must save the token immediately. Agent-assisted runs intentionally must not use installer generation because tool output may be retained; they must pre-create and store `CALLE_WORKFLOW_ENDPOINT_TOKEN`, then supply it through the hidden same-session path in the [Administrator Agent Prompt](./admin-agent-prompt.md). This stricter Agent safety path does not change installer behavior.
 
 ```bash
 read -s CALL_E_API_KEY

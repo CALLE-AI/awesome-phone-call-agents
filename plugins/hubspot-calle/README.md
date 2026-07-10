@@ -13,6 +13,7 @@ The workflow action uses a public HubSpot serverless endpoint. That endpoint req
 Administrators deploy the project, manage HubSpot secrets, install or reinstall the static app, add App Cards to record layouts, and configure workflows. Sales and operations users use a configured App Card or manually enroll an already-approved record; they do not handle `CALLE_WORKFLOW_ENDPOINT_TOKEN` or the CALL-E API key.
 
 The [CALL-E for HubSpot Direct-Call User Manual](docs/direct-call-user-manual.md) is the authoritative installation, administrator, and user guide. See [setup.md](docs/setup.md) for a concise deployment and local-verification reference.
+For administrator-led deployments, use the [Administrator Agent Prompt](docs/admin-agent-prompt.md). It automates preflight checks, validation, deployment, and guided HubSpot UI setup with approval gates before secret entry, remote mutations, layout saves, workflow activation, or real calls.
 
 ## Entry Points
 
@@ -44,5 +45,6 @@ The workflow handler creates a call only when `Phone contact allowed` is explici
 
 - `hubspot-project/` - HubSpot Projects static app and serverless functions.
 - `scripts/install-direct-call.mjs` - account-aware installer helper.
+- `docs/admin-agent-prompt.md` - administrator-only Agent workflow for preflight, deployment, approval-gated HubSpot UI setup, and optional browser automation.
 - `docs/direct-call-user-manual.md` - authoritative administrator and ordinary-user guide.
 - `docs/setup.md` - deployment, recovery, rollback, and local-verification reference.
