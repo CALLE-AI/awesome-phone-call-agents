@@ -11,6 +11,8 @@ import sys
 import json
 import subprocess
 import tempfile
+import textwrap
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -420,13 +422,29 @@ def text_between(path: Path, text: str, start: str, end: str) -> str:
     return text[start_index:end_index]
 
 
+def embedded_python_main(path: Path, section: str):
+    marker = "code: |\n"
+    if marker not in section:
+        fail(f"Missing embedded Python code in {path.relative_to(ROOT)}.")
+    namespace: dict[str, object] = {}
+    code = section.split(marker, 1)[1].split("\n        variables:\n", 1)[0]
+    code = textwrap.dedent(code)
+    exec(compile(code, str(path), "exec"), namespace)
+    main = namespace.get("main")
+    if not callable(main):
+        fail(f"Embedded Python code has no callable main in {path.relative_to(ROOT)}.")
+    return main
+
+
 def validate_dify_template() -> None:
     plugin_dir = ROOT / "plugins" / "dify-template"
+    plugins_readme_path = ROOT / "plugins" / "README.md"
     readme_path = plugin_dir / "README.md"
     dsl_path = plugin_dir / "examples" / "call-e-dify-workflow.dsl.yaml"
     manifest_path = plugin_dir / "manifest.json"
 
     read(readme_path)
+    read(plugins_readme_path)
     read(dsl_path)
     read(manifest_path)
     validate_no_trailing_whitespace(dsl_path)
@@ -449,9 +467,11 @@ def validate_dify_template() -> None:
             "code nodes do not receive it as an input",
             "`request_id`",
             "stable per intended live call",
+            "It must be 8-120 characters and may contain only `[A-Za-z0-9._:-]`.",
             "safety boundaries are prepended",
             "unknown and possibly created",
             "same idempotency key",
+            "use Dify's `default-value` error strategy",
         ],
     )
     forbid_text(
@@ -490,6 +510,8 @@ def validate_dify_template() -> None:
             "seconds = max(0.0, min(seconds, 4.0))",
             "name: CALL_E_API_KEY",
             "value_type: secret",
+            "version: 0.6.0",
+            "error_strategy: default-value",
             "api_key: \"{{#env.CALL_E_API_KEY#}}\"",
             "SAFETY_PREAMBLE =",
             "These safety boundaries override the user-provided task.",
@@ -513,6 +535,7 @@ def validate_dify_template() -> None:
             "context.get(\"createOutcomeUnknown\")",
             "\"creation_state\": \"unknown_possibly_created\"",
             "\"created\": None",
+            "CALL-E create request ended without a determinate HTTP response.",
             "Replay or reconcile this request only with the same Idempotency-Key",
             "title: Gate live calls after health",
             "api_health_status_code",
@@ -531,6 +554,8 @@ def validate_dify_template() -> None:
             "nested_get(call, [\"data\", \"status\"])",
             "nested_get(call, [\"call\", \"status\"])",
             "nested_get(call, [\"result\", \"status\"])",
+            "poll_error = str(poll_error_message or call.get(\"_dify_poll_error\") or \"\").strip()",
+            "failed = bool(poll_error) or bool(poll_timed_out)",
         ],
     )
     forbid_text(
@@ -557,6 +582,10 @@ def validate_dify_template() -> None:
         ],
     )
     dsl_text = read(dsl_path)
+    if not re.search(r"^version: 0\.6\.0$", dsl_text, re.MULTILINE):
+        fail("Dify template must use Dify DSL compatibility version 0.6.0.")
+    if re.search(r"^version: 0\.6\.1$", dsl_text, re.MULTILINE):
+        fail("Dify template release version must not replace the top-level DSL compatibility version.")
     env_section = text_between(dsl_path, dsl_text, "environment_variables:", "features:")
     prepare_section = text_between(dsl_path, dsl_text, "title: Prepare one-shot call", "outputs:")
     start_section = text_between(dsl_path, dsl_text, "title: Start", "height:")
@@ -774,9 +803,16 @@ def validate_dify_template() -> None:
             ["connect: 10", "read: 600", "write: 600"],
         ),
     ]:
-        for snippet in [*timeout_snippets, "retry_enabled: false", "max_retries: 0"]:
+        for snippet in [
+            *timeout_snippets,
+            "error_strategy: default-value",
+            "- key: body\n          type: string\n          value: '{}'",
+            "- key: status_code\n          type: number\n          value: 0",
+            "retry_enabled: false",
+            "max_retries: 0",
+        ]:
             if snippet not in section:
-                fail(f"{section_name} must pass non-2xx responses downstream and use runtime timeouts: {snippet}")
+                fail(f"{section_name} must route HTTP failures downstream without retries: {snippet}")
     for snippet in [
         "status_code = to_int(api_health_status_code)",
         "api_health_ok = 200 <= status_code < 300",
@@ -792,8 +828,9 @@ def validate_dify_template() -> None:
         "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:",
         "status = normalize_status(first_value(\n                  nested_get(call, [\"data\", \"status\"])",
         "poll_status = int(as_number(poll_status_code, 0))",
-        "if poll_status and not (200 <= poll_status < 300):",
+        "if not (200 <= poll_status < 300):",
         "CALL-E poll request returned HTTP",
+        "CALL-E poll request failed before a response was available.",
     ]:
         if snippet not in poll_section:
             fail(f"Evaluate poll state must handle non-2xx poll responses without waiting for timeout: {snippet}")
@@ -805,6 +842,7 @@ def validate_dify_template() -> None:
     for snippet in [
         "def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:",
         "status_code = to_int(create_status_code)",
+        "if status_code == 0:",
         "if not (200 <= status_code < 300):",
         "\"createFailed\": True",
         "CALL-E create request returned HTTP",
@@ -865,6 +903,7 @@ def validate_dify_template() -> None:
             "display formats with parentheses",
             "unknown and possibly created",
             "same idempotency key",
+            "indeterminate create transport and force-failed HTTP outcomes",
         ],
     )
     forbid_text(
@@ -873,6 +912,104 @@ def validate_dify_template() -> None:
             "Start input",
         ],
     )
+    manifest = json.loads(read(manifest_path))
+    if manifest.get("template_version") != "0.6.1":
+        fail("Dify manifest must retain template release version 0.6.1.")
+    manifest_description = str(manifest.get("description") or "").lower()
+    if "transcript" in manifest_description or "structured result" in manifest_description:
+        fail("Dify manifest must not advertise data that the End node does not expose.")
+    require_text(
+        plugins_readme_path,
+        [
+            "resilient polling, and a masked status and summary report",
+        ],
+    )
+    forbid_text(
+        plugins_readme_path,
+        [
+            "masked outputs, polling, transcripts, summaries, and structured results",
+        ],
+    )
+
+    prepare_main = embedded_python_main(dsl_path, prepare_section)
+    invalid_request = prepare_main(
+        "https://api.heycall-e.com",
+        "true",
+        "call-1",
+        "+15555550124",
+        "Place one authorized test call.",
+    )
+    if (
+        invalid_request.get("call_tasks") != []
+        or invalid_request.get("validation_error")
+        != "request_id must be 8-120 characters using letters, numbers, dot, underscore, colon, or hyphen."
+    ):
+        fail("Dify request_id validation must return a normal validation response.")
+
+    gate_main = embedded_python_main(dsl_path, gate_section)
+    health_failure = gate_main(
+        [{"callItemId": "call_001"}],
+        1,
+        "",
+        "false",
+        0,
+    )
+    if health_failure.get("call_tasks") != [] or not str(
+        health_failure.get("validation_error") or ""
+    ).startswith("CALL-E /health request failed"):
+        fail("Dify health transport failures must block call creation and reach the final report.")
+
+    idempotency_key = "dify-" + "a" * 64
+    extract_main = embedded_python_main(dsl_path, extract_section)
+    create_unknown = extract_main(
+        "{}",
+        0,
+        "https://api.heycall-e.com",
+        "{}",
+        "+15****24",
+        idempotency_key,
+        "call_001",
+    )
+    create_context = create_unknown.get("call_context", {})
+    if (
+        not create_context.get("createOutcomeUnknown")
+        or create_context.get("idempotencyKey") != idempotency_key
+    ):
+        fail("Dify indeterminate create failures must preserve the original idempotency key.")
+
+    poll_main = embedded_python_main(dsl_path, poll_section)
+    poll_failure = poll_main(
+        {"data": {"status": "running"}},
+        0,
+        0,
+        int(time.time() * 1000),
+        15,
+        45,
+        "{}",
+        True,
+    )
+    if not poll_failure.get("done") or not poll_failure.get("error_message"):
+        fail("Dify poll transport failures must terminate polling with an error result.")
+
+    parse_main = embedded_python_main(dsl_path, parse_result_section)
+    parsed_poll_failure = parse_main(
+        {
+            "callId": "call-test",
+            "lookupUrl": "https://api.heycall-e.com/v1/calls/call-test",
+            "initialCallJson": '{"data":{"id":"call-test","status":"running"}}',
+            "createResponseJson": "{}",
+            "metadataSentJson": "{}",
+            "maskedPhone": "+15****24",
+            "callItemId": "call_001",
+        },
+        poll_failure.get("latest_call_json"),
+        poll_failure.get("poll_count"),
+        poll_failure.get("timed_out"),
+        poll_failure.get("error_message"),
+    )
+    parsed_status = parsed_poll_failure.get("result", {}).get("callStatus", {})
+    if parsed_status.get("ok") is not False or parsed_status.get("failed") is not True:
+        fail("Dify nested poll payloads with poll errors must be counted as failed results.")
 
 
 def require_text(path: Path, snippets: list[str]) -> None:

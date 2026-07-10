@@ -11,7 +11,7 @@ app:
   use_icon_as_answer_icon: false
 dependencies: []
 kind: app
-version: 0.6.1
+version: 0.6.0
 workflow:
   conversation_variables: []
   environment_variables:
@@ -225,7 +225,7 @@ workflow:
               if not request_id:
                   return validation_response(base_url, dry_run_enabled, "Fill request_id with a stable unique value for this intended call. Reuse it only when replaying the same call after an ambiguous create result.")
               if not REQUEST_ID_RE.match(request_id):
-                  raise ValueError("request_id must be 8-120 characters using letters, numbers, dot, underscore, colon, or hyphen.")
+                  return validation_response(base_url, dry_run_enabled, "request_id must be 8-120 characters using letters, numbers, dot, underscore, colon, or hyphen.")
               if not default_phone or not default_task:
                   return validation_response(base_url, dry_run_enabled, "Fill both phone_number and task for this one-shot call.")
               if default_phone and not E164_RE.match(default_phone):
@@ -393,6 +393,14 @@ workflow:
           max_connect_timeout: 10
           max_read_timeout: 30
           max_write_timeout: 30
+        error_strategy: default-value
+        default_value:
+        - key: body
+          type: string
+          value: '{}'
+        - key: status_code
+          type: number
+          value: 0
         retry_config:
           retry_enabled: false
           max_retries: 0
@@ -429,7 +437,13 @@ workflow:
               status_code = to_int(api_health_status_code)
               api_health_ok = 200 <= status_code < 300
               existing_error = str(validation_error or "").strip()
-              health_error = "" if api_health_ok else f"CALL-E /health returned HTTP {status_code or 'unknown'}; live calls were not created."
+              health_error = ""
+              if not api_health_ok:
+                  health_error = (
+                      f"CALL-E /health returned HTTP {status_code}; live calls were not created."
+                      if status_code
+                      else "CALL-E /health request failed before a response was available; live calls were not created."
+                  )
               effective_error = existing_error or health_error
               call_tasks = original_tasks if api_health_ok and not existing_error else []
               return {
@@ -1014,6 +1028,14 @@ workflow:
           max_connect_timeout: 10
           max_read_timeout: 600
           max_write_timeout: 600
+        error_strategy: default-value
+        default_value:
+        - key: body
+          type: string
+          value: '{}'
+        - key: status_code
+          type: number
+          value: 0
         retry_config:
           retry_enabled: false
           max_retries: 0
@@ -1169,10 +1191,14 @@ workflow:
               done = status in TERMINAL_STATUSES
               timed_out = (elapsed_ms >= timeout_ms or next_poll_count >= max_polls) and not done
               error_message = ""
-              if poll_status and not (200 <= poll_status < 300):
+              if not (200 <= poll_status < 300):
                   done = True
                   timed_out = False
-                  error_message = f"CALL-E poll request returned HTTP {poll_status}."
+                  error_message = (
+                      f"CALL-E poll request returned HTTP {poll_status}."
+                      if poll_status
+                      else "CALL-E poll request failed before a response was available."
+                  )
                   call = dict(call)
                   call["_dify_poll_failed"] = True
                   call["_dify_poll_http_status"] = poll_status
@@ -1598,7 +1624,8 @@ workflow:
               latest_attempt_status = latest_attempt.get("status")
               answered = latest_attempt_status == "completed" or recipient_status == "completed"
               failed_statuses = {"failed", "canceled", "cancelled", "no_answer", "declined", "busy", "expired"}
-              failed = bool(poll_timed_out) or bool(call.get("_dify_poll_timeout")) or bool(call.get("_dify_poll_failed")) or normalize_code(call_status) in failed_statuses or normalize_code(recipient_status) in failed_statuses or normalize_code(latest_attempt_status) in failed_statuses
+              poll_error = str(poll_error_message or call.get("_dify_poll_error") or "").strip()
+              failed = bool(poll_error) or bool(poll_timed_out) or bool(call.get("_dify_poll_timeout")) or bool(call.get("_dify_poll_failed")) or normalize_code(call_status) in failed_statuses or normalize_code(recipient_status) in failed_statuses or normalize_code(latest_attempt_status) in failed_statuses
               metadata_returned = redact_phone_values(as_obj(call.get("metadata")))
               metadata_round_trip = as_obj(call.get("_dify_metadata_round_trip"))
               requested_keys = metadata_round_trip.get("requestedKeys")
@@ -1648,7 +1675,7 @@ workflow:
                   "polling": {
                       "pollCount": int(poll_count or 0),
                       "timedOut": bool(poll_timed_out) or bool(call.get("_dify_poll_timeout")),
-                      "errorMessage": poll_error_message or call.get("_dify_poll_error") or "",
+                      "errorMessage": poll_error,
                   },
                   "callStatus": {
                       "ok": not failed,
@@ -1917,6 +1944,14 @@ workflow:
           max_connect_timeout: 10
           max_read_timeout: 600
           max_write_timeout: 600
+        error_strategy: default-value
+        default_value:
+        - key: body
+          type: string
+          value: '{}'
+        - key: status_code
+          type: number
+          value: 0
         retry_config:
           retry_enabled: false
           max_retries: 0
@@ -2108,6 +2143,16 @@ workflow:
           def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
               body = as_obj(create_response)
               status_code = to_int(create_status_code)
+              if status_code == 0:
+                  return create_unknown_context(
+                      body,
+                      status_code,
+                      "CALL-E create request ended without a determinate HTTP response. The call may already have been created. Replay or reconcile only with the same Idempotency-Key; do not generate a new key.",
+                      metadata_sent_json,
+                      masked_phone,
+                      idempotency_key,
+                      call_item_id,
+                  )
               if not (200 <= status_code < 300):
                   return create_failure_context(
                       body,
@@ -2449,7 +2494,7 @@ workflow:
                   and item["callStatus"].get("created") is True
               )
               health_status = format_health_status(api_health_status_code)
-              connectivity_error = validation_error.startswith("CALL-E /health returned HTTP")
+              connectivity_error = validation_error.startswith("CALL-E /health ")
               if connectivity_error:
                   report_lines = [
                       "CALL-E One-shot Call",

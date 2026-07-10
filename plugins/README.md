@@ -28,5 +28,5 @@ Each plugin should document:
 
 | Plugin | Platform | Purpose |
 | --- | --- | --- |
-| [`dify-template`](dify-template/) | Dify | Importable CALL-E workflow DSL for one-shot outbound calls with dry-run preview, E.164 validation, masked outputs, polling, transcripts, summaries, and structured results. |
+| [`dify-template`](dify-template/) | Dify | Importable CALL-E workflow DSL for one-shot outbound calls with dry-run preview, E.164 validation, resilient polling, and a masked status and summary report. |
 | [`n8n-calle-api`](n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |

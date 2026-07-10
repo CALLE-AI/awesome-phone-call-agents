@@ -3,7 +3,7 @@
   "title": "Dify CALL-E workflow template",
   "platform": "Dify",
   "type": "workflow-template",
-  "description": "Importable Dify workflow DSL that validates one authorized CALL-E phone task, supports dry-run preview, creates one live call only when requested, polls for completion, and returns masked status, transcript, summary, and structured results.",
+  "description": "Importable Dify workflow DSL that validates one authorized CALL-E phone task, supports dry-run preview, creates one live call only when requested, polls for completion, and returns a masked human-readable status and summary report.",
   "entrypoints": [
     {
       "name": "CALL-E one-shot call tool",
@@ -24,6 +24,7 @@
     "Prepends non-overridable phone-call safety boundaries before custom task text reaches CALL-E.",
     "Uses a stable idempotency key derived from request_id and call inputs for replay safety.",
     "Reports a 2xx create response without a recognized call ID as unknown and possibly created, and requires replay or reconciliation with the same idempotency key.",
+    "Reports indeterminate create transport and force-failed HTTP outcomes as unknown and possibly created, and preserves the original idempotency key for reconciliation.",
     "Masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses, in summaries and raw result output.",
     "Does not create recurring schedules."
   ],

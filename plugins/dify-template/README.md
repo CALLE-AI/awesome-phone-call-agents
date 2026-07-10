@@ -15,13 +15,13 @@ The workflow is intentionally small and visible:
 
 1. `Start` accepts `base_url`, `dry_run`, `request_id`, `phone_number`, and `task`; only the HTTP request nodes read the Dify secret environment variable `CALL_E_API_KEY`.
 2. `Prepare one-shot call` validates required fields, normalizes the CALL-E base URL, rejects non-HTTPS or untrusted API hosts, enforces E.164 phone number format, rejects placeholder phone numbers for live calls, and prepares a masked preview.
-3. `Check API connectivity` calls `GET /health` on the configured CALL-E API host.
+3. `Check API connectivity` calls `GET /health` on the configured CALL-E API host. Transport and forced HTTP failures use an explicit Dify default-value error strategy so the health gate can return a final report instead of terminating the workflow.
 4. `Gate live calls after health` allows live-call creation only when `GET /health` returns a 2xx status code.
 5. `Run one-shot call` creates one CALL-E call only when `dry_run=false` and the health gate passes.
 6. `Build per-call payload` creates the CALL-E request body, prepends non-overridable safety boundaries to the task, builds the result schema, recipient schema, metadata, and stable idempotency key.
-7. `Create CALL-E call` calls `POST /v1/calls`.
+7. `Create CALL-E call` calls `POST /v1/calls`. An indeterminate transport or forced HTTP failure is reported as unknown and possibly created with the original idempotency key.
 8. `Extract call lookup id` finds the returned call ID and prepares the result lookup URL. A 2xx response without a recognized ID is reported as unknown and possibly created, with reconciliation restricted to the same idempotency key.
-9. `Poll until terminal` polls `GET /v1/calls/{id}` until the call reaches a terminal state or the timeout is reached.
+9. `Poll until terminal` polls `GET /v1/calls/{id}` until the call reaches a terminal state, the timeout is reached, or a poll request fails. Poll failures are returned as failed results.
 10. `Parse final call result` extracts status, transcript, summary, structured result, metadata, and failure signals with phone numbers masked.
 11. `Summarize iteration results` builds the readable final report and keeps `summary_json` inside that node for debugging.
 
@@ -32,7 +32,7 @@ The workflow is intentionally small and visible:
 3. Keep `CALL-E API base URL` as `https://api.heycall-e.com` for production. Only `https://api.heycall-e.com` is enabled by default.
 4. Add a CALL-E-managed test host to the `TRUSTED_BASE_URLS` set in `Prepare one-shot call` before using a non-production base URL. This is the workflow's single host allowlist. Do not run this template with arbitrary hosts because the workflow sends the Bearer API key from `CALL_E_API_KEY` to `GET /health` and `POST /v1/calls`.
 5. Keep `Dry run?` set to `true` for the first run.
-6. Fill `request_id` with a stable value for this intended call. Reuse the same value only when replaying the same call after an ambiguous create result; use a new value for a new live call.
+6. Fill `request_id` with a stable value for this intended call. It must be 8-120 characters and may contain only ASCII letters, numbers, dot, underscore, colon, or hyphen (`[A-Za-z0-9._:-]`). Reuse the same value only when replaying the same call after an ambiguous create result; use a new value for a new live call.
 7. Fill one owned or explicitly authorized destination number in E.164 format, for example `+15555550123`.
 8. Fill the CALL-E task.
 9. Run the workflow and confirm the dry-run preview and connectivity check.
@@ -48,7 +48,7 @@ Configure these fields in `Start`:
 | --- | --- | --- |
 | `base_url` | Yes | Trusted CALL-E API base URL. Defaults to `https://api.heycall-e.com`. The workflow rejects non-HTTPS URLs and hosts not listed in its `TRUSTED_BASE_URLS` allowlist. Do not include `/v1`. |
 | `dry_run` | Yes | The workflow accepts only exact `true` or `false` for `dry_run`. `true` previews the payload and checks connectivity without creating a call. `false` creates one live call. |
-| `request_id` | Yes | Replay-safe request identifier, stable per intended live call. Reuse the same value only when replaying the same call after an ambiguous `POST /v1/calls` result; use a new value for a new call. |
+| `request_id` | Yes | Replay-safe request identifier, stable per intended live call. It must be 8-120 characters and may contain only `[A-Za-z0-9._:-]`. Reuse the same value only when replaying the same call after an ambiguous `POST /v1/calls` result; use a new value for a new call. |
 | `phone_number` | Yes | Destination phone number in E.164 format. Use only owned or explicitly authorized numbers. |
 | `task` | Yes | English instruction for the CALL-E agent. Non-overridable safety boundaries are prepended before this task reaches CALL-E, including logistics-only handling for medical, legal, financial, and emergency topics. |
 
@@ -70,11 +70,13 @@ With `dry_run=true`, the workflow checks CALL-E API connectivity with `GET /heal
 
 With `dry_run=false`, the workflow creates one outbound phone call through CALL-E only after `GET /health` returns a 2xx status code, then polls for the result. It does not create recurring schedules or provider-side recurrence.
 
+The health, create, and poll HTTP nodes disable automatic retries and use Dify's `default-value` error strategy with an empty JSON body and status code `0`. This lets downstream code return a final report for Dify transport errors and force-failed HTTP responses instead of terminating the workflow.
+
 The polling sleep is capped below Dify's default 5-second code-node timeout. Each polling round uses five serial four-second wait slices, and the workflow runs at most 45 rounds over approximately 15 minutes. Counting the loop-start node conservatively, the graph uses at most 419 workflow steps, below Dify's default limits of 100 loop rounds and 500 workflow steps.
 
 The live create request uses a stable idempotency key derived from `request_id`, the call item, destination phone number, and task. This protects replay after an ambiguous `POST /v1/calls` result from creating a duplicate outbound call.
 
-If `POST /v1/calls` returns 2xx without a recognized call ID, the workflow does not claim that no call was created. It reports the creation outcome as unknown and possibly created, skips automatic lookup, and shows the same idempotency key to use for replay or provider-side reconciliation. Do not retry that request with a new key.
+If `POST /v1/calls` returns 2xx without a recognized call ID, or Dify cannot determine the POST outcome because of a transport or force-failed HTTP response, the workflow does not claim that no call was created. It reports the creation outcome as unknown and possibly created, skips automatic lookup, and shows the same idempotency key to use for replay or provider-side reconciliation. Do not retry that request with a new key.
 
 To prevent future live calls:
 
@@ -94,7 +96,7 @@ The CALL-E API used by this template does not provide a call-cancel action, so c
 3. Confirm the final report says no live call was created.
 4. Confirm the preview masks the phone number.
 5. Set `dry_run=false` only for an authorized test number.
-6. Confirm the workflow creates one call, polls until a terminal status or timeout, and returns a structured result.
+6. Confirm the workflow creates one call, polls until a terminal status or timeout, and returns a masked report with status, summary, and outcome fields.
 
 ## Notes
 
