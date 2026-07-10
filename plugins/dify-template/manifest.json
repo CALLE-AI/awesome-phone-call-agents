@@ -23,8 +23,9 @@
     "Blocks live-call creation when the CALL-E health check returns a non-2xx status code.",
     "Prepends non-overridable phone-call safety boundaries before custom task text reaches CALL-E.",
     "Uses a stable idempotency key derived from request_id and call inputs for replay safety.",
-    "Masks E.164, common US-style, and grouped international phone numbers in summaries and raw result output.",
+    "Reports a 2xx create response without a recognized call ID as unknown and possibly created, and requires replay or reconciliation with the same idempotency key.",
+    "Masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses, in summaries and raw result output.",
     "Does not create recurring schedules."
   ],
-  "template_version": "0.6.0"
+  "template_version": "0.6.1"
 }

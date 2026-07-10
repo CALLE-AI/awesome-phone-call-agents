@@ -443,11 +443,15 @@ def validate_dify_template() -> None:
             "only after `GET /health` returns a 2xx status code",
             "The polling sleep is capped below Dify's default 5-second code-node timeout",
             "grouped international phone numbers",
+            "display formats with parentheses",
             "`CALL_E_API_KEY`",
             "Dify secret environment variable",
+            "code nodes do not receive it as an input",
             "`request_id`",
             "stable per intended live call",
             "safety boundaries are prepended",
+            "unknown and possibly created",
+            "same idempotency key",
         ],
     )
     forbid_text(
@@ -469,9 +473,10 @@ def validate_dify_template() -> None:
             "normalize_trusted_base_url",
             "CALL-E base_url must use https.",
             "CALL-E base_url must be a trusted CALL-E API host.",
-            "PHONE_IN_TEXT_RE",
-            "PHONE_LIKE_RE",
-            "INTERNATIONAL_GROUPED_PHONE_RE",
+            "E164_RE = re.compile(r\"^\\+[1-9]\\d{6,14}$\")",
+            "PHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\d{6,14}\")",
+            "INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)\")",
+            "PHONE_LIKE_RE = re.compile(r\"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)\")",
             "text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or \"\"))",
             "redact_phone_values",
             "return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}",
@@ -505,6 +510,10 @@ def validate_dify_template() -> None:
             "\"initialCallJson\": redacted_json",
             "\"createResponseJson\": redacted_json",
             "context.get(\"createFailed\")",
+            "context.get(\"createOutcomeUnknown\")",
+            "\"creation_state\": \"unknown_possibly_created\"",
+            "\"created\": None",
+            "Replay or reconcile this request only with the same Idempotency-Key",
             "title: Gate live calls after health",
             "api_health_status_code",
             "api_health_ok = 200 <= status_code < 300",
@@ -515,8 +524,10 @@ def validate_dify_template() -> None:
             "if lookup.get(\"skipped\"):",
             "if polling.get(\"errorMessage\"):",
             "created_count = sum(",
-            "f\"Live calls created: {created_count}\"",
-            "\"liveCallsCreated\": 0 if dry_run_enabled else created_count",
+            "f\"Live calls confirmed created: {created_count}\"",
+            "f\"Call creation outcomes unknown (possibly created): {creation_unknown}\"",
+            "\"liveCallsCreated\": 0 if dry_run_enabled else (None if creation_unknown else created_count)",
+            "\"creationOutcomeUnknownCount\": 0 if dry_run_enabled else creation_unknown",
             "nested_get(call, [\"data\", \"status\"])",
             "nested_get(call, [\"call\", \"status\"])",
             "nested_get(call, [\"result\", \"status\"])",
@@ -537,6 +548,12 @@ def validate_dify_template() -> None:
             "\"latest_call_json\": json.dumps(call, ensure_ascii=False)",
             "\"initialCallJson\": json.dumps(body, ensure_ascii=False)",
             "\"createResponseJson\": json.dumps(body, ensure_ascii=False)",
+            "E164_RE = re.compile(r\"^\\+[1-9]\\d{7,14}$\")",
+            "PHONE_IN_TEXT_RE = re.compile(r\"\\+[1-9]\\d{7,14}\")",
+            "INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r\"(?<!\\w)\\+[1-9]\\d{0,2}(?:[\\s.-]?\\d){7,14}(?!\\d)\")",
+            "[1-9]\\d{7,14})(?!\\d)",
+            "def main(api_key:",
+            "replace_with_calle_api_key",
         ],
     )
     dsl_text = read(dsl_path)
@@ -550,10 +567,27 @@ def validate_dify_template() -> None:
     poll_http_section = text_between(dsl_path, dsl_text, "title: Poll CALL-E call status", "height: 90")
     poll_section = text_between(dsl_path, dsl_text, "title: Evaluate poll state", "variables:")
     parse_result_section = text_between(dsl_path, dsl_text, "title: Parse final call result", "variables:")
+    summary_section = text_between(dsl_path, dsl_text, "title: Summarize iteration results", "variables:")
     create_http_section = text_between(dsl_path, dsl_text, "title: Create CALL-E call", "height: 90")
     extract_section = text_between(dsl_path, dsl_text, "title: Extract call lookup id", "variables:")
+    extract_node_section = text_between(dsl_path, dsl_text, "title: Extract call lookup id", "outputs:")
     iteration_section = text_between(dsl_path, dsl_text, "title: Run one-shot call", "output_selector:")
     nodes_section = text_between(dsl_path, dsl_text, "nodes:", "edges:")
+
+    mirrored_phone_patterns = [
+        'PHONE_IN_TEXT_RE = re.compile(r"\\+[1-9]\\d{6,14}")',
+        'INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)")',
+        'PHONE_LIKE_RE = re.compile(r"(?<!\\d)(?:\\+?1[\\s.-]?)?(?:\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}|[1-9]\\d{6,14})(?!\\d)")',
+    ]
+    for pattern in mirrored_phone_patterns:
+        if dsl_text.count(pattern) != 5:
+            fail(f"Dify template must keep all five phone redactors aligned: {pattern}")
+    grouped_phone_re = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+    if not grouped_phone_re.search("Call +44 (20) 7123 4567 tomorrow."):
+        fail("Dify grouped international redaction must match display numbers containing parentheses.")
+    e164_re = re.compile(r"^\+[1-9]\d{6,14}$")
+    if not e164_re.fullmatch("+1234567") or e164_re.fullmatch("+123456") or e164_re.fullmatch("+1234567890123456"):
+        fail("Dify E.164 validation must accept 7-15 digits and reject shorter or longer values.")
 
     review_regressions = []
     if (
@@ -695,9 +729,11 @@ def validate_dify_template() -> None:
     for snippet in ["name: CALL_E_API_KEY", "- env", "- CALL_E_API_KEY", "value_type: secret"]:
         if snippet not in env_section:
             fail(f"Dify template must declare CALL_E_API_KEY as a secret environment variable: {snippet}")
-    for snippet in ["variable: api_key", "- env", "- CALL_E_API_KEY"]:
-        if snippet not in prepare_section:
-            fail(f"Prepare one-shot call must read the CALL-E API key from env: {snippet}")
+    for snippet in ["CALL_E_API_KEY", "api_key", "replace_with_calle_api_key"]:
+        if snippet in prepare_section:
+            fail(f"Prepare one-shot call must not receive or inspect the CALL-E API key: {snippet}")
+    if "- variable: api_key" in dsl_text:
+        fail("Dify code nodes must not receive CALL_E_API_KEY through an api_key input variable.")
     if "variable: api_key" in start_section:
         fail("Dify Start must not collect the CALL-E API key as user input.")
     for snippet in ["variable: request_id", "required: true"]:
@@ -712,8 +748,13 @@ def validate_dify_template() -> None:
     ]:
         if snippet not in build_payload_section:
             fail(f"Build per-call payload must enforce safety and stable idempotency: {snippet}")
-    if "start.api_key" in dsl_text:
-        fail("Dify HTTP nodes must use the secret CALL_E_API_KEY environment variable.")
+    for section_name, section in [
+        ("Check API connectivity", health_section),
+        ("Create CALL-E call", create_http_section),
+        ("Poll CALL-E call status", poll_http_section),
+    ]:
+        if 'api_key: "{{#env.CALL_E_API_KEY#}}"' not in section:
+            fail(f"{section_name} must consume CALL_E_API_KEY directly from the secret environment variable.")
     if ".strip().lower()" in prepare_section:
         fail("Prepare one-shot call must require exact dry_run values before live calls.")
     for section_name, section, timeout_snippets in [
@@ -762,7 +803,7 @@ def validate_dify_template() -> None:
     if "normalize_trusted_base_url" in poll_section:
         fail("Evaluate poll state must not carry unused base_url normalization.")
     for snippet in [
-        "def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, call_item_id: str) -> dict:",
+        "def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:",
         "status_code = to_int(create_status_code)",
         "if not (200 <= status_code < 300):",
         "\"createFailed\": True",
@@ -771,8 +812,47 @@ def validate_dify_template() -> None:
     ]:
         if snippet not in extract_section:
             fail(f"Extract call lookup id must require a 2xx create response before polling and redact create errors: {snippet}")
+    for snippet in [
+        "def create_unknown_context(",
+        "return create_unknown_context(",
+        "\"createOutcomeUnknown\": True",
+        "\"initialStatus\": \"create_outcome_unknown\"",
+        "\"idempotencyKey\": idempotency_key",
+        "The call may already have been created.",
+        "Replay or reconcile only with the same Idempotency-Key",
+    ]:
+        if snippet not in extract_section:
+            fail(f"Extract call lookup id must preserve ambiguous 2xx create outcomes: {snippet}")
+    idempotency_binding = "- variable: idempotency_key\n          value_selector:\n          - build_iteration_payload\n          - idempotency_key"
+    if idempotency_binding not in extract_node_section:
+        fail("Extract call lookup id must receive the exact create-request idempotency key.")
+    for snippet in [
+        "if context.get(\"createOutcomeUnknown\"):",
+        "\"ok\": None",
+        "\"created\": None",
+        "\"creation_state\": \"unknown_possibly_created\"",
+        "\"required\": True",
+        "\"idempotencyKey\": idempotency_key",
+        "\"next_action\": \"manual_review\"",
+    ]:
+        if snippet not in parse_result_section:
+            fail(f"Parse final call result must report an unknown, possibly-created outcome: {snippet}")
+    for snippet in [
+        "if status.get(\"ok\") is True:",
+        "elif status.get(\"ok\") is False:",
+        "creation_unknown += 1",
+        "item[\"callStatus\"].get(\"created\") is True",
+        "Live calls confirmed created:",
+        "Call creation outcomes unknown (possibly created):",
+        "None if creation_unknown else created_count",
+        "IDEMPOTENCY_KEY_RE = re.compile(r\"^dify-[0-9a-f]{64}$\")",
+        "safe_results = restore_reconciliation_keys(raw_results, redact_phone_values(raw_results))",
+        "reconciliation_status_text(reconciliation)",
+    ]:
+        if snippet not in summary_section:
+            fail(f"Summarize iteration results must preserve unknown create outcomes: {snippet}")
     if "raise ValueError(\"CALL-E create response did not include a recognized call id." in extract_section:
-        fail("Extract call lookup id must return a masked failure context instead of raising on missing call id.")
+        fail("Extract call lookup id must return a masked unknown context instead of raising on missing call id.")
     for snippet in ["from urllib.parse import urlparse", "TRUSTED_BASE_URLS", "normalize_trusted_base_url"]:
         if snippet in extract_section:
             fail(f"Extract call lookup id must not duplicate base URL allowlist checks after POST /v1/calls: {snippet}")
@@ -782,6 +862,9 @@ def validate_dify_template() -> None:
             "CALL-E API key stored as the Dify secret environment variable CALL_E_API_KEY before execution.",
             "Blocks live-call creation when the CALL-E health check returns a non-2xx status code.",
             "grouped international phone numbers",
+            "display formats with parentheses",
+            "unknown and possibly created",
+            "same idempotency key",
         ],
     )
     forbid_text(

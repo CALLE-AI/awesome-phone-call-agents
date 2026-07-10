@@ -13,14 +13,14 @@ The workflow validates one authorized phone/task pair, supports a dry-run previe
 
 The workflow is intentionally small and visible:
 
-1. `Start` accepts `base_url`, `dry_run`, `request_id`, `phone_number`, and `task`; the CALL-E API key is read from the Dify secret environment variable `CALL_E_API_KEY`.
+1. `Start` accepts `base_url`, `dry_run`, `request_id`, `phone_number`, and `task`; only the HTTP request nodes read the Dify secret environment variable `CALL_E_API_KEY`.
 2. `Prepare one-shot call` validates required fields, normalizes the CALL-E base URL, rejects non-HTTPS or untrusted API hosts, enforces E.164 phone number format, rejects placeholder phone numbers for live calls, and prepares a masked preview.
 3. `Check API connectivity` calls `GET /health` on the configured CALL-E API host.
 4. `Gate live calls after health` allows live-call creation only when `GET /health` returns a 2xx status code.
 5. `Run one-shot call` creates one CALL-E call only when `dry_run=false` and the health gate passes.
 6. `Build per-call payload` creates the CALL-E request body, prepends non-overridable safety boundaries to the task, builds the result schema, recipient schema, metadata, and stable idempotency key.
 7. `Create CALL-E call` calls `POST /v1/calls`.
-8. `Extract call lookup id` finds the returned call ID and prepares the result lookup URL.
+8. `Extract call lookup id` finds the returned call ID and prepares the result lookup URL. A 2xx response without a recognized ID is reported as unknown and possibly created, with reconciliation restricted to the same idempotency key.
 9. `Poll until terminal` polls `GET /v1/calls/{id}` until the call reaches a terminal state or the timeout is reached.
 10. `Parse final call result` extracts status, transcript, summary, structured result, metadata, and failure signals with phone numbers masked.
 11. `Summarize iteration results` builds the readable final report and keeps `summary_json` inside that node for debugging.
@@ -52,7 +52,7 @@ Configure these fields in `Start`:
 | `phone_number` | Yes | Destination phone number in E.164 format. Use only owned or explicitly authorized numbers. |
 | `task` | Yes | English instruction for the CALL-E agent. Non-overridable safety boundaries are prepended before this task reaches CALL-E, including logistics-only handling for medical, legal, financial, and emergency topics. |
 
-Configure `CALL_E_API_KEY` as a secret Dify environment variable before running the workflow. Do not put live CALL-E API keys in Start inputs, task text, or exported example files.
+Configure `CALL_E_API_KEY` as a secret Dify environment variable before running the workflow. The HTTP request nodes consume it directly; code nodes do not receive it as an input. Do not put live CALL-E API keys in Start inputs, task text, or exported example files.
 
 ## Output
 
@@ -73,6 +73,8 @@ With `dry_run=false`, the workflow creates one outbound phone call through CALL-
 The polling sleep is capped below Dify's default 5-second code-node timeout. Each polling round uses five serial four-second wait slices, and the workflow runs at most 45 rounds over approximately 15 minutes. Counting the loop-start node conservatively, the graph uses at most 419 workflow steps, below Dify's default limits of 100 loop rounds and 500 workflow steps.
 
 The live create request uses a stable idempotency key derived from `request_id`, the call item, destination phone number, and task. This protects replay after an ambiguous `POST /v1/calls` result from creating a duplicate outbound call.
+
+If `POST /v1/calls` returns 2xx without a recognized call ID, the workflow does not claim that no call was created. It reports the creation outcome as unknown and possibly created, skips automatic lookup, and shows the same idempotency key to use for replay or provider-side reconciliation. Do not retry that request with a new key.
 
 To prevent future live calls:
 
@@ -98,4 +100,4 @@ The CALL-E API used by this template does not provide a call-cancel action, so c
 
 - This is a one-shot workflow. For batch behavior, call this Dify workflow from an external loop or scheduler.
 - Host schedulers should handle recurrence. CALL-E should handle exactly one call per scheduled run.
-- The workflow masks E.164, common US-style, and grouped international phone numbers in summaries, transcripts, evidence, structured results, raw result output, and final report text.
+- The workflow masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses such as `+44 (20) 7123 4567`, in summaries, transcripts, evidence, structured results, raw result output, and final report text.

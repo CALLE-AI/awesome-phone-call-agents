@@ -11,7 +11,7 @@ app:
   use_icon_as_answer_icon: false
 dependencies: []
 kind: app
-version: 0.6.0
+version: 0.6.1
 workflow:
   conversation_variables: []
   environment_variables:
@@ -121,11 +121,11 @@ workflow:
               # Add CALL-E-managed test hosts here before running non-production workflows.
           }
           PLACEHOLDER_PHONES = {"+15555550101", "+15555550102", "+15555550123", "+14155550123"}
-          E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+          E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
           REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{8,120}$")
-          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{7,14}")
-          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9]\d{0,2}(?:[\s.-]?\d){7,14}(?!\d)")
-          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{7,14})(?!\d)")
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
 
           def normalize_trusted_base_url(value) -> str:
               raw = str(value or "https://api.heycall-e.com").strip().rstrip("/")
@@ -213,8 +213,7 @@ workflow:
                   }, ensure_ascii=False, indent=2),
               }
 
-          def main(api_key: str, base_url: str, dry_run: str, request_id: str, phone_number: str, task: str) -> dict:
-              api_key = str(api_key or "").strip()
+          def main(base_url: str, dry_run: str, request_id: str, phone_number: str, task: str) -> dict:
               base_url = normalize_trusted_base_url(base_url)
               dry_run_enabled = parse_dry_run(dry_run)
               request_id = str(request_id or "").strip()
@@ -223,8 +222,6 @@ workflow:
               poll_interval_seconds = 20
               wait_timeout_minutes = 15
 
-              if not api_key or api_key == "replace_with_calle_api_key":
-                  raise ValueError("Set the CALL_E_API_KEY secret environment variable before running this workflow.")
               if not request_id:
                   return validation_response(base_url, dry_run_enabled, "Fill request_id with a stable unique value for this intended call. Reuse it only when replaying the same call after an ambiguous create result.")
               if not REQUEST_ID_RE.match(request_id):
@@ -301,10 +298,6 @@ workflow:
                   }, ensure_ascii=False, indent=2),
               }
         variables:
-        - variable: api_key
-          value_selector:
-          - env
-          - CALL_E_API_KEY
         - variable: base_url
           value_selector:
           - start
@@ -1059,9 +1052,9 @@ workflow:
               "completed", "failed", "canceled", "cancelled",
               "no_answer", "declined", "voicemail", "busy", "expired"
           }
-          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{7,14}")
-          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9]\d{0,2}(?:[\s.-]?\d){7,14}(?!\d)")
-          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{7,14})(?!\d)")
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
 
           def as_obj(value):
               if isinstance(value, dict):
@@ -1391,9 +1384,9 @@ workflow:
                   return "****"
               return value[:3] + "****" + value[-2:]
 
-          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{7,14}")
-          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9]\d{0,2}(?:[\s.-]?\d){7,14}(?!\d)")
-          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{7,14})(?!\d)")
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
 
           def mask_phone_like(value: str) -> str:
               raw = str(value or "").strip()
@@ -1478,6 +1471,7 @@ workflow:
                       "callStatus": {
                           "ok": False,
                           "created": False,
+                          "creation_state": "not_created",
                           "callId": "",
                           "call_status": "create_failed",
                           "recipient_status": None,
@@ -1492,12 +1486,88 @@ workflow:
                       "lookup": {
                           "skipped": True,
                           "url": "",
+                          "reason": "The create request failed, so no result lookup was attempted.",
                           "rawLookupJson": raw_call_result_json,
+                      },
+                      "reconciliation": {
+                          "required": False,
+                          "idempotencyKey": context.get("idempotencyKey") or "",
+                          "instruction": "",
                       },
                       "returnedData": redact_phone_values({
                           "summary": context.get("createErrorMessage") or "CALL-E create request failed.",
                           "transcript": [],
                           "structuredResult": {},
+                          "taskCompleted": None,
+                          "completionConfidence": None,
+                          "evidence": [],
+                      }),
+                      "rawCallResultJson": raw_call_result_json,
+                  }
+                  return {"result": result, "results": [result]}
+              if context.get("createOutcomeUnknown"):
+                  metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])
+                  raw_call_result_json = json.dumps(redact_phone_values(create_body), ensure_ascii=False)
+                  idempotency_key = str(context.get("idempotencyKey") or "")
+                  message = context.get("createOutcomeMessage") or (
+                      "CALL-E returned a successful create status without a recognized call id. "
+                      "The call may already have been created."
+                  )
+                  reconciliation_instruction = (
+                      f"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}); "
+                      "do not generate a new key."
+                      if idempotency_key
+                      else "Reconcile this request before retrying; do not submit it with a new idempotency key."
+                  )
+                  result = {
+                      "callItemId": context.get("callItemId"),
+                      "maskedPhone": context.get("maskedPhone"),
+                      "metadataSent": metadata_sent,
+                      "metadataReturned": {},
+                      "metadataRoundTrip": {
+                          "requestedKeys": metadata_keys,
+                          "allRequestedKeysReturned": False,
+                          "missingOrDifferentKeys": metadata_keys,
+                      },
+                      "polling": {
+                          "pollCount": 0,
+                          "timedOut": False,
+                          "errorMessage": "",
+                      },
+                      "callStatus": {
+                          "ok": None,
+                          "created": None,
+                          "creation_state": "unknown_possibly_created",
+                          "callId": "",
+                          "call_status": "create_outcome_unknown",
+                          "recipient_status": None,
+                          "latest_attempt_status": None,
+                          "failure_code": None,
+                          "failure_message": None,
+                          "answered": False,
+                          "no_answer": False,
+                          "busy": False,
+                          "failed": False,
+                      },
+                      "lookup": {
+                          "skipped": True,
+                          "url": "",
+                          "reason": "No recognized call id was returned, so automatic result lookup is unavailable.",
+                          "rawLookupJson": raw_call_result_json,
+                      },
+                      "reconciliation": {
+                          "required": True,
+                          "idempotencyKey": idempotency_key,
+                          "instruction": reconciliation_instruction,
+                      },
+                      "returnedData": redact_phone_values({
+                          "summary": message,
+                          "transcript": [],
+                          "structuredResult": {
+                              "call_completed": "unknown",
+                              "outcome": "unknown",
+                              "next_action": "manual_review",
+                          },
                           "taskCompleted": None,
                           "completionConfidence": None,
                           "evidence": [],
@@ -1583,6 +1653,7 @@ workflow:
                   "callStatus": {
                       "ok": not failed,
                       "created": True,
+                      "creation_state": "confirmed_created",
                       "callId": call_id,
                       "call_status": call_status,
                       "recipient_status": recipient_status,
@@ -1597,7 +1668,13 @@ workflow:
                   "lookup": {
                       "skipped": False,
                       "url": context.get("lookupUrl"),
+                      "reason": "",
                       "rawLookupJson": json.dumps(redact_phone_values(final_body), ensure_ascii=False),
+                  },
+                  "reconciliation": {
+                      "required": False,
+                      "idempotencyKey": context.get("idempotencyKey") or "",
+                      "instruction": "",
                   },
                   "returnedData": redacted_returned_data,
                   "rawCallResultJson": raw_call_result_json,
@@ -1879,9 +1956,9 @@ workflow:
               "completed", "failed", "canceled", "cancelled",
               "no_answer", "declined", "voicemail", "busy", "expired"
           }
-          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{7,14}")
-          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9]\d{0,2}(?:[\s.-]?\d){7,14}(?!\d)")
-          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{7,14})(?!\d)")
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
 
           def as_obj(value):
               if isinstance(value, dict):
@@ -1966,7 +2043,7 @@ workflow:
                   return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
               return value
 
-          def create_failure_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, call_item_id: str) -> dict:
+          def create_failure_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
               redacted_body = redact_phone_values(body)
               redacted_json = json.dumps(redacted_body, ensure_ascii=False)
               now_ms = int(time.time() * 1000)
@@ -1982,8 +2059,10 @@ workflow:
                   "maskedPhone": masked_phone,
                   "callItemId": call_item_id,
                   "createFailed": True,
+                  "createOutcomeUnknown": False,
                   "createStatusCode": status_code,
                   "createErrorMessage": message,
+                  "idempotencyKey": idempotency_key,
               }
               return {
                   "call_id": "",
@@ -1995,7 +2074,38 @@ workflow:
                   "call_context": context,
               }
 
-          def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, call_item_id: str) -> dict:
+          def create_unknown_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
+              redacted_body = redact_phone_values(body)
+              redacted_json = json.dumps(redacted_body, ensure_ascii=False)
+              now_ms = int(time.time() * 1000)
+              context = {
+                  "callId": "",
+                  "lookupUrl": "",
+                  "initialCallJson": redacted_json,
+                  "createResponseJson": redacted_json,
+                  "startedAtMs": now_ms,
+                  "initialStatus": "create_outcome_unknown",
+                  "initialDone": True,
+                  "metadataSentJson": metadata_sent_json,
+                  "maskedPhone": masked_phone,
+                  "callItemId": call_item_id,
+                  "createFailed": False,
+                  "createOutcomeUnknown": True,
+                  "createStatusCode": status_code,
+                  "createOutcomeMessage": message,
+                  "idempotencyKey": idempotency_key,
+              }
+              return {
+                  "call_id": "",
+                  "lookup_url": "",
+                  "initial_call_json": redacted_json,
+                  "started_at_ms": now_ms,
+                  "initial_status": "create_outcome_unknown",
+                  "initial_done": True,
+                  "call_context": context,
+              }
+
+          def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
               body = as_obj(create_response)
               status_code = to_int(create_status_code)
               if not (200 <= status_code < 300):
@@ -2005,6 +2115,7 @@ workflow:
                       f"CALL-E create request returned HTTP {status_code or 'unknown'}.",
                       metadata_sent_json,
                       masked_phone,
+                      idempotency_key,
                       call_item_id,
                   )
               call_id = first_value(
@@ -2019,13 +2130,14 @@ workflow:
                   nested_get(body, ["result", "id"]),
               )
               if not call_id:
-                  response_keys = ", ".join(sorted([str(k) for k in body.keys()]))
-                  return create_failure_context(
+                  response_keys = ", ".join(sorted([str(k) for k in body.keys()])) or "(none)"
+                  return create_unknown_context(
                       body,
                       status_code,
-                      "CALL-E create response did not include a recognized call id. Response keys: " + response_keys,
+                      f"CALL-E create request returned HTTP {status_code} without a recognized call id. The call may already have been created. Replay or reconcile only with the same Idempotency-Key; do not generate a new key. Response keys: {response_keys}",
                       metadata_sent_json,
                       masked_phone,
+                      idempotency_key,
                       call_item_id,
                   )
               root = str(base_url or "").strip().rstrip("/")
@@ -2054,6 +2166,10 @@ workflow:
                   "metadataSentJson": metadata_sent_json,
                   "maskedPhone": masked_phone,
                   "callItemId": call_item_id,
+                  "createFailed": False,
+                  "createOutcomeUnknown": False,
+                  "createStatusCode": status_code,
+                  "idempotencyKey": idempotency_key,
               }
               return {
                   "call_id": call_id,
@@ -2085,6 +2201,10 @@ workflow:
           value_selector:
           - build_iteration_payload
           - masked_phone
+        - variable: idempotency_key
+          value_selector:
+          - build_iteration_payload
+          - idempotency_key
         - variable: call_item_id
           value_selector:
           - build_iteration_payload
@@ -2139,9 +2259,10 @@ workflow:
           import json
           import re
 
-          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{7,14}")
-          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9]\d{0,2}(?:[\s.-]?\d){7,14}(?!\d)")
-          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{7,14})(?!\d)")
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
+          IDEMPOTENCY_KEY_RE = re.compile(r"^dify-[0-9a-f]{64}$")
 
           def mask_phone(phone: str) -> str:
               value = str(phone or "").strip()
@@ -2176,6 +2297,30 @@ workflow:
                   return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
               return value
 
+          def validated_idempotency_key(value) -> str:
+              candidate = str(value or "").strip()
+              return candidate if IDEMPOTENCY_KEY_RE.fullmatch(candidate) else ""
+
+          def restore_reconciliation_keys(raw_results, safe_results):
+              for raw_item, safe_item in zip(raw_results, safe_results):
+                  if not isinstance(raw_item, dict) or not isinstance(safe_item, dict):
+                      continue
+                  raw_reconciliation = raw_item.get("reconciliation")
+                  safe_reconciliation = safe_item.get("reconciliation")
+                  if not isinstance(raw_reconciliation, dict) or not isinstance(safe_reconciliation, dict):
+                      continue
+                  if not raw_reconciliation.get("required"):
+                      continue
+                  idempotency_key = validated_idempotency_key(raw_reconciliation.get("idempotencyKey"))
+                  if not idempotency_key:
+                      continue
+                  safe_reconciliation["idempotencyKey"] = idempotency_key
+                  safe_reconciliation["instruction"] = (
+                      f"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}); "
+                      "do not generate a new key."
+                  )
+              return safe_results
+
           def as_obj(value):
               if isinstance(value, dict):
                   return value
@@ -2192,6 +2337,15 @@ workflow:
                   return fallback
               return redact_phone_text(value)
 
+          def reconciliation_status_text(reconciliation) -> str:
+              idempotency_key = validated_idempotency_key(reconciliation.get("idempotencyKey"))
+              if idempotency_key:
+                  return (
+                      f"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}); "
+                      "do not generate a new key."
+                  )
+              return line_value(reconciliation.get("instruction"))
+
           def build_preview_lines(preview):
               tasks = preview.get("tasks") if isinstance(preview, dict) else []
               if not isinstance(tasks, list) or not tasks:
@@ -2207,7 +2361,7 @@ workflow:
 
           def lookup_status_text(lookup, polling) -> str:
               if lookup.get("skipped"):
-                  return "skipped"
+                  return lookup.get("reason") or "skipped"
               if polling.get("timedOut"):
                   return "timed out"
               if polling.get("errorMessage"):
@@ -2224,11 +2378,13 @@ workflow:
                   structured = data.get("structuredResult") if isinstance(data.get("structuredResult"), dict) else {}
                   polling = item.get("polling", {}) if isinstance(item.get("polling"), dict) else {}
                   lookup = item.get("lookup", {}) if isinstance(item.get("lookup"), dict) else {}
+                  reconciliation = item.get("reconciliation", {}) if isinstance(item.get("reconciliation"), dict) else {}
                   evidence = data.get("evidence") if isinstance(data.get("evidence"), list) else []
                   lines.extend([
                       f"{index}. {line_value(item.get('callItemId'))}",
                       f"   Phone: {line_value(item.get('maskedPhone'))}",
                       f"   Call ID: {line_value(status.get('callId'))}",
+                      f"   Creation state: {line_value(status.get('creation_state'))}",
                       f"   Status: {line_value(status.get('call_status'))}",
                       f"   Recipient status: {line_value(status.get('recipient_status'))}",
                       f"   Result lookup: {line_value(lookup_status_text(lookup, polling))}",
@@ -2239,6 +2395,8 @@ workflow:
                   ])
                   if polling.get("errorMessage"):
                       lines.append(f"   Polling note: {line_value(polling.get('errorMessage'))}")
+                  if reconciliation.get("required"):
+                      lines.append(f"   Reconciliation required: {reconciliation_status_text(reconciliation)}")
                   if evidence:
                       lines.append("   Evidence:")
                       for point in evidence[:5]:
@@ -2260,13 +2418,15 @@ workflow:
               return "unknown"
 
           def main(results: list, task_count: int, live_task_count: int, dry_run: str, preview_json: str, api_health_response, api_health_status_code, validation_error: str) -> dict:
-              safe_results = redact_phone_values(results) if isinstance(results, list) else []
+              raw_results = results if isinstance(results, list) else []
+              safe_results = restore_reconciliation_keys(raw_results, redact_phone_values(raw_results))
               dry_run_enabled = str(dry_run).strip().lower() == "true"
               preview = redact_phone_values(as_obj(preview_json))
               safe_api_health_response = redact_phone_values(api_health_response)
               validation_error = redact_phone_text(validation_error).strip()
               successful = 0
               failed = 0
+              creation_unknown = 0
               timed_out = 0
               for item in safe_results:
                   if not isinstance(item, dict):
@@ -2275,16 +2435,18 @@ workflow:
                   polling = item.get("polling", {}) if isinstance(item.get("polling"), dict) else {}
                   if polling.get("timedOut"):
                       timed_out += 1
-                  if status.get("ok"):
+                  if status.get("ok") is True:
                       successful += 1
-                  else:
+                  elif status.get("ok") is False:
                       failed += 1
+                  else:
+                      creation_unknown += 1
               created_count = sum(
                   1
                   for item in safe_results
                   if isinstance(item, dict)
                   and isinstance(item.get("callStatus"), dict)
-                  and item["callStatus"].get("created")
+                  and item["callStatus"].get("created") is True
               )
               health_status = format_health_status(api_health_status_code)
               connectivity_error = validation_error.startswith("CALL-E /health returned HTTP")
@@ -2332,7 +2494,8 @@ workflow:
                       "CALL-E One-shot Call",
                       "",
                       "Mode: Live",
-                      f"Live calls created: {created_count}",
+                      f"Live calls confirmed created: {created_count}",
+                      f"Call creation outcomes unknown (possibly created): {creation_unknown}",
                       f"Successful results: {successful}",
                       f"Failed results: {failed}",
                       f"API connectivity: {health_status} via GET /health",
@@ -2348,10 +2511,12 @@ workflow:
                       "statusCode": to_int(api_health_status_code),
                       "response": safe_api_health_response,
                   },
-                  "liveCallsCreated": 0 if dry_run_enabled else created_count,
-                    "processedCount": len(safe_results),
-                    "expectedCount": task_count,
-                    "liveExpectedCount": live_task_count,
+                  "liveCallsCreated": 0 if dry_run_enabled else (None if creation_unknown else created_count),
+                  "liveCallsConfirmedCreated": 0 if dry_run_enabled else created_count,
+                  "creationOutcomeUnknownCount": 0 if dry_run_enabled else creation_unknown,
+                  "processedCount": len(safe_results),
+                  "expectedCount": task_count,
+                  "liveExpectedCount": live_task_count,
                   "successfulCount": successful,
                   "failedCount": failed,
                   "timedOutCount": timed_out,
