@@ -8,8 +8,7 @@
     "auth": {
       "type": "static",
       "requiredScopes": [
-        "crm.objects.contacts.read",
-        "crm.objects.deals.read"
+        "crm.objects.contacts.read"
       ],
       "optionalScopes": [],
       "conditionallyRequiredScopes": []

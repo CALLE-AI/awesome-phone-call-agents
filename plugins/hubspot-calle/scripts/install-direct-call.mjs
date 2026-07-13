@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -20,7 +19,8 @@ export const minimumHubSpotCliVersion = "8.4.0";
 const secretNames = [
   "CALL_E_API_KEY",
   "CALL_E_BASE_URL",
-  "CALLE_WORKFLOW_ENDPOINT_TOKEN",
+  "HUBSPOT_CLIENT_SECRET",
+  "HUBSPOT_WORKFLOW_ACTION_URL",
 ];
 
 function usage() {
@@ -48,7 +48,9 @@ Options:
 Environment variables for --set-secrets-from-env:
   CALL_E_API_KEY                Required. Never printed by this script.
   CALL_E_BASE_URL               Optional. Defaults to ${defaultCallEBaseUrl}.
-  CALLE_WORKFLOW_ENDPOINT_TOKEN Optional. Generated when absent.`;
+  HUBSPOT_CLIENT_SECRET         Required. Find it on the HubSpot app Auth tab; never printed.
+
+The workflow action URL is stored server-side from --endpoint-url or --endpoint-host.`;
 }
 
 function readOption(argv, index, name) {
@@ -312,7 +314,8 @@ export function executeCommand(command, args, options = {}) {
   const spawn = options.spawn || spawnSync;
   const childEnv = { ...(options.env || process.env) };
   delete childEnv.CALL_E_API_KEY;
-  delete childEnv.CALLE_WORKFLOW_ENDPOINT_TOKEN;
+  delete childEnv.HUBSPOT_CLIENT_SECRET;
+  delete childEnv.HUBSPOT_WORKFLOW_ACTION_URL;
   const result = spawn(command, args, {
     cwd: options.cwd || process.cwd(),
     env: childEnv,
@@ -432,20 +435,23 @@ async function requireSuccessful(command, executable, args, options = {}) {
   return result;
 }
 
-function prepareSecretPlan(options, env) {
+function prepareSecretPlan(options, env, endpointUrl) {
   if (options.skipSecrets) return { mode: "skip" };
   if (!options.setSecretsFromEnv) return { mode: "check" };
 
   if (!env.CALL_E_API_KEY) {
     throw new Error("CALL_E_API_KEY is required when using --set-secrets-from-env.");
   }
+  if (!env.HUBSPOT_CLIENT_SECRET) {
+    throw new Error("HUBSPOT_CLIENT_SECRET is required when using --set-secrets-from-env.");
+  }
   return {
     mode: "set",
-    generated: false,
     values: {
       CALL_E_API_KEY: env.CALL_E_API_KEY,
       CALL_E_BASE_URL: normalizeCallEBaseUrl(env.CALL_E_BASE_URL || defaultCallEBaseUrl),
-      CALLE_WORKFLOW_ENDPOINT_TOKEN: env.CALLE_WORKFLOW_ENDPOINT_TOKEN || "",
+      HUBSPOT_CLIENT_SECRET: env.HUBSPOT_CLIENT_SECRET,
+      HUBSPOT_WORKFLOW_ACTION_URL: endpointUrl,
     },
   };
 }
@@ -456,35 +462,6 @@ async function preflightSecrets(account, secretPlan, command) {
   const existing = parseSecretList(result.stdout);
   if (secretPlan.mode === "check") assertRequiredSecrets(existing);
   return existing;
-}
-
-function finalizeSecretPlan(options, secretPlan, existing, tokenFactory) {
-  if (secretPlan.mode !== "set" || secretPlan.values.CALLE_WORKFLOW_ENDPOINT_TOKEN) {
-    return secretPlan;
-  }
-  if (existing.has("CALLE_WORKFLOW_ENDPOINT_TOKEN")) {
-    throw new Error(
-      "CALLE_WORKFLOW_ENDPOINT_TOKEN already exists in HubSpot. Supply the administrator-managed existing token or explicitly coordinate rotation."
-    );
-  }
-  return {
-    ...secretPlan,
-    generated: true,
-    values: {
-      ...secretPlan.values,
-      CALLE_WORKFLOW_ENDPOINT_TOKEN: options.dryRun ? "" : tokenFactory(),
-    },
-  };
-}
-
-function printTokenRecoveryNotice(secretPlan, log) {
-  if (secretPlan.mode !== "set" || !secretPlan.generated) return;
-  if (!secretPlan.values.CALLE_WORKFLOW_ENDPOINT_TOKEN) {
-    log("[dry-run] Would generate a workflow endpoint token when applying secrets.");
-    return;
-  }
-  log(`Generated workflow endpoint token: ${secretPlan.values.CALLE_WORKFLOW_ENDPOINT_TOKEN}`);
-  log("Use this token in the workflow action field 'Private pilot endpoint token'. Keep it for recovery if a later step fails.");
 }
 
 async function applySecretPlan(options, account, secretPlan, existing, command, log) {
@@ -552,7 +529,6 @@ export async function runInstaller(options, dependencies = {}) {
     args,
     { ...commandOptions, secretValues }
   );
-  const tokenFactory = dependencies.tokenFactory || (() => randomBytes(24).toString("hex"));
   const configure = dependencies.configureWorkflowAction || configureWorkflowAction;
 
   assertMinimumVersion(nodeVersion, minimumNodeVersion, "Node.js");
@@ -567,13 +543,11 @@ export async function runInstaller(options, dependencies = {}) {
   const account = parseAccountInfo(accountResult.stdout);
   assertRequestedAccount(options.account, account);
   const endpointUrl = normalizeEndpointUrl(options);
-  let secretPlan = prepareSecretPlan(options, env);
+  const secretPlan = prepareSecretPlan(options, env, endpointUrl);
   const existingSecrets = await preflightSecrets(account, secretPlan, successfulCommand);
-  secretPlan = finalizeSecretPlan(options, secretPlan, existingSecrets, tokenFactory);
   if (secretPlan.mode === "set") {
     secretValues.push(...Object.values(secretPlan.values).filter(Boolean));
   }
-  printTokenRecoveryNotice(secretPlan, log);
 
   await configure(endpointUrl, options.dryRun, log);
   await applySecretPlan(options, account, secretPlan, existingSecrets, successfulCommand, log);

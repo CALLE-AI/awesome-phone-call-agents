@@ -9,10 +9,10 @@ Hard rules
 - Treat the manual as authoritative for deployment behavior, safety, rollback, and supported capabilities. If this prompt and the manual conflict, stop and follow the current manual instead of relying on duplicated text.
 - Use only the existing private static app flow. Do not introduce an alternate backend, OAuth, CRM writeback, any HubSpot custom properties, custom CALL-E properties, recurring workflows or schedules, duplicate jobs, or invented cancellation APIs.
 - Preserve the fixed medical/legal/financial/emergency boundary exactly as documented.
-- Never paste, print, echo, save, commit, upload, screenshot, summarize, or type `CALL_E_API_KEY` or `CALLE_WORKFLOW_ENDPOINT_TOKEN` into chat, command arguments, files, commits, logs, summaries, screenshots, or Agent-controlled browser fields.
+- Never paste, print, echo, save, commit, upload, screenshot, summarize, or type `CALL_E_API_KEY` or `HUBSPOT_CLIENT_SECRET` into chat, command arguments, files, commits, logs, summaries, screenshots, or Agent-controlled browser fields.
 - Never commit or push account-specific endpoint metadata.
-- Collect secrets only through hidden local terminal input. The only permitted secret paths are hidden terminal input -> environment -> existing installer -> HubSpot secret store, plus direct administrator entry of `CALLE_WORKFLOW_ENDPOINT_TOKEN` into the approved HubSpot workflow field. All other exposure remains forbidden.
-- `CALLE_WORKFLOW_ENDPOINT_TOKEN` handling is stateful: first install creates and stores a strong random token in the administrator's password manager or secret manager; redeploy reuses the existing token; rotation is a separate explicitly approved operation coordinated with every workflow action before any workflow is re-enabled. The Agent must never see the token, generate it into tool output, echo it, or repeat it.
+- Collect secrets only through hidden local terminal input: hidden input -> environment -> existing installer -> HubSpot secret store. The workflow action must not contain a reusable credential field. All other exposure remains forbidden.
+- The HubSpot App Client Secret is a request-validation credential. If it is rotated in HubSpot, the administrator must explicitly update `HUBSPOT_CLIENT_SECRET` through the installer and redeploy before workflows are re-enabled.
 - When the administrator needs a CALL-E API key, direct them to https://dashboard.heycall-e.com/account/api-keys. Do not ask them to paste the key into chat.
 - Use the official CALL-E API Reference at https://docs.heycall-e.com/#/api-reference when checking CALL-E request and response contracts. Do not infer undocumented fields or behavior.
 - Default to no live call. A real call needs a separate final confirmation after deployment and UI setup are complete.
@@ -33,7 +33,7 @@ Phase 1 - Read-only discovery
    - the administrator has permission for serverless secret read/write
    - the administrator has permission for Standard install or reinstall
    - the administrator has permission for workflow configuration
-   - the administrator has permission for Contact and Deal layout customization
+   - the administrator has permission for Contact layout customization
    If any prerequisite is unavailable or unverified, stop before mutation.
 6. Restate the exact verified target before any mutation:
    - verified HubSpot alias
@@ -52,12 +52,9 @@ Phase 2 - Local validation and credential readiness
 3. Confirm credential readiness:
    - CALL-E API key acquisition page: https://dashboard.heycall-e.com/account/api-keys
    - CALL-E API Reference: https://docs.heycall-e.com/#/api-reference
-   - Hidden local terminal input only for `CALL_E_API_KEY`
-   - First install: the administrator must create and store a strong random `CALLE_WORKFLOW_ENDPOINT_TOKEN` in their own password manager or secret manager before deployment
-   - Redeploy: reuse the existing `CALLE_WORKFLOW_ENDPOINT_TOKEN` from the administrator's secret manager unless the administrator explicitly approves coordinated rotation
-   - Token rotation is never silent. If rotation is requested, coordinate updating every workflow action before re-enabling any workflow
-   - Hidden local terminal input for `CALL_E_API_KEY` and `CALLE_WORKFLOW_ENDPOINT_TOKEN` in the same dedicated subshell session that runs the installer
-4. If you cannot securely prompt for hidden terminal input yourself, stop and tell the administrator that, after explicit deployment approval in Phase 3, they must run the single Phase 3 installer subshell in their own terminal and return only the masked completion state plus whether the run was a first install or redeploy. Explain that exports in another terminal do not reach the Agent shell. Do not continue by using chat, shell history, command arguments, temp files, browser fields, or installer-generated output for secrets or tokens.
+   - HubSpot App Client Secret location: `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`
+   - Hidden local terminal input for `CALL_E_API_KEY` and `HUBSPOT_CLIENT_SECRET` in the same dedicated subshell session that runs the installer
+4. If you cannot securely prompt for hidden terminal input yourself, stop and tell the administrator that, after explicit deployment approval in Phase 3, they must run the single Phase 3 installer subshell in their own terminal and return only the masked completion state. Explain that exports in another terminal do not reach the Agent shell. Do not continue by using chat, shell history, command arguments, temp files, browser fields, or installer-generated output for secrets.
 
 Phase 3 - Approved deployment
 1. Show the exact intended installer path before running it, using the verified alias and exact account ID-derived host.
@@ -76,9 +73,9 @@ Phase 3 - Approved deployment
 5. Use exactly one installer execution block for both the shared-interactivity Agent path and the no-shared-interactivity administrator fallback. Run it only after explicit deployment approval, and only from `plugins/hubspot-calle`:
    ```bash
    (
-     set +x
-     cleanup() {
-       unset CALL_E_API_KEY CALLE_WORKFLOW_ENDPOINT_TOKEN
+    set +x
+    cleanup() {
+       unset CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
      }
      trap cleanup EXIT INT TERM HUP
 
@@ -89,19 +86,19 @@ Phase 3 - Approved deployment
        exit 1
      fi
 
-     read -r -s CALLE_WORKFLOW_ENDPOINT_TOKEN
+     read -r -s HUBSPOT_CLIENT_SECRET
      printf '\n'
-     if [ -z "$CALLE_WORKFLOW_ENDPOINT_TOKEN" ]; then
-       echo "Missing CALLE_WORKFLOW_ENDPOINT_TOKEN." >&2
+     if [ -z "$HUBSPOT_CLIENT_SECRET" ]; then
+       echo "Missing HUBSPOT_CLIENT_SECRET." >&2
        exit 1
      fi
 
-     export CALL_E_API_KEY CALLE_WORKFLOW_ENDPOINT_TOKEN
+     export CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
      node scripts/install-direct-call.mjs --account <verified-alias-or-exact-account-id> --endpoint-host <exact-account-id>.hs-sites.com --set-secrets-from-env
    )
    ```
 6. In the shared-interactivity Agent path, run that dedicated subshell yourself so cleanup completes immediately after installer success or failure, before any install-state interpretation, UI work, retry decision, or reporting.
-7. In the no-shared-interactivity path, require explicit administrator approval immediately before asking them to run that same dedicated subshell in their own terminal. They return only the masked completion state plus whether the run was a first install or redeploy.
+7. In the no-shared-interactivity path, require explicit administrator approval immediately before asking them to run that same dedicated subshell in their own terminal. They return only the masked completion state.
 8. After the run, interpret only these installer completion states:
    - `installed`: upload completed and the static app is installed with current scopes
    - `manual_install_required`: upload completed but the static app is not yet installed
@@ -112,7 +109,7 @@ Phase 3 - Approved deployment
    - report the failing step with secrets masked
    - document the recovery
    - rerun only after the administrator approves the retry
-   - on retry, reuse the administrator-managed `CALLE_WORKFLOW_ENDPOINT_TOKEN` through hidden terminal input unless the administrator explicitly approved coordinated rotation
+   - on retry, use hidden terminal input again for both server-side credentials
 10. After the installer step, run `git status --short --branch` again.
 11. After deployment, only expected account-specific metadata changes may remain locally. Identify them explicitly, never commit or push them, and stop on any unexpected change.
 
@@ -122,7 +119,7 @@ Phase 4 - HubSpot UI completion
    `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Distribution -> Standard install`
 3. Require explicit administrator approval immediately before a Standard install or reinstall click.
 4. For App Card placement, use the exact record-layout path:
-   - open a Contact or Deal record
+   - open a Contact record
    - `Customize`
    - choose the target record view
    - add a card in the middle column for `CALL-E` or the right sidebar for `CALL-E Quick Call`
@@ -138,11 +135,9 @@ Phase 4 - HubSpot UI completion
    - explicit do-not-call exclusion
    - no recurring workflow or schedule
    - no activation until the administrator approves the exact enrollment logic
-   - direct administrator entry of `CALLE_WORKFLOW_ENDPOINT_TOKEN` into the approved HubSpot workflow field
 9. Require explicit administrator approval immediately before:
    - saving the workflow configuration
    - activating the workflow
-10. If browser automation is used for workflow setup, pause and relinquish control for the endpoint-token field so only the administrator enters it directly.
 
 Phase 5 - Verification and handoff
 1. Default to no live call. Treat manual workflow enrollment as a live call action. Do not enroll any record or place a real call during verification unless the administrator gives a separate final confirmation that includes the masked destination, exact call task, consent evidence, do-not-call status, duplicate-risk check, and accepted real-world side effect.
@@ -164,7 +159,7 @@ Phase 5 - Verification and handoff
    - remaining manual steps
 4. Keep secrets, raw phone numbers, and the full endpoint host out of the report.
 5. Distinguish rollback clearly:
-   - preventing new calls: disable workflows, remove the action from active workflows, rotate or remove `CALL_E_API_KEY`, rotate `CALLE_WORKFLOW_ENDPOINT_TOKEN`, remove App Cards, or uninstall the static app
+   - preventing new calls: disable workflows, remove the action from active workflows, rotate or remove `CALL_E_API_KEY`, rotate the HubSpot App Client Secret and redeploy its HubSpot secret, remove App Cards, or uninstall the static app
    - cancelling accepted calls: must use CALL-E-supported dashboard or API controls; this integration does not define a cancellation endpoint
 ````
 

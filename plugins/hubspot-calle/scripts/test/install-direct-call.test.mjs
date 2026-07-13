@@ -26,7 +26,7 @@ const pluginDir = join(scriptDir, "..", "..");
 test("fails closed when required HubSpot secrets are missing", () => {
   assert.throws(
     () => assertRequiredSecrets(new Set(["CALL_E_API_KEY"])),
-    /CALL_E_BASE_URL, CALLE_WORKFLOW_ENDPOINT_TOKEN/
+    /CALL_E_BASE_URL, HUBSPOT_CLIENT_SECRET, HUBSPOT_WORKFLOW_ACTION_URL/
   );
 });
 
@@ -36,12 +36,9 @@ test("installed app metadata keeps only the direct-call read scopes used by App 
   );
   const scopes = metadata.config.auth.requiredScopes;
 
-  assert.deepEqual(scopes, [
-    "crm.objects.contacts.read",
-    "crm.objects.deals.read",
-  ]);
+  assert.deepEqual(scopes, ["crm.objects.contacts.read"]);
   assert.ok(scopes.includes("crm.objects.contacts.read"));
-  assert.ok(scopes.includes("crm.objects.deals.read"));
+  assert.equal(scopes.includes("crm.objects.deals.read"), false);
   assert.equal(scopes.includes("crm.objects.companies.read"), false);
   assert.equal(scopes.includes("crm.objects.owners.read"), false);
 });
@@ -128,37 +125,29 @@ function secretConfirmation(args) {
   };
 }
 
-test("refuses implicit endpoint-token rotation before generation or mutation", async () => {
+test("requires the HubSpot client secret before metadata or secret mutation", async () => {
   const calls = [];
   await assert.rejects(
     () => runInstaller(installerOptions({ setSecretsFromEnv: true, skipUpload: false }), {
       command: successfulCommand(calls, {
         "hs --version": { status: 0, stdout: "8.9.1\n", stderr: "" },
         "hs account info 123456789": { status: 0, stdout: resolvedAccount, stderr: "" },
-        "hs secret list -a 123456789": {
-          status: 0,
-          stdout: "CALLE_WORKFLOW_ENDPOINT_TOKEN\n",
-          stderr: "",
-        },
       }),
       configureWorkflowAction: async () => assert.fail("metadata must not be written"),
       env: { CALL_E_API_KEY: "test-key" },
-      tokenFactory: () => assert.fail("an existing endpoint token must not be replaced"),
       log: () => {},
     }),
-    /supply.*administrator-managed existing token.*explicitly coordinate rotation/i
+    /HUBSPOT_CLIENT_SECRET is required/
   );
 
   assert.deepEqual(calls, [
     ["hs", "--version"],
     ["hs", "account", "info", "123456789"],
-    ["hs", "secret", "list", "-a", "123456789"],
   ]);
 });
 
-test("generates an endpoint token exactly once for a first installation", async () => {
+test("stores provider credentials and HubSpot request-validation configuration", async () => {
   const calls = [];
-  let generated = 0;
   await runInstaller(installerOptions({ setSecretsFromEnv: true }), {
     command: successfulCommand(calls, {
       "hs --version": { status: 0, stdout: "8.9.1\n", stderr: "" },
@@ -166,27 +155,26 @@ test("generates an endpoint token exactly once for a first installation", async 
       "hs secret list -a 123456789": { status: 0, stdout: "", stderr: "" },
     }),
     configureWorkflowAction: async () => {},
-    env: { CALL_E_API_KEY: "test-key" },
-    tokenFactory: () => {
-      generated += 1;
-      return "first-install-token";
+    env: {
+      CALL_E_API_KEY: "test-key",
+      HUBSPOT_CLIENT_SECRET: "hubspot-client-secret",
     },
     log: () => {},
   });
 
-  assert.equal(generated, 1);
   assert.deepEqual(
     calls.filter((call) => call[1] === "secret").map((call) => call.slice(1, 4)),
     [
       ["secret", "list", "-a"],
       ["secret", "add", "CALL_E_API_KEY"],
       ["secret", "add", "CALL_E_BASE_URL"],
-      ["secret", "add", "CALLE_WORKFLOW_ENDPOINT_TOKEN"],
+      ["secret", "add", "HUBSPOT_CLIENT_SECRET"],
+      ["secret", "add", "HUBSPOT_WORKFLOW_ACTION_URL"],
     ]
   );
 });
 
-test("uses the supplied endpoint token to update existing deployment secrets", async () => {
+test("updates existing deployment secrets without client-visible workflow credentials", async () => {
   const calls = [];
   await runInstaller(installerOptions({ setSecretsFromEnv: true }), {
     command: successfulCommand(calls, {
@@ -194,19 +182,21 @@ test("uses the supplied endpoint token to update existing deployment secrets", a
       "hs account info 123456789": { status: 0, stdout: resolvedAccount, stderr: "" },
       "hs secret list -a 123456789": {
         status: 0,
-        stdout: "CALL_E_API_KEY\nCALL_E_BASE_URL\nCALLE_WORKFLOW_ENDPOINT_TOKEN\n",
+        stdout: "CALL_E_API_KEY\nCALL_E_BASE_URL\nHUBSPOT_CLIENT_SECRET\nHUBSPOT_WORKFLOW_ACTION_URL\n",
         stderr: "",
       },
     }),
     configureWorkflowAction: async () => {},
-    env: { CALL_E_API_KEY: "test-key", CALLE_WORKFLOW_ENDPOINT_TOKEN: "saved-token" },
-    tokenFactory: () => assert.fail("a supplied endpoint token must not be regenerated"),
+    env: {
+      CALL_E_API_KEY: "test-key",
+      HUBSPOT_CLIENT_SECRET: "hubspot-client-secret",
+    },
     log: () => {},
   });
 
   assert.deepEqual(
     calls.filter((call) => call[1] === "secret" && call[2] === "update").map((call) => call[3]),
-    ["CALL_E_API_KEY", "CALL_E_BASE_URL", "CALLE_WORKFLOW_ENDPOINT_TOKEN"]
+    ["CALL_E_API_KEY", "CALL_E_BASE_URL", "HUBSPOT_CLIENT_SECRET", "HUBSPOT_WORKFLOW_ACTION_URL"]
   );
 });
 
@@ -214,27 +204,27 @@ test("accepts an ANSI-prefixed exact HubSpot secret update confirmation", () => 
   const account = { id: "123456789", name: "expected-account" };
   assert.doesNotThrow(() => assertSecretMutationConfirmation(
     "update",
-    "CALLE_WORKFLOW_ENDPOINT_TOKEN",
+    "HUBSPOT_CLIENT_SECRET",
     account,
-    { stdout: "\u001b[32m✔ SUCCESS The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was updated in the HubSpot account: 123456789\u001b[39m", stderr: "" }
+    { stdout: "\u001b[32m✔ SUCCESS The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 123456789\u001b[39m", stderr: "" }
   ));
 });
 
 test("accepts a raw-ID HubSpot secret update confirmation", () => {
   assert.doesNotThrow(() => assertSecretMutationConfirmation(
     "update",
-    "CALLE_WORKFLOW_ENDPOINT_TOKEN",
+    "HUBSPOT_CLIENT_SECRET",
     { id: "123456789", name: "expected-account" },
-    { stdout: "The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was updated in the HubSpot account: 123456789", stderr: "" }
+    { stdout: "The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 123456789", stderr: "" }
   ));
 });
 
 test("accepts a named HubSpot secret add confirmation for the resolved account", () => {
   assert.doesNotThrow(() => assertSecretMutationConfirmation(
     "add",
-    "CALLE_WORKFLOW_ENDPOINT_TOKEN",
+    "HUBSPOT_CLIENT_SECRET",
     { id: "123456789", name: "expected-account" },
-    { stdout: "[SUCCESS] The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was added to the HubSpot account: expected-account [standard account] (123456789)", stderr: "" }
+    { stdout: "[SUCCESS] The secret \"HUBSPOT_CLIENT_SECRET\" was added to the HubSpot account: expected-account [standard account] (123456789)", stderr: "" }
   ));
 });
 
@@ -243,34 +233,34 @@ function assertAmbiguousSecretMutationOutput(output) {
   assert.throws(
     () => assertSecretMutationConfirmation(
       "update",
-      "CALLE_WORKFLOW_ENDPOINT_TOKEN",
+      "HUBSPOT_CLIENT_SECRET",
       account,
       { stdout: output, stderr: "" }
     ),
-    /did not confirm update.*CALLE_WORKFLOW_ENDPOINT_TOKEN.*123456789/i
+    /did not confirm update.*HUBSPOT_CLIENT_SECRET.*123456789/i
   );
 }
 
 test("rejects a wrong-account confirmation with the target ID later in prose", () => {
   assertAmbiguousSecretMutationOutput(
-    "The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was updated in the HubSpot account: 999999999; requested target 123456789"
+    "The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 999999999; requested target 123456789"
   );
 });
 
 test("rejects embedded HubSpot secret confirmation prose", () => {
   assertAmbiguousSecretMutationOutput(
-    "Before retry: The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was updated in the HubSpot account: 123456789"
+    "Before retry: The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 123456789"
   );
 });
 
 test("rejects mixed HubSpot secret success and error output", () => {
   assertAmbiguousSecretMutationOutput(
-    "The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was updated in the HubSpot account: 123456789\nERROR The secret update failed"
+    "The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 123456789\nERROR The secret update failed"
   );
 });
 
 test("rejects duplicate HubSpot secret mutation confirmations", () => {
-  const update = "The secret \"CALLE_WORKFLOW_ENDPOINT_TOKEN\" was updated in the HubSpot account: 123456789";
+  const update = "The secret \"HUBSPOT_CLIENT_SECRET\" was updated in the HubSpot account: 123456789";
   assertAmbiguousSecretMutationOutput(`${update}\n${update}`);
 });
 
@@ -284,7 +274,7 @@ test("fails closed on zero-exit secret update errors without exposing values or 
         "hs account info 123456789": { status: 0, stdout: resolvedAccount, stderr: "" },
         "hs secret list -a 123456789": {
           status: 0,
-          stdout: "CALL_E_API_KEY\nCALL_E_BASE_URL\nCALLE_WORKFLOW_ENDPOINT_TOKEN\n",
+          stdout: "CALL_E_API_KEY\nCALL_E_BASE_URL\nHUBSPOT_CLIENT_SECRET\nHUBSPOT_WORKFLOW_ACTION_URL\n",
           stderr: "",
         },
         "hs secret update CALL_E_API_KEY -a 123456789": {
@@ -294,12 +284,12 @@ test("fails closed on zero-exit secret update errors without exposing values or 
         },
       }),
       configureWorkflowAction: async () => {},
-      env: { CALL_E_API_KEY: apiKey, CALLE_WORKFLOW_ENDPOINT_TOKEN: "saved-token" },
+      env: { CALL_E_API_KEY: apiKey, HUBSPOT_CLIENT_SECRET: "hubspot-client-secret" },
       log: () => {},
     }),
     (error) => {
       assert.match(error.message, /did not confirm update.*CALL-E API key.*123456789/i);
-      assert.doesNotMatch(error.message, /synthetic-secret-value|saved-token/);
+      assert.doesNotMatch(error.message, /synthetic-secret-value|hubspot-client-secret/);
       return true;
     }
   );
@@ -344,7 +334,7 @@ test("orchestration resolves account identity before metadata and secret writes"
     {
       command,
       configureWorkflowAction: async () => events.push(["metadata"]),
-      env: { CALL_E_API_KEY: "test-key", CALLE_WORKFLOW_ENDPOINT_TOKEN: "known-token" },
+      env: { CALL_E_API_KEY: "test-key", HUBSPOT_CLIENT_SECRET: "hubspot-client-secret" },
       log: () => {},
     }
   );
@@ -390,12 +380,12 @@ test("orchestration stops for missing secrets before upload", async () => {
       configureWorkflowAction: async () => assert.fail("metadata must not be written"),
       log: () => {},
     }),
-    /CALL_E_BASE_URL, CALLE_WORKFLOW_ENDPOINT_TOKEN/
+    /CALL_E_BASE_URL, HUBSPOT_CLIENT_SECRET, HUBSPOT_WORKFLOW_ACTION_URL/
   );
   assert.equal(calls.some((call) => call.includes("upload")), false);
 });
 
-test("logs a generated token before a later build failure", async () => {
+test("does not print server-side secrets before a later build failure", async () => {
   const events = [];
   const command = (name, args) => {
     events.push(["command", name, ...args]);
@@ -421,19 +411,16 @@ test("logs a generated token before a later build failure", async () => {
     () => runInstaller(installerOptions({ setSecretsFromEnv: true, build: true }), {
       command,
       configureWorkflowAction: async () => events.push(["metadata"]),
-      env: { CALL_E_API_KEY: "test-key" },
-      tokenFactory: () => "recoverable-token",
+      env: { CALL_E_API_KEY: "test-key", HUBSPOT_CLIENT_SECRET: "hubspot-client-secret" },
       log: (message) => events.push(["log", message]),
     }),
     /npm run build failed/
   );
 
-  const tokenNotice = events.findIndex((event) => event[0] === "log" && event[1].includes("recoverable-token"));
-  assert.ok(tokenNotice >= 0);
-  assert.ok(tokenNotice < events.findIndex((event) => event[0] === "metadata"));
+  assert.doesNotMatch(events.filter((event) => event[0] === "log").map((event) => event[1]).join("\n"), /hubspot-client-secret/);
 });
 
-test("dry run logs a placeholder without generating a usable token", async () => {
+test("dry run plans server-side secret writes without printing secret values", async () => {
   const calls = [];
   const logs = [];
   await runInstaller(installerOptions({ setSecretsFromEnv: true, dryRun: true }), {
@@ -443,13 +430,12 @@ test("dry run logs a placeholder without generating a usable token", async () =>
       "hs secret list -a 123456789": { status: 0, stdout: "", stderr: "" },
     }),
     configureWorkflowAction: async () => {},
-    env: { CALL_E_API_KEY: "test-key" },
-    tokenFactory: () => assert.fail("dry run must not generate a token"),
+    env: { CALL_E_API_KEY: "test-key", HUBSPOT_CLIENT_SECRET: "hubspot-client-secret" },
     log: (message) => logs.push(message),
   });
 
-  assert.match(logs.join("\n"), /would generate a workflow endpoint token/i);
-  assert.doesNotMatch(logs.join("\n"), /recoverable-token|[a-f0-9]{48}/i);
+  assert.match(logs.join("\n"), /would add HubSpot secret HUBSPOT_CLIENT_SECRET/i);
+  assert.doesNotMatch(logs.join("\n"), /test-key|hubspot-client-secret/i);
   assert.equal(calls.some((call) => call.includes("add") || call.includes("update")), false);
 });
 
@@ -515,7 +501,7 @@ test("production command failures include safe stderr diagnostics", async () => 
         };
       },
       configureWorkflowAction: async () => {},
-      env: { CALL_E_API_KEY: apiKey, CALLE_WORKFLOW_ENDPOINT_TOKEN: "known-token" },
+      env: { CALL_E_API_KEY: apiKey, HUBSPOT_CLIENT_SECRET: "hubspot-client-secret" },
       log: () => {},
     }),
     (error) => {
@@ -528,7 +514,7 @@ test("production command failures include safe stderr diagnostics", async () => 
 
 test("production command failures redact known secrets from stdout and stderr", async () => {
   const apiKey = "known-api-key-value";
-  const endpointToken = `${apiKey}-with-token-suffix`;
+  const clientSecret = `${apiKey}-with-client-secret-suffix`;
   await assert.rejects(
     () => runInstaller(installerOptions({ setSecretsFromEnv: true, build: true }), {
       spawn: (command, args) => {
@@ -545,22 +531,22 @@ test("production command failures redact known secrets from stdout and stderr", 
         return {
           status: 1,
           stdout: `build stdout exposed ${apiKey}`,
-          stderr: `build stderr exposed ${endpointToken}`,
+          stderr: `build stderr exposed ${clientSecret}`,
         };
       },
       configureWorkflowAction: async () => {},
       env: {
         PATH: "/test/bin",
         CALL_E_API_KEY: apiKey,
-        CALLE_WORKFLOW_ENDPOINT_TOKEN: endpointToken,
+        HUBSPOT_CLIENT_SECRET: clientSecret,
       },
       log: () => {},
     }),
     (error) => {
       assert.match(error.message, /stdout: build stdout exposed \[redacted\]/);
       assert.match(error.message, /stderr: build stderr exposed \[redacted\]/);
-      assert.doesNotMatch(error.message, new RegExp(`${apiKey}|${endpointToken}`));
-      assert.doesNotMatch(error.message, /with-token-suffix/);
+      assert.doesNotMatch(error.message, new RegExp(`${apiKey}|${clientSecret}`));
+      assert.doesNotMatch(error.message, /with-client-secret-suffix/);
       return true;
     }
   );
@@ -573,7 +559,8 @@ test("production runner scrubs call secrets from child environments", () => {
       PATH: "/test/bin",
       SAFE_VALUE: "safe",
       CALL_E_API_KEY: "known-api-key-value",
-      CALLE_WORKFLOW_ENDPOINT_TOKEN: "known-endpoint-token-value",
+      HUBSPOT_CLIENT_SECRET: "known-client-secret-value",
+      HUBSPOT_WORKFLOW_ACTION_URL: "https://example.hs-sites.com/hs/serverless/calle/create-call",
     },
     spawn: (_command, _args, options) => {
       childOptions = options;
@@ -590,7 +577,7 @@ test("production runner scrubs call secrets from child environments", () => {
 
 test("production command failures include spawn errors when no status is available", async () => {
   const apiKey = "known-api-key-value";
-  const endpointToken = "known-endpoint-token-value";
+  const clientSecret = "known-client-secret-value";
   await assert.rejects(
     () => runInstaller(installerOptions(), {
       spawn: (command, args) => {
@@ -601,19 +588,19 @@ test("production command failures include spawn errors when no status is availab
           status: null,
           stdout: "",
           stderr: "",
-          error: new Error(`spawn hs ${apiKey} ${endpointToken} ENOENT`),
+          error: new Error(`spawn hs ${apiKey} ${clientSecret} ENOENT`),
         };
       },
       env: {
         CALL_E_API_KEY: apiKey,
-        CALLE_WORKFLOW_ENDPOINT_TOKEN: endpointToken,
+        HUBSPOT_CLIENT_SECRET: clientSecret,
       },
       log: () => {},
     }),
     (error) => {
       assert.match(error.message, /failed to start: spawn hs \[redacted\] \[redacted\] ENOENT/);
       assert.doesNotMatch(error.message, /exit code null/);
-      assert.doesNotMatch(error.message, new RegExp(`${apiKey}|${endpointToken}`));
+      assert.doesNotMatch(error.message, new RegExp(`${apiKey}|${clientSecret}`));
       return true;
     }
   );
@@ -818,13 +805,15 @@ test("parses HubSpot secret list output", () => {
 Secrets for account example-test-account [test account] (123456789):
   CALL_E_BASE_URL
   CALL_E_API_KEY
-  CALLE_WORKFLOW_ENDPOINT_TOKEN
+  HUBSPOT_CLIENT_SECRET
+  HUBSPOT_WORKFLOW_ACTION_URL
 `);
 
   assert.deepEqual([...found].sort(), [
-    "CALLE_WORKFLOW_ENDPOINT_TOKEN",
     "CALL_E_API_KEY",
     "CALL_E_BASE_URL",
+    "HUBSPOT_CLIENT_SECRET",
+    "HUBSPOT_WORKFLOW_ACTION_URL",
   ]);
 });
 

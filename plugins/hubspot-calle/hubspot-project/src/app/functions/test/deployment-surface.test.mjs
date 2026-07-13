@@ -52,3 +52,32 @@ test("generated function bundles end with exactly one newline", async () => {
     assert.match(source, /[^\n]\n$/);
   }
 });
+
+test("workflow authentication and App Card object types stay portable and server-side", async () => {
+  const workflowAction = JSON.parse(await readFile(
+    join(appDir, "workflow-actions", "create-call-candidate-hsmeta.json"),
+    "utf8"
+  ));
+  const publicFunction = JSON.parse(await readFile(
+    join(appDir, "functions", "create-call-candidate-public-hsmeta.json"),
+    "utf8"
+  ));
+  const cardMetadata = await Promise.all([
+    "call-candidate-card-hsmeta.json",
+    "call-candidate-sidebar-card-hsmeta.json",
+  ].map(async (name) => JSON.parse(await readFile(join(appDir, "cards", name), "utf8"))));
+
+  assert.equal(
+    workflowAction.config.inputFields.some((field) => field.typeDefinition.name === "endpoint_token"),
+    false
+  );
+  assert.deepEqual(publicFunction.config.secretKeys, [
+    "CALL_E_API_KEY",
+    "CALL_E_BASE_URL",
+    "HUBSPOT_CLIENT_SECRET",
+    "HUBSPOT_WORKFLOW_ACTION_URL",
+  ]);
+  for (const card of cardMetadata) {
+    assert.deepEqual(card.config.objectTypes, ["CONTACT"]);
+  }
+});

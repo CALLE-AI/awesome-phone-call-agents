@@ -51,7 +51,8 @@ The agent must:
 - verify Node.js and HubSpot CLI prerequisites before deployment;
 - resolve and restate the exact target HubSpot account before mutation;
 - use only `https://api.heycall-e.com` through the existing installer;
-- never expose `CALL_E_API_KEY` or `CALLE_WORKFLOW_ENDPOINT_TOKEN`;
+- never expose `CALL_E_API_KEY` or `HUBSPOT_CLIENT_SECRET`;
+- require HubSpot v3 request-signature validation to remain server-side, with no reusable workflow credential field;
 - use the HTTPS CALL-E Dashboard API-key page rather than its redirecting HTTP
   form;
 - never commit or push account-specific endpoint metadata;

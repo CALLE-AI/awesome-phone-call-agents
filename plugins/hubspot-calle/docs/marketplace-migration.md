@@ -30,7 +30,7 @@ The Marketplace version should expose:
 
 - app listing for `CALL-E for HubSpot`
 - workflow action visible in the HubSpot action selection panel
-- App Card available for contact and deal records first, with ticket support evaluated as a later Marketplace expansion
+- Contact App Cards first; add Deal support only after defining a portable Deal phone-property or associated-Contact contract, with ticket support evaluated as a later Marketplace expansion
 - setup documentation for phone property mapping and approval-first operation
 - privacy, security, and support documentation
 

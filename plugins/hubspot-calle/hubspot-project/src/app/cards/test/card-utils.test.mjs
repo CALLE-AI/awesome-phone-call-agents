@@ -49,9 +49,9 @@ test("reads HubSpot CRM object context for app card calls", () => {
   );
 });
 
-test("maps only supported HubSpot CRM object type IDs", () => {
+test("maps only the portable HubSpot Contact object type ID", () => {
   assert.equal(readObjectContext({ crm: { objectTypeId: "0-1" } }).objectType, "contact");
-  assert.equal(readObjectContext({ crm: { objectTypeId: "0-3" } }).objectType, "deal");
+  assert.equal(readObjectContext({ crm: { objectTypeId: "0-3" } }).objectType, "");
   assert.equal(readObjectContext({ crm: { objectTypeId: "0-5" } }).objectType, "");
   assert.equal(readObjectContext({ crm: {} }).objectType, "");
 });
@@ -67,7 +67,22 @@ test("rejects an unsupported CRM object context before building call parameters"
       phoneProperty: "phone",
       requestId: "intent-1",
     }),
-    /supported contact or deal/
+    /Contact context/
+  );
+});
+
+test("rejects Deal card parameters because Deals have no portable default phone property", () => {
+  assert.throws(
+    () => buildCardCallParameters({
+      objectContext: {
+        objectId: "67890",
+        objectType: "deal",
+      },
+      callTask: "Qualify demo interest.",
+      phoneProperty: "phone",
+      requestId: "intent-1",
+    }),
+    /Contact context/
   );
 });
 

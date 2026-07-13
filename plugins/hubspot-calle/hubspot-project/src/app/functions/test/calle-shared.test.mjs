@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import test from "node:test";
 
@@ -13,10 +14,31 @@ const {
   maskPhoneNumbers,
   readWorkflowInput,
   validateCandidateInput,
-  verifyEndpointToken,
+  verifyHubSpotV3Signature,
 } = require("../calle-shared.js");
 const { main: createCallCandidate } = require("../createCallCandidate.js");
 const { main: startCallFromCard } = require("../startCallFromCard.js");
+
+const HUBSPOT_CLIENT_SECRET = "hubspot-client-secret";
+const HUBSPOT_WORKFLOW_ACTION_URL = "https://example.hs-sites.com/hs/serverless/calle/create-call";
+
+function signedWorkflowContext(body, overrides = {}) {
+  const method = String(overrides.method || "POST").toUpperCase();
+  const uri = overrides.uri || HUBSPOT_WORKFLOW_ACTION_URL;
+  const timestamp = String(overrides.timestamp || Date.now());
+  const signature = createHmac("sha256", HUBSPOT_CLIENT_SECRET)
+    .update(`${method}${uri}${JSON.stringify(body)}${timestamp}`, "utf8")
+    .digest("base64");
+  return {
+    method,
+    body,
+    headers: {
+      "x-hubspot-signature-v3": signature,
+      "x-hubspot-request-timestamp": timestamp,
+      ...(overrides.headers || {}),
+    },
+  };
+}
 
 function restoreEnv(name, value) {
   if (value === undefined) {
@@ -170,11 +192,23 @@ test("blocks records that are not approved for phone contact", () => {
   assert.equal(doNotCall.liveCallAllowed, false);
 });
 
-test("requires a configured matching public endpoint token", () => {
-  assert.equal(verifyEndpointToken("pilot-secret", "pilot-secret"), true);
-  assert.equal(verifyEndpointToken("wrong-secret", "pilot-secret"), false);
-  assert.equal(verifyEndpointToken("", "pilot-secret"), false);
-  assert.equal(verifyEndpointToken("pilot-secret", ""), false);
+test("validates HubSpot v3 workflow signatures and rejects stale or changed requests", () => {
+  const body = { callbackId: "run-1", inputFields: { phone_property: "phone" } };
+  const now = Date.now();
+  const context = signedWorkflowContext(body, { timestamp: now });
+  const request = {
+    headers: context.headers,
+    method: context.method,
+    uri: HUBSPOT_WORKFLOW_ACTION_URL,
+    body,
+    clientSecret: HUBSPOT_CLIENT_SECRET,
+    now,
+  };
+
+  assert.equal(verifyHubSpotV3Signature(request), true);
+  assert.equal(verifyHubSpotV3Signature({ ...request, body: { ...body, callbackId: "changed" } }), false);
+  assert.equal(verifyHubSpotV3Signature({ ...request, clientSecret: "" }), false);
+  assert.equal(verifyHubSpotV3Signature({ ...request, now: now + 300_001 }), false);
 });
 
 test("normalizes HubSpot workflow envelope values for validation", () => {
@@ -190,7 +224,6 @@ test("normalizes HubSpot workflow envelope values for validation", () => {
           source_object_id: "67890",
           phone_property: "phone",
           call_purpose: "Confirm demo request.",
-          endpoint_token: "secret",
         },
       },
     }),
@@ -203,7 +236,6 @@ test("normalizes HubSpot workflow envelope values for validation", () => {
       source_object_id: "67890",
       phone_property: "phone",
       call_purpose: "Confirm demo request.",
-      endpoint_token: "secret",
       portalId: "12345",
       workflowRunId: "run-1",
       inputFields: {
@@ -211,7 +243,6 @@ test("normalizes HubSpot workflow envelope values for validation", () => {
         source_object_id: "67890",
         phone_property: "phone",
         call_purpose: "Confirm demo request.",
-        endpoint_token: "secret",
       },
     }
   );
@@ -223,7 +254,6 @@ test("rejects unsupported HubSpot object types for the serverless pilot", () => 
     source_object_id: "67890",
     phone_property: "phone",
     call_purpose: "Confirm demo request.",
-    endpoint_token: "secret",
   };
   assert.deepEqual(validateCandidateInput({ ...required, source_object_type: "contact" }), []);
   assert.deepEqual(validateCandidateInput({ ...required, source_object_type: "deal" }), []);
@@ -239,7 +269,6 @@ test("reports missing workflow action inputs before direct-call execution", () =
       source_object_id: "67890",
       phone_property: "phone",
       call_purpose: "Confirm demo request.",
-      endpoint_token: "secret",
     }),
     []
   );
@@ -249,7 +278,6 @@ test("reports missing workflow action inputs before direct-call execution", () =
     "missing_source_object_id",
     "missing_phone_property",
     "missing_call_purpose",
-    "missing_endpoint_token",
   ]);
 });
 
@@ -350,13 +378,15 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
-  const originalEndpointToken = process.env.CALLE_WORKFLOW_ENDPOINT_TOKEN;
+  const originalClientSecret = process.env.HUBSPOT_CLIENT_SECRET;
+  const originalActionUrl = process.env.HUBSPOT_WORKFLOW_ACTION_URL;
   const originalPrivateToken = process.env.PRIVATE_APP_ACCESS_TOKEN;
   const requests = [];
 
   process.env.CALL_E_API_KEY = "calle_test_key";
   process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
-  process.env.CALLE_WORKFLOW_ENDPOINT_TOKEN = "endpoint-secret";
+  process.env.HUBSPOT_CLIENT_SECRET = HUBSPOT_CLIENT_SECRET;
+  process.env.HUBSPOT_WORKFLOW_ACTION_URL = HUBSPOT_WORKFLOW_ACTION_URL;
   process.env.PRIVATE_APP_ACCESS_TOKEN = "hubspot-token";
   global.fetch = async (url, options) => {
     requests.push({ url: String(url), options });
@@ -373,22 +403,20 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
   };
 
   try {
-    const response = await createCallCandidate({
-      body: {
-        origin: { portalId: 12345 },
-        callbackId: "run-1",
-        inputFields: {
-          source_object_type: "contact",
-          source_object_id: "67890",
-          phone: "+15555550123",
-          phone_property: "phone",
-          call_purpose: "Call this lead and qualify demo interest.",
-          consent_allowed: "true",
-          do_not_call: "false",
-          endpoint_token: "endpoint-secret",
-        },
+    const body = {
+      origin: { portalId: 12345 },
+      callbackId: "run-1",
+      inputFields: {
+        source_object_type: "contact",
+        source_object_id: "67890",
+        phone: "+15555550123",
+        phone_property: "phone",
+        call_purpose: "Call this lead and qualify demo interest.",
+        consent_allowed: "true",
+        do_not_call: "false",
       },
-    });
+    };
+    const response = await createCallCandidate(signedWorkflowContext(body));
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body.outputFields, {
@@ -409,8 +437,51 @@ test("workflow handler creates a direct CALL-E call without HubSpot CRM writebac
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
     restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
-    restoreEnv("CALLE_WORKFLOW_ENDPOINT_TOKEN", originalEndpointToken);
+    restoreEnv("HUBSPOT_CLIENT_SECRET", originalClientSecret);
+    restoreEnv("HUBSPOT_WORKFLOW_ACTION_URL", originalActionUrl);
     restoreEnv("PRIVATE_APP_ACCESS_TOKEN", originalPrivateToken);
+  }
+});
+
+test("workflow handler rejects invalid HubSpot signatures before provider lookup", async () => {
+  const originalFetch = global.fetch;
+  const originalClientSecret = process.env.HUBSPOT_CLIENT_SECRET;
+  const originalActionUrl = process.env.HUBSPOT_WORKFLOW_ACTION_URL;
+  let fetchCalls = 0;
+
+  process.env.HUBSPOT_CLIENT_SECRET = HUBSPOT_CLIENT_SECRET;
+  process.env.HUBSPOT_WORKFLOW_ACTION_URL = HUBSPOT_WORKFLOW_ACTION_URL;
+  global.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Provider lookup must not run for an invalid HubSpot signature.");
+  };
+
+  try {
+    const body = {
+      origin: { portalId: 12345 },
+      callbackId: "run-1",
+      inputFields: {
+        source_object_type: "contact",
+        source_object_id: "67890",
+        phone: "+15555550123",
+        phone_property: "phone",
+        call_purpose: "Confirm demo request.",
+        consent_allowed: "true",
+        do_not_call: "false",
+      },
+    };
+    const context = signedWorkflowContext(body, {
+      headers: { "x-hubspot-signature-v3": "invalid-signature" },
+    });
+    const response = await createCallCandidate(context);
+
+    assert.equal(response.statusCode, 401);
+    assert.equal(response.body.outputFields.status, "unauthorized");
+    assert.equal(fetchCalls, 0);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("HUBSPOT_CLIENT_SECRET", originalClientSecret);
+    restoreEnv("HUBSPOT_WORKFLOW_ACTION_URL", originalActionUrl);
   }
 });
 
@@ -418,12 +489,14 @@ test("workflow handler fails closed unless consent and DNC are explicit", async 
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
-  const originalEndpointToken = process.env.CALLE_WORKFLOW_ENDPOINT_TOKEN;
+  const originalClientSecret = process.env.HUBSPOT_CLIENT_SECRET;
+  const originalActionUrl = process.env.HUBSPOT_WORKFLOW_ACTION_URL;
   let fetchCalls = 0;
 
   process.env.CALL_E_API_KEY = "calle_test_key";
   process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
-  process.env.CALLE_WORKFLOW_ENDPOINT_TOKEN = "endpoint-secret";
+  process.env.HUBSPOT_CLIENT_SECRET = HUBSPOT_CLIENT_SECRET;
+  process.env.HUBSPOT_WORKFLOW_ACTION_URL = HUBSPOT_WORKFLOW_ACTION_URL;
   global.fetch = async () => {
     fetchCalls += 1;
     return {
@@ -440,19 +513,16 @@ test("workflow handler fails closed unless consent and DNC are explicit", async 
     call_purpose: "Confirm demo request.",
     consent_allowed: true,
     do_not_call: false,
-    endpoint_token: "endpoint-secret",
   };
 
   async function run(overrides, omitted = []) {
     const inputFields = { ...validInput, ...overrides };
     for (const name of omitted) delete inputFields[name];
-    return createCallCandidate({
-      body: {
-        origin: { portalId: 12345 },
-        callbackId: "run-1",
-        inputFields,
-      },
-    });
+    return createCallCandidate(signedWorkflowContext({
+      origin: { portalId: 12345 },
+      callbackId: "run-1",
+      inputFields,
+    }));
   }
 
   try {
@@ -474,7 +544,75 @@ test("workflow handler fails closed unless consent and DNC are explicit", async 
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);
     restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
-    restoreEnv("CALLE_WORKFLOW_ENDPOINT_TOKEN", originalEndpointToken);
+    restoreEnv("HUBSPOT_CLIENT_SECRET", originalClientSecret);
+    restoreEnv("HUBSPOT_WORKFLOW_ACTION_URL", originalActionUrl);
+  }
+});
+
+test("workflow handler preserves CALL-E retry classification and idempotency", async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CALL_E_API_KEY;
+  const originalBaseUrl = process.env.CALL_E_BASE_URL;
+  const originalClientSecret = process.env.HUBSPOT_CLIENT_SECRET;
+  const originalActionUrl = process.env.HUBSPOT_WORKFLOW_ACTION_URL;
+  const idempotencyKeys = [];
+
+  process.env.CALL_E_API_KEY = "calle_test_key";
+  process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
+  process.env.HUBSPOT_CLIENT_SECRET = HUBSPOT_CLIENT_SECRET;
+  process.env.HUBSPOT_WORKFLOW_ACTION_URL = HUBSPOT_WORKFLOW_ACTION_URL;
+  const body = {
+    origin: { portalId: 12345 },
+    callbackId: "run-retry-1",
+    inputFields: {
+      source_object_type: "contact",
+      source_object_id: "67890",
+      phone: "+15555550123",
+      phone_property: "phone",
+      call_purpose: "Confirm demo request.",
+      consent_allowed: "true",
+      do_not_call: "false",
+    },
+  };
+
+  try {
+    global.fetch = async (_url, options) => {
+      idempotencyKeys.push(options.headers["idempotency-key"]);
+      return {
+        ok: false,
+        status: 429,
+        text: async () => JSON.stringify({
+          code: "rate_limit_exceeded",
+          message: "Retry this CALL-E request.",
+        }),
+      };
+    };
+    const retryable = await createCallCandidate(signedWorkflowContext(body));
+    assert.equal(retryable.statusCode, 429);
+    assert.equal(retryable.body.outputFields.status, "rate_limit_exceeded");
+
+    global.fetch = async (_url, options) => {
+      idempotencyKeys.push(options.headers["idempotency-key"]);
+      return {
+        ok: false,
+        status: 422,
+        text: async () => JSON.stringify({
+          code: "invalid_request",
+          message: "The CALL-E request is invalid.",
+        }),
+      };
+    };
+    const deterministic = await createCallCandidate(signedWorkflowContext(body));
+    assert.equal(deterministic.statusCode, 422);
+    assert.equal(deterministic.body.outputFields.status, "invalid_request");
+    assert.equal(idempotencyKeys.length, 2);
+    assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("CALL_E_API_KEY", originalApiKey);
+    restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
+    restoreEnv("HUBSPOT_CLIENT_SECRET", originalClientSecret);
+    restoreEnv("HUBSPOT_WORKFLOW_ACTION_URL", originalActionUrl);
   }
 });
 
@@ -602,7 +740,7 @@ test("card handler rejects unsupported phone properties before provider lookup",
   }
 });
 
-test("card handler trusts accountId and selected propertiesToSend value", async () => {
+test("card handler trusts accountId and selected Contact propertiesToSend value", async () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CALL_E_API_KEY;
   const originalBaseUrl = process.env.CALL_E_BASE_URL;
@@ -623,7 +761,7 @@ test("card handler trusts accountId and selected propertiesToSend value", async 
       accountId: "trusted-portal",
       parameters: {
         portal_id: "client-portal",
-        source_object_type: "deal",
+        source_object_type: "contact",
         source_object_id: "trusted-record",
         phone_property: "mobilephone",
         call_task: "Qualify demo interest.",
@@ -636,13 +774,13 @@ test("card handler trusts accountId and selected propertiesToSend value", async 
     assert.equal(response.statusCode, 200);
     assert.equal(
       requests[0].options.headers["idempotency-key"],
-      "hubspot-calle:trusted-portal:deal:trusted-record:intent-1"
+      "hubspot-calle:trusted-portal:contact:trusted-record:intent-1"
     );
     assert.deepEqual(JSON.parse(requests[0].options.body).metadata, {
       source_platform: "hubspot",
       source_entrypoint: "app_card",
       portal_id: "trusted-portal",
-      source_object_type: "deal",
+      source_object_type: "contact",
       source_object_id: "trusted-record",
       phone_property: "mobilephone",
     });
@@ -865,7 +1003,7 @@ test("card handler marks network, response-read, and response-parse failures amb
       global.fetch = fetchImplementation;
       const response = await startCallFromCard(baseContext);
 
-      assert.equal(response.statusCode, 502);
+      assert.equal(response.statusCode, 200);
       assert.equal(response.body.success, false);
       assert.equal(response.body.retry_same_intent, true);
       assert.equal(response.body.masked_phone, "[phone]");
@@ -887,7 +1025,10 @@ test("card handler marks parsed provider rejection deterministic", async () => {
   global.fetch = async () => ({
     ok: false,
     status: 422,
-    text: async () => JSON.stringify({ message: "Provider rejected the request." }),
+    text: async () => JSON.stringify({
+      code: "invalid_request",
+      message: "Provider rejected the request.",
+    }),
   });
 
   try {
@@ -904,10 +1045,59 @@ test("card handler marks parsed provider rejection deterministic", async () => {
       propertiesToSend: { phone: "+15555550123", mobilephone: "" },
     });
 
-    assert.equal(response.statusCode, 502);
+    assert.equal(response.statusCode, 200);
     assert.equal(response.body.success, false);
     assert.equal(response.body.retry_same_intent, false);
+    assert.equal(response.body.status, "invalid_request");
     assert.match(response.body.error, /Provider rejected/);
+  } finally {
+    global.fetch = originalFetch;
+    restoreEnv("CALL_E_API_KEY", originalApiKey);
+    restoreEnv("CALL_E_BASE_URL", originalBaseUrl);
+  }
+});
+
+test("card handler preserves retryable CALL-E provider outcomes for the same intent", async () => {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CALL_E_API_KEY;
+  const originalBaseUrl = process.env.CALL_E_BASE_URL;
+  const idempotencyKeys = [];
+  process.env.CALL_E_API_KEY = "calle_test_key";
+  process.env.CALL_E_BASE_URL = "https://api.heycall-e.com";
+  global.fetch = async (_url, options) => {
+    idempotencyKeys.push(options.headers["idempotency-key"]);
+    return {
+      ok: false,
+      status: 503,
+      text: async () => JSON.stringify({
+        code: "provider_unavailable",
+        message: "CALL-E provider unavailable.",
+      }),
+    };
+  };
+  const context = {
+    accountId: "12345",
+    parameters: {
+      source_object_id: "67890",
+      source_object_type: "contact",
+      phone_property: "phone",
+      call_task: "Qualify demo interest.",
+      request_id: "intent-retry-1",
+      confirmed: true,
+    },
+    propertiesToSend: { phone: "+15555550123", mobilephone: "" },
+  };
+
+  try {
+    const first = await startCallFromCard(context);
+    const second = await startCallFromCard(context);
+
+    assert.equal(first.statusCode, 200);
+    assert.equal(first.body.status, "provider_unavailable");
+    assert.equal(first.body.retry_same_intent, true);
+    assert.equal(second.body.retry_same_intent, true);
+    assert.equal(idempotencyKeys.length, 2);
+    assert.equal(idempotencyKeys[0], idempotencyKeys[1]);
   } finally {
     global.fetch = originalFetch;
     restoreEnv("CALL_E_API_KEY", originalApiKey);

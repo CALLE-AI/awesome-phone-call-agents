@@ -120,17 +120,6 @@
           "STATIC_VALUE"
         ],
         "isRequired": true
-      },
-      {
-        "typeDefinition": {
-          "name": "endpoint_token",
-          "type": "string",
-          "fieldType": "text"
-        },
-        "supportedValueTypes": [
-          "STATIC_VALUE"
-        ],
-        "isRequired": true
       }
     ],
     "outputFields": [
@@ -176,8 +165,7 @@
           "phone_property": "Phone property name",
           "call_purpose": "Call task",
           "consent_allowed": "Phone contact allowed",
-          "do_not_call": "Do not call",
-          "endpoint_token": "Private pilot endpoint token"
+          "do_not_call": "Do not call"
         },
         "inputFieldDescriptions": {
           "source_object_type": "HubSpot object type used for CALL-E metadata.",
@@ -186,8 +174,7 @@
           "phone_property": "Name of the property used for phone lookup, such as phone or mobilephone.",
           "call_purpose": "Natural-language CALL-E task. The workflow action creates the CALL-E call task immediately after validation.",
           "consent_allowed": "Select Yes only when phone contact is allowed for this workflow.",
-          "do_not_call": "Select Yes to skip records that must not be called.",
-          "endpoint_token": "Static token that must match the CALLE_WORKFLOW_ENDPOINT_TOKEN HubSpot secret for this private pilot endpoint."
+          "do_not_call": "Select Yes to skip records that must not be called."
         },
         "outputFieldLabels": {
           "call_id": "CALL-E call ID",

@@ -10,9 +10,10 @@
       ]
     },
     "secretKeys": [
-      "CALLE_WORKFLOW_ENDPOINT_TOKEN",
       "CALL_E_API_KEY",
-      "CALL_E_BASE_URL"
+      "CALL_E_BASE_URL",
+      "HUBSPOT_CLIENT_SECRET",
+      "HUBSPOT_WORKFLOW_ACTION_URL"
     ]
   }
 }

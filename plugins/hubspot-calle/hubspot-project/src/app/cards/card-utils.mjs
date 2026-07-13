@@ -5,7 +5,6 @@ export const PHONE_PROPERTY_OPTIONS = [
 
 const CRM_OBJECT_TYPES = {
   "0-1": "contact",
-  "0-3": "deal",
 };
 
 export function readObjectContext(context = {}) {
@@ -19,8 +18,8 @@ export function readObjectContext(context = {}) {
 
 export function buildCardCallParameters({ objectContext, callTask, phoneProperty, requestId }) {
   const objectType = String(objectContext.objectType || "").trim();
-  if (objectType !== "contact" && objectType !== "deal") {
-    throw new Error("The App Card requires a supported contact or deal context.");
+  if (objectType !== "contact") {
+    throw new Error("The App Card requires a Contact context.");
   }
   return {
     source_object_id: objectContext.objectId,

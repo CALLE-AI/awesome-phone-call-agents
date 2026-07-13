@@ -7,8 +7,7 @@
     "entrypoint": "/app/cards/CallCandidateCard.jsx",
     "location": "crm.record.sidebar",
     "objectTypes": [
-      "CONTACT",
-      "DEAL"
+      "CONTACT"
     ]
   }
 }

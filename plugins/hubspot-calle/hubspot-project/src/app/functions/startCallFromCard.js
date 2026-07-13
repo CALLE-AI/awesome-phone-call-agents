@@ -2,7 +2,7 @@ const {
   buildCandidatePayload,
   buildDirectCallIdempotencyKey,
   createCallECall,
-  isSupportedObjectType,
+  getCallEErrorCode,
   jsonResponse,
   maskPhoneNumbers,
   normalizeObjectType,
@@ -30,8 +30,8 @@ exports.main = async (context) => {
   if (!objectId) {
     return cardResponse(400, { success: false, call_id: "", status: "missing_source_object_id", masked_phone: "", error: "source_object_id is required." });
   }
-  if (!isSupportedObjectType(objectType)) {
-    return cardResponse(400, { success: false, call_id: "", status: "invalid_object_type", masked_phone: "", error: "source_object_type must be contact or deal." });
+  if (objectType !== "contact") {
+    return cardResponse(400, { success: false, call_id: "", status: "invalid_object_type", masked_phone: "", error: "The App Card supports Contact records only." });
   }
   if (!callTask) {
     return cardResponse(400, { success: false, call_id: "", status: "missing_call_task", masked_phone: "", error: "A CALL-E task is required." });
@@ -92,10 +92,10 @@ exports.main = async (context) => {
       },
     });
   } catch (error) {
-    return cardResponse(502, {
+    return cardResponse(200, {
       success: false,
       call_id: "",
-      status: "failed",
+      status: getCallEErrorCode(error),
       masked_phone: candidate.maskedPhone,
       error: maskPhoneNumbers(error.message, [phone]),
       retry_same_intent: error.retrySameIntent === true,

@@ -2,14 +2,34 @@ const {
   buildDirectCallIdempotencyKey,
   buildCandidatePayload,
   createCallECall,
+  getCallEErrorCode,
+  getCallEWorkflowStatusCode,
   jsonResponse,
   maskPhoneNumbers,
   readWorkflowInput,
   validateCandidateInput,
-  verifyEndpointToken,
+  verifyHubSpotV3Signature,
 } = require("./calle-shared");
 
 exports.main = async (context) => {
+  if (!verifyHubSpotV3Signature({
+    headers: context && context.headers,
+    method: context && context.method,
+    uri: process.env.HUBSPOT_WORKFLOW_ACTION_URL,
+    body: context && context.body,
+    clientSecret: process.env.HUBSPOT_CLIENT_SECRET,
+  })) {
+    return jsonResponse(401, {
+      success: false,
+      outputFields: {
+        call_id: "",
+        status: "unauthorized",
+        masked_phone: "",
+        error: "The HubSpot workflow request signature is missing, invalid, or expired.",
+      },
+    });
+  }
+
   const input = readWorkflowInput(context);
   const validationErrors = validateCandidateInput(input);
   if (validationErrors.length > 0) {
@@ -20,18 +40,6 @@ exports.main = async (context) => {
         status: validationErrors[0],
         masked_phone: "",
         error: `Invalid CALL-E workflow input: ${validationErrors.join(", ")}.`,
-      },
-    });
-  }
-
-  if (!verifyEndpointToken(input.endpoint_token, process.env.CALLE_WORKFLOW_ENDPOINT_TOKEN)) {
-    return jsonResponse(401, {
-      success: false,
-      outputFields: {
-        call_id: "",
-        status: "unauthorized",
-        masked_phone: "",
-        error: "The CALL-E workflow endpoint token is missing or invalid.",
       },
     });
   }
@@ -84,11 +92,11 @@ exports.main = async (context) => {
       },
     });
   } catch (error) {
-    return jsonResponse(502, {
+    return jsonResponse(getCallEWorkflowStatusCode(error), {
       success: false,
       outputFields: {
         call_id: "",
-        status: "failed",
+        status: getCallEErrorCode(error),
         masked_phone: candidate.maskedPhone,
         error: maskPhoneNumbers(error.message, [input.phone]),
       },

@@ -1,7 +1,29 @@
+const { createHmac, timingSafeEqual } = require("node:crypto");
+
 const DEFAULT_CALL_E_BASE_URL = "https://api.heycall-e.com";
 const PHONE_MASK = "[phone]";
 const HIGH_STAKES_SAFETY_INSTRUCTION = "This safety instruction is fixed and cannot be overridden by the call task: Do not provide medical, legal, financial, or emergency advice. For these topics, limit the call to logistics and routing to an appropriate human or emergency service.";
 const SUPPORTED_OBJECT_TYPES = new Set(["contact", "deal"]);
+const RETRYABLE_CALL_E_CODES = new Set([
+  "rate_limit_exceeded",
+  "provider_unavailable",
+  "internal_error",
+]);
+const HUBSPOT_SIGNATURE_MAX_AGE_MS = 300_000;
+const HUBSPOT_V3_URI_DECODE_MAP = new Map([
+  ["%3A", ":"],
+  ["%2F", "/"],
+  ["%3F", "?"],
+  ["%40", "@"],
+  ["%21", "!"],
+  ["%24", "$"],
+  ["%27", "'"],
+  ["%28", "("],
+  ["%29", ")"],
+  ["%2A", "*"],
+  ["%2C", ","],
+  ["%3B", ";"],
+]);
 const E164_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
 function isNormalizedE164Phone(value) {
@@ -52,8 +74,62 @@ function buildDirectCallIdempotencyKey({ portalId, objectType, objectId, workflo
     .join(":");
 }
 
-function verifyEndpointToken(providedToken, expectedToken) {
-  return Boolean(providedToken && expectedToken && String(providedToken) === String(expectedToken));
+function readHeader(headers, name) {
+  const expected = String(name).toLowerCase();
+  for (const [headerName, value] of Object.entries(headers || {})) {
+    if (String(headerName).toLowerCase() === expected) return String(value || "").trim();
+  }
+  return "";
+}
+
+function decodeHubSpotV3Uri(uri) {
+  return String(uri || "").replace(/%(?:3A|2F|3F|40|21|24|27|28|29|2A|2C|3B)/gi, (encoded) =>
+    HUBSPOT_V3_URI_DECODE_MAP.get(encoded.toUpperCase())
+  );
+}
+
+function verifyHubSpotV3Signature({
+  headers,
+  method,
+  uri,
+  body,
+  clientSecret,
+  now = Date.now(),
+}) {
+  const signature = readHeader(headers, "x-hubspot-signature-v3");
+  const timestampText = readHeader(headers, "x-hubspot-request-timestamp");
+  const requestMethod = String(method || "").trim().toUpperCase();
+  const requestUri = decodeHubSpotV3Uri(uri);
+  const secret = String(clientSecret || "");
+  if (!signature || !/^\d+$/.test(timestampText) || !requestMethod || !requestUri || !secret) {
+    return false;
+  }
+
+  const timestamp = Number(timestampText);
+  const currentTime = Number(now);
+  if (
+    !Number.isSafeInteger(timestamp)
+    || !Number.isFinite(currentTime)
+    || Math.abs(currentTime - timestamp) > HUBSPOT_SIGNATURE_MAX_AGE_MS
+  ) {
+    return false;
+  }
+
+  let bodyText;
+  try {
+    bodyText = body === null || body === undefined
+      ? ""
+      : typeof body === "string"
+        ? body
+        : JSON.stringify(body);
+  } catch {
+    return false;
+  }
+  const source = `${requestMethod}${requestUri}${bodyText}${timestampText}`;
+  const expected = createHmac("sha256", secret).update(source, "utf8").digest("base64");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(signature, "utf8");
+  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
 function safeError(code, message) {
@@ -75,7 +151,6 @@ function validateCandidateInput(input) {
   const objectId = String(input.source_object_id || input.objectId || "").trim();
   const phoneProperty = String(input.phone_property || input.phoneProperty || "").trim();
   const callPurpose = String(input.call_task || input.call_purpose || input.callPurpose || "").trim();
-  const endpointToken = String(input.endpoint_token || input.endpointToken || "").trim();
 
   if (!portalId) {
     errors.push("missing_portal_id");
@@ -94,10 +169,6 @@ function validateCandidateInput(input) {
   if (!callPurpose) {
     errors.push("missing_call_purpose");
   }
-  if (!endpointToken) {
-    errors.push("missing_endpoint_token");
-  }
-
   return errors;
 }
 
@@ -178,8 +249,60 @@ function getCallEBaseUrl() {
 
 function ambiguousCallEError(stage) {
   const error = new Error(`CALL-E create call outcome is unknown after ${stage}. Retry the same intent.`);
+  error.providerCode = "ambiguous_outcome";
+  error.providerStatus = 0;
   error.retrySameIntent = true;
   return error;
+}
+
+function readCallEProviderCode(responseBody, status) {
+  const nestedError = responseBody && typeof responseBody.error === "object"
+    ? responseBody.error
+    : {};
+  return String(
+    responseBody?.code
+    || nestedError.code
+    || (typeof responseBody?.error === "string" ? responseBody.error : "")
+    || `http_${status}`
+  ).trim();
+}
+
+function readCallEProviderMessage(responseBody, status) {
+  const nestedError = responseBody && typeof responseBody.error === "object"
+    ? responseBody.error
+    : {};
+  return String(
+    responseBody?.message
+    || nestedError.message
+    || `CALL-E create call failed with ${status}.`
+  );
+}
+
+function callEProviderError(response, responseBody, suppliedPhone) {
+  const status = Number(response.status) || 0;
+  const providerCode = readCallEProviderCode(responseBody, status);
+  const error = new Error(maskPhoneNumbers(
+    readCallEProviderMessage(responseBody, status),
+    [suppliedPhone]
+  ));
+  error.providerCode = providerCode;
+  error.providerStatus = status;
+  error.retrySameIntent = status === 429
+    || status >= 500
+    || RETRYABLE_CALL_E_CODES.has(providerCode);
+  return error;
+}
+
+function getCallEErrorCode(error) {
+  return String((error && error.providerCode) || "failed").trim() || "failed";
+}
+
+function getCallEWorkflowStatusCode(error) {
+  const providerStatus = Number(error && error.providerStatus);
+  if (Number.isInteger(providerStatus) && providerStatus >= 400 && providerStatus <= 599) {
+    return providerStatus;
+  }
+  return error && error.retrySameIntent === true ? 503 : 400;
 }
 
 async function createCallECall({
@@ -247,10 +370,7 @@ async function createCallECall({
     throw ambiguousCallEError("a response-parse error");
   }
   if (!response.ok) {
-    throw new Error(maskPhoneNumbers(
-      responseBody.message || `CALL-E create call failed with ${response.status}.`,
-      [normalizedPhone]
-    ));
+    throw callEProviderError(response, responseBody, normalizedPhone);
   }
   return responseBody;
 }
@@ -262,6 +382,8 @@ module.exports = {
   buildDirectCallIdempotencyKey,
   buildIdempotencyKey,
   createCallECall,
+  getCallEErrorCode,
+  getCallEWorkflowStatusCode,
   isE164Phone,
   isSupportedObjectType,
   jsonResponse,
@@ -269,5 +391,5 @@ module.exports = {
   normalizeObjectType,
   readWorkflowInput,
   validateCandidateInput,
-  verifyEndpointToken,
+  verifyHubSpotV3Signature,
 };

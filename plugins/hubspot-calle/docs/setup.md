@@ -9,9 +9,10 @@ Administrators who want an approval-gated operator flow can use the [Administrat
 - HubSpot CLI `8.4.0` or newer, authenticated with a deployer's personal access key that can upload developer projects and read or write serverless secrets for the target standard account.
 - Content Hub Enterprise for the public serverless endpoint used by the workflow action.
 - A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Use the official [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for request and response contracts. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
-- Administrator access to install or reinstall the static app and customize Contact or Deal record layouts.
+- Administrator access to install or reinstall the static app and customize Contact record layouts.
+- The HubSpot App Client Secret from `Development -> Projects -> hubspot-calle -> CALL-E for HubSpot -> Auth`. Enter it only through hidden local terminal input, never in Agent chat or command arguments.
 
-The installed static app's scopes are separate from CLI deployment permissions. Its only scopes in `hubspot-project/src/app/app-hsmeta.json` are `crm.objects.contacts.read` and `crm.objects.deals.read`, providing read-only access to contacts and deals.
+The installed static app's scopes are separate from CLI deployment permissions. Its only scope in `hubspot-project/src/app/app-hsmeta.json` is `crm.objects.contacts.read`, providing read-only access to Contact properties used by the App Cards.
 
 ## Deploy Or Recover
 
@@ -27,32 +28,18 @@ Use a hidden shell prompt so the API key does not enter shell history. `CALL_E_B
 
 ```bash
 cd plugins/hubspot-calle
-read -s CALL_E_API_KEY
+read -r -s CALL_E_API_KEY
 export CALL_E_API_KEY
+read -r -s HUBSPOT_CLIENT_SECRET
+export HUBSPOT_CLIENT_SECRET
 node scripts/install-direct-call.mjs \
   --account <configured-standard-account> \
   --endpoint-host <hubspot-account-id>.hs-sites.com \
   --set-secrets-from-env
-unset CALL_E_API_KEY
+unset CALL_E_API_KEY HUBSPOT_CLIENT_SECRET
 ```
 
 The installer validates the local Node.js version, detected HubSpot CLI version, and requested account before local metadata or remote mutation, configures the account-specific action URL, writes secrets when requested, builds, validates, uploads, and reports `installed`, `reinstall_required`, `manual_install_required`, or `upload_skipped`.
-
-If the remote `CALLE_WORKFLOW_ENDPOINT_TOKEN` secret does not yet exist, the installer may generate it for a first installation and print it once before mutation. Store it with administrator secrets. On a redeploy, the installer refuses to generate a replacement token: prompt for the saved administrator-managed value, or explicitly coordinate rotation before using a new value.
-
-Human or other administrator-controlled manual terminal runs may use that installer-generated one-time token path, but the administrator must save the token immediately. Agent-assisted runs intentionally must not use installer generation because tool output may be retained; they must pre-create and store `CALLE_WORKFLOW_ENDPOINT_TOKEN`, then supply it through the hidden same-session path in the [Administrator Agent Prompt](./admin-agent-prompt.md). This stricter Agent safety path does not change installer behavior.
-
-```bash
-read -s CALL_E_API_KEY
-export CALL_E_API_KEY
-read -s CALLE_WORKFLOW_ENDPOINT_TOKEN
-export CALLE_WORKFLOW_ENDPOINT_TOKEN
-node scripts/install-direct-call.mjs \
-  --account <configured-standard-account> \
-  --endpoint-host <hubspot-account-id>.hs-sites.com \
-  --set-secrets-from-env
-unset CALL_E_API_KEY CALLE_WORKFLOW_ENDPOINT_TOKEN
-```
 
 Without `--set-secrets-from-env`, the installer verifies that all required secrets exist and fails before mutation if any are absent. `--skip-secrets` intentionally skips that check and all secret writes; use it only after independently checking remote secret configuration.
 
@@ -75,11 +62,12 @@ The installer updates `src/app/workflow-actions/create-call-candidate-hsmeta.jso
 
 The serverless functions use these HubSpot secrets:
 
-- `CALLE_WORKFLOW_ENDPOINT_TOKEN`
 - `CALL_E_API_KEY`
 - `CALL_E_BASE_URL`
+- `HUBSPOT_CLIENT_SECRET`
+- `HUBSPOT_WORKFLOW_ACTION_URL`
 
-Do not put those values in CRM records, workflow documentation, client-side code, or repository files. Only an administrator configures the endpoint token in the workflow action; ordinary users do not receive or enter it.
+Do not put those values in CRM records, workflow documentation, client-side code, or repository files. The installer stores the exact configured endpoint URL server-side and the public function validates HubSpot's v3 signature and timestamp before it reads the action input. Ordinary users do not receive or enter any workflow credential.
 
 ## Local Tests And Manual Verification
 
@@ -97,11 +85,11 @@ Before broader enrollment:
 3. Confirm the action creates no request unless `Phone contact allowed` is explicitly `Yes` and `Do not call` is explicitly `No`. These selections are static configuration, not per-record CRM checks, so enrollment filters must still exclude records without phone-contact consent and records marked do-not-call.
 4. Confirm one eligible record returns `call_id`, `status`, `masked_phone`, and `error` without exposing secrets.
 5. Replay the same workflow run and confirm idempotency prevents a duplicate task.
-6. Confirm both App Cards require confirmation before creating a task and that the standard installed app is available from the App Card library.
+6. Confirm both Contact App Cards require confirmation before creating a task and that the standard installed app is available from the App Card library.
 7. Confirm every CALL-E task begins with the fixed high-stakes instruction before the user-provided task.
 
 ## Rollback And Accepted Calls
 
-To prevent new calls, disable active workflows, remove the action from active workflows, and rotate or remove `CALL_E_API_KEY`. Rotate `CALLE_WORKFLOW_ENDPOINT_TOKEN` to block new public-endpoint requests, then update the administrator-configured workflow token before re-enabling a workflow. Remove App Cards from record layouts or uninstall the static app when the integration is no longer needed.
+To prevent new calls, disable active workflows, remove the action from active workflows, and rotate or remove `CALL_E_API_KEY`. Rotate the HubSpot App Client Secret, update `HUBSPOT_CLIENT_SECRET` through the installer, and redeploy before re-enabling workflows. Remove App Cards from record layouts or uninstall the static app when the integration is no longer needed.
 
 These actions do not cancel a call that CALL-E already accepted. Card confirmation `Cancel` prevents only the pending submission. Use CALL-E-supported dashboard or API controls for queued or running calls; this integration does not define a cancellation endpoint.
