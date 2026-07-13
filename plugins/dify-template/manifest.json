@@ -1,0 +1,32 @@
+{
+  "name": "dify-template",
+  "title": "Dify CALL-E workflow template",
+  "platform": "Dify",
+  "type": "workflow-template",
+  "description": "Importable Dify workflow DSL that validates one authorized CALL-E phone task, supports dry-run preview, creates one live call only when requested, polls for completion, and returns a masked human-readable status and summary report.",
+  "entrypoints": [
+    {
+      "name": "CALL-E one-shot call tool",
+      "path": "examples/call-e-dify-workflow.dsl.yaml"
+    }
+  ],
+  "side_effects": [
+    "Creates one outbound phone call when dry_run=false, a valid CALL-E API key is configured, an authorized E.164 phone number is provided, and GET /health returns a 2xx status code.",
+    "Checks CALL-E API connectivity with GET /health during dry-run and live runs."
+  ],
+  "credentials": [
+    "CALL-E API key stored as the Dify secret environment variable CALL_E_API_KEY before execution."
+  ],
+  "safety": [
+    "Requires explicit dry_run=false before creating a live call.",
+    "Requires E.164 phone numbers.",
+    "Blocks live-call creation when the CALL-E health check returns a non-2xx status code.",
+    "Prepends non-overridable phone-call safety boundaries before custom task text reaches CALL-E.",
+    "Uses a stable idempotency key derived from request_id and call inputs for replay safety.",
+    "Reports a 2xx create response without a recognized call ID as unknown and possibly created, and requires replay or reconciliation with the same idempotency key.",
+    "Reports indeterminate create transport and force-failed HTTP outcomes as unknown and possibly created, and preserves the original idempotency key for reconciliation.",
+    "Masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses, in summaries and raw result output.",
+    "Does not create recurring schedules."
+  ],
+  "template_version": "0.6.1"
+}

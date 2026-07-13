@@ -1,0 +1,2911 @@
+---
+app:
+  description: One-shot CALL-E outbound call workflow. It validates one authorized
+    phone/task pair, checks CALL-E API connectivity, supports dry run mode, creates
+    one live CALL-E call only when dry_run=false, waits before one result lookup,
+    parses masked output, and returns a user-facing report.
+  icon: "☎️"
+  icon_background: "#E6F4FF"
+  mode: workflow
+  name: CALL-E One-shot Call Tool
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: CALL-E API key for Bearer authentication. Set this in Dify as
+      a secret before running the workflow.
+    id: 95f1a0df-0a97-4b69-bd0d-0ca11e0a0001
+    name: CALL_E_API_KEY
+    selector:
+    - env
+    - CALL_E_API_KEY
+    value: ''
+    value_type: secret
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    nodes:
+    - data:
+        desc: Set the CALL_E_API_KEY secret environment variable, then fill one
+          phone_number and one task. Keep dry_run=true to preview and check API
+          connectivity only. Switch dry_run=false only when you want one live call.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - variable: base_url
+          label: CALL-E API base URL (host only; no /v1)
+          type: text-input
+          required: true
+          default: https://api.heycall-e.com
+        - variable: dry_run
+          label: Dry run? true checks connectivity only
+          type: select
+          required: true
+          options:
+          - 'true'
+          - 'false'
+          default: 'true'
+        - variable: request_id
+          label: Replay-safe request ID
+          type: text-input
+          required: true
+          default: ''
+        - variable: phone_number
+          label: Phone number to call (E.164)
+          type: text-input
+          required: true
+          default: ''
+        - variable: task
+          label: CALL-E task
+          type: paragraph
+          required: true
+          max_length: 4000
+          default: Call this owned or explicitly authorized number. Follow the user's
+            task exactly. Do not request or enter personal data, authenticate, make
+            purchases, open cases, or take irreversible actions unless the user has
+            explicitly authorized that behavior in this task. Keep the call concise
+            and summarize the outcome, key points, issues, and recommended next action.
+      height: 260
+      id: start
+      position:
+        x: 80
+        y: 320
+      positionAbsolute:
+        x: 80
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: |-
+          Converts the Start inputs into one normalized CALL-E task.
+          This is the safety gate: it stops the run before HTTP requests if required fields are missing or placeholders are still present.
+        selected: false
+        title: Prepare one-shot call
+        type: code
+        code_language: python3
+        code: |
+          import json
+          import re
+          import time
+          from urllib.parse import urlparse
+
+          TERMINAL_STATUSES = {
+              "completed", "failed", "canceled", "cancelled",
+              "no_answer", "declined", "voicemail", "busy", "expired"
+          }
+
+          TRUSTED_BASE_URLS = {
+              "https://api.heycall-e.com",
+              # Add CALL-E-managed test hosts here before running non-production workflows.
+          }
+          PLACEHOLDER_PHONES = {"+15555550101", "+15555550102", "+15555550123", "+14155550123"}
+          E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+          REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{8,120}$")
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
+
+          def normalize_trusted_base_url(value) -> str:
+              raw = str(value or "https://api.heycall-e.com").strip().rstrip("/")
+              if raw.endswith("/v1"):
+                  raw = raw[:-3].rstrip("/")
+              parsed = urlparse(raw)
+              if parsed.scheme.lower() != "https":
+                  raise ValueError("CALL-E base_url must use https.")
+              if parsed.params or parsed.query or parsed.fragment:
+                  raise ValueError("CALL-E base_url must not include parameters, query strings, or fragments.")
+              if parsed.path not in {"", "/"}:
+                  raise ValueError("CALL-E base_url must be a host URL only; do not include a path except /v1.")
+              normalized = f"https://{parsed.netloc.lower()}".rstrip("/")
+              if normalized not in TRUSTED_BASE_URLS:
+                  raise ValueError("CALL-E base_url must be a trusted CALL-E API host. Use https://api.heycall-e.com or add a CALL-E-managed test host to the workflow allowlist.")
+              return normalized
+
+          def mask_phone(phone: str) -> str:
+              value = str(phone or "").strip()
+              if not value:
+                  return ""
+              if len(value) <= 5:
+                  return "****"
+              return value[:3] + "****" + value[-2:]
+
+          def mask_phone_like(value: str) -> str:
+              raw = str(value or "").strip()
+              digits = re.sub(r"\D", "", raw)
+              if not digits:
+                  return ""
+              if len(digits) <= 5:
+                  return "****"
+              if raw.startswith("+"):
+                  return "+" + digits[:2] + "****" + digits[-2:]
+              return digits[:3] + "****" + digits[-2:]
+
+          def redact_phone_text(value: str) -> str:
+              text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or ""))
+              text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+              return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+
+          def redact_phone_values(value):
+              if isinstance(value, str):
+                  return redact_phone_text(value)
+              if isinstance(value, list):
+                  return [redact_phone_values(v) for v in value]
+              if isinstance(value, dict):
+                  return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
+              return value
+
+          def parse_dry_run(value) -> bool:
+              normalized = str(value or "").strip()
+              if normalized == "true":
+                  return True
+              if normalized == "false":
+                  return False
+              raise ValueError("dry_run must be either true or false. Use false only when you intend to create one live outbound call.")
+
+          def validation_response(base_url: str, dry_run_enabled: bool, message: str) -> dict:
+              poll_interval_seconds = 20
+              wait_timeout_minutes = 15
+              return {
+                  "base_url": base_url,
+                  "dry_run": "true" if dry_run_enabled else "false",
+                  "poll_interval_seconds": poll_interval_seconds,
+                  "wait_timeout_minutes": wait_timeout_minutes,
+                  "max_poll_count": int((wait_timeout_minutes * 60) / poll_interval_seconds),
+                  "call_tasks": [],
+                  "preview_tasks": [],
+                  "task_count": 0,
+                  "live_task_count": 0,
+                  "validation_error": message,
+                  "preview_json": json.dumps({
+                      "dryRun": dry_run_enabled,
+                      "willCreateLiveCalls": False,
+                      "connectivityCheck": f"{base_url}/health",
+                      "liveCreateEndpoint": f"{base_url}/v1/calls",
+                      "liveResultLookup": {
+                          "endpoint": f"{base_url}/v1/calls/{{id}}",
+                          "pollIntervalSeconds": poll_interval_seconds,
+                          "timeoutMinutes": wait_timeout_minutes,
+                      },
+                      "tasks": [],
+                      "validationError": message,
+                  }, ensure_ascii=False, indent=2),
+              }
+
+          def main(base_url: str, dry_run: str, request_id: str, phone_number: str, task: str) -> dict:
+              base_url = normalize_trusted_base_url(base_url)
+              dry_run_enabled = parse_dry_run(dry_run)
+              request_id = str(request_id or "").strip()
+              default_phone = str(phone_number or "").strip()
+              default_task = str(task or "").strip()
+              poll_interval_seconds = 20
+              wait_timeout_minutes = 15
+
+              if not request_id:
+                  return validation_response(base_url, dry_run_enabled, "Fill request_id with a stable unique value for this intended call. Reuse it only when replaying the same call after an ambiguous create result.")
+              if not REQUEST_ID_RE.match(request_id):
+                  return validation_response(base_url, dry_run_enabled, "request_id must be 8-120 characters using letters, numbers, dot, underscore, colon, or hyphen.")
+              if not default_phone or not default_task:
+                  return validation_response(base_url, dry_run_enabled, "Fill both phone_number and task for this one-shot call.")
+              if default_phone and not E164_RE.match(default_phone):
+                  raise ValueError("phone_number must be in E.164 format, for example +15555550123.")
+              if not dry_run_enabled and default_phone in PLACEHOLDER_PHONES:
+                  raise ValueError("Replace the placeholder phone_number with a number you own or are explicitly authorized to call before running live calls.")
+
+              call_tasks = [{
+                  "callItemId": "call_001",
+                  "requestId": request_id,
+                  "callName": "One-shot outbound call",
+                  "phone": default_phone,
+                  "task": default_task,
+                  "metadata": {},
+              }]
+
+              normalized = []
+              for index, task in enumerate(call_tasks):
+                  if not isinstance(task, dict):
+                      raise ValueError(f"Call task at index {index} must be an object.")
+                  phone = default_phone
+                  call_item_id = str(task.get("callItemId") or f"call_{index + 1}")
+                  if not E164_RE.match(phone):
+                      raise ValueError(f"Fill phone_number for {call_item_id} using E.164 format, for example +15555550123.")
+                  if not dry_run_enabled and phone in PLACEHOLDER_PHONES:
+                      raise ValueError(f"Replace the placeholder phone number for {call_item_id} with a number you own or are explicitly authorized to call before running live calls.")
+                  task_text = default_task
+                  if not task_text:
+                      raise ValueError(f"Fill task for {call_item_id}.")
+                  normalized.append({
+                      "callItemId": call_item_id,
+                      "requestId": str(task.get("requestId") or request_id),
+                      "callName": task.get("callName") or task.get("ivrName") or call_item_id,
+                      "phone": phone,
+                      "task": task_text,
+                      "metadata": task.get("metadata") if isinstance(task.get("metadata"), dict) else {},
+                  })
+
+              preview = [{
+                  "callItemId": item["callItemId"],
+                  "callName": item["callName"],
+                  "requestId": item["requestId"],
+                  "maskedPhone": mask_phone(item["phone"]),
+                  "task": redact_phone_text(item["task"]),
+                  "metadata": redact_phone_values(item["metadata"]),
+              } for item in normalized]
+
+              return {
+                  "base_url": base_url,
+                  "dry_run": "true" if dry_run_enabled else "false",
+                  "poll_interval_seconds": poll_interval_seconds,
+                  "wait_timeout_minutes": wait_timeout_minutes,
+                  "max_poll_count": int((wait_timeout_minutes * 60) / poll_interval_seconds),
+                  "call_tasks": [] if dry_run_enabled else normalized,
+                  "preview_tasks": preview,
+                  "task_count": len(normalized),
+                  "live_task_count": 0 if dry_run_enabled else len(normalized),
+                  "validation_error": "",
+                  "preview_json": json.dumps({
+                      "dryRun": dry_run_enabled,
+                      "willCreateLiveCalls": not dry_run_enabled,
+                      "connectivityCheck": f"{base_url}/health",
+                      "liveCreateEndpoint": f"{base_url}/v1/calls",
+                      "liveResultLookup": {
+                          "endpoint": f"{base_url}/v1/calls/{{id}}",
+                          "pollIntervalSeconds": poll_interval_seconds,
+                          "timeoutMinutes": wait_timeout_minutes,
+                      },
+                      "tasks": preview,
+                  }, ensure_ascii=False, indent=2),
+              }
+        variables:
+        - variable: base_url
+          value_selector:
+          - start
+          - base_url
+        - variable: dry_run
+          value_selector:
+          - start
+          - dry_run
+        - variable: request_id
+          value_selector:
+          - start
+          - request_id
+        - variable: phone_number
+          value_selector:
+          - start
+          - phone_number
+        - variable: task
+          value_selector:
+          - start
+          - task
+        outputs:
+          base_url:
+            type: string
+            children:
+          dry_run:
+            type: string
+            children:
+          poll_interval_seconds:
+            type: number
+            children:
+          wait_timeout_minutes:
+            type: number
+            children:
+          max_poll_count:
+            type: number
+            children:
+          call_tasks:
+            type: array[object]
+            children:
+          preview_tasks:
+            type: array[object]
+            children:
+          task_count:
+            type: number
+            children:
+          live_task_count:
+            type: number
+            children:
+          validation_error:
+            type: string
+            children:
+          preview_json:
+            type: string
+            children:
+      height: 120
+      id: prepare_call_tasks
+      position:
+        x: 420
+        y: 320
+      positionAbsolute:
+        x: 420
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Dry run uses this node only. It checks that the CALL-E API host is reachable
+          without creating a phone call. This is a connectivity check, not a live
+          call request.
+        selected: false
+        title: Check API connectivity
+        type: http-request
+        variables: []
+        method: get
+        url: "{{#prepare_call_tasks.base_url#}}/health"
+        authorization:
+          type: api-key
+          config:
+            type: bearer
+            api_key: "{{#env.CALL_E_API_KEY#}}"
+        headers: 'Accept: application/json'
+        params: ''
+        body:
+          type: none
+          data: []
+        ssl_verify: true
+        timeout:
+          connect: 10
+          read: 30
+          write: 30
+          max_connect_timeout: 10
+          max_read_timeout: 30
+          max_write_timeout: 30
+        error_strategy: default-value
+        default_value:
+        - key: body
+          type: string
+          value: '{}'
+        - key: status_code
+          type: number
+          value: 0
+        retry_config:
+          retry_enabled: false
+          max_retries: 0
+          retry_interval: 1000
+      height: 90
+      id: check_api_connectivity
+      position:
+        x: 760
+        y: 320
+      positionAbsolute:
+        x: 760
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Blocks live-call creation unless the CALL-E health check returns a
+          2xx status code.
+        selected: false
+        title: Gate live calls after health
+        type: code
+        code_language: python3
+        code: |
+          def to_int(value) -> int:
+              try:
+                  return int(value)
+              except Exception:
+                  return 0
+
+          def main(call_tasks: list, live_task_count: int, validation_error: str, dry_run: str, api_health_status_code) -> dict:
+              original_tasks = call_tasks if isinstance(call_tasks, list) else []
+              status_code = to_int(api_health_status_code)
+              api_health_ok = 200 <= status_code < 300
+              existing_error = str(validation_error or "").strip()
+              health_error = ""
+              if not api_health_ok:
+                  health_error = (
+                      f"CALL-E /health returned HTTP {status_code}; live calls were not created."
+                      if status_code
+                      else "CALL-E /health request failed before a response was available; live calls were not created."
+                  )
+              effective_error = existing_error or health_error
+              call_tasks = original_tasks if api_health_ok and not existing_error else []
+              return {
+                  "call_tasks": call_tasks,
+                  "live_task_count": len(call_tasks),
+                  "validation_error": effective_error,
+                  "api_health_ok": api_health_ok,
+                  "api_health_status_code": status_code,
+              }
+        variables:
+        - variable: call_tasks
+          value_selector:
+          - prepare_call_tasks
+          - call_tasks
+        - variable: live_task_count
+          value_selector:
+          - prepare_call_tasks
+          - live_task_count
+        - variable: validation_error
+          value_selector:
+          - prepare_call_tasks
+          - validation_error
+        - variable: dry_run
+          value_selector:
+          - prepare_call_tasks
+          - dry_run
+        - variable: api_health_status_code
+          value_selector:
+          - check_api_connectivity
+          - status_code
+        outputs:
+          call_tasks:
+            type: array[object]
+            children:
+          live_task_count:
+            type: number
+            children:
+          validation_error:
+            type: string
+            children:
+          api_health_ok:
+            type: boolean
+            children:
+          api_health_status_code:
+            type: number
+            children:
+      height: 90
+      id: gate_live_calls_after_health
+      position:
+        x: 960
+        y: 320
+      positionAbsolute:
+        x: 960
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Creates the single live CALL-E call. In dry run mode the task list is
+          empty, so no live call is created.
+        selected: false
+        title: Run one-shot call
+        type: iteration
+        start_node_id: iterate_call_tasks_start
+        iterator_selector:
+        - gate_live_calls_after_health
+        - call_tasks
+        output_selector:
+        - extract_call_lookup_id
+        - call_context
+        output_type: array[object]
+        is_parallel: false
+        parallel_nums: 1
+        error_handle_mode: terminated
+        flatten_output: true
+        width: 1400
+        height: 360
+      height: 360
+      id: iterate_call_tasks
+      position:
+        x: 1260
+        y: 230
+      positionAbsolute:
+        x: 1260
+        y: 230
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 1400
+    - data:
+        desc: Selects the created live call context. Dry run produces no live context
+          and skips polling.
+        selected: false
+        title: Prepare poll context
+        type: code
+        code_language: python3
+        code: |
+          import json
+          import time
+
+          def as_obj(value):
+              if isinstance(value, dict):
+                  return value
+              if isinstance(value, str) and value.strip():
+                  try:
+                      parsed = json.loads(value)
+                      return parsed if isinstance(parsed, dict) else {}
+                  except Exception:
+                      return {}
+              return {}
+
+          def main(call_contexts: list, dry_run: str, validation_error: str, base_url: str) -> dict:
+              contexts = call_contexts if isinstance(call_contexts, list) else []
+              context = contexts[0] if contexts and isinstance(contexts[0], dict) else {}
+              has_live_call = bool(context.get("callId"))
+              now_ms = int(time.time() * 1000)
+              done = not has_live_call or bool(context.get("initialDone"))
+              initial_json = context.get("initialCallJson") or '{"status":"completed","_dify_no_live_call":true}'
+              base_url = str(base_url or "https://api.heycall-e.com").strip().rstrip("/")
+              return {
+                  "has_live_call": has_live_call,
+                  "call_context": context,
+                  "call_id": context.get("callId", ""),
+                  "lookup_url": context.get("lookupUrl", "") if has_live_call else f"{base_url}/health",
+                  "initial_call_json": initial_json,
+                  "started_at_ms": int(context.get("startedAtMs") or now_ms),
+                  "initial_done": done,
+                  "metadata_sent_json": str(context.get("metadataSentJson") or "{}"),
+                  "validation_error": str(validation_error or ""),
+                  "dry_run": str(dry_run or "true"),
+              }
+        variables:
+        - variable: call_contexts
+          value_selector:
+          - iterate_call_tasks
+          - output
+        - variable: dry_run
+          value_selector:
+          - prepare_call_tasks
+          - dry_run
+        - variable: validation_error
+          value_selector:
+          - gate_live_calls_after_health
+          - validation_error
+        - variable: base_url
+          value_selector:
+          - prepare_call_tasks
+          - base_url
+        outputs:
+          has_live_call:
+            type: boolean
+            children:
+          call_context:
+            type: object
+            children:
+          call_id:
+            type: string
+            children:
+          lookup_url:
+            type: string
+            children:
+          initial_call_json:
+            type: string
+            children:
+          started_at_ms:
+            type: number
+            children:
+          initial_done:
+            type: boolean
+            children:
+          metadata_sent_json:
+            type: string
+            children:
+          validation_error:
+            type: string
+            children:
+          dry_run:
+            type: string
+            children:
+      height: 90
+      id: prepare_poll_context
+      position:
+        x: 2600
+        y: 320
+      positionAbsolute:
+        x: 2600
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        break_conditions:
+        - comparison_operator: is
+          id: poll_done_condition
+          value: true
+          varType: boolean
+          variable_selector:
+          - poll_until_terminal
+          - done
+        - comparison_operator: is
+          id: poll_timeout_condition
+          value: true
+          varType: boolean
+          variable_selector:
+          - poll_until_terminal
+          - timed_out
+        desc: Polls GET /v1/calls/{id} until CALL-E returns a terminal status or the
+          timeout is reached.
+        error_handle_mode: terminated
+        height: 320
+        logical_operator: or
+        loop_count: 45
+        loop_variables:
+        - id: loop_var_latest_call_json
+          label: latest_call_json
+          var_type: string
+          value_type: variable
+          value:
+          - prepare_poll_context
+          - initial_call_json
+        - id: loop_var_poll_count
+          label: poll_count
+          var_type: number
+          value_type: constant
+          value: '0'
+        - id: loop_var_done
+          label: done
+          var_type: boolean
+          value_type: variable
+          value:
+          - prepare_poll_context
+          - initial_done
+        - id: loop_var_timed_out
+          label: timed_out
+          var_type: boolean
+          value_type: constant
+          value: false
+        - id: loop_var_started_at_ms
+          label: started_at_ms
+          var_type: number
+          value_type: variable
+          value:
+          - prepare_poll_context
+          - started_at_ms
+        - id: loop_var_last_status
+          label: last_status
+          var_type: string
+          value_type: constant
+          value: ''
+        - id: loop_var_api_error
+          label: api_error
+          var_type: string
+          value_type: constant
+          value: ''
+        selected: false
+        start_node_id: poll_until_terminal_start
+        title: Poll until terminal
+        type: loop
+        width: 2000
+      height: 320
+      id: poll_until_terminal
+      position:
+        x: 2940
+        y: 210
+      positionAbsolute:
+        x: 2940
+        y: 210
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 2000
+    - data:
+        desc: ''
+        isInLoop: true
+        selected: false
+        title: ''
+        type: loop-start
+      height: 48
+      id: poll_until_terminal_start
+      position:
+        x: 60
+        y: 136
+      positionAbsolute:
+        x: 3000
+        y: 346
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-loop-start
+      width: 44
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+      draggable: false
+      selectable: false
+    - data:
+        desc: Sleeps for the first of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 1/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll
+      position:
+        x: 135
+        y: 115
+      positionAbsolute:
+        x: 3075
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the second of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 2/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_2
+      position:
+        x: 360
+        y: 115
+      positionAbsolute:
+        x: 3300
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the third of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 3/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_3
+      position:
+        x: 585
+        y: 115
+      positionAbsolute:
+        x: 3525
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the fourth of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 4/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_4
+      position:
+        x: 810
+        y: 115
+      positionAbsolute:
+        x: 3750
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Sleeps for the fifth of five four-second slices between result checks.
+        selected: false
+        title: Wait before poll 5/5
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import time
+
+          def main(done, poll_interval_seconds) -> dict:
+              already_done = bool(done)
+              try:
+                  seconds = float(poll_interval_seconds)
+              except Exception:
+                  seconds = 20.0
+              seconds = seconds / 5.0
+              seconds = max(0.0, min(seconds, 4.0))
+              if not already_done and seconds > 0:
+                  time.sleep(seconds)
+              return {"waited_seconds": 0 if already_done else seconds}
+        variables:
+        - variable: done
+          value_selector:
+          - poll_until_terminal
+          - done
+        - variable: poll_interval_seconds
+          value_selector:
+          - prepare_call_tasks
+          - poll_interval_seconds
+        outputs:
+          waited_seconds:
+            type: number
+            children:
+      height: 90
+      id: wait_before_poll_5
+      position:
+        x: 1035
+        y: 115
+      positionAbsolute:
+        x: 3975
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Polls GET /v1/calls/{id} during the polling loop.
+        selected: false
+        title: Poll CALL-E call status
+        type: http-request
+        isInLoop: true
+        loop_id: poll_until_terminal
+        variables: []
+        method: get
+        url: "{{#prepare_poll_context.lookup_url#}}"
+        authorization:
+          type: api-key
+          config:
+            type: bearer
+            api_key: "{{#env.CALL_E_API_KEY#}}"
+        headers: 'Accept: application/json'
+        params: ''
+        body:
+          type: none
+          data: []
+        ssl_verify: true
+        timeout:
+          connect: 10
+          read: 600
+          write: 600
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+        error_strategy: default-value
+        default_value:
+        - key: body
+          type: string
+          value: '{}'
+        - key: status_code
+          type: number
+          value: 0
+        retry_config:
+          retry_enabled: false
+          max_retries: 0
+          retry_interval: 3000
+      height: 90
+      id: get_calle_call_result
+      position:
+        x: 1260
+        y: 115
+      positionAbsolute:
+        x: 4200
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Normalizes the latest CALL-E response and decides whether polling is
+          complete or timed out.
+        selected: false
+        title: Evaluate poll state
+        type: code
+        isInLoop: true
+        loop_id: poll_until_terminal
+        code_language: python3
+        code: |
+          import json
+          import re
+          import time
+
+          TERMINAL_STATUSES = {
+              "completed", "failed", "canceled", "cancelled",
+              "no_answer", "declined", "voicemail", "busy", "expired"
+          }
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
+
+          def as_obj(value):
+              if isinstance(value, dict):
+                  return value
+              if isinstance(value, str) and value.strip():
+                  try:
+                      parsed = json.loads(value)
+                      return parsed if isinstance(parsed, dict) else {}
+                  except Exception:
+                      return {}
+              return {}
+
+          def as_number(value, fallback):
+              try:
+                  return float(value)
+              except Exception:
+                  return float(fallback)
+
+          def normalize_status(value):
+              return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+          def nested_get(value, path):
+              cur = value
+              for key in path:
+                  if not isinstance(cur, dict):
+                      return None
+                  cur = cur.get(key)
+              return cur
+
+          def first_value(*values):
+              for value in values:
+                  if value not in (None, ""):
+                      return value
+              return None
+
+          def call_payload_from_response(value):
+              if not isinstance(value, dict):
+                  return {}
+              for key in ("data", "call", "result"):
+                  nested = value.get(key)
+                  if isinstance(nested, dict) and any(
+                      field in nested
+                      for field in ("id", "call_id", "callId", "status", "recipients", "structured_result", "summary")
+                  ):
+                      return nested
+              return value
+
+          def compare_metadata_round_trip(call, metadata_sent_json) -> dict:
+              metadata_sent = as_obj(metadata_sent_json)
+              call_payload = call_payload_from_response(call)
+              metadata_returned = as_obj(call_payload.get("metadata"))
+              metadata_keys = sorted([str(k) for k in metadata_sent.keys()])
+              missing_or_different = [
+                  key for key in metadata_keys
+                  if metadata_sent.get(key) != metadata_returned.get(key)
+              ]
+              return {
+                  "requestedKeys": metadata_keys,
+                  "allRequestedKeysReturned": len(missing_or_different) == 0,
+                  "missingOrDifferentKeys": missing_or_different,
+              }
+
+          def mask_phone_like(value: str) -> str:
+              raw = str(value or "").strip()
+              digits = re.sub(r"\D", "", raw)
+              if not digits:
+                  return ""
+              if len(digits) <= 5:
+                  return "****"
+              if raw.startswith("+"):
+                  return "+" + digits[:2] + "****" + digits[-2:]
+              return digits[:3] + "****" + digits[-2:]
+
+          def redact_phone_text(value: str) -> str:
+              text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or ""))
+              text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+              return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+
+          def redact_phone_values(value):
+              if isinstance(value, str):
+                  return redact_phone_text(value)
+              if isinstance(value, list):
+                  return [redact_phone_values(v) for v in value]
+              if isinstance(value, dict):
+                  return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
+              return value
+
+          def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:
+              if not bool(has_live_call):
+                  return {
+                      "latest_call_json": '{"status":"completed","_dify_no_live_call":true}',
+                      "poll_count": int(as_number(poll_count, 0)),
+                      "status": "no_live_call",
+                      "done": True,
+                      "timed_out": False,
+                      "error_message": "",
+                  }
+              call = as_obj(latest_response)
+              metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)
+              status = normalize_status(first_value(
+                  nested_get(call, ["data", "status"]),
+                  nested_get(call, ["call", "status"]),
+                  nested_get(call, ["result", "status"]),
+                  call.get("status"),
+              ))
+              poll_status = int(as_number(poll_status_code, 0))
+              next_poll_count = int(as_number(poll_count, 0)) + 1
+              started = int(as_number(started_at_ms, int(time.time() * 1000)))
+              timeout_ms = max(1.0, as_number(wait_timeout_minutes, 15)) * 60 * 1000
+              elapsed_ms = int(time.time() * 1000) - started
+              max_polls = int(as_number(max_poll_count, 90))
+              done = status in TERMINAL_STATUSES
+              timed_out = (elapsed_ms >= timeout_ms or next_poll_count >= max_polls) and not done
+              error_message = ""
+              if not (200 <= poll_status < 300):
+                  done = True
+                  timed_out = False
+                  error_message = (
+                      f"CALL-E poll request returned HTTP {poll_status}."
+                      if poll_status
+                      else "CALL-E poll request failed before a response was available."
+                  )
+                  call = dict(call)
+                  call["_dify_poll_failed"] = True
+                  call["_dify_poll_http_status"] = poll_status
+                  call["_dify_poll_error"] = error_message
+              elif timed_out:
+                  call_id = first_value(
+                      call.get("id"),
+                      call.get("call_id"),
+                      call.get("callId"),
+                      nested_get(call, ["data", "id"]),
+                      nested_get(call, ["data", "call_id"]),
+                      nested_get(call, ["data", "callId"]),
+                      nested_get(call, ["call", "id"]),
+                      nested_get(call, ["result", "id"]),
+                  )
+                  error_message = f"Timed out waiting for CALL-E call {call_id or ''} after {next_poll_count} polls."
+                  call = dict(call)
+                  call["_dify_poll_timeout"] = True
+                  call["_dify_poll_error"] = error_message
+              safe_call = redact_phone_values(call)
+              safe_call_payload = call_payload_from_response(safe_call)
+              safe_call_payload["_dify_metadata_round_trip"] = metadata_round_trip
+              return {
+                  "latest_call_json": json.dumps(safe_call, ensure_ascii=False),
+                  "poll_count": next_poll_count,
+                  "status": status,
+                  "done": done,
+                  "timed_out": timed_out,
+                  "error_message": error_message,
+              }
+        variables:
+        - variable: latest_response
+          value_selector:
+          - get_calle_call_result
+          - body
+        - variable: poll_status_code
+          value_selector:
+          - get_calle_call_result
+          - status_code
+        - variable: poll_count
+          value_selector:
+          - poll_until_terminal
+          - poll_count
+        - variable: started_at_ms
+          value_selector:
+          - poll_until_terminal
+          - started_at_ms
+        - variable: wait_timeout_minutes
+          value_selector:
+          - prepare_call_tasks
+          - wait_timeout_minutes
+        - variable: max_poll_count
+          value_selector:
+          - prepare_call_tasks
+          - max_poll_count
+        - variable: metadata_sent_json
+          value_selector:
+          - prepare_poll_context
+          - metadata_sent_json
+        - variable: has_live_call
+          value_selector:
+          - prepare_poll_context
+          - has_live_call
+        outputs:
+          latest_call_json:
+            type: string
+            children:
+          poll_count:
+            type: number
+            children:
+          status:
+            type: string
+            children:
+          done:
+            type: boolean
+            children:
+          timed_out:
+            type: boolean
+            children:
+          error_message:
+            type: string
+            children:
+      height: 90
+      id: evaluate_poll_state
+      position:
+        x: 1505
+        y: 115
+      positionAbsolute:
+        x: 4445
+        y: 325
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Persists the latest poll response into Loop variables so break conditions
+          and downstream parsing can read final state.
+        selected: false
+        title: Store poll state
+        type: assigner
+        version: '2'
+        isInLoop: true
+        loop_id: poll_until_terminal
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - evaluate_poll_state
+          - latest_call_json
+          variable_selector:
+          - poll_until_terminal
+          - latest_call_json
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - evaluate_poll_state
+          - poll_count
+          variable_selector:
+          - poll_until_terminal
+          - poll_count
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - evaluate_poll_state
+          - done
+          variable_selector:
+          - poll_until_terminal
+          - done
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - evaluate_poll_state
+          - timed_out
+          variable_selector:
+          - poll_until_terminal
+          - timed_out
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - evaluate_poll_state
+          - status
+          variable_selector:
+          - poll_until_terminal
+          - last_status
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - evaluate_poll_state
+          - error_message
+          variable_selector:
+          - poll_until_terminal
+          - api_error
+          write_mode: over-write
+      height: 120
+      id: store_poll_state
+      position:
+        x: 1745
+        y: 100
+      positionAbsolute:
+        x: 4685
+        y: 310
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 210
+      parentId: poll_until_terminal
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Parses the final polled response into a demo-friendly summary with phone
+          numbers masked.
+        selected: false
+        title: Parse final call result
+        type: code
+        code_language: python3
+        code: |
+          import json
+          import re
+
+          def as_obj(value):
+              if isinstance(value, dict):
+                  return value
+              if isinstance(value, str) and value.strip():
+                  try:
+                      parsed = json.loads(value)
+                      return parsed if isinstance(parsed, dict) else {}
+                  except Exception:
+                      return {}
+              return {}
+
+          def as_list(value):
+              return value if isinstance(value, list) else []
+
+          def mask_phone(phone: str) -> str:
+              value = str(phone or "").strip()
+              if not value:
+                  return ""
+              if len(value) <= 5:
+                  return "****"
+              return value[:3] + "****" + value[-2:]
+
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
+
+          def mask_phone_like(value: str) -> str:
+              raw = str(value or "").strip()
+              digits = re.sub(r"\D", "", raw)
+              if not digits:
+                  return ""
+              if len(digits) <= 5:
+                  return "****"
+              if raw.startswith("+"):
+                  return "+" + digits[:2] + "****" + digits[-2:]
+              return digits[:3] + "****" + digits[-2:]
+
+          def redact_phone_text(value: str) -> str:
+              text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or ""))
+              text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+              return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+
+          def redact_phone_values(value):
+              if isinstance(value, str):
+                  return redact_phone_text(value)
+              if isinstance(value, list):
+                  return [redact_phone_values(v) for v in value]
+              if isinstance(value, dict):
+                  return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
+              return value
+
+          def call_payload_from_response(value):
+              if not isinstance(value, dict):
+                  return {}
+              for key in ("data", "call", "result"):
+                  nested = value.get(key)
+                  if isinstance(nested, dict) and any(
+                      field in nested
+                      for field in ("id", "call_id", "callId", "status", "recipients", "structured_result", "summary")
+                  ):
+                      return nested
+              return value
+
+          def latest(values):
+              return values[-1] if values else None
+
+          def normalize_code(value):
+              return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+          def nested_get(value, path):
+              cur = value
+              for key in path:
+                  if not isinstance(cur, dict):
+                      return None
+                  cur = cur.get(key)
+              return cur
+
+          def first_value(*values):
+              for value in values:
+                  if value not in (None, ""):
+                      return value
+              return None
+
+          def main(call_context: dict, final_call_response, poll_count, poll_timed_out, poll_error_message: str) -> dict:
+              context = call_context if isinstance(call_context, dict) else {}
+              create_body = as_obj(context.get("createResponseJson"))
+              metadata_sent_raw = as_obj(context.get("metadataSentJson"))
+              metadata_sent = redact_phone_values(metadata_sent_raw)
+              if context.get("createFailed"):
+                  metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])
+                  raw_call_result_json = json.dumps(redact_phone_values(create_body), ensure_ascii=False)
+                  result = {
+                      "callItemId": context.get("callItemId"),
+                      "maskedPhone": context.get("maskedPhone"),
+                      "metadataSent": metadata_sent,
+                      "metadataReturned": {},
+                      "metadataRoundTrip": {
+                          "requestedKeys": metadata_keys,
+                          "allRequestedKeysReturned": False,
+                          "missingOrDifferentKeys": metadata_keys,
+                      },
+                      "polling": {
+                          "pollCount": 0,
+                          "timedOut": False,
+                          "errorMessage": context.get("createErrorMessage") or "CALL-E create request failed.",
+                      },
+                      "callStatus": {
+                          "ok": False,
+                          "created": False,
+                          "creation_state": "not_created",
+                          "callId": "",
+                          "call_status": "create_failed",
+                          "recipient_status": None,
+                          "latest_attempt_status": None,
+                          "failure_code": "create_failed",
+                          "failure_message": context.get("createErrorMessage") or "CALL-E create request failed.",
+                          "answered": False,
+                          "no_answer": False,
+                          "busy": False,
+                          "failed": True,
+                      },
+                      "lookup": {
+                          "skipped": True,
+                          "url": "",
+                          "reason": "The create request failed, so no result lookup was attempted.",
+                          "rawLookupJson": raw_call_result_json,
+                      },
+                      "reconciliation": {
+                          "required": False,
+                          "idempotencyKey": context.get("idempotencyKey") or "",
+                          "instruction": "",
+                      },
+                      "returnedData": redact_phone_values({
+                          "summary": context.get("createErrorMessage") or "CALL-E create request failed.",
+                          "transcript": [],
+                          "structuredResult": {},
+                          "taskCompleted": None,
+                          "completionConfidence": None,
+                          "evidence": [],
+                      }),
+                      "rawCallResultJson": raw_call_result_json,
+                  }
+                  return {"result": result, "results": [result]}
+              if context.get("createOutcomeUnknown"):
+                  metadata_keys = sorted([str(k) for k in metadata_sent_raw.keys()])
+                  raw_call_result_json = json.dumps(redact_phone_values(create_body), ensure_ascii=False)
+                  idempotency_key = str(context.get("idempotencyKey") or "")
+                  message = context.get("createOutcomeMessage") or (
+                      "CALL-E returned a successful create status without a recognized call id. "
+                      "The call may already have been created."
+                  )
+                  reconciliation_instruction = (
+                      f"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}); "
+                      "do not generate a new key."
+                      if idempotency_key
+                      else "Reconcile this request before retrying; do not submit it with a new idempotency key."
+                  )
+                  result = {
+                      "callItemId": context.get("callItemId"),
+                      "maskedPhone": context.get("maskedPhone"),
+                      "metadataSent": metadata_sent,
+                      "metadataReturned": {},
+                      "metadataRoundTrip": {
+                          "requestedKeys": metadata_keys,
+                          "allRequestedKeysReturned": False,
+                          "missingOrDifferentKeys": metadata_keys,
+                      },
+                      "polling": {
+                          "pollCount": 0,
+                          "timedOut": False,
+                          "errorMessage": "",
+                      },
+                      "callStatus": {
+                          "ok": None,
+                          "created": None,
+                          "creation_state": "unknown_possibly_created",
+                          "callId": "",
+                          "call_status": "create_outcome_unknown",
+                          "recipient_status": None,
+                          "latest_attempt_status": None,
+                          "failure_code": None,
+                          "failure_message": None,
+                          "answered": False,
+                          "no_answer": False,
+                          "busy": False,
+                          "failed": False,
+                      },
+                      "lookup": {
+                          "skipped": True,
+                          "url": "",
+                          "reason": "No recognized call id was returned, so automatic result lookup is unavailable.",
+                          "rawLookupJson": raw_call_result_json,
+                      },
+                      "reconciliation": {
+                          "required": True,
+                          "idempotencyKey": idempotency_key,
+                          "instruction": reconciliation_instruction,
+                      },
+                      "returnedData": redact_phone_values({
+                          "summary": message,
+                          "transcript": [],
+                          "structuredResult": {
+                              "call_completed": "unknown",
+                              "outcome": "unknown",
+                              "next_action": "manual_review",
+                          },
+                          "taskCompleted": None,
+                          "completionConfidence": None,
+                          "evidence": [],
+                      }),
+                      "rawCallResultJson": raw_call_result_json,
+                  }
+                  return {"result": result, "results": [result]}
+              if not context.get("callId"):
+                  return {"result": {}, "results": []}
+              final_body = as_obj(final_call_response)
+              initial_body = as_obj(context.get("initialCallJson"))
+              call = call_payload_from_response(final_body) or call_payload_from_response(initial_body) or call_payload_from_response(create_body)
+              recipient = latest(as_list(call.get("recipients"))) or {}
+              attempts = as_list(recipient.get("attempts"))
+              latest_attempt = latest(attempts) or {}
+              transcript_turns = []
+              for attempt in attempts:
+                  transcript_turns.extend(as_list(attempt.get("transcript_turns")))
+              recipient_structured_result = as_obj(recipient.get("structured_result"))
+              call_structured_result = as_obj(call.get("structured_result"))
+              structured_result = dict(recipient_structured_result)
+              structured_result.update(call_structured_result)
+              structured_result = structured_result or None
+              raw_failure_code = latest_attempt.get("failure_code") or call.get("failure_code")
+              failure_code = normalize_code(raw_failure_code)
+              call_status = call.get("status")
+              recipient_status = recipient.get("status")
+              latest_attempt_status = latest_attempt.get("status")
+              answered = latest_attempt_status == "completed" or recipient_status == "completed"
+              failed_statuses = {"failed", "canceled", "cancelled", "no_answer", "declined", "busy", "expired"}
+              poll_error = str(poll_error_message or call.get("_dify_poll_error") or "").strip()
+              failed = bool(poll_error) or bool(poll_timed_out) or bool(call.get("_dify_poll_timeout")) or bool(call.get("_dify_poll_failed")) or normalize_code(call_status) in failed_statuses or normalize_code(recipient_status) in failed_statuses or normalize_code(latest_attempt_status) in failed_statuses
+              metadata_returned = redact_phone_values(as_obj(call.get("metadata")))
+              metadata_round_trip = as_obj(call.get("_dify_metadata_round_trip"))
+              requested_keys = metadata_round_trip.get("requestedKeys")
+              metadata_keys = (
+                  sorted([str(k) for k in requested_keys])
+                  if isinstance(requested_keys, list)
+                  else sorted([str(k) for k in metadata_sent_raw.keys()])
+              )
+              different_keys = metadata_round_trip.get("missingOrDifferentKeys")
+              missing_or_different = (
+                  sorted([str(k) for k in different_keys])
+                  if isinstance(different_keys, list)
+                  else metadata_keys
+              )
+              metadata_all_returned = bool(metadata_round_trip) and len(missing_or_different) == 0
+              raw_call_result_json = json.dumps(redact_phone_values(call), ensure_ascii=False)
+              if len(raw_call_result_json) > 75000:
+                  raw_call_result_json = raw_call_result_json[:75000] + "...[truncated]"
+              call_id = first_value(
+                  call.get("id"), call.get("call_id"), call.get("callId"), call.get("uuid"),
+                  nested_get(call, ["data", "id"]), nested_get(call, ["data", "call_id"]),
+                  nested_get(call, ["data", "callId"]), nested_get(call, ["call", "id"]),
+                  nested_get(call, ["result", "id"]), context.get("callId"),
+              )
+              redacted_returned_data = redact_phone_values({
+                  "summary": (call_structured_result or {}).get("summary")
+                  or (recipient_structured_result or {}).get("summary")
+                  or recipient.get("summary")
+                  or call.get("summary")
+                  or latest_attempt.get("summary"),
+                  "transcript": transcript_turns,
+                  "structuredResult": structured_result,
+                  "taskCompleted": call.get("task_completed"),
+                  "completionConfidence": call.get("completion_confidence"),
+                  "evidence": as_list(call.get("evidence")),
+              })
+              result = {
+                  "callItemId": context.get("callItemId"),
+                  "maskedPhone": context.get("maskedPhone"),
+                  "metadataSent": metadata_sent,
+                  "metadataReturned": metadata_returned,
+                  "metadataRoundTrip": {
+                      "requestedKeys": metadata_keys,
+                      "allRequestedKeysReturned": metadata_all_returned,
+                      "missingOrDifferentKeys": missing_or_different,
+                  },
+                  "polling": {
+                      "pollCount": int(poll_count or 0),
+                      "timedOut": bool(poll_timed_out) or bool(call.get("_dify_poll_timeout")),
+                      "errorMessage": poll_error,
+                  },
+                  "callStatus": {
+                      "ok": not failed,
+                      "created": True,
+                      "creation_state": "confirmed_created",
+                      "callId": call_id,
+                      "call_status": call_status,
+                      "recipient_status": recipient_status,
+                      "latest_attempt_status": latest_attempt_status,
+                      "failure_code": raw_failure_code,
+                      "failure_message": redact_phone_values(latest_attempt.get("failure_message") or call.get("failure_message")),
+                      "answered": answered,
+                      "no_answer": failure_code == "no_answer",
+                      "busy": failure_code == "busy",
+                      "failed": failed,
+                  },
+                  "lookup": {
+                      "skipped": False,
+                      "url": context.get("lookupUrl"),
+                      "reason": "",
+                      "rawLookupJson": json.dumps(redact_phone_values(final_body), ensure_ascii=False),
+                  },
+                  "reconciliation": {
+                      "required": False,
+                      "idempotencyKey": context.get("idempotencyKey") or "",
+                      "instruction": "",
+                  },
+                  "returnedData": redacted_returned_data,
+                  "rawCallResultJson": raw_call_result_json,
+              }
+              return {"result": result, "results": [result]}
+        variables:
+        - variable: call_context
+          value_selector:
+          - prepare_poll_context
+          - call_context
+        - variable: final_call_response
+          value_selector:
+          - poll_until_terminal
+          - latest_call_json
+        - variable: poll_count
+          value_selector:
+          - poll_until_terminal
+          - poll_count
+        - variable: poll_timed_out
+          value_selector:
+          - poll_until_terminal
+          - timed_out
+        - variable: poll_error_message
+          value_selector:
+          - poll_until_terminal
+          - api_error
+        outputs:
+          result:
+            type: object
+            children:
+          results:
+            type: array[object]
+            children:
+      height: 90
+      id: parse_iteration_result
+      position:
+        x: 5140
+        y: 320
+      positionAbsolute:
+        x: 5140
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: ''
+        selected: false
+        title: ''
+        type: iteration-start
+        isInIteration: true
+      height: 48
+      id: iterate_call_tasks_start
+      position:
+        x: 60
+        y: 220
+      positionAbsolute:
+        x: 1160
+        y: 450
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-iteration-start
+      width: 44
+      parentId: iterate_call_tasks
+      extent: parent
+      zIndex: 1002
+      draggable: false
+      selectable: false
+    - data:
+        desc: Builds the CALL-E create-call payload from the normalized task. Phone
+          numbers are masked in outputs, and the raw request body is prepared for
+          the following HTTP node.
+        selected: false
+        title: Build per-call payload
+        type: code
+        isInIteration: true
+        iteration_id: iterate_call_tasks
+        code_language: python3
+        code: |
+          import hashlib
+          import json
+          SAFETY_PREAMBLE = (
+              "Non-overridable phone-call safety boundaries: "
+              "These safety boundaries override the user-provided task. "
+              "For medical, legal, financial, and emergency topics, keep the call logistics-only; "
+              "do not provide diagnosis, treatment, legal advice, financial advice, investment advice, "
+              "emergency instructions, or professional conclusions. Route the person to qualified "
+              "professionals or local emergency services as appropriate. Do not request or enter "
+              "personal data, authenticate, make purchases, open cases, or take irreversible actions "
+              "unless explicitly authorized in the user task and still allowed by these boundaries."
+          )
+
+          def mask_phone(phone: str) -> str:
+              value = str(phone or "").strip()
+              if not value:
+                  return ""
+              if len(value) <= 5:
+                  return "****"
+              return value[:3] + "****" + value[-2:]
+
+          def build_safe_task(user_task: str) -> str:
+              return SAFETY_PREAMBLE + "\n\nUser-provided task:\n" + str(user_task or "").strip()
+
+          def main(call_task: dict, base_url: str) -> dict:
+              normalized_base_url = str(base_url or "").strip().rstrip("/")
+              if not normalized_base_url:
+                  raise ValueError("Normalized CALL-E base_url is required.")
+              metadata = call_task.get("metadata") if isinstance(call_task.get("metadata"), dict) else {}
+              request_id = str(call_task.get("requestId") or "").strip()
+              if not request_id:
+                  raise ValueError("request_id is required to build a replay-safe idempotency key.")
+              result_schema = {
+                  "type": "object",
+                  "required": ["call_completed", "outcome", "summary", "next_action"],
+                  "properties": {
+                      "call_completed": {"type": "string", "enum": ["yes", "no", "partial", "unknown"]},
+                      "outcome": {"type": "string", "enum": ["completed", "partial", "no_answer", "voicemail", "busy", "failed", "unknown"]},
+                      "summary": {"type": "string"},
+                      "next_action": {"type": "string", "enum": ["none", "follow_up", "retry_later", "manual_review"]},
+                      "language_detected": {"type": "string"},
+                      "participant_response": {"type": "string"},
+                      "key_points": {"type": "string"},
+                      "issues": {"type": "string"},
+                      "audio_or_connection_notes": {"type": "string"},
+                  },
+              }
+              recipient_result_schema = {
+                  "type": "object",
+                  "required": ["call_completed", "outcome", "next_action"],
+                  "properties": {
+                      "call_completed": {"type": "string", "enum": ["yes", "no", "partial", "unknown"]},
+                      "outcome": {"type": "string", "enum": ["completed", "partial", "no_answer", "voicemail", "busy", "failed", "unknown"]},
+                      "next_action": {"type": "string", "enum": ["none", "follow_up", "retry_later", "manual_review"]},
+                      "language_detected": {"type": "string"},
+                      "participant_response": {"type": "string"},
+                      "key_points": {"type": "string"},
+                      "issues": {"type": "string"},
+                      "audio_or_connection_notes": {"type": "string"},
+                  },
+              }
+              request_payload = {
+                  "task": build_safe_task(call_task["task"]),
+                  "recipients": [{
+                      "phones": [call_task["phone"]],
+                  }],
+                  "result_schema": result_schema,
+                  "recipient_result_schema": recipient_result_schema,
+                  "metadata": dict(metadata, source="dify_one_shot_call_tool", request_id=request_id),
+              }
+              idempotency_basis = json.dumps({
+                  "requestId": request_id,
+                  "callItemId": call_task.get("callItemId"),
+                  "phone": call_task.get("phone"),
+                  "task": call_task.get("task"),
+              }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+              idempotency_key = "dify-" + hashlib.sha256(idempotency_basis.encode("utf-8")).hexdigest()
+              return {
+                  "call_item_id": call_task.get("callItemId"),
+                  "base_url": normalized_base_url,
+                  "masked_phone": mask_phone(call_task["phone"]),
+                  "idempotency_key": idempotency_key,
+                  "request_payload_json": json.dumps(request_payload, ensure_ascii=False),
+                  "metadata_sent_json": json.dumps(request_payload["metadata"], ensure_ascii=False),
+              }
+        variables:
+        - variable: call_task
+          value_selector:
+          - iterate_call_tasks
+          - item
+        - variable: base_url
+          value_selector:
+          - prepare_call_tasks
+          - base_url
+        outputs:
+          call_item_id:
+            type: string
+            children:
+          base_url:
+            type: string
+            children:
+          masked_phone:
+            type: string
+            children:
+          idempotency_key:
+            type: string
+            children:
+          request_payload_json:
+            type: string
+            children:
+          metadata_sent_json:
+            type: string
+            children:
+      height: 90
+      id: build_iteration_payload
+      position:
+        x: 170
+        y: 200
+      positionAbsolute:
+        x: 1270
+        y: 430
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      parentId: iterate_call_tasks
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Creates the live CALL-E call. This node only runs when dry_run=false
+          because dry runs pass an empty task list into the iteration.
+        selected: false
+        title: Create CALL-E call
+        type: http-request
+        isInIteration: true
+        iteration_id: iterate_call_tasks
+        variables: []
+        method: post
+        url: "{{#build_iteration_payload.base_url#}}/v1/calls"
+        authorization:
+          type: api-key
+          config:
+            type: bearer
+            api_key: "{{#env.CALL_E_API_KEY#}}"
+        headers: |-
+          Accept: application/json
+          Content-Type: application/json
+          Idempotency-Key: {{#build_iteration_payload.idempotency_key#}}
+        params: ''
+        body:
+          type: json
+          data: "{{#build_iteration_payload.request_payload_json#}}"
+        ssl_verify: true
+        timeout:
+          connect: 10
+          read: 600
+          write: 600
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+        error_strategy: default-value
+        default_value:
+        - key: body
+          type: string
+          value: '{}'
+        - key: status_code
+          type: number
+          value: 0
+        retry_config:
+          retry_enabled: false
+          max_retries: 0
+          retry_interval: 1000
+      height: 90
+      id: create_calle_call
+      position:
+        x: 480
+        y: 200
+      positionAbsolute:
+        x: 1580
+        y: 430
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      parentId: iterate_call_tasks
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Extracts the call id from the create-call response before looking up
+          the result. Supports common response shapes such as id, call_id, callId,
+          data.id, data.call_id, call.id, and result.id.
+        selected: false
+        title: Extract call lookup id
+        type: code
+        isInIteration: true
+        iteration_id: iterate_call_tasks
+        code_language: python3
+        code: |
+          import json
+          import re
+          import time
+
+          TERMINAL_STATUSES = {
+              "completed", "failed", "canceled", "cancelled",
+              "no_answer", "declined", "voicemail", "busy", "expired"
+          }
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
+
+          def as_obj(value):
+              if isinstance(value, dict):
+                  return value
+              if isinstance(value, str) and value.strip():
+                  try:
+                      parsed = json.loads(value)
+                      return parsed if isinstance(parsed, dict) else {}
+                  except Exception:
+                      return {}
+              return {}
+
+          def nested_get(value, path):
+              cur = value
+              for key in path:
+                  if not isinstance(cur, dict):
+                      return None
+                  cur = cur.get(key)
+              return cur
+
+          def first_value(*values):
+              for value in values:
+                  if value not in (None, ""):
+                      return str(value)
+              return ""
+
+          def call_payload_from_response(value):
+              if not isinstance(value, dict):
+                  return {}
+              for key in ("data", "call", "result"):
+                  nested = value.get(key)
+                  if isinstance(nested, dict) and any(
+                      field in nested
+                      for field in ("id", "call_id", "callId", "status", "recipients", "structured_result", "summary")
+                  ):
+                      return nested
+              return value
+
+          def compare_metadata_round_trip(call, metadata_sent_json) -> dict:
+              metadata_sent = as_obj(metadata_sent_json)
+              call_payload = call_payload_from_response(call)
+              metadata_returned = as_obj(call_payload.get("metadata"))
+              metadata_keys = sorted([str(k) for k in metadata_sent.keys()])
+              missing_or_different = [
+                  key for key in metadata_keys
+                  if metadata_sent.get(key) != metadata_returned.get(key)
+              ]
+              return {
+                  "requestedKeys": metadata_keys,
+                  "allRequestedKeysReturned": len(missing_or_different) == 0,
+                  "missingOrDifferentKeys": missing_or_different,
+              }
+
+          def to_int(value) -> int:
+              try:
+                  return int(value)
+              except Exception:
+                  return 0
+
+          def mask_phone_like(value: str) -> str:
+              raw = str(value or "").strip()
+              digits = re.sub(r"\D", "", raw)
+              if not digits:
+                  return ""
+              if len(digits) <= 5:
+                  return "****"
+              if raw.startswith("+"):
+                  return "+" + digits[:2] + "****" + digits[-2:]
+              return digits[:3] + "****" + digits[-2:]
+
+          def redact_phone_text(value: str) -> str:
+              text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or ""))
+              text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+              return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+
+          def redact_phone_values(value):
+              if isinstance(value, str):
+                  return redact_phone_text(value)
+              if isinstance(value, list):
+                  return [redact_phone_values(v) for v in value]
+              if isinstance(value, dict):
+                  return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
+              return value
+
+          def create_failure_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
+              redacted_body = redact_phone_values(body)
+              redacted_json = json.dumps(redacted_body, ensure_ascii=False)
+              now_ms = int(time.time() * 1000)
+              context = {
+                  "callId": "",
+                  "lookupUrl": "",
+                  "initialCallJson": redacted_json,
+                  "createResponseJson": redacted_json,
+                  "startedAtMs": now_ms,
+                  "initialStatus": "create_failed",
+                  "initialDone": True,
+                  "metadataSentJson": metadata_sent_json,
+                  "maskedPhone": masked_phone,
+                  "callItemId": call_item_id,
+                  "createFailed": True,
+                  "createOutcomeUnknown": False,
+                  "createStatusCode": status_code,
+                  "createErrorMessage": message,
+                  "idempotencyKey": idempotency_key,
+              }
+              return {
+                  "call_id": "",
+                  "lookup_url": "",
+                  "initial_call_json": redacted_json,
+                  "started_at_ms": now_ms,
+                  "initial_status": "create_failed",
+                  "initial_done": True,
+                  "call_context": context,
+              }
+
+          def create_unknown_context(body: dict, status_code: int, message: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
+              redacted_body = redact_phone_values(body)
+              redacted_json = json.dumps(redacted_body, ensure_ascii=False)
+              now_ms = int(time.time() * 1000)
+              context = {
+                  "callId": "",
+                  "lookupUrl": "",
+                  "initialCallJson": redacted_json,
+                  "createResponseJson": redacted_json,
+                  "startedAtMs": now_ms,
+                  "initialStatus": "create_outcome_unknown",
+                  "initialDone": True,
+                  "metadataSentJson": metadata_sent_json,
+                  "maskedPhone": masked_phone,
+                  "callItemId": call_item_id,
+                  "createFailed": False,
+                  "createOutcomeUnknown": True,
+                  "createStatusCode": status_code,
+                  "createOutcomeMessage": message,
+                  "idempotencyKey": idempotency_key,
+              }
+              return {
+                  "call_id": "",
+                  "lookup_url": "",
+                  "initial_call_json": redacted_json,
+                  "started_at_ms": now_ms,
+                  "initial_status": "create_outcome_unknown",
+                  "initial_done": True,
+                  "call_context": context,
+              }
+
+          def main(create_response, create_status_code, base_url: str, metadata_sent_json: str, masked_phone: str, idempotency_key: str, call_item_id: str) -> dict:
+              body = as_obj(create_response)
+              status_code = to_int(create_status_code)
+              if status_code == 0:
+                  return create_unknown_context(
+                      body,
+                      status_code,
+                      "CALL-E create request ended without a determinate HTTP response. The call may already have been created. Replay or reconcile only with the same Idempotency-Key; do not generate a new key.",
+                      metadata_sent_json,
+                      masked_phone,
+                      idempotency_key,
+                      call_item_id,
+                  )
+              if not (200 <= status_code < 300):
+                  return create_failure_context(
+                      body,
+                      status_code,
+                      f"CALL-E create request returned HTTP {status_code or 'unknown'}.",
+                      metadata_sent_json,
+                      masked_phone,
+                      idempotency_key,
+                      call_item_id,
+                  )
+              call_id = first_value(
+                  body.get("id"),
+                  body.get("call_id"),
+                  body.get("callId"),
+                  body.get("uuid"),
+                  nested_get(body, ["data", "id"]),
+                  nested_get(body, ["data", "call_id"]),
+                  nested_get(body, ["data", "callId"]),
+                  nested_get(body, ["call", "id"]),
+                  nested_get(body, ["result", "id"]),
+              )
+              if not call_id:
+                  response_keys = ", ".join(sorted([str(k) for k in body.keys()])) or "(none)"
+                  return create_unknown_context(
+                      body,
+                      status_code,
+                      f"CALL-E create request returned HTTP {status_code} without a recognized call id. The call may already have been created. Replay or reconcile only with the same Idempotency-Key; do not generate a new key. Response keys: {response_keys}",
+                      metadata_sent_json,
+                      masked_phone,
+                      idempotency_key,
+                      call_item_id,
+                  )
+              root = str(base_url or "").strip().rstrip("/")
+              if not root:
+                  raise ValueError("CALL-E create response included a call id, but the normalized lookup base URL is missing.")
+              status = str(first_value(
+                  body.get("status"),
+                  nested_get(body, ["data", "status"]),
+                  nested_get(body, ["call", "status"]),
+                  nested_get(body, ["result", "status"]),
+              ) or "").strip().lower()
+              lookup_url = f"{root}/v1/calls/{call_id}"
+              metadata_round_trip = compare_metadata_round_trip(body, metadata_sent_json)
+              redacted_body = redact_phone_values(body)
+              redacted_call_payload = call_payload_from_response(redacted_body)
+              redacted_call_payload["_dify_metadata_round_trip"] = metadata_round_trip
+              redacted_json = json.dumps(redacted_body, ensure_ascii=False)
+              context = {
+                  "callId": call_id,
+                  "lookupUrl": lookup_url,
+                  "initialCallJson": redacted_json,
+                  "createResponseJson": redacted_json,
+                  "startedAtMs": int(time.time() * 1000),
+                  "initialStatus": status,
+                  "initialDone": status in TERMINAL_STATUSES,
+                  "metadataSentJson": metadata_sent_json,
+                  "maskedPhone": masked_phone,
+                  "callItemId": call_item_id,
+                  "createFailed": False,
+                  "createOutcomeUnknown": False,
+                  "createStatusCode": status_code,
+                  "idempotencyKey": idempotency_key,
+              }
+              return {
+                  "call_id": call_id,
+                  "lookup_url": lookup_url,
+                  "initial_call_json": context["initialCallJson"],
+                  "started_at_ms": context["startedAtMs"],
+                  "initial_status": status,
+                  "initial_done": context["initialDone"],
+                  "call_context": context,
+              }
+        variables:
+        - variable: create_response
+          value_selector:
+          - create_calle_call
+          - body
+        - variable: create_status_code
+          value_selector:
+          - create_calle_call
+          - status_code
+        - variable: base_url
+          value_selector:
+          - build_iteration_payload
+          - base_url
+        - variable: metadata_sent_json
+          value_selector:
+          - build_iteration_payload
+          - metadata_sent_json
+        - variable: masked_phone
+          value_selector:
+          - build_iteration_payload
+          - masked_phone
+        - variable: idempotency_key
+          value_selector:
+          - build_iteration_payload
+          - idempotency_key
+        - variable: call_item_id
+          value_selector:
+          - build_iteration_payload
+          - call_item_id
+        outputs:
+          call_id:
+            type: string
+            children:
+          lookup_url:
+            type: string
+            children:
+          initial_call_json:
+            type: string
+            children:
+          started_at_ms:
+            type: number
+            children:
+          initial_status:
+            type: string
+            children:
+          initial_done:
+            type: boolean
+            children:
+          call_context:
+            type: object
+            children:
+      height: 90
+      id: extract_call_lookup_id
+      position:
+        x: 790
+        y: 200
+      positionAbsolute:
+        x: 1890
+        y: 430
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      parentId: iterate_call_tasks
+      extent: parent
+      zIndex: 1002
+    - data:
+        desc: Builds the user-facing report and also keeps summary_json inside this
+          node for debugging. Click this node to inspect summary_json; it is not shown
+          in the final Result.
+        selected: false
+        title: Summarize iteration results
+        type: code
+        code_language: python3
+        code: |
+          import json
+          import re
+
+          PHONE_IN_TEXT_RE = re.compile(r"\+[1-9]\d{6,14}")
+          INTERNATIONAL_GROUPED_PHONE_RE = re.compile(r"(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)")
+          PHONE_LIKE_RE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}|[1-9]\d{6,14})(?!\d)")
+          IDEMPOTENCY_KEY_RE = re.compile(r"^dify-[0-9a-f]{64}$")
+
+          def mask_phone(phone: str) -> str:
+              value = str(phone or "").strip()
+              if not value:
+                  return ""
+              if len(value) <= 5:
+                  return "****"
+              return value[:3] + "****" + value[-2:]
+
+          def mask_phone_like(value: str) -> str:
+              raw = str(value or "").strip()
+              digits = re.sub(r"\D", "", raw)
+              if not digits:
+                  return ""
+              if len(digits) <= 5:
+                  return "****"
+              if raw.startswith("+"):
+                  return "+" + digits[:2] + "****" + digits[-2:]
+              return digits[:3] + "****" + digits[-2:]
+
+          def redact_phone_text(value: str) -> str:
+              text = INTERNATIONAL_GROUPED_PHONE_RE.sub(lambda match: mask_phone_like(match.group(0)), str(value or ""))
+              text = PHONE_IN_TEXT_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+              return PHONE_LIKE_RE.sub(lambda match: mask_phone_like(match.group(0)), text)
+
+          def redact_phone_values(value):
+              if isinstance(value, str):
+                  return redact_phone_text(value)
+              if isinstance(value, list):
+                  return [redact_phone_values(v) for v in value]
+              if isinstance(value, dict):
+                  return {redact_phone_text(k) if isinstance(k, str) else k: redact_phone_values(v) for k, v in value.items()}
+              return value
+
+          def validated_idempotency_key(value) -> str:
+              candidate = str(value or "").strip()
+              return candidate if IDEMPOTENCY_KEY_RE.fullmatch(candidate) else ""
+
+          def restore_reconciliation_keys(raw_results, safe_results):
+              for raw_item, safe_item in zip(raw_results, safe_results):
+                  if not isinstance(raw_item, dict) or not isinstance(safe_item, dict):
+                      continue
+                  raw_reconciliation = raw_item.get("reconciliation")
+                  safe_reconciliation = safe_item.get("reconciliation")
+                  if not isinstance(raw_reconciliation, dict) or not isinstance(safe_reconciliation, dict):
+                      continue
+                  if not raw_reconciliation.get("required"):
+                      continue
+                  idempotency_key = validated_idempotency_key(raw_reconciliation.get("idempotencyKey"))
+                  if not idempotency_key:
+                      continue
+                  safe_reconciliation["idempotencyKey"] = idempotency_key
+                  safe_reconciliation["instruction"] = (
+                      f"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}); "
+                      "do not generate a new key."
+                  )
+              return safe_results
+
+          def as_obj(value):
+              if isinstance(value, dict):
+                  return value
+              if isinstance(value, str) and value.strip():
+                  try:
+                      parsed = json.loads(value)
+                      return parsed if isinstance(parsed, dict) else {}
+                  except Exception:
+                      return {}
+              return {}
+
+          def line_value(value, fallback="Not available"):
+              if value is None or value == "":
+                  return fallback
+              return redact_phone_text(value)
+
+          def reconciliation_status_text(reconciliation) -> str:
+              idempotency_key = validated_idempotency_key(reconciliation.get("idempotencyKey"))
+              if idempotency_key:
+                  return (
+                      f"Replay or reconcile this request only with the same Idempotency-Key ({idempotency_key}); "
+                      "do not generate a new key."
+                  )
+              return line_value(reconciliation.get("instruction"))
+
+          def build_preview_lines(preview):
+              tasks = preview.get("tasks") if isinstance(preview, dict) else []
+              if not isinstance(tasks, list) or not tasks:
+                  return ["No preview tasks were generated."]
+              lines = []
+              for index, task in enumerate(tasks, 1):
+                  lines.extend([
+                      f"{index}. {line_value(task.get('callName') or task.get('callItemId'))}",
+                      f"   Phone: {line_value(task.get('maskedPhone'))}",
+                      f"   Task: {line_value(task.get('task'))}",
+                  ])
+              return lines
+
+          def lookup_status_text(lookup, polling) -> str:
+              if lookup.get("skipped"):
+                  return lookup.get("reason") or "skipped"
+              if polling.get("timedOut"):
+                  return "timed out"
+              if polling.get("errorMessage"):
+                  return "failed"
+              return "polled until terminal"
+
+          def build_live_lines(results):
+              if not results:
+                  return ["No live call results were returned."]
+              lines = []
+              for index, item in enumerate(results, 1):
+                  status = item.get("callStatus", {}) if isinstance(item.get("callStatus"), dict) else {}
+                  data = item.get("returnedData", {}) if isinstance(item.get("returnedData"), dict) else {}
+                  structured = data.get("structuredResult") if isinstance(data.get("structuredResult"), dict) else {}
+                  polling = item.get("polling", {}) if isinstance(item.get("polling"), dict) else {}
+                  lookup = item.get("lookup", {}) if isinstance(item.get("lookup"), dict) else {}
+                  reconciliation = item.get("reconciliation", {}) if isinstance(item.get("reconciliation"), dict) else {}
+                  evidence = data.get("evidence") if isinstance(data.get("evidence"), list) else []
+                  lines.extend([
+                      f"{index}. {line_value(item.get('callItemId'))}",
+                      f"   Phone: {line_value(item.get('maskedPhone'))}",
+                      f"   Call ID: {line_value(status.get('callId'))}",
+                      f"   Creation state: {line_value(status.get('creation_state'))}",
+                      f"   Status: {line_value(status.get('call_status'))}",
+                      f"   Recipient status: {line_value(status.get('recipient_status'))}",
+                      f"   Result lookup: {line_value(lookup_status_text(lookup, polling))}",
+                      f"   Call completed: {line_value(structured.get('call_completed'))}",
+                      f"   Outcome: {line_value(structured.get('outcome'))}",
+                      f"   Next action: {line_value(structured.get('next_action'))}",
+                      f"   Summary: {line_value(data.get('summary') or structured.get('summary'))}",
+                  ])
+                  if polling.get("errorMessage"):
+                      lines.append(f"   Polling note: {line_value(polling.get('errorMessage'))}")
+                  if reconciliation.get("required"):
+                      lines.append(f"   Reconciliation required: {reconciliation_status_text(reconciliation)}")
+                  if evidence:
+                      lines.append("   Evidence:")
+                      for point in evidence[:5]:
+                          lines.append(f"   - {line_value(point)}")
+              return lines
+
+          def to_int(value) -> int:
+              try:
+                  return int(value)
+              except Exception:
+                  return 0
+
+          def format_health_status(api_health_status_code) -> str:
+              status_code = to_int(api_health_status_code)
+              if 200 <= status_code < 300:
+                  return f"reachable (HTTP {status_code})"
+              if status_code:
+                  return f"failed (HTTP {status_code})"
+              return "unknown"
+
+          def main(results: list, task_count: int, live_task_count: int, dry_run: str, preview_json: str, api_health_response, api_health_status_code, validation_error: str) -> dict:
+              raw_results = results if isinstance(results, list) else []
+              safe_results = restore_reconciliation_keys(raw_results, redact_phone_values(raw_results))
+              dry_run_enabled = str(dry_run).strip().lower() == "true"
+              preview = redact_phone_values(as_obj(preview_json))
+              safe_api_health_response = redact_phone_values(api_health_response)
+              validation_error = redact_phone_text(validation_error).strip()
+              successful = 0
+              failed = 0
+              creation_unknown = 0
+              timed_out = 0
+              for item in safe_results:
+                  if not isinstance(item, dict):
+                      continue
+                  status = item.get("callStatus", {}) if isinstance(item.get("callStatus"), dict) else {}
+                  polling = item.get("polling", {}) if isinstance(item.get("polling"), dict) else {}
+                  if polling.get("timedOut"):
+                      timed_out += 1
+                  if status.get("ok") is True:
+                      successful += 1
+                  elif status.get("ok") is False:
+                      failed += 1
+                  else:
+                      creation_unknown += 1
+              created_count = sum(
+                  1
+                  for item in safe_results
+                  if isinstance(item, dict)
+                  and isinstance(item.get("callStatus"), dict)
+                  and item["callStatus"].get("created") is True
+              )
+              health_status = format_health_status(api_health_status_code)
+              connectivity_error = validation_error.startswith("CALL-E /health ")
+              if connectivity_error:
+                  report_lines = [
+                      "CALL-E One-shot Call",
+                      "",
+                      "Status: Connectivity error",
+                      f"API connectivity: {health_status} via GET /health",
+                      "",
+                      "Required action:",
+                      "- Check CALL_E_API_KEY, base_url, and CALL-E availability.",
+                      "",
+                      f"Details: {validation_error}",
+                  ]
+              elif validation_error:
+                  report_lines = [
+                      "CALL-E One-shot Call",
+                      "",
+                      "Status: Missing inputs",
+                      f"API connectivity: {health_status} via GET /health",
+                      "",
+                      "Required input:",
+                      "- Fill phone_number with one owned or explicitly authorized number in E.164 format.",
+                      "- Fill task with the exact instruction CALL-E should follow during this one call.",
+                      "",
+                      f"Details: {validation_error}",
+                  ]
+              elif dry_run_enabled:
+                  report_lines = [
+                      "CALL-E One-shot Call",
+                      "",
+                      "Mode: Dry run",
+                      "Live calls created: 0",
+                      f"API connectivity: {health_status} via GET /health",
+                      "",
+                      "Payload Preview:",
+                      *build_preview_lines(preview),
+                      "",
+                      "Next Step:",
+                      "Review the phone number and task. When ready, set dry_run=false to create a live call.",
+                  ]
+              else:
+                  report_lines = [
+                      "CALL-E One-shot Call",
+                      "",
+                      "Mode: Live",
+                      f"Live calls confirmed created: {created_count}",
+                      f"Call creation outcomes unknown (possibly created): {creation_unknown}",
+                      f"Successful results: {successful}",
+                      f"Failed results: {failed}",
+                      f"API connectivity: {health_status} via GET /health",
+                      "",
+                      "Call Results:",
+                      *build_live_lines(safe_results),
+                  ]
+              summary = {
+                  "dryRun": dry_run_enabled,
+                  "apiConnectivity": {
+                      "checked": True,
+                      "endpoint": "GET /health",
+                      "statusCode": to_int(api_health_status_code),
+                      "response": safe_api_health_response,
+                  },
+                  "liveCallsCreated": 0 if dry_run_enabled else (None if creation_unknown else created_count),
+                  "liveCallsConfirmedCreated": 0 if dry_run_enabled else created_count,
+                  "creationOutcomeUnknownCount": 0 if dry_run_enabled else creation_unknown,
+                  "processedCount": len(safe_results),
+                  "expectedCount": task_count,
+                  "liveExpectedCount": live_task_count,
+                  "successfulCount": successful,
+                  "failedCount": failed,
+                  "timedOutCount": timed_out,
+                  "validationError": validation_error,
+                  "preview": preview,
+                  "results": safe_results,
+                  "note": "dry_run=true checks CALL-E /health and previews the payload without POST /v1/calls. dry_run=false creates one live call, then polls GET /v1/calls/{id} until the call is terminal or the polling timeout is reached. For batch behavior, call this one-shot tool from an external loop."
+              }
+              return {
+                  "report": "\n".join(report_lines),
+                  "summary_json": json.dumps(summary, ensure_ascii=False, indent=2)
+              }
+        variables:
+        - variable: results
+          value_selector:
+          - parse_iteration_result
+          - results
+        - variable: task_count
+          value_selector:
+          - prepare_call_tasks
+          - task_count
+        - variable: live_task_count
+          value_selector:
+          - gate_live_calls_after_health
+          - live_task_count
+        - variable: dry_run
+          value_selector:
+          - prepare_call_tasks
+          - dry_run
+        - variable: preview_json
+          value_selector:
+          - prepare_call_tasks
+          - preview_json
+        - variable: api_health_response
+          value_selector:
+          - check_api_connectivity
+          - body
+        - variable: api_health_status_code
+          value_selector:
+          - check_api_connectivity
+          - status_code
+        - variable: validation_error
+          value_selector:
+          - gate_live_calls_after_health
+          - validation_error
+        outputs:
+          report:
+            type: string
+            children:
+          summary_json:
+            type: string
+            children:
+      height: 90
+      id: summarize_iteration_results
+      position:
+        x: 5480
+        y: 320
+      positionAbsolute:
+        x: 5480
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Final output shows only the user-facing report. The debug summary_json
+          remains available inside the Summarize iteration results node and is intentionally
+          not included here.
+        selected: false
+        title: End
+        type: end
+        outputs:
+        - variable: report
+          value_selector:
+          - summarize_iteration_results
+          - report
+          value_type: string
+      height: 90
+      id: end
+      position:
+        x: 5820
+        y: 320
+      positionAbsolute:
+        x: 5820
+        y: 320
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: code
+      id: start-source-prepare_call_tasks-target
+      source: start
+      sourceHandle: source
+      target: prepare_call_tasks
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: http-request
+      id: prepare_call_tasks-source-check_api_connectivity-target
+      source: prepare_call_tasks
+      sourceHandle: source
+      target: check_api_connectivity
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: check_api_connectivity-source-gate_live_calls_after_health-target
+      source: check_api_connectivity
+      sourceHandle: source
+      target: gate_live_calls_after_health
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: iteration
+      id: gate_live_calls_after_health-source-iterate_call_tasks-target
+      source: gate_live_calls_after_health
+      sourceHandle: source
+      target: iterate_call_tasks
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: iteration
+        targetType: code
+      id: iterate_call_tasks-source-prepare_poll_context-target
+      source: iterate_call_tasks
+      sourceHandle: source
+      target: prepare_poll_context
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: loop
+      id: prepare_poll_context-source-poll_until_terminal-target
+      source: prepare_poll_context
+      sourceHandle: source
+      target: poll_until_terminal
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: loop
+        targetType: code
+      id: poll_until_terminal-source-parse_iteration_result-target
+      source: poll_until_terminal
+      sourceHandle: source
+      target: parse_iteration_result
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: parse_iteration_result-source-summarize_iteration_results-target
+      source: parse_iteration_result
+      sourceHandle: source
+      target: summarize_iteration_results
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: summarize_iteration_results-source-end-target
+      source: summarize_iteration_results
+      sourceHandle: source
+      target: end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: iteration-start
+        targetType: code
+        iteration_id: iterate_call_tasks
+      id: iterate_call_tasks_start-source-build_iteration_payload-target
+      source: iterate_call_tasks_start
+      sourceHandle: source
+      target: build_iteration_payload
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
+        targetType: http-request
+        iteration_id: iterate_call_tasks
+      id: build_iteration_payload-source-create_calle_call-target
+      source: build_iteration_payload
+      sourceHandle: source
+      target: create_calle_call
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+        iteration_id: iterate_call_tasks
+      id: create_calle_call-source-extract_call_lookup_id-target
+      source: create_calle_call
+      sourceHandle: source
+      target: extract_call_lookup_id
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: loop-start
+        targetType: code
+        loop_id: poll_until_terminal
+      id: poll_until_terminal_start-source-wait_before_poll-target
+      source: poll_until_terminal_start
+      sourceHandle: source
+      target: wait_before_poll
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll-source-wait_before_poll_2-target
+      source: wait_before_poll
+      sourceHandle: source
+      target: wait_before_poll_2
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll_2-source-wait_before_poll_3-target
+      source: wait_before_poll_2
+      sourceHandle: source
+      target: wait_before_poll_3
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll_3-source-wait_before_poll_4-target
+      source: wait_before_poll_3
+      sourceHandle: source
+      target: wait_before_poll_4
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: code
+        loop_id: poll_until_terminal
+      id: wait_before_poll_4-source-wait_before_poll_5-target
+      source: wait_before_poll_4
+      sourceHandle: source
+      target: wait_before_poll_5
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: http-request
+        loop_id: poll_until_terminal
+      id: wait_before_poll_5-source-get_calle_call_result-target
+      source: wait_before_poll_5
+      sourceHandle: source
+      target: get_calle_call_result
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: http-request
+        targetType: code
+        loop_id: poll_until_terminal
+      id: get_calle_call_result-source-evaluate_poll_state-target
+      source: get_calle_call_result
+      sourceHandle: source
+      target: evaluate_poll_state
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        sourceType: code
+        targetType: assigner
+        loop_id: poll_until_terminal
+      id: evaluate_poll_state-source-store_poll_state-target
+      source: evaluate_poll_state
+      sourceHandle: source
+      target: store_poll_state
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.65
