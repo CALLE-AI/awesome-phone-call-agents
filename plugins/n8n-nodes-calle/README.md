@@ -2,7 +2,8 @@
 
 The CALL-E n8n community node is maintained in its standalone repository:
 
-- [Source code, issues, releases, and contribution guidance](https://github.com/CALLE-AI/n8n-nodes-calle)
+- [Source code, releases, and contribution guidance](https://github.com/CALLE-AI/n8n-nodes-calle)
+- [Issue tracker](https://github.com/CALLE-AI/n8n-nodes-calle/issues)
 - [Published npm package](https://www.npmjs.com/package/@call-e/n8n-nodes-calle)
 - [CALL-E Developer Docs](https://docs.heycall-e.com/)
 
