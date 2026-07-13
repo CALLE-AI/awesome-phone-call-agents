@@ -20,7 +20,7 @@ Keep these permission boundaries separate.
 | Installed static app | HubSpot account | The app requests only the scopes in `hubspot-project/src/app/app-hsmeta.json`: `crm.objects.contacts.read` and `crm.objects.deals.read`. It does not request CRM write scopes. |
 | HubSpot product | Customer account | Content Hub Enterprise for the public workflow endpoint. The account must also support the administrator's project-app installation and CRM record customization work. |
 | HubSpot administration | Administrator | Permission to install or reinstall the app, manage serverless secrets, configure workflows, and customize Contact or Deal record layouts to add App Cards. |
-| CALL-E | Administrator | Create or select a CALL-E API key at https://dashboard.heycall-e.com/account/api-keys, and retain CALL-E dashboard or API access for call review and accepted-call cancellation. |
+| CALL-E | Administrator | Create or select a CALL-E API key at https://dashboard.heycall-e.com/account/api-keys. Use the official [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for request and response contracts, and retain CALL-E dashboard or API access for call review and accepted-call cancellation. |
 
 Before the first deployment, confirm that the test phone number is authorized for outbound contact and stored in E.164 format, for example `+15555550123`.
 
@@ -32,7 +32,7 @@ Browser automation is optional in that workflow. When browser control is unavail
 
 ## Administrator: First-Time Installation
 
-Before running the installer, create or select the CALL-E API key at https://dashboard.heycall-e.com/account/api-keys. Enter it only through hidden local terminal input. Never paste it into Agent chat.
+Before running the installer, create or select the CALL-E API key at https://dashboard.heycall-e.com/account/api-keys. Consult the official [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) when validating the provider request or response contract. Enter the key only through hidden local terminal input. Never paste it into Agent chat.
 
 Use a configured standard-account alias and verify it before any deployment. The installer resolves the alias through the HubSpot CLI and refuses an unknown or mismatched account before changing local workflow metadata, secrets, or the remote project.
 

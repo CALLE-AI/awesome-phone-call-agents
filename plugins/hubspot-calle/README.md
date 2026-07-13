@@ -14,6 +14,7 @@ Administrators deploy the project, manage HubSpot secrets, install or reinstall 
 
 The [CALL-E for HubSpot Direct-Call User Manual](docs/direct-call-user-manual.md) is the authoritative installation, administrator, and user guide. See [setup.md](docs/setup.md) for a concise deployment and local-verification reference.
 For administrator-led deployments, use the [Administrator Agent Prompt](docs/admin-agent-prompt.md). It automates preflight checks, validation, deployment, and guided HubSpot UI setup with approval gates before secret entry, remote mutations, layout saves, workflow activation, or real calls.
+For CALL-E request and response contracts, use the official [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference).
 
 ## Entry Points
 

@@ -14,6 +14,7 @@ Hard rules
 - Collect secrets only through hidden local terminal input. The only permitted secret paths are hidden terminal input -> environment -> existing installer -> HubSpot secret store, plus direct administrator entry of `CALLE_WORKFLOW_ENDPOINT_TOKEN` into the approved HubSpot workflow field. All other exposure remains forbidden.
 - `CALLE_WORKFLOW_ENDPOINT_TOKEN` handling is stateful: first install creates and stores a strong random token in the administrator's password manager or secret manager; redeploy reuses the existing token; rotation is a separate explicitly approved operation coordinated with every workflow action before any workflow is re-enabled. The Agent must never see the token, generate it into tool output, echo it, or repeat it.
 - When the administrator needs a CALL-E API key, direct them to https://dashboard.heycall-e.com/account/api-keys. Do not ask them to paste the key into chat.
+- Use the official CALL-E API Reference at https://docs.heycall-e.com/#/api-reference when checking CALL-E request and response contracts. Do not infer undocumented fields or behavior.
 - Default to no live call. A real call needs a separate final confirmation after deployment and UI setup are complete.
 
 Phase 1 - Read-only discovery
@@ -50,6 +51,7 @@ Phase 2 - Local validation and credential readiness
 2. If any validation fails, stop and report the failure without secrets.
 3. Confirm credential readiness:
    - CALL-E API key acquisition page: https://dashboard.heycall-e.com/account/api-keys
+   - CALL-E API Reference: https://docs.heycall-e.com/#/api-reference
    - Hidden local terminal input only for `CALL_E_API_KEY`
    - First install: the administrator must create and store a strong random `CALLE_WORKFLOW_ENDPOINT_TOKEN` in their own password manager or secret manager before deployment
    - Redeploy: reuse the existing `CALLE_WORKFLOW_ENDPOINT_TOKEN` from the administrator's secret manager unless the administrator explicitly approves coordinated rotation
