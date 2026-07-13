@@ -13,9 +13,6 @@ node_modules/
 .pnpm-store/
 coverage/
 dist/
-!plugins/n8n-nodes-calle/dist/
-!plugins/n8n-nodes-calle/dist/**
-plugins/n8n-nodes-calle/dist/tsconfig.tsbuildinfo
 build/
 .tmp/
 logs/

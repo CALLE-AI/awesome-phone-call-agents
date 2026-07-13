@@ -168,16 +168,6 @@ v0.1.0
 
 If a future artifact-specific release process is introduced, document its tag format here before publishing tags that use it.
 
-Artifact-specific release tags:
-
-- `call-e-n8n-nodes-calle-v<major>.<minor>.<patch>` publishes the `plugins/n8n-nodes-calle` npm package as `@call-e/n8n-nodes-calle`.
-
-Recommended example:
-
-```text
-call-e-n8n-nodes-calle-v0.1.0
-```
-
 ## Remotes
 
 Use short names that identify ownership or purpose:
