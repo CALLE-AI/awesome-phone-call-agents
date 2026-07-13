@@ -11,7 +11,7 @@ Administrators who want an approval-gated operator flow can use the [Administrat
 - A CALL-E API key from https://dashboard.heycall-e.com/account/api-keys and an authorized E.164 test phone number. Enter the key only through hidden local terminal input, never in Agent chat or command arguments.
 - Administrator access to install or reinstall the static app and customize Contact or Deal record layouts.
 
-The installed static app's scopes are separate from CLI deployment permissions. It separately requests `oauth`; its two `crm.objects.*` scopes in `hubspot-project/src/app/app-hsmeta.json` are read-only access to contacts and deals.
+The installed static app's scopes are separate from CLI deployment permissions. Its only scopes in `hubspot-project/src/app/app-hsmeta.json` are `crm.objects.contacts.read` and `crm.objects.deals.read`, providing read-only access to contacts and deals.
 
 ## Deploy Or Recover
 
@@ -38,7 +38,7 @@ unset CALL_E_API_KEY
 
 The installer validates the local Node.js version, detected HubSpot CLI version, and requested account before local metadata or remote mutation, configures the account-specific action URL, writes secrets when requested, builds, validates, uploads, and reports `installed`, `reinstall_required`, `manual_install_required`, or `upload_skipped`.
 
-If it generates `CALLE_WORKFLOW_ENDPOINT_TOKEN`, it prints the value once before mutation. Store it with administrator secrets. For a recovery rerun, prompt for the saved value instead of allowing a new one to replace it:
+If the remote `CALLE_WORKFLOW_ENDPOINT_TOKEN` secret does not yet exist, the installer may generate it for a first installation and print it once before mutation. Store it with administrator secrets. On a redeploy, the installer refuses to generate a replacement token: prompt for the saved administrator-managed value, or explicitly coordinate rotation before using a new value.
 
 Human or other administrator-controlled manual terminal runs may use that installer-generated one-time token path, but the administrator must save the token immediately. Agent-assisted runs intentionally must not use installer generation because tool output may be retained; they must pre-create and store `CALLE_WORKFLOW_ENDPOINT_TOKEN`, then supply it through the hidden same-session path in the [Administrator Agent Prompt](./admin-agent-prompt.md). This stricter Agent safety path does not change installer behavior.
 

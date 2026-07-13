@@ -17,7 +17,7 @@ Keep these permission boundaries separate.
 | Area | Who needs it | Requirement |
 | --- | --- | --- |
 | HubSpot CLI deployment | Administrator or deployer | Node.js `20.0.0` or newer and a HubSpot CLI personal access key authenticated to the target account, with HubSpot CLI `8.4.0` or newer for developer projects and serverless secrets. The deployment permissions include project upload and secret read/write operations; they are not the app's installed CRM scopes. |
-| Installed static app | HubSpot account | The app requests only the scopes in `hubspot-project/src/app/app-hsmeta.json`: `oauth`, `crm.objects.contacts.read`, and `crm.objects.deals.read`. It does not request CRM write scopes. |
+| Installed static app | HubSpot account | The app requests only the scopes in `hubspot-project/src/app/app-hsmeta.json`: `crm.objects.contacts.read` and `crm.objects.deals.read`. It does not request CRM write scopes. |
 | HubSpot product | Customer account | Content Hub Enterprise for the public workflow endpoint. The account must also support the administrator's project-app installation and CRM record customization work. |
 | HubSpot administration | Administrator | Permission to install or reinstall the app, manage serverless secrets, configure workflows, and customize Contact or Deal record layouts to add App Cards. |
 | CALL-E | Administrator | Create or select a CALL-E API key at https://dashboard.heycall-e.com/account/api-keys, and retain CALL-E dashboard or API access for call review and accepted-call cancellation. |
@@ -61,7 +61,7 @@ unset CALL_E_API_KEY
 
 After it validates the local Node.js and HubSpot CLI versions, the requested account, and the preflight secret state, the installer writes the target account's public workflow endpoint into the local workflow-action metadata, optionally adds or updates HubSpot secrets, builds, validates, uploads, and checks static app installation status.
 
-When `--set-secrets-from-env` is used and `CALLE_WORKFLOW_ENDPOINT_TOKEN` is absent, the installer generates a token and prints it once before any mutation. Store it in an administrator-controlled secret store. It is needed only when an administrator configures the workflow action; do not give it to ordinary sales or operations users.
+When `--set-secrets-from-env` is used and the remote `CALLE_WORKFLOW_ENDPOINT_TOKEN` secret is absent, the installer may generate a token for first installation and prints it once before any mutation. Store it in an administrator-controlled secret store. It is needed only when an administrator configures the workflow action; do not give it to ordinary sales or operations users. When that remote secret already exists, the installer requires the administrator-managed existing token or explicit coordinated rotation; it never silently generates a replacement.
 
 Human or other administrator-controlled manual terminal runs may use that installer-generated one-time token path, but the administrator must save the token immediately. Agent-assisted runs intentionally must not use installer generation because tool output may be retained; they must pre-create and store `CALLE_WORKFLOW_ENDPOINT_TOKEN`, then supply it through the hidden same-session path in the [Administrator Agent Prompt](./admin-agent-prompt.md). This stricter Agent safety path does not change installer behavior.
 

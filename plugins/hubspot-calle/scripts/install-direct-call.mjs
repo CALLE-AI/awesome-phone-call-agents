@@ -239,20 +239,6 @@ export function normalizeEndpointUrl(options) {
   return normalizedUrl;
 }
 
-export function collectSecretValues(env) {
-  const apiKey = env.CALL_E_API_KEY;
-  if (!apiKey) {
-    throw new Error("CALL_E_API_KEY is required when using --set-secrets-from-env.");
-  }
-
-  const endpointToken = env.CALLE_WORKFLOW_ENDPOINT_TOKEN || randomBytes(24).toString("hex");
-  return {
-    CALL_E_API_KEY: apiKey,
-    CALL_E_BASE_URL: normalizeCallEBaseUrl(env.CALL_E_BASE_URL || defaultCallEBaseUrl),
-    CALLE_WORKFLOW_ENDPOINT_TOKEN: endpointToken,
-  };
-}
-
 export function parseSecretList(output) {
   const found = new Set();
   for (const line of String(output).split(/\r?\n/)) {
@@ -375,6 +361,56 @@ function safeCommandLine(executable, args) {
     .join(" ");
 }
 
+function escapeRegularExpression(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function normalizeCliOutput(output) {
+  return String(output)
+    .replace(/\u001B\][^\u0007\u001B]*(?:\u0007|\u001B\\)?/g, "")
+    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g, "");
+}
+
+export function assertSecretMutationConfirmation(action, name, account, result) {
+  const actionText = action === "add" ? "was added to" : "was updated in";
+  const confirmation = `The secret "${name}" ${actionText} the HubSpot account:`;
+  const accountId = escapeRegularExpression(account.id);
+  const namedAccount = account.name
+    ? `${escapeRegularExpression(account.name)} \\[[^\\]\\r\\n]+\\] \\(${accountId}\\)`
+    : "";
+  const accountDescription = action === "add"
+    ? `(?:${accountId}${namedAccount ? `|${namedAccount}` : ""})`
+    : accountId;
+  const successLine = new RegExp(
+    `^(?:(?:✔ SUCCESS|\\[SUCCESS\\])\\s+)?${escapeRegularExpression(confirmation)} ${accountDescription}$`
+  );
+  const mutationLine = new RegExp(
+    `The secret "${escapeRegularExpression(name)}" was (?:added to|updated in) the HubSpot account:`
+  );
+  const allowedUpdateExplanation = "Existing serverless functions will start using this new value within 10 seconds.";
+  const lines = normalizeCliOutput(`${result.stdout || ""}\n${result.stderr || ""}`)
+    .split("\n")
+    .filter((line) => line.length > 0);
+  const matchingMutationLines = lines.filter((line) => mutationLine.test(line));
+  const hasFailureMarker = lines.some((line) => /\b(?:ERROR|FAILED|FAILURE)\b/i.test(line));
+  const hasOnlyKnownOutput = lines.every((line) =>
+    successLine.test(line) || (action === "update" && line === allowedUpdateExplanation)
+  );
+
+  if (
+    !hasFailureMarker
+    && matchingMutationLines.length === 1
+    && successLine.test(matchingMutationLines[0])
+    && hasOnlyKnownOutput
+  ) return;
+
+  const displayName = name === "CALL_E_API_KEY" ? "CALL-E API key" : name;
+  throw new Error(
+    `HubSpot CLI did not confirm ${action} of ${displayName} for account ${account.id}.`
+  );
+}
+
 async function requireSuccessful(command, executable, args, options = {}) {
   const result = await command(executable, args, options);
   const allowedStatuses = options.allowedStatuses || [0];
@@ -396,24 +432,20 @@ async function requireSuccessful(command, executable, args, options = {}) {
   return result;
 }
 
-function prepareSecretPlan(options, env, tokenFactory) {
+function prepareSecretPlan(options, env) {
   if (options.skipSecrets) return { mode: "skip" };
   if (!options.setSecretsFromEnv) return { mode: "check" };
 
   if (!env.CALL_E_API_KEY) {
     throw new Error("CALL_E_API_KEY is required when using --set-secrets-from-env.");
   }
-  const generated = !env.CALLE_WORKFLOW_ENDPOINT_TOKEN;
-  const endpointToken = generated
-    ? options.dryRun ? "" : tokenFactory()
-    : env.CALLE_WORKFLOW_ENDPOINT_TOKEN;
   return {
     mode: "set",
-    generated,
+    generated: false,
     values: {
       CALL_E_API_KEY: env.CALL_E_API_KEY,
       CALL_E_BASE_URL: normalizeCallEBaseUrl(env.CALL_E_BASE_URL || defaultCallEBaseUrl),
-      CALLE_WORKFLOW_ENDPOINT_TOKEN: endpointToken,
+      CALLE_WORKFLOW_ENDPOINT_TOKEN: env.CALLE_WORKFLOW_ENDPOINT_TOKEN || "",
     },
   };
 }
@@ -424,6 +456,25 @@ async function preflightSecrets(account, secretPlan, command) {
   const existing = parseSecretList(result.stdout);
   if (secretPlan.mode === "check") assertRequiredSecrets(existing);
   return existing;
+}
+
+function finalizeSecretPlan(options, secretPlan, existing, tokenFactory) {
+  if (secretPlan.mode !== "set" || secretPlan.values.CALLE_WORKFLOW_ENDPOINT_TOKEN) {
+    return secretPlan;
+  }
+  if (existing.has("CALLE_WORKFLOW_ENDPOINT_TOKEN")) {
+    throw new Error(
+      "CALLE_WORKFLOW_ENDPOINT_TOKEN already exists in HubSpot. Supply the administrator-managed existing token or explicitly coordinate rotation."
+    );
+  }
+  return {
+    ...secretPlan,
+    generated: true,
+    values: {
+      ...secretPlan.values,
+      CALLE_WORKFLOW_ENDPOINT_TOKEN: options.dryRun ? "" : tokenFactory(),
+    },
+  };
 }
 
 function printTokenRecoveryNotice(secretPlan, log) {
@@ -445,9 +496,10 @@ async function applySecretPlan(options, account, secretPlan, existing, command, 
       continue;
     }
     log(`${existing.has(name) ? "Updating" : "Adding"} HubSpot secret ${name === "CALL_E_API_KEY" ? "CALL-E API key" : name}`);
-    await command("hs", ["secret", action, name, ...accountArgs(account.id)], {
+    const result = await command("hs", ["secret", action, name, ...accountArgs(account.id)], {
       input: `${secretPlan.values[name]}\n`,
     });
+    assertSecretMutationConfirmation(action, name, account, result);
   }
 }
 
@@ -515,11 +567,12 @@ export async function runInstaller(options, dependencies = {}) {
   const account = parseAccountInfo(accountResult.stdout);
   assertRequestedAccount(options.account, account);
   const endpointUrl = normalizeEndpointUrl(options);
-  const secretPlan = prepareSecretPlan(options, env, tokenFactory);
+  let secretPlan = prepareSecretPlan(options, env);
+  const existingSecrets = await preflightSecrets(account, secretPlan, successfulCommand);
+  secretPlan = finalizeSecretPlan(options, secretPlan, existingSecrets, tokenFactory);
   if (secretPlan.mode === "set") {
     secretValues.push(...Object.values(secretPlan.values).filter(Boolean));
   }
-  const existingSecrets = await preflightSecrets(account, secretPlan, successfulCommand);
   printTokenRecoveryNotice(secretPlan, log);
 
   await configure(endpointUrl, options.dryRun, log);
