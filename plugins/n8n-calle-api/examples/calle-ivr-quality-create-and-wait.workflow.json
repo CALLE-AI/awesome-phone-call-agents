@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Run IVR call quality checks with CALL-E phone calls in n8n\n\n### How it works\n\nThis workflow runs manually, loads and validates CALL-E API settings, builds a small list of IVR quality-check tasks, loops through the tasks one at a time, creates each CALL-E call with `POST /v1/calls`, polls `GET /v1/calls/{id}` until a terminal status, parses the call result, and returns a demo-friendly result view plus an execution summary.\n\n### Setup steps\n\n- Create or copy an API key from [CALL-E API Keys](https://dashboard.heycall-e.com/account/api-keys).\n- Open `CALL-E Config` and replace `replace_with_calle_api_key` with that API key.\n- Review the [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for endpoint, request, and response details.\n- Open `Phone/Task List` and replace the blocked placeholder E.164 phone numbers with numbers you own or are explicitly authorized to call.\n- Update the IVR task text, locale, region, and metadata for your quality-check scenario.\n- Keep the workflow inactive until the API key and authorized test numbers are configured.\n- Run from `Manual Trigger` and inspect `Demo Result View` and `Execution Summary`.\n\n### Safety\n\nThis template can create real outbound calls after a valid API key and authorized phone numbers are configured. By default, placeholder numbers fail validation so the sample cannot dial accidentally. The output masks phone numbers and redacts phone fields from the raw call result view.\n\n### Customization\n\nAdjust the task list, CALL-E payload construction, result schema, parsing logic, and summary formatting to match different IVR quality checks, scoring criteria, or reporting needs.",
+        "content": "## Run IVR call quality checks with CALL-E phone calls in n8n\n\n### How it works\n\nThis workflow runs manually, loads and validates CALL-E API settings, builds a small list of IVR quality-check tasks, loops through the tasks one at a time, creates each CALL-E call with `POST /v1/calls`, polls `GET /v1/calls/{id}` until a terminal status, parses the call result, and returns a demo-friendly result view plus an execution summary.\n\n### Setup steps\n\n- Create or copy an API key from [CALL-E API Keys](https://dashboard.heycall-e.com/account/api-keys).\n- Open `CALL-E Config` and replace `replace_with_calle_api_key` with that API key.\n- Review the [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for endpoint, request, and response details.\n- Open `Phone/Task List` and replace the blocked placeholder E.164 phone numbers with numbers you own or are explicitly authorized to call.\n- Update the IVR task text, locale, region, and metadata for your quality-check scenario.\n- Keep the workflow inactive until the API key and authorized test numbers are configured.\n- Run from `Manual Trigger` and inspect `Demo Result View` and `Execution Summary`.\n\n### Safety\n\nThis template can create real outbound calls after a valid API key and authorized phone numbers are configured. By default, placeholder numbers fail validation so the sample cannot dial accidentally. The output masks phone numbers across the complete displayed result, including metadata, raw call data, status messages, and API errors. Code-node polling is capped at four minutes so it remains below n8n's default runner task timeout.\n\n### Customization\n\nAdjust the task list, CALL-E payload construction, result schema, parsing logic, and summary formatting to match different IVR quality checks, scoring criteria, or reporting needs.",
         "height": 900,
         "width": 520,
         "color": 4
@@ -19,8 +19,8 @@
     },
     {
       "parameters": {
-        "content": "## Start and configure\n\nCreate or copy an API key from [CALL-E API Keys](https://dashboard.heycall-e.com/account/api-keys), then open `CALL-E Config` and replace `replace_with_calle_api_key`.\n\nUse the [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for endpoint, request, and response details.\n\n`Manual Trigger` starts the workflow. `CALL-E Config` stores the API key, base URL, polling interval, and timeout. `Validate CALL-E Config` fails fast before any call task is built if the API key is missing or still set to the placeholder.",
-        "height": 416,
+        "content": "## Start and configure\n\nCreate or copy an API key from [CALL-E API Keys](https://dashboard.heycall-e.com/account/api-keys), then open `CALL-E Config` and replace `replace_with_calle_api_key`.\n\nUse the [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for endpoint, request, and response details.\n\n`Manual Trigger` starts the workflow. `CALL-E Config` stores the API key, base URL, polling interval, and timeout. `Validate CALL-E Config` fails fast before any call task is built if the API key is missing, still set to the placeholder, or the Code-node wait timeout exceeds four minutes.",
+        "height": 480,
         "width": 736,
         "color": 7
       },
@@ -36,7 +36,7 @@
     {
       "parameters": {
         "content": "## Prepare call batches\n\n`Phone/Task List` defines the IVR quality-check rows, validates E.164 numbers, blocks the default placeholder numbers, and passes one item at a time into `Loop Over Calls` with batch size 1.",
-        "height": 352,
+        "height": 480,
         "width": 484,
         "color": 7
       },
@@ -46,13 +46,13 @@
       "typeVersion": 1,
       "position": [
         1376,
-        304
+        320
       ]
     },
     {
       "parameters": {
-        "content": "## Create API request\n\n`Build CALL-E Request Payload` constructs the per-call request body, result schema, recipient schema, metadata, and idempotency key. `Create CALL-E Call and Wait` sends `POST /v1/calls`, then polls `GET /v1/calls/{id}` until the call reaches `completed`, `failed`, or `canceled`, or until timeout.",
-        "height": 368,
+        "content": "## Create API request\n\n`Build CALL-E Request Payload` builds the request body, schemas, metadata, and idempotency key. `Create CALL-E Call and Wait` creates the call and polls until a terminal status or the four-minute deadline. Poll intervals and HTTP requests are bounded to stay within the n8n runner limit.",
+        "height": 480,
         "width": 552,
         "color": 7
       },
@@ -62,13 +62,13 @@
       "typeVersion": 1,
       "position": [
         1920,
-        400
+        432
       ]
     },
     {
       "parameters": {
-        "content": "## Parse call results\n\n`Parse CALL-E Result` extracts call status, recipient status, attempt status, summary, transcript turns, structured result, metadata, failure code, and status signals. `Demo Result View` masks phone numbers and redacts raw phone fields before displaying per-call output.",
-        "height": 368,
+        "content": "## Parse call results\n\n`Parse CALL-E Result` extracts call status, recipient status, attempt status, summary, transcript turns, structured result, metadata, failure code, and status signals. `Demo Result View` applies phone masking to the complete displayed result, including metadata, raw call data, status messages, and API errors.",
+        "height": 480,
         "width": 520,
         "color": 7
       },
@@ -78,13 +78,13 @@
       "typeVersion": 1,
       "position": [
         2560,
-        400
+        432
       ]
     },
     {
       "parameters": {
         "content": "## Summarize execution\n\nThe upper branch from `Loop Over Calls` produces `Execution Summary` after all items have been processed. The summary includes counts, masked phone values, metadata round-trip data, call status, and returned summary/structured result fields.",
-        "height": 424,
+        "height": 448,
         "width": 300,
         "color": 7
       },
@@ -105,12 +105,12 @@
       "typeVersion": 1,
       "position": [
         608,
-        496
+        640
       ]
     },
     {
       "parameters": {
-        "jsCode": "return [\n  {\n    json: {\n      calleConfig: {\n        apiKey: \"replace_with_calle_api_key\",\n        baseUrl: \"https://api.heycall-e.com\",\n        pollIntervalSeconds: 5,\n        waitTimeoutMinutes: 30\n      }\n    }\n  }\n];"
+        "jsCode": "return [\n  {\n    json: {\n      calleConfig: {\n        apiKey: \"replace_with_calle_api_key\",\n        baseUrl: \"https://api.heycall-e.com\",\n        pollIntervalSeconds: 5,\n        waitTimeoutMinutes: 4\n      }\n    }\n  }\n];"
       },
       "id": "56fb6781-18dc-4293-a1ca-54df15c2365c",
       "name": "CALL-E Config",
@@ -118,12 +118,12 @@
       "typeVersion": 2,
       "position": [
         864,
-        496
+        640
       ]
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst config = items[0]?.json?.calleConfig || {};\n\nif (!config.apiKey || config.apiKey === \"replace_with_calle_api_key\") {\n  throw new Error(\"CALL-E API key is missing. Open the CALL-E Config node and replace apiKey before running this workflow.\");\n}\n\nif (!config.baseUrl) {\n  throw new Error(\"CALL-E baseUrl is missing. Open the CALL-E Config node and set baseUrl.\");\n}\n\nreturn items;"
+        "jsCode": "const items = $input.all();\nconst config = items[0]?.json?.calleConfig || {};\n\nif (!config.apiKey || config.apiKey === \"replace_with_calle_api_key\") {\n  throw new Error(\"CALL-E API key is missing. Open the CALL-E Config node and replace apiKey before running this workflow.\");\n}\n\nif (!config.baseUrl) {\n  throw new Error(\"CALL-E baseUrl is missing. Open the CALL-E Config node and set baseUrl.\");\n}\n\nconst pollIntervalSeconds = Number(config.pollIntervalSeconds);\nif (!Number.isFinite(pollIntervalSeconds) || pollIntervalSeconds < 1 || pollIntervalSeconds > 30) {\n  throw new Error(\"CALL-E pollIntervalSeconds must be between 1 and 30 seconds.\");\n}\n\nconst waitTimeoutMinutes = Number(config.waitTimeoutMinutes);\nif (!Number.isFinite(waitTimeoutMinutes) || waitTimeoutMinutes <= 0 || waitTimeoutMinutes > 4) {\n  throw new Error(\"CALL-E waitTimeoutMinutes must be greater than 0 and cannot exceed 4 minutes. This keeps the Code-node polling loop below n8n\\'s default 300-second N8N_RUNNERS_TASK_TIMEOUT.\");\n}\n\nreturn items;"
       },
       "id": "19166449-3e98-4f9f-9c61-017b9c571335",
       "name": "Validate CALL-E Config",
@@ -131,7 +131,7 @@
       "typeVersion": 2,
       "position": [
         1152,
-        496
+        640
       ]
     },
     {
@@ -144,7 +144,7 @@
       "typeVersion": 2,
       "position": [
         1424,
-        496
+        640
       ]
     },
     {
@@ -157,7 +157,7 @@
       "typeVersion": 3,
       "position": [
         1712,
-        496
+        640
       ]
     },
     {
@@ -170,12 +170,12 @@
       "typeVersion": 2,
       "position": [
         2000,
-        608
+        752
       ]
     },
     {
       "parameters": {
-        "jsCode": "const terminalStatuses = new Set([\"completed\", \"failed\", \"canceled\"]);\n\nfunction sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nasync function requestJson(url, options) {\n  const response = await helpers.httpRequest({\n    url,\n    method: options.method,\n    headers: options.headers,\n    body: options.body,\n    json: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true\n  });\n\n  const statusCode = response.statusCode;\n  const body = response.body;\n\n  if (statusCode < 200 || statusCode >= 300) {\n    throw new Error(`CALL-E API request failed: ${statusCode} ${response.statusMessage || \"\"} ${JSON.stringify(body)}`);\n  }\n\n  return body;\n}\n\nasync function createAndWaitForCurrentItem(item) {\n  const { calleConfig, createInput, idempotencyKey, ...callTask } = item.json;\n  const apiKey = calleConfig?.apiKey;\n\n  if (!apiKey || apiKey === \"replace_with_calle_api_key\") {\n    throw new Error(\"CALL-E API key is missing. Open the CALL-E Config node and replace apiKey before running this workflow.\");\n  }\n\n  const baseUrl = (calleConfig?.baseUrl || \"https://api.heycall-e.com\").replace(/\\/$/, \"\");\n  const pollIntervalMs = Math.max(1, Number(calleConfig?.pollIntervalSeconds || 5)) * 1000;\n  const timeoutMs = Math.max(1, Number(calleConfig?.waitTimeoutMinutes || 30)) * 60 * 1000;\n  const startedAtMs = Date.now();\n  let pollCount = 0;\n\n  const headers = {\n    \"Accept\": \"application/json\",\n    \"Authorization\": `Bearer ${apiKey}`,\n    \"Content-Type\": \"application/json\"\n  };\n\n  if (idempotencyKey) {\n    headers[\"Idempotency-Key\"] = idempotencyKey;\n  }\n\n  try {\n    let call = await requestJson(`${baseUrl}/v1/calls`, {\n      method: \"POST\",\n      headers,\n      body: createInput\n    });\n\n    while (!terminalStatuses.has(call.status)) {\n      if (Date.now() - startedAtMs >= timeoutMs) {\n        throw new Error(`Timed out waiting for CALL-E call ${call.id} after ${timeoutMs}ms.`);\n      }\n\n      await sleep(pollIntervalMs);\n      pollCount += 1;\n      call = await requestJson(`${baseUrl}/v1/calls/${call.id}`, {\n        method: \"GET\",\n        headers\n      });\n    }\n\n    return {\n      json: {\n        ...callTask,\n        createInput,\n        ok: true,\n        idempotencyKey,\n        pollCount,\n        rawCallResult: call,\n        apiError: null\n      }\n    };\n  } catch (error) {\n    return {\n      json: {\n        ...callTask,\n        createInput,\n        ok: false,\n        idempotencyKey,\n        pollCount,\n        rawCallResult: null,\n        apiError: {\n          message: error.message,\n          name: error.name || \"Error\"\n        }\n      }\n    };\n  }\n}\n\nreturn await Promise.all($input.all().map((item) => createAndWaitForCurrentItem(item)));"
+        "jsCode": "const terminalStatuses = new Set([\"completed\", \"failed\", \"canceled\"]);\n\nfunction sleep(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nasync function requestJson(url, options) {\n  const response = await helpers.httpRequest({\n    url,\n    method: options.method,\n    headers: options.headers,\n    body: options.body,\n    json: true,\n    returnFullResponse: true,\n    ignoreHttpStatusErrors: true,\n    timeout: options.timeoutMs\n  });\n\n  const statusCode = response.statusCode;\n  const body = response.body;\n\n  if (statusCode < 200 || statusCode >= 300) {\n    const statusMessage = String(response.statusMessage || \"\").replace(/[\\r\\n]+/g, \" \").trim();\n    throw new Error(\"CALL-E API request failed: \" + statusCode + (statusMessage ? \" \" + statusMessage : \"\") + \". Response body omitted from workflow output.\");\n  }\n\n  return body;\n}\n\nasync function createAndWaitForCurrentItem(item) {\n  const { calleConfig, createInput, idempotencyKey, ...callTask } = item.json;\n  const apiKey = calleConfig?.apiKey;\n\n  if (!apiKey || apiKey === \"replace_with_calle_api_key\") {\n    throw new Error(\"CALL-E API key is missing. Open the CALL-E Config node and replace apiKey before running this workflow.\");\n  }\n\n  const baseUrl = (calleConfig?.baseUrl || \"https://api.heycall-e.com\").replace(/\\/$/, \"\");\n  const pollIntervalMs = Math.min(30, Math.max(1, Number(calleConfig?.pollIntervalSeconds || 5))) * 1000;\n  const timeoutMs = Math.max(1, Number(calleConfig?.waitTimeoutMinutes || 4)) * 60 * 1000;\n  const startedAtMs = Date.now();\n  let pollCount = 0;\n\n  const headers = {\n    \"Accept\": \"application/json\",\n    \"Authorization\": `Bearer ${apiKey}`,\n    \"Content-Type\": \"application/json\"\n  };\n\n  if (idempotencyKey) {\n    headers[\"Idempotency-Key\"] = idempotencyKey;\n  }\n\n  try {\n    let call = await requestJson(`${baseUrl}/v1/calls`, {\n      method: \"POST\",\n      headers,\n      body: createInput,\n      timeoutMs: 30 * 1000\n    });\n\n    while (!terminalStatuses.has(call.status)) {\n      const remainingBeforeSleepMs = timeoutMs - (Date.now() - startedAtMs);\n      if (remainingBeforeSleepMs <= 0) {\n        throw new Error(`Timed out waiting for CALL-E call ${call.id} after ${timeoutMs}ms.`);\n      }\n\n      await sleep(Math.min(pollIntervalMs, remainingBeforeSleepMs));\n      const remainingBeforePollMs = timeoutMs - (Date.now() - startedAtMs);\n      if (remainingBeforePollMs <= 0) {\n        throw new Error(`Timed out waiting for CALL-E call ${call.id} after ${timeoutMs}ms.`);\n      }\n\n      pollCount += 1;\n      call = await requestJson(`${baseUrl}/v1/calls/${call.id}`, {\n        method: \"GET\",\n        headers,\n        timeoutMs: Math.min(30 * 1000, remainingBeforePollMs)\n      });\n    }\n\n    return {\n      json: {\n        ...callTask,\n        createInput,\n        ok: true,\n        idempotencyKey,\n        pollCount,\n        rawCallResult: call,\n        apiError: null\n      }\n    };\n  } catch (error) {\n    return {\n      json: {\n        ...callTask,\n        createInput,\n        ok: false,\n        idempotencyKey,\n        pollCount,\n        rawCallResult: null,\n        apiError: {\n          message: error.message,\n          name: error.name || \"Error\"\n        }\n      }\n    };\n  }\n}\n\nreturn await Promise.all($input.all().map((item) => createAndWaitForCurrentItem(item)));"
       },
       "id": "ed4b9e80-93c2-41be-9c3d-093a249f0cec",
       "name": "Create CALL-E Call and Wait",
@@ -183,7 +183,7 @@
       "typeVersion": 2,
       "position": [
         2304,
-        608
+        752
       ]
     },
     {
@@ -196,12 +196,12 @@
       "typeVersion": 2,
       "position": [
         2608,
-        608
+        752
       ]
     },
     {
       "parameters": {
-        "jsCode": "const metadataKeys = [\"lead_id\", \"notion_page_id\", \"company\", \"property\", \"campaign\"];\n\nfunction maskPhone(phone) {\n  const value = String(phone || \"\").trim();\n  if (!value) return null;\n  if (value.length <= 5) return \"****\";\n  return value.slice(0, 3) + \"****\" + value.slice(-2);\n}\n\nfunction redactPhoneFields(value, parentKey = \"\") {\n  if (Array.isArray(value)) {\n    return value.map((entry) => redactPhoneFields(entry, parentKey));\n  }\n\n  if (value && typeof value === \"object\") {\n    return Object.fromEntries(\n      Object.entries(value).map(([key, entry]) => {\n        const lowerKey = key.toLowerCase();\n        if (lowerKey === \"phone\" || lowerKey === \"phones\" || lowerKey.includes(\"phone_number\")) {\n          if (Array.isArray(entry)) return [key, entry.map(maskPhone)];\n          return [key, maskPhone(entry)];\n        }\n        return [key, redactPhoneFields(entry, key)];\n      })\n    );\n  }\n\n  if (typeof value === \"string\" && /phone/i.test(parentKey)) {\n    return maskPhone(value);\n  }\n\n  return value;\n}\n\nreturn $input.all().map((item) => {\n  const result = item.json;\n  const metadataSent = result.metadataSent || {};\n  const metadataReturned = result.metadataReturned || {};\n  const missingReturnedMetadata = metadataKeys.filter((key) => metadataSent[key] !== metadataReturned[key]);\n\n  return {\n    json: {\n      callItemId: result.callItemId,\n      maskedPhone: maskPhone(result.phone),\n      task: result.task,\n      metadataSent,\n      metadataReturned,\n      metadataRoundTrip: {\n        requestedKeys: metadataKeys,\n        allRequestedKeysReturned: missingReturnedMetadata.length === 0,\n        missingOrDifferentKeys: missingReturnedMetadata\n      },\n      callStatus: {\n        ok: result.ok,\n        callId: result.callId,\n        call_status: result.callStatus,\n        recipient_status: result.recipientStatus,\n        latest_attempt_status: result.latestAttemptStatus,\n        failure_code: result.failureCode,\n        failure_message: result.failureMessage,\n        answered: result.statusSignals?.answered || false,\n        no_answer: result.statusSignals?.no_answer || false,\n        busy: result.statusSignals?.busy || false,\n        failed: result.statusSignals?.failed || false\n      },\n      returnedData: {\n        summary: result.summary,\n        transcript: result.transcriptTurns,\n        structuredResult: result.structuredResult\n      },\n      redactedRawCallResult: redactPhoneFields(result.rawCallResult),\n      apiError: result.apiError\n    }\n  };\n});"
+        "jsCode": "const metadataKeys = [\"lead_id\", \"notion_page_id\", \"company\", \"property\", \"campaign\"];\n\nfunction maskPhone(phone) {\n  const value = String(phone || \"\").trim();\n  if (!value) return null;\n  if (value.length <= 5) return \"****\";\n  return value.slice(0, 3) + \"****\" + value.slice(-2);\n}\n\nfunction redactPhoneData(value, parentKey = \"\", phoneContext = false) {\n  const hasPhoneContext = phoneContext || /phone/i.test(parentKey);\n\n  if (Array.isArray(value)) {\n    return value.map((entry) => redactPhoneData(entry, parentKey, hasPhoneContext));\n  }\n\n  if (value && typeof value === \"object\") {\n    return Object.fromEntries(\n      Object.entries(value).map(([key, entry]) => [key, redactPhoneData(entry, key, hasPhoneContext)])\n    );\n  }\n\n  if (typeof value === \"string\") {\n    const maskedE164 = value.replace(/\\+[1-9]\\d{7,14}/g, (phone) => maskPhone(phone));\n    if (hasPhoneContext && maskedE164 === value) return maskPhone(value);\n    return maskedE164;\n  }\n\n  if (hasPhoneContext && value !== null && (typeof value === \"number\" || typeof value === \"boolean\")) {\n    return \"****\";\n  }\n\n  return value;\n}\n\nreturn $input.all().map((item) => {\n  const result = item.json;\n  const metadataSent = result.metadataSent || {};\n  const metadataReturned = result.metadataReturned || {};\n  const missingReturnedMetadata = metadataKeys.filter((key) => metadataSent[key] !== metadataReturned[key]);\n\n  return {\n    json: redactPhoneData({\n      callItemId: result.callItemId,\n      maskedPhone: maskPhone(result.phone),\n      task: result.task,\n      metadataSent,\n      metadataReturned,\n      metadataRoundTrip: {\n        requestedKeys: metadataKeys,\n        allRequestedKeysReturned: missingReturnedMetadata.length === 0,\n        missingOrDifferentKeys: missingReturnedMetadata\n      },\n      callStatus: {\n        ok: result.ok,\n        callId: result.callId,\n        call_status: result.callStatus,\n        recipient_status: result.recipientStatus,\n        latest_attempt_status: result.latestAttemptStatus,\n        failure_code: result.failureCode,\n        failure_message: result.failureMessage,\n        answered: result.statusSignals?.answered || false,\n        no_answer: result.statusSignals?.no_answer || false,\n        busy: result.statusSignals?.busy || false,\n        failed: result.statusSignals?.failed || false\n      },\n      returnedData: {\n        summary: result.summary,\n        transcript: result.transcriptTurns,\n        structuredResult: result.structuredResult\n      },\n      redactedRawCallResult: result.rawCallResult,\n      apiError: result.apiError\n    })\n  };\n});"
       },
       "id": "1cf5d320-aecf-4d68-997e-b515c8a6555c",
       "name": "Demo Result View",
@@ -209,12 +209,12 @@
       "typeVersion": 2,
       "position": [
         2912,
-        608
+        752
       ]
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nfunction maskPhone(phone) {\n  const value = String(phone || \"\").trim();\n  if (!value) return null;\n  if (value.length <= 5) return \"****\";\n  return value.slice(0, 3) + \"****\" + value.slice(-2);\n}\n\nreturn [\n  {\n    json: {\n      processedCount: items.length,\n      successfulCount: items.filter((item) => item.json.callStatus?.ok).length,\n      failedCount: items.filter((item) => !item.json.callStatus?.ok).length,\n      results: items.map((item) => ({\n        callItemId: item.json.callItemId,\n        maskedPhone: item.json.maskedPhone || maskPhone(item.json.phone),\n        task: item.json.task,\n        metadataSent: item.json.metadataSent,\n        metadataReturned: item.json.metadataReturned,\n        metadataRoundTrip: item.json.metadataRoundTrip,\n        callStatus: item.json.callStatus,\n        returnedData: item.json.returnedData\n      }))\n    }\n  }\n];"
+        "jsCode": "const items = $input.all();\n\nreturn [\n  {\n    json: {\n      processedCount: items.length,\n      successfulCount: items.filter((item) => item.json.callStatus?.ok).length,\n      failedCount: items.filter((item) => !item.json.callStatus?.ok).length,\n      results: items.map((item) => ({\n        callItemId: item.json.callItemId,\n        maskedPhone: item.json.maskedPhone,\n        task: item.json.task,\n        metadataSent: item.json.metadataSent,\n        metadataReturned: item.json.metadataReturned,\n        metadataRoundTrip: item.json.metadataRoundTrip,\n        callStatus: item.json.callStatus,\n        returnedData: item.json.returnedData\n      }))\n    }\n  }\n];"
       },
       "id": "771d3c58-fe9f-49a1-a57e-42f7cff8749f",
       "name": "Execution Summary",
