@@ -1,0 +1,9 @@
+{
+  "name": "hubspot-calle-functions",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node build-bundles.mjs",
+    "test": "npm run build -- --check && node --test test/*.test.mjs"
+  }
+}

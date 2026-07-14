@@ -1,0 +1,13 @@
+{
+  "uid": "calle_call_candidate_sidebar_card",
+  "type": "card",
+  "config": {
+    "name": "CALL-E Quick Call",
+    "description": "Starts a low-permission CALL-E direct call from the CRM record sidebar.",
+    "entrypoint": "/app/cards/CallCandidateCard.jsx",
+    "location": "crm.record.sidebar",
+    "objectTypes": [
+      "CONTACT"
+    ]
+  }
+}

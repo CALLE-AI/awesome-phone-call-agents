@@ -1,0 +1,29 @@
+{
+  "uid": "hubspot_calle_private_app",
+  "type": "app",
+  "config": {
+    "description": "Private CALL-E integration for direct HubSpot workflow-triggered phone-call tasks.",
+    "name": "CALL-E for HubSpot",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "crm.objects.contacts.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://api.hubapi.com",
+        "https://api.heycall-e.com"
+      ],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "documentationUrl": "https://github.com/CALLE-AI/awesome-phone-call-agents/tree/main/plugins/hubspot-calle",
+      "supportUrl": "https://github.com/CALLE-AI/awesome-phone-call-agents/issues"
+    }
+  }
+}
