@@ -67,6 +67,9 @@ const summary = await runBackfill({
     }
     const who = e.name ? `${e.name} (${e.phone})` : "";
     console.log(`${ICON[e.type] ?? " "} ${who.padEnd(34)} ${e.answer ?? e.code ?? ""}`);
+    // The provider's own call id is the only reference that ties this trail back to CALL-E,
+    // so print it rather than leaving the audit record ending at our side of the boundary.
+    if (e.callId) console.log(`  call ${e.callId}`);
     if (e.detail) console.log(`  ${e.detail}`);
   },
 });
