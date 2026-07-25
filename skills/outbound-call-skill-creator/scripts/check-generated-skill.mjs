@@ -408,19 +408,20 @@ function readText(filePath) {
 }
 
 function parseFrontmatter(text, filePath) {
-  if (!text.startsWith("---\n")) {
+  const opening = /^---\r?\n/.exec(text);
+  if (!opening) {
     fail(`Missing YAML frontmatter: ${filePath}`);
     return {};
   }
 
-  const end = text.indexOf("\n---", 4);
+  const end = text.indexOf("\n---", opening[0].length);
   if (end === -1) {
     fail(`Unterminated YAML frontmatter: ${filePath}`);
     return {};
   }
 
   const result = {};
-  const block = text.slice(4, end).trim();
+  const block = text.slice(opening[0].length, end).trim();
   for (const line of block.split(/\r?\n/)) {
     if (!line.trim() || line.trim().startsWith("#")) {
       continue;
