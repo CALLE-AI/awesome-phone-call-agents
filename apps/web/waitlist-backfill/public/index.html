@@ -5,199 +5,339 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Waitlist Backfill</title>
 <style>
+  /* Matched to the CALL-E dashboard: ice-blue page, white surfaces, hairline rules, 8px radii,
+     Inter, and flat elevation - a 1px border rather than a shadow. Light because the use scene
+     is a practice reception desk in daylight. */
   :root {
-    --bg: #f6f7f9; --panel: #fff; --ink: #16191d; --muted: #667085; --line: #e3e6ea;
-    --ok: #17803d; --warn: #b45309; --stop: #b42318; --live: #1d4ed8; --accent: #0b5fff;
+    --page:    #f4f9ff;
+    --surface: #ffffff;
+    --rule:    #dde5ef;
+    --rule-soft: #e5ebf2;
+
+    --ink:      #2e2f33;
+    --ink-2:    #5b6472;
+    --ink-muted:#6b7689;
+
+    --accent:   #004ead;
+    --accent-bg:#e8f0fb;
+
+    --good:     #0f6b45;
+    --good-bg:  #e6f3ec;
+    --hold:     #7a5310;
+    --hold-bg:  #fbf1de;
+    --bad:      #a32b1f;
+    --bad-bg:   #fbeae8;
+
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0e1116; --panel: #161a21; --ink: #e8eaed; --muted: #98a2b3; --line: #262c36;
-      --ok: #4ade80; --warn: #fbbf24; --stop: #f87171; --live: #7aa2ff; --accent: #6f9bff;
-    }
-  }
+
   * { box-sizing: border-box; }
+
   body {
-    margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
-    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 44px 24px 80px;
+    background: var(--page);
+    color: var(--ink);
+    font: 400 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 2px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  .slot { display: flex; flex-wrap: wrap; gap: 20px; align-items: baseline; }
-  .slot b { font-size: 17px; }
-  .slot span { color: var(--muted); font-size: 13px; }
+  .wrap { max-width: 1020px; margin: 0 auto; }
+
+  /* ---- masthead ------------------------------------------------------- */
+
+  h1 {
+    font-size: 28px; font-weight: 400; letter-spacing: -.01em; line-height: 1.25;
+    margin: 0 0 10px; max-width: 40ch;
+  }
+  .standfirst { margin: 0 0 28px; max-width: 68ch; color: var(--ink-2); font-size: 15px; }
+
+  /* ---- panels --------------------------------------------------------- */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 22px;
+  }
+  .panel + .panel { margin-top: 12px; }
+
+  .slot { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 30px; }
+  .field .label {
+    display: block; font-size: 12px; color: var(--ink-muted); margin-bottom: 5px;
+  }
+  .field .value { font-size: 16px; line-height: 1.35; }
+  .field .value.id { font-family: var(--mono); font-size: 13px; word-break: break-all; }
+  .field .sub { display: block; color: var(--ink-muted); font-size: 12px; margin-top: 3px; }
+
+  /* ---- controls ------------------------------------------------------- */
+
   .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   button {
-    font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 8px; cursor: pointer;
-    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    font: 600 14px/1 var(--sans);
+    padding: 11px 16px; border-radius: 8px; border: 1px solid transparent; cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
   }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.danger { border-color: var(--stop); color: var(--stop); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  .note { color: var(--muted); font-size: 12.5px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; }
-  td { padding: 9px 8px; border-top: 1px solid var(--line); vertical-align: top; }
-  tr.pending { opacity: .55; }
-  .pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
-  .p-ok { color: var(--ok); } .p-skip { color: var(--warn); } .p-stop { color: var(--stop); }
-  .p-live { color: var(--live); } .p-mute { color: var(--muted); }
-  .reason { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
-  #log { max-height: 320px; overflow-y: auto; }
-  #log div { padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px; }
-  #log div:first-child { border-top: 0; }
-  .stats { display: flex; flex-wrap: wrap; gap: 28px; }
-  .stat b { display: block; font-size: 26px; line-height: 1.2; }
-  .stat span { color: var(--muted); font-size: 12px; }
-  .banner { border-left: 3px solid var(--accent); padding-left: 12px; }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #1c1d20; }
+  button.go { background: var(--accent); color: #fff; }
+  button.go:hover:not(:disabled) { background: #003d8a; }
+  button.ghost { background: var(--surface); color: var(--ink-2); border-color: var(--rule); }
+  button.ghost:hover:not(:disabled) { border-color: var(--ink-muted); color: var(--ink); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #confirm {
+    flex: 1; min-width: 240px;
+    font: 400 13px/1 var(--mono);
+    padding: 11px 13px; border-radius: 8px; border: 1px solid var(--rule);
+    background: var(--surface); color: var(--ink);
+  }
+  #confirm::placeholder { color: var(--ink-muted); font-family: var(--sans); font-size: 13px; }
+  #confirm:disabled { background: #f7f9fc; color: var(--ink-muted); }
+
+  .mode-note { font-size: 13px; color: var(--ink-2); margin: 14px 0 0; max-width: 76ch; }
+  .mode-note strong { color: var(--ink); font-weight: 600; }
+  .mode-note .danger { color: var(--bad); font-weight: 600; }
+
+  /* ---- list ----------------------------------------------------------- */
+
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    margin: 36px 0 10px;
+  }
+  .section-head h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .section-head .hint { font-size: 12px; color: var(--ink-muted); }
+
+  .panel.flush { padding: 4px 22px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 12px; font-weight: 500; color: var(--ink-muted);
+    padding: 14px 10px; border-bottom: 1px solid var(--rule-soft);
+  }
+  tbody td { padding: 14px 10px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr { transition: background-color .45s ease; }
+  tbody tr.pending .name, tbody tr.pending .num { color: var(--ink-muted); }
+  tbody tr.filled { background: var(--good-bg); }
+
+  .num  { font-family: var(--mono); font-size: 12.5px; color: var(--ink-muted); width: 32px; }
+  .name { font-size: 15px; }
+  .tel, .tz { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+  .tz.absent { color: var(--bad); }
+
+  .pill {
+    display: inline-block; font-size: 12px; font-weight: 600; line-height: 1;
+    padding: 6px 10px; border-radius: 999px;
+    background: #eef2f7; color: var(--ink-2); white-space: nowrap;
+  }
+  .p-ok   { background: var(--good-bg);   color: var(--good); }
+  .p-skip { background: var(--hold-bg);   color: var(--hold); }
+  .p-stop { background: var(--bad-bg);    color: var(--bad); }
+  .p-live { background: var(--accent-bg); color: var(--accent); }
+  .p-mute { background: transparent; color: var(--ink-muted); box-shadow: inset 0 0 0 1px var(--rule); }
+
+  .reason { margin-top: 7px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 56ch; }
+  .reason code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: #eef2f7; padding: 1px 5px; border-radius: 4px; color: var(--ink-2);
+  }
+
+  /* ---- record --------------------------------------------------------- */
+
+  .record { max-height: 320px; overflow-y: auto; padding: 8px 22px; }
+  #log p { margin: 0; padding: 9px 0; font: 400 13px/1.6 var(--mono); color: var(--ink-2); }
+  #log p + p { border-top: 1px solid var(--rule-soft); }
+  #log p b { color: var(--ink); font-weight: 600; }
+  #log p.empty { color: var(--ink-muted); font-family: var(--sans); }
+
+  /* ---- outcome -------------------------------------------------------- */
+
+  .outcome { display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 22px; margin-top: 12px; }
+  .stat b { display: block; font-size: 28px; font-weight: 400; letter-spacing: -.01em; line-height: 1.2; }
+  .stat span { display: block; margin-top: 4px; font-size: 12px; color: var(--ink-muted); }
+
+  /* One authored moment: a decision arriving. Defaults are already visible for anyone who has
+     asked the system to stop moving things. */
+  @media (prefers-reduced-motion: no-preference) {
+    .settle { animation: settle .4s cubic-bezier(.16, 1, .3, 1) both; }
+    @keyframes settle {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 30px 16px 60px; }
+    thead th:nth-child(4), tbody td:nth-child(4) { display: none; }
+    .panel, .panel.flush, .record { padding-left: 16px; padding-right: 16px; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Waitlist Backfill</h1>
-  <div class="sub">A slot just opened. Ring the waiting list one at a time, stop at the first yes, and never call anyone behind them.</div>
+  <h1>A slot just opened. Someone on the list can still take it.</h1>
+  <p class="standfirst">
+    The waiting list is called one person at a time. The first person to say yes gets the
+    appointment, and nobody behind them is called at all.
+  </p>
 
   <div class="panel slot" id="slot"></div>
 
   <div class="panel">
     <div class="controls">
-      <button class="primary" id="preview">Preview run</button>
-      <input id="confirm" class="mono" placeholder="type the slot id to enable live calling"
-             style="flex:1;min-width:260px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
-      <button id="live" title="Requires a CALL-E API key and the slot id typed above" disabled>Run live</button>
-      <button class="danger" id="cancel" disabled>Cancel</button>
+      <button class="primary" id="preview">Preview the run</button>
+      <input id="confirm" placeholder="type the slot id to unlock calling" aria-label="Slot id confirmation">
+      <button class="go" id="live" disabled>Start calling</button>
+      <button class="ghost" id="cancel" disabled>Stop</button>
     </div>
-    <div class="note" id="modeNote" style="margin-top:10px"></div>
+    <p class="mode-note" id="modeNote"></p>
   </div>
 
-  <div class="panel">
+  <div class="section-head">
+    <h2>The waiting list</h2>
+    <span class="hint">in priority order</span>
+  </div>
+  <div class="panel flush">
     <table>
-      <thead><tr><th style="width:34px">#</th><th>Contact</th><th style="width:120px">Number</th><th style="width:150px">Timezone</th><th>Decision</th></tr></thead>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Contact</th>
+          <th scope="col">Number</th>
+          <th scope="col">Timezone</th>
+          <th scope="col">Decision</th>
+        </tr>
+      </thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
 
-  <div class="panel">
-    <div class="sub" style="margin:0 0 8px">Decision log</div>
-    <div id="log"><div class="note">Nothing yet. Start a preview run.</div></div>
+  <div class="section-head">
+    <h2>What happened, and why</h2>
+    <span class="hint">every decision, in order</span>
+  </div>
+  <div class="panel record" id="log">
+    <p class="empty">Nothing yet. Preview the run to see who would be called.</p>
   </div>
 
-  <div class="panel" id="summary" hidden></div>
+  <div class="panel outcome" id="summary" hidden></div>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 let scenario = null, source = null;
 
-const CODE_CLASS = {
-  slot_already_filled: "p-mute", preview_only: "p-live", live: "p-live",
-};
-function pillClass(code, type) {
-  if (type === "slot_filled") return "p-ok";
-  if (type === "contact_suppressed") return "p-mute";
-  if (type === "contact_would_call") return "p-live";
-  if (type === "call_completed") return code === "yes" ? "p-ok" : "p-skip";
-  if (type === "call_failed") return "p-stop";
-  return "p-skip";
-}
-
 async function init() {
   scenario = await (await fetch("/api/scenario")).json();
   const s = scenario.slot;
-  $("slot").innerHTML =
-    `<div><b>${s.businessName}</b><br><span>${s.service}</span></div>` +
-    `<div><b>${s.startsAtLocal}</b><br><span>${s.timeZone}</span></div>` +
-    `<div><b>&pound;${s.valueGbp}</b><br><span>value if filled</span></div>` +
-    `<div class="mono" style="color:var(--muted)">${s.id}</div>`;
+  $("slot").innerHTML = [
+    field("Practice", s.businessName, s.service),
+    field("Appointment", s.startsAtLocal, s.timeZone),
+    field("Worth", `£${s.valueGbp}`, "if it is filled"),
+    `<div class="field"><span class="label">Slot</span><span class="value id">${s.id}</span></div>`,
+  ].join("");
+
   const simulated = scenario.liveConfigured && scenario.transport === "fake";
-  $("live").textContent = simulated ? "Run (simulated)" : "Run live";
+  $("live").textContent = simulated ? "Start the simulated run" : "Start calling";
   $("modeNote").innerHTML = !scenario.liveConfigured
-    ? "Preview only: this server has no CALL-E credentials, so it cannot place a call."
+    ? "This server has no CALL-E credentials, so it cannot place a call. Preview shows who would "
+      + "be rung, and why the others would not."
     : simulated
-      ? `<b>Simulated mode.</b> The full run loop, including acceptance and suppression, against a `
-        + `fake transport. <b>No real calls are placed.</b> Type the slot id `
-        + `<span class="mono">${s.id}</span> above to unlock the run.`
-      : `<b style="color:var(--stop)">LIVE mode: this will place real phone calls.</b> Type the `
-        + `slot id <span class="mono">${s.id}</span> above to unlock it.`;
+      ? "<strong>Simulated.</strong> The whole run — the calls, the acceptance, the people who are "
+        + "never rung — against a fake transport. <strong>No real calls are placed.</strong>"
+      : "<span class='danger'>This places real phone calls.</span> Type the slot id to unlock it.";
   $("confirm").disabled = !scenario.liveConfigured;
   refreshLiveButton();
   resetRows();
 }
 
+function field(label, value, sub) {
+  return `<div class="field"><span class="label">${label}</span>`
+    + `<span class="value">${value}</span><span class="sub">${sub}</span></div>`;
+}
+
 function resetRows() {
   $("rows").innerHTML = scenario.waitlist.map((c, i) => `
     <tr class="pending" id="row_${c.id}">
-      <td class="mono">${i + 1}</td>
-      <td>${c.name}</td>
-      <td class="mono">${maskLocal(c.phone)}</td>
-      <td class="mono">${c.timeZone ?? '<span style="color:var(--stop)">not recorded</span>'}</td>
+      <td class="num">${String(i + 1).padStart(2, "0")}</td>
+      <td class="name">${c.name}</td>
+      <td class="tel">${maskLocal(c.phone)}</td>
+      <td class="tz${c.timeZone ? "" : " absent"}">${c.timeZone ?? "not recorded"}</td>
       <td class="decision"><span class="pill p-mute">waiting</span></td>
     </tr>`).join("");
 }
 
-// The server never sends raw numbers; this masks the ones loaded from the scenario for display.
+// The server never sends raw numbers. This masks the ones loaded from the scenario for display.
 function maskLocal(p) { return p.slice(0, 2) + "*".repeat(Math.max(0, p.length - 4)) + p.slice(-2); }
 
 function setDecision(contactId, label, cls, reason) {
   const row = $("row_" + contactId);
   if (!row) return;
   row.classList.remove("pending");
-  row.querySelector(".decision").innerHTML =
-    `<span class="pill ${cls}">${label}</span>` + (reason ? `<div class="reason">${reason}</div>` : "");
+  const cell = row.querySelector(".decision");
+  cell.innerHTML = `<span class="pill ${cls}">${label}</span>`
+    + (reason ? `<div class="reason">${reason}</div>` : "");
+  cell.classList.remove("settle");
+  void cell.offsetWidth;
+  cell.classList.add("settle");
 }
 
 function logLine(text, cls) {
   const log = $("log");
-  if (log.firstChild && log.firstChild.classList?.contains("note")) log.innerHTML = "";
-  const d = document.createElement("div");
-  d.innerHTML = text;
-  if (cls) d.className = cls;
-  log.appendChild(d);
+  const first = log.firstElementChild;
+  if (first && first.classList.contains("empty")) log.innerHTML = "";
+  const p = document.createElement("p");
+  p.innerHTML = text;
+  if (cls) p.className = cls;
+  log.appendChild(p);
   log.scrollTop = log.scrollHeight;
 }
 
 function onEvent(e) {
   switch (e.type) {
     case "run_started": {
-      const label = e.mode !== "live" ? "PREVIEW" : e.transport === "live" ? "LIVE" : "SIMULATED";
-      logLine(`<b>Run started</b> &mdash; ${label}. ${e.detail}`, "banner");
+      const label = e.mode !== "live" ? "Preview" : e.transport === "live" ? "Live" : "Simulated";
+      logLine(`<b>${label} run.</b> ${e.detail}`);
       break;
     }
     case "contact_skipped":
-      setDecision(e.contactId, "not called", "p-skip", `<span class="mono">${e.code}</span> &mdash; ${e.detail}`);
-      logLine(`Skipped <b>${e.name}</b> (${e.phone}): ${e.detail}`);
+      setDecision(e.contactId, "not called", "p-skip", `<code>${e.code}</code> ${e.detail}`);
+      logLine(`Skipped <b>${e.name}</b> (${e.phone}). ${e.detail}`);
       break;
     case "contact_would_call":
       setDecision(e.contactId, "would call", "p-live", e.detail);
-      logLine(`Would call <b>${e.name}</b> (${e.phone}) &mdash; passed every guardrail.`);
+      logLine(`Would call <b>${e.name}</b> (${e.phone}). Passed every check.`);
       break;
     case "call_started":
-      setDecision(e.contactId, "calling&hellip;", "p-live", `idempotency key <span class="mono">${e.idempotencyKey}</span>`);
-      logLine(`Calling <b>${e.name}</b> (${e.phone})&hellip;`);
+      setDecision(e.contactId, "calling", "p-live", `key <code>${e.idempotencyKey}</code>`);
+      logLine(`Calling <b>${e.name}</b> (${e.phone})…`);
       break;
     case "call_completed":
-      setDecision(e.contactId, e.answer ?? e.status, pillClass(e.answer, e.type), e.summary ?? "");
-      logLine(`<b>${e.name}</b> answered: <b>${e.answer ?? e.status}</b>`);
+      // A declined call is neutral, not amber. Amber means a guardrail stopped us; this person
+      // was reached and said no, which is a normal outcome rather than something we prevented.
+      setDecision(e.contactId, e.answer ?? e.status, e.answer === "yes" ? "p-ok" : "",
+        e.summary ?? "");
+      logLine(`<b>${e.name}</b> answered <b>${e.answer ?? e.status}</b>.`);
       break;
     case "call_failed":
       setDecision(e.contactId, "failed", "p-stop", e.detail);
-      logLine(`Call to <b>${e.name}</b> failed: ${e.detail}`);
+      logLine(`Call to <b>${e.name}</b> failed. ${e.detail}`);
       break;
     case "slot_filled":
-      setDecision(e.contactId, "SLOT FILLED", "p-ok", e.detail);
-      logLine(`<b>Slot filled by ${e.name}.</b> No further calls will be placed.`, "banner");
+      setDecision(e.contactId, "slot filled", "p-ok", e.detail);
+      $("row_" + e.contactId)?.classList.add("filled");
+      logLine(`<b>${e.name} took the slot.</b> Nobody else will be called.`);
       break;
     case "contact_suppressed":
       setDecision(e.contactId, "never called", "p-mute", e.detail);
-      logLine(`Suppressed <b>${e.name}</b> &mdash; slot already filled.`);
+      logLine(`Did not call <b>${e.name}</b>. The slot was already gone.`);
       break;
     case "run_cancelled":
-      logLine(`<b>Cancelled.</b> ${e.detail}`, "banner");
+      logLine(`<b>Stopped.</b> ${e.detail}`);
       break;
     case "run_error":
-      logLine(`<b style="color:var(--stop)">Error:</b> ${e.detail}`, "banner");
+      logLine(`<b>Error.</b> ${e.detail}`);
       break;
     case "run_finished":
       showSummary(e.summary);
@@ -210,14 +350,23 @@ function onEvent(e) {
 
 function showSummary(s) {
   $("summary").hidden = false;
-  $("summary").innerHTML = `
-    <div class="stats">
-      <div class="stat"><b>${s.filled ? "Filled" : "Open"}</b><span>${s.filledBy ? s.filledBy.name : "no acceptance"}</span></div>
-      <div class="stat"><b>${s.callsPlaced}</b><span>calls placed</span></div>
-      <div class="stat"><b>${s.callsAvoided}</b><span>calls avoided</span></div>
-      <div class="stat"><b>${s.skipped}</b><span>blocked by a guardrail</span></div>
-      <div class="stat"><b>${s.suppressed}</b><span>suppressed after the fill</span></div>
-    </div>`;
+  $("summary").innerHTML = [
+    stat(s.filled ? s.filledBy.name : "Still open", s.filled ? "took the slot" : "nobody accepted"),
+    stat(s.callsPlaced, "calls placed"),
+    stat(s.callsAvoided, "calls avoided"),
+    stat(s.skipped, "stopped by a check"),
+    stat(s.suppressed, "never called"),
+  ].join("");
+}
+
+function stat(value, label) {
+  return `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
+}
+
+// Calling only unlocks once the operator has typed this exact slot id. Intent has to name the
+// thing being authorised, not just be a general yes.
+function refreshLiveButton() {
+  $("live").disabled = !scenario?.liveConfigured || $("confirm").value.trim() !== scenario.slot.id;
 }
 
 function start(mode) {
@@ -230,7 +379,7 @@ function start(mode) {
   if (mode === "live") {
     const typed = $("confirm").value.trim();
     if (typed !== scenario.slot.id) {
-      logLine("<b>Live run not confirmed.</b> The slot id did not match, so nothing was called.", "banner");
+      logLine("<b>Not confirmed.</b> The slot id did not match, so nothing was called.");
       return;
     }
     qs += `&confirmSlotId=${encodeURIComponent(typed)}`;
@@ -250,11 +399,6 @@ function finish() {
   refreshLiveButton();
 }
 
-// The live button only wakes up once the operator has typed the exact slot id. Intent has to be
-// specific to the thing being authorised, not a general "yes".
-function refreshLiveButton() {
-  $("live").disabled = !scenario?.liveConfigured || $("confirm").value.trim() !== scenario.slot.id;
-}
 $("confirm").oninput = refreshLiveButton;
 $("preview").onclick = () => start("preview");
 $("live").onclick = () => start("live");
