@@ -8,18 +8,13 @@ inverse: an appointment nobody has yet, and a short window to give it away. It i
 with an obvious cost attached — an unfilled slot is revenue that simply does not happen — and it is
 tedious enough that it usually does not get done at all.
 
-```text
-14:02  Slot opens: 45-minute hygienist appointment, Wed 14:30
-14:02  Tomas Lindqvist    not called   timezone_missing
-14:02  Grace Abara        not called   consent_revoked
-14:02  Ken Watanabe       not called   frequency_cap
-14:03  Dana Whitfield     called       "no"
-14:05  Marcus Oyelaran    called       "yes"  -> SLOT FILLED
-14:05  Priya Raman        never called slot_already_filled
-```
+![A completed backfill run: six people on the waiting list, three stopped by guardrails with their
+reason codes, one called who declined, one called who accepted, and one never called because the
+slot had already gone.](docs/run.png)
 
 Six people on the list, two calls placed, one slot filled, and a written reason for each of the
-four phones that never rang.
+four phones that never rang. Reproduce it with `CALLE_MODE=simulate node server.mjs` — no account
+and no credentials needed.
 
 ## Why sequential, and not the API's multi-recipient fan-out
 
