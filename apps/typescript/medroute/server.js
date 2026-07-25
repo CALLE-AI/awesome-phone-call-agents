@@ -1,0 +1,244 @@
+import { createServer } from "node:http";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { extname, join, normalize } from "node:path";
+
+const port = Number(process.env.PORT || 3000);
+const publicDir = join(process.cwd(), "public");
+const dataDir = process.env.MEDROUTE_DATA_DIR || join(process.cwd(), "data");
+const historyFile = join(dataDir, "medroute-history.json");
+const transcriptPdfScript = join(process.cwd(), "scripts", "generate-transcript-pdf.py");
+
+const resultSchema = {
+  type: "object",
+  required: ["stock_status", "price_range", "pickup_readiness", "hours", "confidence"],
+  properties: {
+    stock_status: { type: "string", enum: ["in_stock", "limited", "out_of_stock", "unknown"] },
+    price_range: { type: "string" },
+    pickup_readiness: { type: "string", enum: ["can_hold", "cannot_hold", "unknown"] },
+    hours: { type: "string" },
+    substitution_available: { type: "string" },
+    notes: { type: "string" },
+    confidence: { type: "string", enum: ["high", "medium", "low"] }
+  }
+};
+
+function json(res, status, value) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(value));
+}
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", chunk => { body += chunk; if (body.length > 100_000) req.destroy(); });
+    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { reject(new Error("Invalid JSON")); } });
+    req.on("error", reject);
+  });
+}
+
+function safeText(value, max = 120) {
+  return typeof value === "string" ? value.replace(/[\r\n<>]/g, " ").trim().slice(0, max) : "";
+}
+
+function demoResult(pharmacy, medicine) {
+  const seeds = ["in_stock", "limited", "out_of_stock"];
+  const status = seeds[Number(pharmacy.phone.at(-1)) % seeds.length];
+  return {
+    pharmacy: pharmacy.name,
+    phone: pharmacy.phone,
+    distanceKm: pharmacy.distanceKm,
+    result: {
+      stock_status: status,
+      price_range: status === "out_of_stock" ? "Not available" : "KES 850–1,150",
+      pickup_readiness: status === "in_stock" ? "can_hold" : "cannot_hold",
+      hours: "Open until 8:00 PM",
+      substitution_available: status === "out_of_stock" ? "Ask pharmacist" : "Not needed",
+      notes: `Demo response for ${medicine}. Verify with a live authorized call.`,
+      confidence: "medium"
+    },
+    mode: "demo"
+  };
+}
+
+function score(item) {
+  const r = item.result;
+  return (r.stock_status === "in_stock" ? 100 : r.stock_status === "limited" ? 55 : 0)
+    + (r.pickup_readiness === "can_hold" ? 20 : 0) - Number(item.distanceKm || 0) * 2;
+}
+
+async function readHistory() {
+  try { return JSON.parse(await readFile(historyFile, "utf8")); }
+  catch { return []; }
+}
+
+async function saveHistory(record) {
+  const history = await readHistory();
+  history.unshift(record);
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(historyFile, JSON.stringify(history.slice(0, 100), null, 2), "utf8");
+}
+
+function analytics(history) {
+  const medicineCounts = new Map();
+  let calls = 0, inStock = 0, liveRuns = 0;
+  for (const run of history) {
+    medicineCounts.set(run.medicine, (medicineCounts.get(run.medicine) || 0) + 1);
+    calls += run.results.length;
+    inStock += run.results.filter(item => item.result?.stock_status === "in_stock").length;
+    if (run.mode === "live") liveRuns += 1;
+  }
+  return {
+    totalRuns: history.length, totalCalls: calls, liveRuns,
+    inStockRate: calls ? Math.round((inStock / calls) * 100) : 0,
+    topMedicines: [...medicineCounts.entries()].map(([medicine, count]) => ({ medicine, count })).sort((a, b) => b.count - a.count),
+    recent: history
+  };
+}
+
+function normalizeTranscriptText(value) {
+  return safeText(value, 2_000).replace(/^\s*\d+\.\s+/, "").replace(/\s+/g, " ").trim();
+}
+
+function sentenceComplete(value) {
+  return /[.!?]["')\]]?\s*$/.test(value);
+}
+
+function mergeTranscriptTurns(turns) {
+  return turns.reduce((merged, turn) => {
+    const previous = merged.at(-1);
+    if (previous && previous.speaker === turn.speaker && !sentenceComplete(previous.text)) {
+      previous.text = `${previous.text} ${turn.text}`.replace(/\s+/g, " ").trim();
+      return merged;
+    }
+    merged.push({ ...turn });
+    return merged;
+  }, []);
+}
+
+function cleanTranscript(call) {
+  const attempts = call.recipients[0]?.attempts || [];
+  const turns = attempts.flatMap(attempt => attempt.transcriptTurns || []).map(turn => ({
+    speaker: ["bot", "user"].includes(turn.speaker) ? turn.speaker : "unknown",
+    text: normalizeTranscriptText(turn.text),
+    offsetSeconds: Number.isFinite(turn.offsetSeconds) ? turn.offsetSeconds : null
+  })).filter(turn => turn.text);
+  return mergeTranscriptTurns(turns);
+}
+
+function createTranscriptPdf(payload) {
+  return new Promise((resolve, reject) => {
+    const python = process.env.MEDROUTE_PYTHON || "python";
+    const child = spawn(python, [transcriptPdfScript], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+    const output = [], errors = [];
+    child.stdout.on("data", chunk => output.push(chunk));
+    child.stderr.on("data", chunk => errors.push(chunk));
+    child.once("error", error => reject(new Error(`Could not create transcript PDF: ${error.message}`)));
+    child.once("close", code => {
+      if (code !== 0) return reject(new Error(`Could not create transcript PDF: ${Buffer.concat(errors).toString("utf8").trim() || "PDF generator failed."}`));
+      const pdf = Buffer.concat(output);
+      if (!pdf.length) return reject(new Error("Could not create transcript PDF: generator returned an empty file."));
+      resolve(pdf);
+    });
+    child.stdin.end(JSON.stringify(payload));
+  });
+}
+
+async function runLiveCall(pharmacy, medicine, strength) {
+  const { CalleClient } = await import("@call-e/calle");
+  const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
+  const medicineRequest = `${medicine}${strength ? `, ${strength}` : ""}`;
+  const task = `You are an automated MedRoute medicine-availability representative calling ${pharmacy.name}.
+
+CRITICAL OPENING: Your first spoken words must be exactly: "Hello, this is an AI representative from Med Route. Is this ${pharmacy.name}?" Speak the full pharmacy name exactly as written. Stop immediately after this question and wait for the response. Do not ask about medicine before the pharmacy is confirmed.
+
+IDENTITY CHECK:
+- If they clearly confirm this is ${pharmacy.name}, continue.
+- If the answer is unclear, ask exactly once: "May I confirm, is this ${pharmacy.name}?" Then wait.
+- If they do not confirm after that, say "Thank you. I may have reached the wrong number. Goodbye." and end the call. Do not ask any availability questions.
+
+AFTER CONFIRMATION: Say exactly: "On behalf of our customer, we're requesting an availability check for medicine." Then ask: "Is ${medicineRequest} available today?"
+
+QUESTION RULES:
+1. Listen completely to each answer before speaking again.
+2. Never ask the same question twice. If an answer is unclear, refused, or unknown, record that item as unknown and move on; do not rephrase it.
+3. Extract every fact volunteered in an answer. Do not ask for a fact that the pharmacy has already supplied.
+4. Only when still missing, ask each of these once and in this order: approximate price range; whether it is available for pickup today (do not ask the pharmacy to reserve or hold it); today's closing time.
+5. Once those four items are answered or marked unknown, say "Thank you for your help. Goodbye." and end the call. Do not restart the conversation or repeat the medicine name.
+
+SAFETY: Identify yourself as an automated assistant. Do not share patient information, request prescriptions, make a purchase, place an order, reserve medicine, give medical advice, or infer facts the pharmacy did not state. Return only facts stated by ${pharmacy.name}.`;
+  const call = await client.calls.createAndWait({
+    task,
+    recipient: { phone: pharmacy.phone, locale: "en-KE", region: "KE" },
+    resultSchema,
+    recipientResultSchema: resultSchema,
+    metadata: { workflow: "medroute-pharmacy-availability" }
+  });
+  const recipient = call.recipients[0];
+  const result = recipient?.structuredResult ?? call.structuredResult;
+  if (!result) throw new Error("CALL-E completed without a structured pharmacy result.");
+  return { pharmacy: pharmacy.name, phone: pharmacy.phone, distanceKm: pharmacy.distanceKm, result, callId: call.id, summary: recipient?.summary ?? call.summary ?? "", transcript: cleanTranscript(call), mode: "live" };
+}
+
+const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".mp4": "video/mp4", ".svg": "image/svg+xml" };
+const server = createServer(async (req, res) => {
+  if (req.method === "GET" && req.url === "/api/history") return json(res, 200, { history: await readHistory() });
+  if (req.method === "GET" && req.url === "/api/analytics") return json(res, 200, analytics(await readHistory()));
+  const transcriptRequest = (req.url || "").split("?")[0].match(/^\/api\/transcripts\/(run_\d+)\/(\d+)\.pdf$/);
+  if (req.method === "GET" && transcriptRequest) {
+    try {
+      const history = await readHistory();
+      const record = history.find(item => item.id === transcriptRequest[1]);
+      const item = record?.results?.[Number(transcriptRequest[2])];
+      if (!record || !item || !Array.isArray(item.transcript) || item.transcript.length === 0) return json(res, 404, { error: "No transcript is available for this call." });
+      const pdf = await createTranscriptPdf({
+        runId: record.id,
+        createdAt: record.createdAt,
+        medicine: record.medicine,
+        strength: record.strength,
+        pharmacy: item.pharmacy,
+        phone: item.phone,
+        callId: item.callId,
+        summary: item.summary,
+        transcript: item.transcript
+      });
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "attachment; filename=medroute-call-transcript.pdf",
+        "Content-Length": pdf.length,
+        "Cache-Control": "private, no-store"
+      });
+      res.end(pdf);
+    } catch (error) { json(res, 500, { error: error.message || "Could not create transcript PDF." }); }
+    return;
+  }
+  if (req.method === "POST" && req.url === "/api/check") {
+    try {
+      const body = await parseBody(req);
+      const medicine = safeText(body.medicine);
+      const strength = safeText(body.strength, 60);
+      const pharmacies = Array.isArray(body.pharmacies) ? body.pharmacies.slice(0, 5) : [];
+      if (!medicine || pharmacies.length === 0) return json(res, 400, { error: "Medicine and at least one pharmacy are required." });
+      const clean = pharmacies.map(p => ({ name: safeText(p.name), phone: safeText(p.phone, 24), distanceKm: Number(p.distanceKm) || 0 }))
+        .filter(p => p.name && /^\+[1-9]\d{7,14}$/.test(p.phone));
+      if (!clean.length) return json(res, 400, { error: "Use authorized pharmacy phone numbers in E.164 format." });
+      const live = process.env.CALLE_API_KEY && body.confirmLive === true;
+      const calls = live
+        ? await Promise.allSettled(clean.map(p => runLiveCall(p, medicine, strength)))
+        : clean.map(p => ({ status: "fulfilled", value: demoResult(p, medicine) }));
+      const results = calls.map((item, index) => item.status === "fulfilled" ? item.value : ({ pharmacy: clean[index].name, phone: clean[index].phone, distanceKm: clean[index].distanceKm, error: "Call could not be completed.", mode: "live" }))
+        .sort((a, b) => score(b) - score(a));
+      const record = { id: `run_${Date.now()}`, createdAt: new Date().toISOString(), mode: live ? "live" : "demo", medicine, strength, results };
+      await saveHistory(record);
+      json(res, 200, record);
+    } catch (error) { json(res, 500, { error: error.message || "Unexpected server error" }); }
+    return;
+  }
+  const requested = req.url === "/" ? "index.html" : req.url.split("?")[0].replace(/^\//, "");
+  const path = normalize(join(publicDir, requested));
+  if (!path.startsWith(publicDir)) return json(res, 403, { error: "Forbidden" });
+  try { const content = await readFile(path); res.writeHead(200, { "Content-Type": mime[extname(path)] || "application/octet-stream" }); res.end(content); }
+  catch { json(res, 404, { error: "Not found" }); }
+});
+
+server.listen(port, () => console.log(`MedRoute running at http://localhost:${port}`));

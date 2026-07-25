@@ -1,0 +1,15 @@
+{
+  "name": "medroute-calle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "check": "node --check server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.2.2"
+  }
+}
