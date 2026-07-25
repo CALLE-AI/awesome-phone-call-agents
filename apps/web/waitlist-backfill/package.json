@@ -1,0 +1,19 @@
+{
+  "name": "waitlist-backfill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fill a cancelled appointment slot by phoning a waiting list one person at a time, stopping at the first acceptance.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "simulate": "node cli.mjs --simulate",
+    "dry-run": "node cli.mjs --dry-run",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.2.2"
+  }
+}
