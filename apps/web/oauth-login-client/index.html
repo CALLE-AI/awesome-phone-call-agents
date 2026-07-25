@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CALL-E OAuth Login</title>
+    <meta name="description" content="CALL-E OAuth Login Client using MCP SDK" />
+  </head>
+  <body>
+    <div id="app">
+      <div class="card">
+        <div class="header">
+          <h1>CALL-E</h1>
+          <p>Model Context Protocol Client</p>
+        </div>
+
+        <div id="status" class="status-indicator">
+          <div id="status-dot" class="dot"></div>
+          <span id="status-text">Disconnected</span>
+        </div>
+
+        <button id="login-btn" class="btn btn-primary">
+          <span id="btn-text">Connect & Login</span>
+          <div id="btn-loader" class="loader hidden"></div>
+        </button>
+        
+        <div id="error-container" class="data-section hidden" style="margin-top: 1rem;">
+          <h2 style="color: var(--error);">Error</h2>
+          <p id="error-text" style="color: var(--error);"></p>
+        </div>
+
+        <div id="content" class="hidden">
+          <div class="data-section">
+            <h2>Available Tools</h2>
+            <div id="tools-container" class="data-grid"></div>
+          </div>
+          
+          <div class="data-section" style="animation-delay: 0.1s;">
+            <h2>Resources</h2>
+            <div id="resources-container" class="data-grid">
+              <div class="data-card"><p>Loading...</p></div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal for Tool Details -->
+    <div id="tool-modal" class="modal hidden">
+      <div class="modal-content card">
+        <div class="modal-header">
+          <h2 id="modal-title">Tool Name</h2>
+          <button id="modal-close" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <pre id="modal-details"></pre>
+        </div>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "oauth-login-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  }
+}
