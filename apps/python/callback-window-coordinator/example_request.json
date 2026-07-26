@@ -1,0 +1,20 @@
+{
+  "workflow_id": "support-demo-2026-001",
+  "phone": "+12025550123",
+  "recipient_has_requested_callback": true,
+  "business_display_name": "Example Service Desk",
+  "callback_purpose": "Choose a convenient time for a requested support callback",
+  "callback_date": "2026-09-01",
+  "timezone": "America/New_York",
+  "locale": "en-US",
+  "available_windows": [
+    {
+      "id": "morning",
+      "label": "09:00-11:00"
+    },
+    {
+      "id": "afternoon",
+      "label": "14:00-16:00"
+    }
+  ]
+}
