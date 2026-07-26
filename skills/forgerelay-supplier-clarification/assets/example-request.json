@@ -1,0 +1,25 @@
+{
+  "requestId": "RFQ-DEMO-1042",
+  "supplierLabel": "Northstar Prototype Works",
+  "phoneNumber": "+15550101234",
+  "outreachBasis": "The supplier submitted an inbound quote and requested clarification by phone.",
+  "callerIdentity": "ForgeRelay on behalf of Example Manufacturing",
+  "questions": [
+    {
+      "id": "material-grade",
+      "prompt": "Can you confirm whether the quoted material is 6061-T6 aluminum?",
+      "required": true
+    },
+    {
+      "id": "drawing-revision",
+      "prompt": "Which drawing revision did you use for the quote?",
+      "required": true
+    }
+  ],
+  "allowedContext": [
+    "Request id RFQ-DEMO-1042",
+    "Part label BRACKET-DEMO",
+    "The currently approved drawing revision is B"
+  ],
+  "resultTarget": "ForgeRelay task RFQ-DEMO-1042 clarification record"
+}
