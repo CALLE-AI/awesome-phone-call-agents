@@ -87,13 +87,16 @@
   button:disabled { opacity: .4; cursor: not-allowed; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  #confirm {
+  #confirm, #token {
     flex: 1; min-width: 240px;
     font: 400 13px/1 var(--mono);
     padding: 11px 13px; border-radius: 8px; border: 1px solid var(--rule);
     background: var(--surface); color: var(--ink);
   }
-  #confirm::placeholder { color: var(--ink-muted); font-family: var(--sans); font-size: 13px; }
+  #token { min-width: 180px; }
+  #confirm::placeholder, #token::placeholder {
+    color: var(--ink-muted); font-family: var(--sans); font-size: 13px;
+  }
   #confirm:disabled { background: #f7f9fc; color: var(--ink-muted); }
 
   .mode-note { font-size: 13px; color: var(--ink-2); margin: 14px 0 0; max-width: 76ch; }
@@ -190,6 +193,7 @@
     <div class="controls">
       <button class="primary" id="preview">Preview the run</button>
       <input id="confirm" placeholder="type the slot id to unlock calling" aria-label="Slot id confirmation">
+      <input id="token" placeholder="operator token" aria-label="Operator token" type="password" hidden>
       <button class="go" id="live" disabled>Start calling</button>
       <button class="ghost" id="cancel" disabled>Stop</button>
     </div>
@@ -273,8 +277,12 @@ async function init() {
   slot.appendChild(field("Worth", `£${s.valueGbp}`, "if it is filled"));
   const idField = el("div", "field");
   idField.appendChild(el("span", "label", "Slot"));
-  idField.appendChild(el("span", "value id", s.id));
+  // In live mode the server withholds the id, because echoing it is half the intent gate and it
+  // would otherwise be readable by anything that can reach the port.
+  idField.appendChild(el("span", "value id", scenario.slotIdWithheld ? "not shown in live mode" : s.id));
   slot.appendChild(idField);
+
+  $("token").hidden = !scenario.operatorTokenRequired;
 
   const simulated = scenario.liveConfigured && scenario.transport === "fake";
   $("live").textContent = simulated ? "Start the simulated run" : "Start calling";
@@ -434,10 +442,16 @@ function showSummary(s) {
   }
 }
 
-// Calling only unlocks once the operator has typed this exact slot id. Intent has to name the
-// thing being authorised, not just be a general yes.
+// Calling only unlocks once the operator has named the slot, and supplied the token when the
+// server requires one. Intent has to name the thing being authorised, not just be a general yes.
+//
+// When the id is withheld the button cannot check it, only that something was typed. That is fine:
+// this was always a UI affordance, and the server is what actually enforces the match.
 function refreshLiveButton() {
-  $("live").disabled = !scenario?.liveConfigured || $("confirm").value.trim() !== scenario.slot.id;
+  const typed = $("confirm").value.trim();
+  const named = scenario?.slotIdWithheld ? typed !== "" : typed === scenario?.slot?.id;
+  const authed = !scenario?.operatorTokenRequired || $("token").value.trim() !== "";
+  $("live").disabled = !scenario?.liveConfigured || !named || !authed;
 }
 
 /**
@@ -454,14 +468,18 @@ async function start(mode) {
   clear($("log"));
   $("summary").hidden = true;
 
+  const headers = { "content-type": "application/json" };
   const body = { mode };
   if (mode === "live") {
     const typed = $("confirm").value.trim();
-    if (typed !== scenario.slot.id) {
+    // Only pre-check when we hold the id to check against. Otherwise the server decides, and a
+    // mismatch comes back as a refused run rather than a silent no-op here.
+    if (!scenario.slotIdWithheld && typed !== scenario.slot.id) {
       logLine([bold("Not confirmed."), " The slot id did not match, so nothing was called."]);
       return;
     }
     body.confirmSlotId = typed;
+    if (scenario.operatorTokenRequired) headers.authorization = `Bearer ${$("token").value.trim()}`;
   }
 
   $("preview").disabled = $("live").disabled = true;
@@ -471,7 +489,7 @@ async function start(mode) {
   try {
     const res = await fetch("/api/run", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify(body),
       signal: abort.signal,
     });
@@ -510,11 +528,14 @@ function finish() {
 }
 
 $("confirm").oninput = refreshLiveButton;
+$("token").oninput = refreshLiveButton;
 $("preview").onclick = () => start("preview");
 $("live").onclick = () => start("live");
 $("cancel").onclick = async () => {
   $("cancel").disabled = true;
-  await fetch("/api/cancel", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  const headers = { "content-type": "application/json" };
+  if (scenario?.operatorTokenRequired) headers.authorization = `Bearer ${$("token").value.trim()}`;
+  await fetch("/api/cancel", { method: "POST", headers, body: "{}" });
 };
 init();
 </script>

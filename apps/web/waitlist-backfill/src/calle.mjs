@@ -50,6 +50,11 @@ export function classifyTransportError(err) {
   const name = err?.name ?? err?.constructor?.name ?? "";
   const status = Number.isInteger(err?.status) ? err.status : null;
 
+  // The ONLY failure this app can prove happened before a call could exist. The SDK raises
+  // CalleAuthenticationError for 401/403, which means the request was rejected at authentication,
+  // so nothing was created. It still halts, because every later call fails identically and the
+  // operator needs to fix credentials rather than watch a loop retry - but there is nothing to
+  // reconcile afterwards.
   if (name === "CalleAuthenticationError" || status === 401 || status === 403) {
     return {
       ambiguous: false,
@@ -58,16 +63,19 @@ export function classifyTransportError(err) {
       detail: "The API rejected our credentials. No call was placed, and none can be until this is fixed.",
     };
   }
-  // A 4xx other than the retryable/ambiguous ones means the request was refused before any call
-  // existed. Safe to skip this contact and carry on down the list.
-  if (status !== null && status >= 400 && status < 500 && status !== 408 && status !== 429) {
-    return {
-      ambiguous: false,
-      halt: false,
-      code: "call_rejected",
-      detail: "The API refused the request outright, so no call was placed for this person.",
-    };
-  }
+
+  // EVERYTHING ELSE HALTS AND MUST BE RECONCILED, INCLUDING THE REST OF 4xx.
+  //
+  // A previous version advanced on any 4xx except 408/429, on the assumption that a 4xx proves the
+  // request never became a call. That assumption is not supported by anything: the SDK derives
+  // `code` from whatever the response envelope contained and falls back to "internal_error", and
+  // it documents no mapping from status to whether a call was created. A 409 in particular is a
+  // natural way for a provider to report an existing idempotent or in-progress call, which is the
+  // precise case where advancing would put two calls on one slot.
+  //
+  // So the rule is: fail closed unless the SDK proves otherwise, and it only proves it for auth.
+  // If CALL-E later documents statuses or codes that guarantee pre-creation rejection, they can be
+  // added here as an explicit allowlist, with the documentation cited.
   return {
     ambiguous: true,
     halt: true,

@@ -252,12 +252,16 @@ test("an ambiguous transport failure HALTS the run rather than calling the next 
   assert.equal(result.reconcileKey, idempotencyKey(scenario.slot, contact("c_whitfield")));
 });
 
-test("a definitive rejection skips that person and the run carries on", async () => {
+test("a 4xx halts too: nothing documents that it means no call was created", async () => {
+  // A 409 is the sharp case. It is a natural way for a provider to report an existing idempotent
+  // or in-progress call, which is precisely when advancing would put two calls on one slot. The
+  // SDK derives its error code from the response envelope and documents no status-to-created
+  // mapping, so there is nothing here to justify treating any of this as proof.
   const client = new FakeCalleClient(scenario.scriptedAnswers);
   client.placeCall = async ({ contact: c }) => {
     if (c.id === "c_whitfield") {
-      const err = new Error("recipient number is not callable");
-      err.status = 422; // the API refused it outright, so no call was ever created
+      const err = new Error("a call for this idempotency key already exists");
+      err.status = 409;
       throw err;
     }
     client.placed.push({ contactId: c.id });
@@ -266,9 +270,11 @@ test("a definitive rejection skips that person and the run carries on", async ()
   const { args } = baseRun();
   const result = await runBackfill({ ...args, client });
 
-  assert.equal(result.halted, false);
-  assert.ok(result.events.some((e) => e.type === "call_failed" && e.code === "call_rejected"));
-  assert.equal(result.filledBy.id, "c_oyelaran", "the run moved on to the next person");
+  assert.equal(result.halted, true);
+  assert.equal(result.haltCode, "call_outcome_unknown");
+  assert.equal(result.filled, false);
+  assert.deepEqual(client.placed, [], "nobody behind an unexplained 4xx may be rung");
+  assert.equal(result.reconcileKey, idempotencyKey(scenario.slot, contact("c_whitfield")));
 });
 
 test("an auth failure stops the run: every later call would fail the same way", async () => {
@@ -286,13 +292,31 @@ test("an auth failure stops the run: every later call would fail the same way", 
   assert.equal(result.reconcileKey, null);
 });
 
-test("classification is fail-closed: an unrecognised failure counts as ambiguous", () => {
-  assert.equal(classifyTransportError(new Error("???")).ambiguous, true);
-  assert.equal(classifyTransportError({ status: 500 }).ambiguous, true);
-  assert.equal(classifyTransportError({ status: 429 }).ambiguous, true);
-  assert.equal(classifyTransportError({ status: 408 }).ambiguous, true);
-  assert.equal(classifyTransportError({ name: "CalleTimeoutError" }).ambiguous, true);
-  assert.equal(classifyTransportError({ status: 422 }).ambiguous, false);
+test("classification is fail-closed: only a proven auth rejection is treated as no-call", () => {
+  for (const err of [
+    new Error("???"),
+    { status: 500 },
+    { status: 429 },
+    { status: 408 },
+    { status: 409 },   // may be an existing in-progress call
+    { status: 400 },
+    { status: 422 },
+    { name: "CalleTimeoutError" },
+    { name: "CalleConnectionError" },
+  ]) {
+    const v = classifyTransportError(err);
+    assert.equal(v.ambiguous, true, `${JSON.stringify(err)} must be treated as ambiguous`);
+    assert.equal(v.halt, true);
+  }
+
+  // The single documented exception: the SDK raises CalleAuthenticationError for 401/403, so the
+  // request was rejected at authentication and no call can have been created. It still halts.
+  for (const err of [{ status: 401 }, { status: 403 }, { name: "CalleAuthenticationError" }]) {
+    const v = classifyTransportError(err);
+    assert.equal(v.ambiguous, false);
+    assert.equal(v.halt, true);
+    assert.equal(v.code, "transport_not_authorised");
+  }
 });
 
 test("consent fails closed when the scope is missing or malformed", () => {

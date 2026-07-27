@@ -35,7 +35,7 @@ feature**, and the log records why for each one.
 Nothing here needs credentials, an account, or a network connection.
 
 ```bash
-npm test                  # 32 tests, no credentials, no network
+npm test                  # 45 tests, no credentials, no network, no child processes
 node cli.mjs --dry-run    # walk the list, place nothing
 node cli.mjs --simulate   # the full loop, acceptance and suppression, against a fake transport
 node server.mjs           # web workbench on http://localhost:8787
@@ -54,16 +54,26 @@ npm install
 CALLE_MODE=live CALLE_API_KEY=sk_... node server.mjs
 ```
 
-Live mode is gated twice. The server needs `CALLE_MODE=live` and a key, **and** the operator has to
-type the specific slot id into the UI before the run button becomes active. A general "yes" does not
-authorise a call; the confirmation has to name the thing being authorised. The CLI equivalent is
-`--execute --confirm-slot <id>`, and it exits non-zero rather than guessing.
+Live mode is gated three times. The server needs `CALLE_MODE=live` and a key; the request needs the
+**operator token** the server prints at startup; and the operator has to name the specific slot id.
+A general "yes" does not authorise a call, and neither does merely being able to reach the port.
+
+The token exists because the browser-origin checks answer a different question. `Origin`,
+`Sec-Fetch-Site` and the JSON content type establish that a request did not come from another
+website; none of them establishes that a person sent it, and a direct HTTP client is not a browser.
+So anything that can dial requires authentication, and in live mode the slot id is withheld from
+`/api/scenario` as well, since publishing it would hand over half of the confirmation gate.
+
+The server binds **loopback only** by default. Set `HOST` deliberately if you want otherwise; it
+warns on startup when you do.
 
 | Variable | Meaning |
 | --- | --- |
 | `CALLE_MODE` | unset for preview, `simulate` for the full loop with no calls, `live` for real calls. |
 | `CALLE_API_KEY` | Required for `live`. Read from the environment only, never stored or logged. |
+| `CALLE_OPERATOR_TOKEN` | Optional. Pins the live-mode token across restarts; one is generated per start otherwise. |
 | `CALLE_BASE_URL` | Optional override. Defaults to the SDK's `https://api.heycall-e.com`. |
+| `HOST` | Defaults to `127.0.0.1`. |
 | `PORT` | Defaults to `8787`. |
 
 ## Side effects
@@ -126,10 +136,17 @@ The fix for Tomas is to ask him and record it, which is a data-entry problem, no
 npm test
 ```
 
-32 tests, no credentials, no network. `npm test` names the test files explicitly rather than
-passing the directory, because `node --test test/` makes Node try to load the directory itself as
-a module and fails before running anything. The assertions that matter most are the negative ones
-— that a call was *not* placed:
+45 tests, no credentials, no network, and nothing spawned, so the suite runs identically in a
+restricted sandbox. `npm test` names the test files explicitly rather than passing the directory,
+because `node --test test/` makes Node try to load the directory itself as a module and fails
+before running anything.
+
+`test/http.test.mjs` drives the request handler directly with stub request and response objects,
+which is why the rules about who may start a run — the one-run lock under concurrent requests,
+operator authentication, the cross-site refusals — are ordinary unit tests rather than something
+requiring a live port.
+
+The assertions that matter most are the negative ones — that a call was *not* placed:
 
 - preview mode places zero calls whatever the list says
 - a live request whose confirmation names the wrong slot places zero calls
