@@ -1,10 +1,8 @@
-# MedRoute — consent-first pharmacy availability workbench
+# MedRoute — CALL-E Hackathon Entry
 
 MedRoute turns a frustrating phone-bound task into a safe, structured workflow: with the user's authorization, it calls selected pharmacies to check a medicine's availability, approximate price, pickup readiness, and closing time—then ranks the responses into a clear shortlist.
 
 It deliberately does **not** provide medical advice, share patient details, place orders, or reserve medication. A licensed clinician or pharmacist remains responsible for medicine suitability.
-
-MedRoute is a runnable Node.js reference app for the [CALL-E](https://www.heycall-e.com/) server SDK. It demonstrates a reusable "call an authorized shortlist, compare factual answers, let a human decide" workflow.
 
 ## Why this matters
 
@@ -24,39 +22,19 @@ npm start
 
 Open `http://localhost:3000`. By default the app is in **demo mode**, which produces deterministic mock call results and never contacts anyone.
 
-To activate the CALL-E code path, place a valid server-side key in `.env` (or your host's environment) as `CALLE_API_KEY`, then select the separate **I authorize the live calls now** checkbox. The default remains safe demo mode.
+To run the app, configure both a valid server-side `CALLE_API_KEY` (only needed for live calls) and a long random `MEDROUTE_ACCESS_TOKEN` in `.env`. Enter the latter in the operator-token field; it is kept only in browser session storage and sent as a Bearer token for API requests. The server requires this token for all stored history and transcript access.
+
+Live calls are Kenya-only (`+254XXXXXXXXX`). The server requires both consent acknowledgements and a stable `Idempotency-Key` header before it will place a live call. The browser creates this key for each deliberate live submission; integrations must retain it when retrying the same request.
 
 Completed live calls preserve CALL-E's returned transcript turns alongside the results. Each live pharmacy result with a transcript has a **Download call transcript PDF** button; the same download remains available when opening the saved result later. The authorized pharmacy list is stored locally in the browser, while completed check history is saved server-side in the local `data/` directory.
 
-## Side effects, controls, and cancellation
-
-- The default **Preview availability checks** path is a deterministic dry run. It does not import credentials or place a call.
-- A live run happens only after the operator confirms they are authorized to contact the listed pharmacies **and** explicitly selects **I authorize the live calls now**. The app then makes at most five one-off CALL-E calls for that submission.
-- Calls require a syntactically valid E.164 number. Public examples use fictional reserved numbers only; do not put real contact details in documentation, commits, or screenshots.
-- There are no recurring schedules, background replays, or hidden call jobs. The action button is disabled while a run is in progress to prevent duplicate submissions from the interface.
-- A live call already accepted by CALL-E cannot be cancelled from this demo. Closing or refreshing the page does not cancel it. Operators should only submit an authorized call they intend to complete.
-- The app does not collect patient data. Its local history and generated PDFs may contain the pharmacy contact and the factual call record, so they should be treated as private operational data and not shared publicly.
-
 ## Safety and privacy
 
-- Use only pharmacy phone numbers the operator is authorized to contact, in E.164 format.
+- Use only authorized Kenyan pharmacy phone numbers in `+254XXXXXXXXX` format.
 - Do not enter patient names, diagnoses, prescription identifiers, payment data, or other personal health information.
 - No ordering, holding, payment, or clinical recommendation is permitted.
 - Demo numbers are fictional and formatted only to exercise the validation path.
-- Keep credentials server-side; `.env` is ignored by Git.
-
-## Verification
-
-```bash
-npm run check
-npm test
-```
-
-The smoke test starts the app without `CALLE_API_KEY`, verifies the ranked demo response, and verifies that a stored transcript can be downloaded as a PDF. It never makes an outbound call.
-
-## Assets
-
-See [ATTRIBUTION.md](ATTRIBUTION.md) for the two visual assets used by the interface and the required phone-animation attribution.
+- Keep credentials server-side; `.env` is ignored by Git. Phone numbers are masked in responses, saved history, and transcript PDFs.
 
 ## Demo script (3 minutes)
 

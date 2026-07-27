@@ -1,6 +1,10 @@
 let pharmacies = loadSavedPharmacies();
 let history = [];
 const root = document.querySelector("#pharmacies");
+const accessTokenInput = document.querySelector("#access-token");
+accessTokenInput.value = sessionStorage.getItem("medroute-access-token") || "";
+const authHeaders = () => ({ "Authorization": `Bearer ${accessTokenInput.value.trim()}` });
+accessTokenInput.addEventListener("input", () => sessionStorage.setItem("medroute-access-token", accessTokenInput.value.trim()));
 const esc = value => String(value ?? "").replace(/[&<>"]/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[char]);
 function loadSavedPharmacies() {
   try {
@@ -52,7 +56,8 @@ function show(record, scroll = true) {
 }
 
 async function loadHistory() {
-  const response = await fetch("/api/history");
+  const response = await fetch("/api/history", { headers: authHeaders() });
+  if (!response.ok) return;
   const data = await response.json();
   history = data.history || [];
   document.querySelector("#history-count").textContent = `${history.length} saved`;
@@ -79,7 +84,8 @@ function analyticsOverflow(items, label, renderItem) {
 }
 
 async function loadAnalytics() {
-  const response = await fetch("/api/analytics");
+  const response = await fetch("/api/analytics", { headers: authHeaders() });
+  if (!response.ok) return;
   const data = await response.json();
   const maximum = Math.max(...data.topMedicines.map(item => item.count), 1);
   const medicineRows = data.topMedicines.slice(0, analyticsPreviewLimit).map(item => medicineDemandRow(item, maximum)).join("");
@@ -94,12 +100,13 @@ document.querySelector("#live").onchange = event => { document.querySelector("#r
 document.querySelector("#run").onclick = async () => {
   const button = document.querySelector("#run"), consent = document.querySelector("#consent");
   if (!consent.checked) return alert("Please confirm authorization before preparing checks.");
+  if (!accessTokenInput.value.trim()) return alert("Enter the operator access token.");
   const confirmLive = document.querySelector("#live").checked;
   const medicine = document.querySelector("#medicine").value;
   button.disabled = true; button.textContent = confirmLive ? "Live checks in progress…" : "Preparing checks…";
   const strength = [document.querySelector("#strength-value").value, document.querySelector("#strength-unit").value, document.querySelector("#dosage-form").value].filter(Boolean).join(" ");
   if (confirmLive) setLiveCallOverlay(true, pharmacies, medicine);
-  try { const response = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ medicine, strength, pharmacies, confirmLive }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); show(data); await loadHistory(); } catch (e) { alert(e.message); } finally { if (confirmLive) setLiveCallOverlay(false); button.disabled = false; button.innerHTML = confirmLive ? "<span>Place authorized live checks</span><b>→</b>" : "<span>Preview availability checks</span><b>→</b>"; }
+  try { const response = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders(), ...(confirmLive ? { "Idempotency-Key": crypto.randomUUID() } : {}) }, body: JSON.stringify({ medicine, strength, pharmacies, confirmLive, consentAcknowledged: consent.checked, liveCallAcknowledged: confirmLive }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); show(data); await loadHistory(); } catch (e) { alert(e.message); } finally { if (confirmLive) setLiveCallOverlay(false); button.disabled = false; button.innerHTML = confirmLive ? "<span>Place authorized live checks</span><b>→</b>" : "<span>Preview availability checks</span><b>→</b>"; }
 };
 document.querySelector("#history-list").onclick = event => { const id = event.target.closest("[data-history-id]")?.dataset.historyId; const record = history.find(item => item.id === id); if (record) show(record, true); };
 document.querySelector("#analytics-content").onclick = async event => { const id = event.target.closest("[data-history-id]")?.dataset.historyId; if (!id) return; const record = history.find(item => item.id === id); if (!record) return; await changeView("workspace"); show(record, true); };

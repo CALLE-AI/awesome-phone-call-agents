@@ -1,13 +1,16 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, relative } from "node:path";
 
 const port = Number(process.env.PORT || 3000);
 const publicDir = join(process.cwd(), "public");
 const dataDir = process.env.MEDROUTE_DATA_DIR || join(process.cwd(), "data");
 const historyFile = join(dataDir, "medroute-history.json");
 const transcriptPdfScript = join(process.cwd(), "scripts", "generate-transcript-pdf.py");
+const accessToken = process.env.MEDROUTE_ACCESS_TOKEN;
+const idempotentRuns = new Map();
+let saveQueue = Promise.resolve();
 
 const resultSchema = {
   type: "object",
@@ -41,12 +44,25 @@ function safeText(value, max = 120) {
   return typeof value === "string" ? value.replace(/[\r\n<>]/g, " ").trim().slice(0, max) : "";
 }
 
+function maskPhone(phone) {
+  const value = safeText(phone, 24);
+  return value.length > 6 ? `${value.slice(0, 4)}${"•".repeat(Math.max(0, value.length - 8))}${value.slice(-4)}` : "Hidden";
+}
+
+function redactPhoneNumbers(value) {
+  return safeText(value, 2_000).replace(/\+\d[\d -]{7,}\d/g, match => maskPhone(match.replace(/[ -]/g, "")));
+}
+
+function authorized(req) {
+  return Boolean(accessToken) && req.headers.authorization === `Bearer ${accessToken}`;
+}
+
 function demoResult(pharmacy, medicine) {
   const seeds = ["in_stock", "limited", "out_of_stock"];
   const status = seeds[Number(pharmacy.phone.at(-1)) % seeds.length];
   return {
     pharmacy: pharmacy.name,
-    phone: pharmacy.phone,
+    phone: maskPhone(pharmacy.phone),
     distanceKm: pharmacy.distanceKm,
     result: {
       stock_status: status,
@@ -62,7 +78,7 @@ function demoResult(pharmacy, medicine) {
 }
 
 function score(item) {
-  const r = item.result;
+  const r = item.result || {};
   return (r.stock_status === "in_stock" ? 100 : r.stock_status === "limited" ? 55 : 0)
     + (r.pickup_readiness === "can_hold" ? 20 : 0) - Number(item.distanceKm || 0) * 2;
 }
@@ -73,10 +89,17 @@ async function readHistory() {
 }
 
 async function saveHistory(record) {
-  const history = await readHistory();
-  history.unshift(record);
-  await mkdir(dataDir, { recursive: true });
-  await writeFile(historyFile, JSON.stringify(history.slice(0, 100), null, 2), "utf8");
+  const save = async () => {
+    const history = await readHistory();
+    history.unshift(record);
+    await mkdir(dataDir, { recursive: true });
+    const temporaryFile = `${historyFile}.${process.pid}.tmp`;
+    await writeFile(temporaryFile, JSON.stringify(history.slice(0, 100), null, 2), "utf8");
+    await rename(temporaryFile, historyFile);
+  };
+  const pending = saveQueue.then(save, save);
+  saveQueue = pending.catch(() => {});
+  return pending;
 }
 
 function analytics(history) {
@@ -120,7 +143,7 @@ function cleanTranscript(call) {
   const attempts = call.recipients[0]?.attempts || [];
   const turns = attempts.flatMap(attempt => attempt.transcriptTurns || []).map(turn => ({
     speaker: ["bot", "user"].includes(turn.speaker) ? turn.speaker : "unknown",
-    text: normalizeTranscriptText(turn.text),
+    text: redactPhoneNumbers(normalizeTranscriptText(turn.text)),
     offsetSeconds: Number.isFinite(turn.offsetSeconds) ? turn.offsetSeconds : null
   })).filter(turn => turn.text);
   return mergeTranscriptTurns(turns);
@@ -145,7 +168,7 @@ function createTranscriptPdf(payload) {
 }
 
 async function runLiveCall(pharmacy, medicine, strength) {
-  const { CalleClient } = await import("@call-e/calle");
+  const { CalleClient } = await import(process.env.MEDROUTE_CALLE_CLIENT_MODULE || "@call-e/calle");
   const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY });
   const medicineRequest = `${medicine}${strength ? `, ${strength}` : ""}`;
   const task = `You are an automated MedRoute medicine-availability representative calling ${pharmacy.name}.
@@ -177,11 +200,12 @@ SAFETY: Identify yourself as an automated assistant. Do not share patient inform
   const recipient = call.recipients[0];
   const result = recipient?.structuredResult ?? call.structuredResult;
   if (!result) throw new Error("CALL-E completed without a structured pharmacy result.");
-  return { pharmacy: pharmacy.name, phone: pharmacy.phone, distanceKm: pharmacy.distanceKm, result, callId: call.id, summary: recipient?.summary ?? call.summary ?? "", transcript: cleanTranscript(call), mode: "live" };
+  return { pharmacy: pharmacy.name, phone: maskPhone(pharmacy.phone), distanceKm: pharmacy.distanceKm, result, callId: call.id, summary: redactPhoneNumbers(recipient?.summary ?? call.summary ?? ""), transcript: cleanTranscript(call), mode: "live" };
 }
 
 const mime = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".mp4": "video/mp4", ".svg": "image/svg+xml" };
 const server = createServer(async (req, res) => {
+  if ((req.url || "").startsWith("/api/") && !authorized(req)) return json(res, 401, { error: "Operator authentication is required." });
   if (req.method === "GET" && req.url === "/api/history") return json(res, 200, { history: await readHistory() });
   if (req.method === "GET" && req.url === "/api/analytics") return json(res, 200, analytics(await readHistory()));
   const transcriptRequest = (req.url || "").split("?")[0].match(/^\/api\/transcripts\/(run_\d+)\/(\d+)\.pdf$/);
@@ -197,7 +221,7 @@ const server = createServer(async (req, res) => {
         medicine: record.medicine,
         strength: record.strength,
         pharmacy: item.pharmacy,
-        phone: item.phone,
+        phone: maskPhone(item.phone),
         callId: item.callId,
         summary: item.summary,
         transcript: item.transcript
@@ -220,23 +244,33 @@ const server = createServer(async (req, res) => {
       const pharmacies = Array.isArray(body.pharmacies) ? body.pharmacies.slice(0, 5) : [];
       if (!medicine || pharmacies.length === 0) return json(res, 400, { error: "Medicine and at least one pharmacy are required." });
       const clean = pharmacies.map(p => ({ name: safeText(p.name), phone: safeText(p.phone, 24), distanceKm: Number(p.distanceKm) || 0 }))
-        .filter(p => p.name && /^\+[1-9]\d{7,14}$/.test(p.phone));
-      if (!clean.length) return json(res, 400, { error: "Use authorized pharmacy phone numbers in E.164 format." });
-      const live = process.env.CALLE_API_KEY && body.confirmLive === true;
-      const calls = live
-        ? await Promise.allSettled(clean.map(p => runLiveCall(p, medicine, strength)))
-        : clean.map(p => ({ status: "fulfilled", value: demoResult(p, medicine) }));
-      const results = calls.map((item, index) => item.status === "fulfilled" ? item.value : ({ pharmacy: clean[index].name, phone: clean[index].phone, distanceKm: clean[index].distanceKm, error: "Call could not be completed.", mode: "live" }))
-        .sort((a, b) => score(b) - score(a));
-      const record = { id: `run_${Date.now()}`, createdAt: new Date().toISOString(), mode: live ? "live" : "demo", medicine, strength, results };
-      await saveHistory(record);
-      json(res, 200, record);
+        .filter(p => p.name && /^\+254\d{9}$/.test(p.phone));
+      if (!clean.length) return json(res, 400, { error: "Use authorized Kenyan pharmacy phone numbers in +254XXXXXXXXX format." });
+      if (body.consentAcknowledged !== true) return json(res, 400, { error: "Confirm authorization to contact every pharmacy before running a check." });
+      const liveRequested = body.confirmLive === true;
+      if (liveRequested && body.liveCallAcknowledged !== true) return json(res, 400, { error: "Explicit live-call authorization is required." });
+      const live = Boolean(process.env.CALLE_API_KEY && liveRequested);
+      const idempotencyKey = safeText(req.headers["idempotency-key"], 120);
+      if (live && !/^[A-Za-z0-9_-]{16,120}$/.test(idempotencyKey)) return json(res, 400, { error: "A stable Idempotency-Key header is required for live calls." });
+      const execute = async () => {
+        const calls = live
+          ? await Promise.allSettled(clean.map(p => runLiveCall(p, medicine, strength)))
+          : clean.map(p => ({ status: "fulfilled", value: demoResult(p, medicine) }));
+        const results = calls.map((item, index) => item.status === "fulfilled" ? item.value : ({ pharmacy: clean[index].name, phone: maskPhone(clean[index].phone), distanceKm: clean[index].distanceKm, error: "Call could not be completed.", mode: "live" }))
+          .sort((a, b) => score(b) - score(a));
+        const record = { id: `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, createdAt: new Date().toISOString(), mode: live ? "live" : "demo", medicine, strength, results };
+        await saveHistory(record);
+        return record;
+      };
+      const record = live ? (idempotentRuns.get(idempotencyKey) || (() => { const pending = execute(); idempotentRuns.set(idempotencyKey, pending); return pending; })()) : await execute();
+      json(res, 200, await record);
     } catch (error) { json(res, 500, { error: error.message || "Unexpected server error" }); }
     return;
   }
   const requested = req.url === "/" ? "index.html" : req.url.split("?")[0].replace(/^\//, "");
   const path = normalize(join(publicDir, requested));
-  if (!path.startsWith(publicDir)) return json(res, 403, { error: "Forbidden" });
+  const relativePath = relative(publicDir, path);
+  if (relativePath.startsWith("..") || normalize(relativePath) === "") return json(res, 403, { error: "Forbidden" });
   try { const content = await readFile(path); res.writeHead(200, { "Content-Type": mime[extname(path)] || "application/octet-stream" }); res.end(content); }
   catch { json(res, 404, { error: "Not found" }); }
 });
