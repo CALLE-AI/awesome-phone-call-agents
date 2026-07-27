@@ -130,6 +130,7 @@ body {
 }
 
 .dot.connected { background: var(--success); box-shadow: 0 0 10px var(--success); }
+.dot.authenticating { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
 .dot.error { background: var(--error); box-shadow: 0 0 10px var(--error); }
 
 .data-section {
@@ -276,6 +277,12 @@ body {
 .error-card p {
   color: #fca5a5;
 }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .loader {
   border: 3px solid rgba(255,255,255,0.1);
   border-radius: 50%;

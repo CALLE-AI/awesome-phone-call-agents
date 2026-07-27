@@ -1,16 +1,27 @@
 import { test, expect } from '@playwright/test';
 
-test('has title', async ({ page }) => {
+test('has title matching app name', async ({ page }) => {
   await page.goto('/');
-
-  // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/Vite/);
+  await expect(page).toHaveTitle(/CALL-E OAuth Login/);
 });
 
-test('loads the main page and shows login elements', async ({ page }) => {
+test('shows disconnected status and enabled login button on load', async ({ page }) => {
   await page.goto('/');
 
-  // Check that some expected content is rendered
-  // You might want to adjust this based on the actual app content
-  await expect(page.locator('body')).toBeVisible();
+  const loginBtn = page.locator('#login-btn');
+  await expect(loginBtn).toBeVisible();
+  await expect(loginBtn).toBeEnabled();
+
+  const statusText = page.locator('#status-text');
+  await expect(statusText).toHaveText('Disconnected');
+});
+
+test('error container is hidden on initial load', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#error-container')).toBeHidden();
+});
+
+test('content section is hidden before login', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#content')).toBeHidden();
 });
