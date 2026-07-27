@@ -10,6 +10,8 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "@call-e/calle": "^0.2.2"
+    "@call-e/calle": "^0.2.2",
+    "jose": "^6.2.4",
+    "pg": "^8.22.0"
   }
 }

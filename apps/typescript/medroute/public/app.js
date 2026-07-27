@@ -4,6 +4,7 @@ const root = document.querySelector("#pharmacies");
 const accessTokenInput = document.querySelector("#access-token");
 accessTokenInput.value = sessionStorage.getItem("medroute-access-token") || "";
 const authHeaders = () => ({ "Authorization": `Bearer ${accessTokenInput.value.trim()}` });
+const pendingLiveRequestKey = "medroute-pending-live-request";
 accessTokenInput.addEventListener("input", () => sessionStorage.setItem("medroute-access-token", accessTokenInput.value.trim()));
 const esc = value => String(value ?? "").replace(/[&<>"]/g, char => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[char]);
 function loadSavedPharmacies() {
@@ -106,7 +107,12 @@ document.querySelector("#run").onclick = async () => {
   button.disabled = true; button.textContent = confirmLive ? "Live checks in progress…" : "Preparing checks…";
   const strength = [document.querySelector("#strength-value").value, document.querySelector("#strength-unit").value, document.querySelector("#dosage-form").value].filter(Boolean).join(" ");
   if (confirmLive) setLiveCallOverlay(true, pharmacies, medicine);
-  try { const response = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders(), ...(confirmLive ? { "Idempotency-Key": crypto.randomUUID() } : {}) }, body: JSON.stringify({ medicine, strength, pharmacies, confirmLive, consentAcknowledged: consent.checked, liveCallAcknowledged: confirmLive }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); show(data); await loadHistory(); } catch (e) { alert(e.message); } finally { if (confirmLive) setLiveCallOverlay(false); button.disabled = false; button.innerHTML = confirmLive ? "<span>Place authorized live checks</span><b>→</b>" : "<span>Preview availability checks</span><b>→</b>"; }
+  const requestBody = { medicine, strength, pharmacies, confirmLive, consentAcknowledged: consent.checked, liveCallAcknowledged: confirmLive };
+  const requestFingerprint = JSON.stringify(requestBody);
+  const savedRequest = confirmLive ? JSON.parse(sessionStorage.getItem(pendingLiveRequestKey) || "null") : null;
+  const idempotencyKey = confirmLive ? (savedRequest?.fingerprint === requestFingerprint ? savedRequest.idempotencyKey : crypto.randomUUID()) : null;
+  if (confirmLive) sessionStorage.setItem(pendingLiveRequestKey, JSON.stringify({ fingerprint: requestFingerprint, idempotencyKey }));
+  try { const response = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders(), ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) }, body: JSON.stringify(requestBody) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); if (confirmLive) sessionStorage.removeItem(pendingLiveRequestKey); show(data); await loadHistory(); } catch (e) { alert(e.message); } finally { if (confirmLive) setLiveCallOverlay(false); button.disabled = false; button.innerHTML = confirmLive ? "<span>Place authorized live checks</span><b>→</b>" : "<span>Preview availability checks</span><b>→</b>"; }
 };
 document.querySelector("#history-list").onclick = event => { const id = event.target.closest("[data-history-id]")?.dataset.historyId; const record = history.find(item => item.id === id); if (record) show(record, true); };
 document.querySelector("#analytics-content").onclick = async event => { const id = event.target.closest("[data-history-id]")?.dataset.historyId; if (!id) return; const record = history.find(item => item.id === id); if (!record) return; await changeView("workspace"); show(record, true); };

@@ -26,6 +26,12 @@ To run the app, configure both a valid server-side `CALLE_API_KEY` (only needed 
 
 Live calls are Kenya-only (`+254XXXXXXXXX`). The server requires both consent acknowledgements and a stable `Idempotency-Key` header before it will place a live call. The browser creates this key for each deliberate live submission; integrations must retain it when retrying the same request.
 
+The default production safeguards allow 30 checks per minute per operator/IP and enforce a 15-minute per-pharmacy live-call cooldown. Configure `MEDROUTE_MAX_CHECKS_PER_MINUTE`, `MEDROUTE_LIVE_COOLDOWN_SECONDS`, `MEDROUTE_MAX_TRANSCRIPT_TURNS`, and a stable `MEDROUTE_RECIPIENT_HASH_KEY` for the deployment. Idempotency records are persisted with local history, but a multi-instance deployment should replace this local JSON store and shared bearer token with a transactional database plus managed identity, rate limiting, and audit logging.
+
+## Production deployment
+
+Set `MEDROUTE_ENV=production` to require PostgreSQL and OpenID Connect. In this mode the service will refuse to start unless `DATABASE_URL`, `MEDROUTE_OIDC_ISSUER`, `MEDROUTE_OIDC_AUDIENCE`, and `MEDROUTE_OIDC_JWKS_URL` are configured. PostgreSQL stores completed runs, idempotency reservations, pharmacy cooldowns, and an audit trail. OIDC access tokens replace the development-only shared operator token; use a provider-managed identity and restrict its audience to this service.
+
 Completed live calls preserve CALL-E's returned transcript turns alongside the results. Each live pharmacy result with a transcript has a **Download call transcript PDF** button; the same download remains available when opening the saved result later. The authorized pharmacy list is stored locally in the browser, while completed check history is saved server-side in the local `data/` directory.
 
 ## Safety and privacy

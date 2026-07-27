@@ -16,7 +16,7 @@ async function startServer(options = {}) {
   const dataDir = await mkdtemp(join(tmpdir(), "medroute-test-"));
   const port = 31000 + Math.floor(Math.random() * 1000);
   const server = spawn(process.execPath, ["server.js"], {
-    env: { ...process.env, PORT: String(port), MEDROUTE_DATA_DIR: dataDir, MEDROUTE_ACCESS_TOKEN: token, CALLE_API_KEY: options.live ? "test-key" : "", MEDROUTE_CALLE_CLIENT_MODULE: pathToFileURL(join(process.cwd(), "test", "mock-calle.js")).href, MEDROUTE_PYTHON: options.python || "python" },
+    env: { ...process.env, PORT: String(port), MEDROUTE_DATA_DIR: dataDir, MEDROUTE_ACCESS_TOKEN: token, CALLE_API_KEY: options.live ? "test-key" : "", MEDROUTE_CALLE_CLIENT_MODULE: pathToFileURL(join(process.cwd(), "test", "mock-calle.js")).href, MEDROUTE_PYTHON: options.python || "python", ...(options.env || {}) },
     stdio: ["ignore", "pipe", "pipe"]
   });
   await new Promise((resolve, reject) => {
@@ -67,6 +67,19 @@ test("live calls require both consents and return ranked partial failures idempo
     assert.equal(one.results.length, 2);
     assert.equal(one.results.filter(result => result.error).length, 1);
     assert.equal((await (await app.request("/api/history")).json()).history.length, 1);
+    const mismatched = await app.request("/api/check", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": "stable-live-key-123" }, body: JSON.stringify(checkBody({ medicine: "Different medicine", confirmLive: true, liveCallAcknowledged: true })) });
+    assert.equal(mismatched.status, 409);
+    const cooldown = await app.request("/api/check", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": "another-live-key-456" }, body: JSON.stringify(checkBody({ confirmLive: true, liveCallAcknowledged: true })) });
+    assert.equal(cooldown.status, 429);
+  } finally { await app.close(); }
+});
+
+test("rate limits repeated availability-check requests", async () => {
+  const app = await startServer({ env: { MEDROUTE_MAX_CHECKS_PER_MINUTE: "1" } });
+  try {
+    const request = () => app.request("/api/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(checkBody()) });
+    assert.equal((await request()).status, 200);
+    assert.equal((await request()).status, 429);
   } finally { await app.close(); }
 });
 
