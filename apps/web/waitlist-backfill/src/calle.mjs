@@ -29,6 +29,53 @@ export const SLOT_RESULT_SCHEMA = {
   },
 };
 
+/**
+ * Did this failure definitely leave no call behind, or might one still be running?
+ *
+ * THE SAFETY QUESTION THIS APP TURNS ON. There is one slot. If a request times out or the
+ * connection drops after the provider has already accepted the call, the call is placed and we
+ * never saw the response. Moving to the next person then puts two calls in flight for one
+ * appointment and can promise it to two people, which is the exact failure the sequential design
+ * exists to prevent.
+ *
+ * So the classification is fail-closed: only an outright rejection by the API - a 4xx that means
+ * the request was never actioned - counts as definitively "no call exists". Timeouts, dropped
+ * connections, 5xx, 408, 429 and anything unrecognised are all treated as ambiguous, because for
+ * every one of them the provider may hold a call we cannot see.
+ *
+ * 401/403 are definitive (nothing was placed) but still halt the run, because every subsequent
+ * call would fail the same way and the operator needs to fix credentials, not watch a loop retry.
+ */
+export function classifyTransportError(err) {
+  const name = err?.name ?? err?.constructor?.name ?? "";
+  const status = Number.isInteger(err?.status) ? err.status : null;
+
+  if (name === "CalleAuthenticationError" || status === 401 || status === 403) {
+    return {
+      ambiguous: false,
+      halt: true,
+      code: "transport_not_authorised",
+      detail: "The API rejected our credentials. No call was placed, and none can be until this is fixed.",
+    };
+  }
+  // A 4xx other than the retryable/ambiguous ones means the request was refused before any call
+  // existed. Safe to skip this contact and carry on down the list.
+  if (status !== null && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+    return {
+      ambiguous: false,
+      halt: false,
+      code: "call_rejected",
+      detail: "The API refused the request outright, so no call was placed for this person.",
+    };
+  }
+  return {
+    ambiguous: true,
+    halt: true,
+    code: "call_outcome_unknown",
+    detail: "The request failed without a definite answer, so a call may already be in progress.",
+  };
+}
+
 /** Build the call instruction. Boundaries are restated to the agent, not just checked by us. */
 export function buildTask({ slot, contact, message }) {
   return [

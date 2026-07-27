@@ -45,6 +45,38 @@ export function maskPhone(value) {
 }
 
 /**
+ * Strip anything phone-shaped out of text we did not write.
+ *
+ * Provider summaries and error messages are free text from outside this app, and they routinely
+ * quote the number that was dialled. Masking `contact.phone` at the call site is therefore not
+ * enough: the number comes back a second time inside strings nobody here composed. Everything that
+ * reaches an event, a log or the browser goes through this.
+ *
+ * The three patterns are deliberately narrow so that ordinary content survives. An ISO timestamp
+ * like `2026-09-03T01:30:00Z` has no run of ten digits and does not match the grouped form, so it
+ * is left alone; `+15555550100` and `(555) 555-0100` do not survive.
+ */
+const PHONE_SHAPES = [
+  /\+[1-9]\d{7,14}/g,                        // E.164
+  /\b\d{10,15}\b/g,                          // a bare run of digits long enough to dial
+  /\(?\b\d{3}\)?[ .-]\d{3}[ .-]\d{4}\b/g,    // (555) 555-0100 and friends
+];
+
+export function redactPhones(text) {
+  if (typeof text !== "string" || text === "") return text;
+  let out = text;
+  for (const re of PHONE_SHAPES) {
+    out = out.replace(re, (match) => {
+      const digits = match.replace(/\D/g, "");
+      if (digits.length < 10) return match;
+      const normalised = match.trim().startsWith("+") ? `+${digits}` : digits;
+      return maskPhone(normalised);
+    });
+  }
+  return out;
+}
+
+/**
  * P4: the timezone must be supplied explicitly as an IANA identifier.
  *
  * Deliberately NOT accepted: country code, dialling prefix, locale, language, UTC offset, or an
@@ -121,7 +153,16 @@ function fmtMinutes(m) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-/** Consent must be on file, un-revoked, and scoped to this kind of call. */
+/**
+ * Consent must be on file, un-revoked, and EXPLICITLY scoped to this kind of call.
+ *
+ * The scope check is fail-closed on purpose. It used to read
+ * `if (Array.isArray(c.scopes) && !c.scopes.includes(scope))`, which skipped itself entirely when
+ * `scopes` was absent or not an array - so a record carrying nothing but a `grantedAt` was treated
+ * as consent to call. A missing scope is not a permissive scope. The whole point of recording a
+ * scope is that consent to be told about an appointment is not consent to be marketed to, and a
+ * malformed record is exactly the case where we know least about what was agreed.
+ */
 export function checkConsent(contact, scope) {
   const c = contact.consent;
   if (!c || !c.grantedAt) {
@@ -130,7 +171,21 @@ export function checkConsent(contact, scope) {
   if (c.revokedAt) {
     return { allowed: false, code: "consent_revoked", detail: `Consent revoked at ${c.revokedAt}.` };
   }
-  if (Array.isArray(c.scopes) && !c.scopes.includes(scope)) {
+  if (typeof scope !== "string" || scope === "") {
+    return {
+      allowed: false,
+      code: "consent_scope_unspecified",
+      detail: "No consent scope was configured for this run, so no consent can be matched to it.",
+    };
+  }
+  if (!Array.isArray(c.scopes) || c.scopes.length === 0) {
+    return {
+      allowed: false,
+      code: "consent_scope_missing",
+      detail: `Consent record has no scopes array, so it cannot be shown to cover "${scope}".`,
+    };
+  }
+  if (!c.scopes.includes(scope)) {
     return {
       allowed: false,
       code: "consent_scope_mismatch",

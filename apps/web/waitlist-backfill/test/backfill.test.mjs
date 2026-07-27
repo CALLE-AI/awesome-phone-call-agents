@@ -19,9 +19,10 @@ import {
   isE164,
   localTimeIn,
   maskPhone,
+  redactPhones,
   resolveTimeZone,
 } from "../src/guardrails.mjs";
-import { FakeCalleClient, buildTask } from "../src/calle.mjs";
+import { FakeCalleClient, buildTask, classifyTransportError } from "../src/calle.mjs";
 import { idempotencyKey, runBackfill } from "../src/backfill.mjs";
 
 const scenario = JSON.parse(
@@ -219,15 +220,118 @@ test("idempotency keys are stable, so a re-run cannot double-call", () => {
   assert.notEqual(idempotencyKey(scenario.slot, c), idempotencyKey(scenario.slot, contact("c_raman")));
 });
 
-test("a transport failure does not abort the run or fill the slot", async () => {
+/*
+ * THE DOUBLE-BOOKING GUARD.
+ *
+ * These two tests are the reason the loop exists in this shape. A failure that might have left a
+ * call running must stop everything, because the alternative is two calls in flight for one slot
+ * and one appointment promised to two people. A failure that definitely placed no call is allowed
+ * to move on, because stopping there would strand the slot for no reason.
+ */
+
+test("an ambiguous transport failure HALTS the run rather than calling the next person", async () => {
   const client = new FakeCalleClient(scenario.scriptedAnswers);
   client.placeCall = async ({ contact: c }) => {
-    if (c.id === "c_whitfield") throw new Error("network down");
+    // No status: we never learned whether the provider accepted this call.
+    if (c.id === "c_whitfield") throw new Error("socket hang up");
     client.placed.push({ contactId: c.id });
     return { id: "x", status: "completed", structuredResult: { can_take_slot: "yes" } };
   };
   const { args } = baseRun();
   const result = await runBackfill({ ...args, client });
-  assert.ok(result.events.some((e) => e.type === "call_failed" && e.code === "transport_error"));
+
+  assert.equal(result.halted, true);
+  assert.equal(result.haltCode, "call_outcome_unknown");
+  assert.equal(result.filled, false, "an unknown outcome must never be read as an acceptance");
+  assert.deepEqual(client.placed, [], "nobody behind the ambiguous call may be rung");
+
+  const halt = result.events.find((e) => e.type === "run_halted");
+  assert.ok(halt, "the run must say why it stopped");
+  assert.equal(halt.reconcileRequired, true);
+  // The operator needs the key to go and look the call up at the provider.
+  assert.equal(result.reconcileKey, idempotencyKey(scenario.slot, contact("c_whitfield")));
+});
+
+test("a definitive rejection skips that person and the run carries on", async () => {
+  const client = new FakeCalleClient(scenario.scriptedAnswers);
+  client.placeCall = async ({ contact: c }) => {
+    if (c.id === "c_whitfield") {
+      const err = new Error("recipient number is not callable");
+      err.status = 422; // the API refused it outright, so no call was ever created
+      throw err;
+    }
+    client.placed.push({ contactId: c.id });
+    return { id: "x", status: "completed", structuredResult: { can_take_slot: "yes" } };
+  };
+  const { args } = baseRun();
+  const result = await runBackfill({ ...args, client });
+
+  assert.equal(result.halted, false);
+  assert.ok(result.events.some((e) => e.type === "call_failed" && e.code === "call_rejected"));
   assert.equal(result.filledBy.id, "c_oyelaran", "the run moved on to the next person");
+});
+
+test("an auth failure stops the run: every later call would fail the same way", async () => {
+  const client = new FakeCalleClient(scenario.scriptedAnswers);
+  client.placeCall = async () => {
+    const err = new Error("invalid api key");
+    err.status = 401;
+    throw err;
+  };
+  const { args } = baseRun();
+  const result = await runBackfill({ ...args, client });
+  assert.equal(result.halted, true);
+  assert.equal(result.haltCode, "transport_not_authorised");
+  // Nothing was placed, so there is nothing to reconcile.
+  assert.equal(result.reconcileKey, null);
+});
+
+test("classification is fail-closed: an unrecognised failure counts as ambiguous", () => {
+  assert.equal(classifyTransportError(new Error("???")).ambiguous, true);
+  assert.equal(classifyTransportError({ status: 500 }).ambiguous, true);
+  assert.equal(classifyTransportError({ status: 429 }).ambiguous, true);
+  assert.equal(classifyTransportError({ status: 408 }).ambiguous, true);
+  assert.equal(classifyTransportError({ name: "CalleTimeoutError" }).ambiguous, true);
+  assert.equal(classifyTransportError({ status: 422 }).ambiguous, false);
+});
+
+test("consent fails closed when the scope is missing or malformed", () => {
+  const granted = (consent) => checkConsent({ consent }, "appointment_offers");
+  // The bug this replaces: a record with only a grantedAt was treated as callable, because the
+  // scope check skipped itself whenever `scopes` was not an array.
+  assert.equal(granted({ grantedAt: "2026-01-01" }).allowed, false);
+  assert.equal(granted({ grantedAt: "2026-01-01" }).code, "consent_scope_missing");
+  assert.equal(granted({ grantedAt: "2026-01-01", scopes: "appointment_offers" }).allowed, false);
+  assert.equal(granted({ grantedAt: "2026-01-01", scopes: [] }).allowed, false);
+  assert.equal(granted({ grantedAt: "2026-01-01", scopes: ["appointment_offers"] }).allowed, true);
+  // A run with no configured scope cannot match anything, so it must not call.
+  assert.equal(checkConsent({ consent: { grantedAt: "x", scopes: ["a"] } }, "").allowed, false);
+});
+
+test("phone-shaped text is redacted out of anything the provider wrote", () => {
+  assert.equal(redactPhones("Called +15550100178 and got voicemail"),
+    "Called +1********78 and got voicemail");
+  assert.ok(!redactPhones("dialled (555) 555-0100 twice").includes("555-0100"));
+  assert.ok(!redactPhones("connect failed for 15550100178").includes("15550100178"));
+  // Must not mangle ordinary content: timestamps, ids and small numbers survive intact.
+  assert.equal(redactPhones("at 2026-09-03T01:30:00Z"), "at 2026-09-03T01:30:00Z");
+  assert.equal(redactPhones("slot_2026_09 has 12 people"), "slot_2026_09 has 12 people");
+  assert.equal(redactPhones(""), "");
+});
+
+test("a provider summary quoting the number does not reach the audit trail", async () => {
+  const client = new FakeCalleClient(scenario.scriptedAnswers);
+  const raw = contact("c_whitfield").phone;
+  client.placeCall = async ({ contact: c }) => {
+    client.placed.push({ contactId: c.id });
+    return {
+      id: "x",
+      status: "completed",
+      structuredResult: { can_take_slot: "yes" },
+      summary: `Reached ${c.phone} and they accepted.`,
+    };
+  };
+  const { args } = baseRun();
+  const result = await runBackfill({ ...args, client });
+  assert.ok(!JSON.stringify(result).includes(raw), "provider free text leaked the raw number");
 });

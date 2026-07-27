@@ -150,6 +150,8 @@
   #log p + p { border-top: 1px solid var(--rule-soft); }
   #log p b { color: var(--ink); font-weight: 600; }
   #log p.empty { color: var(--ink-muted); font-family: var(--sans); }
+  /* A halt is not a normal outcome: a call may be live and unaccounted for. */
+  #log p.halted b { color: var(--bad); }
 
   /* ---- outcome -------------------------------------------------------- */
 
@@ -226,70 +228,128 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-let scenario = null, source = null;
+let scenario = null, abort = null;
+
+/* ---------------------------------------------------------------------------
+   DOM construction, not string concatenation.
+
+   Every value below - contact names, reason text, provider call summaries,
+   transport error messages - originates outside this page, in a scenario file
+   or in a response from the calling provider. Interpolating those into
+   innerHTML makes any one of them able to run script in the operator's
+   browser. Nothing untrusted is ever parsed as HTML here; it is assigned as
+   text, which cannot become markup no matter what it contains.
+   --------------------------------------------------------------------------- */
+
+function el(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text !== undefined && text !== null) n.textContent = String(text);
+  return n;
+}
+
+const bold = (t) => el("b", null, t);
+const code = (t) => el("code", null, t);
+
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+  return node;
+}
+
+function append(parent, parts) {
+  for (const part of parts) {
+    if (part === null || part === undefined) continue;
+    parent.appendChild(typeof part === "string" ? document.createTextNode(part) : part);
+  }
+  return parent;
+}
 
 async function init() {
   scenario = await (await fetch("/api/scenario")).json();
   const s = scenario.slot;
-  $("slot").innerHTML = [
-    field("Practice", s.businessName, s.service),
-    field("Appointment", s.startsAtLocal, s.timeZone),
-    field("Worth", `£${s.valueGbp}`, "if it is filled"),
-    `<div class="field"><span class="label">Slot</span><span class="value id">${s.id}</span></div>`,
-  ].join("");
+  const slot = clear($("slot"));
+  slot.appendChild(field("Practice", s.businessName, s.service));
+  slot.appendChild(field("Appointment", s.startsAtLocal, s.timeZone));
+  slot.appendChild(field("Worth", `£${s.valueGbp}`, "if it is filled"));
+  const idField = el("div", "field");
+  idField.appendChild(el("span", "label", "Slot"));
+  idField.appendChild(el("span", "value id", s.id));
+  slot.appendChild(idField);
 
   const simulated = scenario.liveConfigured && scenario.transport === "fake";
   $("live").textContent = simulated ? "Start the simulated run" : "Start calling";
-  $("modeNote").innerHTML = !scenario.liveConfigured
-    ? "This server has no CALL-E credentials, so it cannot place a call. Preview shows who would "
-      + "be rung, and why the others would not."
-    : simulated
-      ? "<strong>Simulated.</strong> The whole run — the calls, the acceptance, the people who are "
-        + "never rung — against a fake transport. <strong>No real calls are placed.</strong>"
-      : "<span class='danger'>This places real phone calls.</span> Type the slot id to unlock it.";
+
+  const note = clear($("modeNote"));
+  if (!scenario.liveConfigured) {
+    note.textContent = "This server has no CALL-E credentials, so it cannot place a call. "
+      + "Preview shows who would be rung, and why the others would not.";
+  } else if (simulated) {
+    append(note, [
+      el("strong", null, "Simulated."),
+      " The whole run — the calls, the acceptance, the people who are never rung — against a "
+        + "fake transport. ",
+      el("strong", null, "No real calls are placed."),
+    ]);
+  } else {
+    append(note, [
+      el("span", "danger", "This places real phone calls."),
+      " Type the slot id to unlock it.",
+    ]);
+  }
+
   $("confirm").disabled = !scenario.liveConfigured;
   refreshLiveButton();
   resetRows();
 }
 
 function field(label, value, sub) {
-  return `<div class="field"><span class="label">${label}</span>`
-    + `<span class="value">${value}</span><span class="sub">${sub}</span></div>`;
+  const wrap = el("div", "field");
+  wrap.appendChild(el("span", "label", label));
+  wrap.appendChild(el("span", "value", value));
+  wrap.appendChild(el("span", "sub", sub));
+  return wrap;
 }
 
 function resetRows() {
-  $("rows").innerHTML = scenario.waitlist.map((c, i) => `
-    <tr class="pending" id="row_${c.id}">
-      <td class="num">${String(i + 1).padStart(2, "0")}</td>
-      <td class="name">${c.name}</td>
-      <td class="tel">${maskLocal(c.phone)}</td>
-      <td class="tz${c.timeZone ? "" : " absent"}">${c.timeZone ?? "not recorded"}</td>
-      <td class="decision"><span class="pill p-mute">waiting</span></td>
-    </tr>`).join("");
+  const body = clear($("rows"));
+  scenario.waitlist.forEach((c, i) => {
+    const tr = el("tr", "pending");
+    tr.id = "row_" + c.id;
+    tr.appendChild(el("td", "num", String(i + 1).padStart(2, "0")));
+    tr.appendChild(el("td", "name", c.name));
+    // The server sends only the masked form; there is no raw number in this page to leak.
+    tr.appendChild(el("td", "tel", c.phoneMasked ?? "***"));
+    tr.appendChild(el("td", "tz" + (c.timeZone ? "" : " absent"), c.timeZone ?? "not recorded"));
+    const decision = el("td", "decision");
+    decision.appendChild(el("span", "pill p-mute", "waiting"));
+    tr.appendChild(decision);
+    body.appendChild(tr);
+  });
 }
 
-// The server never sends raw numbers. This masks the ones loaded from the scenario for display.
-function maskLocal(p) { return p.slice(0, 2) + "*".repeat(Math.max(0, p.length - 4)) + p.slice(-2); }
-
-function setDecision(contactId, label, cls, reason) {
+function setDecision(contactId, label, cls, reason, reasonCode) {
   const row = $("row_" + contactId);
   if (!row) return;
   row.classList.remove("pending");
-  const cell = row.querySelector(".decision");
-  cell.innerHTML = `<span class="pill ${cls}">${label}</span>`
-    + (reason ? `<div class="reason">${reason}</div>` : "");
+  const cell = clear(row.querySelector(".decision"));
+  cell.appendChild(el("span", "pill " + (cls || ""), label));
+  if (reason || reasonCode) {
+    const r = el("div", "reason");
+    if (reasonCode) { r.appendChild(code(reasonCode)); r.appendChild(document.createTextNode(" ")); }
+    if (reason) r.appendChild(document.createTextNode(reason));
+    cell.appendChild(r);
+  }
   cell.classList.remove("settle");
   void cell.offsetWidth;
   cell.classList.add("settle");
 }
 
-function logLine(text, cls) {
+function logLine(parts, cls) {
   const log = $("log");
   const first = log.firstElementChild;
-  if (first && first.classList.contains("empty")) log.innerHTML = "";
-  const p = document.createElement("p");
-  p.innerHTML = text;
-  if (cls) p.className = cls;
+  if (first && first.classList.contains("empty")) clear(log);
+  const p = el("p", cls || null);
+  append(p, Array.isArray(parts) ? parts : [parts]);
   log.appendChild(p);
   log.scrollTop = log.scrollHeight;
 }
@@ -298,69 +358,80 @@ function onEvent(e) {
   switch (e.type) {
     case "run_started": {
       const label = e.mode !== "live" ? "Preview" : e.transport === "live" ? "Live" : "Simulated";
-      logLine(`<b>${label} run.</b> ${e.detail}`);
+      logLine([bold(`${label} run.`), " ", e.detail]);
       break;
     }
     case "contact_skipped":
-      setDecision(e.contactId, "not called", "p-skip", `<code>${e.code}</code> ${e.detail}`);
-      logLine(`Skipped <b>${e.name}</b> (${e.phone}). ${e.detail}`);
+      setDecision(e.contactId, "not called", "p-skip", e.detail, e.code);
+      logLine(["Skipped ", bold(e.name), ` (${e.phone}). `, e.detail]);
       break;
     case "contact_would_call":
       setDecision(e.contactId, "would call", "p-live", e.detail);
-      logLine(`Would call <b>${e.name}</b> (${e.phone}). Passed every check.`);
+      logLine(["Would call ", bold(e.name), ` (${e.phone}). Passed every check.`]);
       break;
     case "call_started":
-      setDecision(e.contactId, "calling", "p-live", `key <code>${e.idempotencyKey}</code>`);
-      logLine(`Calling <b>${e.name}</b> (${e.phone})…`);
+      setDecision(e.contactId, "calling", "p-live", null, e.idempotencyKey);
+      logLine(["Calling ", bold(e.name), ` (${e.phone})…`]);
       break;
     case "call_completed":
       // A declined call is neutral, not amber. Amber means a guardrail stopped us; this person
       // was reached and said no, which is a normal outcome rather than something we prevented.
       setDecision(e.contactId, e.answer ?? e.status, e.answer === "yes" ? "p-ok" : "",
         e.summary ?? "");
-      logLine(`<b>${e.name}</b> answered <b>${e.answer ?? e.status}</b>.`);
+      logLine([bold(e.name), " answered ", bold(e.answer ?? e.status), "."]);
       break;
     case "call_failed":
-      setDecision(e.contactId, "failed", "p-stop", e.detail);
-      logLine(`Call to <b>${e.name}</b> failed. ${e.detail}`);
+      setDecision(e.contactId, "failed", "p-stop", e.detail, e.code);
+      logLine(["Call to ", bold(e.name), " failed. ", e.detail]);
+      break;
+    case "run_halted":
+      setDecision(e.contactId, "unresolved", "p-stop", e.detail, e.code);
+      logLine([bold("Run stopped."), " ", e.detail], "halted");
       break;
     case "slot_filled":
       setDecision(e.contactId, "slot filled", "p-ok", e.detail);
       $("row_" + e.contactId)?.classList.add("filled");
-      logLine(`<b>${e.name} took the slot.</b> Nobody else will be called.`);
+      logLine([bold(`${e.name} took the slot.`), " Nobody else will be called."]);
       break;
     case "contact_suppressed":
       setDecision(e.contactId, "never called", "p-mute", e.detail);
-      logLine(`Did not call <b>${e.name}</b>. The slot was already gone.`);
+      logLine(["Did not call ", bold(e.name), ". The slot was already gone."]);
       break;
     case "run_cancelled":
-      logLine(`<b>Stopped.</b> ${e.detail}`);
+      logLine([bold("Stopped."), " ", e.detail]);
       break;
     case "run_error":
-      logLine(`<b>Error.</b> ${e.detail}`);
+      logLine([bold("Error."), " ", e.detail]);
       break;
     case "run_finished":
       showSummary(e.summary);
-      // Close from this side. An EventSource reopens itself when the server ends the stream,
-      // which would silently start the whole backfill again.
       finish();
       break;
   }
 }
 
 function showSummary(s) {
-  $("summary").hidden = false;
-  $("summary").innerHTML = [
-    stat(s.filled ? s.filledBy.name : "Still open", s.filled ? "took the slot" : "nobody accepted"),
-    stat(s.callsPlaced, "calls placed"),
-    stat(s.callsAvoided, "calls avoided"),
-    stat(s.skipped, "stopped by a check"),
-    stat(s.suppressed, "never called"),
-  ].join("");
-}
-
-function stat(value, label) {
-  return `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
+  const panel = clear($("summary"));
+  panel.hidden = false;
+  const stats = [
+    [s.filled ? s.filledBy.name : "Still open", s.filled ? "took the slot" : "nobody accepted"],
+    [s.callsPlaced, "calls placed"],
+    [s.callsAvoided, "calls avoided"],
+    [s.skipped, "stopped by a check"],
+    [s.suppressed, "never called"],
+  ];
+  for (const [value, label] of stats) {
+    const box = el("div", "stat");
+    box.appendChild(bold(value));
+    box.appendChild(el("span", null, label));
+    panel.appendChild(box);
+  }
+  if (s.reconcileKey) {
+    const warn = el("div", "stat");
+    warn.appendChild(bold("Check"));
+    warn.appendChild(el("span", null, `reconcile ${s.reconcileKey} before re-running`));
+    panel.appendChild(warn);
+  }
 }
 
 // Calling only unlocks once the operator has typed this exact slot id. Intent has to name the
@@ -369,31 +440,70 @@ function refreshLiveButton() {
   $("live").disabled = !scenario?.liveConfigured || $("confirm").value.trim() !== scenario.slot.id;
 }
 
-function start(mode) {
-  if (source) source.close();
+/**
+ * Starting a run is a POST carrying JSON, not a GET.
+ *
+ * EventSource can only issue GET, and a GET that dials people can be triggered by anything that
+ * can make the browser fetch a URL - a prefetch, an <img>, a link from another tab. The stream is
+ * read straight off the POST response instead, which keeps the live view and makes the request
+ * one no cross-site context can forge.
+ */
+async function start(mode) {
+  if (abort) abort.abort();
   resetRows();
-  $("log").innerHTML = "";
+  clear($("log"));
   $("summary").hidden = true;
 
-  let qs = `mode=${mode}`;
+  const body = { mode };
   if (mode === "live") {
     const typed = $("confirm").value.trim();
     if (typed !== scenario.slot.id) {
-      logLine("<b>Not confirmed.</b> The slot id did not match, so nothing was called.");
+      logLine([bold("Not confirmed."), " The slot id did not match, so nothing was called."]);
       return;
     }
-    qs += `&confirmSlotId=${encodeURIComponent(typed)}`;
+    body.confirmSlotId = typed;
   }
 
   $("preview").disabled = $("live").disabled = true;
   $("cancel").disabled = false;
-  source = new EventSource(`/api/run?${qs}`);
-  source.onmessage = (m) => onEvent(JSON.parse(m.data));
-  source.onerror = finish;
+  abort = new AbortController();
+
+  try {
+    const res = await fetch("/api/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: abort.signal,
+    });
+    if (!res.ok || !res.body) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      logLine([bold("Refused."), " ", err.error ?? "The server would not start the run."]);
+      return finish();
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let split;
+      while ((split = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("data: ")) onEvent(JSON.parse(line.slice(6)));
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") logLine([bold("Connection lost."), " ", String(err.message ?? err)]);
+  }
+  finish();
 }
 
 function finish() {
-  if (source) { source.close(); source = null; }
+  abort = null;
   $("preview").disabled = false;
   $("cancel").disabled = true;
   refreshLiveButton();
@@ -403,8 +513,8 @@ $("confirm").oninput = refreshLiveButton;
 $("preview").onclick = () => start("preview");
 $("live").onclick = () => start("live");
 $("cancel").onclick = async () => {
-  await fetch("/api/cancel", { method: "POST" });
   $("cancel").disabled = true;
+  await fetch("/api/cancel", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
 };
 init();
 </script>

@@ -11,7 +11,7 @@
     "start": "node server.mjs",
     "simulate": "node cli.mjs --simulate",
     "dry-run": "node cli.mjs --dry-run",
-    "test": "node --test test/"
+    "test": "node --test test/backfill.test.mjs test/server.test.mjs"
   },
   "dependencies": {
     "@call-e/calle": "^0.2.2"

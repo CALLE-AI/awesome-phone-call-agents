@@ -35,7 +35,7 @@ feature**, and the log records why for each one.
 Nothing here needs credentials, an account, or a network connection.
 
 ```bash
-node --test test/     # 19 tests, no credentials, no network
+npm test                  # 32 tests, no credentials, no network
 node cli.mjs --dry-run    # walk the list, place nothing
 node cli.mjs --simulate   # the full loop, acceptance and suppression, against a fake transport
 node server.mjs           # web workbench on http://localhost:8787
@@ -123,11 +123,13 @@ The fix for Tomas is to ask him and record it, which is a data-entry problem, no
 ## Testing
 
 ```bash
-node --test test/
+npm test
 ```
 
-19 tests, no credentials, no network, no installed dependencies. The assertions that matter most
-are the negative ones — that a call was *not* placed:
+32 tests, no credentials, no network. `npm test` names the test files explicitly rather than
+passing the directory, because `node --test test/` makes Node try to load the directory itself as
+a module and fails before running anything. The assertions that matter most are the negative ones
+— that a call was *not* placed:
 
 - preview mode places zero calls whatever the list says
 - a live request whose confirmation names the wrong slot places zero calls

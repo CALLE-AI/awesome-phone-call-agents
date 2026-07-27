@@ -11,8 +11,8 @@
  * the acceptance is never called at all. That suppression is the feature.
  */
 
-import { evaluateContact, maskPhone, requireLiveIntent } from "./guardrails.mjs";
-import { buildTask } from "./calle.mjs";
+import { evaluateContact, maskPhone, redactPhones, requireLiveIntent } from "./guardrails.mjs";
+import { buildTask, classifyTransportError } from "./calle.mjs";
 
 /**
  * Deterministic idempotency key. Re-running the same slot against the same contact will not
@@ -151,16 +151,44 @@ export async function runBackfill({
         idempotencyKey: key,
       });
     } catch (err) {
-      emit({
-        type: "call_failed",
+      const verdictOnError = classifyTransportError(err);
+      const base = {
         contactId: contact.id,
         name: contact.name,
         phone: maskPhone(contact.phone),
         position: index + 1,
-        code: "transport_error",
-        detail: String(err.message ?? err),
+        code: verdictOnError.code,
+        // The provider wrote this message, not us, and provider errors quote the number dialled.
+        detail: `${verdictOnError.detail} (${redactPhones(String(err.message ?? err))})`,
+      };
+
+      if (!verdictOnError.halt) {
+        emit({ type: "call_failed", ...base });
+        continue;
+      }
+
+      // STOP. Either a call may already be in flight for this slot, or nothing can succeed.
+      // Advancing here is what lets one appointment be promised twice.
+      emit({
+        type: "run_halted",
+        ...base,
+        idempotencyKey: key,
+        reconcileRequired: verdictOnError.ambiguous,
+        detail: verdictOnError.ambiguous
+          ? `${base.detail} The run stopped. Before retrying, look up idempotency key `
+            + `"${key}" at the provider and confirm whether that call exists and what it did.`
+          : base.detail,
       });
-      continue;
+      return summarise({
+        events,
+        filledBy,
+        callsPlaced,
+        cancelled: false,
+        halted: verdictOnError,
+        pendingKey: verdictOnError.ambiguous ? key : null,
+        slot,
+        waitlist,
+      });
     }
 
     callsPlaced += 1;
@@ -176,7 +204,8 @@ export async function runBackfill({
       callId: result.id,
       status: result.status,
       answer,
-      summary: result.summary,
+      // Provider free text. It has quoted the dialled number before now.
+      summary: redactPhones(result.summary),
       failureCode: result.failureCode ?? null,
     });
 
@@ -196,7 +225,16 @@ export async function runBackfill({
   return summarise({ events, filledBy, callsPlaced, cancelled: false, slot, waitlist });
 }
 
-function summarise({ events, filledBy, callsPlaced, cancelled, slot, waitlist }) {
+function summarise({
+  events,
+  filledBy,
+  callsPlaced,
+  cancelled,
+  slot,
+  waitlist,
+  halted = null,
+  pendingKey = null,
+}) {
   const suppressed = events.filter((e) => e.type === "contact_suppressed").length;
   const skipped = events.filter((e) => e.type === "contact_skipped").length;
   return {
@@ -204,6 +242,11 @@ function summarise({ events, filledBy, callsPlaced, cancelled, slot, waitlist })
     filled: Boolean(filledBy),
     filledBy: filledBy ? { id: filledBy.id, name: filledBy.name, phone: maskPhone(filledBy.phone) } : null,
     cancelled,
+    halted: Boolean(halted),
+    haltCode: halted ? halted.code : null,
+    // Set when a call may exist that we never got an answer for. Reconcile this key at the
+    // provider before running the slot again.
+    reconcileKey: pendingKey,
     callsPlaced,
     callsAvoided: waitlist.length - callsPlaced,
     suppressed,

@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import { runBackfill } from "./src/backfill.mjs";
 import { makeClient } from "./src/calle.mjs";
+import { maskPhone } from "./src/guardrails.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const SCENARIO_PATH = fileURLToPath(new URL("./data/scenario.sample.json", import.meta.url));
@@ -44,12 +45,67 @@ function json(res, status, body) {
   res.end(payload);
 }
 
-async function handleRunStream(req, res, url) {
+/**
+ * Is this request a real gesture from our own page, rather than something another site caused the
+ * browser to send?
+ *
+ * A typed confirmation in the UI proves nothing at the server boundary: the server sees only an
+ * HTTP request. Starting a run is a side effect that dials real people, so it needs the three
+ * things a cross-site attacker cannot all produce - a non-simple method, a same-origin `Origin`,
+ * and a JSON content type, which forces a CORS preflight that a plain form or an <img> cannot make.
+ * `Sec-Fetch-Site` is checked when the browser sends it and ignored when it does not, since it is
+ * a hardening signal rather than the guarantee.
+ */
+function requireSameOriginPost(req, res) {
+  if (req.method !== "POST") {
+    json(res, 405, { error: "This endpoint changes state and must be a POST." });
+    return false;
+  }
+  const site = req.headers["sec-fetch-site"];
+  if (site && site !== "same-origin") {
+    json(res, 403, { error: `Cross-site request refused (sec-fetch-site: ${site}).` });
+    return false;
+  }
+  const origin = req.headers.origin;
+  if (origin) {
+    let host;
+    try {
+      host = new URL(origin).host;
+    } catch {
+      json(res, 403, { error: "Unparseable Origin header." });
+      return false;
+    }
+    if (host !== req.headers.host) {
+      json(res, 403, { error: "Cross-origin request refused." });
+      return false;
+    }
+  }
+  const type = String(req.headers["content-type"] ?? "").split(";")[0].trim();
+  if (type !== "application/json") {
+    json(res, 415, { error: "Expected content-type: application/json." });
+    return false;
+  }
+  return true;
+}
+
+async function readJsonBody(req, limitBytes = 64 * 1024) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > limitBytes) throw new Error("Request body too large.");
+    chunks.push(chunk);
+  }
+  if (total === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+async function handleRunStream(req, res, body) {
   if (activeRun) return json(res, 409, { error: "A backfill is already running." });
 
   const scenario = await loadScenario();
-  const mode = url.searchParams.get("mode") === "live" ? "live" : "preview";
-  const confirmSlotId = url.searchParams.get("confirmSlotId") ?? null;
+  const mode = body.mode === "live" ? "live" : "preview";
+  const confirmSlotId = typeof body.confirmSlotId === "string" ? body.confirmSlotId : null;
 
   if (mode === "live" && !liveConfigured) {
     return json(res, 400, {
@@ -82,9 +138,17 @@ async function handleRunStream(req, res, url) {
       message: scenario.message,
       isCancelled: () => run.cancelled,
       onEvent: send,
-      // A fixed instant keeps the sample deterministic, so every guardrail demonstrates itself
-      // whatever time of day the app is opened. Live mode uses the real clock.
-      now: mode === "live" ? new Date() : new Date(scenario.demoNow),
+      // THE CLOCK FOLLOWS THE TRANSPORT, NOT THE REQUESTED MODE.
+      //
+      // This read `mode === "live" ? new Date() : demoNow`, which broke simulation: a simulated
+      // run asks for mode "live" on purpose, to exercise the intent gate and the whole loop, so it
+      // took the real clock. Open the app outside the sample calling window and quiet hours then
+      // skipped every contact, and the deterministic acceptance-and-suppression run the README
+      // promises never happened.
+      //
+      // Only a genuinely live transport dials real people, and only that case must obey the real
+      // clock. Anything against the fake transport gets the scripted instant.
+      now: liveMode ? new Date() : new Date(scenario.demoNow),
     });
     send({ type: "run_finished", summary });
   } catch (err) {
@@ -106,16 +170,30 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === "/api/scenario") {
       const scenario = await loadScenario();
+      // THE BROWSER NEVER RECEIVES A RAW NUMBER. This used to spread the scenario wholesale, which
+      // shipped every waitlist phone number to the client and made the app's own claim false. The
+      // masked form is all the UI ever displays, so it is all the UI is given; masking in the page
+      // is not a control, because the raw value has already left the building by then.
+      const { waitlist, ...rest } = scenario;
       return json(res, 200, {
-        ...scenario,
+        ...rest,
+        waitlist: waitlist.map(({ phone, ...c }) => ({ ...c, phoneMasked: maskPhone(phone) })),
         liveConfigured,
         transport: liveMode ? "live" : "fake",
       });
     }
     if (url.pathname === "/api/run") {
-      return await handleRunStream(req, res, url);
+      if (!requireSameOriginPost(req, res)) return;
+      let body;
+      try {
+        body = await readJsonBody(req);
+      } catch (err) {
+        return json(res, 400, { error: String(err.message ?? err) });
+      }
+      return await handleRunStream(req, res, body);
     }
-    if (url.pathname === "/api/cancel" && req.method === "POST") {
+    if (url.pathname === "/api/cancel") {
+      if (!requireSameOriginPost(req, res)) return;
       if (activeRun) activeRun.cancelled = true;
       return json(res, 200, { cancelled: Boolean(activeRun) });
     }
