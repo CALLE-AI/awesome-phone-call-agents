@@ -1,0 +1,35 @@
+[
+  {
+    "appointmentId": "APT-20260729-001",
+    "patientName": "Budi Santoso",
+    "phoneNumber": "+6285929931919",
+    "doctorName": "Dr. Ahmad Ridwan",
+    "department": "Poli Jantung",
+    "appointmentDate": "2026-07-30",
+    "appointmentTime": "09:00",
+    "hospitalName": "RSUD Leuwiliang",
+    "timezone": "Asia/Jakarta"
+  },
+  {
+    "appointmentId": "APT-20260729-002",
+    "patientName": "Siti Rahayu",
+    "phoneNumber": "+6281234567890",
+    "doctorName": "Dr. Dewi Lestari",
+    "department": "Poli Anak",
+    "appointmentDate": "2026-07-30",
+    "appointmentTime": "10:30",
+    "hospitalName": "RSUD Leuwiliang",
+    "timezone": "Asia/Jakarta"
+  },
+  {
+    "appointmentId": "APT-20260729-003",
+    "patientName": "Agus Pratama",
+    "phoneNumber": "+6287654321098",
+    "doctorName": "Dr. Rina Wati",
+    "department": "Poli Dalam",
+    "appointmentDate": "2026-07-30",
+    "appointmentTime": "11:00",
+    "hospitalName": "RSUD Leuwiliang",
+    "timezone": "Asia/Jakarta"
+  }
+]
