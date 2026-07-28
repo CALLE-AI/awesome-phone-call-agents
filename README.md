@@ -6,7 +6,7 @@
 
 Maintainers provide reference skills, runnable examples, templates, validation, and safety guidance so developers and workflow builders can quickly explore phone-call agent workflows.
 
-[Community contributions](#community-contributions) · [Resources](#resource-list) · [CLI](#cli-reference) · [Templates](#templates) · [Roadmap](docs/roadmap.md) · [Contributing](#contributing)
+[Community contributions](#community-contributions) · [Resources](#resource-list) · [CLI](#cli-reference) · [Templates](#templates) · [Roadmap](docs/roadmap.md) · [Contributing](#contributing) · [Discord](https://discord.gg/6AbXUzUV8w)
 
 ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-phone--call-blue)
 ![CALL-E](https://img.shields.io/badge/CALL--E-one--off%20calls-black)
@@ -36,8 +36,8 @@ The community roadmap is a direction guide, not a fixed release plan. Small exam
 
 ## Table of Contents
 
-- [Why this repository exists](#why-this-repository-exists)
 - [Community contributions](#community-contributions)
+- [Why this repository exists](#why-this-repository-exists)
 - [CLI reference](#cli-reference)
 - [Templates](#templates)
 - [Resource list](#resource-list)
@@ -47,11 +47,7 @@ The community roadmap is a direction guide, not a fixed release plan. Small exam
 
 ## Why this repository exists
 
-AI agents increasingly need to turn phone calls into reusable workflows: reminders, follow-ups, appointment coordination, provider-specific call adapters, scheduler integrations, runnable demo apps, safety checks, and reference apps that other agents can install or adapt.
-
-This repository exists to collect those phone-call capabilities and scenarios as portable Agent Skills, apps, adapters, scheduler recipes, and safety patterns. Each entry should help an agent package, schedule, execute, or safely operate a real phone-call workflow.
-
-The scope is intentionally focused on AI-agent phone-call workflows, not generic voice-agent products, telephony vendor directories, or call-center software lists.
+AI agents increasingly need to turn phone calls into reusable workflows: reminders, follow-ups, appointment coordination, provider-specific call adapters, scheduler integrations, and safety checks that other agents can install or adapt. Each entry should help an agent package, schedule, execute, or safely operate a real phone-call workflow — not act as a generic voice-agent product, telephony vendor directory, or call-center software list.
 
 This repository focuses on three principles:
 
@@ -113,6 +109,9 @@ Every plugin should document supported triggers or actions, required inputs, sid
 
 Keep descriptions short, specific, factual, and directly tied to packaging, scheduling, executing, or safely operating AI-agent phone-call tasks.
 
+Good: `- [call-reminder](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.`
+Avoid: `- [call-reminder](skills/call-reminder/) - A great tool for calling people!` (marketing language, no indication of what it does or how it fits the AI-agent workflow)
+
 ## Resource list
 
 This project is an awesome list for AI-agent phone-call workflows. Add resources only when they directly help agents package, schedule, execute, or safely operate phone-call tasks.
@@ -148,6 +147,9 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | Plugin | Platform | Purpose |
 | --- | --- | --- |
 | [`plugins/n8n-calle-api`](plugins/n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
+| [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/) | n8n | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes. |
+| [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
+| [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
 
 ### Safety patterns
 
@@ -175,7 +177,13 @@ python3 scripts/validate_repository.py
 
 High-quality additions should include a short description, compatibility notes, safety notes for real-world side effects, setup or install instructions, tests, cancellation or rollback behavior for recurring workflows, and no secrets or personal data.
 
-Out of scope: generic telephony vendor directories, marketing-only pages, call-center software lists without an AI-agent workflow, tools that require unsafe credential handling, and resources that hide phone calls, recurring jobs, or external side effects from the user.
+Out of scope:
+
+- generic telephony vendor directories
+- marketing-only pages
+- call-center software lists without an AI-agent workflow
+- tools that require unsafe credential handling
+- resources that hide phone calls, recurring jobs, or external side effects from the user
 
 ## Community
 
