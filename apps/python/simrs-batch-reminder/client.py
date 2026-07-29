@@ -1,17 +1,18 @@
 """
-SIMRS Batch Appointment Reminder — CALL-E Integration
+SIMRS Batch Appointment Reminder — CALL-E REST API Integration
 
 Processes a batch of hospital appointments and places CALL-E outbound calls
 to remind each patient. Parses conversation outcomes and writes back to
 SIMRS or SatuSehat FHIR endpoint.
 
-This script uses only the Python standard library plus the CALL-E CLI.
-No external dependencies required.
+This script uses only the Python standard library. No external dependencies.
+Uses CALL-E REST API directly (api.heycall-e.com) — no OAuth/CLI needed.
 
 Usage:
+    export CALL_E_API_KEY="your-api-key"
     python3 client.py --appointments appointments.json
     python3 client.py --appointments appointments.json --dry-run
-    python3 client.py --appointments appointments.csv --simrs-url http://simrs.local/api
+    python3 client.py --appointments appointments.json --simrs-url http://simrs.local/api
 """
 
 from __future__ import annotations
@@ -21,97 +22,138 @@ import csv
 import json
 import os
 import re
-import subprocess
+import ssl
 import sys
 import time
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+import urllib.request
+from datetime import datetime, timezone
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-CLI_CANDIDATES = [
-    ["node", "packages/cli/bin/calle.js"],
-    ["calle"],
-    ["npx", "-y", "@call-e/cli"],
-]
+CALL_E_API_BASE = "https://api.heycall-e.com"
 
-CALL_GOAL_TEMPLATE = (
-    "Anda adalah asisten pengingat janji temu otomatis dari {hospital_name}. "
-    "Telepon pasien berikut untuk mengingatkan jadwal kontrol: "
-    "Nama: {patient_name}. "
-    "Dokter: {doctor_name} ({department}). "
-    "Tanggal: {appointment_date} jam {appointment_time}. "
-    "Tugas: 1) Sapa pasien dengan sopan. "
-    "2) Sampaikan info janji temu. "
-    "3) Tanya apakah bisa hadir. "
-    "4) Jika reschedule, tanya waktu baru. "
-    "5) Jika batal, tanya alasan. "
-    "6) Akhiri dengan terima kasih. "
-    "ATURAN: Berbicara Bahasa Indonesia. Jangan berikan saran medis. "
-    "Jika pasien sebut kondisi darurat, sarankan hubungi 112."
+CALL_TASK_TEMPLATE = (
+    "You are an automated appointment reminder assistant for {hospital_name}. "
+    "Call the patient at {phone_number} to remind them about their upcoming "
+    "outpatient appointment. "
+    "Appointment details: "
+    "Doctor {doctor_name}, {department} department, "
+    "{appointment_date} at {appointment_time}. "
+    "Greet the patient warmly. "
+    "Ask if they can attend: Can you make it? "
+    "If they want to reschedule, ask for their preferred new time. "
+    "If they cancel, acknowledge and note the reason. "
+    "Do NOT provide any medical advice or discuss health conditions. "
+    "Thank them at the end."
 )
 
 OUTCOME_PATTERNS = {
     "CONFIRMED": [
-        r"\bconfirmed\b", r"\bbisa hadir\b", r"\bakan datang\b",
-        r"\bsetuju\b", r"\boke\b", r"\bsiap\b", r"\bya\b.*\bdatang\b",
+        r"\bconfirmed\b", r"\bcan attend\b", r"\bwill come\b",
+        r"\byes\b.*\battend\b", r"\bthey will\b", r"\byes\b.*\bappointment\b",
     ],
     "RESCHEDULED": [
-        r"\breschedule\b", r"\bdiganti\b", r"\bubah jadwal\b",
-        r"\bminggu depan\b", r"\blain waktu\b",
+        r"\breschedule\b", r"\bnew time\b", r"\bdifferent time\b",
+        r"\bchange.*time\b", r"\bprefer\b",
     ],
     "CANCELLED": [
-        r"\bcancel\b", r"\bbatal\b", r"\btidak bisa\b",
-        r"\btidak jadi\b", r"\bsakit\b",
+        r"\bcancel\b", r"\bcannot attend\b", r"\bwon't come\b",
+        r"\bnot coming\b", r"\bdecline\b",
     ],
     "PENDING_RETRY": [
-        r"\bno.?answer\b", r"\btidak diangkat\b", r"\btidak aktif\b",
-        r"\bvoicemail\b", r"\bringing\b",
+        r"\bdid not connect\b", r"\bno answer\b", r"\bnot reachable\b",
+        r"\bunavailable\b", r"\bbusy\b",
     ],
     "CONTACT_ERROR": [
-        r"\binvalid.?number\b", r"\bnomor salah\b",
-        r"\bnot.?found\b", r"\bwrong.?number\b",
+        r"\binvalid.*number\b", r"\bwrong.*number\b",
+        r"\bnot.*found\b", r"\bfailed.*connect\b",
     ],
 }
 
 MASKED_RE = re.compile(r"(\+\d{1,3})\d+(\d{4})")
 
 # ---------------------------------------------------------------------------
-# CLI Detection
+# SSL Context
 # ---------------------------------------------------------------------------
 
-def detect_cli(cwd: str) -> list[str]:
-    """Return the first working calle CLI command."""
-    for cmd in CLI_CANDIDATES:
-        test = cmd + ["--help"]
-        try:
-            result = subprocess.run(
-                test, capture_output=True, text=True, timeout=15, cwd=cwd
-            )
-            if result.returncode == 0:
-                return cmd
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            continue
-    print("ERROR: calle CLI not found. Install from https://github.com/CALLE-AI/call-e-integrations",
-          file=sys.stderr)
-    sys.exit(1)
-
-
-def check_auth(cli: list[str], cwd: str) -> bool:
-    """Check if CALL-E auth token is usable."""
-    result = subprocess.run(
-        cli + ["auth", "status", "--json"],
-        capture_output=True, text=True, timeout=30, cwd=cwd
-    )
-    if result.returncode != 0:
-        return False
+def get_ssl_context() -> ssl.SSLContext:
+    """Return SSL context (compatible with container environments)."""
+    ctx = ssl.create_default_context()
     try:
-        status = json.loads(result.stdout)
-        return status.get("usable", False)
-    except json.JSONDecodeError:
-        return False
+        ctx.check_hostname = True
+        ctx.verify_mode = ssl.CERT_REQUIRED
+    except Exception:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+# ---------------------------------------------------------------------------
+# API Client
+# ---------------------------------------------------------------------------
+
+class CalleClient:
+    """Direct REST client for CALL-E API."""
+
+    def __init__(self, api_key: str, base_url: str = CALL_E_API_BASE):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.ctx = get_ssl_context()
+
+    def _request(self, method: str, path: str, data: dict | None = None) -> dict:
+        """Make an authenticated API request."""
+        url = f"{self.base_url}{path}"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        body = json.dumps(data).encode("utf-8") if data else None
+
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+
+        try:
+            with urllib.request.urlopen(req, context=self.ctx, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="replace")[:500]
+            return {"error": True, "status": e.code, "body": err_body}
+        except Exception as e:
+            return {"error": True, "message": str(e)}
+
+    def health_check(self) -> bool:
+        """Check if API is reachable."""
+        try:
+            url = f"{self.base_url}/health"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, context=self.ctx, timeout=10) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    def create_call(self, task: str, metadata: dict | None = None) -> dict:
+        """Create a new outbound call."""
+        payload = {"task": task}
+        if metadata:
+            payload["metadata"] = metadata
+        return self._request("POST", "/v1/calls", payload)
+
+    def get_call(self, call_id: str) -> dict:
+        """Get call status and transcript."""
+        return self._request("GET", f"/v1/calls/{call_id}")
+
+    def wait_for_call(self, call_id: str, timeout: int = 300, poll_interval: int = 15) -> dict:
+        """Poll until call completes or times out."""
+        elapsed = 0
+        while elapsed < timeout:
+            result = self.get_call(call_id)
+            status = result.get("status", "")
+            if status in ("completed", "failed"):
+                return result
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+        return {"status": "timeout", "elapsed": elapsed}
 
 
 # ---------------------------------------------------------------------------
@@ -119,35 +161,26 @@ def check_auth(cli: list[str], cwd: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def load_appointments_json(path: str) -> list[dict]:
-    """Load appointments from a JSON file."""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     if isinstance(data, dict) and "appointments" in data:
         return data["appointments"]
     if isinstance(data, list):
         return data
-    raise ValueError("JSON must be a list of appointments or {appointments: [...]}")
-
+    raise ValueError("JSON must be a list or {appointments: [...]}")
 
 def load_appointments_csv(path: str) -> list[dict]:
-    """Load appointments from a CSV file."""
     with open(path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        return list(reader)
-
+        return list(csv.DictReader(f))
 
 def load_appointments(path: str) -> list[dict]:
-    """Detect format and load appointments."""
     if path.endswith(".json"):
         return load_appointments_json(path)
     elif path.endswith(".csv"):
         return load_appointments_csv(path)
-    else:
-        raise ValueError(f"Unsupported file format: {path}")
-
+    raise ValueError(f"Unsupported format: {path}")
 
 def validate_appointment(apt: dict) -> list[str]:
-    """Return list of missing required fields."""
     required = [
         "appointmentId", "patientName", "phoneNumber",
         "doctorName", "department", "appointmentDate",
@@ -161,142 +194,92 @@ def validate_appointment(apt: dict) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def mask_phone(phone: str) -> str:
-    """Mask phone number for display."""
     return MASKED_RE.sub(r"\1****\2", phone)
 
-
-def build_goal(apt: dict) -> str:
-    """Build CALL-E call goal from appointment data."""
-    return CALL_GOAL_TEMPLATE.format(
-        hospital_name=apt.get("hospitalName", "Rumah Sakit"),
-        patient_name=apt.get("patientName", "Pasien"),
-        doctor_name=apt.get("doctorName", "Dokter"),
-        department=apt.get("department", "Poli Umum"),
+def build_task(apt: dict) -> str:
+    return CALL_TASK_TEMPLATE.format(
+        hospital_name=apt.get("hospitalName", "Hospital"),
+        phone_number=apt["phoneNumber"],
+        doctor_name=apt.get("doctorName", "Doctor"),
+        department=apt.get("department", "General"),
         appointment_date=apt.get("appointmentDate", ""),
         appointment_time=apt.get("appointmentTime", ""),
     )
 
+def classify_outcome(result: dict) -> str:
+    text = json.dumps(result).lower()
+    for outcome, patterns in OUTCOME_PATTERNS.items():
+        for pattern in patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return outcome
+    return "UNKNOWN"
 
-def place_call(cli: list[str], apt: dict, cwd: str, dry_run: bool = False) -> dict:
-    """Place a CALL-E call for one appointment. Returns result dict."""
-    goal = build_goal(apt)
+def place_call(client: CalleClient, apt: dict, dry_run: bool = False,
+               wait: bool = True, timeout: int = 300) -> dict:
+    """Place a call for one appointment. Returns result dict."""
     phone = apt["phoneNumber"]
-    timezone = apt.get("timezone", "Asia/Jakarta")
+    task = build_task(apt)
 
     if dry_run:
         return {
             "appointmentId": apt["appointmentId"],
             "phone": mask_phone(phone),
             "status": "DRY_RUN",
-            "goal": goal[:200] + "...",
+            "task": task[:200] + "...",
         }
 
-    # Step 1: Plan
-    plan_cmd = cli + [
-        "call", "plan",
-        "--to-phone", phone,
-        "--goal", goal,
-        "--language", "Indonesian",
-        "--timezone", timezone,
-    ]
+    # Create call
+    metadata = {
+        "appointmentId": apt["appointmentId"],
+        "source": "simrs-batch-reminder",
+    }
+    resp = client.create_call(task, metadata)
 
-    try:
-        plan_result = subprocess.run(
-            plan_cmd, capture_output=True, text=True, timeout=30, cwd=cwd
-        )
-    except subprocess.TimeoutExpired:
+    if resp.get("error"):
         return {
             "appointmentId": apt["appointmentId"],
             "phone": mask_phone(phone),
-            "status": "PLAN_TIMEOUT",
+            "status": "API_ERROR",
+            "error": resp.get("body", resp.get("message", ""))[:200],
         }
 
-    if plan_result.returncode != 0:
+    call_id = resp.get("id", "")
+    if not wait:
         return {
             "appointmentId": apt["appointmentId"],
             "phone": mask_phone(phone),
-            "status": "PLAN_FAILED",
-            "error": plan_result.stderr[:200],
+            "status": "QUEUED",
+            "callId": call_id,
         }
 
-    try:
-        plan = json.loads(plan_result.stdout)
-    except json.JSONDecodeError:
-        return {
-            "appointmentId": apt["appointmentId"],
-            "phone": mask_phone(phone),
-            "status": "PLAN_PARSE_ERROR",
-        }
+    # Wait for completion
+    result = client.wait_for_call(call_id, timeout=timeout)
 
-    if not plan.get("ready_to_run", False):
-        return {
-            "appointmentId": apt["appointmentId"],
-            "phone": mask_phone(phone),
-            "status": "PLAN_NOT_READY",
-            "question": plan.get("clarification_question", ""),
-        }
+    # Parse outcome
+    outcome = classify_outcome(result)
+    summary = result.get("summary", "")
 
-    # Step 2: Run
-    plan_id = plan.get("plan_id", "")
-    confirm_token = plan.get("confirm_token", "")
-
-    run_cmd = cli + [
-        "call", "run",
-        "--plan-id", plan_id,
-        "--confirm-token", confirm_token,
-    ]
-
-    try:
-        run_result = subprocess.run(
-            run_cmd, capture_output=True, text=True, timeout=600, cwd=cwd
-        )
-    except subprocess.TimeoutExpired:
-        return {
-            "appointmentId": apt["appointmentId"],
-            "phone": mask_phone(phone),
-            "status": "CALL_TIMEOUT",
-        }
-
-    if run_result.returncode != 0:
-        return {
-            "appointmentId": apt["appointmentId"],
-            "phone": mask_phone(phone),
-            "status": "CALL_FAILED",
-            "error": run_result.stderr[:200],
-        }
-
-    try:
-        run_data = json.loads(run_result.stdout)
-    except json.JSONDecodeError:
-        return {
-            "appointmentId": apt["appointmentId"],
-            "phone": mask_phone(phone),
-            "status": "CALL_PARSE_ERROR",
-        }
-
-    # Step 3: Parse outcome
-    run_id = run_data.get("run_id", "")
-    outcome = classify_outcome(run_data)
+    # Extract transcript
+    transcript = []
+    recipients = result.get("recipients", [])
+    if recipients:
+        for att in recipients[0].get("attempts", []):
+            for turn in att.get("transcript_turns", []):
+                content = str(turn.get("content", "")).strip()
+                if content:
+                    transcript.append({
+                        "role": turn.get("role", "?"),
+                        "content": content,
+                    })
 
     return {
         "appointmentId": apt["appointmentId"],
         "phone": mask_phone(phone),
         "status": outcome,
-        "runId": run_id,
-        "rawResult": run_data,
+        "callId": call_id,
+        "summary": summary,
+        "transcript": transcript,
     }
-
-
-def classify_outcome(result: dict) -> str:
-    """Classify call result into an outcome category."""
-    text = json.dumps(result).lower()
-
-    for outcome, patterns in OUTCOME_PATTERNS.items():
-        for pattern in patterns:
-            if re.search(pattern, text, re.IGNORECASE):
-                return outcome
-
-    return "UNKNOWN"
 
 
 # ---------------------------------------------------------------------------
@@ -304,17 +287,16 @@ def classify_outcome(result: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def writeback_simrs(base_url: str, results: list[dict]) -> None:
-    """Write call outcomes back to SIMRS REST API."""
-    import urllib.request
-
+    ctx = get_ssl_context()
     for result in results:
-        if result["status"] in ("DRY_RUN", "PLAN_TIMEOUT", "PLAN_FAILED"):
+        if result["status"] in ("DRY_RUN", "API_ERROR"):
             continue
 
         payload = json.dumps({
             "appointmentId": result["appointmentId"],
             "reminderStatus": result["status"],
-            "callRunId": result.get("runId", ""),
+            "callId": result.get("callId", ""),
+            "summary": result.get("summary", ""),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }).encode("utf-8")
 
@@ -324,9 +306,8 @@ def writeback_simrs(base_url: str, results: list[dict]) -> None:
             headers={"Content-Type": "application/json"},
             method="PATCH",
         )
-
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
                 result["writeback"] = "OK" if resp.status < 300 else f"HTTP {resp.status}"
         except Exception as e:
             result["writeback"] = f"ERROR: {e}"
@@ -337,37 +318,43 @@ def writeback_simrs(base_url: str, results: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 def generate_report(results: list[dict]) -> str:
-    """Generate a human-readable batch summary."""
     total = len(results)
     counts = {}
     for r in results:
-        status = r["status"]
-        counts[status] = counts.get(status, 0) + 1
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
 
     lines = [
         "=" * 60,
-        f"  SIMRS Appointment Reminder — Batch Report",
+        "  SIMRS Appointment Reminder — Batch Report",
         f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "=" * 60,
         "",
         f"  Total: {total}",
     ]
-
     for status, count in sorted(counts.items()):
         lines.append(f"  {status}: {count}")
 
     lines.append("")
     lines.append("-" * 60)
-    lines.append(f"  {'ID':<20} {'Phone':<18} {'Status':<18} {'Writeback'}")
+    lines.append(f"  {'ID':<22} {'Phone':<16} {'Status':<16} {'Summary'}")
     lines.append("-" * 60)
 
     for r in results:
-        wb = r.get("writeback", "-")
+        summary = r.get("summary", "")[:40]
         lines.append(
-            f"  {r['appointmentId']:<20} {r['phone']:<18} {r['status']:<18} {wb}"
+            f"  {r['appointmentId']:<22} {r['phone']:<16} {r['status']:<16} {summary}"
         )
 
     lines.append("=" * 60)
+
+    # Show transcripts
+    for r in results:
+        transcript = r.get("transcript", [])
+        if transcript:
+            lines.append(f"\n  --- Transcript: {r['appointmentId']} ({r['phone']}) ---")
+            for turn in transcript[:10]:
+                lines.append(f"  [{turn['role']}] {turn['content'][:120]}")
+
     return "\n".join(lines)
 
 
@@ -377,45 +364,33 @@ def generate_report(results: list[dict]) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="SIMRS Batch Appointment Reminder via CALL-E"
+        description="SIMRS Batch Appointment Reminder via CALL-E REST API"
     )
-    parser.add_argument(
-        "--appointments", required=True,
-        help="Path to appointments file (JSON or CSV)"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Simulate calls without placing them"
-    )
-    parser.add_argument(
-        "--simrs-url",
-        help="SIMRS API base URL for writeback"
-    )
-    parser.add_argument(
-        "--delay", type=int, default=5,
-        help="Seconds between calls (default: 5)"
-    )
-    parser.add_argument(
-        "--repo-root", default=".",
-        help="Path to call-e-integrations repo root"
-    )
+    parser.add_argument("--appointments", required=True, help="JSON or CSV file")
+    parser.add_argument("--dry-run", action="store_true", help="No real calls")
+    parser.add_argument("--no-wait", action="store_true", help="Fire-and-forget (don't poll)")
+    parser.add_argument("--simrs-url", help="SIMRS API for writeback")
+    parser.add_argument("--delay", type=int, default=5, help="Seconds between calls")
+    parser.add_argument("--timeout", type=int, default=300, help="Poll timeout per call")
+    parser.add_argument("--api-key", help="CALL-E API key (or set CALL_E_API_KEY env)")
+    parser.add_argument("--api-base", default=CALL_E_API_BASE, help="CALL-E API base URL")
     args = parser.parse_args()
 
-    cwd = os.path.abspath(args.repo_root)
+    # Get API key
+    api_key = args.api_key or os.environ.get("CALL_E_API_KEY", "")
+    if not api_key and not args.dry_run:
+        print("ERROR: Set CALL_E_API_KEY env or pass --api-key", file=sys.stderr)
+        sys.exit(1)
 
-    # Detect CLI
-    print("Detecting CALL-E CLI...")
-    cli = detect_cli(cwd)
-    print(f"Using: {' '.join(cli)}")
+    client = CalleClient(api_key, args.api_base)
 
-    # Check auth (skip for dry-run)
+    # Health check
     if not args.dry_run:
-        print("Checking CALL-E auth...")
-        if not check_auth(cli, cwd):
-            print("ERROR: CALL-E auth not usable. Run 'calle auth login' first.",
-                  file=sys.stderr)
+        print("Checking CALL-E API...")
+        if not client.health_check():
+            print("ERROR: CALL-E API not reachable", file=sys.stderr)
             sys.exit(1)
-        print("Auth OK ✓")
+        print("API OK ✓")
 
     # Load appointments
     print(f"Loading appointments from {args.appointments}...")
@@ -428,7 +403,6 @@ def main():
         missing = validate_appointment(apt)
         if missing:
             errors.append(f"  Row {i+1}: missing {', '.join(missing)}")
-
     if errors:
         print("Validation errors:", file=sys.stderr)
         for e in errors:
@@ -438,14 +412,21 @@ def main():
     # Process
     results = []
     for i, apt in enumerate(appointments):
-        print(f"\n[{i+1}/{len(appointments)}] Calling {apt.get('patientName', '?')} "
-              f"({mask_phone(apt['phoneNumber'])})...")
+        print(f"\n[{i+1}/{len(appointments)}] "
+              f"{apt.get('patientName', '?')} ({mask_phone(apt['phoneNumber'])})...")
 
-        result = place_call(cli, apt, cwd, dry_run=args.dry_run)
+        result = place_call(
+            client, apt,
+            dry_run=args.dry_run,
+            wait=not args.no_wait,
+            timeout=args.timeout,
+        )
         results.append(result)
         print(f"  → {result['status']}")
 
-        # Delay between calls
+        if result.get("summary"):
+            print(f"  → {result['summary'][:100]}")
+
         if i < len(appointments) - 1 and not args.dry_run:
             time.sleep(args.delay)
 
