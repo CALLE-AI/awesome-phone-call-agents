@@ -26,11 +26,14 @@ Do not use this skill to:
 
 - call automatically after an exception is created
 - call a requester, vendor, customer, or unverified third party
+- disclose invoice context to a callee who has not positively confirmed that they are the verified manager
+- leave a voicemail, call-back message, or invoice-specific message when a person does not answer or cannot confirm their role
 - make a decision, promise payment, or imply that a decision has been made
 - read full invoice contents, payment data, personal data, credentials, or unrestricted audit history over the phone
 - create recurring calls, retries, reminders, or background schedules
 - retry a call after failure without a new explicit request
 - use a browser-delivered API key or expose provider credentials
+- provide medical, legal, or emergency advice, triage, or response; direct an emergency caller to local emergency services instead
 
 ## Required Inputs
 
@@ -50,21 +53,29 @@ Do not infer the recipient, phone number, role, tenant, workspace, scope, amount
 
 1. Confirm explicit user intent for exactly one call.
 2. Verify the manager role and tenant, workspace, and scope against the exception.
-3. Build a redacted briefing that states only the factual exception summary, what the manager should review, and the human decision route. Do not include secrets, full payment details, or personal data.
-4. Produce a dry-run plan by default. Show a masked destination, the call purpose, the human review route, and the cancellation control.
-5. Before dispatch, confirm that the kill switch is off, the call has not already been sent for the same idempotency key, and the destination matches the verified manager.
-6. Dispatch one CALL-E call only after the user confirms the plan.
-7. Report a minimal result: requested, accepted, delivered, or failed. Do not retain or repeat voicemail or call-transcript content unless separately authorized and policy permits it.
-8. Direct the manager to the existing review application. Keep all decisions and immutable decision evidence there.
+3. At the start of a live call, disclose no invoice context. Ask the callee to positively confirm that they are the verified manager before continuing. If they cannot confirm, the call reaches voicemail, or the response is ambiguous, end the call without leaving a message or disclosing the exception.
+4. Build a redacted briefing that states only the factual exception summary, what the confirmed manager should review, and the human decision route. Do not include secrets, full payment details, or personal data.
+5. Produce a dry-run plan by default. Show a masked destination, the call purpose, the human review route, and the cancellation control.
+6. Before dispatch, confirm that cancellation is available and not requested, the call has not already been reserved for the same idempotency key, and the destination matches the verified manager.
+7. Atomically create a durable reservation for the idempotency key before provider dispatch. Dispatch one CALL-E call only after the user confirms the plan.
+8. Report a minimal result: requested, accepted, delivered, failed, cancelled, or outcome-unknown. Do not retain or repeat voicemail or call-transcript content unless separately authorized and policy permits it.
+9. Direct the manager to the existing review application. Keep all decisions and immutable decision evidence there.
 
 ## Idempotency, Cancellation, and Failure
 
-- Use an idempotency key bound to the exception, recipient, and call purpose.
-- Return the original result for an exact replay; reject a changed request that reuses the key.
-- Treat the kill switch as a hard stop before dispatch.
-- If cancellation is requested before dispatch, do not place the call and report `cancelled`.
+- Use an idempotency key bound to the exception, recipient, call purpose, and canonical request content.
+- Store a durable, atomic reservation and result record for that key before dispatch. Concurrent exact requests must reuse the same reservation; a changed request that reuses the key must be rejected.
+- Treat a provider timeout or ambiguous provider response as `outcome-unknown`. Reuse the same key and reconcile the original attempt; never issue a new-key retry unless the original attempt is confirmed absent.
+- Keep the cancellation control armed and available for every planned call. Dispatch is allowed only while it is not cancelled. A cancellation request before provider acceptance must prevent dispatch and report `cancelled`.
+- Provider acceptance is the point of no return for this skill. After acceptance, do not issue another call or retry. If the provider supports cancellation, request it through the same server-side operation and report only the provider-safe outcome; do not promise that an accepted call can be stopped.
 - If provider authentication, recipient verification, or any scope check fails, do not call.
-- A failed or unanswered call does not authorize an automatic retry. Require a new explicit user request.
+- A failed, unanswered, unconfirmed, or provider-rejected call does not authorize an automatic retry. Require a new explicit user request after the original attempt has a known terminal outcome.
+
+## Off-Topic Safety Boundaries
+
+- Do not use this skill for medical, legal, or emergency advice, triage, or response.
+- If a callee raises an emergency, end the workflow without collecting additional sensitive information and direct them to local emergency services or the appropriate emergency contact.
+- If a callee asks for legal or medical guidance, state that the call cannot provide that guidance and direct them to a qualified professional or the existing human review route when relevant.
 
 ## Credential and Phone Safety
 
