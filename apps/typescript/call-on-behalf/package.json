@@ -1,0 +1,22 @@
+{
+  "name": "calle-call-on-behalf",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Delegated errand caller with a disclosure budget: make the call somebody cannot make, say only what they authorized, hand back the transcript.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "demo": "tsx demo/run-local.ts",
+    "errand": "tsx src/cli.ts",
+    "preview": "tsx src/cli.ts preview --errand examples/errand.example.json"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
