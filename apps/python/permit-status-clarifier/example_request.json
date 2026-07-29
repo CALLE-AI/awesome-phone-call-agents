@@ -1,0 +1,21 @@
+{
+  "workflow_id": "permit-demo-2026-001",
+  "phone": "+12025550123",
+  "caller_has_authority": true,
+  "recipient_is_public_department_number": true,
+  "organization_display_name": "Example Build Co",
+  "jurisdiction": "Example City",
+  "department": "Building and Safety Permit Desk",
+  "permit_reference": "BLD-2026-00421",
+  "project_type": "Interior commercial renovation",
+  "region": "US",
+  "locale": "en-US",
+  "questions": [
+    "current_status",
+    "blocking_items",
+    "next_action",
+    "response_deadline",
+    "resubmission_channel",
+    "followup_contact"
+  ]
+}

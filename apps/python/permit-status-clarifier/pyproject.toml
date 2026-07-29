@@ -1,0 +1,13 @@
+[project]
+name = "calle-permit-status-clarifier-app"
+version = "0.1.0"
+description = "Information-only permit status clarification with the CALL-E Python SDK."
+requires-python = ">=3.11"
+dependencies = [
+  "calle-ai==0.2.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Turn a permit desk phone call into a verified blocker and next-action brief.">
+    <title>Permit Status Clarifier</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span>PSC</span><b>Permit Status Clarifier</b></div>
+      <div id="status" class="status"><i></i><span>Checking call readiness…</span></div>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">CALL‑E workflow · one authorised call</p>
+        <h1>Turn “still under review” into an exact next action.</h1>
+        <p>Prepare a factual status inquiry for a municipal permit desk. Preview the complete call plan with masked identifiers before deciding whether to place one real call.</p>
+        <div class="guardrails">
+          <span>AI disclosed</span><span>No payments</span><span>No legal advice</span><span>No recurring calls</span>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form id="permit-form">
+          <div class="step"><b>01</b><span>Authorised context</span></div>
+          <div class="field-grid">
+            <label>Organisation shown to the desk<input name="organization_display_name" required maxlength="80" value="Example Build Co"></label>
+            <label>Workflow ID<input name="workflow_id" required maxlength="64" value="permit-demo-2026-001"></label>
+            <label>Jurisdiction<input name="jurisdiction" required maxlength="100" value="Example City"></label>
+            <label>Department<input name="department" required maxlength="100" value="Building and Safety Permit Desk"></label>
+            <label>Public department phone (E.164)<input name="phone" required maxlength="16" value="+12025550123" autocomplete="off"></label>
+            <label>Permit reference<input name="permit_reference" required maxlength="48" value="BLD-2026-00421" autocomplete="off"></label>
+            <label class="wide">Project type<input name="project_type" required maxlength="140" value="Interior commercial renovation"></label>
+            <label>Recipient region<select name="region"><option>US</option><option>GB</option><option>FR</option><option>DE</option><option>AU</option><option>CA</option><option>SG</option></select></label>
+            <label>Spoken locale<select name="locale"><option>en-US</option><option>en-GB</option><option>fr-FR</option><option>de-DE</option></select></label>
+          </div>
+
+          <div class="step"><b>02</b><span>Questions to resolve</span></div>
+          <div class="questions">
+            <label><input type="checkbox" name="questions" value="current_status" checked><span><b>Current status</b><small>Identify the recorded review state.</small></span></label>
+            <label><input type="checkbox" name="questions" value="blocking_items" checked><span><b>Blocking items</b><small>Capture missing or incorrect material.</small></span></label>
+            <label><input type="checkbox" name="questions" value="next_action" checked><span><b>Next action</b><small>Ask what the applicant should do next.</small></span></label>
+            <label><input type="checkbox" name="questions" value="response_deadline" checked><span><b>Deadline</b><small>Record response or expiry dates.</small></span></label>
+            <label><input type="checkbox" name="questions" value="resubmission_channel" checked><span><b>Submission route</b><small>Portal, email, counter or named team.</small></span></label>
+            <label><input type="checkbox" name="questions" value="fee_information"><span><b>Fee information</b><small>Information only—never authorise payment.</small></span></label>
+            <label><input type="checkbox" name="questions" value="followup_contact" checked><span><b>Follow-up contact</b><small>Public team, extension or reference.</small></span></label>
+          </div>
+
+          <div class="confirmations">
+            <label><input id="authority" type="checkbox" required> I am authorised to make this factual inquiry.</label>
+            <label><input id="public-number" type="checkbox" required> This is a published department number, not a private individual.</label>
+          </div>
+          <button id="preview-button" type="submit">Build masked preview <span>→</span></button>
+        </form>
+
+        <aside id="result-panel" class="result-panel" aria-live="polite">
+          <div class="empty-state">
+            <span>Call brief</span>
+            <h2>Nothing leaves this page yet.</h2>
+            <p>Complete the form to inspect the exact CALL‑E task, masked recipient, result schema and duplicate-call key.</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <footer><span>Local demo · no analytics · no saved form data</span><span>CALL‑E is invoked only after a second live-call confirmation</span></footer>
+    <script src="/app.js"></script>
+  </body>
+</html>
