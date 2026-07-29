@@ -39,22 +39,27 @@ The second line is the design working as intended: the call never asked about th
 
 ## Example 3: reconciliation verdict with visible arithmetic
 
-`--qhat` is required. Reconciliation runs extraction itself, and an uncalibrated extractor abstains on every claim, so without a threshold this script could only ever print UNVERIFIABLE.
+Both `--qhat` and `--org` are required, and for the same reason: reconciliation runs extraction itself, and extraction fails closed without a calibrated threshold and without a positive identity confirmation. Omit either and this script can only ever print UNVERIFIABLE.
+
+Runs against the bundled sample with no credentials and no call:
 
 ```bash
-python3 scripts/reconcile_record.py --payload result.json --qhat 0.750 \
+python3 scripts/reconcile_record.py --payload references/sample-call.json --qhat 0.750 \
+  --org "Example Family Medicine" \
   --claim-accepting-new-patients yes --claim-plan-accepted yes
 ```
 
 ```text
 prior: +0.00 bits (50/50 audit odds)
 accepting_new_patients: call=yes record=yes -> +1.36 bits
-accepts_plan: no evidence, the call did not establish this (record says yes)
-posterior: +1.36 bits = 72% record-accurate
+accepts_plan: call=no record=yes -> -2.32 bits
+posterior: -0.96 bits = 34% record-accurate
 verdict: UNVERIFIABLE
 ```
 
-Two fields, two different reasons, and the output distinguishes them. The first carried real evidence and moved the posterior. The second was never established by the call, so it contributes exactly zero rather than being counted as a disagreement. The verdict stays UNVERIFIABLE because 72 percent does not clear the 85 percent bar (`VERIFIED_AT` in `reconcile_record.py`, with `CONTRADICTED_AT` at 30 percent). One agreeing field is not enough to bless a listing, and partial evidence is reported as partial rather than rounded up.
+This is the interesting case rather than the flattering one. The record claimed both things; the call confirmed one and contradicted the other. Agreement on accepting new patients adds 1.36 bits, disagreement on the plan subtracts 2.32, and the disagreement weighs more because `(m, u)` for the plan field is set that way: plans change quietly and a directory is likelier to be stale about them.
+
+Net 34 percent. That is below the 50 percent prior, so the listing is now doubted. It is nowhere near the 85 percent `VERIFIED_AT` bar, and it does not clear the 30 percent `CONTRADICTED_AT` bar either, so the verdict is UNVERIFIABLE rather than CONTRADICTED. Mixed evidence is reported as mixed. Rounding it either way would be the guess this tool exists not to make.
 
 ## Example 4: calibrating the abstention threshold, no credentials
 

@@ -31,6 +31,15 @@ CONTRADICTED_AT = 0.30
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--payload", required=True, help="JSON file from poll_result.py")
+    parser.add_argument(
+        "--org",
+        required=True,
+        help=(
+            "Organization name as listed, the same value passed to "
+            "place_verify_call.py. Required and passed through to extraction, "
+            "which fails closed without a positive identity confirmation."
+        ),
+    )
     parser.add_argument("--claim-accepting-new-patients", choices=["yes", "no"], default=None)
     parser.add_argument("--claim-plan-accepted", choices=["yes", "no"], default=None)
     parser.add_argument(
@@ -63,6 +72,11 @@ def main() -> None:
             args.payload,
             "--qhat",
             str(args.qhat),
+            # Without --org, extraction cannot confirm identity and abstains on
+            # every claim, which would silently recreate the earlier bug where
+            # this script could only ever print UNVERIFIABLE.
+            "--org",
+            args.org,
         ],
         capture_output=True,
         text=True,
@@ -72,16 +86,23 @@ def main() -> None:
         raise SystemExit(f"extract_answer failed: {extractor.stderr.strip()}")
     answers = {}
     identity_denied = False
+    identity_confirmed = False
     for line in extractor.stdout.strip().splitlines():
         item = json.loads(line)
         identity_denied = identity_denied or bool(item.get("organization_denied"))
+        identity_confirmed = identity_confirmed or bool(item.get("organization_confirmed"))
         answers[item["claim"]] = item["answer"] if not item["abstain"] else "unknown"
 
-    if identity_denied:
-        # Stop before the arithmetic. Reaching a different party is not weak
-        # evidence to be weighed down, it is no evidence about this listing at
-        # all, and running the match weights anyway would put a number on it.
-        print("identity: the respondent indicated this is not the listed organization")
+    if identity_denied or not identity_confirmed:
+        # Stop before the arithmetic. Reaching a different party, or never
+        # establishing which party answered, is not weak evidence to be weighed
+        # down. It is no evidence about this listing at all, and running the
+        # match weights anyway would put a number on it.
+        if identity_denied:
+            print("identity: the respondent indicated this is not the listed organization")
+        else:
+            print(f"identity: never confirmed that the respondent represents {args.org}")
+            print("absence of a denial is not confirmation, so no answer is attributable")
         print("no reconciliation performed: answers from another party are not evidence")
         print("verdict: UNVERIFIABLE")
         return

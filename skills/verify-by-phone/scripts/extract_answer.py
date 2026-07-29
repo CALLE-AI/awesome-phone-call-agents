@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 
 from gate import abstains, class_scores
 
@@ -131,6 +130,89 @@ def organization_denied(turns: list[dict]) -> bool:
     return False
 
 
+def organization_confirmed(turns: list[dict], org: str | None) -> bool:
+    """Did the respondent positively confirm they represent the named listing?
+
+    Absence of a denial is not confirmation. The agent opens by naming the
+    organization, so a respondent who simply starts answering questions has
+    established nothing: wrong numbers, answering services, shared reception
+    desks and reassigned lines all produce cooperative respondents who are not
+    the listing. Attributing their answers to the listing is how a verification
+    tool manufactures a false confirmation.
+
+    Confirmation requires one of two things from a USER turn:
+      - a distinctive word from the organization's own name, which is what
+        "Northside Family Medicine, how can I help you" looks like, or
+      - an explicit affirmative that they are the named practice.
+
+    Generic pleasantries deliberately do not count. "Hello", "how can I help
+    you", and "sure" are what any human says on any phone.
+
+    Without --org there is nothing to confirm against, so this returns False
+    and every claim abstains. That is the fail-closed direction on purpose.
+    """
+    if not org:
+        return False
+    # Words distinctive enough to identify the practice. Corporate suffixes and
+    # generic clinical nouns are dropped: "the center called" matching "center"
+    # would confirm essentially any medical listing.
+    generic = {
+        "the",
+        "and",
+        "of",
+        "for",
+        "llc",
+        "inc",
+        "pc",
+        "pa",
+        "llp",
+        "group",
+        "center",
+        "centre",
+        "clinic",
+        "practice",
+        "associates",
+        "health",
+        "healthcare",
+        "medical",
+        "medicine",
+        "counseling",
+        "counselling",
+        "therapy",
+        "wellness",
+        "services",
+        "care",
+        "family",
+        "partners",
+    }
+    tokens = {w for w in re.findall(r"[a-z0-9]+", org.lower()) if len(w) > 2 and w not in generic}
+    asked_identity = False
+    for turn in turns:
+        text = str(turn.get("text", ""))
+        lowered = text.lower()
+        if turn.get("speaker") == "bot":
+            # A bare affirmative only confirms identity if it ANSWERS an
+            # identity question. Tracking which question the agent last asked is
+            # the whole difference between a real check and a decorative one:
+            # an earlier version accepted "Yes, we are." as confirmation, which
+            # is the ordinary way to answer "are you accepting new patients",
+            # so every cooperative respondent confirmed themselves.
+            asked_identity = bool(
+                re.search(r"\bis this\b|\bhave i reached\b|\bam i speaking\b|confirm", lowered)
+            ) or (any(re.search(rf"\b{re.escape(t)}\b", lowered) for t in tokens) and "?" in text)
+            continue
+        # Saying the practice's own distinctive name is confirmation on its own,
+        # unprompted, and is how a staffed front desk actually answers.
+        if any(re.search(rf"\b{re.escape(tok)}\b", lowered) for tok in tokens):
+            return True
+        if asked_identity and re.match(
+            r"\W*(?:yes|yeah|yep|correct|speaking|that'?s right|that'?s us|it is|sure is)\b",
+            lowered,
+        ):
+            return True
+    return False
+
+
 def last_span(cues: tuple[str, ...], text: str) -> tuple[int, int] | None:
     """The LAST cue occurrence of this polarity in the turn.
 
@@ -189,6 +271,7 @@ def extract(
     window open.
     """
     question_seen = False
+    combined_turn = False
     yes_hits: list[tuple[int, str, int, int]] = []
     no_hits: list[tuple[int, str, int, int]] = []
     hedge_strength = 0.0
@@ -199,6 +282,16 @@ def extract(
         lowered = text.lower()
         if turn.get("speaker") == "bot":
             if re.search(question_pattern, lowered):
+                # Both questions in ONE turn makes the reply un-attributable.
+                # "Are you accepting new patients, and do you take Example PPO?"
+                # answered "Yes." opens both claims' windows on the same reply,
+                # and the old code handed that single "Yes." to both claims,
+                # each with the same span. One of those is very likely wrong and
+                # both look identically confident. There is no way to split it
+                # after the fact, so the honest move is to abstain and let the
+                # call conduct keep the questions separate in the first place.
+                if any(re.search(other, lowered) for other in other_question_patterns):
+                    combined_turn = True
                 # Re-asking this claim reopens rather than closes the window.
                 question_seen = True
             elif question_seen and any(
@@ -236,6 +329,11 @@ def extract(
             "span": None,
         }
 
+    if combined_turn:
+        # Checked before every other outcome, including a clean single "Yes.":
+        # a confident-looking answer is exactly what this case produces, and it
+        # is exactly what must not be served.
+        return {**unknown(0.5), "combined_question": True}
     if dead_end and not yes_hits and not no_hits:
         return unknown(0.85)
     if yes_hits and no_hits:
@@ -267,6 +365,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--payload", required=True, help="JSON file from poll_result.py")
     parser.add_argument(
+        "--org",
+        default=None,
+        help=(
+            "Organization name as listed, the same value passed to "
+            "place_verify_call.py. Required for any claim to be answered: "
+            "without it identity cannot be confirmed and every claim abstains."
+        ),
+    )
+    parser.add_argument(
         "--qhat",
         type=float,
         default=None,
@@ -277,19 +384,50 @@ def main() -> None:
     with open(args.payload, encoding="utf-8") as handle:
         payload = json.load(handle)
     turns = turns_from_payload(payload)
+
+    # A call with no transcript is the single most common real outcome: nobody
+    # picked up, or it went to voicemail and the agent correctly left nothing.
+    # Exiting with an error there was wrong twice over. It broke every caller
+    # downstream, including reconcile_record.py, on the ordinary case rather
+    # than an exceptional one. And a tool whose entire claim is that it emits an
+    # explicit abstention when it learns nothing must emit that record LOUDEST
+    # when it learned nothing at all. Silence is a result, not a failure.
     if not turns:
-        sys.exit("ERROR: no transcript turns found in payload.")
+        for claim in CLAIM_PATTERNS:
+            print(
+                json.dumps(
+                    {
+                        "claim": claim,
+                        "answer": "unknown",
+                        "trust_score": 0.0,
+                        "hedged": False,
+                        "span": None,
+                        "abstain": True,
+                        "gate": "no-transcript",
+                        "organization_confirmed": False,
+                        "organization_denied": False,
+                    }
+                )
+            )
+        return
+
     # Computed once for the call, not per claim: identity is a property of who
     # answered the phone, not of any one question.
     denied = organization_denied(turns)
+    confirmed = organization_confirmed(turns, args.org)
     for claim, pattern in CLAIM_PATTERNS.items():
         others = tuple(p for name, p in CLAIM_PATTERNS.items() if name != claim)
         record = apply_gate(extract(turns, claim, pattern, others), args.qhat)
+        record["organization_confirmed"] = confirmed
         record["organization_denied"] = denied
-        if denied:
-            # Whatever was said, it was not said by this listing. Abstain and
-            # drop the span so nothing can be quoted as directory evidence.
-            record.update(answer="unknown", span=None, abstain=True, gate="identity-unconfirmed")
+        # Fail CLOSED on identity. Detecting an explicit denial is not enough:
+        # absence of a denial is not confirmation, and a directory answer is
+        # only evidence about the listing if we know we reached the listing.
+        if record.pop("combined_question", False):
+            record.update(answer="unknown", span=None, abstain=True, gate="combined-question")
+        if denied or not confirmed:
+            gate = "identity-denied" if denied else "identity-unconfirmed"
+            record.update(answer="unknown", span=None, abstain=True, gate=gate)
         print(json.dumps(record))
 
 

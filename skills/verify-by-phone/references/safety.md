@@ -21,6 +21,18 @@
 - No credentials are stored by this skill; `CALLE_API_KEY` is read from the environment at call time only.
 - The dry-run default and the bundled labeled scenario data mean everything except a live call runs with no credentials, no network, and no side effects.
 
+## Medical, legal, financial, and emergency boundaries
+
+This skill calls healthcare organizations, so these boundaries are load-bearing rather than boilerplate.
+
+**It handles directory logistics only.** It asks whether a listing is current: is this the named practice, are they accepting new patients, do they take a named plan. That is the entire scope.
+
+- **No clinical content, in either direction.** The agent does not provide diagnosis, dosage, treatment or triage, and it does not collect symptoms or a reason for the visit. If asked for patient details such as a name, date of birth, or an insurance member number, it says plainly that it does not have them because this is a directory verification call and not an appointment request, and it never invents one, not even a placeholder. That instruction is pinned by a test.
+- **No legal or financial advice.** A plan question is a directory question, not a coverage determination. "Do you accept Example PPO" is not, and must not be presented as, an answer to whether a given person's care will be covered or what it will cost.
+- **Never for emergencies.** This places one non-urgent verification call and can reach voicemail, a queue, or nobody. It is not a route to care. Anyone who needs urgent help should contact local emergency services, and in the US the 988 Suicide and Crisis Lifeline handles mental-health crises. Do not use this skill, or any automated caller, as a substitute for that.
+- **It does not book, cancel, or change anything.** No appointments, no referrals, no records requests, no callbacks. It asks and it records.
+- **It is not an authority.** A verified listing means one respondent said one thing on one day, with the exact words retained. It does not establish that a person will be seen, covered, or treated. Everything it emits carries either a transcript span or an explicit abstention so a human can judge it.
+
 ### The saved payload
 
 `scripts/poll_result.py` writes the terminal payload to disk, and that file is the most sensitive artifact this skill produces: it contains the recipient's phone number in the clear and a verbatim transcript of a real person who did not choose to be recorded by us.

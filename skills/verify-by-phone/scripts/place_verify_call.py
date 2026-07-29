@@ -47,19 +47,30 @@ CALL_CONDUCT = (
 
 
 def build_task(org: str, accepting: str | None, plan: str | None) -> str:
-    questions = []
+    # The identity question comes first and is not optional. Extraction fails
+    # closed without a positive confirmation that the respondent represents this
+    # listing, so a script that never asks guarantees an abstention. The product
+    # builder in backend/app/runs.py has always asked; this one had drifted.
+    questions = [f"first, confirm you have reached the right place by asking: 'Is this {org}?'"]
     if accepting is not None:
-        questions.append("whether the practice is currently accepting new patients")
+        questions.append("then ask whether the practice is currently accepting new patients")
     if plan is not None:
-        questions.append(f"whether the practice currently accepts {plan}")
-    if not questions:
-        questions.append("whether the published listing information is current")
-    asks = "; and ".join(questions)
+        questions.append(f"then ask whether the practice currently accepts {plan}")
+    if len(questions) == 1:
+        # No generic fallback. There used to be one ("whether the published
+        # listing information is current") and it was unextractable by
+        # construction: no claim pattern matches it, so the call could never
+        # produce a recordable answer. Callers must supply a claim; main()
+        # rejects this case before dialing and this guard keeps any other
+        # caller from reintroducing it quietly.
+        raise ValueError("build_task requires at least one claim to verify")
+    asks = "; ".join(questions)
     return (
         f"You are placing a short verification call to {org} on behalf of a records "
         "verification service. Open with: 'Hi, this is an automated assistant calling "
         f"to verify directory information for {org}. This call may be recorded.' "
-        f"Then politely ask: {asks}. " + CALL_CONDUCT
+        f"Then ask ONE question at a time, waiting for an answer before asking the "
+        f"next: {asks}. " + CALL_CONDUCT
     )
 
 
@@ -121,6 +132,21 @@ def main() -> None:
 
     if not E164.match(args.phone):
         sys.exit("ERROR: --phone must be E.164, for example +15550101234")
+
+    # Refuse a call that cannot produce a result. With neither claim supplied
+    # the task used to fall back to asking "whether the published listing
+    # information is current", which no extractor pattern matches, so the call
+    # was guaranteed to yield nothing extractable. That is worse than a bug:
+    # it spends real money and a real person's time on a question whose answer
+    # this tool has no way to record. Refuse before dialing, not after.
+    if args.claim_accepting_new_patients is None and args.claim_plan is None:
+        sys.exit(
+            "ERROR: nothing to verify. Pass at least one claim:\n"
+            "  --claim-accepting-new-patients yes|no\n"
+            "  --claim-plan 'Example PPO'\n"
+            "A call with no claim cannot produce an extractable answer, so it "
+            "would use a real call and a real person's time for nothing."
+        )
 
     task = build_task(args.org, args.claim_accepting_new_patients, args.claim_plan)
     idempotency_key = args.idempotency_key or default_idempotency_key(

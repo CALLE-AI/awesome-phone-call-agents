@@ -70,12 +70,19 @@ here and answered there.
 
 ## Requirements
 
-**Python 3.9 or newer.** Verified by running this entire quick start on 3.9.6, not inferred from the syntax used. The scripts are standard library only, so nothing below needs `pip install` except step 3, which dials.
+There are **two different floors**, and conflating them is how you get a confusing failure:
 
-Two exceptions worth stating rather than leaving to be discovered:
+| What you are doing | Minimum Python | Why |
+|---|---|---|
+| Everything except placing a live call | **3.9** | Standard library only, verified by running the whole quick start on 3.9.6 |
+| Placing a live call (step 3, `--live`) | **3.11** | `calle-ai` declares `requires-python >=3.11`, so pip will not install it below that |
+
+So calibrate, extract, reconcile and every dry run work on 3.9. The moment you actually dial, you need 3.11 or newer, because that is the SDK's own floor and not a choice this skill makes. Both numbers were read from the source rather than assumed: 3.9.6 by running it, 3.11 from the published package metadata.
+
+Two dependency notes worth stating rather than leaving to be discovered:
 
 - Step 3 needs `calle-ai` and a `CALLE_API_KEY`. Every other step runs with no credentials and places no call.
-- `scripts/verify_attestation.py` needs `cryptography`. It is the only script with a third-party import, and it is optional: it checks an attestation signature and is not part of the verification workflow.
+- `scripts/verify_attestation.py` needs `cryptography`. It is the only other script with a third-party import, and it is optional: it checks an attestation signature and is not part of the verification workflow.
 
 ## Quick Start
 
@@ -98,16 +105,27 @@ python3 scripts/place_verify_call.py ... --live
 # 4. Wait for the terminal payload.
 python3 scripts/poll_result.py --call-id call_abc123 --out result.json
 
-# 5. Extract the span-grounded answer, gated by the calibrated threshold.
-python3 scripts/extract_answer.py --payload result.json --qhat 0.750
+# 5. Extract the span-grounded answer. --org is required: an answer is only
+#    evidence about this listing if the respondent confirmed they ARE it.
+python3 scripts/extract_answer.py --payload result.json --qhat 0.750 \
+  --org "Example Counseling Center"
 
-# 6. Reconcile against the stored record. The same --qhat as step 5: reconciliation
-#    runs extraction itself, and without a threshold every field abstains.
+# 6. Reconcile against the stored record. Same --qhat and --org as step 5:
+#    reconciliation runs extraction itself, and without either every field abstains.
 python3 scripts/reconcile_record.py --payload result.json --qhat 0.750 \
+  --org "Example Counseling Center" \
   --claim-accepting-new-patients yes --claim-plan-accepted yes
 ```
 
-All sample numbers in this skill are reserved fictional numbers. The dry run path and the bundled scenario data mean everything except step 3 runs with no credentials and no real call.
+Steps 5 and 6 run against the bundled `references/sample-call.json` if you want to see real output before placing any call.
+
+All sample numbers in this skill are reserved fictional numbers. The dry run path and the bundled sample data mean everything except step 3 runs with no credentials and no real call.
+
+**Three things make a claim abstain no matter how clearly it was answered**, and all three are deliberate:
+
+1. **No calibrated threshold** (`--qhat` missing). There is no coverage guarantee to answer behind.
+2. **Identity not positively confirmed.** Absence of a denial is not confirmation. Wrong numbers, answering services and reassigned lines all produce cooperative respondents who are not the listing.
+3. **Both questions asked in one turn.** A single "Yes" cannot be split between two claims after the fact, so it is attributed to neither. The call script asks one question at a time to avoid this.
 
 ## What The Output Looks Like
 
