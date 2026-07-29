@@ -1,0 +1,47 @@
+{
+  "request_id": "ash-lane-3b-leak",
+  "meeting": {
+    "purpose": "the plumbing repair at 14 Ash Lane, apartment 3B",
+    "location": "14 Ash Lane, apartment 3B",
+    "timezone": "America/Los_Angeles",
+    "organizer": "Ash Lane property management",
+    "duration_minutes": 90
+  },
+  "slots": [
+    { "id": "thu-10", "start": "2026-08-06T10:00:00-07:00" },
+    { "id": "thu-14", "start": "2026-08-06T14:00:00-07:00" },
+    { "id": "fri-09", "start": "2026-08-07T09:00:00-07:00" }
+  ],
+  "parties": [
+    {
+      "id": "plumber",
+      "name": "Marcus Lee",
+      "phone": "+14155550101",
+      "role": "plumber",
+      "region": "US",
+      "locale": "en-US"
+    },
+    {
+      "id": "tenant",
+      "name": "Fatima Haddad",
+      "phone": "+14155550100",
+      "role": "tenant",
+      "region": "US",
+      "locale": "en-US"
+    },
+    {
+      "id": "superintendent",
+      "name": "Dana Alvarez",
+      "phone": "+14155550102",
+      "role": "building superintendent",
+      "region": "US",
+      "locale": "en-US"
+    }
+  ],
+  "policy": {
+    "window_minutes": 45,
+    "per_call_timeout_seconds": 240,
+    "max_calls": 12,
+    "min_confidence": 0.5
+  }
+}

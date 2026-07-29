@@ -1,0 +1,253 @@
+/**
+ * Local reading of what people actually said.
+ *
+ * Availability comes back as a list, which an extraction model handles well, so
+ * the structured result leads and this reader cross-checks it. A commitment is a
+ * yes or a no, which is exactly where a summary can flatten a hesitation, so for
+ * confirm calls this reader leads instead.
+ *
+ * Only `user` turns are read. A list of options the caller read out must never be
+ * scored as the person choosing them.
+ */
+
+import type { Slot, TranscriptTurn } from "./types.js";
+
+const MACHINE_PATTERNS: RegExp[] = [
+  /\bleave a (?:message|voicemail)\b/i,
+  /\bat the tone\b/i,
+  /\bis not available\b/i,
+  /\bpress \d\b/i,
+  /\bmailbox\b/i,
+];
+
+const NEGATIVE_MARKERS: RegExp[] = [
+  /\bnot\b/i,
+  /\bno\b/i,
+  /\bcan'?t\b/i,
+  /\bcannot\b/i,
+  /\bwon'?t\b/i,
+  /\bdoesn'?t\b/i,
+  /\bunable\b/i,
+  /\bbusy\b/i,
+  /\bbad\b/i,
+  /\bimpossible\b/i,
+];
+
+const NONE_PATTERNS: RegExp[] = [
+  /\bnone of (?:those|them|these)\b/i,
+  /\bnone work\b/i,
+  /\bnothing works\b/i,
+  /\bneither\b/i,
+  /\bno good\b/i,
+  /\bnot any of\b/i,
+];
+
+const CONFIRM_PATTERNS: RegExp[] = [
+  /\bconfirm(?:ed|ing)?\b/i,
+  /\bthat works\b/i,
+  /\bbook it\b/i,
+  /\bsee you then\b/i,
+  /\bagreed\b/i,
+  /\byes\b/i,
+  /\bsounds good\b/i,
+  /\block it in\b/i,
+];
+
+const DECLINE_PATTERNS: RegExp[] = [
+  /\bcan'?t (?:do|make)\b/i,
+  /\bcannot (?:do|make)\b/i,
+  /\bwon'?t work\b/i,
+  /\bno longer\b/i,
+  /\bsomething came up\b/i,
+  /\bcancel\b/i,
+  /\breschedule\b/i,
+  /\bnot anymore\b/i,
+  /\bdecline\b/i,
+  /\bno\b/i,
+];
+
+const ACK_PATTERNS: RegExp[] = [
+  /\bok(?:ay)?\b/i,
+  /\bunderstood\b/i,
+  /\bgot it\b/i,
+  /\bthanks?\b/i,
+  /\bthank you\b/i,
+  /\bno problem\b/i,
+  /\bfine\b/i,
+  /\bnoted\b/i,
+];
+
+const OPTION_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+};
+
+const ORDINAL_WORDS: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+};
+
+export function looksLikeMachine(turns: TranscriptTurn[]): boolean {
+  return turns.some(
+    (turn) => turn.speaker === "user" && MACHINE_PATTERNS.some((pattern) => pattern.test(turn.text)),
+  );
+}
+
+function userTurns(turns: TranscriptTurn[]): TranscriptTurn[] {
+  return turns.filter((turn) => turn.speaker === "user");
+}
+
+/** Clauses, because "two works but three does not" carries two opposite facts. */
+function clauses(text: string): string[] {
+  return text
+    .split(/[,.;!?]|\band\b|\bbut\b|\bhowever\b|\bthough\b/i)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+}
+
+/**
+ * Option numbers in one clause.
+ *
+ * "Option two" and "the second one" are both clear. A bare number word is only
+ * read as an option when the clause gives no stronger signal, so "the second
+ * one" is option two and not options one and two.
+ */
+function optionsIn(clause: string, maxOption: number): number[] {
+  const found = new Set<number>();
+  let strong = false;
+
+  for (const match of clause.matchAll(/\b(?:option|number|slot|choice)\s+(\d|one|two|three|four)\b/gi)) {
+    const token = (match[1] ?? "").toLowerCase();
+    const value = /^\d$/.test(token) ? Number(token) : (OPTION_WORDS[token] ?? 0);
+    if (value >= 1 && value <= maxOption) {
+      found.add(value);
+      strong = true;
+    }
+  }
+  for (const [word, value] of Object.entries(ORDINAL_WORDS)) {
+    if (value <= maxOption && new RegExp(`\\b${word}\\b`, "i").test(clause)) {
+      found.add(value);
+      strong = true;
+    }
+  }
+  for (const match of clause.matchAll(/\b(\d)\b/g)) {
+    const value = Number(match[1]);
+    if (value >= 1 && value <= maxOption) {
+      found.add(value);
+      strong = true;
+    }
+  }
+  if (!strong) {
+    for (const [word, value] of Object.entries(OPTION_WORDS)) {
+      if (value <= maxOption && new RegExp(`\\b${word}\\b`, "i").test(clause)) {
+        found.add(value);
+      }
+    }
+  }
+  return [...found].sort((left, right) => left - right);
+}
+
+function negative(clause: string): boolean {
+  return NEGATIVE_MARKERS.some((pattern) => pattern.test(clause));
+}
+
+export interface GatherReading {
+  heardOptions: number[];
+  noneWork: boolean;
+  userTurnCount: number;
+  machineAnswered: boolean;
+  excerpt: string[];
+}
+
+export function readGather(turns: TranscriptTurn[], slots: Slot[]): GatherReading {
+  const maxOption = slots.length;
+  const positive = new Set<number>();
+  const negated = new Set<number>();
+  const excerpt: string[] = [];
+  let noneWork = false;
+
+  for (const turn of userTurns(turns)) {
+    let interesting = false;
+    if (NONE_PATTERNS.some((pattern) => pattern.test(turn.text))) {
+      noneWork = true;
+      interesting = true;
+    }
+    for (const clause of clauses(turn.text)) {
+      const options = optionsIn(clause, maxOption);
+      if (options.length === 0) {
+        continue;
+      }
+      interesting = true;
+      for (const option of options) {
+        if (negative(clause)) {
+          negated.add(option);
+        } else {
+          positive.add(option);
+        }
+      }
+    }
+    if (interesting) {
+      excerpt.push(turn.text);
+    }
+  }
+
+  const heardOptions = [...positive].filter((option) => !negated.has(option)).sort((a, b) => a - b);
+  return {
+    heardOptions,
+    noneWork: noneWork && heardOptions.length === 0,
+    userTurnCount: userTurns(turns).length,
+    machineAnswered: looksLikeMachine(turns),
+    excerpt,
+  };
+}
+
+export interface CommitReading {
+  answer: "confirm" | "decline" | "unknown";
+  userTurnCount: number;
+  machineAnswered: boolean;
+  excerpt: string[];
+}
+
+export function readConfirm(turns: TranscriptTurn[]): CommitReading {
+  let answer: CommitReading["answer"] = "unknown";
+  const excerpt: string[] = [];
+  for (const turn of userTurns(turns)) {
+    const declined = DECLINE_PATTERNS.some((pattern) => pattern.test(turn.text));
+    const confirmed = CONFIRM_PATTERNS.some((pattern) => pattern.test(turn.text));
+    if (declined) {
+      excerpt.push(turn.text);
+      return {
+        answer: "decline",
+        userTurnCount: userTurns(turns).length,
+        machineAnswered: looksLikeMachine(turns),
+        excerpt,
+      };
+    }
+    if (confirmed) {
+      answer = "confirm";
+      excerpt.push(turn.text);
+    }
+  }
+  return {
+    answer,
+    userTurnCount: userTurns(turns).length,
+    machineAnswered: looksLikeMachine(turns),
+    excerpt,
+  };
+}
+
+export function readRelease(turns: TranscriptTurn[]): CommitReading {
+  const acknowledged = userTurns(turns).some((turn) =>
+    ACK_PATTERNS.some((pattern) => pattern.test(turn.text)),
+  );
+  return {
+    answer: acknowledged ? "confirm" : "unknown",
+    userTurnCount: userTurns(turns).length,
+    machineAnswered: looksLikeMachine(turns),
+    excerpt: userTurns(turns).map((turn) => turn.text).slice(0, 2),
+  };
+}

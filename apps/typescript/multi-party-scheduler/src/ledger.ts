@@ -1,0 +1,166 @@
+/**
+ * The coordination ledger.
+ *
+ * Every call, every narrowing of the feasible set, the commit decision and every
+ * release call is appended as one JSON line. The point is not that a log exists.
+ * The point is `replay`, which walks the recorded answers and recomputes the
+ * feasible set, the chosen slot and the outcome. If the ledger says Thursday but
+ * the recorded answers do not intersect on Thursday, replay says so.
+ */
+
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chooseSlot, intersect } from "./slots.js";
+import type {
+  CoordinationRequest,
+  LedgerEntry,
+  ReplayIssue,
+  ReplayVerification,
+  Slot,
+} from "./types.js";
+
+export function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== undefined)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+}
+
+export function digestOf(value: unknown): string {
+  return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
+}
+
+export function requestDigest(request: CoordinationRequest): string {
+  return digestOf({
+    meeting: request.meeting,
+    slots: request.slots.map((slot) => ({ id: slot.id, start: slot.start })),
+    parties: request.parties.map((party) => party.id),
+    policy: request.policy,
+  });
+}
+
+export function appendEntry(path: string, entry: LedgerEntry): void {
+  appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: "utf8", mode: 0o600 });
+}
+
+export function readEntries(path: string): LedgerEntry[] {
+  if (!existsSync(path)) {
+    return [];
+  }
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as LedgerEntry);
+}
+
+function ids(slots: Slot[]): string[] {
+  return slots.map((slot) => slot.id);
+}
+
+/**
+ * Recompute the whole run from the recorded answers.
+ *
+ * This is the check a plain log cannot do. It re-derives the feasible set after
+ * every gather call, the slot that choice implies and whether the recorded
+ * outcome follows from the confirm and release calls.
+ */
+export function replay(entries: LedgerEntry[]): ReplayVerification {
+  const issues: ReplayIssue[] = [];
+  const started = entries.find((entry) => entry.kind === "run_started");
+  if (started === undefined || started.kind !== "run_started") {
+    return { ok: false, entries: entries.length, outcome: null, issues: [{ entry: 0, problem: "no run_started entry" }] };
+  }
+  const slots = started.slots;
+  const parties = started.parties;
+
+  let feasible: Slot[] = slots;
+  let index = 0;
+  let calls = 0;
+  const confirmed: string[] = [];
+  const released: string[] = [];
+  let chosen: string | null = null;
+
+  for (const entry of entries) {
+    index += 1;
+    if (entry.kind === "gather") {
+      calls += 1;
+      if (canonicalJson(entry.feasible_before) !== canonicalJson(ids(feasible))) {
+        issues.push({ entry: index, problem: `feasible_before ${entry.feasible_before.join(",")} does not match the run so far (${ids(feasible).join(",")})` });
+      }
+      const expected = entry.result.reached_person
+        ? intersect(feasible, entry.result.available_options)
+        : [];
+      if (canonicalJson(entry.feasible_after) !== canonicalJson(ids(expected))) {
+        issues.push({
+          entry: index,
+          problem: `feasible_after ${entry.feasible_after.join(",") || "empty"} does not follow from ${entry.result.party_id}'s recorded answer (${ids(expected).join(",") || "empty"})`,
+        });
+      }
+      feasible = slots.filter((slot) => entry.feasible_after.includes(slot.id));
+    }
+    if (entry.kind === "slot_chosen") {
+      const expected = chooseSlot(feasible);
+      if (expected === null || expected.id !== entry.slot_id) {
+        issues.push({
+          entry: index,
+          problem: `slot ${entry.slot_id} is not the earliest slot the recorded answers leave (${expected?.id ?? "none"})`,
+        });
+      }
+      chosen = entry.slot_id;
+    }
+    if (entry.kind === "commit") {
+      calls += 1;
+      if (chosen !== null && entry.result.slot_id !== chosen) {
+        issues.push({ entry: index, problem: `confirm call for ${entry.result.party_id} names slot ${entry.result.slot_id}, not the chosen ${chosen}` });
+      }
+      if (entry.result.confirmed) {
+        confirmed.push(entry.result.party_id);
+      }
+    }
+    if (entry.kind === "release") {
+      calls += 1;
+      released.push(entry.result.party_id);
+    }
+    if (entry.kind === "outcome") {
+      if (entry.calls_placed !== calls) {
+        issues.push({ entry: index, problem: `calls_placed ${entry.calls_placed} does not match the ${calls} call entries in this ledger` });
+      }
+      if (entry.outcome === "booked") {
+        const missing = parties.filter((party) => !confirmed.includes(party));
+        if (missing.length > 0) {
+          issues.push({ entry: index, problem: `booked, but ${missing.join(", ")} never confirmed` });
+        }
+        if (entry.slot_id !== chosen) {
+          issues.push({ entry: index, problem: `booked slot ${String(entry.slot_id)} is not the chosen slot ${String(chosen)}` });
+        }
+      }
+      if (entry.outcome === "not_confirmed") {
+        const owed = confirmed.filter((party) => !released.includes(party) && !entry.unreleased.includes(party));
+        if (owed.length > 0) {
+          issues.push({
+            entry: index,
+            problem: `${owed.join(", ")} confirmed and were never released or listed as unreleased`,
+          });
+        }
+      }
+      if (entry.outcome === "no_common_slot" && chosen !== null) {
+        issues.push({ entry: index, problem: "no_common_slot, but a slot was chosen" });
+      }
+      return { ok: issues.length === 0, entries: entries.length, outcome: entry.outcome, issues };
+    }
+  }
+
+  issues.push({ entry: index, problem: "no outcome entry, the run did not finish" });
+  return { ok: false, entries: entries.length, outcome: null, issues };
+}
+
+export function replayFile(path: string): ReplayVerification {
+  return replay(readEntries(path));
+}
