@@ -1,0 +1,22 @@
+{
+  "name": "calle-phone-approval-gate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Phone-verified approval gate for automated changes that need one human decision.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "demo": "tsx demo/run-local.ts",
+    "gate": "tsx src/cli.ts",
+    "preview": "tsx src/cli.ts preview --request examples/request.example.json"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
