@@ -28,7 +28,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
 }
@@ -105,6 +105,19 @@ body {
   transform: translateY(0);
 }
 
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.95rem;
+  padding: 0.65rem 1.5rem;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
 .btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
@@ -131,6 +144,7 @@ body {
 
 .dot.connected { background: var(--success); box-shadow: 0 0 10px var(--success); }
 .dot.authenticating { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.dot.degraded { background: #f97316; box-shadow: 0 0 10px #f97316; animation: pulse 2s ease-in-out infinite; }
 .dot.error { background: var(--error); box-shadow: 0 0 10px var(--error); }
 
 .data-section {

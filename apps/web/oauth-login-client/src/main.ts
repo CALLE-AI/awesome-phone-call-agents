@@ -20,7 +20,11 @@ const SCOPE = 'openid email profile';
 let transport: StreamableHTTPClientTransport | null = null;
 let client: Client | null = null;
 
+// Keep a reference to the active provider so the logout button can call it.
+let activeProvider: BrowserOAuthClientProvider | null = null;
+
 const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
+const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
 const statusDot = document.getElementById('status-dot') as HTMLDivElement;
 const statusText = document.getElementById('status-text') as HTMLSpanElement;
 const contentSection = document.getElementById('content') as HTMLDivElement;
@@ -53,26 +57,34 @@ function showError(msg: string) {
 // Connection status
 // ---------------------------------------------------------------------------
 
-type ConnectionStatus = 'disconnected' | 'authenticating' | 'connected' | 'error';
-
 /**
- * Update the status indicator.
+ * Connection state machine:
  *
- * Two-phase design:
- *   1. 'authenticating' — transport layer connected, OAuth token valid.
- *      Shown while listTools / listResources are in-flight.
- *   2. 'connected'      — at least one of listTools / listResources succeeded.
- *
- * This prevents a misleading "Connected" badge when the integration is not
- * actually usable because the capability fetches failed.
+ *   'disconnected' — initial / after logout
+ *   'authenticating' — transport connected, OAuth token valid; capabilities in-flight
+ *   'connected'      — BOTH listTools AND listResources succeeded
+ *   'degraded'       — transport connected but only ONE capability returned data
+ *   'error'          — transport-level failure or both capabilities failed
  */
+type ConnectionStatus = 'disconnected' | 'authenticating' | 'connected' | 'degraded' | 'error';
+
 function updateStatus(status: ConnectionStatus) {
-  statusDot.classList.remove('connected', 'authenticating', 'error');
+  statusDot.classList.remove('connected', 'authenticating', 'degraded', 'error');
+  logoutBtn.classList.add('hidden');
+
   switch (status) {
     case 'connected':
       statusDot.classList.add('connected');
       statusText.textContent = 'Connected';
       loginBtn.classList.add('hidden');
+      logoutBtn.classList.remove('hidden');
+      contentSection.classList.remove('hidden');
+      break;
+    case 'degraded':
+      statusDot.classList.add('degraded');
+      statusText.textContent = 'Partial — one capability unavailable';
+      loginBtn.classList.add('hidden');
+      logoutBtn.classList.remove('hidden');
       contentSection.classList.remove('hidden');
       break;
     case 'authenticating':
@@ -90,9 +102,36 @@ function updateStatus(status: ConnectionStatus) {
       break;
     default:
       statusText.textContent = 'Disconnected';
+      loginBtn.classList.remove('hidden');
+      loginBtn.disabled = false;
+      btnText.textContent = 'Connect \u0026 Login';
+      btnLoader.classList.add('hidden');
       break;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Logout
+// ---------------------------------------------------------------------------
+
+function handleLogout() {
+  if (activeProvider) {
+    activeProvider.clearCredentials();
+    activeProvider = null;
+  }
+  if (transport) {
+    try { transport.close(); } catch { /* ignore */ }
+    transport = null;
+  }
+  client = null;
+  toolsContainer.innerHTML = '';
+  resourcesContainer.innerHTML = '';
+  errorContainer.classList.add('hidden');
+  contentSection.classList.add('hidden');
+  updateStatus('disconnected');
+}
+
+logoutBtn.addEventListener('click', handleLogout);
 
 // ---------------------------------------------------------------------------
 // Safe static SVG markup (no user-supplied data interpolated here)
@@ -300,8 +339,10 @@ async function connect() {
     const redirectUri = window.location.origin + window.location.pathname;
     const provider = new BrowserOAuthClientProvider(
       redirectUri,
-      makeClientMetadata(redirectUri)
+      makeClientMetadata(redirectUri),
+      SERVER_URL
     );
+    activeProvider = provider;
 
     client = new Client(
       { name: 'calle-oauth-web-client', version: '1.0.0' },
@@ -334,9 +375,10 @@ async function connect() {
  *
  * Phase 1: Mark as "Authenticating" immediately — the transport OAuth token
  *   is valid but we have not yet confirmed the integration is usable.
- * Phase 2: Fetch capabilities. Promote to "Connected" only when at least
- *   one of listTools / listResources succeeds. Failures leave a clear
- *   "Error" state rather than a misleading "Connected" badge.
+ * Phase 2: Fetch capabilities:
+ *   - BOTH succeed  → 'connected'   (fully healthy)
+ *   - ONE succeeds  → 'degraded'    (partial — one capability unavailable)
+ *   - NEITHER       → 'error'       (connection is not usable)
  */
 async function onConnected() {
   if (!client) return;
@@ -376,9 +418,12 @@ async function onConnected() {
     resourcesContainer.appendChild(errCard);
   }
 
-  // Phase 2: only promote when the integration is actually usable
-  if (toolsOk || resourcesOk) {
+  // Phase 2: promote to the most accurate readiness level
+  if (toolsOk && resourcesOk) {
     updateStatus('connected');
+    contentSection.classList.remove('hidden');
+  } else if (toolsOk || resourcesOk) {
+    updateStatus('degraded');
     contentSection.classList.remove('hidden');
   } else {
     updateStatus('error');
@@ -413,6 +458,7 @@ async function checkOAuthCallback() {
   const url = new URL(window.location.href);
   const code = url.searchParams.get('code');
   const errorParam = url.searchParams.get('error');
+  const returnedState = url.searchParams.get('state');
 
   if (errorParam) {
     showError(`OAuth Error: ${errorParam}`);
@@ -428,8 +474,10 @@ async function checkOAuthCallback() {
     const redirectUri = window.location.origin + window.location.pathname;
     const provider = new BrowserOAuthClientProvider(
       redirectUri,
-      makeClientMetadata(redirectUri)
+      makeClientMetadata(redirectUri),
+      SERVER_URL
     );
+    activeProvider = provider;
 
     client = new Client(
       { name: 'calle-oauth-web-client', version: '1.0.0' },
@@ -439,9 +487,22 @@ async function checkOAuthCallback() {
       authProvider: provider,
     });
 
+    // Always clean the callback params from the address bar first, regardless
+    // of whether auth succeeds or fails — the authorization code must not
+    // remain visible or be replayable from the browser history.
+    window.history.replaceState({}, document.title, window.location.pathname);
+
     try {
+      // Validate CSRF state before exchanging the code.
+      if (!returnedState) {
+        throw new Error(
+          'OAuth callback is missing the required state parameter. ' +
+          'Login aborted to prevent CSRF.'
+        );
+      }
+      provider.validateState(returnedState);
+
       await transport.finishAuth(code);
-      window.history.replaceState({}, document.title, window.location.pathname);
       await client.connect(transport);
       await onConnected();
     } catch (error: any) {

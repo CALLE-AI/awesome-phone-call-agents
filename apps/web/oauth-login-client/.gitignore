@@ -26,3 +26,6 @@ dist-ssr
 playwright-report
 test-results
 .env
+# Allow .env.mock — the offline demo mode config must be committed so that
+# `npm run dev:mock` works out of the box without any manual setup.
+!.env.mock

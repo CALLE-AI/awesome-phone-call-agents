@@ -5,7 +5,8 @@
  * resource URIs, and MIME types.  These tests inject classic XSS payloads into
  * those fields via a Playwright route interceptor and assert that:
  *   1. No injected script ever executes (sentinel window.__xss remains 0).
- *   2. The payload text is rendered literally, not parsed as markup.
+ *   2. The payload text is rendered literally in the correct DOM container,
+ *      not parsed as markup.
  *
  * This protects against DOM XSS that could steal OAuth tokens stored in
  * sessionStorage.
@@ -36,7 +37,11 @@ function buildMcpResponse(method: string, id: unknown): unknown {
       id,
       result: {
         tools: [
-          { name: XSS_TOOL_NAME, description: XSS_TOOL_DESC },
+          { 
+            name: XSS_TOOL_NAME, 
+            description: XSS_TOOL_DESC,
+            inputSchema: { type: 'object', properties: {} }
+          },
         ],
       },
     };
@@ -122,8 +127,12 @@ test.describe('XSS regression — server-controlled MCP metadata', () => {
   test('no injected script executes via tool name or description', async ({ page }) => {
     await page.click('#login-btn');
 
-    // Wait for the MCP round-trip to complete (or time out gracefully)
-    await page.waitForSelector('#content:not(.hidden)', { timeout: 5000 }).catch(() => {});
+    // Wait for the MCP round-trip to complete — fail loudly on timeout so a
+    // rendering regression does not produce a false-passing test.
+    await page.waitForSelector('#content:not(.hidden)', { timeout: 8000 });
+
+    // Confirm the tools container has rendered at least one card
+    await page.waitForSelector('[data-testid="tools-container"] .card-title', { timeout: 5000 });
 
     const xssFired = await page.evaluate(() => (window as any).__xss);
     expect(xssFired).toBe(0);
@@ -131,24 +140,38 @@ test.describe('XSS regression — server-controlled MCP metadata', () => {
 
   test('no injected script executes via resource URI or MIME type', async ({ page }) => {
     await page.click('#login-btn');
-    await page.waitForSelector('#content:not(.hidden)', { timeout: 5000 }).catch(() => {});
+
+    // Wait for content section AND at least one resource card
+    await page.waitForSelector('#content:not(.hidden)', { timeout: 8000 });
+    await page.waitForSelector('[data-testid="resources-container"] .card-title', { timeout: 5000 });
 
     const xssFired = await page.evaluate(() => (window as any).__xss);
     expect(xssFired).toBe(0);
   });
 
-  test('malicious tool name is rendered as literal text, not parsed HTML', async ({ page }) => {
-  await page.click('#login-btn');
-  await page.waitForSelector('#content:not(.hidden)', { timeout: 5000 }).catch(() => {});
+  test('malicious tool name is rendered as literal text in tools container', async ({ page }) => {
+    await page.click('#login-btn');
+    await page.waitForSelector('#content:not(.hidden)', { timeout: 8000 });
+    await page.waitForSelector('[data-testid="tools-container"] .card-title', { timeout: 5000 });
 
-  // 1. The injected <img> must NOT appear as a real DOM element
-  await expect(page.locator('img[src="x"]')).toHaveCount(0);
+    // 1. The injected <img> must NOT appear as a real DOM element
+    await expect(page.locator('img[src="x"]')).toHaveCount(0);
 
-  // 2. Assert that the title contains the actual payload being injected in this test run
-  const firstTitle = page.locator('.card-title').first();
-  await expect(firstTitle).toContainText('javascript:window.__xss=1');
+    // 2. The tool name card-title must contain the XSS_TOOL_NAME payload as
+    //    literal text — NOT the resource URI (which is the separate XSS_URI value).
+    const toolTitle = page.locator('[data-testid="tools-container"] .card-title').first();
+    await expect(toolTitle).toContainText(XSS_TOOL_NAME);
   });
 
+  test('malicious resource URI is rendered as literal text in resources container', async ({ page }) => {
+    await page.click('#login-btn');
+    await page.waitForSelector('#content:not(.hidden)', { timeout: 8000 });
+    await page.waitForSelector('[data-testid="resources-container"] .card-title', { timeout: 5000 });
+
+    // The resource card-title must contain the XSS_URI payload as literal text.
+    const resourceTitle = page.locator('[data-testid="resources-container"] .card-title').first();
+    await expect(resourceTitle).toContainText(XSS_URI);
+  });
 
   test('error container does not expose unescaped server strings', async ({ page }) => {
     // Override to return an error response for all tool/resource calls
