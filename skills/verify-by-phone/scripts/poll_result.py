@@ -63,7 +63,10 @@ def main() -> None:
         "this file contains the recipient's phone number and the verbatim "
         "transcript of a real person; delete it when the verification is recorded"
     )
-    print("next: python3 scripts/extract_answer.py --payload", args.out)
+    print(
+        f"next: python3 scripts/extract_answer.py --payload {args.out} "
+        f"--qhat <from calibrate.py> --org '<organization exactly as listed>'"
+    )
 
 
 if __name__ == "__main__":

@@ -60,7 +60,14 @@ def main() -> None:
     print(f"abstention rate: {1 - answered / n:.1%}")
     if answered:
         print(f"accuracy when answering: {answered_correct / answered:.1%}")
-    print(f"\nApply it:  extract_answer.py --payload result.json --qhat {qhat:.3f}")
+    # Printed commands are operator-facing and must be runnable as shown.
+    # --org is not optional: extraction fails closed without a positive
+    # identity confirmation, so a command missing it returns abstentions
+    # rather than the result this output implies.
+    print(
+        f"\nApply it:  extract_answer.py --payload result.json "
+        f"--qhat {qhat:.3f} --org '<organization exactly as listed>'"
+    )
 
 
 if __name__ == "__main__":

@@ -23,7 +23,8 @@ python3 scripts/poll_result.py --call-id call_abc123 --out result.json
 ## Example 2: extraction with a supporting span
 
 ```bash
-python3 scripts/extract_answer.py --payload result.json --qhat 0.750
+python3 scripts/extract_answer.py --payload result.json --qhat 0.750 \
+  --org "Example Family Medicine"
 ```
 
 ```json
@@ -74,7 +75,7 @@ empirical coverage: 90.0% (target 90%)
 abstention rate: 60.0%
 accuracy when answering: 100.0%
 
-Apply it:  extract_answer.py --payload result.json --qhat 0.750
+Apply it:  extract_answer.py --payload result.json --qhat 0.750 --org '<organization exactly as listed>'
 ```
 
 Read the two middle numbers together. Coverage lands on the 90 percent target, and the price of that guarantee is abstaining on 60 percent of the bundled scenarios. That is the trade the threshold exists to make: the scenario set is deliberately full of hedges, contradictions, and dead ends, so a high abstention rate on it is the system working rather than failing. Accuracy is 100 percent on the answers it does give.

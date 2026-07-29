@@ -112,50 +112,20 @@ def turns_from_payload(payload: dict) -> list[dict]:
     return []
 
 
-def organization_denied(turns: list[dict]) -> bool:
-    """Did the respondent say we reached somewhere other than the listing?
+# A negation immediately before the organization's name flips a mention from
+# confirmation into denial. Scoped to a short window BEFORE the name rather than
+# applied to the whole turn, because "Yes, this is Example Family Medicine, not
+# the Buckhead office" contains a negation and is still a confirmation.
+_NEGATION = r"\b(?:no|not|isn'?t|aren'?t|ain'?t|never|wrong|different|another)\b"
+_NEGATION_WINDOW = 40
 
-    Answering this is a precondition for treating anything said on the call as
-    directory evidence, not a detail. If the number now belongs to someone
-    else, a clean "yes, we are accepting new patients" is a true statement
-    about the wrong organization, and recording it against the listing would
-    manufacture exactly the false confirmation this tool exists to prevent.
+
+def _org_tokens(org: str) -> set[str]:
+    """Words distinctive enough to identify the practice.
+
+    Corporate suffixes and generic clinical nouns are dropped: matching "center"
+    or "health" would confirm essentially any medical listing.
     """
-    for turn in turns:
-        if turn.get("speaker") == "bot":
-            continue
-        lowered = str(turn.get("text", "")).lower()
-        if any(re.search(cue, lowered) for cue in IDENTITY_DENIALS):
-            return True
-    return False
-
-
-def organization_confirmed(turns: list[dict], org: str | None) -> bool:
-    """Did the respondent positively confirm they represent the named listing?
-
-    Absence of a denial is not confirmation. The agent opens by naming the
-    organization, so a respondent who simply starts answering questions has
-    established nothing: wrong numbers, answering services, shared reception
-    desks and reassigned lines all produce cooperative respondents who are not
-    the listing. Attributing their answers to the listing is how a verification
-    tool manufactures a false confirmation.
-
-    Confirmation requires one of two things from a USER turn:
-      - a distinctive word from the organization's own name, which is what
-        "Northside Family Medicine, how can I help you" looks like, or
-      - an explicit affirmative that they are the named practice.
-
-    Generic pleasantries deliberately do not count. "Hello", "how can I help
-    you", and "sure" are what any human says on any phone.
-
-    Without --org there is nothing to confirm against, so this returns False
-    and every claim abstains. That is the fail-closed direction on purpose.
-    """
-    if not org:
-        return False
-    # Words distinctive enough to identify the practice. Corporate suffixes and
-    # generic clinical nouns are dropped: "the center called" matching "center"
-    # would confirm essentially any medical listing.
     generic = {
         "the",
         "and",
@@ -185,7 +155,90 @@ def organization_confirmed(turns: list[dict], org: str | None) -> bool:
         "family",
         "partners",
     }
-    tokens = {w for w in re.findall(r"[a-z0-9]+", org.lower()) if len(w) > 2 and w not in generic}
+    return {w for w in re.findall(r"[a-z0-9]+", org.lower()) if len(w) > 2 and w not in generic}
+
+
+def _name_mentions(lowered: str, tokens: set[str]) -> tuple[bool, bool]:
+    """(mentioned_affirmatively, mentioned_under_negation) for one turn.
+
+    A turn can do both, so both are reported and the caller decides. Denial
+    wins, because an explicit "this is not X" must never be outvoted by an
+    incidental affirmative-looking mention elsewhere in the same breath.
+    """
+    affirmative = negated = False
+    for tok in tokens:
+        for m in re.finditer(rf"\b{re.escape(tok)}\b", lowered):
+            prefix = lowered[max(0, m.start() - _NEGATION_WINDOW) : m.start()]
+            if re.search(_NEGATION, prefix):
+                negated = True
+            else:
+                affirmative = True
+    return affirmative, negated
+
+
+def organization_denied(turns: list[dict], org: str | None = None) -> bool:
+    """Did the respondent say we reached somewhere other than the listing?
+
+    Answering this is a precondition for treating anything said on the call as
+    directory evidence, not a detail. If the number now belongs to someone
+    else, a clean "yes, we are accepting new patients" is a true statement
+    about the wrong organization, and recording it against the listing would
+    manufacture exactly the false confirmation this tool exists to prevent.
+
+    Two ways to deny. The fixed cue list catches "wrong number" and friends.
+    The second, added after review, catches a NEGATED mention of the
+    organization's own name: "No, this is not Example Family Medicine" matched
+    no cue, and the name tokens inside it then made confirmation return True,
+    so an explicit denial was read as a confirmation. That is worse than
+    fail-open, it is inverted.
+    """
+    tokens = _org_tokens(org) if org else set()
+    for turn in turns:
+        if turn.get("speaker") == "bot":
+            continue
+        lowered = str(turn.get("text", "")).lower()
+        if any(re.search(cue, lowered) for cue in IDENTITY_DENIALS):
+            return True
+        if tokens:
+            _, negated = _name_mentions(lowered, tokens)
+            if negated:
+                return True
+    return False
+
+
+def organization_confirmed(turns: list[dict], org: str | None) -> bool:
+    """Did the respondent positively confirm they represent the named listing?
+
+    Absence of a denial is not confirmation. The agent opens by naming the
+    organization, so a respondent who simply starts answering questions has
+    established nothing: wrong numbers, answering services, shared reception
+    desks and reassigned lines all produce cooperative respondents who are not
+    the listing. Attributing their answers to the listing is how a verification
+    tool manufactures a false confirmation.
+
+    Confirmation requires one of two things from a USER turn:
+      - the organization's own distinctive name, stated WITHOUT a negation in
+        front of it, which is what "Northside Family Medicine, how can I help
+        you" looks like, or
+      - an explicit affirmative answering an identity question.
+
+    Generic pleasantries deliberately do not count. "Hello", "how can I help
+    you", and "sure" are what any human says on any phone.
+
+    **Denial always wins.** Checked first and for the whole call, because
+    "No, this is not Example Family Medicine" contains the name and used to
+    return True here. An explicit denial read as a confirmation is worse than
+    fail-open: it is inverted, and it would attribute a later answer to a party
+    that had just told us they are not the listing.
+
+    Without --org there is nothing to confirm against, so this returns False
+    and every claim abstains. That is the fail-closed direction on purpose.
+    """
+    if not org:
+        return False
+    if organization_denied(turns, org):
+        return False
+    tokens = _org_tokens(org)
     asked_identity = False
     for turn in turns:
         text = str(turn.get("text", ""))
@@ -202,8 +255,13 @@ def organization_confirmed(turns: list[dict], org: str | None) -> bool:
             ) or (any(re.search(rf"\b{re.escape(t)}\b", lowered) for t in tokens) and "?" in text)
             continue
         # Saying the practice's own distinctive name is confirmation on its own,
-        # unprompted, and is how a staffed front desk actually answers.
-        if any(re.search(rf"\b{re.escape(tok)}\b", lowered) for tok in tokens):
+        # unprompted, and is how a staffed front desk actually answers. Only an
+        # UN-negated mention counts: organization_denied already rejected the
+        # whole call on a negated one, and this keeps the two consistent.
+        affirmative, negated = _name_mentions(lowered, tokens)
+        if negated:
+            return False
+        if affirmative:
             return True
         if asked_identity and re.match(
             r"\W*(?:yes|yeah|yep|correct|speaking|that'?s right|that'?s us|it is|sure is)\b",
@@ -413,7 +471,7 @@ def main() -> None:
 
     # Computed once for the call, not per claim: identity is a property of who
     # answered the phone, not of any one question.
-    denied = organization_denied(turns)
+    denied = organization_denied(turns, args.org)
     confirmed = organization_confirmed(turns, args.org)
     for claim, pattern in CLAIM_PATTERNS.items():
         others = tuple(p for name, p in CLAIM_PATTERNS.items() if name != claim)
