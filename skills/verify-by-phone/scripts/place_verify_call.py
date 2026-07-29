@@ -6,11 +6,14 @@ needs no credentials. Pass --live (with CALLE_API_KEY set) to actually dial.
 Exactly one call per live invocation; there is no batch mode on purpose.
 """
 
+from __future__ import annotations
+
 import argparse
+import hashlib
 import os
 import re
 import sys
-import uuid
+from datetime import datetime, timezone
 
 E164 = re.compile(r"^\+[1-9]\d{6,14}$")
 
@@ -20,6 +23,11 @@ E164 = re.compile(r"^\+[1-9]\d{6,14}$")
 # import the original; tests/test_skill_parity.py compares the two strings and
 # fails on the commit that lets them drift.
 CALL_CONDUCT = (
+    "First establish that you have reached the organization named above. If the "
+    "person says you have reached a different business, a private residence, or a "
+    "wrong number, do NOT ask the verification questions: thank them and end the "
+    "call, because an answer from somewhere else is not evidence about this "
+    "listing. "
     "Record the answers exactly as given. If the person "
     "hedges, capture their exact wording. If they decline to speak with an automated "
     "caller, thank them and end the call immediately. If asked to hold, wait briefly, "
@@ -59,6 +67,41 @@ def mask(phone: str) -> str:
     return phone[:3] + "*" * (len(phone) - 6) + phone[-3:]
 
 
+def utc_day() -> str:
+    # timezone.utc, not datetime.UTC: the alias is 3.11+, and this file ships
+    # standalone into repositories whose default interpreter may be older.
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")  # noqa: UP017
+
+
+def default_idempotency_key(
+    org: str, phone: str, accepting: str | None, plan: str | None, day: str
+) -> str:
+    """Derive the key from the verification itself, scoped to one UTC day.
+
+    A random key per invocation is the dangerous default for a tool that dials
+    real phone numbers. If the create request times out, the operator does not
+    know whether the call was placed, and the obvious recovery, running the
+    same command again, generates a NEW key and dials a real office a second
+    time. Deriving the key from the request makes the obvious recovery the safe
+    one: an identical re-run collides with the original and the platform
+    returns the first call instead of placing another.
+
+    The day scope is deliberate. A key derived from the parameters alone would
+    be permanent, so re-verifying the same listing next month would silently
+    return last month's answer. For a tool whose entire claim is that it never
+    presents an unestablished answer as established, a stale cached result is a
+    worse failure than a duplicate call. The retry hazard lasts minutes; a
+    legitimate re-verification comes days or months later, so a UTC-day
+    boundary separates them.
+
+    It is not airtight: a call placed at 23:59 UTC and retried at 00:01 gets a
+    different key. That is why the key is printed BEFORE the request and why
+    --idempotency-key exists, so a retry can always reuse the exact key.
+    """
+    material = "\x00".join([org.strip().lower(), phone.strip(), accepting or "", plan or "", day])
+    return "verify-" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:24]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--org", required=True, help="Organization name as listed")
@@ -66,13 +109,31 @@ def main() -> None:
     parser.add_argument("--claim-accepting-new-patients", choices=["yes", "no"], default=None)
     parser.add_argument("--claim-plan", default=None, help="Insurance plan name to verify")
     parser.add_argument("--live", action="store_true", help="Actually place the call")
+    parser.add_argument(
+        "--idempotency-key",
+        default=None,
+        help=(
+            "Reuse a specific key. Pass the key printed by the run you are "
+            "retrying so a call that may already exist is never placed twice."
+        ),
+    )
     args = parser.parse_args()
 
     if not E164.match(args.phone):
         sys.exit("ERROR: --phone must be E.164, for example +15550101234")
 
     task = build_task(args.org, args.claim_accepting_new_patients, args.claim_plan)
+    idempotency_key = args.idempotency_key or default_idempotency_key(
+        args.org,
+        args.phone,
+        args.claim_accepting_new_patients,
+        args.claim_plan,
+        utc_day(),
+    )
     print(f"recipient: {mask(args.phone)}")
+    # Printed BEFORE the request on purpose. If the create call times out, the
+    # operator still has the key and can retry without risking a second dial.
+    print(f"idempotency key: {idempotency_key}")
     print(f"task:\n{task}\n")
 
     if not args.live:
@@ -87,16 +148,28 @@ def main() -> None:
     except ImportError:
         sys.exit("ERROR: pip install calle-ai (the package installs as module 'calle').")
 
-    idempotency_key = f"verify-{uuid.uuid4().hex[:16]}"
-    with CalleClient(api_key=api_key) as client:
-        created = client.calls.create(
-            task=task,
-            recipient={"phone": args.phone},
-            metadata={"skill": "verify-by-phone", "org": args.org},
-            idempotency_key=idempotency_key,
+    try:
+        with CalleClient(api_key=api_key) as client:
+            created = client.calls.create(
+                task=task,
+                recipient={"phone": args.phone},
+                metadata={"skill": "verify-by-phone", "org": args.org},
+                idempotency_key=idempotency_key,
+            )
+    except Exception as exc:
+        # Deliberately broad: any failure at all leaves the call's fate unknown,
+        # and a narrower catch would let some of them escape as a traceback with
+        # no recovery instructions.
+        # An error here is ambiguous: the request may have reached the platform
+        # and placed the call before the response was lost. Re-running blind
+        # would dial a real office twice, so spell out the safe recovery.
+        sys.exit(
+            f"ERROR: the create request failed: {exc}\n"
+            "The call MAY ALREADY HAVE BEEN PLACED. Do not re-run this command blind.\n"
+            "Retry with the same key, which cannot place a second call:\n"
+            f"  --idempotency-key {idempotency_key}"
         )
     print(f"call created: id={created.get('id')} status={created.get('status')}")
-    print(f"idempotency key (reuse to avoid double-dialing): {idempotency_key}")
     print("next: python3 scripts/poll_result.py --call-id", created.get("id"))
 
 

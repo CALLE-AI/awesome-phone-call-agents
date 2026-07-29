@@ -13,6 +13,8 @@ runs both extractors over the same transcripts and fails if they disagree on
 the answer, the span, or the cue lexicons.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re
@@ -78,6 +80,20 @@ DEAD_ENDS = (
     r"\bcan'?t answer\b",
     r"\bdon'?t know\b",
 )
+# Identity is tracked separately from DEAD_ENDS on purpose. A dead end makes one
+# claim unanswerable; a denied identity invalidates the whole call as evidence
+# about THIS listing, however cleanly the questions were answered. Numbers get
+# reassigned, so a confident "yes, we're accepting patients" from whoever holds
+# the number now says nothing about the practice in the directory.
+IDENTITY_DENIALS = (
+    r"\bwrong number\b",
+    r"\bthis is a residence\b",
+    r"\bno such (?:business|office|practice|clinic)\b",
+    r"\bthere'?s no\b.*\bhere\b",
+    r"\b(?:different|another) (?:office|business|practice|clinic|company)\b",
+    r"\byou'?ve reached\b.*\b(?:instead|not)\b",
+    r"\bwe'?re not\b.*\b(?:that|them)\b",
+)
 CLAIM_PATTERNS = {
     "accepting_new_patients": r"accepting new patients",
     # Word-bounded on purpose: "accepting" must NOT trigger this claim, or a
@@ -95,6 +111,24 @@ def turns_from_payload(payload: dict) -> list[dict]:
             if turns:
                 return list(turns)
     return []
+
+
+def organization_denied(turns: list[dict]) -> bool:
+    """Did the respondent say we reached somewhere other than the listing?
+
+    Answering this is a precondition for treating anything said on the call as
+    directory evidence, not a detail. If the number now belongs to someone
+    else, a clean "yes, we are accepting new patients" is a true statement
+    about the wrong organization, and recording it against the listing would
+    manufacture exactly the false confirmation this tool exists to prevent.
+    """
+    for turn in turns:
+        if turn.get("speaker") == "bot":
+            continue
+        lowered = str(turn.get("text", "")).lower()
+        if any(re.search(cue, lowered) for cue in IDENTITY_DENIALS):
+            return True
+    return False
 
 
 def last_span(cues: tuple[str, ...], text: str) -> tuple[int, int] | None:
@@ -132,7 +166,28 @@ def apply_gate(result: dict, qhat: float | None) -> dict:
     }
 
 
-def extract(turns: list[dict], claim: str, question_pattern: str) -> dict:
+def extract(
+    turns: list[dict],
+    claim: str,
+    question_pattern: str,
+    other_question_patterns: tuple[str, ...] = (),
+) -> dict:
+    """Read one claim's answer out of the transcript.
+
+    The answer window OPENS when the agent asks this claim's question and
+    CLOSES when the agent asks a different one. Both halves matter. Without the
+    close, the window ran to the end of the call, so on a two-question call the
+    reply to the second question was also counted as the answer to the first.
+    A respondent who said "I'd have to look into that one" about new patients
+    and later "Yes, we take that plan" about insurance had the new-patients
+    claim reported as a confident yes, span-grounded to a sentence that is
+    plainly about insurance. A wrong answer carrying a citation is worse than
+    no answer, because the citation is what invites belief.
+
+    Pass the other claims' patterns so the boundary can be recognised. Bot
+    turns that ask nothing tracked (acknowledgements, hold requests) leave the
+    window open.
+    """
     question_seen = False
     yes_hits: list[tuple[int, str, int, int]] = []
     no_hits: list[tuple[int, str, int, int]] = []
@@ -144,7 +199,14 @@ def extract(turns: list[dict], claim: str, question_pattern: str) -> dict:
         lowered = text.lower()
         if turn.get("speaker") == "bot":
             if re.search(question_pattern, lowered):
+                # Re-asking this claim reopens rather than closes the window.
                 question_seen = True
+            elif question_seen and any(
+                re.search(other, lowered) for other in other_question_patterns
+            ):
+                # The agent moved on. Everything after this answers that
+                # question, not this one.
+                break
             continue
         if not question_seen:
             continue
@@ -217,8 +279,18 @@ def main() -> None:
     turns = turns_from_payload(payload)
     if not turns:
         sys.exit("ERROR: no transcript turns found in payload.")
+    # Computed once for the call, not per claim: identity is a property of who
+    # answered the phone, not of any one question.
+    denied = organization_denied(turns)
     for claim, pattern in CLAIM_PATTERNS.items():
-        print(json.dumps(apply_gate(extract(turns, claim, pattern), args.qhat)))
+        others = tuple(p for name, p in CLAIM_PATTERNS.items() if name != claim)
+        record = apply_gate(extract(turns, claim, pattern, others), args.qhat)
+        record["organization_denied"] = denied
+        if denied:
+            # Whatever was said, it was not said by this listing. Abstain and
+            # drop the span so nothing can be quoted as directory evidence.
+            record.update(answer="unknown", span=None, abstain=True, gate="identity-unconfirmed")
+        print(json.dumps(record))
 
 
 if __name__ == "__main__":

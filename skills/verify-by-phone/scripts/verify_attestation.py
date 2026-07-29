@@ -7,6 +7,8 @@ separators) of the document without its signature field.
     uv run --with cryptography python verify_attestation.py attestation.json public-key.pem
 """
 
+from __future__ import annotations
+
 import base64
 import json
 import pathlib

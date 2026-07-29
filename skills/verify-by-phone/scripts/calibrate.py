@@ -8,6 +8,8 @@ here is the threshold that decides real answers. It is printed for exactly
 that reason: feed it to `extract_answer.py --qhat`.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 

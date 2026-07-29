@@ -21,6 +21,24 @@
 - No credentials are stored by this skill; `CALLE_API_KEY` is read from the environment at call time only.
 - The dry-run default and the bundled labeled scenario data mean everything except a live call runs with no credentials, no network, and no side effects.
 
+### The saved payload
+
+`scripts/poll_result.py` writes the terminal payload to disk, and that file is the most sensitive artifact this skill produces: it contains the recipient's phone number in the clear and a verbatim transcript of a real person who did not choose to be recorded by us.
+
+- It is written **mode 0600**, owner read/write only. The previous default of 0644 left it world-readable on any shared or multi-user machine.
+- The mode is enforced on write and re-applied afterwards, so re-running against a path that already exists with loose permissions still ends at 0600.
+- Console output is masked, but **the file is not**. Do not paste it into an issue, a chat, or a pull request.
+
+### Retention
+
+This skill deliberately has no retention policy of its own, because it does not know what regime the operator is under. What it does instead:
+
+- It never sends the payload anywhere except back to the CALL-E API it came from.
+- It prints a reminder on save that the file holds a real person's number and words, and should be deleted once the verification is recorded.
+- Delete with `rm result.json` when done. Nothing in the workflow needs the raw payload after `extract_answer.py` has produced the span-grounded record.
+
+Operators subject to a records regime should keep the derived record, which carries the span and the verdict, rather than the raw transcript, and should set their own retention window for anything they choose to keep.
+
 ## Honest failure modes
 
 - If the call yields no usable answer, the output is an explicit abstention. The skill never converts silence, hedging, refusal, or a wrong number into a confident value.

@@ -68,6 +68,15 @@ learned to trust the last cue in a turn and to read "no problem" as agreement
 while this script still trusted the first, so a plain "No, we are not" abstained
 here and answered there.
 
+## Requirements
+
+**Python 3.9 or newer.** Verified by running this entire quick start on 3.9.6, not inferred from the syntax used. The scripts are standard library only, so nothing below needs `pip install` except step 3, which dials.
+
+Two exceptions worth stating rather than leaving to be discovered:
+
+- Step 3 needs `calle-ai` and a `CALLE_API_KEY`. Every other step runs with no credentials and places no call.
+- `scripts/verify_attestation.py` needs `cryptography`. It is the only script with a third-party import, and it is optional: it checks an attestation signature and is not part of the verification workflow.
+
 ## Quick Start
 
 ```bash
@@ -92,8 +101,9 @@ python3 scripts/poll_result.py --call-id call_abc123 --out result.json
 # 5. Extract the span-grounded answer, gated by the calibrated threshold.
 python3 scripts/extract_answer.py --payload result.json --qhat 0.750
 
-# 6. Reconcile against the stored record.
-python3 scripts/reconcile_record.py --payload result.json \
+# 6. Reconcile against the stored record. The same --qhat as step 5: reconciliation
+#    runs extraction itself, and without a threshold every field abstains.
+python3 scripts/reconcile_record.py --payload result.json --qhat 0.750 \
   --claim-accepting-new-patients yes --claim-plan-accepted yes
 ```
 

@@ -14,6 +14,8 @@ hardcoded 0.65, so the abstention the skill advertised was not the abstention it
 performed. Two copies of a rule are two rules.
 """
 
+from __future__ import annotations
+
 import math
 
 CLASSES = ("yes", "no", "unknown")
@@ -55,9 +57,26 @@ def prediction_set(scores: dict[str, float], qhat: float) -> set[str]:
 
 
 def abstains(scores: dict[str, float], answer: str, qhat: float) -> bool:
-    """Two conditions, both meaning "do not answer": the prediction set is not
-    a single value, or the single value is "unknown". A singleton {unknown} is
-    an abstention, not an answer.
+    """Answer only when the calibrated set is a singleton that IS the answer.
+
+    Three conditions, all meaning "do not answer":
+      1. the prediction set is not a single value,
+      2. that single value is not the answer we are about to report,
+      3. the answer is "unknown".
+
+    Condition 2 is the one that is easy to omit and was omitted here. Testing
+    `len(pset) != 1 or answer == "unknown"` compares the SIZE of the set
+    against the EXTRACTED answer without ever checking that they agree, so a
+    low-trust polar answer whose calibrated set is exactly {"unknown"} passed
+    both checks and was served as a confident "yes". The set said the only
+    plausible label was unknown; the gate answered anyway. Reported by a
+    maintainer during upstream review of this skill.
+
+    The reference harness never hit this because it derives the answer as the
+    argmax of the scores, and the argmax is "unknown" throughout the region
+    where the set is {"unknown"}. Extraction does not use the argmax, so the
+    skill could hit it and the harness could not. A gate must not depend on
+    which caller it has.
     """
     pset = prediction_set(scores, qhat)
-    return len(pset) != 1 or answer == "unknown"
+    return pset != {answer} or answer == "unknown"

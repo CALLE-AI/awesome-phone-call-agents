@@ -25,7 +25,16 @@ As of late July 2026 the live API rejects both `result_schema` and `recipient_re
 
 ## Idempotency
 
-`Idempotency-Key` on call creation is honored: resubmitting with the same key returns the same call instead of dialing twice. `place_verify_call.py` prints its generated key so a retry after a network failure can reuse it safely.
+`Idempotency-Key` on call creation is honored: resubmitting with the same key returns the same call instead of dialing twice.
+
+`place_verify_call.py` derives its key from the verification itself, `sha256(org, phone, claims, UTC date)`, rather than generating a random one per run. This matters because the natural recovery from a lost response is to run the same command again, and with a random key that dials a real office a second time. A derived key makes the obvious recovery the safe one.
+
+The key is scoped to a single UTC day on purpose. A key derived from the parameters alone would be permanent, so re-verifying the same listing next month would silently return last month's answer, and for this tool a stale cached result is a worse failure than a duplicate call.
+
+Two consequences worth knowing:
+
+- The key is printed **before** the request is sent, not after it succeeds. A key first disclosed in the success response is useless in the exact situation it exists for.
+- A call placed at 23:59 UTC and retried at 00:01 derives a different key. Pass `--idempotency-key <printed key>` to retry with the exact key regardless of the boundary. The failure message prints that flag with the key already filled in.
 
 ## Webhooks
 

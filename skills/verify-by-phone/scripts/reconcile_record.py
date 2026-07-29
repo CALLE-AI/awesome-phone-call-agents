@@ -8,6 +8,8 @@ no evidence. Prints per-field arithmetic and a verdict, so the operator can
 see exactly why a listing was believed or doubted.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
@@ -31,14 +33,36 @@ def main() -> None:
     parser.add_argument("--payload", required=True, help="JSON file from poll_result.py")
     parser.add_argument("--claim-accepting-new-patients", choices=["yes", "no"], default=None)
     parser.add_argument("--claim-plan-accepted", choices=["yes", "no"], default=None)
+    parser.add_argument(
+        "--qhat",
+        type=float,
+        required=True,
+        help=(
+            "Calibrated threshold from calibrate.py. Required: without it "
+            "extraction abstains on every claim and this script can only ever "
+            "print UNVERIFIABLE."
+        ),
+    )
     args = parser.parse_args()
 
+    # --qhat is required rather than optional-with-a-default. Omitting it used
+    # to be silently catastrophic: extract_answer.py fails closed without a
+    # threshold, so every field arrived as "unknown", every field was labelled
+    # "no evidence", and the run printed a 50% posterior and UNVERIFIABLE. That
+    # reads exactly like a real reconciliation that found nothing, while in
+    # fact the evidence was thrown away unexamined. On the bundled fixture the
+    # call plainly says "Yes. We're accepting new patients." with a transcript
+    # span behind it, and the old default reported "no evidence" for it. A tool
+    # that cannot do its job without an argument must demand the argument, not
+    # invent a confident-looking null result.
     extractor = subprocess.run(
         [
             sys.executable,
             str(Path(__file__).with_name("extract_answer.py")),
             "--payload",
             args.payload,
+            "--qhat",
+            str(args.qhat),
         ],
         capture_output=True,
         text=True,
@@ -47,9 +71,20 @@ def main() -> None:
     if extractor.returncode != 0:
         raise SystemExit(f"extract_answer failed: {extractor.stderr.strip()}")
     answers = {}
+    identity_denied = False
     for line in extractor.stdout.strip().splitlines():
         item = json.loads(line)
+        identity_denied = identity_denied or bool(item.get("organization_denied"))
         answers[item["claim"]] = item["answer"] if not item["abstain"] else "unknown"
+
+    if identity_denied:
+        # Stop before the arithmetic. Reaching a different party is not weak
+        # evidence to be weighed down, it is no evidence about this listing at
+        # all, and running the match weights anyway would put a number on it.
+        print("identity: the respondent indicated this is not the listed organization")
+        print("no reconciliation performed: answers from another party are not evidence")
+        print("verdict: UNVERIFIABLE")
+        return
 
     claims = {
         "accepting_new_patients": args.claim_accepting_new_patients,
@@ -60,8 +95,14 @@ def main() -> None:
     print(f"prior: {PRIOR_LOG_ODDS:+.2f} bits (50/50 audit odds)")
     for field, (m, u) in FIELD_PARAMS.items():
         answer, claim = answers.get(field, "unknown"), claims.get(field)
-        if answer == "unknown" or claim is None:
-            print(f"{field}: no evidence ({answer=} {claim=})")
+        # Say which of the two reasons applies. "No evidence" covering both a
+        # claim the operator never supplied and a call that established nothing
+        # is how the uncalibrated bug stayed invisible.
+        if claim is None:
+            print(f"{field}: not checked, no claim supplied to verify against")
+            continue
+        if answer == "unknown":
+            print(f"{field}: no evidence, the call did not establish this (record says {claim})")
             continue
         agreed = answer == claim
         weight = math.log2(m / u) if agreed else math.log2((1 - m) / (1 - u))
