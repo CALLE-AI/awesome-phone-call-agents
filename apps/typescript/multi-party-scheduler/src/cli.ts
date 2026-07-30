@@ -33,10 +33,11 @@ const USAGE = `Multi-party scheduler
       Print the options, the call order, the calling hours, the call budget and
       every call script. Places no call and needs no credentials.
 
-  run --request <file> --live [--ledger <file>] [--json] [--base-url <url>]
+  run --request <file> --live --ledger <file> [--json] [--base-url <url>]
       Gather availability, confirm one slot with everybody, release everyone who
-      confirmed if the commit fails. Needs CALLE_API_KEY. Ctrl-C stops the run
-      and still places the release calls that are owed.
+      confirmed if the commit fails. Needs CALLE_API_KEY. The ledger is required:
+      it is the durable state resume reads if this run does not finish. Ctrl-C
+      stops the run and still places the release calls that are owed.
 
   resume --request <file> --ledger <file> --live [--json] [--base-url <url>]
       Finish an interrupted run: settle every call the ledger cannot account for
@@ -89,6 +90,24 @@ function requireValue(parsed: Parsed, name: string): string {
   return value;
 }
 
+/**
+ * A live run needs durable state before the first call.
+ *
+ * With no ledger every recovery entry is discarded, so a crash or a second
+ * interrupt after somebody has said yes on a call leaves no way to reconcile
+ * that call and nobody to tell that the time is off. The in memory path is for
+ * unit tests and for `plan`, not for a run that dials people.
+ */
+function requireLedger(parsed: Parsed): string {
+  const value = parsed.values["ledger"];
+  if (value === undefined || value.length === 0) {
+    throw new ConfigError(
+      `${parsed.command} dials people, so it needs --ledger <file>. That file is what resume reads to settle a call this run could not finish and to place the release calls it owes. Nothing was dialled.`,
+    );
+  }
+  return value;
+}
+
 async function main(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
   if (parsed.command === "" || parsed.command === "help" || parsed.flags.has("help")) {
@@ -134,6 +153,7 @@ async function main(argv: string[]): Promise<number> {
         `${parsed.command} places real phone calls. Look at plan first, then add --live when the options and the order are right.`,
       );
     }
+    const ledgerPath = requireLedger(parsed);
     const apiKey = process.env.CALLE_API_KEY;
     if (apiKey === undefined || apiKey.length === 0) {
       throw new ConfigError("CALLE_API_KEY is not set. The scheduler never reads keys from the request file.");
@@ -148,7 +168,7 @@ async function main(argv: string[]): Promise<number> {
       result = await resumeCoordination({
         request,
         port,
-        ledgerPath: requireValue(parsed, "ledger"),
+        ledgerPath,
         onProgress: progress,
       });
     } else {
@@ -170,7 +190,7 @@ async function main(argv: string[]): Promise<number> {
         result = await runCoordination({
           request,
           port,
-          ledgerPath: parsed.values["ledger"] ?? null,
+          ledgerPath,
           signal: canceling.signal,
           onProgress: progress,
         });
