@@ -90,6 +90,15 @@ file again reads the same call back, because the key covers the content of the
 call. Editing the file first makes it a different call, so the next step says not
 to.
 
+A call CALL-E has not finished with lands in the same place. Only a terminal status
+is read as a result: `completed`, `failed`, `canceled`, `no_answer`, `busy` or
+`voicemail`. A call that is still `queued` or `in_progress` when the timeout runs
+out has a transcript that is still being written, so the app reports
+`outcome_unknown` with `call_status` unknown and the call id kept, and it states no
+verdict, no commitment and no privacy finding. Reading a call in flight as a result
+is how a call still ringing gets reported as an errand that is done. The next step
+is the same: run the same errand file again and it reads that same call back.
+
 A refusal is different. When CALL-E declines to create the call at all, nothing was
 placed, the outcome is `api_error` and the report can say so plainly.
 

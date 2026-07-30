@@ -108,7 +108,7 @@ export function renderReport(report: ErrandReport): string {
   if (report.commitment !== "none_sought") {
     lines.push("What was agreed");
     if (report.outcome === "outcome_unknown") {
-      lines.push("  not known. Nothing about this call could be read");
+      lines.push("  not known. This app has no finished call to read, so treat nothing as arranged");
     } else if (report.commitment === "committed") {
       const when =
         report.committed_datetime === null
@@ -151,7 +151,7 @@ export function renderReport(report: ErrandReport): string {
 
   lines.push("What was said about you");
   if (report.outcome === "outcome_unknown") {
-    lines.push("  not known, because nothing about this call could be read");
+    lines.push("  not known, because this app has no finished call to read");
   } else {
     lines.push(`  said          ${report.disclosed.length > 0 ? report.disclosed.join(", ") : "nothing"}`);
     lines.push(

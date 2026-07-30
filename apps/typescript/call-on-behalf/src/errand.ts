@@ -10,11 +10,13 @@
  * Nothing here reports more than it knows. An answer or an agreement is only
  * reported when the transcript supports it. A call this app could not read comes
  * back as an unknown outcome rather than as a failure, because "nothing was said"
- * is a claim of its own.
+ * is a claim of its own. Only a call CALL-E has finished with is read at all: a
+ * queued, ringing or running call is an unknown outcome too, because its transcript
+ * is still being written.
  */
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
-import { CalleCallError, CalleWaitTimeout, type CallePort } from "./calle.js";
+import { CalleCallError, CalleWaitTimeout, isTerminalCallStatus, type CallePort } from "./calle.js";
 import { agreementTurn, readTranscript, supportingTurn } from "./read.js";
 import {
   buildCallInput,
@@ -86,14 +88,23 @@ function failureOutcome(failureCode: string | null): ErrandOutcome {
   return "call_failed";
 }
 
+/** A call this app could not read at all. Nobody knows whether it was even made. */
+const UNREAD_NEXT_STEP =
+  "CALL-E took the errand and this app could not read what happened, so nobody knows yet whether the call was made or what was said. Treat nothing as arranged. Running this same errand file again reads that same call back instead of ringing anybody, because the key is unchanged. Edit the file first and it becomes a different call, so do not edit it.";
+
+/** A call CALL-E has not finished with. It exists and it has no result yet. */
+const UNFINISHED_NEXT_STEP =
+  "CALL-E still had this call open when this app stopped waiting, so what was said and whether anything was agreed is not known yet. Treat nothing as arranged. Running this same errand file again reads that same call back instead of ringing anybody, because the key is unchanged. Edit the file first and it becomes a different call, so do not edit it.";
+
 function nextStep(
   outcome: ErrandOutcome,
   commitment: CommitmentState,
   request: ErrandRequest,
   offered: string,
+  stillOpen = false,
 ): string {
   if (outcome === "outcome_unknown") {
-    return "CALL-E took the errand and this app could not read what happened, so nobody knows yet whether the call was made or what was said. Treat nothing as arranged. Running this same errand file again reads that same call back instead of ringing anybody, because the key is unchanged. Edit the file first and it becomes a different call, so do not edit it.";
+    return stillOpen ? UNFINISHED_NEXT_STEP : UNREAD_NEXT_STEP;
   }
   if (outcome === "api_error") {
     return "CALL-E refused to create the call, so no call was placed and nothing was said on your behalf. The reason is in the notes above.";
@@ -211,6 +222,21 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     authorized_but_unused: request.disclosure.map((item) => item.label),
   };
 
+  /** What is known about a call that exists and has no result, for the report. */
+  let stillOpen: { providerCallId: string | null; startedAt: string | null } | null = null;
+
+  if (call !== null && !isTerminalCallStatus(call.status)) {
+    // A call CALL-E has not finished with is not a result. Its transcript is still
+    // being written and its extraction is whatever the model has so far, so reading
+    // one as an outcome is how a call still ringing gets reported as an errand done.
+    const open = call.recipients[0]?.attempts.at(-1) ?? null;
+    progress(`CALL-E still has call ${call.id} as ${call.status || "no status"}, so there is no result to read.`);
+    unknown = `the call was created and CALL-E still had it as ${call.status || "no status"}, so it has no result yet`;
+    stillOpen = { providerCallId: open?.providerCallId ?? null, startedAt: open?.startedAt ?? call.createdAt };
+    callId = call.id;
+    call = null;
+  }
+
   if (call === null) {
     if (unknown === null && refusal === null) {
       unknown = "the call was created and no result came back";
@@ -237,11 +263,11 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
       leaks: [],
       reached_person: false,
       callee_notes: unknown ?? refusal?.code ?? "the call was not created",
-      next_step: nextStep(outcome, "none_sought", request, ""),
+      next_step: nextStep(outcome, "none_sought", request, "", stillOpen !== null),
       call_id: callId,
-      provider_call_id: null,
+      provider_call_id: stillOpen?.providerCallId ?? null,
       call_status: outcome === "outcome_unknown" ? "unknown" : "api_error",
-      started_at: null,
+      started_at: stillOpen?.startedAt ?? null,
       completed_at: null,
       transcript: [],
     };
@@ -301,8 +327,10 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
 
   const answered = answers.filter((answer) => answer.answered).length;
   let outcome: ErrandOutcome;
-  if (call.status === "failed" || call.status === "canceled") {
-    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode);
+  if (call.status !== "completed") {
+    // Terminal and not completed, so the call ended before the conversation did.
+    // The failure code says why when there is one and the status says it otherwise.
+    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode ?? call.status);
   } else if (reading.declinedAutomated) {
     outcome = "callee_declined_automated";
   } else if (reading.machineAnswered) {

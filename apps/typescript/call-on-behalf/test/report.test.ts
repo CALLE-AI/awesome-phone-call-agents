@@ -83,8 +83,8 @@ test("a call this app could not read says that and nothing more", async () => {
   const text = renderReport(await report({ pollError: { status: 503, code: "service_unavailable" } }));
   assert.match(text, /Status        unknown, so whether anybody answered is not known either/);
   assert.match(text, /Outcome       outcome_unknown/);
-  assert.match(text, /not known\. Nothing about this call could be read/);
-  assert.match(text, /not known, because nothing about this call could be read/);
+  assert.match(text, /not known\. This app has no finished call to read/);
+  assert.match(text, /not known, because this app has no finished call to read/);
   assert.equal(text.includes("not answered"), false);
   assert.equal(text.includes("privacy check"), false);
   assert.equal(text.includes("said          nothing"), false);

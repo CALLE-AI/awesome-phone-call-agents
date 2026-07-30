@@ -47,6 +47,31 @@ export class CalleCallError extends Error {
 
 export class CalleWaitTimeout extends Error {}
 
+/**
+ * The states CALL-E is finished with, in one place so nothing can drift.
+ *
+ * `CallStatus` in the SDK's generated schema is `queued`, `in_progress`,
+ * `completed`, `failed` or `canceled`, and the SDK's own `waitForResult` returns on
+ * exactly the last three. The three end of call states are listed with them because
+ * a call that ended in voicemail, a busy line or no answer has ended: it is a result
+ * to read, not a call still in flight.
+ *
+ * Anything not in this list is a call with no result yet, and a call with no result
+ * is not something to report an outcome from.
+ */
+export const TERMINAL_CALL_STATUSES: readonly string[] = [
+  "completed",
+  "failed",
+  "canceled",
+  "no_answer",
+  "busy",
+  "voicemail",
+];
+
+export function isTerminalCallStatus(status: string | null | undefined): boolean {
+  return typeof status === "string" && TERMINAL_CALL_STATUSES.includes(status.trim().toLowerCase());
+}
+
 export const DEFAULT_BASE_URL = "https://api.heycall-e.com";
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);

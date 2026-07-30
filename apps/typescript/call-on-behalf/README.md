@@ -53,9 +53,11 @@ The extraction proposes. The transcript decides.
   the commitment reads `unconfirmed` and the next step says to treat nothing as
   booked. The confirmation code belongs to the agreement, so it is dropped too.
 - A call this app could not read comes back as `outcome_unknown`, never as a
-  failure and never with "nothing was said". Re-running the same errand file reads
-  the same call back, because the idempotency key covers the content of the call and
-  has not changed.
+  failure and never with "nothing was said". So does a call CALL-E has not finished
+  with: only a terminal status is read as a result, and a call still `queued` or
+  `in_progress` gets no verdict, no commitment and no privacy finding. Re-running the
+  same errand file reads the same call back, because the idempotency key covers the
+  content of the call and has not changed.
 
 ## Try it without an account
 
