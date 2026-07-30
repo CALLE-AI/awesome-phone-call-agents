@@ -37,6 +37,13 @@ const SUPER = "+14155550102";
  */
 const CLOCK = Date.parse("2026-08-04T17:00:00Z");
 
+/**
+ * When the fake API says each call finished, eighty seconds into the run. The
+ * coordinator checks a confirmation against the window on the way out as well as
+ * on the way in, so the provider clock and the injected clock have to agree.
+ */
+const CALL_FINISHED = new Date(CLOCK + 80_000).toISOString();
+
 function gather(phone: string, options: number[], spoken: string): FakeScript {
   return {
     phone,
@@ -136,7 +143,7 @@ async function crashThenResume(request: ReturnType<typeof loadRequest>): Promise
     confirm(SUPER, "confirm", "Confirm."),
     release(TENANT),
     release(PLUMBER),
-  ]);
+  ], { completedAt: CALL_FINISHED });
   const port = await createSdkPort({ apiKey: "calle_demo_key", baseUrl: fake.baseUrl });
   try {
     await runCoordination({
@@ -186,7 +193,7 @@ async function main(): Promise<void> {
       rmSync(demo.ledger);
     }
     process.stdout.write(`\n${demo.title}\n${"-".repeat(demo.title.length)}\n${demo.note}\n\n`);
-    const fake = await startFakeCalle(demo.scripts);
+    const fake = await startFakeCalle(demo.scripts, { completedAt: CALL_FINISHED });
     const port = await createSdkPort({ apiKey: "calle_demo_key", baseUrl: fake.baseUrl });
     const result = await runCoordination({
       request,

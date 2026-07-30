@@ -27,6 +27,7 @@ import { withinCallingHours } from "./hours.js";
 import { acquireLedgerLock, appendEntry, readEntries, requestDigest } from "./ledger.js";
 import { confirmSchema, confirmTask, releaseSchema, releaseTask } from "./script.js";
 import { slotById } from "./slots.js";
+import { saidYes, type WindowSpan } from "./window.js";
 import type {
   CommitResult,
   CoordinationRequest,
@@ -54,7 +55,7 @@ export interface RecoveryState {
   outcome: Outcome | null;
   chosenSlotId: string | null;
   callsPlaced: number;
-  /** Parties with a recorded yes, in the order they gave it. */
+  /** Parties with a recorded confirmation, in the order they first gave it. */
   confirmed: string[];
   /**
    * Parties a person acknowledged a release call for. Nothing else clears the
@@ -88,7 +89,9 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
   let callsPlaced = 0;
   let chosenSlotId: string | null = null;
   let outcome: Outcome | null = null;
-  const confirmed: string[] = [];
+  const confirmOrder: string[] = [];
+  const credited = new Map<string, boolean>();
+  const spokenYes: string[] = [];
   const released = new Set<string>();
   const owed = new Set<string>();
   const unsettled = new Map<string, CommitResult>();
@@ -112,15 +115,25 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
       } else {
         unsettled.delete(key);
       }
-      if (result.phase === "confirm" && result.confirmed && !confirmed.includes(result.party_id)) {
-        confirmed.push(result.party_id);
+      if (result.phase === "confirm") {
+        if (!confirmOrder.includes(result.party_id)) {
+          confirmOrder.push(result.party_id);
+        }
+        // Credit is the ledger's last word on that call, so a later entry
+        // settling the same call replaces it rather than adding to it. A yes
+        // recorded outside the window is not credit at all.
+        credited.set(result.party_id, result.confirmed && result.within_window !== false);
+        // A debt only grows. Somebody who said yes has to be told, and no later
+        // entry talks this app out of placing that call.
+        if (saidYes(result) && !spokenYes.includes(result.party_id)) {
+          spokenYes.push(result.party_id);
+        }
       }
       if (result.phase === "release") {
         releasesRecorded += 1;
         // Only acknowledged delivery settles the debt. A release call that
-        // failed, was canceled, rang out, hit a busy line or left a message on a
-        // machine is over and the person still has not been told, so they are
-        // owed the call.
+        // failed, was canceled or left a message on a machine is over and the
+        // person still has not been told, so they are owed the call.
         if (result.acknowledged) {
           released.add(result.party_id);
           owed.delete(result.party_id);
@@ -142,6 +155,7 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
     }
   }
 
+  const confirmed = confirmOrder.filter((party) => credited.get(party) === true);
   return {
     entries: entries.length,
     finished: outcome !== null,
@@ -158,7 +172,9 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
     owedReleases:
       outcome === "verbally_confirmed"
         ? []
-        : [...new Set([...confirmed.filter((party) => !released.has(party)), ...owed])],
+        : [...new Set([...spokenYes, ...confirmed, ...owed])].filter(
+            (party) => !released.has(party),
+          ),
   };
 }
 
@@ -248,6 +264,15 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   }
   const state = inspectLedger(entries);
   const chosen = state.chosenSlotId === null ? undefined : slotById(request.slots, state.chosenSlotId);
+  /**
+   * The window belongs to the coordination, not to this process. It opened when
+   * the run started and `resume` is that same coordination finishing, so a yes
+   * this ledger already holds is judged against the window it was given in and
+   * nobody new is asked to commit once that window has closed.
+   */
+  const windowStart = Date.parse(started.at);
+  const deadline = windowStart + started.policy.windowMinutes * 60_000;
+  const span = (): WindowSpan => ({ windowStart, deadline, now: now() });
   const record = (entry: LedgerEntry): void => {
     appendEntry(options.ledgerPath, entry);
   };
@@ -272,6 +297,8 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   let calls = state.callsPlaced;
   const confirmed = [...state.confirmed];
   const released = new Set(state.released);
+  /** Everybody the ledger says is owed a release call, plus anybody this round finds. */
+  const owedNow = new Set(state.owedReleases);
   const stuck: string[] = [];
   const timeoutMs = Math.max(request.policy.perCallTimeoutSeconds * 1000, 1_000);
 
@@ -286,6 +313,13 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     let placedCall = false;
     if (previous.call_id !== null) {
       outcome = await settleExisting(port, previous.call_id, timeoutMs, pollIntervalMs);
+    } else if (previous.phase === "confirm" && now() >= deadline) {
+      // The key would place this call if CALL-E does not already have it, and
+      // asking somebody to commit to a time this coordination can no longer act
+      // on is a call nobody should get. Anybody who said yes is released instead.
+      progress(`  ${party.id}: the confirm call cannot be settled, the coordination window has closed.`);
+      stuck.push(party.id);
+      continue;
     } else if (previous.phase === "confirm" && slot.startMs <= now()) {
       // The key would answer the question, but if the create never landed the key
       // places the call and confirming a time that has already started is a call
@@ -319,13 +353,18 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
         pollIntervalMs,
       });
     }
-    const result = evaluateCommit(request, party, slot, previous.phase, outcome);
+    const result = evaluateCommit(request, party, slot, previous.phase, outcome, span());
     record({ kind: "reconcile", at: stamp(), placed_call: placedCall, result });
     if (unsettledCall(result)) {
       stuck.push(party.id);
     }
     if (result.phase === "confirm" && result.confirmed && !confirmed.includes(party.id)) {
       confirmed.push(party.id);
+    }
+    if (saidYes(result)) {
+      // Settling the call is how this run learns they said yes. Late or not, they
+      // are owed the call that says it is off.
+      owedNow.add(party.id);
     }
     if (result.phase === "release" && result.acknowledged) {
       released.add(party.id);
@@ -350,7 +389,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     // Everybody who said yes, plus every debt the ledger already recorded, minus
     // the people a release call actually reached. A debt is not written off
     // because a call ended.
-    const debt = [...new Set([...confirmed, ...state.owedReleases])];
+    const debt = [...new Set([...confirmed, ...owedNow])];
     const owed = debt
       .filter((party) => !released.has(party))
       .map((party) => partyById(request, party))

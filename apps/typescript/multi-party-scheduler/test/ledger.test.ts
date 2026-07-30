@@ -208,6 +208,22 @@ test("a release call that reached nobody does not count as telling them", async 
   );
 });
 
+test("a confirmation credited from a late answer is caught", async () => {
+  const { path, entries } = await confirmedLedger();
+  const tampered = entries.map((entry) =>
+    entry.kind === "commit" && entry.result.party_id === "tenant"
+      ? { ...entry, result: { ...entry.result, within_window: false } }
+      : entry,
+  );
+  rewrite(path, tampered);
+  const verification = replay(readEntries(path));
+  assert.equal(verification.ok, false);
+  assert.ok(
+    verification.issues.some((issue) => issue.problem.includes("landed outside the window")),
+    JSON.stringify(verification.issues),
+  );
+});
+
 test("a ledger with no outcome entry is an unfinished run", async () => {
   const { path, entries } = await confirmedLedger();
   rewrite(path, entries.filter((entry) => entry.kind !== "outcome"));

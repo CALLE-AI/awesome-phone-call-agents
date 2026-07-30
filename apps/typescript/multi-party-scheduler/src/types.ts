@@ -213,6 +213,12 @@ export interface CommitResult {
   confirmed: boolean;
   declined: boolean;
   acknowledged: boolean;
+  /**
+   * Confirm calls only: did the answer land inside the window this round could
+   * still act on. A late final response cannot confirm anything. A release call
+   * is not governed by the window, so it records true.
+   */
+  within_window: boolean;
   /** Confirm calls only: did the call actually ask the confirmation question. */
   question_asked: boolean;
   reached_person: boolean;

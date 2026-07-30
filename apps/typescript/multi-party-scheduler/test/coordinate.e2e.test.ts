@@ -12,7 +12,7 @@ import { createSdkPort } from "../src/calle.js";
 import { runCoordination } from "../src/coordinate.js";
 import { readEntries, replay } from "../src/ledger.js";
 import type { CoordinationRequest } from "../src/types.js";
-import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
+import { startFakeCalle, type FakeOptions, type FakeScript } from "../fake/calle-server.js";
 import { coordinationRequest, PLUMBER, requestInput, SUPER, TENANT } from "./fixtures.js";
 
 const WORDS = ["", "one", "two", "three", "four"];
@@ -71,8 +71,9 @@ async function withFake(
     port: Awaited<ReturnType<typeof createSdkPort>>,
     fake: Awaited<ReturnType<typeof startFakeCalle>>,
   ) => Promise<void>,
+  options: FakeOptions = {},
 ): Promise<void> {
-  const fake = await startFakeCalle(scripts);
+  const fake = await startFakeCalle(scripts, options);
   const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
   try {
     await body(port, fake);
@@ -361,6 +362,87 @@ test("the window closes the run before the next party is called", async () => {
     assert.equal(result.outcome, "window_expired");
     assert.equal(fake.created.length, 1);
   });
+});
+
+test("a confirm answer that landed outside this run's window confirms nothing", async () => {
+  await withFake(
+    [
+      gather(PLUMBER, [2]),
+      gather(TENANT, [2]),
+      gather(SUPER, [2]),
+      confirmYes(PLUMBER),
+      releaseOk(PLUMBER),
+    ],
+    async (port, fake) => {
+      const path = ledgerPath();
+      // The fake says every call finished at 17:01:20Z and this run's clock says
+      // 19:00Z, so the answer is final and it is from a window that closed two
+      // hours ago. That is what a replayed idempotency key hands back.
+      const result = await runCoordination({
+        request: coordinationRequest(),
+        port,
+        ledgerPath: path,
+        pollIntervalMs: 5,
+        now: () => Date.parse("2026-08-04T19:00:00Z"),
+      });
+      assert.equal(result.outcome, "window_expired");
+      assert.equal(result.slot_id, null);
+      assert.deepEqual(result.confirmed_with, []);
+      assert.match(result.note, /window closed before plumber/);
+
+      const commit = readEntries(path).find((entry) => entry.kind === "commit");
+      assert.ok(commit !== undefined && commit.kind === "commit");
+      assert.equal(commit.result.heard_answer, "confirm", "the person did say yes");
+      assert.equal(commit.result.within_window, false, "and it was too late to act on");
+      assert.equal(commit.result.confirmed, false);
+
+      // The yes still left somebody expecting an appointment, so the release call
+      // is owed exactly as it is when another party declines.
+      assert.deepEqual(
+        fake.created.filter((call) => call.phase === "release").map((call) => call.phones[0]),
+        [PLUMBER],
+      );
+      assert.deepEqual(result.unreleased, []);
+      assert.equal(result.calls_placed, 5, "three gathers, the confirm, the release call it owed");
+      const verification = replay(readEntries(path));
+      assert.equal(verification.ok, true, JSON.stringify(verification.issues));
+    },
+    { completedAt: "2026-08-04T17:01:20Z" },
+  );
+});
+
+test("a full set of yeses from a closed window is not a verbal confirmation", async () => {
+  await withFake(
+    [
+      gather(PLUMBER, [2]),
+      gather(TENANT, [2]),
+      gather(SUPER, [2]),
+      confirmYes(PLUMBER),
+      confirmYes(TENANT),
+      confirmYes(SUPER),
+      releaseOk(PLUMBER),
+    ],
+    async (port, fake) => {
+      const path = ledgerPath();
+      const result = await runCoordination({
+        request: coordinationRequest(),
+        port,
+        ledgerPath: path,
+        pollIntervalMs: 5,
+        now: () => Date.parse("2026-08-04T19:00:00Z"),
+      });
+      assert.equal(result.outcome, "window_expired", "every answer is two hours stale");
+      assert.deepEqual(result.confirmed_with, []);
+      assert.equal(
+        fake.created.filter((call) => call.phase === "confirm").length,
+        1,
+        "the first late answer stops the round rather than collecting two more",
+      );
+      assert.deepEqual(result.unreleased, [], "the one person who said yes was told");
+      assert.equal(replay(readEntries(path)).ok, true);
+    },
+    { completedAt: "2026-08-04T17:01:20Z" },
+  );
 });
 
 test("a party outside their calling hours is not dialled at all", async () => {

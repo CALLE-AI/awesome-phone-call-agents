@@ -11,7 +11,9 @@
 import { appendFileSync, closeSync, existsSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { chooseSlot, intersect } from "./slots.js";
+import { saidYes } from "./window.js";
 import type {
+  CommitResult,
   CoordinationRequest,
   LedgerEntry,
   Outcome,
@@ -136,15 +138,32 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
   let feasible: Slot[] = slots;
   let index = 0;
   let calls = 0;
-  const confirmed: string[] = [];
+  const credited = new Map<string, boolean>();
+  const spokenYes: string[] = [];
   const released: string[] = [];
   let chosen: string | null = null;
   let outcome: Outcome | null = null;
   let closed = false;
 
-  const creditConfirm = (partyId: string): void => {
-    if (!confirmed.includes(partyId)) {
-      confirmed.push(partyId);
+  /**
+   * Read one confirm result.
+   *
+   * Credit is the ledger's last word on that call, so a later entry settling the
+   * same call replaces it. A yes recorded outside the window is not credit at all
+   * and a ledger that claims otherwise is reported. The debt only grows: once
+   * somebody has said yes on a call they have to be told when it is off, whatever
+   * a later entry says.
+   */
+  const readConfirm = (at: number, result: CommitResult): void => {
+    if (result.confirmed && result.within_window === false) {
+      issues.push({
+        entry: at,
+        problem: `${result.party_id} is credited with a confirmation that landed outside the window this run could act on`,
+      });
+    }
+    credited.set(result.party_id, result.confirmed && result.within_window !== false);
+    if (saidYes(result) && !spokenYes.includes(result.party_id)) {
+      spokenYes.push(result.party_id);
     }
   };
 
@@ -190,9 +209,7 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       if (chosen !== null && entry.result.slot_id !== chosen) {
         issues.push({ entry: index, problem: `confirm call for ${entry.result.party_id} names slot ${entry.result.slot_id}, not the chosen ${chosen}` });
       }
-      if (entry.result.confirmed) {
-        creditConfirm(entry.result.party_id);
-      }
+      readConfirm(index, entry.result);
     }
     if (entry.kind === "reconcile") {
       // Looking a call up by its idempotency key places no call. Only a
@@ -200,8 +217,8 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       if (entry.placed_call) {
         calls += 1;
       }
-      if (entry.result.phase === "confirm" && entry.result.confirmed) {
-        creditConfirm(entry.result.party_id);
+      if (entry.result.phase === "confirm") {
+        readConfirm(index, entry.result);
       }
       if (entry.result.phase === "release" && entry.result.acknowledged) {
         released.push(entry.result.party_id);
@@ -221,7 +238,7 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
         issues.push({ entry: index, problem: `calls_placed ${entry.calls_placed} does not match the ${calls} call entries in this ledger` });
       }
       if (entry.outcome === "verbally_confirmed") {
-        const missing = parties.filter((party) => !confirmed.includes(party));
+        const missing = parties.filter((party) => credited.get(party) !== true);
         if (missing.length > 0) {
           issues.push({ entry: index, problem: `verbally_confirmed, but ${missing.join(", ")} never confirmed` });
         }
@@ -229,9 +246,12 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
           issues.push({ entry: index, problem: `confirmed slot ${String(entry.slot_id)} is not the chosen slot ${String(chosen)}` });
         }
       } else {
-        // Nothing is going ahead, so everybody who said yes has to have been
-        // told or named as still owed a call.
-        const owed = confirmed.filter((party) => !released.includes(party) && !entry.unreleased.includes(party));
+        // Nothing is going ahead, so everybody who said yes on a call has to have
+        // been told or named as still owed a call. That includes a yes the run
+        // refused to act on: the person still heard themselves agree to a time.
+        const owed = spokenYes.filter(
+          (party) => !released.includes(party) && !entry.unreleased.includes(party),
+        );
         if (owed.length > 0) {
           issues.push({
             entry: index,

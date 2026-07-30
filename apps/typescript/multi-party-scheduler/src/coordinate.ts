@@ -26,6 +26,7 @@ import { clockOf, withinCallingHours } from "./hours.js";
 import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
+import { decidedInWindow, saidYes, type WindowSpan } from "./window.js";
 import {
   confirmSchema,
   confirmTask,
@@ -325,12 +326,21 @@ function evaluateGather(
   };
 }
 
+/**
+ * Read one confirm or release call.
+ *
+ * `window` is the coordination window this call belongs to, which a confirm
+ * result is judged against once it comes back. A release call is not governed by
+ * the window, so it passes null: telling somebody the time is off is a duty and
+ * it does not expire because a timer did.
+ */
 export function evaluateCommit(
   request: CoordinationRequest,
   party: Party,
   slot: Slot,
   phase: Phase,
   outcome: CallOutcome,
+  window: WindowSpan | null,
 ): CommitResult {
   const base = {
     party_id: party.id,
@@ -340,6 +350,8 @@ export function evaluateCommit(
     call_id: outcome.call?.id ?? null,
     provider_call_id: lastAttempt(outcome.call)?.providerCallId ?? null,
   };
+  const inWindow = (completedAt: string | null): boolean =>
+    phase === "release" ? true : window !== null && decidedInWindow({ ...window, completedAt });
   if (outcome.call === null) {
     return {
       ...base,
@@ -347,6 +359,7 @@ export function evaluateCommit(
       confirmed: false,
       declined: false,
       acknowledged: false,
+      within_window: inWindow(null),
       question_asked: false,
       reached_person: false,
       machine_answered: false,
@@ -378,8 +391,12 @@ export function evaluateCommit(
   const lowConfidence = confidence !== null && confidence.score < request.policy.minConfidence;
 
   const declined = reading.answer === "decline" || structuredAnswer === "decline";
+  // Late is not confirmed. The person may well have said yes, and this run can no
+  // longer act on it, so the yes leaves a release call owed instead.
+  const withinWindow = inWindow(call.completedAt ?? attempt?.completedAt ?? null);
   const confirmed =
     phase === "confirm" &&
+    withinWindow &&
     reachedPerson &&
     !lowConfidence &&
     reading.answer === "confirm" &&
@@ -393,6 +410,7 @@ export function evaluateCommit(
     confirmed,
     declined,
     acknowledged,
+    within_window: withinWindow,
     question_asked: reading.questionAsked,
     reached_person: reachedPerson,
     machine_answered: machineAnswered,
@@ -462,7 +480,7 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
       timeoutMs: Math.max(request.policy.perCallTimeoutSeconds * 1000, 1_000),
       pollIntervalMs: options.pollIntervalMs,
     });
-    const result = evaluateCommit(request, party, slot, "release", outcome);
+    const result = evaluateCommit(request, party, slot, "release", outcome, null);
     options.record({ kind: "release", at: new Date(at).toISOString(), result });
     if (!result.acknowledged) {
       unreleased.push(party.id);
@@ -492,7 +510,8 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
   const progress = options.onProgress ?? (() => {});
   const pollIntervalMs = options.pollIntervalMs ?? 2000;
   const ledgerPath = options.ledgerPath ?? null;
-  const deadline = now() + request.policy.windowMinutes * 60_000;
+  const windowStart = now();
+  const deadline = windowStart + request.policy.windowMinutes * 60_000;
 
   const record = (entry: LedgerEntry): void => {
     if (ledgerPath !== null) {
@@ -604,6 +623,12 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
   }
 
   const confirmedParties: Party[] = [];
+  /**
+   * Everybody who said yes on a confirm call, in the order they said it. This is
+   * the release list, and it is not the same as the list above: a yes the window
+   * arrived too late for still leaves a person expecting an appointment.
+   */
+  const saidYesParties: Party[] = [];
   const unreleased: string[] = [];
   let chosen: Slot | null = null;
   let outcome: Outcome = stopped ?? "verbally_confirmed";
@@ -639,12 +664,28 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
           "confirm",
           chosen,
         );
-        const result = evaluateCommit(request, party, chosen, "confirm", commitOutcome);
+        const result = evaluateCommit(request, party, chosen, "confirm", commitOutcome, {
+          windowStart,
+          deadline,
+          now: now(),
+        });
         record({ kind: "commit", at: stamp(), result });
+        if (saidYes(result)) {
+          saidYesParties.push(party);
+        }
         if (result.confirmed) {
           confirmedParties.push(party);
           progress(`  ${party.id}: confirmed.`);
           continue;
+        }
+        if (saidYes(result) && !result.within_window) {
+          // The answer came back too late to act on. Nothing is arranged and the
+          // person who said yes is told, which is the same duty as any other run
+          // that does not go ahead.
+          outcome = "window_expired";
+          note = `the window closed before ${party.id} answered, so nothing is going ahead`;
+          progress(`  ${party.id}: said yes after the window closed. Nothing is going ahead, releasing everyone who said yes.`);
+          break;
         }
         outcome = commitOutcome.errorCode === "canceled" ? "canceled" : "not_confirmed";
         note = result.declined
@@ -670,13 +711,13 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
               : "ran out of call budget while gathering availability";
   }
 
-  if (outcome !== "verbally_confirmed" && chosen !== null && confirmedParties.length > 0) {
+  if (outcome !== "verbally_confirmed" && chosen !== null && saidYesParties.length > 0) {
     const round = await releaseRound({
       request,
       port,
       slot: chosen,
       // Most recent yes first: that person changed their day most recently.
-      parties: [...confirmedParties].reverse(),
+      parties: [...saidYesParties].reverse(),
       callsPlaced: calls,
       pollIntervalMs,
       now,

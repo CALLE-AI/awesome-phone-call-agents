@@ -43,6 +43,23 @@ export interface FakeCalle {
   close: () => Promise<void>;
 }
 
+export interface FakeOptions {
+  /**
+   * What the API reports as the moment a call finished. It defaults to the clock
+   * when the server starts, so a test that pins no clock still gets timestamps its
+   * own run can act on. A test that pins a clock passes the matching stamp here,
+   * which is what makes a late answer reproducible.
+   */
+  completedAt?: string;
+}
+
+/** The three timestamps the API puts on a call, in the order they happen. */
+interface Stamps {
+  createdAt: string;
+  startedAt: string;
+  completedAt: string;
+}
+
 interface StoredCall {
   id: string;
   script: FakeScript;
@@ -97,7 +114,7 @@ function turns(script: FakeScript): unknown[] {
   return output;
 }
 
-function snapshot(call: StoredCall, terminal: boolean): string {
+function snapshot(call: StoredCall, terminal: boolean, stamps: Stamps): string {
   const script = call.script;
   const status = terminal ? script.status ?? "completed" : call.polls === 0 ? "queued" : "in_progress";
   const structured = terminal ? script.structuredResult ?? null : null;
@@ -105,8 +122,8 @@ function snapshot(call: StoredCall, terminal: boolean): string {
     id: `att_${call.id.slice(5)}`,
     phone: call.phones[0],
     status: terminal ? script.status ?? "completed" : "dialing",
-    started_at: "2026-08-04T17:00:05Z",
-    completed_at: terminal ? "2026-08-04T17:01:20Z" : null,
+    started_at: stamps.startedAt,
+    completed_at: terminal ? stamps.completedAt : null,
     summary: null,
     transcript_turns: terminal ? turns(script) : [],
     provider_call_id: `provider_${call.id.slice(5)}`,
@@ -138,12 +155,24 @@ function snapshot(call: StoredCall, terminal: boolean): string {
     metadata: call.metadata,
     failure_code: terminal ? script.failureCode ?? null : null,
     failure_message: null,
-    created_at: "2026-08-04T17:00:00Z",
-    completed_at: terminal ? "2026-08-04T17:01:20Z" : null,
+    created_at: stamps.createdAt,
+    completed_at: terminal ? stamps.completedAt : null,
   });
 }
 
-export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> {
+export async function startFakeCalle(
+  scripts: FakeScript[],
+  options: FakeOptions = {},
+): Promise<FakeCalle> {
+  const completedAt = options.completedAt ?? new Date().toISOString();
+  const finished = Date.parse(completedAt);
+  const base = Number.isNaN(finished) ? Date.now() : finished;
+  // Created, rang for a bit, then finished, in that order.
+  const stamps: Stamps = {
+    createdAt: new Date(base - 80_000).toISOString(),
+    startedAt: new Date(base - 75_000).toISOString(),
+    completedAt,
+  };
   const created: CreatedCall[] = [];
   const calls = new Map<string, StoredCall>();
   const idempotency = new Map<string, { id: string; bodyKey: string }>();
@@ -192,7 +221,7 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
               return;
             }
             response.statusCode = 201;
-            response.end(snapshot(calls.get(seen.id)!, false));
+            response.end(snapshot(calls.get(seen.id)!, false, stamps));
             return;
           }
         }
@@ -226,7 +255,7 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
           resultSchema: body.result_schema,
         });
         response.statusCode = 201;
-        response.end(snapshot(stored, false));
+        response.end(snapshot(stored, false, stamps));
         return;
       }
 
@@ -247,7 +276,7 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
                 id: `evt_${call.id.slice(5)}`,
                 type: "call.completed",
                 call_id: call.id,
-                created_at: "2026-08-04T17:01:20Z",
+                created_at: stamps.completedAt,
                 level: "info",
                 status: call.script.status ?? "completed",
                 message: "Call completed.",
@@ -270,7 +299,7 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
         }
         call.polls += 1;
         response.statusCode = 200;
-        response.end(snapshot(call, call.script.stall !== true));
+        response.end(snapshot(call, call.script.stall !== true, stamps));
         return;
       }
 
