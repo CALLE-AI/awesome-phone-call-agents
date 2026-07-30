@@ -64,7 +64,7 @@ export function assertTrustedBaseUrl(baseUrl: string): string {
     return baseUrl;
   }
   throw new ConfigError(
-    `Refusing to send CALLE_API_KEY to ${baseUrl}. --base-url and CALLE_BASE_URL must use https, or http only for localhost, 127.0.0.1 or ::1. Nothing was sent.`,
+    `Refusing to send CALLE_API_KEY to ${baseUrl}. --base-url and CALLE_BASE_URL must use https or http only for localhost, 127.0.0.1 or ::1. Nothing was sent.`,
   );
 }
 

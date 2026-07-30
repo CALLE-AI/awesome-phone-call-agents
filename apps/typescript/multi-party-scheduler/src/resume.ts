@@ -2,14 +2,14 @@
  * Recovery.
  *
  * A run can die between the confirm call that got a yes and the release call that
- * owes the apology, and a create response can be lost while the call itself goes
+ * owes the apology and a create response can be lost while the call itself goes
  * ahead. Both leave a person believing an appointment is on with nobody left to
  * tell them otherwise. Replay can prove that happened. It cannot fix it.
  *
  * `resume` reads a ledger, settles every call whose fate is unknown and finishes
  * what the run owed. It never gathers availability again and never chooses a
  * different slot: a call it settles is the same call under the same idempotency
- * key, and once the answers are known it either records the verbal confirmation
+ * key and once the answers are known it either records the verbal confirmation
  * they support or releases everybody who said yes.
  */
 
@@ -264,7 +264,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       outcome = await settleExisting(port, previous.call_id, timeoutMs, pollIntervalMs);
     } else if (previous.phase === "confirm" && slot.startMs <= now()) {
       // The key would answer the question, but if the create never landed the key
-      // places the call, and confirming a time that has already started is a call
+      // places the call and confirming a time that has already started is a call
       // nobody should get. Report it instead.
       progress(`  ${party.id}: the confirm call cannot be settled, ${slot.id} has already started.`);
       stuck.push(party.id);

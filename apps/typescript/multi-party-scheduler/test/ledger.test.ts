@@ -71,7 +71,7 @@ test("a real run replays cleanly and keeps the codes out of the file", async () 
   assert.equal(text.includes("booked"), false, "the ledger never claims a booking exists");
 });
 
-test("one writer per ledger, and the lock is taken before any call", () => {
+test("one writer per ledger and the lock is taken before any call", () => {
   const path = join(mkdtempSync(join(tmpdir(), "mps-lock-")), "ledger.jsonl");
   const lock = acquireLedgerLock(path);
   assert.throws(

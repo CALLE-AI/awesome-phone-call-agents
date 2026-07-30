@@ -26,7 +26,7 @@ without promising anything, one time is chosen and then commitment is a separate
 round that can be rolled back.
 
 The rollback is the part a human coordinator forgets when the day gets long. Here
-it is not optional: it is the same code path every time, and `resume` finishes it
+it is not optional: it is the same code path every time and `resume` finishes it
 even when the process dies half way through.
 
 ## Try it without an account
@@ -124,7 +124,7 @@ numbers you are authorized to call and put the least flexible person first. The
 sooner the set narrows, the shorter every later call.
 
 Ctrl-C cancels a run in flight. No new gather or confirm call is placed, everybody
-who already said yes is still called and told it is off, and a call that was
+who already said yes is still called and told it is off and a call that was
 already connected is recorded as unsettled because the API has no way to hang it
 up. A second Ctrl-C gives up on the release calls too.
 
@@ -135,15 +135,15 @@ npm run schedule -- resume --request your-request.json --ledger booking.jsonl --
 ```
 
 A process can die between the call that got a yes and the call that owes the
-apology, and a create response can be lost while the call itself goes ahead.
+apology and a create response can be lost while the call itself goes ahead.
 Both leave somebody expecting an appointment that is not happening.
 
 `resume` reads the ledger, settles every call it cannot account for and places
 the release calls that are still owed. A call with an id is settled by asking for
 it. A call with no id, which is what a lost create response leaves behind, is
 settled by re-issuing the same idempotency key: CALL-E answers with the call it
-already has, or places the one the run owed. It never gathers availability again
-and never picks a different slot, and once any release call has gone out the
+already has or places the one the run owed. It never gathers availability again
+and never picks a different slot and once any release call has gone out the
 appointment stays off, so a late yes cannot bring it back. Anything it still
 cannot settle is named in the note for a human to check.
 
@@ -153,16 +153,16 @@ cannot settle is named in the note for a human to check.
 | --- | --- | --- |
 | gather | "Which of these could you do?" Nothing is booked and the script says so. | An answer narrows the feasible set. An empty set ends the run as `no_common_slot`. A machine, a silence or an API error ends it as `not_reached`. |
 | confirm | "Can I confirm Thursday at 2?" One time, one word back. | Everybody confirms and the outcome is `verbally_confirmed`. Anybody does not and the outcome is `not_confirmed`. |
-| release | "That time is not going ahead, nothing is booked." | Sent to every party who confirmed, most recent first. A party the release call cannot reach, or cannot be called inside their hours, is reported in `unreleased` for a human to chase. |
+| release | "That time is not going ahead, nothing is booked." | Sent to every party who confirmed, most recent first. A party the release call cannot reach or cannot be called inside their hours is reported in `unreleased` for a human to chase. |
 
 Two reading rules, both conservative in the same direction. Availability is
 credited only when CALL-E's extracted list and this app's own read of the
 transcript agree, so a mishearing cannot invent a free slot. A confirmation has to
 come from the transcript, after the turn where the caller asked the confirmation
-question, and the extracted answer can veto a confirmation but never create one.
+question and the extracted answer can veto a confirmation but never create one.
 
 Every script refuses the same things: no medical, legal or financial advice, no
-payment or card details, and anybody who says there is an emergency is told to
+payment or card details and anybody who says there is an emergency is told to
 hang up and call their local emergency number.
 
 ## The ledger and why replay matters
@@ -206,23 +206,23 @@ confirmation has to show every party who said yes either released or named in
 - At most one call per party per phase. Nothing recurring is created, so there is
   no schedule to clean up.
 - Ctrl-C cancels a run in flight: no new gather or confirm call, the release calls
-  still go out, and a call already connected is recorded as unsettled because the
+  still go out and a call already connected is recorded as unsettled because the
   API has no cancel. `resume` settles it.
 - `plan` and `replay` place no calls and need no credentials.
 - `CALLE_API_KEY` is read from the environment only, never from the request file.
-  `CALLE_BASE_URL` and `--base-url` select the environment, and both are checked
-  before the key is sent: https, or plain http only for `localhost`, `127.0.0.1`
+  `CALLE_BASE_URL` and `--base-url` select the environment and both are checked
+  before the key is sent: https or plain http only for `localhost`, `127.0.0.1`
   and `::1`. Anything else is refused rather than warned about.
 - Every idempotency key carries a short sha256 of the call payload, so a call is
   reused only when it would say the same words.
 - Ledgers are appended with mode `0600`. Numbers are masked to the country code
-  plus the last two digits, in `--json` output too, and only the decisive turns
+  plus the last two digits, in `--json` output too and only the decisive turns
   are kept.
 
 ## What it does not do
 
 - It does not book anything. There is no calendar write and no booking adapter, so
-  the best outcome is `verbally_confirmed`: every party said yes on a call, and the
+  the best outcome is `verbally_confirmed`: every party said yes on a call and the
   ledger records who said it and when.
 - It does not negotiate. The call offers the options in the request file and
   nothing else. If somebody proposes a different time, the call notes it, says

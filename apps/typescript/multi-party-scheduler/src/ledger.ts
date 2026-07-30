@@ -82,7 +82,7 @@ export function acquireLedgerLock(path: string): LedgerLock {
       holder = "";
     }
     throw new LedgerLockError(
-      `Another run holds ${path}.${holder} Wait for it to finish, or delete ${lockPath} if that process is gone.`,
+      `Another run holds ${path}.${holder} Wait for it to finish or delete ${lockPath} if that process is gone.`,
     );
   }
   writeSync(handle, `pid ${process.pid} since ${new Date().toISOString()}`);
@@ -225,7 +225,7 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
         }
       } else {
         // Nothing is going ahead, so everybody who said yes has to have been
-        // told, or named as still owed a call.
+        // told or named as still owed a call.
         const owed = confirmed.filter((party) => !released.includes(party) && !entry.unreleased.includes(party));
         if (owed.length > 0) {
           issues.push({

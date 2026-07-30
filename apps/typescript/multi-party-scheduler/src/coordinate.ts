@@ -396,7 +396,7 @@ export interface ReleaseRoundResult {
  *
  * The coordination window does not apply here: telling somebody their afternoon
  * is free again is a duty and it does not expire because a timer did. The call
- * budget and the party's calling hours do apply, and a party who cannot be called
+ * budget and the party's calling hours do apply and a party who cannot be called
  * inside either is reported as still owed the call rather than rung at 3am. The
  * same round runs from a fresh coordination and from `resume`.
  */

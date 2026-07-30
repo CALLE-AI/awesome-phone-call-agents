@@ -2,7 +2,7 @@
  * Recovery, end to end over the real client against the local fake CALL-E.
  *
  * The two failures that matter are a process that dies between the yes and the
- * release call, and a create response that is lost while the call itself goes
+ * release call and a create response that is lost while the call itself goes
  * ahead. Both can leave somebody expecting an appointment that is not happening.
  */
 

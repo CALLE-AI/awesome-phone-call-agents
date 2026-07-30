@@ -43,7 +43,7 @@ test("a window that wraps past midnight is refused rather than guessed", () => {
 test("a party who declares nothing gets a daytime window in the meeting zone", () => {
   const hours = resolveCallingHours(undefined, "Asia/Kolkata", "party");
   assert.deepEqual([hours.start, hours.end, hours.timezone], ["09:00", "20:00", "Asia/Kolkata"]);
-  // 09:30 in Kolkata is 04:00 UTC, and it is inside the window there.
+  // 09:30 in Kolkata is 04:00 UTC and it is inside the window there.
   assert.equal(withinCallingHours(hours, Date.parse("2026-08-06T04:00:00Z")), true);
   assert.equal(withinCallingHours(hours, Date.parse("2026-08-06T00:30:00Z")), false);
 });

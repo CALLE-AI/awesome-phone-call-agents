@@ -16,7 +16,7 @@ import type { CoordinationRequest, JsonSchema, Party, Phase, Slot } from "./type
 
 /**
  * The lines every call carries, whatever the phase. A scheduling call has no
- * business giving medical, legal or financial advice, and it must not keep
+ * business giving medical, legal or financial advice and it must not keep
  * somebody on the line who needs an ambulance.
  */
 export function boundaryRules(): string[] {
@@ -226,7 +226,7 @@ export function releaseSchema(): JsonSchema {
 }
 
 /**
- * Stable per request, phase, party and slot, and bound to the content of the
+ * Stable per request, phase, party and slot and bound to the content of the
  * call.
  *
  * The identifiers alone say which call this is. They do not say what it says, so

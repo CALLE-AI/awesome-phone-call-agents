@@ -48,7 +48,7 @@ time and asks for nothing.
 Release calls ignore the coordination window. The window governs how long it is
 sensible to keep gathering and confirming. Telling somebody their afternoon is
 free again is a duty and it does not expire because a timer did. The call budget
-and the party's calling hours still apply, and a party who cannot be called inside
+and the party's calling hours still apply and a party who cannot be called inside
 either is listed in `unreleased` for a human to chase. A duty to tell somebody is
 not a licence to ring them at 3am.
 
@@ -66,7 +66,7 @@ and `resume` settles it.
 ## Recovery
 
 The ledger is not only there to be read back. A process can die between the call
-that got a yes and the call that owes the apology, and a create response can be
+that got a yes and the call that owes the apology and a create response can be
 lost while the call itself goes ahead. Both leave somebody expecting an
 appointment that is not happening, which is the one failure this protocol exists
 to prevent.
@@ -78,7 +78,7 @@ to prevent.
 - settles every call the ledger cannot account for. A call with an id is settled by
   asking for it, which places nothing. A call with no id, which is what a lost
   create response leaves, is settled by re-issuing the same idempotency key: CALL-E
-  answers with the call it already has, or places the one the run owed. That is
+  answers with the call it already has or places the one the run owed. That is
   charged to the call budget, because from the outside the two cannot be told apart
 - places the release calls that are owed, most recent yes first
 - writes a fresh outcome entry, so the ledger still replays as one history
@@ -101,7 +101,7 @@ not a failure and costs nothing from the budget: it simply is not placed.
 
 Every script, in all three phases, refuses the same things: no medical, legal or
 financial advice and no opinion on any of them, no payment or card or bank
-details, and anybody who says there is an emergency is told to hang up and call
+details and anybody who says there is an emergency is told to hang up and call
 their local emergency number. Those lines are in the task text the agent follows
 and there is a test for each phase.
 
@@ -110,7 +110,7 @@ and there is a test for each phase.
 | Question | What leads | Why |
 | --- | --- | --- |
 | Which options work? | CALL-E's extracted `available_options`, cross-checked against a local read of the transcript. Only options both sources contain are credited. | A list is what an extraction model is good at. Requiring the transcript to contain the same option numbers means a mishearing cannot invent a free slot. When the two disagree the overlap is kept and the disagreement is recorded. |
-| Did they confirm? | The transcript, after the turn that asked the confirmation question. The extracted answer can veto a confirmation, never create one. | A summary can flatten "well, maybe" into a yes, and an early "yes, speaking" is not an answer to a question nobody has asked yet. A commitment has to be something the person actually said, about the time they were read. |
+| Did they confirm? | The transcript, after the turn that asked the confirmation question. The extracted answer can veto a confirmation, never create one. | A summary can flatten "well, maybe" into a yes and an early "yes, speaking" is not an answer to a question nobody has asked yet. A commitment has to be something the person actually said, about the time they were read. |
 | Was it a person at all? | Only turns labelled `user`, with voicemail and menu language treated as a machine. | A list of options the caller read out must never be scored as the person choosing them. |
 
 When CALL-E cannot produce a schema-valid result at all, which the API documents
@@ -149,7 +149,7 @@ call and different words get their own key. That is also what makes recovery
 possible: `resume` rebuilds the same payload and therefore the same key, so
 settling a call cannot create a second one.
 
-The keys are the reservation that stops a person being dialled twice, and that
+The keys are the reservation that stops a person being dialled twice and that
 reservation lives at CALL-E. The ledger is not a substitute for it. What the ledger
 does have is a lock: a run creates `<ledger>.lock` with `O_EXCL` before it dials
 anybody and holds it until it finishes, so two processes cannot interleave their
@@ -167,7 +167,7 @@ which is what keeps the budget honest.
 that does not follow: a feasible set that grew, a chosen slot the answers do not
 support, a confirmation that is missing from a confirmed outcome, a run that ended
 in anything other than a confirmation without releasing everybody who said yes or
-naming them in `unreleased`, or a call count that does not match the entries.
+naming them in `unreleased` or a call count that does not match the entries.
 
 A ledger can hold more than one round. A crashed or cancelled run leaves no outcome
 entry, `resume` opens a `resume_started` entry and closes with a fresh outcome, and

@@ -77,7 +77,7 @@ test("every call script refuses advice, emergencies and payment details", () => 
   }
 });
 
-test("idempotency keys are stable, specific to phase and slot, and bound to the content", () => {
+test("idempotency keys are stable, specific to phase and slot and bound to the content", () => {
   const gather = { task: gatherTask(request, plumber, request.slots), schema: gatherSchema(3) };
   const key = idempotencyKey(request, "gather", plumber, undefined, gather);
   assert.match(key, /^mps-ash-lane-3b-leak-gather-plumber-[0-9a-f]{12}$/);

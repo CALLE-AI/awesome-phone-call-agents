@@ -7,7 +7,7 @@
  * confirm calls this reader leads instead.
  *
  * Only `user` turns are read. A list of options the caller read out must never be
- * scored as the person choosing them, and a confirmation has to come after the
+ * scored as the person choosing them and a confirmation has to come after the
  * confirmation question, so a greeting cannot be read as agreement to a time the
  * person has not heard yet.
  */
@@ -226,7 +226,7 @@ export interface CommitReading {
   excerpt: string[];
 }
 
-/** The first turn where the caller asked the confirmation question, or -1. */
+/** Where the caller asked the confirmation question. -1 when it was never asked. */
 function confirmQuestionAt(turns: TranscriptTurn[]): number {
   return turns.findIndex(
     (turn) =>
