@@ -21,7 +21,7 @@
  */
 
 import { CalleCallError, CalleWaitTimeout, type CallePort, type CreateCallInput } from "./calle.js";
-import { worstCaseCalls } from "./config.js";
+import { ConfigError, worstCaseCalls } from "./config.js";
 import { clockOf, withinCallingHours } from "./hours.js";
 import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
@@ -86,20 +86,37 @@ export interface CallOutcome {
 /**
  * Statuses a call can no longer move out of.
  *
- * Anything else, so `queued`, `in_progress`, `ringing`, `scheduled`, a missing
- * status or one the API adds later, means the call is still in flight: it keeps
- * its call id, `resume` owns it and no phase result is decided off it. One set
- * for the coordinator and for recovery, so the two cannot drift apart on what
- * finished means.
+ * The API's `CallStatus` is `queued`, `in_progress`, `completed`, `failed` or
+ * `canceled` (`@call-e/calle` 0.2.2,
+ * `dist/generated/schema.d.ts:125`), so exactly three of them are terminal.
+ * Anything else, a status still in flight or one this app has never seen, means
+ * the call is unresolved: it keeps its call id, `resume` owns it and no phase
+ * result is decided off it. One set for the coordinator and for recovery, so the
+ * two cannot drift apart on what finished means.
  */
-export const TERMINAL_STATUSES = new Set([
-  "completed",
-  "failed",
-  "canceled",
-  "no_answer",
-  "busy",
-  "voicemail",
-]);
+export const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled"]);
+
+/**
+ * A port that dials real phones may not place its first call with no durable
+ * state.
+ *
+ * With no ledger every recovery entry is discarded, so a crash or a second
+ * interrupt after somebody has said yes on a call leaves no way to reconcile that
+ * call and nobody to tell them the time is off. The CLI refuses this at the flag.
+ * This is the same refusal one level down, so a caller that embeds the
+ * coordinator cannot lose it. A port pointed at the local fake CALL-E is not
+ * live, which is why the unit suite can still run in memory.
+ */
+export function assertDurableState(port: CallePort, ledgerPath: string | null): void {
+  if (port.live !== true) {
+    return;
+  }
+  if (ledgerPath === null || ledgerPath.length === 0) {
+    throw new ConfigError(
+      "This port places real calls, so it needs a ledger: pass --ledger <file>, or ledgerPath. That file is what resume reads to settle a call this run could not finish and to place the release calls it owes. Nothing was dialled.",
+    );
+  }
+}
 
 class Aborted extends Error {}
 
@@ -460,6 +477,7 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
  * a second process cannot interleave its lines into the same history.
  */
 export async function runCoordination(options: RunOptions): Promise<RunResult> {
+  assertDurableState(options.port, options.ledgerPath ?? null);
   const lock = options.ledgerPath == null ? null : acquireLedgerLock(options.ledgerPath);
   try {
     return await coordinate(options);

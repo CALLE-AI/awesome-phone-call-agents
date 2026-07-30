@@ -20,6 +20,12 @@ export interface CreateCallInput {
 }
 
 export interface CallePort {
+  /**
+   * True when this port talks to a real CALL-E, so a call it places rings a real
+   * phone. A port pointed at loopback is the local fake server or the demo. The
+   * coordinator reads this to decide what it may do without durable state.
+   */
+  live?: boolean;
   createCall(input: CreateCallInput, idempotencyKey: string): Promise<CallSnapshot>;
   waitForResult(callId: string, options: { timeoutMs: number; intervalMs: number }): Promise<CallSnapshot>;
   getCall(callId: string): Promise<CallSnapshot>;
@@ -39,7 +45,22 @@ export class CalleWaitTimeout extends Error {}
 export const DEFAULT_BASE_URL = "https://api.heycall-e.com";
 
 /** Loopback names the local fake CALL-E can bind to. */
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/** Lowercased and without the brackets `new URL()` leaves around an IPv6 host. */
+function normalizeHost(hostname: string): string {
+  return hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+}
+
+/**
+ * Is this host the machine we are running on.
+ *
+ * Exact names only. `localhost.attacker.example` is not loopback and neither is
+ * anything that merely ends in one of these.
+ */
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(normalizeHost(hostname));
+}
 
 /**
  * Decide whether a base URL may carry the API key, before any request is made.
@@ -59,7 +80,7 @@ export function assertTrustedBaseUrl(baseUrl: string): string {
       `${baseUrl} is not a URL. Set --base-url or CALLE_BASE_URL to an https URL such as ${DEFAULT_BASE_URL}.`,
     );
   }
-  const loopback = LOOPBACK_HOSTS.has(url.hostname.toLowerCase());
+  const loopback = isLoopbackHost(url.hostname);
   if (url.protocol === "https:" || (url.protocol === "http:" && loopback)) {
     return baseUrl;
   }
@@ -88,6 +109,9 @@ export async function createSdkPort(options: {
   };
 
   return {
+    // A call through this port rings a real phone unless it is aimed at the fake
+    // server on this machine.
+    live: !isLoopbackHost(new URL(baseUrl).hostname),
     async createCall(input, idempotencyKey) {
       try {
         return (await client.calls.create(

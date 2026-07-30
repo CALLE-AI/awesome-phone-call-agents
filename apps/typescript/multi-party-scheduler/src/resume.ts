@@ -16,6 +16,7 @@
 import { CalleCallError, CalleWaitTimeout, type CallePort } from "./calle.js";
 import { worstCaseCalls } from "./config.js";
 import {
+  assertDurableState,
   type CallOutcome,
   evaluateCommit,
   placeCall,
@@ -184,6 +185,7 @@ function partyById(request: CoordinationRequest, id: string): Party | undefined 
 }
 
 export async function resumeCoordination(options: ResumeOptions): Promise<RunResult> {
+  assertDurableState(options.port, options.ledgerPath);
   const lock = acquireLedgerLock(options.ledgerPath);
   try {
     return await recover(options);

@@ -195,7 +195,7 @@ test("resume refuses a ledger another request wrote", async () => {
 
 /**
  * A run where the one release call it owed reached an answering machine. The
- * call is over, so its status is terminal, and the person still has not been
+ * call completed, so nothing is left to settle, and the person still has not been
  * told. That gap is what the debt rules below are about.
  */
 const MACHINE_RELEASE: FakeScript[] = [
@@ -247,8 +247,9 @@ test("a terminal release call that reached nobody leaves the debt owed", async (
       result: { ...machine.result, ...overrides },
     });
 
-    // A failed or canceled release call is terminal and reached nobody, so it
-    // cannot erase a debt the outcome entry already recorded.
+    // A release call that ended and reached nobody cannot erase a debt the
+    // outcome entry already recorded. The last three are statuses this API never
+    // returns, which must not be read as delivery either.
     for (const status of ["failed", "canceled", "no_answer", "busy", "voicemail"]) {
       assert.deepEqual(
         inspectLedger([...entries, later({ call_status: status })]).owedReleases,
