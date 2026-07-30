@@ -17,7 +17,7 @@
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
 import { CalleCallError, CalleWaitTimeout, isTerminalCallStatus, type CallePort } from "./calle.js";
-import { agreementEvidence, readTranscript, supportingTurn } from "./read.js";
+import { agreementEvidence, codeNamedAround, mentionsDatetime, readTranscript, supportingTurn } from "./read.js";
 import {
   buildCallInput,
   buildTask,
@@ -303,22 +303,35 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const madeRaw = readString(structured, "commitment_made");
   const offered = readString(structured, "offered_datetime");
   const offeredSpoken = /^\d{4}-\d{2}-\d{2}T/.test(offered) ? spokenLocal(offered) : offered;
+  // Whether the callee named the time the extraction reported. A time only the
+  // extraction knows about is not a time to print back at somebody.
+  const offeredSaid =
+    offered.length > 0 && turns.some((turn) => turn.speaker === "user" && mentionsDatetime(turn.text, offered));
   let commitment: CommitmentState = "none_sought";
   let agreedQuote = "";
-  /** Booking language the transcript carries that is not evidence for the claim. */
-  let unrelatedQuote = "";
+  let agreedIndex = -1;
+  /** Why the report will not stand behind a claimed agreement, for the note. */
+  let unconfirmedNote = "";
   if (request.goal.commitment !== "none") {
     if (madeRaw === "accepted") {
       const agreement = agreementEvidence(turns, request.goal.commitment, offered);
-      agreedQuote = agreement.quote;
-      if (agreedQuote.length === 0) {
+      if (agreement.quote.length === 0) {
         // An agreement about a time nobody said is not an agreement this app can
         // report, so it does not become committed and it does not become an
-        // unauthorized booking either. Both of those print a time off the
-        // extraction alone. It reads unconfirmed and the note says which it was.
+        // unauthorized booking either. Both of those act on the extraction alone.
         commitment = "unconfirmed";
-        unrelatedQuote = agreement.otherQuote;
+        unconfirmedNote =
+          agreement.otherQuote.length > 0
+            ? `CALL-E reported an agreement for ${offeredSpoken || "a time"} and no turn in the transcript agrees to that. They did say: "${agreement.otherQuote}"`
+            : "";
+      } else if (request.goal.commitment !== "confirm_existing" && offered.length === 0) {
+        // Somebody agreed to something and the extraction gave no time for it, so
+        // there is nothing to hold against the windows the person authorized.
+        commitment = "unconfirmed";
+        unconfirmedNote = `CALL-E reported an agreement and no time for it, so there is nothing to check against the windows you authorized. They did say: "${agreement.quote}"`;
       } else {
+        agreedQuote = agreement.quote;
+        agreedIndex = agreement.index;
         commitment =
           request.goal.commitment === "confirm_existing"
             ? "committed"
@@ -332,6 +345,11 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
       commitment = "declined_by_callee";
     }
   }
+
+  // A reference number belongs to an agreement, so it is held to the same standard:
+  // somebody has to have read it out where the agreement was made.
+  const claimedCode = readString(structured, "confirmation_code");
+  const confirmationCode = codeNamedAround(turns, agreedIndex, claimedCode) ? claimedCode : "";
 
   const answered = answers.filter((answer) => answer.answered).length;
   let outcome: ErrandOutcome;
@@ -365,7 +383,9 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     request.disclosure,
     "what the caller said",
   );
-  const notes = [readString(structured, "notes")];
+  const claimedNote = readString(structured, "notes");
+  // Labelled, because it is the model's own sentence and nothing here checked it.
+  const notes = [claimedNote.length > 0 ? `CALL-E's note, unchecked: "${claimedNote}"` : ""];
   if (lowConfidence) {
     notes.push(`CALL-E scored its own completion low (${String(confidence?.score)}), so treat the answers with care.`);
   }
@@ -377,10 +397,15 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   if (agreedQuote.length > 0) {
     notes.push(`They agreed with: "${agreedQuote}"`);
   }
+  if (claimedCode.length > 0 && confirmationCode.length === 0 && agreedQuote.length > 0) {
+    notes.push(
+      "CALL-E reported a confirmation code and nobody read one out around the agreement, so it is not in this report.",
+    );
+  }
   if (commitment === "unconfirmed") {
     notes.push(
-      unrelatedQuote.length > 0
-        ? `CALL-E reported an agreement for ${offeredSpoken || "a time"} and no turn in the transcript agrees to that. They did say: "${unrelatedQuote}"`
+      unconfirmedNote.length > 0
+        ? unconfirmedNote
         : "CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.",
     );
   }
@@ -393,8 +418,7 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     outcome,
     commitment,
     committed_datetime: commitment === "committed" && offered.length > 0 ? offered : null,
-    // A reference number belongs to an agreement, so it goes with the evidence for one.
-    confirmation_code: agreedQuote.length > 0 ? readString(structured, "confirmation_code") : "",
+    confirmation_code: confirmationCode,
     answers,
     disclosed,
     authorized_but_unused: request.disclosure
@@ -403,7 +427,9 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     leaks,
     reached_person: reading.reachedPerson,
     callee_notes: notes.filter((note) => note.length > 0).join(" "),
-    next_step: nextStep(outcome, commitment, request, offeredSpoken),
+    // A time only the extraction knows about is not read back to the person as if
+    // they had been offered it.
+    next_step: nextStep(outcome, commitment, request, commitment === "proposal_only" && !offeredSaid ? "" : offeredSpoken),
     call_id: call.id,
     provider_call_id: attempt?.providerCallId ?? null,
     call_status: call.status,

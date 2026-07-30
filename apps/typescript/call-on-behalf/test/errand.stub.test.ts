@@ -164,6 +164,41 @@ test("an agreement about another time is not the agreement the extraction claims
   assert.match(report.next_step, /treat nothing as booked/);
 });
 
+test("a confirmation code nobody read out is not in the report", async () => {
+  const user = [...USER_LINES];
+  user[2] = "Earliest is Thursday the thirteenth at nine forty in the morning. I can hold that slot.";
+  const report = await run(snapshot("completed", conversation(BOT_LINES, user), goodResult()));
+  assert.equal(report.commitment, "committed");
+  assert.equal(report.confirmation_code, "");
+  assert.match(report.callee_notes, /nobody read one out around the agreement/);
+});
+
+test("an agreement to the same time on another day is not this agreement", async () => {
+  // Both days are authorized, so the window check cannot catch this one. The
+  // transcript says Thursday the thirteenth and the extraction says the twelfth.
+  const report = await run(snapshot("completed", conversation(), goodResult("2026-08-12T09:40:00-07:00")));
+  assert.equal(report.commitment, "unconfirmed");
+  assert.equal(report.committed_datetime, null);
+  assert.equal(report.confirmation_code, "");
+  assert.match(report.callee_notes, /Wednesday, August 12 at 9:40 AM/);
+});
+
+test("an agreement with no time has nothing to check against the windows", async () => {
+  const report = await run(snapshot("completed", conversation(), { ...goodResult(), offered_datetime: "" }));
+  assert.equal(report.commitment, "unconfirmed");
+  assert.equal(report.committed_datetime, null);
+  assert.equal(report.confirmation_code, "");
+  assert.match(report.callee_notes, /no time for it/);
+  assert.equal(report.next_step.includes("outside the windows"), false);
+});
+
+test("the model's own note is labelled as the model's", async () => {
+  const report = await run(
+    snapshot("completed", conversation(), { ...goodResult(), notes: "the receptionist sounded rushed" }),
+  );
+  assert.match(report.callee_notes, /CALL-E's note, unchecked: "the receptionist sounded rushed"/);
+});
+
 test("a call that ended without a conversation is read from its own status", async () => {
   const cases: [string, string][] = [
     ["no_answer", "not_reached"],

@@ -81,6 +81,20 @@ the extraction alone. The note quotes what they did say, so nobody reads
 `unconfirmed` as nothing having happened. Any confirmation code goes with the
 agreement.
 
+The time is matched as a wall clock, in the forms a transcript carries. When a turn
+names a day or a weekday it has to be the claimed one, so the same time on another
+authorized day is not reported as this one. A turn that names no day is taken as the
+day the caller had already established.
+
+Everything else the report prints off the extraction is held to the same standard. A
+confirmation code has to have been read out around the agreement, or the report drops
+it and says it did. A time no callee turn named is not read back as an offer, so the
+next step says "another time" rather than a time nobody said. An agreement with no
+time at all cannot be checked against the windows, so it reads `unconfirmed` too.
+CALL-E's own note is printed with its name on it, because nothing here checked that
+sentence. The one claim left standing on the extraction alone is
+`declined_by_callee`, which says less than the extraction did rather than more.
+
 When nothing supports the claim, the report says not answered or `unconfirmed` and
 notes that CALL-E claimed otherwise. It will sometimes be too strict, in two ways.
 The checks compare words, so a paraphrase they cannot see reads as unsupported. And

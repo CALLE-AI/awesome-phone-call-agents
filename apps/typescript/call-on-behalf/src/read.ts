@@ -217,14 +217,73 @@ function phrase(words: string, tail = ""): RegExp {
 /** So "nine forty" does not match somebody saying nine forty five. */
 const NOT_ANOTHER_NUMBER = `(?![^a-z0-9]{1,3}(?:${ONE_WORDS.slice(1).join("|")}))`;
 
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const MONTHS =
+  "january|february|march|april|may|june|july|august|september|october|november|december";
+const ORDINAL_ONES = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth"];
+const ORDINAL_TEENS = [
+  "tenth", "eleventh", "twelfth", "thirteenth", "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth",
+  "nineteenth",
+];
+const ORDINAL_TENS: Record<number, string> = { 10: "tenth", 20: "twentieth", 30: "thirtieth" };
+
+/** How a transcript says a day of the month, as a word. */
+function dayWord(day: number): string {
+  if (day < 10) {
+    return ORDINAL_ONES[day]!;
+  }
+  if (day < 20) {
+    return ORDINAL_TEENS[day - 10]!;
+  }
+  if (day % 10 === 0) {
+    return ORDINAL_TENS[day] ?? "";
+  }
+  return `${TEN_WORDS[Math.floor(day / 10)]!} ${ORDINAL_ONES[day % 10]!}`;
+}
+
+/**
+ * Which days of the month the text names, if any.
+ *
+ * A bare number is not a day: "nine forty" written as `9:40` is a time. So a digit
+ * counts only where the sentence marks it as a date, which is an ordinal suffix, the
+ * word "the" in front of it or a month name beside it. Ordinal words are a date on
+ * their own.
+ */
+function daysNamed(text: string): Set<number> {
+  const days = new Set<number>();
+  const dated = new RegExp(`\\b(?:(\\d{1,2})(?:st|nd|rd|th)|the (\\d{1,2})\\b|(?:${MONTHS})\\s+(\\d{1,2})\\b)`, "gi");
+  for (const match of text.matchAll(dated)) {
+    const found = Number(match[1] ?? match[2] ?? match[3]);
+    if (found >= 1 && found <= 31) {
+      days.add(found);
+    }
+  }
+  for (let day = 1; day <= 31; day += 1) {
+    const word = dayWord(day);
+    if (word.length > 0 && phrase(word).test(text)) {
+      days.add(day);
+    }
+  }
+  return days;
+}
+
+/** Which weekdays the text names, if any. */
+function weekdaysNamed(text: string): Set<string> {
+  return new Set(WEEKDAYS.filter((weekday) => new RegExp(`\\b${weekday}\\b`, "i").test(text)));
+}
+
 /**
  * Whether a turn names this datetime.
  *
  * The extraction hands back ISO 8601 when it could work the time out, so that is
  * compared as the wall clock it was written with, in the forms a transcript actually
- * carries: `9:40`, "nine forty", "half past nine", "ten o'clock". The date is not
- * compared, because a callee who has already said "Thursday" says the time alone
- * after that. Which day it was is what the authorized windows check.
+ * carries: `9:40`, "nine forty", "half past nine", "ten o'clock".
+ *
+ * The day is not required, because a callee who has already said "Thursday" says the
+ * time alone after that. It is checked when the turn names one: a turn that names a
+ * different day or a different weekday from the claimed date is not naming this
+ * datetime, whatever the clock says. Two authorized days at the same time of day is
+ * otherwise a way to report the wrong one.
  *
  * A form this does not know reads as not named, so the report says `unconfirmed`.
  * That is the direction to be wrong in.
@@ -234,13 +293,14 @@ export function mentionsDatetime(text: string, datetime: string): boolean {
   if (value.length === 0) {
     return false;
   }
-  const clock = /^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})/.exec(value);
+  const clock = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value);
   if (clock === null) {
     // Free text from the extraction, so it is compared by its own words.
     return support(tokens(value), text) >= 0.6;
   }
-  const hour = Number(clock[1]);
-  const minute = Number(clock[2]);
+  const date = clock[1]!;
+  const hour = Number(clock[2]);
+  const minute = Number(clock[3]);
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   const word = HOUR_WORDS[hour % 12]!;
   const padded = String(minute).padStart(2, "0");
@@ -265,12 +325,51 @@ export function mentionsDatetime(text: string, datetime: string): boolean {
       patterns.push(phrase(`quarter to ${HOUR_WORDS[(hour + 1) % 12]}`), phrase(`quarter to ${(hour12 % 12) + 1}`));
     }
   }
-  return patterns.some((pattern) => pattern.test(text));
+  if (!patterns.some((pattern) => pattern.test(text))) {
+    return false;
+  }
+  const days = daysNamed(text);
+  if (days.size > 0 && !days.has(Number(date.slice(8, 10)))) {
+    return false;
+  }
+  const weekdays = weekdaysNamed(text);
+  // Midday on the written date, so the weekday is the one the file wrote and not
+  // whatever an offset would shift it to.
+  const weekday = WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]!;
+  return weekdays.size === 0 || weekdays.has(weekday);
+}
+
+/**
+ * Whether a turn names this confirmation code.
+ *
+ * A reference number is read out digit by digit, so "four four seven one" is how
+ * `4471` arrives. The literal form counts too, with or without separators. Anything
+ * else reads as not named, so the report drops the code rather than printing one
+ * nobody said.
+ */
+export function mentionsCode(text: string, code: string): boolean {
+  const wanted = code.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (wanted.length < 2) {
+    return false;
+  }
+  if (text.toLowerCase().replace(/[^a-z0-9]/g, "").includes(wanted)) {
+    return true;
+  }
+  if (!/^\d+$/.test(wanted)) {
+    return false;
+  }
+  const digits = wanted.split("").map((digit) => ONE_WORDS[Number(digit)]!);
+  return (
+    phrase(digits.join(" ")).test(text) ||
+    phrase(digits.map((digit) => (digit === "zero" ? "oh" : digit)).join(" ")).test(text)
+  );
 }
 
 export interface AgreementEvidence {
   /** The callee turn that agrees to what the extraction claims. Empty when none does. */
   quote: string;
+  /** Where that turn is, so anything else claimed about the agreement can be checked there. */
+  index: number;
   /**
    * Booking language in the call that is not evidence for the claim, either because
    * the caller never raised an arrangement or because it is about another time. It
@@ -304,7 +403,7 @@ export function agreementEvidence(
   );
   const prompt = commitmentPromptAt(turns, offered);
   if (prompt === -1) {
-    return { quote: "", otherQuote: booking[0]?.text ?? "" };
+    return { quote: "", index: -1, otherQuote: booking[0]?.text ?? "" };
   }
   let otherQuote = booking[0]?.text ?? "";
   for (const [index, turn] of turns.entries()) {
@@ -318,9 +417,9 @@ export function agreementEvidence(
       otherQuote = turn.text;
       continue;
     }
-    return { quote: turn.text, otherQuote: "" };
+    return { quote: turn.text, index, otherQuote: "" };
   }
-  return { quote: "", otherQuote };
+  return { quote: "", index: -1, otherQuote };
 }
 
 /** Caller language that raises an arrangement, which is what an agreement answers. */
@@ -344,8 +443,23 @@ function commitmentPromptAt(turns: TranscriptTurn[], offered: string): number {
 /** How far either side of the agreement the time may have been said. */
 const NEIGHBOURING_TURNS = 1;
 
+function nearby(turns: TranscriptTurn[], index: number): TranscriptTurn[] {
+  return turns.slice(Math.max(index - NEIGHBOURING_TURNS, 0), index + NEIGHBOURING_TURNS + 1);
+}
+
 function namedAround(turns: TranscriptTurn[], index: number, offered: string): boolean {
-  return turns
-    .slice(Math.max(index - NEIGHBOURING_TURNS, 0), index + NEIGHBOURING_TURNS + 1)
-    .some((turn) => mentionsDatetime(turn.text, offered));
+  return nearby(turns, index).some((turn) => mentionsDatetime(turn.text, offered));
+}
+
+/**
+ * Whether the confirmation code was said around the agreement.
+ *
+ * A reference number is part of the same claim as the booking, so it is held to the
+ * same standard. A code the extraction produced and nobody read out is dropped.
+ */
+export function codeNamedAround(turns: TranscriptTurn[], index: number, code: string): boolean {
+  if (index < 0 || code.trim().length === 0) {
+    return false;
+  }
+  return nearby(turns, index).some((turn) => mentionsCode(turn.text, code));
 }

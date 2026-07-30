@@ -94,7 +94,13 @@ test("a time the caller was not allowed to accept comes back as a proposal", asy
       {
         phone: CLINIC,
         botLines: BOT_LINES,
-        userLines: USER_LINES,
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "Nothing this week. I could do the twentieth at eleven.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
         structuredResult: {
           ...goodResult(),
           commitment_made: "other_time_offered",
@@ -109,6 +115,30 @@ test("a time the caller was not allowed to accept comes back as a proposal", asy
       assert.equal(report.outcome, "partially_met");
       assert.match(report.next_step, /Thursday, August 20 at 11:00 AM/);
       assert.match(report.next_step, /nothing was agreed/);
+    },
+  );
+});
+
+test("a time only the extraction knows about is not read back as an offer", async () => {
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: USER_LINES,
+        structuredResult: {
+          ...goodResult(),
+          commitment_made: "other_time_offered",
+          offered_datetime: "2026-08-20T11:00:00-07:00",
+          confirmation_code: "",
+        },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "proposal_only");
+      assert.match(report.next_step, /They offered another time and nothing was agreed/);
+      assert.equal(report.next_step.includes("August 20"), false);
     },
   );
 });

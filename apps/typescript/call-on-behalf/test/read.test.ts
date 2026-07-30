@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agreementEvidence, readTranscript, supportingTurn } from "../src/read.js";
+import { agreementEvidence, mentionsCode, mentionsDatetime, readTranscript, supportingTurn } from "../src/read.js";
 import type { ErrandQuestion, TranscriptTurn } from "../src/types.js";
 
 const EARLIEST: ErrandQuestion = {
@@ -131,6 +131,25 @@ test("confirming an existing appointment reads different from booking one", () =
   ]);
   assert.equal(agreementEvidence(confirmed, "slot_within_windows").quote, "");
   assert.match(agreementEvidence(confirmed, "confirm_existing").quote, /still on/);
+});
+
+test("a time is not named when the turn names another day", () => {
+  assert.equal(mentionsDatetime("Thursday the thirteenth at nine forty then.", "2026-08-13T09:40:00-07:00"), true);
+  // The same clock on another day. Both of these can be inside the authorized windows.
+  assert.equal(mentionsDatetime("Thursday the thirteenth at nine forty then.", "2026-08-12T09:40:00-07:00"), false);
+  assert.equal(mentionsDatetime("Wednesday at nine forty then.", "2026-08-13T09:40:00-07:00"), false);
+  // No day in the turn, so the clock is enough: the caller established the day.
+  assert.equal(mentionsDatetime("Nine forty is fine.", "2026-08-13T09:40:00-07:00"), true);
+  assert.equal(mentionsDatetime("Nine forty is fine.", "2026-08-13T14:00:00-07:00"), false);
+});
+
+test("a confirmation code counts when somebody read it out", () => {
+  assert.equal(mentionsCode("Reference four four seven one.", "4471"), true);
+  assert.equal(mentionsCode("Reference 4471.", "4471"), true);
+  assert.equal(mentionsCode("Reference 44-71.", "4471"), true);
+  assert.equal(mentionsCode("Reference four four seven two.", "4471"), false);
+  assert.equal(mentionsCode("No reference came up at all.", "4471"), false);
+  assert.equal(mentionsCode("Reference oh one two.", "012"), true);
 });
 
 test("reading the transcript still finds the machine and the refusal", () => {

@@ -54,7 +54,11 @@ The extraction proposes. The transcript decides.
   caller raised the arrangement and about the time the report would print.
   Otherwise the commitment reads `unconfirmed`, the next step says to treat nothing
   as booked and the note quotes whatever they did say. The confirmation code
-  belongs to the agreement, so it is dropped too.
+  belongs to the agreement, so a code nobody read out is dropped even when the
+  agreement stands.
+- A time no callee turn named is not read back as an offer, and CALL-E's own note
+  is printed with its name on it. Nothing in the report is both unchecked and
+  unlabelled.
 - A call this app could not read comes back as `outcome_unknown`, never as a
   failure and never with "nothing was said". So does a call CALL-E has not finished
   with: only a terminal status is read as a result, and a call still `queued` or
