@@ -155,6 +155,9 @@ may accept, the result contract, the privacy check and a receipt for that exact
 preview. It contacts nothing. The person sees what will be said about them before
 anything rings.
 
+The receipt covers every line the preview printed, including the reason for
+delegation. That field is hashed on this machine and still never sent to CALL-E.
+
 ## One live call
 
 The receipt is what carries consent from the preview to the call.

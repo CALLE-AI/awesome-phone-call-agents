@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { renderPreview } from "../src/report.js";
 import {
   buildCallInput,
   buildResultSchema,
@@ -8,11 +9,13 @@ import {
   idempotencyKey,
   metadata,
   previewReceipt,
+  receiptMaterial,
   spokenLocal,
   spokenWindow,
   withinWindows,
 } from "../src/script.js";
-import { errandRequest } from "./fixtures.js";
+import type { ErrandRequest } from "../src/types.js";
+import { CLINIC, errandRequest } from "./fixtures.js";
 
 const WINDOWS = [
   { from: "2026-08-12T09:00:00-07:00", to: "2026-08-12T17:00:00-07:00" },
@@ -162,6 +165,78 @@ test("the preview receipt covers the script, the budget and the windows", () => 
   });
   assert.notEqual(previewReceipt(request), previewReceipt(widerBudget));
   assert.notEqual(previewReceipt(request), previewReceipt(laterWindow));
+});
+
+test("the receipt covers every field the preview prints", () => {
+  const request = errandRequest();
+  const base = previewReceipt(request);
+  assert.match(base, /^[0-9a-f]{16}$/);
+  assert.equal(base, previewReceipt(errandRequest()));
+
+  // The inverse check. Every labelled line in the preview header, and nothing else
+  // printed there, so a line added later cannot slip past this test.
+  const labelled = renderPreview(request)
+    .split("\n")
+    .filter((line) => /^[A-Z][A-Za-z ]{2,13}\S? {2,}/.test(line));
+  assert.deepEqual(
+    labelled.map((line) => line.split(/ {2,}/)[0]),
+    ["Errand", "On behalf of", "Reason", "Calling", "Number from", "Language", "Goal", "May agree to"],
+  );
+  const material = receiptMaterial(request);
+  for (const value of [
+    request.errandId,
+    request.onBehalfOf.name,
+    request.onBehalfOf.reason_for_delegation,
+    request.callee.name,
+    // The preview masks the number. The receipt covers the number the mask came from.
+    request.callee.phone,
+    request.callee.published_source,
+    request.policy.language,
+    request.goal.summary,
+    request.goal.commitment,
+    spokenWindow(request.authorizedWindows[0]!),
+    request.disclosure[1]!.label,
+    request.disclosure[1]!.value,
+    request.questions[2]!.text,
+  ]) {
+    assert.equal(material.includes(value), true, `the preview prints ${value} and the receipt does not cover it`);
+  }
+
+  // And one edit per line, because covering a value is no use if the hash ignores it.
+  const edits: [string, ErrandRequest][] = [
+    ["Errand", errandRequest({ errand_id: "bayview-checkup-sep" })],
+    ["On behalf of", errandRequest({ on_behalf_of: { name: "F Haddad", reason_for_delegation: "she is deaf and this clinic takes bookings by phone only" } })],
+    ["Reason", errandRequest({ on_behalf_of: { name: "Fatima Haddad", reason_for_delegation: "she cannot use a phone line" } })],
+    ["Calling", errandRequest({ callee: { name: "Bayview Clinic", phone: CLINIC, published_source: "https://example.com/bayview-family-clinic/contact", region: "US" } })],
+    ["the number", errandRequest({ callee: { name: "Bayview Family Clinic", phone: "+14155550133", published_source: "https://example.com/bayview-family-clinic/contact", region: "US" } })],
+    ["Number from", errandRequest({ callee: { name: "Bayview Family Clinic", phone: CLINIC, published_source: "https://example.com/other-page", region: "US" } })],
+    ["Language", errandRequest({ policy: { language: "en-GB" } })],
+    ["Goal", errandRequest({ goal: { summary: "book a routine check-up for Fatima Haddad", commitment: "slot_within_windows" } })],
+    ["May agree to", errandRequest({ goal: { summary: "book a routine check-up for Fatima Haddad, who is a new patient", commitment: "confirm_existing" } })],
+    ["a window", errandRequest({ authorized_windows: [{ from: "2026-08-12T09:00:00-07:00", to: "2026-08-12T16:00:00-07:00" }] })],
+    ["the budget", errandRequest({ disclosure: [{ key: "full_name", label: "the caller's full name", value: "Fatima Haddad" }] })],
+    ["a question", errandRequest({ questions: [{ id: "earliest", text: "What is your earliest appointment next week?", answer: "datetime" }] })],
+  ];
+  for (const [line, edited] of edits) {
+    assert.notEqual(previewReceipt(edited), base, `editing ${line} left the receipt unchanged`);
+  }
+});
+
+test("the reason for delegation is inside the receipt and still never sent", () => {
+  const request = errandRequest();
+  const reworded = errandRequest({
+    on_behalf_of: { name: "Fatima Haddad", reason_for_delegation: "she cannot use a phone line at all" },
+  });
+  // Inside the hash, because the preview prints it and the receipt is what the
+  // person is agreeing to. Reword it and the consent no longer matches.
+  assert.notEqual(previewReceipt(request), previewReceipt(reworded));
+  assert.match(renderPreview(request), /Reason        she is deaf and this clinic takes bookings by phone only/);
+  // Never sent, which is the round 1 fix. Hashing it locally does not send it.
+  const sent = canonicalJson(buildCallInput(request));
+  assert.equal(sent.includes(request.onBehalfOf.reason_for_delegation), false);
+  assert.equal(sent.includes("deaf"), false);
+  assert.equal(buildTask(request).includes("deaf"), false);
+  assert.equal(JSON.stringify(metadata(request)).includes("deaf"), false);
 });
 
 test("what is sent to CALL-E is built in one place", () => {

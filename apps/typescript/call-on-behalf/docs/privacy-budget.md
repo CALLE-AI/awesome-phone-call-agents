@@ -65,6 +65,10 @@ printed in the preview, marked as staying local, then dropped: it never reaches 
 task, the metadata or the transcript. The only things about the person that go out
 are their name and the disclosure list.
 
+It is inside the preview receipt, because the receipt has to cover what the preview
+showed. That is a hash computed on this machine and compared on this machine, so
+the field is bound to the consent without ever leaving.
+
 ## The sensitive topic warning
 
 Clinical, legal and financial subject matter can walk in through `goal.summary` or

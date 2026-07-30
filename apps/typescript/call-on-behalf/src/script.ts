@@ -14,7 +14,8 @@
  *
  * Two short hashes come off the same canonical JSON of what will be sent. The
  * idempotency key, so a changed errand is a different call rather than a reused
- * one. The preview receipt, which is what `call --live` demands back.
+ * one. The preview receipt, which is what `call --live` demands back, and which
+ * covers the whole errand file so that everything the preview prints is inside it.
  */
 
 import { createHash } from "node:crypto";
@@ -237,20 +238,39 @@ function shortHash(text: string, length: number): string {
 }
 
 /**
+ * Exactly what the receipt covers, as canonical JSON.
+ *
+ * Exported so the claim is checkable rather than asserted: every value the preview
+ * prints has to appear in here, and a test walks the preview to prove it.
+ *
+ * The errand goes in as the app parsed it, so nothing the preview shows is left
+ * out. `reason_for_delegation` is in here because the preview prints it, and it
+ * still never leaves the machine: `buildCallInput` is the only thing sent to CALL-E
+ * and this string is only ever hashed and compared locally. The call input goes in
+ * as well, so a change in what will actually be said moves the receipt too.
+ */
+export function receiptMaterial(request: ErrandRequest): string {
+  return canonicalJson({
+    errand: {
+      errand_id: request.errandId,
+      on_behalf_of: request.onBehalfOf,
+      callee: request.callee,
+      goal: request.goal,
+      disclosure: request.disclosure,
+      questions: request.questions,
+      authorized_windows: request.authorizedWindows,
+      policy: request.policy,
+    },
+    call: buildCallInput(request),
+  });
+}
+
+/**
  * The receipt for a preview.
  *
- * It covers the script, the disclosure list and the windows, which is everything
- * the preview shows and everything the person is agreeing to. Edit the errand file
- * and the receipt changes, so the consent no longer matches and `call --live`
- * refuses. That is the point of it.
+ * Edit the errand file and the receipt changes, so the consent no longer matches
+ * and `call --live` refuses. That is the point of it.
  */
 export function previewReceipt(request: ErrandRequest): string {
-  return shortHash(
-    canonicalJson({
-      call: buildCallInput(request),
-      disclosure: request.disclosure,
-      windows: request.authorizedWindows,
-    }),
-    16,
-  );
+  return shortHash(receiptMaterial(request), 16);
 }

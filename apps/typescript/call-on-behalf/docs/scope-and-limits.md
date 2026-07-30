@@ -129,8 +129,11 @@ down where the number came from is a small brake worth having.
 
 The errand file is the consent record: who is delegating, why, what may be said
 about them and what may be agreed. `preview` prints the exact script and the
-disclosure list so they can read it before anything rings. It ends with a receipt:
-a short hash of the script, the budget and the windows.
+disclosure list so they can read it before anything rings. It ends with a receipt: a
+short hash of the errand file as the app parsed it, together with the exact call
+that would be sent. Everything the preview prints is inside that hash, including
+`reason_for_delegation`, which is hashed here and still never sent to CALL-E. A test
+walks the labelled lines of the preview and fails if one of them is not covered.
 
 `call --live` will not run without that receipt. A missing one is a usage error and
 a stale one names the file as changed and refuses. Nothing is sent either way. So
