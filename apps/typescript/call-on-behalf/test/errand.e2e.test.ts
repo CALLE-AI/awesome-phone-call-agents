@@ -68,7 +68,13 @@ test("a time outside the authorized windows is reported as an unauthorized agree
       {
         phone: CLINIC,
         botLines: BOT_LINES,
-        userLines: USER_LINES,
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "Nothing this week. I have put her in for Saturday the fifteenth at ten o'clock.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
         structuredResult: goodResult("2026-08-15T10:00:00-07:00"),
       },
     ],

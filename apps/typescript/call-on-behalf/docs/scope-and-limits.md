@@ -69,9 +69,17 @@ The report prints the turn it stands on. Every answer shape is anchored to its
 question: the caller must have asked it in the transcript, and the supporting turn
 must be one of the two callee turns after it. That holds for text and datetime
 answers as much as for a yes or a no, because "Thursday at nine forty" said while
-discussing something else is not an answer to a question nobody asked. An agreement
-is reported when the transcript shows somebody agreeing. Any confirmation code goes
-with it.
+discussing something else is not an answer to a question nobody asked.
+
+An agreement is reported when the transcript shows somebody agreeing to the thing
+the report would print. It is anchored twice: to the turn where the caller raised
+the arrangement, and to the time itself, which has to be named in the agreeing turn
+or in the turn either side of it. Booking language on its own proves nothing. An
+agreement about some other time reads `unconfirmed`, not `committed` and not
+`outside_authorized_window`, because both of those would print or act on a time off
+the extraction alone. The note quotes what they did say, so nobody reads
+`unconfirmed` as nothing having happened. Any confirmation code goes with the
+agreement.
 
 When nothing supports the claim, the report says not answered or `unconfirmed` and
 notes that CALL-E claimed otherwise. It will sometimes be too strict, in two ways.

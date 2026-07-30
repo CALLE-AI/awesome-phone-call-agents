@@ -141,6 +141,29 @@ test("an answer to a question nobody asked is not an answer", async () => {
   assert.match(report.callee_notes, /1 answer\(s\) the transcript does not support/);
 });
 
+test("an agreement about another time is not the agreement the extraction claims", async () => {
+  // Ray's case: booking language in the call, and a different time from the
+  // extraction that happens to fall inside an authorized window.
+  const user = [
+    "Bayview Family Clinic, how can I help?",
+    "Let me look. Can I take the date of birth?",
+    "Nothing on Thursday, I am afraid. I have booked her in for Tuesday the eighteenth at half past three.",
+    "Yes, we take Blue Shield PPO.",
+    "Photo identification and the insurance card.",
+  ];
+  const report = await run(
+    snapshot("completed", conversation(BOT_LINES, user), goodResult("2026-08-12T14:00:00-07:00")),
+  );
+  assert.equal(report.commitment, "unconfirmed");
+  assert.equal(report.committed_datetime, null);
+  assert.equal(report.confirmation_code, "");
+  assert.notEqual(report.outcome, "goal_met");
+  assert.match(report.callee_notes, /no turn in the transcript agrees to that/);
+  // What they did agree to is quoted, so the person is not told nothing happened.
+  assert.match(report.callee_notes, /I have booked her in for Tuesday/);
+  assert.match(report.next_step, /treat nothing as booked/);
+});
+
 test("a call that ended without a conversation is read from its own status", async () => {
   const cases: [string, string][] = [
     ["no_answer", "not_reached"],

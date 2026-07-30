@@ -189,15 +189,163 @@ const CONFIRMED_PATTERNS: RegExp[] = [
   /\byes,? (?:she|he|they|you) (?:are|is) (?:booked|down|scheduled|confirmed)\b/i,
 ];
 
+const HOUR_WORDS = ["twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"];
+const ONE_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const TEEN_WORDS = [
+  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+];
+const TEN_WORDS = ["", "", "twenty", "thirty", "forty", "fifty"];
+
+/** How a transcript says the minutes past an hour. */
+function minuteWords(minute: number): string[] {
+  if (minute < 10) {
+    return [`oh ${ONE_WORDS[minute]}`, `zero ${ONE_WORDS[minute]}`];
+  }
+  if (minute < 20) {
+    return [TEEN_WORDS[minute - 10]!];
+  }
+  const tens = TEN_WORDS[Math.floor(minute / 10)]!;
+  const ones = minute % 10;
+  return ones === 0 ? [tens] : [`${tens} ${ONE_WORDS[ones]}`];
+}
+
+/** A spoken phrase as a pattern, allowing for punctuation between its words. */
+function phrase(words: string, tail = ""): RegExp {
+  return new RegExp(`\\b${words.split(" ").join("[^a-z0-9]{1,3}")}\\b${tail}`, "i");
+}
+
+/** So "nine forty" does not match somebody saying nine forty five. */
+const NOT_ANOTHER_NUMBER = `(?![^a-z0-9]{1,3}(?:${ONE_WORDS.slice(1).join("|")}))`;
+
 /**
- * The callee turn that shows something was agreed. Empty when the transcript does
- * not show it. An extraction saying `accepted` is not an agreement on its own.
+ * Whether a turn names this datetime.
+ *
+ * The extraction hands back ISO 8601 when it could work the time out, so that is
+ * compared as the wall clock it was written with, in the forms a transcript actually
+ * carries: `9:40`, "nine forty", "half past nine", "ten o'clock". The date is not
+ * compared, because a callee who has already said "Thursday" says the time alone
+ * after that. Which day it was is what the authorized windows check.
+ *
+ * A form this does not know reads as not named, so the report says `unconfirmed`.
+ * That is the direction to be wrong in.
  */
-export function agreementTurn(turns: TranscriptTurn[], commitment: CommitmentMode): string {
+export function mentionsDatetime(text: string, datetime: string): boolean {
+  const value = datetime.trim();
+  if (value.length === 0) {
+    return false;
+  }
+  const clock = /^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})/.exec(value);
+  if (clock === null) {
+    // Free text from the extraction, so it is compared by its own words.
+    return support(tokens(value), text) >= 0.6;
+  }
+  const hour = Number(clock[1]);
+  const minute = Number(clock[2]);
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const word = HOUR_WORDS[hour % 12]!;
+  const padded = String(minute).padStart(2, "0");
+  const patterns: RegExp[] = [new RegExp(`\\b0?${hour12}[:.]${padded}\\b`), new RegExp(`\\b${hour}[:.]${padded}\\b`)];
+  if (minute === 0) {
+    for (const spoken of [word, String(hour12)]) {
+      patterns.push(phrase(`${spoken} o clock`), phrase(`at ${spoken}`), phrase(`${spoken} am`), phrase(`${spoken} pm`));
+    }
+  } else {
+    for (const spoken of [word, String(hour12)]) {
+      for (const minuteWord of minuteWords(minute)) {
+        patterns.push(phrase(`${spoken} ${minuteWord}`, NOT_ANOTHER_NUMBER));
+      }
+      if (minute === 15) {
+        patterns.push(phrase(`quarter past ${spoken}`));
+      }
+      if (minute === 30) {
+        patterns.push(phrase(`half past ${spoken}`));
+      }
+    }
+    if (minute === 45) {
+      patterns.push(phrase(`quarter to ${HOUR_WORDS[(hour + 1) % 12]}`), phrase(`quarter to ${(hour12 % 12) + 1}`));
+    }
+  }
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+export interface AgreementEvidence {
+  /** The callee turn that agrees to what the extraction claims. Empty when none does. */
+  quote: string;
+  /**
+   * Booking language in the call that is not evidence for the claim, either because
+   * the caller never raised an arrangement or because it is about another time. It
+   * goes in the report so a person is not told nothing happened when something did.
+   */
+  otherQuote: string;
+}
+
+/**
+ * What the transcript shows about an agreement. An extraction saying `accepted` is
+ * not an agreement on its own.
+ *
+ * Two bindings, because booking language on its own proves nothing. The agreement
+ * has to come after the caller raised the arrangement, and when the extraction
+ * claims a datetime that datetime has to be named around the agreement itself: in
+ * the turn, in the caller's proposal before it or in the read back after it. An
+ * unrelated yes plus a plausible time is not a booking.
+ *
+ * Booking language that fails either binding is still worth saying out loud, so it
+ * comes back as `otherQuote` and the report quotes it as what was said instead.
+ */
+export function agreementEvidence(
+  turns: TranscriptTurn[],
+  commitment: CommitmentMode,
+  offered = "",
+): AgreementEvidence {
   const patterns =
     commitment === "confirm_existing" ? [...ACCEPTED_PATTERNS, ...CONFIRMED_PATTERNS] : ACCEPTED_PATTERNS;
-  const turn = turns.find(
-    (candidate) => candidate.speaker === "user" && patterns.some((pattern) => pattern.test(candidate.text)),
+  const booking = turns.filter(
+    (turn) => turn.speaker === "user" && patterns.some((pattern) => pattern.test(turn.text)),
   );
-  return turn?.text ?? "";
+  const prompt = commitmentPromptAt(turns, offered);
+  if (prompt === -1) {
+    return { quote: "", otherQuote: booking[0]?.text ?? "" };
+  }
+  let otherQuote = booking[0]?.text ?? "";
+  for (const [index, turn] of turns.entries()) {
+    if (index <= prompt || turn.speaker !== "user") {
+      continue;
+    }
+    if (!patterns.some((pattern) => pattern.test(turn.text))) {
+      continue;
+    }
+    if (offered.length > 0 && !namedAround(turns, index, offered)) {
+      otherQuote = turn.text;
+      continue;
+    }
+    return { quote: turn.text, otherQuote: "" };
+  }
+  return { quote: "", otherQuote };
+}
+
+/** Caller language that raises an arrangement, which is what an agreement answers. */
+const COMMITMENT_PROMPT =
+  /\b(?:book|books|booked|booking|hold|holding|reserve|reserving|reserved|schedule|scheduled|scheduling|reschedule|pencil|slot|slots|appointment|appointments|availability|confirm|confirming)\b/i;
+
+/** Where the caller raised the arrangement. -1 when it never did. */
+function commitmentPromptAt(turns: TranscriptTurn[], offered: string): number {
+  for (const [index, turn] of turns.entries()) {
+    if (turn.speaker !== "bot") {
+      continue;
+    }
+    // Proposing the time is raising the arrangement as much as the word book is.
+    if (COMMITMENT_PROMPT.test(turn.text) || mentionsDatetime(turn.text, offered)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/** How far either side of the agreement the time may have been said. */
+const NEIGHBOURING_TURNS = 1;
+
+function namedAround(turns: TranscriptTurn[], index: number, offered: string): boolean {
+  return turns
+    .slice(Math.max(index - NEIGHBOURING_TURNS, 0), index + NEIGHBOURING_TURNS + 1)
+    .some((turn) => mentionsDatetime(turn.text, offered));
 }

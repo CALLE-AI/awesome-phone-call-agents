@@ -50,9 +50,11 @@ The extraction proposes. The transcript decides.
   after the caller asked that question. The report prints that turn. An answer
   nobody can be quoted saying comes back as not answered, with a note that CALL-E
   claimed one.
-- Something is agreed only when the transcript shows somebody agreeing. Otherwise
-  the commitment reads `unconfirmed` and the next step says to treat nothing as
-  booked. The confirmation code belongs to the agreement, so it is dropped too.
+- Something is agreed only when the transcript shows somebody agreeing, after the
+  caller raised the arrangement and about the time the report would print.
+  Otherwise the commitment reads `unconfirmed`, the next step says to treat nothing
+  as booked and the note quotes whatever they did say. The confirmation code
+  belongs to the agreement, so it is dropped too.
 - A call this app could not read comes back as `outcome_unknown`, never as a
   failure and never with "nothing was said". So does a call CALL-E has not finished
   with: only a terminal status is read as a result, and a call still `queued` or

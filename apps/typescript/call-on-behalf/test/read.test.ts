@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agreementTurn, readTranscript, supportingTurn } from "../src/read.js";
+import { agreementEvidence, readTranscript, supportingTurn } from "../src/read.js";
 import type { ErrandQuestion, TranscriptTurn } from "../src/types.js";
 
 const EARLIEST: ErrandQuestion = {
@@ -89,14 +89,39 @@ test("a callee who takes a turn to look something up has still answered", () => 
 });
 
 test("an agreement has to be in the transcript", () => {
-  assert.equal(agreementTurn(CALL, "slot_within_windows"), "");
+  assert.equal(agreementEvidence(CALL, "slot_within_windows").quote, "");
   const held = turns([
     ["bot", "Can you hold that slot?"],
     ["user", "I can hold that slot, reference four four seven one."],
   ]);
-  assert.match(agreementTurn(held, "slot_within_windows"), /^I can hold that slot/);
+  assert.match(agreementEvidence(held, "slot_within_windows").quote, /^I can hold that slot/);
   const refused = turns([["user", "We do not hold slots over the phone."]]);
-  assert.equal(agreementTurn(refused, "slot_within_windows"), "");
+  assert.equal(agreementEvidence(refused, "slot_within_windows").quote, "");
+});
+
+test("an agreement has to be about the time the extraction claims", () => {
+  const elsewhere = turns([
+    ["bot", "I am calling to book a routine check-up. What is the earliest appointment you have?"],
+    ["user", "Nothing this week, I am afraid."],
+    ["user", "I have booked her in for Tuesday the eighteenth at two in the afternoon."],
+  ]);
+  // A real agreement, and not to the time the extraction reported. Being inside an
+  // authorized window is not the same as being the time anybody said.
+  const claimed = agreementEvidence(elsewhere, "slot_within_windows", "2026-08-13T09:40:00-07:00");
+  assert.equal(claimed.quote, "");
+  // What they did agree to is still reported, so nobody reads this as nothing happened.
+  assert.match(claimed.otherQuote, /^I have booked/);
+  assert.match(agreementEvidence(elsewhere, "slot_within_windows", "2026-08-18T14:00:00-07:00").quote, /^I have booked/);
+});
+
+test("an agreement the caller never asked for is not an agreement with the caller", () => {
+  const volunteered = turns([
+    ["bot", "Do you take Blue Shield PPO?"],
+    ["user", "Yes, we do. I have booked Mr Osei in for Thursday the thirteenth at nine forty."],
+  ]);
+  const evidence = agreementEvidence(volunteered, "slot_within_windows", "2026-08-13T09:40:00-07:00");
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /Mr Osei/);
 });
 
 test("confirming an existing appointment reads different from booking one", () => {
@@ -104,8 +129,8 @@ test("confirming an existing appointment reads different from booking one", () =
     ["bot", "I am calling to confirm the appointment on Thursday."],
     ["user", "Yes, that is right, it is still on."],
   ]);
-  assert.equal(agreementTurn(confirmed, "slot_within_windows"), "");
-  assert.match(agreementTurn(confirmed, "confirm_existing"), /still on/);
+  assert.equal(agreementEvidence(confirmed, "slot_within_windows").quote, "");
+  assert.match(agreementEvidence(confirmed, "confirm_existing").quote, /still on/);
 });
 
 test("reading the transcript still finds the machine and the refusal", () => {

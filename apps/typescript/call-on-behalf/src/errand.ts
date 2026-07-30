@@ -17,7 +17,7 @@
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
 import { CalleCallError, CalleWaitTimeout, isTerminalCallStatus, type CallePort } from "./calle.js";
-import { agreementTurn, readTranscript, supportingTurn } from "./read.js";
+import { agreementEvidence, readTranscript, supportingTurn } from "./read.js";
 import {
   buildCallInput,
   buildTask,
@@ -305,11 +305,19 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const offeredSpoken = /^\d{4}-\d{2}-\d{2}T/.test(offered) ? spokenLocal(offered) : offered;
   let commitment: CommitmentState = "none_sought";
   let agreedQuote = "";
+  /** Booking language the transcript carries that is not evidence for the claim. */
+  let unrelatedQuote = "";
   if (request.goal.commitment !== "none") {
     if (madeRaw === "accepted") {
-      agreedQuote = agreementTurn(turns, request.goal.commitment);
+      const agreement = agreementEvidence(turns, request.goal.commitment, offered);
+      agreedQuote = agreement.quote;
       if (agreedQuote.length === 0) {
+        // An agreement about a time nobody said is not an agreement this app can
+        // report, so it does not become committed and it does not become an
+        // unauthorized booking either. Both of those print a time off the
+        // extraction alone. It reads unconfirmed and the note says which it was.
         commitment = "unconfirmed";
+        unrelatedQuote = agreement.otherQuote;
       } else {
         commitment =
           request.goal.commitment === "confirm_existing"
@@ -370,7 +378,11 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     notes.push(`They agreed with: "${agreedQuote}"`);
   }
   if (commitment === "unconfirmed") {
-    notes.push("CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.");
+    notes.push(
+      unrelatedQuote.length > 0
+        ? `CALL-E reported an agreement for ${offeredSpoken || "a time"} and no turn in the transcript agrees to that. They did say: "${unrelatedQuote}"`
+        : "CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.",
+    );
   }
   if (reading.declineQuote.length > 0) {
     notes.push(`They said: "${reading.declineQuote}"`);
