@@ -6,7 +6,7 @@
   "description": "Phone-verified approval gate for automated changes that need one human decision.",
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "demo": "tsx demo/run-local.ts",
     "gate": "tsx src/cli.ts",
     "preview": "tsx src/cli.ts preview --request examples/request.example.json"

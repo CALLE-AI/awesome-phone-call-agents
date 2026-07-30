@@ -21,7 +21,13 @@ export interface FakeScenario {
   structuredResult?: Record<string, unknown> | null;
   confidence?: { score: number; label: string } | null;
   failureCode?: string | null;
-  apiError?: { status: number; code: string };
+  /**
+   * Error returned instead of a normal reply. `times` limits how many creates it
+   * applies to and `afterCreate` remembers the call before answering with the
+   * error, which is how a lost reply looks to a caller: the call exists and the
+   * client never heard about it.
+   */
+  apiError?: { status: number; code: string; times?: number; afterCreate?: boolean };
   stall?: boolean;
   pollsBeforeTerminal?: number;
 }
@@ -49,6 +55,7 @@ interface StoredCall {
   metadata: Record<string, unknown>;
   polls: number;
   bodyKey: string;
+  createdAtMs: number;
 }
 
 function errorEnvelope(code: string, message: string): string {
@@ -81,12 +88,16 @@ function snapshot(call: StoredCall, terminal: boolean): string {
   const scenario = call.scenario;
   const status = terminal ? scenario.status ?? "completed" : call.polls === 0 ? "queued" : "in_progress";
   const isTerminal = terminal;
+  // Timestamps track the clock the caller runs on, the way the real API does, so
+  // a gate that checks its approval window against them sees a live call.
+  const startedAt = new Date(call.createdAtMs + 5_000).toISOString();
+  const completedAt = new Date(call.createdAtMs + 10_000).toISOString();
   const attempt = {
     id: `att_${call.id.slice(5)}`,
     phone: call.phones[0],
     status: isTerminal ? scenario.attemptStatus ?? scenario.status ?? "completed" : "dialing",
-    started_at: "2026-07-29T10:00:05Z",
-    completed_at: isTerminal ? "2026-07-29T10:01:10Z" : null,
+    started_at: startedAt,
+    completed_at: isTerminal ? completedAt : null,
     summary: null,
     transcript_turns: isTerminal ? transcriptTurns(scenario) : [],
     provider_call_id: `provider_${call.id.slice(5)}`,
@@ -119,8 +130,8 @@ function snapshot(call: StoredCall, terminal: boolean): string {
     metadata: call.metadata,
     failure_code: isTerminal ? scenario.failureCode ?? null : null,
     failure_message: null,
-    created_at: "2026-07-29T10:00:00Z",
-    completed_at: isTerminal ? "2026-07-29T10:01:10Z" : null,
+    created_at: new Date(call.createdAtMs).toISOString(),
+    completed_at: isTerminal ? completedAt : null,
   });
 }
 
@@ -128,6 +139,7 @@ export async function startFakeCalle(scenarios: FakeScenario[]): Promise<FakeCal
   const created: CreatedCall[] = [];
   const calls = new Map<string, StoredCall>();
   const idempotency = new Map<string, { id: string; bodyKey: string }>();
+  const apiErrorsSent = new Map<FakeScenario, number>();
   let counter = 0;
 
   const server: Server = createServer((request, response) => {
@@ -175,9 +187,13 @@ export async function startFakeCalle(scenarios: FakeScenario[]): Promise<FakeCal
             return;
           }
         }
-        if (scenario.apiError !== undefined) {
-          response.statusCode = scenario.apiError.status;
-          response.end(errorEnvelope(scenario.apiError.code, "Fake server refused the call."));
+        const failure = scenario.apiError;
+        const sent = apiErrorsSent.get(scenario) ?? 0;
+        const failing = failure !== undefined && sent < (failure.times ?? Number.POSITIVE_INFINITY);
+        if (failing && failure!.afterCreate !== true) {
+          apiErrorsSent.set(scenario, sent + 1);
+          response.statusCode = failure!.status;
+          response.end(errorEnvelope(failure!.code, "Fake server refused the call."));
           return;
         }
         counter += 1;
@@ -190,6 +206,7 @@ export async function startFakeCalle(scenarios: FakeScenario[]): Promise<FakeCal
           metadata: body.metadata ?? {},
           polls: 0,
           bodyKey,
+          createdAtMs: Date.now(),
         };
         calls.set(id, stored);
         if (key !== null) {
@@ -203,6 +220,13 @@ export async function startFakeCalle(scenarios: FakeScenario[]): Promise<FakeCal
           metadata: body.metadata ?? {},
           resultSchema: body.result_schema,
         });
+        if (failing) {
+          // The call exists and the caller is told nothing about it.
+          apiErrorsSent.set(scenario, sent + 1);
+          response.statusCode = failure!.status;
+          response.end(errorEnvelope(failure!.code, "Fake server lost the reply."));
+          return;
+        }
         response.statusCode = 201;
         response.end(snapshot(stored, false));
         return;
