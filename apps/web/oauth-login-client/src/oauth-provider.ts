@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   OAuthClientInformationMixed,
   OAuthClientMetadata,
   OAuthTokens,
@@ -13,11 +13,14 @@ import type { OAuthClientProvider, OAuthDiscoveryState } from "@modelcontextprot
  * own isolated bucket.  The result is base64url-encoded and capped at 32
  * characters to keep sessionStorage keys readable.
  */
-function deriveNamespace(serverUrl: string): string {
+async function deriveNamespace(serverUrl: string): Promise<string> {
   try {
-    const origin = new URL(serverUrl).origin; // e.g. "https://example.com:8080"
-    // btoa is available in all modern browsers; replace chars unsafe in key names
-    return btoa(origin).replace(/[+/=]/g, '_').slice(0, 32);
+    const canonicalUrl = new URL(serverUrl).href;
+    const msgUint8 = new TextEncoder().encode(canonicalUrl);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const b64 = btoa(String.fromCharCode(...hashArray));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   } catch {
     // Fallback for unparseable URLs — use a fixed generic namespace
     return 'default';
@@ -48,10 +51,10 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    */
   private readonly storagePrefix: string;
 
-  constructor(
+  private constructor(
     redirectUri: string | URL,
     metadata: OAuthClientMetadata,
-    serverUrl: string,
+    storagePrefix: string,
     onRedirect?: (url: URL) => void,
     clientMetadataUrl?: string
   ) {
@@ -59,27 +62,27 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.metadata = metadata;
     this.clientMetadataUrl = clientMetadataUrl;
     this.onRedirect = onRedirect || ((url) => { window.location.href = url.toString(); });
-
-    const ns = deriveNamespace(serverUrl);
-    this.storagePrefix = `calle_oauth_${ns}_`;
-
-    // Purge stale credentials that belong to a different server namespace.
-    // This prevents a previous server's tokens from being sent to the new one.
-    this._purgeStaleNamespaces(ns);
+    this.storagePrefix = storagePrefix;
   }
 
-  /** Remove all `calle_oauth_` keys that belong to a different namespace. */
-  private _purgeStaleNamespaces(currentNs: string): void {
-    const legacyPrefix = 'calle_oauth_';
-    const currentPrefix = `calle_oauth_${currentNs}_`;
-    const toRemove: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (key && key.startsWith(legacyPrefix) && !key.startsWith(currentPrefix)) {
-        toRemove.push(key);
-      }
+  /**
+   * Asynchronously creates a BrowserOAuthClientProvider by hashing the serverUrl
+   * to ensure a collision-resistant storage namespace.
+   */
+  static async create(
+    redirectUri: string | URL,
+    metadata: OAuthClientMetadata,
+    serverUrl: string,
+    onRedirect?: (url: URL) => void,
+    clientMetadataUrl?: string
+  ): Promise<BrowserOAuthClientProvider> {
+    const serverUrlObj = new URL(serverUrl);
+    if (serverUrlObj.protocol !== 'https:' && serverUrlObj.hostname !== 'localhost' && serverUrlObj.hostname !== '127.0.0.1') {
+      throw new Error("HTTPS is required for non-loopback MCP endpoints.");
     }
-    toRemove.forEach((k) => sessionStorage.removeItem(k));
+    const ns = await deriveNamespace(serverUrl);
+    const storagePrefix = `calle_oauth_${ns}_`;
+    return new BrowserOAuthClientProvider(redirectUri, metadata, storagePrefix, onRedirect, clientMetadataUrl);
   }
 
   get redirectUrl(): string | URL {
@@ -201,4 +204,17 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       (k) => this.removeItem(k)
     );
   }
+
+  /**
+   * Invalidate stored credentials (e.g., when recovery retries with stale credentials).
+   * Removing all credentials forces a re-login flow.
+   */
+  invalidateCredentials(scope?: string): void {
+    this.clearCredentials();
+  }
+}
+
+// Expose provider for Playwright tests when running in development/test mode
+if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
+  (window as any).__BrowserOAuthClientProvider = BrowserOAuthClientProvider;
 }

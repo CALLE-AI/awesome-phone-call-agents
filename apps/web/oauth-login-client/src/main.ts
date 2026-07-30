@@ -337,7 +337,7 @@ async function connect() {
     errorContainer.classList.add('hidden');
 
     const redirectUri = window.location.origin + window.location.pathname;
-    const provider = new BrowserOAuthClientProvider(
+    const provider = await BrowserOAuthClientProvider.create(
       redirectUri,
       makeClientMetadata(redirectUri),
       SERVER_URL
@@ -460,32 +460,10 @@ async function checkOAuthCallback() {
   const errorParam = url.searchParams.get('error');
   const returnedState = url.searchParams.get('state');
 
-  if (errorParam) {
-    showError(`OAuth Error: ${errorParam}`);
-    window.history.replaceState({}, document.title, window.location.pathname);
-    return;
-  }
-
-  if (code) {
+  if (errorParam || code) {
     loginBtn.disabled = true;
     btnText.textContent = 'Completing Login...';
     btnLoader.classList.remove('hidden');
-
-    const redirectUri = window.location.origin + window.location.pathname;
-    const provider = new BrowserOAuthClientProvider(
-      redirectUri,
-      makeClientMetadata(redirectUri),
-      SERVER_URL
-    );
-    activeProvider = provider;
-
-    client = new Client(
-      { name: 'calle-oauth-web-client', version: '1.0.0' },
-      { capabilities: {} }
-    );
-    transport = new StreamableHTTPClientTransport(new URL(SERVER_URL), {
-      authProvider: provider,
-    });
 
     // Always clean the callback params from the address bar first, regardless
     // of whether auth succeeds or fails — the authorization code must not
@@ -493,7 +471,15 @@ async function checkOAuthCallback() {
     window.history.replaceState({}, document.title, window.location.pathname);
 
     try {
-      // Validate CSRF state before exchanging the code.
+      const redirectUri = window.location.origin + window.location.pathname;
+      const provider = await BrowserOAuthClientProvider.create(
+        redirectUri,
+        makeClientMetadata(redirectUri),
+        SERVER_URL
+      );
+      activeProvider = provider;
+
+      // Validate CSRF state before handling code or error.
       if (!returnedState) {
         throw new Error(
           'OAuth callback is missing the required state parameter. ' +
@@ -502,14 +488,30 @@ async function checkOAuthCallback() {
       }
       provider.validateState(returnedState);
 
-      await transport.finishAuth(code);
+      if (errorParam) {
+        provider.clearCredentials();
+        throw new Error(`OAuth Error: ${errorParam}`);
+      }
+
+      client = new Client(
+        { name: 'calle-oauth-web-client', version: '1.0.0' },
+        { capabilities: {} }
+      );
+      transport = new StreamableHTTPClientTransport(new URL(SERVER_URL), {
+        authProvider: provider,
+      });
+
+      await transport.finishAuth(code!);
       await client.connect(transport);
       await onConnected();
     } catch (error: any) {
+      if (activeProvider) {
+        activeProvider.clearCredentials();
+      }
       loginBtn.disabled = false;
       btnText.textContent = 'Connect \u0026 Login';
       btnLoader.classList.add('hidden');
-      showError(`Failed to finish auth: ${error.message || String(error)}`);
+      showError(error.message || String(error));
     }
   }
 }
@@ -519,3 +521,9 @@ loginBtn.addEventListener('click', connect);
 window.addEventListener('DOMContentLoaded', () => {
   checkOAuthCallback();
 });
+
+if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
+  (window as any).__SERVER_URL = SERVER_URL;
+  (window as any).__getActiveProvider = () => activeProvider;
+  (window as any).__setActiveProvider = (p: any) => { activeProvider = p; };
+}

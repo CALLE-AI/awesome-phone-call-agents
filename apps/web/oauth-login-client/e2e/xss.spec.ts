@@ -1,4 +1,4 @@
-/**
+﻿/**
  * XSS regression tests — server-controlled MCP metadata must not execute as HTML.
  *
  * The MCP server can return arbitrary strings for tool names, descriptions,
@@ -37,8 +37,8 @@ function buildMcpResponse(method: string, id: unknown): unknown {
       id,
       result: {
         tools: [
-          { 
-            name: XSS_TOOL_NAME, 
+          {
+            name: XSS_TOOL_NAME,
             description: XSS_TOOL_DESC,
             inputSchema: { type: 'object', properties: {} }
           },
