@@ -140,7 +140,7 @@ const ANSWER_WINDOW = 2;
  * The callee turn that supports a claimed answer. Empty when the transcript does
  * not support it.
  *
- * Every answer is anchored to its question. The caller must have asked it, and the
+ * Every answer is anchored to its question. The caller must have asked it. The
  * evidence must come from the callee turns right after it, because a sentence
  * somewhere else in the call is evidence for whatever was being discussed there. A
  * yes or a no needs the same anchor and reads the polarity the callee used.
@@ -383,7 +383,7 @@ export interface AgreementEvidence {
  * not an agreement on its own.
  *
  * Two bindings, because booking language on its own proves nothing. The agreement
- * has to come after the caller raised the arrangement, and when the extraction
+ * has to come after the caller raised the arrangement. When the extraction
  * claims a datetime that datetime has to be named around the agreement itself: in
  * the turn, in the caller's proposal before it or in the read back after it. An
  * unrelated yes plus a plausible time is not a booking.

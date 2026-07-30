@@ -14,7 +14,7 @@
  *
  * Two short hashes come off the same canonical JSON of what will be sent. The
  * idempotency key, so a changed errand is a different call rather than a reused
- * one. The preview receipt, which is what `call --live` demands back, and which
+ * one. The preview receipt, which is what `call --live` demands back and which
  * covers the whole errand file so that everything the preview prints is inside it.
  */
 
@@ -241,10 +241,10 @@ function shortHash(text: string, length: number): string {
  * Exactly what the receipt covers, as canonical JSON.
  *
  * Exported so the claim is checkable rather than asserted: every value the preview
- * prints has to appear in here, and a test walks the preview to prove it.
+ * prints has to appear in here. A test walks the preview to prove it.
  *
  * The errand goes in as the app parsed it, so nothing the preview shows is left
- * out. `reason_for_delegation` is in here because the preview prints it, and it
+ * out. `reason_for_delegation` is in here because the preview prints it. It
  * still never leaves the machine: `buildCallInput` is the only thing sent to CALL-E
  * and this string is only ever hashed and compared locally. The call input goes in
  * as well, so a change in what will actually be said moves the receipt too.

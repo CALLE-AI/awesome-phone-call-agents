@@ -53,11 +53,22 @@ test("the right receipt gets past consent and stops at the missing credential", 
 
 test("an untrusted base URL never receives the key", () => {
   const result = cli(
-    ["call", "--errand", errandFile, "--live", "--receipt", receipt, "--base-url", "http://api.example.com"],
+    ["call", "--errand", errandFile, "--live", "--receipt", receipt, "--base-url", "https://api.example.com"],
     { CALLE_API_KEY: "calle_test_key" },
   );
   assert.equal(result.code, 30);
-  assert.match(result.err, /is not trusted, so the API key was not sent/);
+  assert.match(result.err, /is not a host this app trusts, so the API key was not sent/);
+  assert.match(result.err, /--allow-host/);
+});
+
+test("--allow-host is repeatable and does not swallow the option after it", () => {
+  const result = cli([
+    "call", "--errand", errandFile, "--live",
+    "--allow-host", "a.example", "--allow-host", "b.example",
+    "--receipt", "0123456789abcdef",
+  ]);
+  assert.equal(result.code, 30);
+  assert.match(result.err, /is not the receipt for this errand file/);
 });
 
 test("call without --live still refuses and points at the preview", () => {

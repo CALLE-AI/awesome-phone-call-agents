@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, statSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -106,4 +106,26 @@ test("a saved report is private and reads back the same", async () => {
   const round = readReport(path);
   assert.deepEqual(round, value);
   assert.match(renderReport(round), /Call report: bayview-checkup-aug/);
+});
+
+test("a report written over a file that already exists is set back to 0600", async () => {
+  const value = await report();
+  const path = join(mkdtempSync(join(tmpdir(), "cob-")), "report.json");
+  writeReport(path, value);
+  chmodSync(path, 0o644);
+  writeReport(path, value);
+  assert.equal((statSync(path).mode & 0o777).toString(8), "600");
+  assert.deepEqual(readReport(path), value);
+});
+
+test("a report path that is not a regular file is refused, not followed", async () => {
+  const value = await report();
+  const dir = mkdtempSync(join(tmpdir(), "cob-"));
+  const target = join(dir, "somebody-elses.json");
+  const link = join(dir, "report.json");
+  writeFileSync(target, "{}\n");
+  symlinkSync(target, link);
+  assert.throws(() => writeReport(link, value), /not a regular file/);
+  assert.throws(() => writeReport(dir, value), /not a regular file/);
+  assert.equal(readFileSync(target, "utf8"), "{}\n");
 });

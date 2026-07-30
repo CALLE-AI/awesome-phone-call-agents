@@ -66,14 +66,14 @@ The structured result from the model is a proposal. The transcript is the eviden
 
 An answer is reported when a turn from the callee supports that specific question.
 The report prints the turn it stands on. Every answer shape is anchored to its
-question: the caller must have asked it in the transcript, and the supporting turn
+question: the caller must have asked it in the transcript. The supporting turn
 must be one of the two callee turns after it. That holds for text and datetime
 answers as much as for a yes or a no, because "Thursday at nine forty" said while
 discussing something else is not an answer to a question nobody asked.
 
 An agreement is reported when the transcript shows somebody agreeing to the thing
 the report would print. It is anchored twice: to the turn where the caller raised
-the arrangement, and to the time itself, which has to be named in the agreeing turn
+the arrangement, plus to the time itself, which has to be named in the agreeing turn
 or in the turn either side of it. Booking language on its own proves nothing. An
 agreement about some other time reads `unconfirmed`, not `committed` and not
 `outside_authorized_window`, because both of those would print or act on a time off
@@ -87,7 +87,7 @@ authorized day is not reported as this one. A turn that names no day is taken as
 day the caller had already established.
 
 Everything else the report prints off the extraction is held to the same standard. A
-confirmation code has to have been read out around the agreement, or the report drops
+confirmation code has to have been read out around the agreement or the report drops
 it and says it did. A time no callee turn named is not read back as an offer, so the
 next step says "another time" rather than a time nobody said. An agreement with no
 time at all cannot be checked against the windows, so it reads `unconfirmed` too.
@@ -120,7 +120,7 @@ A call CALL-E has not finished with lands in the same place. Only a terminal sta
 is read as a result: `completed`, `failed`, `canceled`, `no_answer`, `busy` or
 `voicemail`. A call that is still `queued` or `in_progress` when the timeout runs
 out has a transcript that is still being written, so the app reports
-`outcome_unknown` with `call_status` unknown and the call id kept, and it states no
+`outcome_unknown` with `call_status` unknown and the call id kept. It states no
 verdict, no commitment and no privacy finding. Reading a call in flight as a result
 is how a call still ringing gets reported as an errand that is done. The next step
 is the same: run the same errand file again and it reads that same call back.
@@ -160,15 +160,24 @@ agreed to any of this. The receipt binds the consent to a script, not to a perso
 ## What it stores
 
 The report holds the answers, the disclosure record, the privacy findings, the
-CALL-E call id and the full transcript, written with mode `0600`. The transcript is
-kept on purpose: a person who could not hear the call is entitled to what was said
-on their behalf. Phone numbers are masked. Findings are masked.
+CALL-E call id and the full transcript, written with mode `0600`. A mode passed to a
+write only applies when the file is created, so the mode is set on the open
+descriptor with fchmod: a report written over a file somebody had left at `0644`
+comes back `0600`. A path that is not a regular file is refused instead of
+followed. The transcript is kept on purpose: a person who could not hear the call is
+entitled to what was said on their behalf. Phone numbers are masked. Findings are
+masked.
 
-Nothing is sent anywhere except CALL-E and the API key is read from the
-environment only. The base URL is checked before the client that carries the key is
-built: HTTPS anywhere, plain HTTP only on `localhost`, `127.0.0.1` or `::1` so the
-local fake works. Anything else is refused with the name of the flag and the
-environment variable that set it. The key stays where it is.
+Nothing is sent anywhere except CALL-E and the API key is read from the environment
+only. The base URL is checked before the client that carries the key is built, and
+the check is the host, not the scheme: `https:` says the transport was encrypted and
+says nothing about who is on the other end. The host has to be `api.heycall-e.com`,
+or `localhost`, `127.0.0.1` or `::1` for the local fake, which is the only place
+plain HTTP is allowed. Any other host has to be named exactly in
+`CALLE_ALLOWED_HOSTS` or with `--allow-host`, so a lookalike such as
+`localhost.attacker.example` is refused: the comparison is the whole hostname
+lowercased, never a suffix. The refusal names the flag and the environment variable
+that set it. The key stays where it is.
 
 ## Where it will disappoint you
 

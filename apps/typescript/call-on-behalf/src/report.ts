@@ -6,7 +6,8 @@
  * rings and ends with the receipt that `call --live` demands back.
  */
 
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, constants, fchmodSync, fstatSync, lstatSync, openSync, readFileSync, writeSync } from "node:fs";
+import { ConfigError } from "./config.js";
 import { blocking } from "./disclosure.js";
 import { maskPhone, preflight } from "./errand.js";
 import { buildResultSchema, buildTask, previewReceipt, spokenLocal, spokenWindow } from "./script.js";
@@ -180,9 +181,43 @@ export function renderReport(report: ErrandReport): string {
   return lines.join("\n");
 }
 
+/** Write only, create, truncate, never following a symlink to get there. */
+const REPORT_FLAGS = constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW;
+
+/**
+ * Writes the report as 0600, including over a file that already exists.
+ *
+ * A mode passed to a write only applies when the file is created, so a report
+ * written over an existing 0644 file used to keep 0644 while the app said 0600. The
+ * mode is set on the descriptor with fchmod, so there is no window where the path
+ * points at something else, the open refuses to follow a symlink and a target that is
+ * not a regular file is refused rather than written to.
+ */
 export function writeReport(path: string, report: ErrandReport): void {
-  writeFileSync(path, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  chmodSync(path, 0o600);
+  let existing: ReturnType<typeof lstatSync> | null = null;
+  try {
+    existing = lstatSync(path);
+  } catch {
+    existing = null;
+  }
+  if (existing !== null && !existing.isFile()) {
+    throw new ConfigError(`Report path ${path} is not a regular file, so nothing was written to it.`);
+  }
+  let fd: number;
+  try {
+    fd = openSync(path, REPORT_FLAGS, 0o600);
+  } catch (error) {
+    throw new ConfigError(`Report path ${path} could not be opened for writing: ${(error as Error).message}`);
+  }
+  try {
+    if (!fstatSync(fd).isFile()) {
+      throw new ConfigError(`Report path ${path} is not a regular file, so nothing was written to it.`);
+    }
+    fchmodSync(fd, 0o600);
+    writeSync(fd, `${JSON.stringify(report, null, 2)}\n`);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export function readReport(path: string): ErrandReport {

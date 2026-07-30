@@ -105,7 +105,7 @@ test("an agreement has to be about the time the extraction claims", () => {
     ["user", "Nothing this week, I am afraid."],
     ["user", "I have booked her in for Tuesday the eighteenth at two in the afternoon."],
   ]);
-  // A real agreement, and not to the time the extraction reported. Being inside an
+  // A real agreement, but not to the time the extraction reported. Being inside an
   // authorized window is not the same as being the time anybody said.
   const claimed = agreementEvidence(elsewhere, "slot_within_windows", "2026-08-13T09:40:00-07:00");
   assert.equal(claimed.quote, "");

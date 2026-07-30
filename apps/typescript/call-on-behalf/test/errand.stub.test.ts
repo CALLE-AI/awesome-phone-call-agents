@@ -142,7 +142,7 @@ test("an answer to a question nobody asked is not an answer", async () => {
 });
 
 test("an agreement about another time is not the agreement the extraction claims", async () => {
-  // Ray's case: booking language in the call, and a different time from the
+  // Ray's case: booking language in the call, plus a different time from the
   // extraction that happens to fall inside an authorized window.
   const user = [
     "Bayview Family Clinic, how can I help?",

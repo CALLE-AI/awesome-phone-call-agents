@@ -31,9 +31,10 @@ const USAGE = `Call on behalf
       Print the exact call script, the details it may give, the privacy check and
       the receipt for this preview. Places no call and needs no credentials.
 
-  call --errand <file> --live --receipt <hash> [--report <file>] [--json] [--base-url <url>]
+  call --errand <file> --live --receipt <hash> [--report <file>] [--json] [--base-url <url>] [--allow-host <host>]
       Place one call. The receipt must be the one the preview printed for this
-      errand file. Needs CALLE_API_KEY.
+      errand file. Needs CALLE_API_KEY. The key is only ever sent to CALL-E,
+      loopback or a host named exactly with --allow-host or CALLE_ALLOWED_HOSTS.
 
   show --report <file>
       Re-render a saved report as text.
@@ -44,11 +45,14 @@ interface Parsed {
   command: string;
   values: Record<string, string>;
   flags: Set<string>;
+  /** Repeatable, because opting a host in one at a time is the point of it. */
+  allowHosts: string[];
 }
 
 function parseArgs(argv: string[]): Parsed {
   const values: Record<string, string> = {};
   const flags = new Set<string>();
+  const allowHosts: string[] = [];
   const command = argv[0] ?? "";
   for (let index = 1; index < argv.length; index += 1) {
     const token = argv[index]!;
@@ -64,10 +68,14 @@ function parseArgs(argv: string[]): Parsed {
     if (value === undefined || value.startsWith("--")) {
       throw new ConfigError(`Option --${name} needs a value.`);
     }
-    values[name] = value;
+    if (name === "allow-host") {
+      allowHosts.push(value);
+    } else {
+      values[name] = value;
+    }
     index += 1;
   }
-  return { command, values, flags };
+  return { command, values, flags, allowHosts };
 }
 
 function requireValue(parsed: Parsed, name: string): string {
@@ -124,20 +132,34 @@ async function main(argv: string[]): Promise<number> {
     }
     const configured = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL;
     const baseUrl = configured === undefined || configured.length === 0 ? undefined : configured;
-    const port = await createSdkPort(baseUrl === undefined ? { apiKey } : { apiKey, baseUrl });
+    const port = await createSdkPort({
+      apiKey,
+      ...(baseUrl === undefined ? {} : { baseUrl }),
+      ...(parsed.allowHosts.length === 0 ? {} : { allowHosts: parsed.allowHosts }),
+    });
     const report = await runErrand({
       request,
       port,
       onProgress: (line) => process.stderr.write(`${line}\n`),
     });
+    // The call has happened by now, so a report that cannot be saved is not allowed
+    // to swallow the report itself. It goes to stdout either way.
     const reportPath = parsed.values["report"];
+    let writeFailure = "";
     if (reportPath !== undefined) {
-      writeReport(reportPath, report);
-      process.stderr.write(`Report written to ${reportPath} with mode 0600.\n`);
+      try {
+        writeReport(reportPath, report);
+        process.stderr.write(`Report written to ${reportPath} with mode 0600.\n`);
+      } catch (error) {
+        writeFailure = error instanceof ConfigError ? error.message : String(error);
+      }
     }
     process.stdout.write(
       parsed.flags.has("json") ? `${JSON.stringify(report, null, 2)}\n` : `${renderReport(report)}\n`,
     );
+    if (writeFailure.length > 0) {
+      process.stderr.write(`${writeFailure} The report above is the only copy, so save it yourself.\n`);
+    }
     if (report.outcome === "goal_met") {
       return EXIT_DONE;
     }

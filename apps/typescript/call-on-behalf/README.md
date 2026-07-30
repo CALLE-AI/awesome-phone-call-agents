@@ -56,12 +56,12 @@ The extraction proposes. The transcript decides.
   as booked and the note quotes whatever they did say. The confirmation code
   belongs to the agreement, so a code nobody read out is dropped even when the
   agreement stands.
-- A time no callee turn named is not read back as an offer, and CALL-E's own note
+- A time no callee turn named is not read back as an offer. CALL-E's own note
   is printed with its name on it. Nothing in the report is both unchecked and
   unlabelled.
 - A call this app could not read comes back as `outcome_unknown`, never as a
   failure and never with "nothing was said". So does a call CALL-E has not finished
-  with: only a terminal status is read as a result, and a call still `queued` or
+  with: only a terminal status is read as a result. A call still `queued` or
   `in_progress` gets no verdict, no commitment and no privacy finding. Re-running the
   same errand file reads the same call back, because the idempotency key covers the
   content of the call and has not changed.
@@ -177,8 +177,11 @@ npm run errand -- show --report report.json
 the file and the receipt changes, which is the point: the consent belongs to a
 preview somebody read.
 
-Reports are written with mode `0600`. They hold the full transcript on purpose:
-the person is entitled to what was said on their behalf.
+Reports are written with mode `0600`, including over a report file that already
+exists: the mode is set on the descriptor, so a file left at `0644` comes back
+`0600` and a path that is not a regular file is refused rather than followed. They
+hold the full transcript on purpose: the person is entitled to what was said on
+their behalf.
 
 ## The errand file
 
@@ -224,8 +227,11 @@ required to make them write it down.
 - `preview` and `show` place no calls and need no credentials.
 - `CALLE_API_KEY` is read from the environment only, never from the errand file.
 - The key goes out on every request, so the base URL is checked before the client
-  is built. HTTPS anywhere, plain HTTP only on `localhost`, `127.0.0.1` or `::1`
-  for the local fake. Anything else is refused by name and the key is not sent.
+  is built. The host has to be `api.heycall-e.com`, `localhost`, `127.0.0.1` or
+  `::1` for the local fake, which is also the only place plain HTTP is allowed. Any
+  other host has to be named exactly in `CALLE_ALLOWED_HOSTS` or with
+  `--allow-host`: no wildcards, no suffix matching, port ignored. Anything else is
+  refused by name and the key is not sent.
 - The report holds the transcript and the disclosure record. Numbers are masked.
   Findings are masked. Keep the file the way you keep anything with your own
   details in it.

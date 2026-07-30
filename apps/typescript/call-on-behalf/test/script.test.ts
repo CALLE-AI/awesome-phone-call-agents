@@ -173,7 +173,7 @@ test("the receipt covers every field the preview prints", () => {
   assert.match(base, /^[0-9a-f]{16}$/);
   assert.equal(base, previewReceipt(errandRequest()));
 
-  // The inverse check. Every labelled line in the preview header, and nothing else
+  // The inverse check. Every labelled line in the preview header, nothing else
   // printed there, so a line added later cannot slip past this test.
   const labelled = renderPreview(request)
     .split("\n")
