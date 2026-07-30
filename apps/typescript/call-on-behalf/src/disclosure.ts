@@ -10,6 +10,11 @@
  * the realistic mistakes: a date of birth pasted into a question, an account
  * number left in a note, a caller that volunteers an identifier it was given for
  * a different field. It cannot catch a detail that looks like ordinary prose.
+ *
+ * Ordinary prose is why `sensitiveTopicFindings` exists. It flags clinical, legal
+ * and financial wording in the text the caller will speak so the person sees it in
+ * the preview. It warns, it never blocks and it misses anything written without one
+ * of its words.
  */
 
 import type { DisclosureFinding, DisclosureItem } from "./types.js";
@@ -167,6 +172,55 @@ export function unauthorizedFindings(
 /** Findings that stop a call. A bare date is reported, an identifier is refused. */
 export function blocking(findings: DisclosureFinding[]): DisclosureFinding[] {
   return findings.filter((finding) => finding.severity === "block");
+}
+
+/**
+ * Words that mark clinical, legal or financial subject matter.
+ *
+ * These are not identifiers, so no pattern can decide whether saying one is a
+ * mistake. "Book a routine check-up" is the errand. "She needs her diagnosis
+ * read back" is the person's medical history going out over a phone line the
+ * app cannot take it back from. So this list warns and never blocks: the finding
+ * is printed in the preview, next to the field it came from, before anybody
+ * consents to it.
+ *
+ * It is a prompt to reread the sentence, not a classifier. Sensitive prose with
+ * none of these words in it goes through untouched.
+ */
+const SENSITIVE_TOPICS: { kind: string; pattern: RegExp }[] = [
+  {
+    kind: "clinical detail",
+    pattern:
+      /\b(?:symptoms?|diagnosis|diagnosed|prognosis|medications?|prescriptions?|dosage|chemotherapy|biopsy|cancer|hiv|pregnant|pregnancy|miscarriage|depression|anxiety|addiction|rehab|surgery|blood test|test results?|mental health)\b/gi,
+  },
+  {
+    kind: "legal detail",
+    pattern:
+      /\b(?:lawsuit|attorney|solicitor|custody|eviction|deportation|immigration status|arrest(?:ed)?|court date|probation|restraining order|divorce)\b/gi,
+  },
+  {
+    kind: "financial detail",
+    pattern:
+      /\b(?:debt|arrears|overdue|bankruptcy|foreclosure|collections|unpaid|repossession|credit score|salary|benefits claim)\b/gi,
+  },
+];
+
+/** Clinical, legal or financial subject matter in text that will be spoken. */
+export function sensitiveTopicFindings(text: string, where: string): DisclosureFinding[] {
+  const findings: DisclosureFinding[] = [];
+  const seen = new Set<string>();
+  for (const topic of SENSITIVE_TOPICS) {
+    for (const match of text.matchAll(topic.pattern)) {
+      const token = match[0].toLowerCase();
+      const key = `${topic.kind}:${token}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      findings.push({ kind: topic.kind, masked: mask(match[0]), where, severity: "warn" });
+    }
+  }
+  return findings;
 }
 
 /** Which budget items were actually spoken by the caller, by label. */

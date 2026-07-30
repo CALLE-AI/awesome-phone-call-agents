@@ -1,5 +1,5 @@
 /**
- * The call script and the result contract.
+ * The call script, the result contract and what identifies the call.
  *
  * The script is the product. It discloses that the caller is automated and whose
  * errand it is running, in the first sentence. It asks a short list of questions.
@@ -7,8 +7,18 @@
  * say when asked for anything else. It refuses to claim to be a person, refuses
  * clinical or financial detail and it accepts a time only inside the windows the
  * person authorized.
+ *
+ * Nothing about the person goes into the script except the disclosure list and
+ * their name. Why they delegated the call is theirs, so it stays in the errand
+ * file and is never sent.
+ *
+ * Two short hashes come off the same canonical JSON of what will be sent. The
+ * idempotency key, so a changed errand is a different call rather than a reused
+ * one. The preview receipt, which is what `call --live` demands back.
  */
 
+import { createHash } from "node:crypto";
+import type { CreateCallInput } from "./calle.js";
 import type { ErrandRequest, JsonSchema } from "./types.js";
 
 function offsetMinutes(iso: string): number {
@@ -56,7 +66,7 @@ export function buildTask(request: ErrandRequest): string {
   const person = request.onBehalfOf.name;
   const lines: string[] = [];
   lines.push(
-    `You are placing one phone call on behalf of ${person}, who asked you to make it because ${request.onBehalfOf.reason_for_delegation}. You are calling ${request.callee.name} on a number they publish. Speak ${request.policy.language}. Keep the call under four minutes and be brief and polite.`,
+    `You are placing one phone call on behalf of ${person}, who asked you to make it. You are calling ${request.callee.name} on a number they publish. Speak ${request.policy.language}. Keep the call under four minutes and be brief and polite.`,
   );
   lines.push("");
   lines.push(
@@ -176,7 +186,7 @@ export function buildResultSchema(request: ErrandRequest): JsonSchema {
 
 /** One call per errand. A retried run reuses it instead of ringing again. */
 export function idempotencyKey(request: ErrandRequest): string {
-  return `cob-${request.errandId}`;
+  return `cob-${request.errandId}-${shortHash(canonicalJson(buildCallInput(request)), 12)}`;
 }
 
 export function metadata(request: ErrandRequest): Record<string, string> {
@@ -186,4 +196,61 @@ export function metadata(request: ErrandRequest): Record<string, string> {
     commitment: request.goal.commitment,
     language: request.policy.language,
   };
+}
+
+/** Exactly what will be sent to CALL-E, built in one place so it can be hashed. */
+export function buildCallInput(request: ErrandRequest): CreateCallInput {
+  return {
+    task: buildTask(request),
+    recipients: [
+      {
+        phones: [request.callee.phone],
+        locale: request.policy.language,
+        ...(request.callee.region === undefined ? {} : { region: request.callee.region }),
+      },
+    ],
+    resultSchema: buildResultSchema(request),
+    metadata: metadata(request),
+  };
+}
+
+function sorted(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sorted);
+  }
+  if (typeof value === "object" && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+      left < right ? -1 : left > right ? 1 : 0,
+    );
+    return Object.fromEntries(entries.map(([key, item]) => [key, sorted(item)]));
+  }
+  return value;
+}
+
+/** JSON with the keys in one order, so the same content always hashes the same. */
+export function canonicalJson(value: unknown): string {
+  return JSON.stringify(sorted(value));
+}
+
+function shortHash(text: string, length: number): string {
+  return createHash("sha256").update(text, "utf8").digest("hex").slice(0, length);
+}
+
+/**
+ * The receipt for a preview.
+ *
+ * It covers the script, the disclosure list and the windows, which is everything
+ * the preview shows and everything the person is agreeing to. Edit the errand file
+ * and the receipt changes, so the consent no longer matches and `call --live`
+ * refuses. That is the point of it.
+ */
+export function previewReceipt(request: ErrandRequest): string {
+  return shortHash(
+    canonicalJson({
+      call: buildCallInput(request),
+      disclosure: request.disclosure,
+      windows: request.authorizedWindows,
+    }),
+    16,
+  );
 }

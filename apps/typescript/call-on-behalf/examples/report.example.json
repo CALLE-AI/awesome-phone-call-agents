@@ -14,21 +14,21 @@
       "text": "What is the earliest appointment you have for a routine check-up?",
       "answered": true,
       "answer": "Thursday the thirteenth at nine forty in the morning",
-      "quote": ""
+      "quote": "Thanks. Earliest for a new patient is Thursday the thirteenth at nine forty."
     },
     {
       "id": "accepts_plan",
       "text": "Do you take Blue Shield PPO?",
       "answered": true,
       "answer": "yes",
-      "quote": ""
+      "quote": "Yes, we take Blue Shield PPO. I can hold that slot, reference four four seven one."
     },
     {
       "id": "bring",
       "text": "What should she bring to a first appointment?",
       "answered": true,
       "answer": "photo identification and the insurance card",
-      "quote": ""
+      "quote": "Photo identification and the insurance card."
     }
   ],
   "disclosed": [
@@ -38,7 +38,7 @@
   ],
   "leaks": [],
   "reached_person": true,
-  "callee_notes": "",
+  "callee_notes": "They agreed with: \"Yes, we take Blue Shield PPO. I can hold that slot, reference four four seven one.\"",
   "next_step": "That is arranged. The confirmation, if they gave one, is in the report above.",
   "call_id": "call_fake1",
   "provider_call_id": "provider_fake1",

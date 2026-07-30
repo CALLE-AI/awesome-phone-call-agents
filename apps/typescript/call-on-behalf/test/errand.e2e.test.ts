@@ -8,19 +8,7 @@ import test from "node:test";
 import { createSdkPort } from "../src/calle.js";
 import { PreflightError, runErrand } from "../src/errand.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
-import { CLINIC, errandRequest, goodResult } from "./fixtures.js";
-
-const BOT_LINES = [
-  "Hello, I am an automated assistant calling on behalf of Fatima Haddad, with their permission. I am not a person.",
-  "I am calling to book a routine check-up. Her date of birth is 12 April 1990.",
-  "What is the earliest appointment you have for a routine check-up?",
-];
-
-const USER_LINES = [
-  "Bayview Family Clinic, how can I help?",
-  "Sure, what is the date of birth?",
-  "Earliest is Thursday the thirteenth at nine forty in the morning.",
-];
+import { BOT_LINES, CLINIC, errandRequest, goodResult, USER_LINES } from "./fixtures.js";
 
 async function withFake(
   scripts: FakeScript[],
@@ -48,18 +36,28 @@ test("a clean errand comes back answered, agreed and with a transcript", async (
       assert.equal(report.committed_datetime, "2026-08-13T09:40:00-07:00");
       assert.equal(report.confirmation_code, "4471");
       assert.equal(report.answers.every((answer) => answer.answered), true);
-      assert.deepEqual(report.disclosed, ["the caller's full name", "date of birth"]);
-      assert.deepEqual(report.authorized_but_unused, ["insurance plan name"]);
+      // Every answer names the turn it came from, because that is what makes it an answer.
+      assert.equal(report.answers.every((answer) => answer.quote.length > 0), true);
+      assert.match(report.answers[1]!.quote, /Yes, we take Blue Shield PPO/);
+      assert.match(report.callee_notes, /They agreed with: "Earliest is Thursday/);
+      assert.deepEqual(report.disclosed, [
+        "the caller's full name",
+        "date of birth",
+        "insurance plan name",
+      ]);
+      assert.deepEqual(report.authorized_but_unused, []);
       assert.deepEqual(report.leaks, []);
       assert.equal(report.reached_person, true);
-      assert.equal(report.transcript.length, 6);
+      assert.equal(report.transcript.length, 10);
       assert.equal(report.callee_phone_masked, "+14*******22");
 
       const created = fake.created[0]!;
-      assert.equal(created.idempotencyKey, "cob-bayview-checkup-aug");
+      assert.match(created.idempotencyKey ?? "", /^cob-bayview-checkup-aug-[0-9a-f]{12}$/);
       assert.equal(created.locale, "en-US");
       assert.equal(created.metadata.errand_id, "bayview-checkup-aug");
       assert.equal(created.resultSchema?.additionalProperties, false);
+      // Why the call was delegated is the person's business, not the callee's.
+      assert.equal(created.task.includes("she is deaf"), false);
     },
   );
 });
@@ -156,13 +154,15 @@ test("voicemail asks nothing and says so", async () => {
   );
 });
 
-test("an API failure is reported without inventing a call", async () => {
-  await withFake([{ phone: CLINIC, apiError: { status: 402, code: "insufficient_balance" } }], async (port) => {
+test("a refusal from CALL-E is reported without inventing a call", async () => {
+  await withFake([{ phone: CLINIC, apiError: { status: 402, code: "insufficient_balance" } }], async (port, fake) => {
     const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
     assert.equal(report.outcome, "api_error");
     assert.equal(report.call_id, null);
     assert.equal(report.callee_notes, "insufficient_balance");
+    assert.match(report.next_step, /refused to create the call/);
     assert.deepEqual(report.transcript, []);
+    assert.equal(fake.created.length, 0);
   });
 });
 
@@ -256,6 +256,121 @@ test("an errand that only asks questions never agrees to anything", async () => 
       assert.equal(report.commitment, "none_sought");
       assert.equal(report.outcome, "goal_met");
       assert.equal(fake.created[0]!.task.includes("You may not agree to anything"), true);
+    },
+  );
+});
+
+test("an answer the transcript does not support is reported as not answered", async () => {
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES.slice(0, 2),
+        userLines: ["Bayview Family Clinic.", "Let me take a look for you."],
+        structuredResult: goodResult(),
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.reached_person, true);
+      assert.equal(report.answers.every((answer) => !answer.answered), true);
+      assert.equal(report.answers.every((answer) => answer.answer === ""), true);
+      assert.equal(report.answers.every((answer) => answer.quote === ""), true);
+      assert.match(report.callee_notes, /3 answer\(s\) the transcript does not support/);
+    },
+  );
+});
+
+test("an agreement the transcript does not show is not reported as agreed", async () => {
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "Earliest is Thursday the thirteenth at nine forty in the morning.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: goodResult(),
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.equal(report.committed_datetime, null);
+      assert.equal(report.confirmation_code, "");
+      assert.equal(report.outcome, "partially_met");
+      assert.equal(report.answers.every((answer) => answer.answered), true);
+      assert.match(report.callee_notes, /no turn in the transcript shows anybody agreeing/);
+      assert.match(report.next_step, /treat nothing as booked/);
+    },
+  );
+});
+
+test("a create whose answer was lost is reconciled under the same key, not dialled again", async () => {
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: USER_LINES,
+        structuredResult: goodResult(),
+        lostCreateResponse: true,
+      },
+    ],
+    async (port, fake) => {
+      const lines: string[] = [];
+      const report = await runErrand({
+        request: errandRequest(),
+        port,
+        pollIntervalMs: 5,
+        onProgress: (line) => lines.push(line),
+      });
+      assert.equal(report.outcome, "goal_met");
+      assert.equal(fake.created.length, 1);
+      assert.ok(lines.some((line) => line.includes("reconciling under the same key")));
+    },
+  );
+});
+
+test("a call that cannot be read comes back unknown and does not claim nothing was said", async () => {
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: USER_LINES,
+        structuredResult: goodResult(),
+        pollError: { status: 503, code: "service_unavailable" },
+      },
+    ],
+    async (port, fake) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.outcome, "outcome_unknown");
+      assert.equal(report.call_status, "unknown");
+      assert.equal(report.call_id, fake.created[0]!.id);
+      assert.equal(report.commitment, "unconfirmed");
+      assert.match(report.callee_notes, /service_unavailable/);
+      assert.equal(report.next_step.includes("Nothing was said"), false);
+      assert.match(report.next_step, /nobody knows yet whether the call was made/);
+      assert.match(report.next_step, /reads that same call back/);
+      assert.equal(fake.created.length, 1);
+    },
+  );
+});
+
+test("an errand that cannot be created at all is unknown, not a refusal", async () => {
+  await withFake(
+    [{ phone: CLINIC, apiError: { status: 503, code: "service_unavailable" } }],
+    async (port, fake) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.outcome, "outcome_unknown");
+      assert.equal(report.call_id, null);
+      assert.match(report.callee_notes, /could not be reconciled/);
+      assert.equal(fake.created.length, 0);
     },
   );
 });

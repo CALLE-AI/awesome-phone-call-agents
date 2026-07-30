@@ -17,6 +17,10 @@ export interface FakeScript {
   confidence?: { score: number; label: string } | null;
   failureCode?: string | null;
   apiError?: { status: number; code: string };
+  /** The call is created and the answer to the create is lost, so the caller cannot tell. */
+  lostCreateResponse?: boolean;
+  /** Reading the call back fails, so the result of a created call cannot be read. */
+  pollError?: { status: number; code: string };
   stall?: boolean;
 }
 
@@ -192,6 +196,12 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
           metadata: body.metadata ?? {},
           resultSchema: body.result_schema,
         });
+        if (script.lostCreateResponse === true) {
+          // The call exists. The caller just never finds out from this response.
+          response.statusCode = 503;
+          response.end(envelope("service_unavailable", "The answer to the create was lost."));
+          return;
+        }
         response.statusCode = 201;
         response.end(snapshot(stored, false));
         return;
@@ -203,6 +213,11 @@ export async function startFakeCalle(scripts: FakeScript[]): Promise<FakeCalle> 
         if (call === undefined) {
           response.statusCode = 404;
           response.end(envelope("not_found", "Unknown call."));
+          return;
+        }
+        if (call.script.pollError !== undefined) {
+          response.statusCode = call.script.pollError.status;
+          response.end(envelope(call.script.pollError.code, "Fake server could not read the call."));
           return;
         }
         call.polls += 1;

@@ -6,16 +6,20 @@
  * call rather than warning about it. After it, everything the caller actually
  * said is scanned the same way, so a detail the caller volunteered on its own is
  * reported to the person it belongs to.
+ *
+ * Nothing here reports more than it knows. An answer or an agreement is only
+ * reported when the transcript supports it. A call this app could not read comes
+ * back as an unknown outcome rather than as a failure, because "nothing was said"
+ * is a claim of its own.
  */
 
-import { blocking, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
+import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
 import { CalleCallError, CalleWaitTimeout, type CallePort } from "./calle.js";
-import { readTranscript } from "./read.js";
+import { agreementTurn, readTranscript, supportingTurn } from "./read.js";
 import {
-  buildResultSchema,
+  buildCallInput,
   buildTask,
   idempotencyKey,
-  metadata,
   spokenLocal,
   withinWindows,
 } from "./script.js";
@@ -49,11 +53,21 @@ export function maskPhone(phone: string): string {
   return `${phone.slice(0, 3)}${"*".repeat(Math.max(phone.length - 5, 1))}${phone.slice(-2)}`;
 }
 
-/** Everything in the script that looks personal and is not in the budget. */
+/**
+ * Everything in the outgoing text that looks personal and is not in the budget,
+ * plus any clinical, legal or financial wording, which is reported and never
+ * blocked because only the person can say whether it belongs on the call.
+ */
 export function preflight(request: ErrandRequest): DisclosureFinding[] {
   const knownNumbers = [request.callee.phone, ...request.disclosure.map((item) => item.value)];
   const script = withoutKnownNumbers(buildTask(request), knownNumbers);
-  return unauthorizedFindings(script, request.disclosure, "call script");
+  return [
+    ...unauthorizedFindings(script, request.disclosure, "call script"),
+    ...sensitiveTopicFindings(request.goal.summary, "goal.summary"),
+    ...request.questions.flatMap((question, index) =>
+      sensitiveTopicFindings(question.text, `questions[${index}].text`),
+    ),
+  ];
 }
 
 function readString(structured: Record<string, unknown> | null, key: string): string {
@@ -78,14 +92,23 @@ function nextStep(
   request: ErrandRequest,
   offered: string,
 ): string {
+  if (outcome === "outcome_unknown") {
+    return "CALL-E took the errand and this app could not read what happened, so nobody knows yet whether the call was made or what was said. Treat nothing as arranged. Running this same errand file again reads that same call back instead of ringing anybody, because the key is unchanged. Edit the file first and it becomes a different call, so do not edit it.";
+  }
+  if (outcome === "api_error") {
+    return "CALL-E refused to create the call, so no call was placed and nothing was said on your behalf. The reason is in the notes above.";
+  }
   if (outcome === "callee_declined_automated") {
     return `${request.callee.name} will not deal with an automated caller. Nothing was arranged. Call them yourself, ask somebody to call for you or use a relay service if you have one.`;
   }
   if (outcome === "voicemail") {
     return "The line went to a machine, so nothing was asked. Try again at a different time of day.";
   }
-  if (outcome === "not_reached" || outcome === "call_failed" || outcome === "api_error") {
+  if (outcome === "not_reached" || outcome === "call_failed") {
     return "The call did not connect to a person. Nothing was said on your behalf and nothing was arranged.";
+  }
+  if (commitment === "unconfirmed") {
+    return "Something was reported as agreed and the transcript does not show anybody agreeing to it, so treat nothing as booked. Read the transcript below, then call to check if you need it.";
   }
   if (commitment === "outside_authorized_window") {
     return `Something was agreed for ${offered}, which is outside the windows you authorized. Check it and cancel it if it does not work, because this app should not have accepted it.`;
@@ -109,6 +132,10 @@ export interface RunOptions {
   onProgress?: (line: string) => void;
 }
 
+function asCallError(error: unknown): CalleCallError {
+  return error instanceof CalleCallError ? error : new CalleCallError("sdk_error", String(error));
+}
+
 export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const { request, port } = options;
   const progress = options.onProgress ?? (() => {});
@@ -118,43 +145,62 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     throw new PreflightError(findings);
   }
 
-  const task = buildTask(request);
+  const input = buildCallInput(request);
+  const key = idempotencyKey(request);
   let call: CallSnapshot | null = null;
-  let apiErrorCode: string | null = null;
+  let callId: string | null = null;
+  /** Set when CALL-E refused outright, so no call exists. */
+  let refusal: CalleCallError | null = null;
+  /** Set when the call may exist and this app cannot say what it did. */
+  let unknown: string | null = null;
+
   progress(`Calling ${request.callee.name} on ${maskPhone(request.callee.phone)}.`);
   try {
-    const created = await port.createCall(
-      {
-        task,
-        recipients: [
-          {
-            phones: [request.callee.phone],
-            locale: request.policy.language,
-            ...(request.callee.region === undefined ? {} : { region: request.callee.region }),
-          },
-        ],
-        resultSchema: buildResultSchema(request),
-        metadata: metadata(request),
-      },
-      idempotencyKey(request),
-    );
+    const created = await port.createCall(input, key);
+    callId = created.id;
     progress(`Call ${created.id} created.`);
+  } catch (error) {
+    const problem = asCallError(error);
+    progress(`CALL-E returned ${problem.code} on create.`);
+    if (problem.ambiguous) {
+      // The request may have reached CALL-E, so ask for the same idempotency key
+      // back. That returns the call if it exists and never rings a second time.
+      progress("That leaves the call unknown, so reconciling under the same key.");
+      try {
+        const reconciled = await port.createCall(input, key);
+        callId = reconciled.id;
+        progress(`Reconciled to call ${reconciled.id}.`);
+      } catch (secondError) {
+        const second = asCallError(secondError);
+        if (second.ambiguous) {
+          unknown = `the call could not be reconciled (${problem.code}, then ${second.code})`;
+        } else {
+          refusal = second;
+        }
+      }
+    } else {
+      refusal = problem;
+    }
+  }
+
+  if (callId !== null) {
     try {
-      call = await port.waitForResult(created.id, {
+      call = await port.waitForResult(callId, {
         timeoutMs: request.policy.perCallTimeoutSeconds * 1000,
         intervalMs: options.pollIntervalMs ?? 2000,
       });
     } catch (error) {
-      if (error instanceof CalleWaitTimeout) {
-        progress("The call ran past the timeout, reading its last state.");
-        call = await port.getCall(created.id);
-      } else {
-        throw error;
+      progress(
+        error instanceof CalleWaitTimeout
+          ? "The call ran past the timeout, reading its last state."
+          : `CALL-E returned ${asCallError(error).code} while waiting, reading the call directly.`,
+      );
+      try {
+        call = await port.getCall(callId);
+      } catch (readError) {
+        unknown = `the call was created and its state could not be read (${asCallError(readError).code})`;
       }
     }
-  } catch (error) {
-    apiErrorCode = error instanceof CalleCallError ? error.code : "sdk_error";
-    progress(`CALL-E returned ${apiErrorCode}.`);
   }
 
   const base = {
@@ -166,10 +212,15 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   };
 
   if (call === null) {
+    if (unknown === null && refusal === null) {
+      unknown = "the call was created and no result came back";
+    }
+    const outcome: ErrandOutcome = unknown === null ? "api_error" : "outcome_unknown";
     return {
       ...base,
-      outcome: "api_error",
-      commitment: "none_sought",
+      outcome,
+      // An unknown call may have agreed to something, so it is not "none sought".
+      commitment: outcome === "outcome_unknown" && request.goal.commitment !== "none" ? "unconfirmed" : "none_sought",
       committed_datetime: null,
       confirmation_code: "",
       answers: request.questions.map((question) => ({
@@ -180,13 +231,16 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
         quote: "",
       })),
       disclosed: [],
+      // For a refusal nothing was said, so everything was unused. For an unknown
+      // call neither list is known, so it claims neither.
+      authorized_but_unused: outcome === "outcome_unknown" ? [] : request.disclosure.map((item) => item.label),
       leaks: [],
       reached_person: false,
-      callee_notes: apiErrorCode ?? "the call was not created",
-      next_step: nextStep("api_error", "none_sought", request, ""),
-      call_id: null,
+      callee_notes: unknown ?? refusal?.code ?? "the call was not created",
+      next_step: nextStep(outcome, "none_sought", request, ""),
+      call_id: callId,
       provider_call_id: null,
-      call_status: "api_error",
+      call_status: outcome === "outcome_unknown" ? "unknown" : "api_error",
       started_at: null,
       completed_at: null,
       transcript: [],
@@ -201,29 +255,43 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const confidence = call.completionConfidence ?? null;
   const lowConfidence = confidence !== null && confidence.score < request.policy.minConfidence;
 
+  // The extraction proposes an answer. The transcript is what decides whether the
+  // report may state it, so an answer nobody can be quoted saying is not answered.
   const answers: QuestionAnswer[] = request.questions.map((question) => {
-    const answer = readString(structured, `answer_${question.id}`);
+    const claimed = readString(structured, `answer_${question.id}`);
+    const quote = reading.reachedPerson ? supportingTurn(question, claimed, turns) : "";
+    const answered = quote.length > 0;
     return {
       id: question.id,
       text: question.text,
-      answered: answer.length > 0 && reading.reachedPerson,
-      answer,
-      quote: "",
+      answered,
+      answer: answered ? claimed : "",
+      quote,
     };
   });
+  const unsupported = request.questions.filter(
+    (question, index) =>
+      readString(structured, `answer_${question.id}`).length > 0 && !answers[index]!.answered,
+  ).length;
 
   const madeRaw = readString(structured, "commitment_made");
   const offered = readString(structured, "offered_datetime");
   const offeredSpoken = /^\d{4}-\d{2}-\d{2}T/.test(offered) ? spokenLocal(offered) : offered;
   let commitment: CommitmentState = "none_sought";
+  let agreedQuote = "";
   if (request.goal.commitment !== "none") {
     if (madeRaw === "accepted") {
-      commitment =
-        request.goal.commitment === "confirm_existing"
-          ? "committed"
-          : withinWindows(offered, request.authorizedWindows)
+      agreedQuote = agreementTurn(turns, request.goal.commitment);
+      if (agreedQuote.length === 0) {
+        commitment = "unconfirmed";
+      } else {
+        commitment =
+          request.goal.commitment === "confirm_existing"
             ? "committed"
-            : "outside_authorized_window";
+            : withinWindows(offered, request.authorizedWindows)
+              ? "committed"
+              : "outside_authorized_window";
+      }
     } else if (madeRaw === "other_time_offered") {
       commitment = "proposal_only";
     } else if (madeRaw === "declined_by_callee") {
@@ -265,6 +333,17 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   if (lowConfidence) {
     notes.push(`CALL-E scored its own completion low (${String(confidence?.score)}), so treat the answers with care.`);
   }
+  if (unsupported > 0) {
+    notes.push(
+      `CALL-E reported ${unsupported} answer(s) the transcript does not support, so they are marked not answered.`,
+    );
+  }
+  if (agreedQuote.length > 0) {
+    notes.push(`They agreed with: "${agreedQuote}"`);
+  }
+  if (commitment === "unconfirmed") {
+    notes.push("CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.");
+  }
   if (reading.declineQuote.length > 0) {
     notes.push(`They said: "${reading.declineQuote}"`);
   }
@@ -274,7 +353,8 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     outcome,
     commitment,
     committed_datetime: commitment === "committed" && offered.length > 0 ? offered : null,
-    confirmation_code: readString(structured, "confirmation_code"),
+    // A reference number belongs to an agreement, so it goes with the evidence for one.
+    confirmation_code: agreedQuote.length > 0 ? readString(structured, "confirmation_code") : "",
     answers,
     disclosed,
     authorized_but_unused: request.disclosure

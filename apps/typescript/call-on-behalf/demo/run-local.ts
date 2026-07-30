@@ -4,9 +4,10 @@
  *
  *   npm run demo
  *
- * Four beats: an errand that works, a business that refuses to deal with an
- * automated caller, a time the caller was not allowed to accept and the three
- * privacy gates.
+ * Six beats: an errand that works, a business that refuses to deal with an
+ * automated caller, a time the caller was not allowed to accept, the three
+ * privacy gates, an extraction claiming an agreement the transcript does not show
+ * and a call this app could not read the outcome of.
  */
 
 import { mkdirSync } from "node:fs";
@@ -193,6 +194,52 @@ async function main(): Promise<void> {
       .join(", ")}\n`,
   );
   process.stdout.write("  The call still happened and the person is told what was said about them.\n");
+
+  heading("5. The extraction says it was agreed and the transcript does not");
+  const unsupported = await run([
+    {
+      phone: CLINIC,
+      botLines: BOT_LINES,
+      userLines: [
+        "Bayview Family Clinic, how can I help?",
+        "Let me look. Can I take the date of birth?",
+        "Thanks. Earliest for a new patient is Thursday the thirteenth at nine forty.",
+        "Yes, we take Blue Shield PPO.",
+        "Photo identification and the insurance card.",
+      ],
+      structuredResult: {
+        answer_earliest: "Thursday the thirteenth at nine forty in the morning",
+        answer_accepts_plan: "yes",
+        answer_bring: "photo identification and the insurance card",
+        commitment_made: "accepted",
+        offered_datetime: "2026-08-13T09:40:00-07:00",
+        confirmation_code: "4471",
+        callee_declined_automated: "no",
+        notes: "",
+      },
+    },
+  ]);
+  process.stdout.write(
+    `  outcome: ${unsupported.report.outcome}, commitment: ${unsupported.report.commitment}\n`,
+  );
+  process.stdout.write(`  confirmation code kept: ${JSON.stringify(unsupported.report.confirmation_code)}\n`);
+  process.stdout.write(`  questions answered: ${unsupported.report.answers.filter((a) => a.answered).length}\n`);
+  process.stdout.write(`  next step: ${unsupported.report.next_step}\n`);
+  process.stdout.write("  Nobody in the transcript agreed to anything, so the report does not say they did.\n");
+
+  heading("6. The call CALL-E would not report back on");
+  const unreadable = await run([
+    {
+      phone: CLINIC,
+      botLines: BOT_LINES,
+      userLines: ["Bayview Family Clinic, how can I help?"],
+      pollError: { status: 503, code: "service_unavailable" },
+    },
+  ]);
+  process.stdout.write(`  outcome: ${unreadable.report.outcome}, call id: ${String(unreadable.report.call_id)}\n`);
+  process.stdout.write(`  next step: ${unreadable.report.next_step}\n`);
+  process.stdout.write(`  calls placed: ${unreadable.created}\n`);
+
   process.stdout.write(`\nReport written to ${reportPath} with mode 0600\n`);
 }
 

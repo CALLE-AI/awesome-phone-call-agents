@@ -1,12 +1,15 @@
 /**
  * Rendering. The report is the product: a person who could not make the call gets
  * the answer, exactly what was said about them and the transcript in writing.
+ *
+ * The preview is the other half of it. It prints what will be said before anything
+ * rings and ends with the receipt that `call --live` demands back.
  */
 
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { blocking } from "./disclosure.js";
 import { maskPhone, preflight } from "./errand.js";
-import { buildResultSchema, buildTask, spokenLocal, spokenWindow } from "./script.js";
+import { buildResultSchema, buildTask, previewReceipt, spokenLocal, spokenWindow } from "./script.js";
 import type { DisclosureFinding, ErrandReport, ErrandRequest, TranscriptTurn } from "./types.js";
 
 function speaker(turn: TranscriptTurn): string {
@@ -38,7 +41,9 @@ export function renderPreview(request: ErrandRequest): string {
   lines.push("Preview only. No call is placed and no credentials are used.");
   lines.push("");
   lines.push(`Errand        ${request.errandId}`);
-  lines.push(`On behalf of  ${request.onBehalfOf.name} (${request.onBehalfOf.reason_for_delegation})`);
+  lines.push(`On behalf of  ${request.onBehalfOf.name}`);
+  lines.push(`Reason        ${request.onBehalfOf.reason_for_delegation}`);
+  lines.push("              (your record, kept in the errand file and never sent to CALL-E)");
   lines.push(`Calling       ${request.callee.name} ${maskPhone(request.callee.phone)}`);
   lines.push(`Number from   ${request.callee.published_source}`);
   lines.push(`Language      ${request.policy.language}`);
@@ -73,11 +78,16 @@ export function renderPreview(request: ErrandRequest): string {
   lines.push("Result contract");
   lines.push(`  ${JSON.stringify(buildResultSchema(request))}`);
   lines.push("");
-  lines.push(
-    blockers.length === 0
-      ? "Nothing above has been sent anywhere. Add --live to place the call."
-      : "This errand will not run until the refused details are removed or authorized.",
-  );
+  if (blockers.length > 0) {
+    lines.push("This errand will not run until the refused details are removed or authorized.");
+    return lines.join("\n");
+  }
+  lines.push("Nothing above has been sent anywhere. This preview is what you are agreeing to, so");
+  lines.push("placing the call needs its receipt back:");
+  lines.push("");
+  lines.push(`  call --errand <file> --live --receipt ${previewReceipt(request)}`);
+  lines.push("");
+  lines.push("Edit the errand file and that receipt changes, so read the preview again.");
   return lines.join("\n");
 }
 
@@ -88,14 +98,18 @@ export function renderReport(report: ErrandReport): string {
   lines.push(`On behalf of  ${report.on_behalf_of}`);
   lines.push(`Called        ${report.callee_name}  ${report.callee_phone_masked}`);
   lines.push(
-    `Status        ${report.call_status}, ${report.reached_person ? "a person answered" : "no person on the line"}`,
+    report.outcome === "outcome_unknown"
+      ? "Status        unknown, so whether anybody answered is not known either"
+      : `Status        ${report.call_status}, ${report.reached_person ? "a person answered" : "no person on the line"}`,
   );
   lines.push(`Outcome       ${report.outcome}`);
   lines.push("");
 
   if (report.commitment !== "none_sought") {
     lines.push("What was agreed");
-    if (report.commitment === "committed") {
+    if (report.outcome === "outcome_unknown") {
+      lines.push("  not known. Nothing about this call could be read");
+    } else if (report.commitment === "committed") {
       const when =
         report.committed_datetime === null
           ? "as discussed on the call"
@@ -108,6 +122,8 @@ export function renderReport(report: ErrandReport): string {
       }
     } else if (report.commitment === "outside_authorized_window") {
       lines.push("  something was agreed outside the windows you authorized, see what to do next");
+    } else if (report.commitment === "unconfirmed") {
+      lines.push("  nothing you can rely on. Something was reported as agreed and the transcript does not show it");
     } else if (report.commitment === "proposal_only") {
       lines.push("  nothing. They offered something the caller was not allowed to accept");
     } else {
@@ -117,22 +133,36 @@ export function renderReport(report: ErrandReport): string {
   }
 
   lines.push("Your questions");
+  const unknownCall = report.outcome === "outcome_unknown";
   for (const [index, answer] of report.answers.entries()) {
     lines.push(`  ${index + 1}. ${answer.text}`);
-    lines.push(answer.answered ? `     answered: ${answer.answer}` : "     not answered");
+    lines.push(
+      answer.answered
+        ? `     answered: ${answer.answer}`
+        : unknownCall
+          ? "     not known"
+          : "     not answered",
+    );
+    if (answer.quote.length > 0) {
+      lines.push(`     they said: ${answer.quote}`);
+    }
   }
   lines.push("");
 
   lines.push("What was said about you");
-  lines.push(`  said          ${report.disclosed.length > 0 ? report.disclosed.join(", ") : "nothing"}`);
-  lines.push(
-    `  not needed    ${report.authorized_but_unused.length > 0 ? report.authorized_but_unused.join(", ") : "nothing left over"}`,
-  );
-  if (report.leaks.length === 0) {
-    lines.push("  privacy check nothing outside your list was said");
+  if (report.outcome === "outcome_unknown") {
+    lines.push("  not known, because nothing about this call could be read");
   } else {
-    for (const leak of report.leaks) {
-      lines.push(`  privacy check ${leak.severity === "block" ? "LEAK" : "possible leak"}: ${leak.kind} (${leak.masked})`);
+    lines.push(`  said          ${report.disclosed.length > 0 ? report.disclosed.join(", ") : "nothing"}`);
+    lines.push(
+      `  not needed    ${report.authorized_but_unused.length > 0 ? report.authorized_but_unused.join(", ") : "nothing left over"}`,
+    );
+    if (report.leaks.length === 0) {
+      lines.push("  privacy check nothing outside your list was said");
+    } else {
+      for (const leak of report.leaks) {
+        lines.push(`  privacy check ${leak.severity === "block" ? "LEAK" : "possible leak"}: ${leak.kind} (${leak.masked})`);
+      }
     }
   }
   lines.push("");

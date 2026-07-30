@@ -7,34 +7,38 @@
  *   10 partly done or something was offered that needs the person to decide
  *   20 nothing was arranged: they will not deal with an automated caller, a
  *      machine answered, nobody answered or the call failed
- *   30 usage error or the privacy check refused the script
+ *   30 usage error, a wrong preview receipt or the privacy check refused the script
+ *   40 the call may have run and its outcome could not be read
  *
  * Progress goes to stderr, the report to stdout.
  */
 
-import { createSdkPort, DEFAULT_BASE_URL } from "./calle.js";
+import { createSdkPort } from "./calle.js";
 import { ConfigError, loadRequest } from "./config.js";
 import { PreflightError, runErrand } from "./errand.js";
 import { readReport, renderPreview, renderReport, writeReport } from "./report.js";
+import { previewReceipt } from "./script.js";
 
 const EXIT_DONE = 0;
 const EXIT_PARTIAL = 10;
 const EXIT_NOT_DONE = 20;
 const EXIT_USAGE = 30;
+const EXIT_UNKNOWN = 40;
 
 const USAGE = `Call on behalf
 
   preview --errand <file>
-      Print the exact call script, the details it may give and the privacy check.
-      Places no call and needs no credentials.
+      Print the exact call script, the details it may give, the privacy check and
+      the receipt for this preview. Places no call and needs no credentials.
 
-  call --errand <file> --live [--report <file>] [--json] [--base-url <url>]
-      Place one call. Needs CALLE_API_KEY.
+  call --errand <file> --live --receipt <hash> [--report <file>] [--json] [--base-url <url>]
+      Place one call. The receipt must be the one the preview printed for this
+      errand file. Needs CALLE_API_KEY.
 
   show --report <file>
       Re-render a saved report as text.
 
-Exit codes: 0 done, 10 partly done, 20 nothing arranged, 30 usage or privacy refusal.`;
+Exit codes: 0 done, 10 partly done, 20 nothing arranged, 30 usage, receipt or privacy refusal, 40 outcome unknown.`;
 
 interface Parsed {
   command: string;
@@ -100,12 +104,27 @@ async function main(argv: string[]): Promise<number> {
         "call places a real phone call. Read the preview first, then add --live when the script is right.",
       );
     }
+    // Consent is a receipt for a preview somebody read, not a flag. The hash covers
+    // the script, the disclosure list and the windows, so an edited errand file is a
+    // preview nobody has seen and this refuses it.
+    const receipt = parsed.values["receipt"];
+    if (receipt === undefined) {
+      throw new ConfigError(
+        "call --live needs --receipt <hash>. Run preview --errand <file>, read what will be said about you, then pass the receipt it prints.",
+      );
+    }
+    if (receipt !== previewReceipt(request)) {
+      throw new ConfigError(
+        `Receipt ${receipt} is not the receipt for this errand file, so no call was placed. The file has changed since that preview. Run preview --errand <file> again, read it, then pass the receipt it prints.`,
+      );
+    }
     const apiKey = process.env.CALLE_API_KEY;
     if (apiKey === undefined || apiKey.length === 0) {
       throw new ConfigError("CALLE_API_KEY is not set. This app never reads a key from the errand file.");
     }
-    const baseUrl = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL ?? DEFAULT_BASE_URL;
-    const port = await createSdkPort({ apiKey, baseUrl });
+    const configured = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL;
+    const baseUrl = configured === undefined || configured.length === 0 ? undefined : configured;
+    const port = await createSdkPort(baseUrl === undefined ? { apiKey } : { apiKey, baseUrl });
     const report = await runErrand({
       request,
       port,
@@ -121,6 +140,9 @@ async function main(argv: string[]): Promise<number> {
     );
     if (report.outcome === "goal_met") {
       return EXIT_DONE;
+    }
+    if (report.outcome === "outcome_unknown") {
+      return EXIT_UNKNOWN;
     }
     return report.outcome === "partially_met" ? EXIT_PARTIAL : EXIT_NOT_DONE;
   }

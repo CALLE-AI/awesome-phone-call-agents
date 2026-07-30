@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   blocking,
   forbiddenDisclosure,
+  sensitiveTopicFindings,
   spokenItems,
   unauthorizedFindings,
   withoutKnownNumbers,
@@ -83,4 +84,26 @@ test("the number being called is not a leak", () => {
   const text = "calling 415 555 0122 now";
   assert.equal(kinds(text).includes("long number"), true);
   assert.deepEqual(kinds(withoutKnownNumbers(text, ["+14155550122"])), []);
+});
+
+test("clinical, legal and financial wording is reported and never blocks", () => {
+  const clinical = sensitiveTopicFindings("ask whether the biopsy results are back", "goal.summary");
+  assert.deepEqual(clinical.map((finding) => finding.kind), ["clinical detail"]);
+  assert.equal(clinical[0]!.severity, "warn");
+  assert.deepEqual(blocking(clinical), []);
+  assert.equal(clinical[0]!.where, "goal.summary");
+  assert.equal(clinical[0]!.masked.includes("biopsy"), false);
+
+  assert.deepEqual(
+    sensitiveTopicFindings("the eviction hearing and the arrears on the account", "questions[0].text").map(
+      (finding) => finding.kind,
+    ),
+    ["legal detail", "financial detail"],
+  );
+});
+
+test("an ordinary errand is not flagged and prose with no keyword is missed", () => {
+  assert.deepEqual(sensitiveTopicFindings("book a routine check-up for a new patient", "goal.summary"), []);
+  // The honest limit: this says something clinical, no pattern sees it and the docs say so.
+  assert.deepEqual(sensitiveTopicFindings("she has been unwell since the spring", "goal.summary"), []);
 });

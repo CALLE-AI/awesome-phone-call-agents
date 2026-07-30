@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildCallInput,
   buildResultSchema,
   buildTask,
+  canonicalJson,
   idempotencyKey,
   metadata,
+  previewReceipt,
   spokenLocal,
   spokenWindow,
   withinWindows,
@@ -21,6 +24,14 @@ test("the first sentence says it is automated and whose errand it is", () => {
   assert.match(task, /I am an automated assistant calling on behalf of Fatima Haddad, with their permission/);
   assert.match(task, /I am not a person/);
   assert.match(task, /Never claim to be Fatima Haddad or any person/);
+});
+
+test("why the call was delegated never leaves the errand file", () => {
+  const request = errandRequest();
+  const task = buildTask(request);
+  assert.equal(task.includes(request.onBehalfOf.reason_for_delegation), false);
+  assert.equal(task.includes("deaf"), false);
+  assert.equal(canonicalJson(buildCallInput(request)).includes("deaf"), false);
 });
 
 test("the script carries the questions in order and the goal", () => {
@@ -116,8 +127,47 @@ test("the window check is inclusive at the edges and rejects everything else", (
 
 test("one errand is one call and metadata carries the errand id", () => {
   const request = errandRequest();
-  assert.equal(idempotencyKey(request), "cob-bayview-checkup-aug");
+  assert.match(idempotencyKey(request), /^cob-bayview-checkup-aug-[0-9a-f]{12}$/);
+  assert.equal(idempotencyKey(request), idempotencyKey(errandRequest()));
   assert.equal(metadata(request).app, "call-on-behalf");
   assert.equal(metadata(request).errand_id, "bayview-checkup-aug");
   assert.equal(metadata(request).commitment, "slot_within_windows");
+});
+
+test("the idempotency key binds the content, so an edited errand is a different call", () => {
+  const request = errandRequest();
+  const edited = errandRequest({
+    questions: [{ id: "earliest", text: "What is your earliest appointment next week?", answer: "datetime" }],
+  });
+  const other = errandRequest({ errand_id: "bayview-checkup-sep" });
+  assert.notEqual(idempotencyKey(request), idempotencyKey(edited));
+  assert.notEqual(idempotencyKey(request), idempotencyKey(other));
+  assert.match(idempotencyKey(edited), /^cob-bayview-checkup-aug-/);
+});
+
+test("the canonical JSON is one order, so the same content hashes the same", () => {
+  assert.equal(canonicalJson({ b: 1, a: [{ d: 2, c: 3 }] }), canonicalJson({ a: [{ c: 3, d: 2 }], b: 1 }));
+  assert.equal(canonicalJson({ b: 1, a: 2 }), '{"a":2,"b":1}');
+});
+
+test("the preview receipt covers the script, the budget and the windows", () => {
+  const request = errandRequest();
+  assert.match(previewReceipt(request), /^[0-9a-f]{16}$/);
+  assert.equal(previewReceipt(request), previewReceipt(errandRequest()));
+  const widerBudget = errandRequest({
+    disclosure: [...errandRequest().disclosure, { key: "email", label: "email address", value: "fatima at example" }],
+  });
+  const laterWindow = errandRequest({
+    authorized_windows: [{ from: "2026-08-12T09:00:00-07:00", to: "2026-08-12T16:00:00-07:00" }],
+  });
+  assert.notEqual(previewReceipt(request), previewReceipt(widerBudget));
+  assert.notEqual(previewReceipt(request), previewReceipt(laterWindow));
+});
+
+test("what is sent to CALL-E is built in one place", () => {
+  const input = buildCallInput(errandRequest());
+  assert.equal(input.task, buildTask(errandRequest()));
+  assert.deepEqual(input.recipients, [{ phones: ["+14155550122"], locale: "en-US", region: "US" }]);
+  assert.equal(input.resultSchema.additionalProperties, false);
+  assert.equal(input.metadata.errand_id, "bayview-checkup-aug");
 });

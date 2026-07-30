@@ -17,14 +17,19 @@ export type ErrandOutcome =
   | "voicemail"
   | "not_reached"
   | "call_failed"
-  | "api_error";
+  /** CALL-E refused to create the call, so nothing was said. */
+  | "api_error"
+  /** The call may have run and this app could not read what happened. */
+  | "outcome_unknown";
 
 export type CommitmentState =
   | "none_sought"
   | "committed"
   | "proposal_only"
   | "declined_by_callee"
-  | "outside_authorized_window";
+  | "outside_authorized_window"
+  /** The extraction claimed an agreement the transcript does not show. */
+  | "unconfirmed";
 
 export type AnswerShape = "text" | "yes_no" | "datetime";
 
@@ -49,6 +54,7 @@ export interface AuthorizedWindow {
 
 export interface OnBehalfOf {
   name: string;
+  /** The consent record only. It is never sent to CALL-E and never spoken. */
   reason_for_delegation: string;
 }
 
@@ -173,6 +179,7 @@ export interface QuestionAnswer {
   text: string;
   answered: boolean;
   answer: string;
+  /** The callee turn that supports the answer. Empty means nothing supported it. */
   quote: string;
 }
 

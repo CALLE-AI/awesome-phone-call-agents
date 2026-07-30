@@ -1,12 +1,33 @@
 /**
  * Shared fixtures. The clinic number is from the reserved 555-01xx range, so
  * nothing here can ring a real handset.
+ *
+ * The transcript is the evidence the report is allowed to stand on, so it carries
+ * a real answer to every question and a real agreement. A test that wants an
+ * unsupported claim leaves lines out on purpose.
  */
 
 import { parseRequest } from "../src/config.js";
 import type { ErrandRequest, ErrandRequestInput } from "../src/types.js";
 
 export const CLINIC = "+14155550122";
+
+/** What the caller says, in order. The fake server interleaves it with the callee. */
+export const BOT_LINES = [
+  "Hello, I am an automated assistant calling on behalf of Fatima Haddad, with their permission. I am not a person.",
+  "What is the earliest appointment you have for a routine check-up?",
+  "Her date of birth is 12 April 1990.",
+  "Do you take Blue Shield PPO?",
+  "What should she bring to a first appointment?",
+];
+
+export const USER_LINES = [
+  "Bayview Family Clinic, how can I help?",
+  "Let me look. Can I take the date of birth?",
+  "Earliest is Thursday the thirteenth at nine forty in the morning. I can hold that slot, reference four four seven one.",
+  "Yes, we take Blue Shield PPO.",
+  "Photo identification and the insurance card.",
+];
 
 export function errandInput(overrides: Partial<ErrandRequestInput> = {}): ErrandRequestInput {
   return {
