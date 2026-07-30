@@ -203,13 +203,18 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       if (entry.result.phase === "confirm" && entry.result.confirmed) {
         creditConfirm(entry.result.party_id);
       }
-      if (entry.result.phase === "release") {
+      if (entry.result.phase === "release" && entry.result.acknowledged) {
         released.push(entry.result.party_id);
       }
     }
     if (entry.kind === "release") {
       calls += 1;
-      released.push(entry.result.party_id);
+      // A call that ended is not a call that told somebody. Only acknowledged
+      // delivery counts here, so a ledger cannot close a debt with a release
+      // call that reached a machine or failed.
+      if (entry.result.acknowledged) {
+        released.push(entry.result.party_id);
+      }
     }
     if (entry.kind === "outcome") {
       if (entry.calls_placed !== calls) {

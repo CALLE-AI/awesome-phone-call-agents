@@ -14,7 +14,8 @@ import test from "node:test";
 import { CalleCallError, createSdkPort, type CallePort } from "../src/calle.js";
 import { runCoordination } from "../src/coordinate.js";
 import { readEntries, replay } from "../src/ledger.js";
-import { resumeCoordination, ResumeError } from "../src/resume.js";
+import { inspectLedger, resumeCoordination, ResumeError } from "../src/resume.js";
+import type { CommitResult, LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
 import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
 
@@ -189,5 +190,97 @@ test("resume refuses a ledger another request wrote", async () => {
         return true;
       },
     );
+  });
+});
+
+/**
+ * A run where the one release call it owed reached an answering machine. The
+ * call is over, so its status is terminal, and the person still has not been
+ * told. That gap is what the debt rules below are about.
+ */
+const MACHINE_RELEASE: FakeScript[] = [
+  gather(PLUMBER),
+  gather(TENANT),
+  gather(SUPER),
+  confirmYes(PLUMBER),
+  {
+    phone: TENANT,
+    phase: "confirm",
+    userLines: ["Speaking.", "Sorry, I cannot make that."],
+    structuredResult: { answer: "decline", notes: "" },
+  },
+  { phone: PLUMBER, phase: "release", userLines: ["Please leave a message after the tone."] },
+];
+
+async function withOwedRelease(
+  body: (args: {
+    port: CallePort;
+    path: string;
+    request: ReturnType<typeof coordinationRequest>;
+  }) => Promise<void>,
+): Promise<void> {
+  const fake = await startFakeCalle(MACHINE_RELEASE);
+  const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+  const request = coordinationRequest();
+  const path = ledgerPath();
+  try {
+    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(first.outcome, "not_confirmed");
+    assert.deepEqual(first.unreleased, ["plumber"], "the release call reached a machine");
+    await body({ port, path, request });
+  } finally {
+    await fake.close();
+  }
+}
+
+test("a terminal release call that reached nobody leaves the debt owed", async () => {
+  await withOwedRelease(async ({ path }) => {
+    const entries = readEntries(path);
+    const state = inspectLedger(entries);
+    assert.deepEqual(state.released, [], "nobody acknowledged anything");
+    assert.deepEqual(state.owedReleases, ["plumber"]);
+
+    const machine = entries.find((entry) => entry.kind === "release");
+    assert.ok(machine !== undefined && machine.kind === "release");
+    const later = (overrides: Partial<CommitResult>): LedgerEntry => ({
+      ...machine,
+      result: { ...machine.result, ...overrides },
+    });
+
+    // A failed or canceled release call is terminal and reached nobody, so it
+    // cannot erase a debt the outcome entry already recorded.
+    for (const status of ["failed", "canceled", "no_answer", "busy", "voicemail"]) {
+      assert.deepEqual(
+        inspectLedger([...entries, later({ call_status: status })]).owedReleases,
+        ["plumber"],
+        `a ${status} release call must not count as delivery`,
+      );
+    }
+
+    // Acknowledged delivery is the only thing that clears it.
+    const settled = inspectLedger([...entries, later({ acknowledged: true, reached_person: true })]);
+    assert.deepEqual(settled.released, ["plumber"]);
+    assert.deepEqual(settled.owedReleases, []);
+  });
+});
+
+test("resume finishes a release nobody acknowledged instead of writing it off", async () => {
+  await withOwedRelease(async ({ port, path, request }) => {
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.notEqual(resumed.note, "nothing to resume");
+    assert.deepEqual(resumed.unreleased, ["plumber"], "the machine answered again");
+    assert.match(resumed.note, /still owed a release call: plumber/);
+    assert.equal(resumed.calls_placed, 7, "6 recorded calls plus the release call it tried again");
+
+    const entries = readEntries(path);
+    assert.equal(
+      entries.filter((entry) => entry.kind === "release").length,
+      2,
+      "resume called again rather than reading the first attempt as delivery",
+    );
+    const opened = entries.find((entry) => entry.kind === "resume_started");
+    assert.ok(opened !== undefined && opened.kind === "resume_started");
+    assert.deepEqual(opened.owed_releases, ["plumber"]);
+    assert.equal(replay(entries).ok, true, JSON.stringify(replay(entries).issues));
   });
 });

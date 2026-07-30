@@ -55,7 +55,10 @@ export interface RecoveryState {
   callsPlaced: number;
   /** Parties with a recorded yes, in the order they gave it. */
   confirmed: string[];
-  /** Parties a release call has already reached the end of. */
+  /**
+   * Parties a person acknowledged a release call for. Nothing else clears the
+   * debt: a release call can end and still have told nobody.
+   */
   released: string[];
   /** How many release calls this ledger holds. One is enough to make it off. */
   releasesRecorded: number;
@@ -86,6 +89,7 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
   let outcome: Outcome | null = null;
   const confirmed: string[] = [];
   const released = new Set<string>();
+  const owed = new Set<string>();
   const unsettled = new Map<string, CommitResult>();
   let releasesRecorded = 0;
 
@@ -112,13 +116,28 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
       }
       if (result.phase === "release") {
         releasesRecorded += 1;
-        if (TERMINAL_STATUSES.has(result.call_status)) {
+        // Only acknowledged delivery settles the debt. A release call that
+        // failed, was canceled, rang out, hit a busy line or left a message on a
+        // machine is over and the person still has not been told, so they are
+        // owed the call.
+        if (result.acknowledged) {
           released.add(result.party_id);
+          owed.delete(result.party_id);
+        } else {
+          owed.add(result.party_id);
         }
       }
     }
     if (entry.kind === "outcome") {
       outcome = entry.outcome;
+      // A debt this run wrote down stays a debt. Only an acknowledged delivery
+      // after it can clear it, which is why this reads the released set rather
+      // than trusting a later terminal entry.
+      for (const party of entry.unreleased) {
+        if (!released.has(party)) {
+          owed.add(party);
+        }
+      }
     }
   }
 
@@ -133,9 +152,12 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
     releasesRecorded,
     unsettled: [...unsettled.values()],
     // A release is owed only when the appointment is off. A run that ended in a
-    // verbal confirmation owes nobody a call saying it is not happening.
+    // verbal confirmation owes nobody a call saying it is not happening, and
+    // `resume` only reaches that outcome when no release call has gone out.
     owedReleases:
-      outcome === "verbally_confirmed" ? [] : confirmed.filter((party) => !released.has(party)),
+      outcome === "verbally_confirmed"
+        ? []
+        : [...new Set([...confirmed.filter((party) => !released.has(party)), ...owed])],
   };
 }
 
@@ -303,7 +325,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     if (result.phase === "confirm" && result.confirmed && !confirmed.includes(party.id)) {
       confirmed.push(party.id);
     }
-    if (result.phase === "release" && TERMINAL_STATUSES.has(result.call_status)) {
+    if (result.phase === "release" && result.acknowledged) {
       released.add(party.id);
     }
     progress(`  ${party.id}: the ${previous.phase} call ${describe(result)}.`);
@@ -323,7 +345,11 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
 
   const unreleased: string[] = [];
   if (outcome !== "verbally_confirmed" && chosen !== undefined) {
-    const owed = confirmed
+    // Everybody who said yes, plus every debt the ledger already recorded, minus
+    // the people a release call actually reached. A debt is not written off
+    // because a call ended.
+    const debt = [...new Set([...confirmed, ...state.owedReleases])];
+    const owed = debt
       .filter((party) => !released.has(party))
       .map((party) => partyById(request, party))
       .filter((party): party is Party => party !== undefined)

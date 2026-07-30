@@ -170,6 +170,44 @@ test("a failed run that never released a party who said yes is caught", async ()
   );
 });
 
+test("a release call that reached nobody does not count as telling them", async () => {
+  const fake = await startFakeCalle([
+    gather(PLUMBER, [2], "Option two works."),
+    gather(TENANT, [2], "Option two works."),
+    gather(SUPER, [2], "Option two works."),
+    confirmYes(PLUMBER),
+    {
+      phone: TENANT,
+      phase: "confirm",
+      userLines: ["Speaking.", "Sorry, I cannot make that."],
+      structuredResult: { answer: "decline", notes: "" },
+    },
+    { phone: PLUMBER, phase: "release", userLines: ["Please leave a message after the tone."] },
+  ]);
+  const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+  const path = join(mkdtempSync(join(tmpdir(), "mps-ledger-")), "ledger.jsonl");
+  const result = await runCoordination({ request: coordinationRequest(), port, ledgerPath: path, pollIntervalMs: 5 });
+  await fake.close();
+  assert.deepEqual(result.unreleased, ["plumber"]);
+
+  const entries = readEntries(path);
+  const release = entries.find((entry) => entry.kind === "release");
+  assert.ok(release !== undefined && release.kind === "release");
+  assert.equal(release.result.call_status, "completed", "the call ended");
+  assert.equal(release.result.acknowledged, false, "and told nobody");
+  assert.equal(replay(entries).ok, true, "naming the debt is what makes it replay");
+
+  // The same history with the debt dropped from the outcome. The release call is
+  // still there and still reached nobody, so replay must not read it as delivery.
+  rewrite(path, entries.map((entry) => (entry.kind === "outcome" ? { ...entry, unreleased: [] } : entry)));
+  const verification = replay(readEntries(path));
+  assert.equal(verification.ok, false);
+  assert.ok(
+    verification.issues.some((issue) => issue.problem.includes("plumber confirmed and were never released")),
+    JSON.stringify(verification.issues),
+  );
+});
+
 test("a ledger with no outcome entry is an unfinished run", async () => {
   const { path, entries } = await confirmedLedger();
   rewrite(path, entries.filter((entry) => entry.kind !== "outcome"));

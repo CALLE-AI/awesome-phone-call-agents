@@ -83,8 +83,23 @@ export interface CallOutcome {
   errorCode: string | null;
 }
 
-/** Statuses a call can no longer move out of. Anything else is still in flight. */
-export const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled"]);
+/**
+ * Statuses a call can no longer move out of.
+ *
+ * Anything else, so `queued`, `in_progress`, `ringing`, `scheduled`, a missing
+ * status or one the API adds later, means the call is still in flight: it keeps
+ * its call id, `resume` owns it and no phase result is decided off it. One set
+ * for the coordinator and for recovery, so the two cannot drift apart on what
+ * finished means.
+ */
+export const TERMINAL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "canceled",
+  "no_answer",
+  "busy",
+  "voicemail",
+]);
 
 class Aborted extends Error {}
 
