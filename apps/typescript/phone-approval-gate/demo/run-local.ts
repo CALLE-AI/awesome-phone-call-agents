@@ -23,6 +23,7 @@ import { startFakeCalle, type FakeScenario } from "../fake/calle-server.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..");
 const auditFile = join(appRoot, "results", "audit.jsonl");
+const stateDir = join(appRoot, "results", "state");
 
 /** One code per approver, so an approval recorded on one handset cannot come from another. */
 const CODES: Record<string, string> = {
@@ -77,6 +78,20 @@ const cases: DemoCase[] = [
       },
     ],
   },
+  {
+    title: "4. The reply to the create is lost, so the call state is unknown",
+    note: "The call exists and the gate never heard about it. It replays the same idempotency key, finds that call and never rings the backup.",
+    scenarios: [
+      {
+        phone: OWNER,
+        apiError: { status: 503, code: "service_unavailable", times: 1, afterCreate: true },
+        userLines: ["Hello?", "Four seven two nine one three. I approve."],
+        structuredResult: { decision: "approve", spoken_code: "472913", reason: "Said approve." },
+        confidence: { score: 0.94, label: "high" },
+      },
+      { phone: BACKUP, userLines: ["Hello?"] },
+    ],
+  },
 ];
 
 function forge(record: AuditRecord): AuditRecord {
@@ -90,9 +105,11 @@ async function main(): Promise<void> {
   if (existsSync(auditFile)) {
     rmSync(auditFile);
   }
+  // Reservations are per request, so the demo starts from a clean one.
+  rmSync(stateDir, { recursive: true, force: true });
   const request = loadRequest(join(appRoot, "examples", "request.example.json"));
 
-  for (const demo of cases) {
+  for (const [index, demo] of cases.entries()) {
     process.stdout.write(`\n${demo.title}\n${"-".repeat(demo.title.length)}\n${demo.note}\n\n`);
     const fake = await startFakeCalle(demo.scenarios);
     const port = await createSdkPort({ apiKey: "calle_demo_key", baseUrl: fake.baseUrl });
@@ -100,6 +117,8 @@ async function main(): Promise<void> {
       request,
       port,
       auditPath: auditFile,
+      // Each case is its own run of this request, so each gets its own state.
+      stateDir: join(stateDir, `case-${index + 1}`),
       pollIntervalMs: 5,
       makeSecret: (approver) => ({ code: CODES[approver.id] ?? "000000", phrase: PHRASE }),
       onProgress: (line) => process.stdout.write(`  ${line}\n`),
@@ -112,7 +131,7 @@ async function main(): Promise<void> {
 
   const verification = verifyAudit(auditFile);
   process.stdout.write(
-    `\n4. The record chain\n-------------------\n${verification.records} record(s): ${
+    `\n5. The record chain\n-------------------\n${verification.records} record(s): ${
       verification.ok ? "chain and verdicts hold" : "PROBLEMS FOUND"
     }\n`,
   );
@@ -124,7 +143,7 @@ async function main(): Promise<void> {
   const forged = forge(records[1]!);
   const forgedCheck = verifyRecords([records[0]!, forged]);
   process.stdout.write(
-    `\n5. Same chain, one verdict rewritten from not_approved to approved, hash recomputed\n`,
+    `\n6. Same chain, one verdict rewritten from not_approved to approved, hash recomputed\n`,
   );
   process.stdout.write(`   verified: ${forgedCheck.ok}\n`);
   for (const issue of forgedCheck.issues) {

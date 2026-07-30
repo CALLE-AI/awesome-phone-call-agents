@@ -33,8 +33,9 @@ const USAGE = `Phone approval gate
   preview --request <file> [--json]
       Print the call script, the ladder and the result contract. Places no call.
 
-  request --request <file> --live [--audit <file>] [--json] [--base-url <url>]
+  request --request <file> --live --audit <file> [--json] [--base-url <url>] [--state <dir>]
       Place one call per approver until someone decides. Needs CALLE_API_KEY.
+      Every live run appends an approval record, so --audit is required.
 
   verify --audit <file> [--json]
       Re-link the record chain and recompute every recorded verdict.
@@ -140,12 +141,21 @@ async function main(argv: string[]): Promise<number> {
     if (apiKey === undefined || apiKey.length === 0) {
       throw new ConfigError("CALLE_API_KEY is not set. The gate never reads keys from the request file.");
     }
+    // Required, because a live run that leaves no record is not evidence of
+    // anything. The base URL is checked inside the adapter before the key moves.
+    const auditPath = parsed.values["audit"];
+    if (auditPath === undefined) {
+      throw new ConfigError(
+        "Option --audit is required for a live run. Every run appends one approval record, including the runs nobody approved.",
+      );
+    }
     const baseUrl = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL ?? DEFAULT_BASE_URL;
     const port = await createSdkPort({ apiKey, baseUrl });
     const result = await runGate({
       request,
       port,
-      auditPath: parsed.values["audit"] ?? null,
+      auditPath,
+      ...(parsed.values["state"] === undefined ? {} : { stateDir: parsed.values["state"] }),
       onProgress: (line) => process.stderr.write(`${line}\n`),
       onSecret: (approver, display) =>
         process.stderr.write(

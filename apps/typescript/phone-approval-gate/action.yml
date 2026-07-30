@@ -11,11 +11,11 @@ inputs:
     description: "CALL-E API key. Pass a repository or environment secret, never a literal."
     required: true
   audit-file:
-    description: "Path to append the hash-chained approval record to. Empty means no record."
+    description: "Path to append the hash-chained approval record to. Every run appends one, including runs nobody approved."
     required: false
-    default: ""
+    default: "phone-approval-audit.jsonl"
   base-url:
-    description: "CALL-E Developer API base URL."
+    description: "CALL-E Developer API base URL. Must be https. Plain http is accepted on loopback for a local fake."
     required: false
     default: "https://api.heycall-e.com"
   node-version:
@@ -60,8 +60,10 @@ runs:
         CALLE_BASE_URL: ${{ inputs.base-url }}
       run: |
         set -uo pipefail
-        args=(request --request "$GATE_REQUEST_FILE" --live --json --github-output)
-        if [ -n "$GATE_AUDIT_FILE" ]; then
-          args+=(--audit "$GATE_AUDIT_FILE")
+        if [ -z "$GATE_AUDIT_FILE" ]; then
+          echo "audit-file must name a path. Every run appends one approval record." >&2
+          exit 30
         fi
+        args=(request --request "$GATE_REQUEST_FILE" --live --json --github-output)
+        args+=(--audit "$GATE_AUDIT_FILE")
         "$GITHUB_ACTION_PATH/node_modules/.bin/tsx" "$GITHUB_ACTION_PATH/src/cli.ts" "${args[@]}"
