@@ -10,7 +10,7 @@
  * valid, which a plain append-only log cannot catch.
  */
 
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { attemptOutcome, decisionFromExcerpt, verdictFromAttempts } from "./decide.js";
 import type {
@@ -57,7 +57,6 @@ export function auditPolicy(policy: Policy): AuditPolicy {
     window_seconds: policy.windowSeconds,
     min_confidence: policy.minConfidence,
     max_failed_attempts: policy.maxFailedAttempts,
-    allow_structured_only: policy.allowStructuredOnly,
   };
 }
 
@@ -69,7 +68,6 @@ function policyFromAudit(policy: AuditPolicy): Policy {
     windowSeconds: policy.window_seconds,
     minConfidence: policy.min_confidence,
     maxFailedAttempts: policy.max_failed_attempts,
-    allowStructuredOnly: policy.allow_structured_only,
   };
 }
 
@@ -122,6 +120,75 @@ export function buildRecord(options: {
 
 export function appendRecord(path: string, record: AuditRecord): void {
   appendFileSync(path, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
+}
+
+/** How long a lock file may sit before it is treated as abandoned. */
+export const LOCK_STALE_MS = 30_000;
+/** How long a run waits for another run to finish its append. */
+export const LOCK_WAIT_MS = 10_000;
+
+/** Block without spinning the event loop. The guarded section is synchronous. */
+function pause(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Run an append under an exclusive lock.
+ *
+ * Adding a record is a read and then a write: the new record needs the tail's
+ * hash and its sequence number. Two runs appending at the same time would both
+ * read the same tail and both claim the same place in the chain, which
+ * verification then reports as a broken chain. The lock is a file created with
+ * O_CREAT and O_EXCL beside the record file, so the filesystem decides who goes
+ * first rather than a read-then-write race. A lock left behind by a killed run
+ * is broken once it is older than `staleMs`. It is one filesystem and one
+ * advisory lock, not a distributed one: two runners with their own copy of the
+ * file still need their own record files.
+ */
+export function withAuditLock<T>(
+  path: string,
+  body: () => T,
+  options: { waitMs?: number; staleMs?: number } = {},
+): T {
+  const lockPath = `${path}.lock`;
+  const waitMs = options.waitMs ?? LOCK_WAIT_MS;
+  const staleMs = options.staleMs ?? LOCK_STALE_MS;
+  const giveUpAt = Date.now() + waitMs;
+  for (;;) {
+    try {
+      writeFileSync(lockPath, `${process.pid} ${new Date().toISOString()}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+        flag: "wx",
+      });
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
+      let heldForMs = 0;
+      try {
+        heldForMs = Date.now() - statSync(lockPath).mtimeMs;
+      } catch {
+        continue; // The holder released it while we looked.
+      }
+      if (heldForMs > staleMs) {
+        rmSync(lockPath, { force: true });
+        continue;
+      }
+      if (Date.now() >= giveUpAt) {
+        throw new Error(
+          `Another run holds ${lockPath} and did not release it within ${waitMs}ms. Nothing was appended to ${path}.`,
+        );
+      }
+      pause(25);
+    }
+  }
+  try {
+    return body();
+  } finally {
+    rmSync(lockPath, { force: true });
+  }
 }
 
 export function nextSequence(records: AuditRecord[]): number {

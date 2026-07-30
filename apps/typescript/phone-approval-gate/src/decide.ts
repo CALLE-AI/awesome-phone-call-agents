@@ -3,17 +3,19 @@
  *
  * Two rules carry the design.
  *
- * The transcript is authoritative and the extracted result is corroboration.
- * CALL-E's own `structured_result` can be null on a call that went perfectly,
- * so a gate that needed it would fail for the wrong reason and a gate that
- * trusted it alone would approve a production change on a summary. This gate
- * reads the recipient turns itself, then refuses to approve when the extracted
- * decision contradicts what it read.
+ * The transcript is authoritative and the extracted result is corroboration
+ * only. CALL-E's own `structured_result` can be null on a call that went
+ * perfectly, so a gate that needed it would fail for the wrong reason and a gate
+ * that trusted it alone would approve a production change on a summary. This
+ * gate reads the recipient turns itself, then refuses to approve when the
+ * extracted decision contradicts what it read. A call that came back with no
+ * recipient turns has nothing to corroborate, so it cannot approve at all.
  *
  * Silence is never approval. A machine answering, an empty transcript, a
- * missing code, a low completion confidence and an API failure all land on
- * `not_approved` with a reason. The only path to `approved` is a person who
- * returned the secret and said yes.
+ * missing code, a low completion confidence, a result that landed outside the
+ * approval window, an API failure and a call whose state could not be settled
+ * all land on `not_approved` with a reason. The only path to `approved` is a
+ * person who returned the secret and said yes, inside the window.
  */
 
 import { redactSecret, secretDigest } from "./secret.js";
@@ -62,6 +64,15 @@ export function attemptOutcome(
   if (inputs.decision === "reject" || inputs.structured_decision === "reject") {
     return { outcome: "rejected", reason: null };
   }
+  if (inputs.call_status === "state_unknown") {
+    // A create or a poll that could not be settled. A call may be live, so this
+    // is neither an approval nor a clean failure and the ladder stops on it.
+    return { outcome: "not_approved", reason: "call_state_unknown" };
+  }
+  if (inputs.call_status === "api_error") {
+    // CALL-E refused the request, so no call reached a handset.
+    return { outcome: "not_approved", reason: "api_error" };
+  }
   if (inputs.call_status === "failed" || inputs.call_status === "canceled") {
     if (hints(inputs.failure_code, MACHINE_HINTS)) {
       return { outcome: "not_approved", reason: "voicemail" };
@@ -78,7 +89,13 @@ export function attemptOutcome(
   if (inputs.machine_answered) {
     return { outcome: "not_approved", reason: "voicemail" };
   }
-  if (!inputs.transcript_available && !policy.allowStructuredOnly) {
+  if (!inputs.within_window) {
+    // The decision landed outside the window this run opened, either late or on
+    // a call from an earlier run. An approval that outlives its request is
+    // worse than no approval.
+    return { outcome: "not_approved", reason: "window_expired" };
+  }
+  if (!inputs.transcript_available) {
     return { outcome: "not_approved", reason: "no_transcript_evidence" };
   }
   if (!inputs.reached_person) {
@@ -116,9 +133,16 @@ export function evaluateAttempt(options: {
   code: string;
   phrase: string[];
   apiErrorCode?: string | null;
+  /** Set when a create or a poll left a call that may be running. */
+  callStateUnknown?: boolean;
+  /** The call id, when it is known even though no snapshot came back. */
+  callId?: string | null;
+  /** False when the decision landed outside this run's approval window. */
+  withinWindow?: boolean;
 }): AttemptEvaluation {
   const { request, approver, call, code, phrase } = options;
   const policy = request.policy;
+  const withinWindow = options.withinWindow ?? true;
   const expectedSecret = policy.binding === "code_from_request" ? code : phrase.join(" ");
   const digest = secretDigest(request.requestId, expectedSecret);
   const base = {
@@ -128,23 +152,29 @@ export function evaluateAttempt(options: {
   };
 
   if (call === null) {
+    // Two different situations. The record has to tell them apart. CALL-E
+    // refusing the request means no call happened. A create or a poll that
+    // could not be settled means a call may be live under the same key.
+    const evidence: OutcomeInputs = {
+      call_status: options.callStateUnknown === true ? "state_unknown" : "api_error",
+      failure_code: options.apiErrorCode ?? null,
+      reached_person: false,
+      machine_answered: false,
+      within_window: withinWindow,
+      transcript_available: false,
+      code_match: false,
+      decision: "unknown",
+      structured_decision: null,
+      confidence: null,
+    };
+    const noCall = attemptOutcome(evidence, policy);
     return {
       ...base,
-      call_id: null,
+      call_id: options.callId ?? null,
       provider_call_id: null,
-      outcome: "not_approved",
-      reason: "api_error",
-      evidence: {
-        call_status: "api_error",
-        failure_code: options.apiErrorCode ?? null,
-        reached_person: false,
-        machine_answered: false,
-        transcript_available: false,
-        code_match: false,
-        decision: "unknown",
-        structured_decision: null,
-        confidence: null,
-      },
+      outcome: noCall.outcome,
+      reason: noCall.reason,
+      evidence,
       spoken_secret_digest: null,
       transcript_excerpt: [],
       started_at: null,
@@ -158,14 +188,12 @@ export function evaluateAttempt(options: {
   const reading = readTranscript(turns, { binding: policy.binding, code, phrase });
   const structured = call.structuredResult ?? recipient?.structuredResult ?? null;
   const structuredDecision = structured === null ? null : readDecision(structured.decision);
-  const structuredCode =
-    structured !== null && typeof structured.spoken_code === "string" ? structured.spoken_code : "";
 
   const machineAnswered = looksLikeMachine(turns) && reading.decisionSignal === "unknown";
   const transcriptAvailable = turns.length > 0;
   const reachedPerson = reading.userTurnCount > 0 && !machineAnswered;
 
-  let codeMatch = reading.secretSpoken;
+  const codeMatch = reading.secretSpoken;
   let spokenSecretDigest: string | null = null;
   if (codeMatch) {
     spokenSecretDigest = digest;
@@ -173,26 +201,18 @@ export function evaluateAttempt(options: {
     spokenSecretDigest = secretDigest(request.requestId, reading.spokenDigits);
   }
 
-  // Structured evidence can stand in for a transcript only when the operator
-  // opted in and no transcript came back at all.
-  let decision = reading.decisionSignal;
-  if (!transcriptAvailable && policy.allowStructuredOnly) {
-    if (policy.binding === "code_from_request" && structuredCode.length > 0) {
-      const digits = structuredCode.replace(/\D/g, "");
-      codeMatch = digits.includes(code);
-      spokenSecretDigest = secretDigest(request.requestId, codeMatch ? code : digits);
-    }
-    if (structuredDecision !== null) {
-      decision = structuredDecision;
-    }
-  }
+  // The extracted result is read for corroboration and never stands in for the
+  // transcript. Whatever it says, an approval has to come from a recipient turn
+  // this gate read itself.
+  const decision = reading.decisionSignal;
 
   const confidence: Confidence | null = call.completionConfidence ?? null;
   const evidence: OutcomeInputs = {
     call_status: call.status,
     failure_code: attempt?.failureCode ?? call.failureCode ?? null,
-    reached_person: reachedPerson || (!transcriptAvailable && policy.allowStructuredOnly),
+    reached_person: reachedPerson,
     machine_answered: machineAnswered,
+    within_window: withinWindow,
     transcript_available: transcriptAvailable,
     code_match: codeMatch,
     decision,

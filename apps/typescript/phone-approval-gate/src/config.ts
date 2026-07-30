@@ -17,6 +17,12 @@ export class ConfigError extends Error {}
 
 const E164 = /^\+[1-9]\d{6,14}$/;
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/;
+/**
+ * Ids travel into the provider idempotency key and into reservation file names,
+ * so they take the same characters `request_id` does. A separator or a path
+ * segment in an id has no legitimate use here.
+ */
+const APPROVER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:T[\d:.]+Z?)?$/;
 
 export const POLICY_LIMITS = {
@@ -104,10 +110,6 @@ function resolvePolicy(input: PolicyInput | undefined): Policy {
           POLICY_LIMITS.maxFailedAttempts.min,
           POLICY_LIMITS.maxFailedAttempts.max,
         );
-  const allowStructuredOnly = policy.allow_structured_only ?? false;
-  if (typeof allowStructuredOnly !== "boolean") {
-    throw new ConfigError("policy.allow_structured_only must be true or false.");
-  }
   return {
     mode,
     binding,
@@ -115,7 +117,6 @@ function resolvePolicy(input: PolicyInput | undefined): Policy {
     windowSeconds,
     minConfidence,
     maxFailedAttempts,
-    allowStructuredOnly,
   };
 }
 
@@ -125,6 +126,11 @@ function validateApprover(value: unknown, index: number, environment: string): A
   }
   const raw = value as Record<string, unknown>;
   const id = requireString(raw.id, `approvers[${index}].id`);
+  if (!APPROVER_ID.test(id)) {
+    throw new ConfigError(
+      `approvers[${index}].id must be 2 to 64 characters of letters, digits, dot, dash or underscore. Received ${id}.`,
+    );
+  }
   const name = requireString(raw.name, `approvers[${index}].name`);
   const phone = requireString(raw.phone, `approvers[${index}].phone`);
   if (!E164.test(phone)) {

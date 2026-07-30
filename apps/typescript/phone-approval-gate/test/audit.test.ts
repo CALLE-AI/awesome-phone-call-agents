@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -14,6 +14,7 @@ import {
   readRecords,
   verifyAudit,
   verifyRecords,
+  withAuditLock,
 } from "../src/audit.js";
 import { evaluateAttempt } from "../src/decide.js";
 import type { AuditRecord, CallSnapshot } from "../src/types.js";
@@ -72,18 +73,22 @@ function writeChain(path: string, count: number): AuditRecord[] {
       code: FIXED_SECRET.code,
       phrase: FIXED_SECRET.phrase,
     });
-    const existing = readRecords(path);
-    const record = buildRecord({
-      request,
-      attempts: [attempt],
-      verdict: "approved",
-      reason: null,
-      approvedBy: ["alice"],
-      previousHash: previousHash(existing),
-      sequence: nextSequence(existing),
-      recordedAt: `2026-07-29T10:0${index}:00Z`,
+    // The same read then write the gate does, under the same lock.
+    const record = withAuditLock(path, () => {
+      const existing = readRecords(path);
+      const built = buildRecord({
+        request,
+        attempts: [attempt],
+        verdict: "approved",
+        reason: null,
+        approvedBy: ["alice"],
+        previousHash: previousHash(existing),
+        sequence: nextSequence(existing),
+        recordedAt: `2026-07-29T10:0${index}:00Z`,
+      });
+      appendRecord(path, built);
+      return built;
     });
-    appendRecord(path, record);
     written.push(record);
   }
   return written;
@@ -195,4 +200,76 @@ test("verifying a missing file reports zero records rather than throwing", () =>
   const result = verifyAudit(join(tmpdir(), "pag-does-not-exist.jsonl"));
   assert.equal(result.records, 0);
   assert.equal(result.ok, true);
+});
+
+function noCallRecord(options: { apiErrorCode: string; unknown: boolean }): AuditRecord {
+  const request = approvalRequest();
+  const attempt = evaluateAttempt({
+    request,
+    approver: request.approvers[0]!,
+    call: null,
+    code: FIXED_SECRET.code,
+    phrase: FIXED_SECRET.phrase,
+    apiErrorCode: options.apiErrorCode,
+    ...(options.unknown ? { callStateUnknown: true, callId: "call_maybe" } : {}),
+  });
+  return buildRecord({
+    request,
+    attempts: [attempt],
+    verdict: "not_approved",
+    reason: attempt.reason,
+    approvedBy: [],
+    previousHash: GENESIS_HASH,
+    sequence: 1,
+    recordedAt: "2026-07-30T10:00:00.000Z",
+  });
+}
+
+test("a record of a refused call verifies, because its outcome replays", () => {
+  const record = noCallRecord({ apiErrorCode: "insufficient_balance", unknown: false });
+  assert.equal(record.attempts[0]!.evidence.call_status, "api_error");
+  const result = verifyRecords([record]);
+  assert.deepEqual(result.issues, []);
+  assert.equal(result.ok, true);
+});
+
+test("a record of an unknown call state verifies and keeps saying unknown", () => {
+  const record = noCallRecord({ apiErrorCode: "service_unavailable", unknown: true });
+  assert.equal(record.reason, "call_state_unknown");
+  assert.equal(record.attempts[0]!.evidence.call_status, "state_unknown");
+  assert.equal(record.attempts[0]!.call_id, "call_maybe");
+  assert.equal(verifyRecords([record]).ok, true);
+});
+
+test("a lock another run holds stops the append instead of racing it", () => {
+  const path = tempAudit();
+  writeChain(path, 1);
+  const lockPath = `${path}.lock`;
+  writeFileSync(lockPath, "999999 held by another run\n", "utf8");
+  assert.throws(
+    () =>
+      withAuditLock(
+        path,
+        () => {
+          throw new Error("the guarded section must not run");
+        },
+        { waitMs: 30 },
+      ),
+    /did not release it/,
+  );
+  assert.equal(readRecords(path).length, 1);
+  rmSync(lockPath, { force: true });
+});
+
+test("a lock left behind by a killed run is broken", () => {
+  const path = tempAudit();
+  const lockPath = `${path}.lock`;
+  writeFileSync(lockPath, "1 abandoned\n", "utf8");
+  const old = new Date(Date.now() - 120_000);
+  utimesSync(lockPath, old, old);
+  assert.equal(
+    withAuditLock(path, () => "appended", { staleMs: 60_000 }),
+    "appended",
+  );
+  assert.equal(existsSync(lockPath), false);
 });

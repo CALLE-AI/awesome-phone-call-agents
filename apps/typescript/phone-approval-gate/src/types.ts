@@ -29,7 +29,13 @@ export type NotApprovedReason =
   | "quorum_not_met"
   | "not_reached"
   | "timed_out"
-  | "api_error";
+  | "api_error"
+  /**
+   * A create or a poll failed without saying whether the call exists, and
+   * reading it back under the same idempotency key did not settle it. A call
+   * may be live, so the ladder stops here.
+   */
+  | "call_state_unknown";
 
 export interface Approver {
   id: string;
@@ -56,7 +62,6 @@ export interface PolicyInput {
   window_seconds?: number;
   min_confidence?: number;
   max_failed_attempts?: number;
-  allow_structured_only?: boolean;
 }
 
 export interface Policy {
@@ -66,7 +71,6 @@ export interface Policy {
   windowSeconds: number;
   minConfidence: number;
   maxFailedAttempts: number;
-  allowStructuredOnly: boolean;
 }
 
 /** Shape of the request file on disk. */
@@ -167,6 +171,8 @@ export interface OutcomeInputs {
   failure_code: string | null;
   reached_person: boolean;
   machine_answered: boolean;
+  /** False when the decision landed outside the window this run opened. */
+  within_window: boolean;
   transcript_available: boolean;
   code_match: boolean;
   decision: Decision;
@@ -196,7 +202,6 @@ export interface AuditPolicy {
   window_seconds: number;
   min_confidence: number;
   max_failed_attempts: number;
-  allow_structured_only: boolean;
 }
 
 export interface AuditRecord {

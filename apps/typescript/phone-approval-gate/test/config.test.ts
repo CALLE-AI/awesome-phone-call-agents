@@ -19,8 +19,18 @@ test("a valid request resolves policy defaults", () => {
   assert.equal(request.policy.mode, "single");
   assert.equal(request.policy.binding, "code_from_request");
   assert.equal(request.policy.windowSeconds, POLICY_LIMITS.windowSeconds.default);
-  assert.equal(request.policy.allowStructuredOnly, false);
   assert.equal(request.approvers.length, 1);
+});
+
+test("an approver id that could become a path or a key separator is refused", () => {
+  expectConfigError(
+    requestInput({ approvers: [{ ...requestInput().approvers[0]!, id: "../alice" }] }),
+    "approvers\\[0\\].id must be 2 to 64 characters",
+  );
+  expectConfigError(
+    requestInput({ approvers: [{ ...requestInput().approvers[0]!, id: "a" }] }),
+    "approvers\\[0\\].id must be 2 to 64 characters",
+  );
 });
 
 test("a phone number that is not E.164 is refused", () => {

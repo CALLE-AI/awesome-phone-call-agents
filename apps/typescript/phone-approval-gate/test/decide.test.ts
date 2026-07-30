@@ -68,7 +68,10 @@ function snapshot(options: {
   };
 }
 
-function evaluate(options: Parameters<typeof snapshot>[0], policyOverrides: Partial<Policy> = {}) {
+function evaluate(
+  options: Parameters<typeof snapshot>[0] & { withinWindow?: boolean },
+  policyOverrides: Partial<Policy> = {},
+) {
   const request = approvalRequest();
   const patched = { ...request, policy: { ...request.policy, ...policyOverrides } };
   return evaluateAttempt({
@@ -77,6 +80,7 @@ function evaluate(options: Parameters<typeof snapshot>[0], policyOverrides: Part
     call: snapshot(options),
     code: CODE,
     phrase: FIXED_SECRET.phrase,
+    ...(options.withinWindow === undefined ? {} : { withinWindow: options.withinWindow }),
   });
 }
 
@@ -150,24 +154,56 @@ test("a completed call where nobody spoke is not_reached", () => {
   assert.equal(result.reason, "not_reached");
 });
 
-test("a missing transcript blocks approval unless the operator opted in", () => {
-  const strict = evaluate({
+test("a missing transcript blocks approval, whatever the extracted result says", () => {
+  const result = evaluate({
     botLines: [],
     userLines: [],
     structured: { decision: "approve", spoken_code: "472913", reason: "ok" },
   });
-  assert.equal(strict.reason, "no_transcript_evidence");
+  assert.equal(result.outcome, "not_approved");
+  assert.equal(result.reason, "no_transcript_evidence");
+  assert.equal(result.evidence.transcript_available, false);
+  // The extraction claimed a person and a code. Neither is evidence on its own.
+  assert.equal(result.evidence.reached_person, false);
+  assert.equal(result.evidence.code_match, false);
+  assert.equal(result.spoken_secret_digest, null);
+});
 
-  const relaxed = evaluate(
-    {
-      botLines: [],
-      userLines: [],
-      structured: { decision: "approve", spoken_code: "472913", reason: "ok" },
-    },
-    { allowStructuredOnly: true },
-  );
-  assert.equal(relaxed.outcome, "approved");
-  assert.equal(relaxed.evidence.transcript_available, false);
+test("a decision that landed outside the window cannot approve", () => {
+  const late = evaluate({
+    userLines: ["Four seven two nine one three, I approve."],
+    structured: { decision: "approve", spoken_code: "472913", reason: "ok" },
+    withinWindow: false,
+  });
+  assert.equal(late.outcome, "not_approved");
+  assert.equal(late.reason, "window_expired");
+  assert.equal(late.evidence.within_window, false);
+
+  // A rejection still counts. Nothing is safer than honouring a no.
+  const rejected = evaluate({
+    userLines: ["No, reject that."],
+    structured: { decision: "reject", spoken_code: "", reason: "Said reject." },
+    withinWindow: false,
+  });
+  assert.equal(rejected.outcome, "rejected");
+});
+
+test("a call whose state could not be settled is recorded as unknown, not as a failure", () => {
+  const request = approvalRequest();
+  const result = evaluateAttempt({
+    request,
+    approver: request.approvers[0]!,
+    call: null,
+    code: CODE,
+    phrase: FIXED_SECRET.phrase,
+    apiErrorCode: "service_unavailable",
+    callStateUnknown: true,
+    callId: "call_maybe",
+  });
+  assert.equal(result.outcome, "not_approved");
+  assert.equal(result.reason, "call_state_unknown");
+  assert.equal(result.evidence.call_status, "state_unknown");
+  assert.equal(result.call_id, "call_maybe");
 });
 
 test("failure codes map to the reason an operator needs", () => {
@@ -206,6 +242,7 @@ function attempt(id: string, outcome: AttemptEvaluation["outcome"], reason: Atte
     failure_code: null,
     reached_person: true,
     machine_answered: false,
+    within_window: true,
     transcript_available: true,
     code_match: outcome === "approved",
     decision: outcome === "approved" ? "approve" : outcome === "rejected" ? "reject" : "unknown",
@@ -271,6 +308,7 @@ test("outcome inputs alone decide the outcome, which is what verification replay
     failure_code: null,
     reached_person: true,
     machine_answered: false,
+    within_window: true,
     transcript_available: true,
     code_match: true,
     decision: "approve",
@@ -281,6 +319,12 @@ test("outcome inputs alone decide the outcome, which is what verification replay
   assert.equal(attemptOutcome({ ...inputs, code_match: false }, singlePolicy).reason, "code_mismatch");
   assert.equal(attemptOutcome({ ...inputs, decision: "unknown" }, singlePolicy).reason, "no_decision");
   assert.equal(attemptOutcome({ ...inputs, decision: "reject" }, singlePolicy).outcome, "rejected");
+  assert.equal(attemptOutcome({ ...inputs, within_window: false }, singlePolicy).reason, "window_expired");
+  assert.equal(
+    attemptOutcome({ ...inputs, call_status: "state_unknown" }, singlePolicy).reason,
+    "call_state_unknown",
+  );
+  assert.equal(attemptOutcome({ ...inputs, call_status: "api_error" }, singlePolicy).reason, "api_error");
 });
 
 test("a request with two approvers keeps them in ladder order", () => {
