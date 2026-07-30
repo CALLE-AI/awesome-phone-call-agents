@@ -45,6 +45,7 @@ person whose detail it was, in the report, in the same place they read the answe
 | street address | refuse | `42 Bayview Street` |
 | long number | refuse | `4915 6612 3300` |
 | date | report only | `2026-08-12`, `12/08/2026` |
+| clinical, legal or financial wording | report only | `biopsy`, `eviction`, `arrears` |
 
 Specific detectors claim a token first, so `123-45-6789` is a national identifier
 rather than a long number and `2026-08-12` is a date rather than either. A date on
@@ -54,6 +55,32 @@ the person rather than blocking the call.
 The number being called and any number in the budget are stripped before the
 checks run, in national form as well as full form, because that is how people say a
 number out loud.
+
+## What is not sent at all
+
+`on_behalf_of.reason_for_delegation` is the consent record, not part of the call.
+"She is deaf and this clinic takes bookings by phone only" is a disability
+disclosure. No callee needs it to answer a question about appointments. It is
+printed in the preview, marked as staying local, then dropped: it never reaches the
+task, the metadata or the transcript. The only things about the person that go out
+are their name and the disclosure list.
+
+## The sensitive topic warning
+
+Clinical, legal and financial subject matter can walk in through `goal.summary` or
+a question. None of it looks like an identifier. So the goal and every question are
+scanned for that kind of wording and any hit is printed in the preview, next to the
+field it came from, before anybody consents.
+
+It warns and never blocks. "Book a routine check-up" is the errand, so a gate that
+refused clinical words would refuse the app's own example. What the warning is for
+is the sentence somebody wrote without thinking: put the words in front of them
+while nothing has been sent yet.
+
+It is a keyword list, so be honest about the size of it. "She has been unwell since
+the spring" trips nothing and no list of words will ever catch that. The defence
+there is the script, which refuses to discuss anything but the errand, plus the
+preview, which shows the whole script before anything rings.
 
 ## When the budget covers a token
 
@@ -68,8 +95,9 @@ the email gate in the demo fires.
 Pattern detection is a safety net, not a proof.
 
 - It cannot catch a detail that reads as ordinary prose. "She has been coming here
-  since her divorce" contains no pattern and no detector will see it. The defence
-  against that is the script, which refuses to discuss anything but the errand.
+  since her divorce" contains no identifier. The topic warning only sees a word it
+  already knows. The defence against that is the script, which refuses to discuss
+  anything but the errand.
 - It cannot know that an authorized value is wrong. If the file says the date of
   birth is April, April is what gets said.
 - It will sometimes flag something harmless. That is the direction to be wrong in

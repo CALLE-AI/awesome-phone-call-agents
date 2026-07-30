@@ -38,6 +38,13 @@ passwords outright. Administrative errands are in scope: book, confirm, reschedu
 ask what to bring, ask whether a plan is accepted, ask whether something arrived.
 Anything that needs judgment about a person's health, rights or money is not.
 
+That boundary lives in the script, so it holds for what the caller volunteers. It
+cannot hold for what somebody writes into `goal.summary` or a question, because
+that text is read out as written. Those two fields are scanned for clinical, legal
+and financial wording and any hit is shown in the preview before consent, which is
+a prompt to reread the sentence and not a filter. Why the call was delegated is
+never sent at all.
+
 Never use this app for an emergency. It places one call, waits and reports
 afterwards. If somebody needs help now, call emergency services directly.
 
@@ -52,6 +59,39 @@ cancel it.
 If the extracted result says a time was accepted and that time is outside the
 windows, the report marks `outside_authorized_window` and tells the person to check
 and cancel it. The app does not hide its own mistake behind a success message.
+
+## It reports only what the transcript supports
+
+The structured result from the model is a proposal. The transcript is the evidence.
+
+An answer is reported when a turn from the callee supports that specific question.
+The report prints the turn it stands on. A yes or a no counts only when the caller
+asked that question and the callee answered it, because "yes" on its own belongs to
+whatever it was asked about. An agreement is reported when the transcript shows
+somebody agreeing. Any confirmation code goes with it.
+
+When nothing supports the claim, the report says not answered or `unconfirmed` and
+notes that CALL-E claimed otherwise. It will sometimes be too strict: the checks
+compare words, so a paraphrase they cannot see reads as unsupported. That is the
+direction to be wrong in. A report that says less than the extraction claimed costs
+a phone call to check. A report that says more is how somebody misses an
+appointment they were told was booked.
+
+## When nobody knows what happened
+
+A create or a poll can fail in a way that leaves the state of the call unknown: a
+lost connection, a timeout, a server error. The call may be ringing right now.
+
+In that case the app reconciles under the same idempotency key first, which returns
+the existing call rather than placing a second one. If it still cannot read the
+call, the outcome is `outcome_unknown` with exit code 40. The report says the
+outcome is not known instead of saying nothing was said. Running the same errand
+file again reads the same call back, because the key covers the content of the
+call. Editing the file first makes it a different call, so the next step says not
+to.
+
+A refusal is different. When CALL-E declines to create the call at all, nothing was
+placed, the outcome is `api_error` and the report can say so plainly.
 
 ## Who you may call
 
@@ -68,8 +108,16 @@ down where the number came from is a small brake worth having.
 
 The errand file is the consent record: who is delegating, why, what may be said
 about them and what may be agreed. `preview` prints the exact script and the
-disclosure list so they can read it before anything rings. Nothing in this app
-places a call without `--live` on the command line.
+disclosure list so they can read it before anything rings. It ends with a receipt:
+a short hash of the script, the budget and the windows.
+
+`call --live` will not run without that receipt. A missing one is a usage error and
+a stale one names the file as changed and refuses. Nothing is sent either way. So
+consent belongs to a preview somebody actually read. Editing the errand file after
+reading it invalidates the consent instead of quietly riding on it.
+
+That is as far as it goes. The app cannot tell whether the person named in the file
+agreed to any of this. The receipt binds the consent to a script, not to a person.
 
 ## What it stores
 
@@ -79,7 +127,10 @@ kept on purpose: a person who could not hear the call is entitled to what was sa
 on their behalf. Phone numbers are masked. Findings are masked.
 
 Nothing is sent anywhere except CALL-E and the API key is read from the
-environment only.
+environment only. The base URL is checked before the client that carries the key is
+built: HTTPS anywhere, plain HTTP only on `localhost`, `127.0.0.1` or `::1` so the
+local fake works. Anything else is refused with the name of the flag and the
+environment variable that set it. The key stays where it is.
 
 ## Where it will disappoint you
 
