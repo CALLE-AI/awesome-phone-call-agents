@@ -65,17 +65,21 @@ and cancel it. The app does not hide its own mistake behind a success message.
 The structured result from the model is a proposal. The transcript is the evidence.
 
 An answer is reported when a turn from the callee supports that specific question.
-The report prints the turn it stands on. A yes or a no counts only when the caller
-asked that question and the callee answered it, because "yes" on its own belongs to
-whatever it was asked about. An agreement is reported when the transcript shows
-somebody agreeing. Any confirmation code goes with it.
+The report prints the turn it stands on. Every answer shape is anchored to its
+question: the caller must have asked it in the transcript, and the supporting turn
+must be one of the two callee turns after it. That holds for text and datetime
+answers as much as for a yes or a no, because "Thursday at nine forty" said while
+discussing something else is not an answer to a question nobody asked. An agreement
+is reported when the transcript shows somebody agreeing. Any confirmation code goes
+with it.
 
 When nothing supports the claim, the report says not answered or `unconfirmed` and
-notes that CALL-E claimed otherwise. It will sometimes be too strict: the checks
-compare words, so a paraphrase they cannot see reads as unsupported. That is the
-direction to be wrong in. A report that says less than the extraction claimed costs
-a phone call to check. A report that says more is how somebody misses an
-appointment they were told was booked.
+notes that CALL-E claimed otherwise. It will sometimes be too strict, in two ways.
+The checks compare words, so a paraphrase they cannot see reads as unsupported. And
+the window is two turns, so an answer the callee circles back to four turns later
+reads as unsupported as well. That is the direction to be wrong in. A report that
+says less than the extraction claimed costs a phone call to check. A report that
+says more is how somebody misses an appointment they were told was booked.
 
 ## When nobody knows what happened
 

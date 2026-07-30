@@ -46,9 +46,10 @@ Prose with none of those words in it goes out untouched.
 
 The extraction proposes. The transcript decides.
 
-- A question is answered only when a turn from the callee supports that answer. The
-  report prints that turn. An answer nobody can be quoted saying comes back as not
-  answered, with a note that CALL-E claimed one.
+- A question is answered only when a turn from the callee supports that answer,
+  after the caller asked that question. The report prints that turn. An answer
+  nobody can be quoted saying comes back as not answered, with a note that CALL-E
+  claimed one.
 - Something is agreed only when the transcript shows somebody agreeing. Otherwise
   the commitment reads `unconfirmed` and the next step says to treat nothing as
   booked. The confirmation code belongs to the agreement, so it is dropped too.

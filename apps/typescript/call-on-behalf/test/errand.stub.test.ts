@@ -126,6 +126,21 @@ test("a finished call is still read, so nothing stopped being reported", async (
   assert.equal(report.answers.every((answer) => answer.answered), true);
 });
 
+test("an answer to a question nobody asked is not an answer", async () => {
+  // The caller never reached the third question. The callee mentioned it anyway and
+  // the extraction reported that sentence as the answer.
+  const user = [
+    ...USER_LINES.slice(0, 3),
+    "Yes, we take Blue Shield PPO. Photo identification and the insurance card are what new patients bring.",
+  ];
+  const report = await run(snapshot("completed", conversation(BOT_LINES.slice(0, 4), user), goodResult()));
+  const bring = report.answers.find((answer) => answer.id === "bring")!;
+  assert.equal(bring.answered, false);
+  assert.equal(bring.answer, "");
+  assert.equal(bring.quote, "");
+  assert.match(report.callee_notes, /1 answer\(s\) the transcript does not support/);
+});
+
 test("a call that ended without a conversation is read from its own status", async () => {
   const cases: [string, string][] = [
     ["no_answer", "not_reached"],

@@ -133,13 +133,18 @@ function askedAt(question: string, turns: TranscriptTurn[]): number {
   return found;
 }
 
+/** How many callee turns after a question can still be the answer to it. */
+const ANSWER_WINDOW = 2;
+
 /**
  * The callee turn that supports a claimed answer. Empty when the transcript does
  * not support it.
  *
- * A yes or a no is only evidence when the caller asked that question and the
- * callee answered it, so those are bound to the two turns after the question.
- * Everything else is bound by its own words.
+ * Every answer is anchored to its question. The caller must have asked it, and the
+ * evidence must come from the callee turns right after it, because a sentence
+ * somewhere else in the call is evidence for whatever was being discussed there. A
+ * yes or a no needs the same anchor and reads the polarity the callee used.
+ * Everything else needs its own words in one of those turns.
  */
 export function supportingTurn(question: ErrandQuestion, claimed: string, turns: TranscriptTurn[]): string {
   const answer = claimed.trim();
@@ -147,17 +152,19 @@ export function supportingTurn(question: ErrandQuestion, claimed: string, turns:
     return "";
   }
   const anchor = askedAt(question.text, turns);
-  const after = turns.filter((turn, index) => turn.speaker === "user" && index > anchor);
+  if (anchor === -1) {
+    return "";
+  }
+  const after = turns
+    .filter((turn, index) => turn.speaker === "user" && index > anchor)
+    .slice(0, ANSWER_WINDOW);
 
   if (question.answer === "yes_no") {
-    if (anchor === -1) {
-      return "";
-    }
     const wanted = /^y/i.test(answer) ? "yes" : /^n/i.test(answer) ? "no" : null;
     if (wanted === null) {
       return "";
     }
-    const reply = after.slice(0, 2).find((turn) => polarity(turn.text) === wanted);
+    const reply = after.find((turn) => polarity(turn.text) === wanted);
     return reply?.text ?? "";
   }
 

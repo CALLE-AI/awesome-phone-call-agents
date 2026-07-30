@@ -9,6 +9,11 @@ const EARLIEST: ErrandQuestion = {
   answer: "datetime",
 };
 const PLAN: ErrandQuestion = { id: "plan", text: "Do you take Blue Shield PPO?", answer: "yes_no" };
+const BRING: ErrandQuestion = {
+  id: "bring",
+  text: "What should she bring to a first appointment?",
+  answer: "text",
+};
 
 function turns(lines: [TranscriptTurn["speaker"], string][]): TranscriptTurn[] {
   return lines.map(([speaker, text], index) => ({ offset_seconds: index * 6, speaker, text }));
@@ -50,6 +55,37 @@ test("the first marker the callee used decides which way they answered", () => {
   ]);
   assert.equal(supportingTurn(PLAN, "no", declined), "No, but we do take Aetna.");
   assert.equal(supportingTurn(PLAN, "yes", declined), "");
+});
+
+test("a text or datetime answer needs the question to have been asked too", () => {
+  // The extraction is right about the sentence and wrong about what it answers. The
+  // caller never asked, so there is no question for the sentence to be evidence for.
+  const unasked = turns([
+    ["bot", "Hello, I am an automated assistant calling on behalf of Fatima Haddad."],
+    ["user", "Bayview Family Clinic. Our next free slot is Thursday the thirteenth at nine forty."],
+  ]);
+  assert.equal(supportingTurn(EARLIEST, "Thursday the thirteenth at nine forty", unasked), "");
+  assert.equal(supportingTurn({ ...EARLIEST, answer: "text" }, "Thursday the thirteenth at nine forty", unasked), "");
+});
+
+test("the evidence for an answer comes from the turns after that question", () => {
+  const drifted = turns([
+    ["bot", "What should she bring to a first appointment?"],
+    ["user", "I cannot see that on the system."],
+    ["user", "Was there anything else?"],
+    ["bot", "That is everything, thank you."],
+    ["user", "By the way, photo identification and the insurance card are what a second patient needs to register."],
+  ]);
+  assert.equal(supportingTurn(BRING, "photo identification and the insurance card", drifted), "");
+});
+
+test("a callee who takes a turn to look something up has still answered", () => {
+  const paused = turns([
+    ["bot", "What should she bring to a first appointment?"],
+    ["user", "Let me check."],
+    ["user", "Photo identification and the insurance card."],
+  ]);
+  assert.match(supportingTurn(BRING, "photo identification and the insurance card", paused), /^Photo identification/);
 });
 
 test("an agreement has to be in the transcript", () => {
