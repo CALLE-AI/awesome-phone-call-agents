@@ -59,7 +59,7 @@ export interface RunOptions {
   onProgress?: (line: string) => void;
   /**
    * Cancels the run in flight. No new gather or confirm call is placed once it
-   * fires. Release calls still go out: cancelling the booking does not cancel the
+   * fires. Release calls still go out: canceling the booking does not cancel the
    * duty to tell somebody who already said yes. A call already connected cannot
    * be hung up, the API has no cancel, so it is recorded as unfinished and
    * `resume` reconciles it.

@@ -52,10 +52,10 @@ and the party's calling hours still apply and a party who cannot be called insid
 either is listed in `unreleased` for a human to chase. A duty to tell somebody is
 not a licence to ring them at 3am.
 
-## Cancelling in flight
+## Canceling in flight
 
 `run` takes an `AbortSignal` and the CLI wires Ctrl-C to it. Once it fires no new
-gather or confirm call is placed, but the release round still runs: cancelling the
+gather or confirm call is placed, but the release round still runs: canceling the
 appointment does not cancel the duty to tell anybody who said yes. A second
 interrupt gives up on that too.
 
@@ -169,7 +169,7 @@ support, a confirmation that is missing from a confirmed outcome, a run that end
 in anything other than a confirmation without releasing everybody who said yes or
 naming them in `unreleased` or a call count that does not match the entries.
 
-A ledger can hold more than one round. A crashed or cancelled run leaves no outcome
+A ledger can hold more than one round. A crashed or canceled run leaves no outcome
 entry, `resume` opens a `resume_started` entry and closes with a fresh outcome, and
 replay folds the rounds in order and reports the last outcome. Entries that follow
 an outcome without a `resume_started` opening a new round are reported as a

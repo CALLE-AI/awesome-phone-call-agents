@@ -119,7 +119,7 @@ function ids(slots: Slot[]): string[] {
  * every gather call, the slot that choice implies and whether the recorded
  * outcome follows from the confirm and release calls.
  *
- * A ledger can hold more than one round. A crashed or cancelled run is picked up
+ * A ledger can hold more than one round. A crashed or canceled run is picked up
  * by `resume`, which opens a `resume_started` entry and closes with a fresh
  * outcome, so replay folds every round in order and reports the last outcome.
  * Entries after an outcome that no `resume_started` opened are a problem.
