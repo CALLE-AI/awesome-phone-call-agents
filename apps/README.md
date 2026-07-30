@@ -17,6 +17,7 @@ Current apps:
 | [`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
 | [`python/oauth-login-client`](python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
+| [`typescript/vibehub-founder-relay`](typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 
 Suggested grouping:
 
