@@ -43,8 +43,7 @@ reject it.
     "per_call_timeout_seconds": 240,
     "window_seconds": 600,
     "min_confidence": 0.5,
-    "max_failed_attempts": 3,
-    "allow_structured_only": false
+    "max_failed_attempts": 3
   },
   "secret_delivery": "request_channel",
   "attempts": [
@@ -60,6 +59,7 @@ reject it.
         "failure_code": null,
         "reached_person": true,
         "machine_answered": false,
+        "within_window": true,
         "transcript_available": true,
         "code_match": true,
         "decision": "approve",
@@ -88,6 +88,26 @@ two records for the same `request_id` with different content are visible as such
 Equal digests mean the code came back correctly. The salt keeps digests from
 being comparable across requests. The secret is single use and expires with the
 window, so this digest is a binding aid and not a place to hide a lasting value.
+
+`within_window` is false when the decision landed outside the window the run
+opened, either after it closed or on a call from an earlier run. It is part of the
+evidence rather than something recomputed later, because the clock it was read
+from has moved on by the time anybody verifies the record.
+
+`call_status` carries two values the CALL-E API never sends. `api_error` means
+CALL-E refused the request, so no call was placed. `state_unknown` means a create
+or a poll failed without saying whether the call exists and replaying the
+idempotency key did not settle it, so a call may have happened. A record that says
+`state_unknown` is a record asking somebody to reconcile that call.
+
+## Appending
+
+One run appends one record. The append takes a lock file beside the record file,
+because building a record reads the tail of the chain first. Two runs
+appending at once without it would both link to the same tail and verification
+would report the chain as broken. The lock is one filesystem and advisory: it
+orders runs that share the file, it does nothing for two runners that each have
+their own copy.
 
 ## Hashing rule
 

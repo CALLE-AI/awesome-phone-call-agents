@@ -38,14 +38,21 @@ request.
 
 1. **A live person was on the line.** The decision comes from recipient turns in
    the transcript, not from a summary and voicemail greetings and menu prompts
-   are treated as machines. A recorded yes cannot pass the code check.
+   are treated as machines. A recorded yes cannot pass the code check. CALL-E's
+   extracted result only corroborates those turns: a call that came back with no
+   transcript cannot approve, whatever the extraction says.
 2. **That person could see the request.** Returning the code shows access to the
    request channel, so an approval is bound to one specific change and not to a
    vague question about deploying.
 3. **The call reached an enrolled handset.** The gate only dials numbers listed
    in the request file with an `enrolled_at` date and an `authorized_for` scope
-   that covers the environment.
-4. **The decision is recorded with its evidence.** The record holds the inputs
+   that covers the environment. The caller asks who answered before it reads any
+   change detail, so a wrong person hears nothing about the change.
+4. **The decision happened inside the window.** The window is checked before a
+   call and again on its result, against the local clock and against the call's
+   own completion time. A late decision and a decision that belongs to an earlier
+   run both land on `window_expired`.
+5. **The decision is recorded with its evidence.** The record holds the inputs
    the outcome was computed from plus the CALL-E `call_id` and the provider call
    id, so an auditor can reconcile it against the CALL-E side independently.
 
@@ -65,6 +72,11 @@ Read this list before putting the gate in front of anything expensive.
 | Guessing the code | Six digits, capped failed attempts and a ten minute window. |
 | Instructions injected during the call | The call script refuses every request other than this one approval and the gate treats transcript text as evidence to read, never as an instruction to follow. |
 | Change details left on a machine | The script ends the call on voicemail or a menu system without describing the change and without leaving a message. |
+| Change details read to whoever picks up | The caller asks who is on the line first and reads nothing about the change until the expected approver has said they are on it. Possession of the handset still stands unproven, so this bounds disclosure rather than proving identity. |
+| The credential sent to a host the operator did not mean | `--base-url` and `CALLE_BASE_URL` are refused unless they are https or a loopback host, before any client holds the key. An operator who needs a private host uses https on it. |
+| An accepted call the gate never heard about | A create or a poll that fails without saying whether the call exists is reconciled by replaying the same idempotency key. If that does not settle it, the attempt is recorded as `call_state_unknown` and the ladder stops, so a second approver is not rung while a call may be live. |
+| Two runs of one request racing | The secret for an attempt is reserved with an exclusive file create before the call, so the second run adopts the first run's code and its key instead of ringing the same handset with a code the approver never saw. Record appends take a lock, so the hash chain cannot fork. Both live on one filesystem: two runners with separate checkouts still hold separate state. |
+| A stale approval replayed on a later run | The window is checked against the call's own completion time as well as the local clock, so a call that finished outside this run's window cannot approve. |
 
 ## PSTN is a restricted channel
 
@@ -114,3 +126,12 @@ Not stored:
 
 Records are appended with mode `0600`. Rotate and retain them the way your change
 management policy already says to.
+
+Held for the life of the request, outside the record:
+
+- the reserved secret for each attempt, in clear, with mode `0600`, under
+  `.phone-approval-gate` beside the record file or under `--state <dir>`. It is
+  what lets a retried run accept the code the approver was actually shown. The
+  same code is already printed on the request channel, so this is not a new
+  exposure. It stops being useful when the window closes. Delete the directory
+  when the request is done.

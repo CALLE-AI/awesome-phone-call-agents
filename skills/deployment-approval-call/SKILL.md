@@ -43,7 +43,8 @@ exit code plus a hash-chained record.
 3. On the user's go-ahead you run it live. The gate prints a six digit code for
    the current approver. Show that code to the user in your reply, because the
    approver reads it back on the call and that is what binds the approval to this
-   change.
+   change. The caller asks who answered before it reads any change detail, so a
+   wrong person hears nothing about the change.
 4. You read the exit code. Nothing else counts as an approval.
 
 ## Running it
@@ -56,6 +57,7 @@ npm install
 npm run gate -- preview --request /tmp/approval-request.json
 
 # One call per approver, in order. Needs CALLE_API_KEY in the environment.
+# --audit is required: every live run appends one approval record.
 npm run gate -- request --request /tmp/approval-request.json --live --audit approvals.jsonl --json
 ```
 
@@ -69,7 +71,7 @@ handsets, which is the control to use for a destructive database action.
 | --- | --- |
 | 0 | Approved. Proceed with the exact action that was described on the call, nothing more. |
 | 10 | A person rejected it. Stop. Tell the user who rejected it and do not re-run the gate. |
-| 20 | No approval: no answer, voicemail, wrong code, window closed. Stop and report the reason. |
+| 20 | No approval: no answer, voicemail, wrong code, window closed. Stop and report the reason. If the reason is `call_state_unknown`, a call may still be live: report the call id and do not run the gate again until a person has reconciled it. |
 | 30 | The request file is wrong. Fix it and preview again. Do not place a call to find out. |
 
 After a run, tell the user the verdict, the approver id, the reason when there is

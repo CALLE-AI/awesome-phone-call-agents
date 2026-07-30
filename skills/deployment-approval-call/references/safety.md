@@ -36,16 +36,23 @@ request file, never echo it, never write it into a log line or a commit.
 
 One run places at most one call per approver, in ladder order and stops at the
 first decision. Nothing recurring is created, so there is no schedule to cancel.
-A retried workflow step reuses the same idempotency key, so a retry does not ring
-the approver twice. Stopping the process stops the ladder. A call already
-connected finishes on the CALL-E side and its outcome is simply not used.
+A retried step lands on the same idempotency key, which carries a digest of the
+call it stands for, so a retry does not ring the approver twice and an edited
+request does not quietly reuse an older call. The code for each attempt is
+reserved on disk before the call, so a second run accepts the code the approver
+was actually shown instead of a fresh one. Stopping the process stops the ladder.
+A call already connected finishes on the CALL-E side and its outcome is simply not
+used.
+
+If the gate reports `call_state_unknown`, a call may still be live. Do not run it
+again. Report the call id in the record and let a person reconcile it first.
 
 ## Voicemail and the wrong person
 
-The call script ends on voicemail, an answering machine or a menu system without
-describing the change and without leaving a message. Change details do not belong
-on a recording. If someone says they are not the expected person, the call ends
-without repeating the detail.
+The call script asks who is on the line before it says anything about the change,
+so a person who is not the expected approver hears no change detail. It ends on
+voicemail, an answering machine or a menu system without describing the change and
+without leaving a message. Change details do not belong on a recording.
 
 ## One rejection is final
 

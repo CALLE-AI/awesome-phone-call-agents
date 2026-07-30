@@ -2,10 +2,11 @@
 
 Automation that can do something irreversible needs a way to ask a person, and
 the person is usually not at a keyboard. This app puts one phone call in the
-path. It rings the change owner, reads the change out, asks for a decision, and
-reports approval only when a live person reads back a one-time code that was
-printed on the request. The caller gets an exit code and the run leaves an
-approval record that can be checked later.
+path. It rings the change owner, checks who answered before it says anything
+about the change, reads the change out, asks for a decision and reports approval
+only when a live person reads back a one-time code that was printed on the
+request. The caller gets an exit code and the run leaves an approval record that
+can be checked later.
 
 Three entry points, one core: a CLI, a GitHub Action and an exit-code contract
 any script or agent can gate on.
@@ -53,16 +54,24 @@ Verdict  not_approved (no_answer)
   Attempt for backup-owner: approved.
 Verdict  approved
 
-4. The record chain
-3 record(s): chain and verdicts hold
+4. The reply to the create is lost, so the call state is unknown
+  CALL-E returned service_unavailable for release-owner without saying whether the call exists. Reconciling pag-deploy-1842-release-owner-1-7ca8652e41de.
+  Reconciled pag-deploy-1842-release-owner-1-7ca8652e41de to call call_fake1.
+  Attempt for release-owner: approved.
+Verdict  approved
 
-5. Same chain, one verdict rewritten from not_approved to approved, hash recomputed
+5. The record chain
+4 record(s): chain and verdicts hold
+
+6. Same chain, one verdict rewritten from not_approved to approved, hash recomputed
    verified: false
    record 2: verdict approved does not follow from the recorded attempts (not_approved)
 ```
 
 Case 2 is the point of the whole app. Somebody answered and sounded willing, and
-that is not an approval.
+that is not an approval. Case 4 is the other one: a call the gate cannot see is
+not a call that did not happen, so it reads that call back under the same
+idempotency key instead of ringing the next person.
 
 ## Setup
 
@@ -72,7 +81,7 @@ Node 20 or later.
 cd apps/typescript/phone-approval-gate
 npm install
 npm run check   # tsc --noEmit
-npm test        # 72 tests, no credentials, no outbound calls
+npm test        # 101 tests, no credentials, no outbound calls
 npm run demo    # the full flow against the local fake CALL-E
 ```
 
@@ -88,7 +97,8 @@ npm run gate -- preview --request examples/request.example.json
 ## One live run
 
 Live mode needs a CALL-E API key in the environment and the `--live` flag. The
-gate never reads a key from the request file.
+gate never reads a key from the request file. It only sends that key to an https
+host or to loopback, so a mistyped `--base-url` cannot walk off with it.
 
 ```bash
 export CALLE_API_KEY="<CALL_E_API_KEY>"
@@ -96,10 +106,30 @@ npm run gate -- request --request your-request.json --live --audit approvals.jso
 npm run gate -- verify --audit approvals.jsonl
 ```
 
+`--audit` is required on a live run. Every run appends one record, including the
+runs nobody approved, because those are the ones you are asked about later.
+
 Copy `examples/request.example.json`, replace the reserved 555-01xx numbers with
 a phone you own or are authorized to call and keep the enrolment fields honest.
 One run places at most one call per approver, in order and stops at the first
 decision.
+
+## Retries and two runs at once
+
+A retried workflow step must not ring the approver again. Two runs of one request
+must not expect two different codes. Three things hold that together.
+
+- The provider idempotency key carries the request id, the approver, the attempt
+  and a digest of the payload the call is created from. A retry lands on the same
+  key. An edited request gets a different one instead of replaying a call about
+  something else.
+- Before the phone rings, the run reserves the secret for that attempt in a file
+  created with O_CREAT and O_EXCL, under `.phone-approval-gate` next to the
+  record file or under `--state <dir>`. The first run owns the attempt and any
+  later run reads its code back, so the code the approver was shown is the code
+  the gate checks.
+- Appends to the record file happen under a lock file, because adding a record
+  reads the tail of the chain first.
 
 ## In GitHub Actions
 
@@ -136,7 +166,7 @@ changed.
 | --- | --- |
 | 0 | approved |
 | 10 | a person rejected the change |
-| 20 | no approval: no answer, voicemail, wrong code, window closed |
+| 20 | no approval: no answer, voicemail, wrong code, window closed, call state unknown |
 | 30 | usage or request file error |
 | 40 | audit verification failed (`verify` only) |
 
@@ -146,27 +176,39 @@ Every path other than a live person returning the code lands on `not_approved`
 with a reason: `no_answer`, `voicemail`, `call_failed`, `timed_out`,
 `not_reached`, `code_mismatch`, `no_decision`, `no_transcript_evidence`,
 `low_confidence`, `disagreement`, `window_expired`, `attempt_limit`,
-`quorum_not_met`, `api_error`.
+`quorum_not_met`, `api_error`, `call_state_unknown`.
 
-`disagreement` is worth calling out. The gate reads the recipient turns itself
-and treats CALL-E's extracted `structured_result` as corroboration. When the two
-disagree, it refuses. It can decline an approval a person really gave. It will
-not invent one.
+Three of them are worth calling out.
+
+`disagreement`: the gate reads the recipient turns itself and treats CALL-E's
+extracted `structured_result` as corroboration. When the two disagree, it
+refuses. It can decline an approval a person really gave. It will not invent one.
+A call that came back with no recipient turns has nothing to corroborate, so it
+lands on `no_transcript_evidence` however confident the extraction is.
+
+`window_expired`: the window is checked before a call and again on its result,
+against the local clock and against the call's own completion time. A decision
+that arrives after the window closed does not open the gate. Nor does one that
+belongs to an earlier run.
+
+`call_state_unknown`: a create or a poll failed without saying whether the call
+exists. Reading it back under the same key did not settle it either. The ladder
+stops there rather than ringing the next approver while a call may be live.
+Reconcile that call before running the gate again.
 
 ## The request file
 
 | Field | Notes |
 | --- | --- |
-| `request_id` | Stable per change. Used in the idempotency key, so a retried step reuses the call instead of ringing twice. |
-| `change.title`, `change.summary` | Read out loud. Capped at 120 and 600 characters, because a call cannot read an essay. |
+| `request_id` | Stable per change. Part of the idempotency key, so a retried step reuses the call instead of ringing twice. |
+| `change.title`, `change.summary` | Read out loud, after the caller has established who answered. Capped at 120 and 600 characters, because a call cannot read an essay. |
 | `change.environment` | Must appear in each approver's `authorized_for`. |
-| `approvers[]` | Ladder order. E.164 phone, `enrolled_at`, `authorized_for`. Unique ids and unique numbers. |
+| `approvers[]` | Ladder order. E.164 phone, `enrolled_at`, `authorized_for`. Unique ids and unique numbers. Ids take letters, digits, dot, dash and underscore. |
 | `policy.mode` | `single` or `dual` for two approvals from two handsets. |
 | `policy.binding` | `code_from_request` (default) or `liveness_phrase` when the approver has no screen. |
 | `policy.window_seconds` | Capped at 600. The whole decision expires with it. |
 | `policy.min_confidence` | Floor on CALL-E's task completion confidence. |
 | `policy.max_failed_attempts` | Stops the ladder walking a list of numbers. |
-| `policy.allow_structured_only` | Off by default. On, an approval can rest on the extracted result when no transcript came back. Lower assurance, recorded as such. |
 
 ## Side effects, cancellation, credentials
 
@@ -174,10 +216,15 @@ not invent one.
   so there is no schedule to clean up. Stopping the process stops the ladder, and
   a call already in flight finishes on the CALL-E side.
 - Preview and `verify` place no calls and need no credentials.
-- `CALLE_API_KEY` is read from the environment only. `CALLE_BASE_URL` selects the
-  environment so a staging job cannot dial from a production project.
+- `CALLE_API_KEY` is read from the environment only. `CALLE_BASE_URL` and
+  `--base-url` select the environment. Both are refused unless they are https or a
+  loopback host, so the key never travels to an arbitrary host.
 - Records are appended to the file you name, with mode `0600`. Numbers are masked,
   transcripts are trimmed to the decisive turns and the code is never stored.
+- Secret reservations are written with mode `0600` under `.phone-approval-gate`
+  beside the record file. They hold the code in clear for as long as the request
+  is open, which is no more exposure than the request channel the approver reads
+  it from. Delete the directory when the request is done.
 
 ## Reading further
 
