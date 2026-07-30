@@ -12,10 +12,11 @@
  * recipient turns has nothing to corroborate, so it cannot approve at all.
  *
  * Silence is never approval. A machine answering, an empty transcript, a
- * missing code, a low completion confidence, a result that landed outside the
- * approval window, an API failure and a call whose state could not be settled
- * all land on `not_approved` with a reason. The only path to `approved` is a
- * person who returned the secret and said yes, inside the window.
+ * missing code, a code the gate does not hold, a low completion confidence, a
+ * result that landed outside the approval window, an API failure and a call
+ * whose state could not be settled all land on `not_approved` with a reason. The
+ * only path to `approved` is a person who returned the secret and said yes,
+ * inside the window.
  */
 
 import { redactSecret, secretDigest } from "./secret.js";
@@ -39,21 +40,20 @@ const MACHINE_HINTS = ["voicemail", "machine", "ivr", "answering"];
 /**
  * The statuses CALL-E ends a call on.
  *
- * Everything else (queued, scheduled, ringing, in_progress, a status this gate
- * has never seen) means the call may still be talking to the approver, so it can
- * never resolve an attempt. The set lives here because both readers need the
- * same answer: the gate, when it reads a call back after a poll gave up, and
- * this module, when it turns a status into an outcome. Two copies would drift
- * and a drift here rings a second handset over a live call.
+ * This is the whole of `CallStatus` in the Developer API schema that ends a
+ * call: `queued` and `in_progress` are the other two values it can hold. A no
+ * answer, a busy line or a voicemail arrives as `failed` with a failure code
+ * rather than as a status of its own, so those are read from the code and are
+ * deliberately not in this set.
+ *
+ * Everything else (queued, in_progress, a status this gate has never seen) means
+ * the call may still be talking to the approver, so it can never resolve an
+ * attempt. The set lives here because both readers need the same answer: the
+ * gate reads a call back after a poll gave up and this module turns a status into
+ * an outcome. Two copies would drift and a drift here rings a second handset over
+ * a live call.
  */
-export const TERMINAL_CALL_STATUSES = new Set([
-  "completed",
-  "failed",
-  "canceled",
-  "no_answer",
-  "busy",
-  "voicemail",
-]);
+export const TERMINAL_CALL_STATUSES = new Set(["completed", "failed", "canceled"]);
 
 export function isTerminalCallStatus(status: string): boolean {
   return TERMINAL_CALL_STATUSES.has(status.trim().toLowerCase());
@@ -97,8 +97,8 @@ export function attemptOutcome(
     return { outcome: "not_approved", reason: "api_error" };
   }
   if (!isTerminalCallStatus(inputs.call_status)) {
-    // Still queued, ringing or talking. The call may be live, so nothing in this
-    // snapshot resolves the attempt, whatever else the snapshot carries, and the
+    // Still queued or in progress. The call may be live, so nothing in this
+    // snapshot resolves the attempt, whatever else the snapshot carries. The
     // ladder stops on it.
     return { outcome: "not_approved", reason: "call_state_unknown" };
   }
@@ -129,7 +129,15 @@ export function attemptOutcome(
     return { outcome: "not_approved", reason: "not_reached" };
   }
   if (!inputs.code_match) {
-    return { outcome: "not_approved", reason: "code_mismatch" };
+    if (inputs.unmatched_code_spoken) {
+      // A person read a code back and it is not the one this run holds, so this
+      // call was set up under a secret this run never had. Another runner may own
+      // it. Not an approval and not a clean failure either, so the ladder stops
+      // on it instead of ringing the next approver behind that person's back.
+      return { outcome: "not_approved", reason: "code_mismatch" };
+    }
+    // Nobody returned the secret. A bare yes is not an approval.
+    return { outcome: "not_approved", reason: "secret_not_returned" };
   }
   if (inputs.decision !== "approve") {
     return { outcome: "not_approved", reason: "no_decision" };
@@ -190,6 +198,7 @@ export function evaluateAttempt(options: {
       within_window: withinWindow,
       transcript_available: false,
       code_match: false,
+      unmatched_code_spoken: false,
       decision: "unknown",
       structured_decision: null,
       confidence: null,
@@ -221,10 +230,15 @@ export function evaluateAttempt(options: {
   const reachedPerson = reading.userTurnCount > 0 && !machineAnswered;
 
   const codeMatch = reading.secretSpoken;
+  // A code came back and it was not this run's. The binding matters: in phrase
+  // mode nothing is read off the request channel, so there is no other code to
+  // confuse this one with.
+  const unmatchedCodeSpoken =
+    !codeMatch && policy.binding === "code_from_request" && reading.spokenDigits !== null;
   let spokenSecretDigest: string | null = null;
   if (codeMatch) {
     spokenSecretDigest = digest;
-  } else if (policy.binding === "code_from_request" && reading.spokenDigits !== null) {
+  } else if (unmatchedCodeSpoken && reading.spokenDigits !== null) {
     spokenSecretDigest = secretDigest(request.requestId, reading.spokenDigits);
   }
 
@@ -242,6 +256,7 @@ export function evaluateAttempt(options: {
     within_window: withinWindow,
     transcript_available: transcriptAvailable,
     code_match: codeMatch,
+    unmatched_code_spoken: unmatchedCodeSpoken,
     decision,
     structured_decision: structuredDecision,
     confidence,

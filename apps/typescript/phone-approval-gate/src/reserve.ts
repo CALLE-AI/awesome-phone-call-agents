@@ -20,7 +20,7 @@
  * the request is done.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { digestOf } from "./audit.js";
@@ -72,6 +72,15 @@ function reservationPath(options: {
 }
 
 function readReservation(path: string): Reservation {
+  // Every reservation this app writes is created 0600, so a wider mode means
+  // something else made this file. It holds a live code in clear, so it is
+  // refused rather than adopted and rather than quietly chmodded.
+  const mode = statSync(path).mode & 0o777;
+  if ((mode & 0o077) !== 0) {
+    throw new Error(
+      `Reservation ${path} is mode 0${mode.toString(8)}, which other accounts can read. It holds the approval code in clear, so it was not adopted. Delete it once the call under its idempotency key is settled, then run again.`,
+    );
+  }
   const record = JSON.parse(readFileSync(path, "utf8")) as Reservation;
   if (typeof record.code !== "string" || !Array.isArray(record.phrase)) {
     throw new Error(

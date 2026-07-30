@@ -253,6 +253,48 @@ test("a call that never finishes stays unresolved and holds the ladder", async (
   );
 });
 
+test("two runners with their own state directory derive the same code", async () => {
+  await withFake([{ phone: ALICE_PHONE, userLines: ["Hello? Who is this?"] }], async (port, fake) => {
+    const request = approvalRequest();
+    const codeKey = Buffer.from("shared operator key material for two runners", "utf8");
+    // Separate state directories, so neither reservation can see the other. The
+    // key is the only thing the two runs share and it is enough.
+    const first = await runGate({ request, port, stateDir: statePath(), pollIntervalMs: 5, codeKey });
+    const second = await runGate({ request, port, stateDir: statePath(), pollIntervalMs: 5, codeKey });
+    assert.equal(second.attempts[0]!.secret_digest, first.attempts[0]!.secret_digest);
+    assert.equal(fake.created.length, 1, "one derived code means one provider key and one call");
+    assert.equal(first.attempts[0]!.reason, "secret_not_returned");
+    assert.equal(second.attempts[0]!.reason, "secret_not_returned");
+  });
+});
+
+test("an approval code is derived per approver and per attempt", async () => {
+  await withFake(
+    [
+      { phone: ALICE_PHONE, userLines: ["Hello?"] },
+      { phone: BOB_PHONE, userLines: ["Hello?"] },
+    ],
+    async (port) => {
+      const codeKey = Buffer.from("shared operator key material for two runners", "utf8");
+      const delivered: string[] = [];
+      const result = await gate({
+        request: twoApprovers("single"),
+        port,
+        pollIntervalMs: 5,
+        codeKey,
+        onSecret: (approver, display) => delivered.push(`${approver.id}:${display}`),
+      });
+      assert.equal(result.attempts.length, 2);
+      assert.notEqual(result.attempts[0]!.secret_digest, result.attempts[1]!.secret_digest);
+      assert.equal(delivered.length, 2);
+      assert.notEqual(delivered[0], delivered[1]);
+      for (const line of delivered) {
+        assert.match(line, /^(alice|bob):(\d ){5}\d$/);
+      }
+    },
+  );
+});
+
 test("an API error is recorded with its CALL-E code", async () => {
   await withFake(
     [{ phone: ALICE_PHONE, apiError: { status: 402, code: "insufficient_balance" } }],

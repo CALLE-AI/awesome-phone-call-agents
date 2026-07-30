@@ -4,7 +4,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -75,6 +75,18 @@ test("a reservation with no secret in it fails closed", () => {
   assert.throws(
     () => reserve(dir, SECOND, { change: "deploy 1.14.2" }),
     /does not hold a secret/,
+  );
+});
+
+test("a reservation other accounts can read is refused, not adopted", () => {
+  const dir = stateDir();
+  const reserved = reserve(dir, FIRST, { change: "deploy 1.14.2" });
+  // Nothing this app writes is ever wider than 0600, so a wider file is somebody
+  // else's. It holds a live code in clear, so the run stops instead of trusting it.
+  chmodSync(reserved.path!, 0o644);
+  assert.throws(
+    () => reserve(dir, SECOND, { change: "deploy 1.14.2" }),
+    /mode 0644, which other accounts can read/,
   );
 });
 

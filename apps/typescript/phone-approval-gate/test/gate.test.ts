@@ -19,7 +19,12 @@ const APPROVE_TURNS: TranscriptTurn[] = [
   { offset_seconds: 4, speaker: "user", text: "Four seven two nine one three, I approve." },
 ];
 
-function snapshot(options: { id: string; completedAt: string; status?: string }): CallSnapshot {
+function snapshot(options: {
+  id: string;
+  completedAt: string;
+  status?: string;
+  turns?: TranscriptTurn[];
+}): CallSnapshot {
   return {
     id: options.id,
     status: options.status ?? "completed",
@@ -38,7 +43,7 @@ function snapshot(options: { id: string; completedAt: string; status?: string })
             startedAt: options.completedAt,
             completedAt: options.completedAt,
             summary: null,
-            transcriptTurns: APPROVE_TURNS,
+            transcriptTurns: options.turns ?? APPROVE_TURNS,
             providerCallId: "provider_1",
             failureCode: null,
             failureMessage: null,
@@ -148,6 +153,42 @@ test("a read-back that is still running leaves the attempt unresolved", async ()
   assert.equal(result.attempts[0]!.evidence.call_status, "state_unknown");
   assert.equal(result.attempts[0]!.evidence.failure_code, "call_in_progress");
   assert.equal(result.attempts[0]!.call_id, "call_stub4", "the record keeps the id to reconcile");
+  assert.equal(created.length, 1);
+});
+
+test("a call decided against a code this run does not hold stops the ladder", async () => {
+  const created: string[] = [];
+  const foreign: TranscriptTurn[] = [
+    { offset_seconds: 0, speaker: "bot", text: "Decision please." },
+    { offset_seconds: 4, speaker: "user", text: "Eight one nine two seven four, approved." },
+  ];
+  const port: CallePort = {
+    async createCall(input: CreateCallInput, key: string) {
+      created.push(key);
+      return snapshot({ id: "call_stub5", completedAt: new Date().toISOString(), status: "queued" });
+    },
+    async waitForResult() {
+      // What a runner sees when it lands on a call another runner placed under
+      // the same idempotency key: a person approved, against a code this run
+      // never held.
+      return snapshot({ id: "call_stub5", completedAt: new Date().toISOString(), turns: foreign });
+    },
+    async getCall() {
+      return snapshot({ id: "call_stub5", completedAt: new Date().toISOString(), turns: foreign });
+    },
+  };
+  const result = await runGate({
+    request: twoApprovers(),
+    port,
+    stateDir: null,
+    pollIntervalMs: 1,
+    makeSecret: () => FIXED_SECRET,
+  });
+  assert.equal(result.verdict, "not_approved");
+  assert.equal(result.reason, "code_mismatch");
+  assert.equal(result.attempts[0]!.evidence.unmatched_code_spoken, true);
+  assert.equal(result.attempts.length, 1, "bob must not be rung behind that person's back");
+  assert.equal(result.attempts[0]!.call_id, "call_stub5");
   assert.equal(created.length, 1);
 });
 

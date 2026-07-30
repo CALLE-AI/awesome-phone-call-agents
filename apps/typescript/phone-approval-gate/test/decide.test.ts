@@ -105,14 +105,30 @@ test("the code is redacted out of the stored excerpt", () => {
   assert.match(result.transcript_excerpt.join(" "), /approve/);
 });
 
-test("a wrong code is a mismatch, not an approval", () => {
+test("a code this run does not hold is a mismatch, not an approval", () => {
   const result = evaluate({
     userLines: ["Four seven two nine one four. Approved."],
     structured: { decision: "approve", spoken_code: "472914", reason: "ok" },
   });
   assert.equal(result.outcome, "not_approved");
   assert.equal(result.reason, "code_mismatch");
+  assert.equal(result.evidence.unmatched_code_spoken, true);
   assert.notEqual(result.spoken_secret_digest, result.secret_digest);
+  assert.notEqual(result.spoken_secret_digest, null);
+  // The code that came back is not this run's, so it is not stored either.
+  assert.match(result.transcript_excerpt.join(" "), /\[digits\]/);
+  assert.match(result.transcript_excerpt.join(" "), /Approved/);
+});
+
+test("a yes with no code at all is a secret that never came back", () => {
+  const result = evaluate({
+    userLines: ["Yeah sure, go ahead, ship it."],
+    structured: { decision: "approve", spoken_code: "", reason: "Said go ahead." },
+  });
+  assert.equal(result.outcome, "not_approved");
+  assert.equal(result.reason, "secret_not_returned");
+  assert.equal(result.evidence.unmatched_code_spoken, false);
+  assert.equal(result.spoken_secret_digest, null);
 });
 
 test("a rejection is recorded as a rejection", () => {
@@ -210,16 +226,26 @@ test("failure codes map to the reason an operator needs", () => {
   assert.equal(evaluate({ status: "failed", failureCode: "no_answer" }).reason, "no_answer");
   assert.equal(evaluate({ status: "failed", failureCode: "voicemail_detected" }).reason, "voicemail");
   assert.equal(evaluate({ status: "failed", failureCode: "carrier_error" }).reason, "call_failed");
-  assert.equal(evaluate({ status: "no_answer" }).reason, "no_answer");
-  assert.equal(evaluate({ status: "busy" }).reason, "no_answer");
-  assert.equal(evaluate({ status: "voicemail" }).reason, "voicemail");
 });
 
 test("a status that is not terminal resolves nothing, whatever else the call says", () => {
   // Every one of these read back a call that may still be talking to the
   // approver. An approval in the transcript cannot settle it and neither can a
-  // clean failure, so the attempt stays unresolved and the ladder stops.
-  for (const status of ["queued", "scheduled", "ringing", "in_progress", "dialing", "surprise"]) {
+  // clean failure, so the attempt stays unresolved and the ladder stops. The last
+  // three are not CALL-E statuses at all: a no answer, a busy line and a
+  // voicemail arrive as failed with a failure code, so a status spelled that way
+  // is something this gate does not understand.
+  for (const status of [
+    "queued",
+    "scheduled",
+    "ringing",
+    "in_progress",
+    "dialing",
+    "surprise",
+    "no_answer",
+    "busy",
+    "voicemail",
+  ]) {
     const result = evaluate({
       status,
       userLines: ["Four seven two nine one three, I approve."],
@@ -262,6 +288,7 @@ function attempt(id: string, outcome: AttemptEvaluation["outcome"], reason: Atte
     within_window: true,
     transcript_available: true,
     code_match: outcome === "approved",
+    unmatched_code_spoken: false,
     decision: outcome === "approved" ? "approve" : outcome === "rejected" ? "reject" : "unknown",
     structured_decision: null,
     confidence: { score: 0.9, label: "high" },
@@ -328,12 +355,20 @@ test("outcome inputs alone decide the outcome, which is what verification replay
     within_window: true,
     transcript_available: true,
     code_match: true,
+    unmatched_code_spoken: false,
     decision: "approve",
     structured_decision: "approve",
     confidence: { score: 0.9, label: "high" },
   };
   assert.equal(attemptOutcome(inputs, singlePolicy).outcome, "approved");
-  assert.equal(attemptOutcome({ ...inputs, code_match: false }, singlePolicy).reason, "code_mismatch");
+  assert.equal(
+    attemptOutcome({ ...inputs, code_match: false }, singlePolicy).reason,
+    "secret_not_returned",
+  );
+  assert.equal(
+    attemptOutcome({ ...inputs, code_match: false, unmatched_code_spoken: true }, singlePolicy).reason,
+    "code_mismatch",
+  );
   assert.equal(attemptOutcome({ ...inputs, decision: "unknown" }, singlePolicy).reason, "no_decision");
   assert.equal(attemptOutcome({ ...inputs, decision: "reject" }, singlePolicy).outcome, "rejected");
   assert.equal(attemptOutcome({ ...inputs, within_window: false }, singlePolicy).reason, "window_expired");

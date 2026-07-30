@@ -20,6 +20,7 @@ export type NotApprovedReason =
   | "voicemail"
   | "call_failed"
   | "code_mismatch"
+  | "secret_not_returned"
   | "no_decision"
   | "no_transcript_evidence"
   | "low_confidence"
@@ -30,10 +31,10 @@ export type NotApprovedReason =
   | "not_reached"
   | "api_error"
   /**
-   * A create or a poll failed without saying whether the call exists, or a call
-   * read back after a poll gave up was still queued, ringing or talking.
-   * Reading it under the same idempotency key did not settle it. A call may be
-   * live, so the ladder stops here.
+   * A create or a poll failed without saying whether the call exists. Or a call
+   * read back after a poll gave up was still queued or in progress. Reading it
+   * under the same idempotency key did not settle it either. A call may be live,
+   * so the ladder stops here.
    */
   | "call_state_unknown";
 
@@ -175,6 +176,13 @@ export interface OutcomeInputs {
   within_window: boolean;
   transcript_available: boolean;
   code_match: boolean;
+  /**
+   * A person read a code back and it is not the one this run holds. Recorded
+   * separately from `code_match`, because nothing came back and something else
+   * came back are different facts: the first is a call nobody completed, the
+   * second is a call somebody completed against a secret this run never had.
+   */
+  unmatched_code_spoken: boolean;
   decision: Decision;
   structured_decision: Decision | null;
   confidence: Confidence | null;

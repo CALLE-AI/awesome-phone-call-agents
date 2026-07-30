@@ -8,7 +8,7 @@
  * approve is in it.
  */
 
-import { containsCode, containsPhrase, spokenDigits } from "./secret.js";
+import { containsCode, containsPhrase, spokenDigits, CODE_DIGITS } from "./secret.js";
 import type { Binding, Decision, TranscriptReading, TranscriptTurn } from "./types.js";
 
 const REJECT_PATTERNS: RegExp[] = [
@@ -86,7 +86,9 @@ export function looksLikeMachine(turns: TranscriptTurn[]): boolean {
  *
  * The last decision signal wins, because a person often thinks out loud before
  * committing. A rejection anywhere in the call is kept, because a person who
- * said stop should not be talked past.
+ * said stop should not be talked past. Any code-length run of digits is kept as
+ * well, matching or not, because the gate has to be able to tell "nobody read a
+ * code back" from "somebody read back a code that is not ours".
  */
 export function readTranscript(
   turns: TranscriptTurn[],
@@ -105,18 +107,22 @@ export function readTranscript(
         ? containsCode(turn.text, options.code)
         : containsPhrase(turn.text, options.phrase);
     const lineDecision = decisionFromLine(turn.text);
+    // Long enough to be somebody reading a code back. Kept whether it matched or
+    // not: a code this run does not hold says the call was set up by something
+    // else, which the caller has to know about.
+    const digits = spokenDigits(turn.text);
+    const codeRead = digits.length >= CODE_DIGITS;
+    if (codeRead) {
+      spoken = digits;
+    }
 
     if (matchedSecret) {
       secretSpoken = true;
-      const digits = spokenDigits(turn.text);
-      if (digits.length > 0) {
-        spoken = digits;
-      }
     }
     if (lineDecision === "reject") {
       rejected = true;
     }
-    if (matchedSecret || lineDecision !== "unknown") {
+    if (matchedSecret || codeRead || lineDecision !== "unknown") {
       excerpt.push(turn.text);
       if (lineDecision !== "unknown") {
         decisionSignal = lineDecision;

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { ConfigError, POLICY_LIMITS, parseRequest } from "../src/config.js";
+import { ConfigError, POLICY_LIMITS, parseRequest, resolveCodeKey } from "../src/config.js";
 import { approvalRequest, BOB_PHONE, requestInput } from "./fixtures.js";
 
 function expectConfigError(input: unknown, fragment: string): void {
@@ -97,4 +100,36 @@ test("a missing request id or change field is refused", () => {
     requestInput({ change: { ...requestInput().change, environment: "" } }),
     "change.environment",
   );
+});
+
+test("code_from_request will not run without shared key material", () => {
+  assert.throws(
+    () => resolveCodeKey({ binding: "code_from_request" }),
+    (error: unknown) => {
+      assert.ok(error instanceof ConfigError, `expected ConfigError, got ${String(error)}`);
+      assert.match(error.message, /CALLE_APPROVAL_CODE_KEY/);
+      assert.match(error.message, /--code-key-file/);
+      return true;
+    },
+  );
+  // The phrase is spoken on the call, so it is not a secret an operator has to hold.
+  assert.equal(resolveCodeKey({ binding: "liveness_phrase" }), null);
+  assert.equal(resolveCodeKey({ binding: "code_from_request", env: "k".repeat(32) })?.length, 32);
+  assert.throws(
+    () => resolveCodeKey({ binding: "code_from_request", env: "too short" }),
+    /128 bits/,
+  );
+});
+
+test("a key file other accounts can read is refused before the key is read", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "pag-key-")), "approval-code.key");
+  writeFileSync(path, `${"k".repeat(40)}\n`, "utf8");
+  chmodSync(path, 0o644);
+  assert.throws(
+    () => resolveCodeKey({ binding: "code_from_request", file: path }),
+    /0644/,
+  );
+  chmodSync(path, 0o600);
+  const key = resolveCodeKey({ binding: "code_from_request", file: path });
+  assert.equal(key?.toString("utf8"), "k".repeat(40));
 });

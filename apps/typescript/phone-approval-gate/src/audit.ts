@@ -10,7 +10,18 @@
  * valid, which a plain append-only log cannot catch.
  */
 
-import { appendFileSync, existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  fchmodSync,
+  fstatSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { attemptOutcome, decisionFromExcerpt, verdictFromAttempts } from "./decide.js";
 import type {
@@ -118,8 +129,24 @@ export function buildRecord(options: {
   return { ...unhashed, hash: hashRecord(unhashed) };
 }
 
+/** Mode a record file is held at. Reset on every append, not only on create. */
+export const RECORD_MODE = 0o600;
+
 export function appendRecord(path: string, record: AuditRecord): void {
-  appendFileSync(path, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
+  // A mode handed to open only applies when open creates the file, so a record
+  // file that already existed kept whatever mode it had, which is not what the
+  // docs promise. The descriptor is chmodded instead: it covers both cases and
+  // it cannot be pointed at another path between the check and the write.
+  const fd = openSync(path, "a", RECORD_MODE);
+  try {
+    if (!fstatSync(fd).isFile()) {
+      throw new Error(`${path} is not a regular file, so no record was appended.`);
+    }
+    fchmodSync(fd, RECORD_MODE);
+    writeSync(fd, `${JSON.stringify(record)}\n`);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /** How long a lock file may sit before it is treated as abandoned. */

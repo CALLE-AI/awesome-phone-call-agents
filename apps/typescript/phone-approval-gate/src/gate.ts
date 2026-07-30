@@ -6,18 +6,21 @@
  * distinct secret, so an approval recorded against one handset cannot be
  * produced from another.
  *
- * Two rules keep a retry honest. The secret is reserved on disk before the call,
- * so a second run of the same request uses the code the approver was shown
- * instead of inventing a new one for the same provider key. And a call the gate
- * cannot settle stops the ladder rather than moving to the next approver, because
- * an accepted call may still be ringing the first one. A create or a poll that
- * fails without saying whether the call exists counts as unsettled, and so does a
- * call that reads back as still queued, ringing or talking.
+ * Two rules keep a retry honest. The secret for an attempt is derived from
+ * operator key material, so every runner of one request derives the same code
+ * with nothing shared but the key. It is reserved on disk before the call too, so
+ * a second run on the same filesystem reads back the code the approver was shown.
+ * And a call the gate cannot settle stops the ladder rather than moving to the
+ * next approver, because an accepted call may still be ringing the first one. A
+ * create or a poll that fails without saying whether the call exists counts as
+ * unsettled, so does a call that reads back as still queued, ringing or talking,
+ * and so does a call somebody decided against a code this run does not hold.
  */
 
 import {
   appendRecord,
   buildRecord,
+  digestOf,
   nextSequence,
   previousHash,
   readRecords,
@@ -34,7 +37,7 @@ import {
   idempotencyKey,
   type CallSecret,
 } from "./script.js";
-import { generateCode, generatePhrase } from "./secret.js";
+import { deriveSecret, generateCode, generatePhrase } from "./secret.js";
 import type {
   ApprovalRequest,
   Approver,
@@ -55,6 +58,14 @@ export interface RunGateOptions {
   stateDir?: string | null;
   pollIntervalMs?: number;
   now?: () => number;
+  /**
+   * Operator key material the attempt secret is derived from. Every runner that
+   * holds it derives the same code for the same request, so no coordination is
+   * needed and no runner can end up checking a call against a code the approver
+   * was never shown. Undefined falls back to `makeSecret`, which is a fresh
+   * random secret per run.
+   */
+  codeKey?: Buffer | null;
   makeSecret?: (approver: Approver) => CallSecret;
   onProgress?: (line: string) => void;
   /** Called with the code a person must read back, before the phone rings. */
@@ -229,20 +240,33 @@ export async function runGate(options: RunGateOptions): Promise<GateResult> {
     }
 
     // Reserved before the call, so a second run of this request cannot ring the
-    // same handset expecting a different code.
+    // same handset expecting a different code. The reservation is the local layer
+    // and the audit trail. Where the runs do not share a filesystem, the derived
+    // code is what keeps them agreeing.
+    const content = {
+      change: request.change,
+      policy: request.policy,
+      organization: request.organization,
+      system: request.system,
+      approver,
+    };
+    const codeKey = options.codeKey ?? null;
     const reserved = reserveSecret({
       dir: stateDir,
       requestId: request.requestId,
       approverId: approver.id,
       attempt: attemptNumber,
-      content: {
-        change: request.change,
-        policy: request.policy,
-        organization: request.organization,
-        system: request.system,
-        approver,
-      },
-      secret: makeSecret(approver),
+      content,
+      secret:
+        codeKey === null
+          ? makeSecret(approver)
+          : deriveSecret(codeKey, {
+              // The same content the reservation is keyed on, so the code and the
+              // reservation cannot end up bound to different requests.
+              requestDigest: digestOf(content),
+              approverId: approver.id,
+              attempt: attemptNumber,
+            }),
       reservedAt: new Date(now()).toISOString(),
     });
     const secret = reserved.secret;
@@ -322,6 +346,19 @@ export async function runGate(options: RunGateOptions): Promise<GateResult> {
         `Stopping the ladder. Reconcile ${
           evaluation.call_id ?? "the call under this request's idempotency key"
         } for ${approver.id} before running the gate again.`,
+      );
+      break;
+    }
+    if (evaluation.reason === "code_mismatch") {
+      // Somebody read a code back and it was not this run's, so this call was
+      // set up under a secret this run never had. Another runner may own it and
+      // may be acting on it. Walking down the ladder here would ring a second
+      // approver behind the first one's back.
+      stopReason = "code_mismatch";
+      progress(
+        `Stopping the ladder. ${
+          evaluation.call_id ?? "The call for this attempt"
+        } was decided against a code this run does not hold. Reconcile it before running the gate again.`,
       );
       break;
     }

@@ -71,6 +71,26 @@ test("the last decision wins when a person thinks out loud", () => {
   assert.equal(reading.secretSpoken, true);
 });
 
+test("a code that is not the expected one is still read out of the turn", () => {
+  const reading = readTranscript(
+    turns(["user", "Eight one nine two seven four, approved."]),
+    { binding: "code_from_request", code: CODE, phrase: PHRASE },
+  );
+  assert.equal(reading.secretSpoken, false);
+  // Kept because a code this run does not hold is evidence in its own right.
+  assert.equal(reading.spokenDigits, "819274");
+  assert.equal(reading.excerpt.length, 1);
+});
+
+test("a short run of digits is not a code read-back", () => {
+  const reading = readTranscript(
+    turns(["user", "I am on extension 4155."]),
+    { binding: "code_from_request", code: CODE, phrase: PHRASE },
+  );
+  assert.equal(reading.spokenDigits, null);
+  assert.deepEqual(reading.excerpt, []);
+});
+
 test("voicemail and menu greetings are detected", () => {
   assert.equal(
     looksLikeMachine(turns(["user", "Please leave a message after the tone."])),

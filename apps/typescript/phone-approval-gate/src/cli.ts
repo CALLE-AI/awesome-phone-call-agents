@@ -15,8 +15,8 @@
 
 import { appendFileSync } from "node:fs";
 import { verifyAudit } from "./audit.js";
-import { createSdkPort, DEFAULT_BASE_URL } from "./calle.js";
-import { ConfigError, loadRequest } from "./config.js";
+import { createSdkPort, DEFAULT_BASE_URL, parseAllowedHosts } from "./calle.js";
+import { ConfigError, loadRequest, resolveCodeKey } from "./config.js";
 import { renderPreview, renderResult } from "./format.js";
 import { runGate } from "./gate.js";
 import { generateCode, generatePhrase } from "./secret.js";
@@ -33,9 +33,14 @@ const USAGE = `Phone approval gate
   preview --request <file> [--json]
       Print the call script, the ladder and the result contract. Places no call.
 
-  request --request <file> --live --audit <file> [--json] [--base-url <url>] [--state <dir>]
+  request --request <file> --live --audit <file> [--json] [--base-url <url>]
+          [--state <dir>] [--code-key-file <path>] [--allow-host <host>]
       Place one call per approver until someone decides. Needs CALLE_API_KEY.
       Every live run appends an approval record, so --audit is required.
+      code_from_request derives the code from CALLE_APPROVAL_CODE_KEY or
+      --code-key-file, the same key on every runner of one request.
+      A base URL outside https://api.heycall-e.com and loopback needs its host
+      named in --allow-host or CALLE_ALLOWED_HOSTS. The key goes nowhere else.
 
   verify --audit <file> [--json]
       Re-link the record chain and recompute every recorded verdict.
@@ -45,11 +50,17 @@ Exit codes: 0 approved, 10 rejected, 20 no approval, 30 usage error, 40 audit fa
 interface Parsed {
   command: string;
   values: Record<string, string>;
+  /** Options that may be given more than once. */
+  lists: Record<string, string[]>;
   flags: Set<string>;
 }
 
+/** An operator may have to name more than one host, so this one accumulates. */
+const REPEATABLE = new Set(["allow-host"]);
+
 function parseArgs(argv: string[]): Parsed {
   const values: Record<string, string> = {};
+  const lists: Record<string, string[]> = {};
   const flags = new Set<string>();
   const command = argv[0] ?? "";
   for (let index = 1; index < argv.length; index += 1) {
@@ -66,10 +77,14 @@ function parseArgs(argv: string[]): Parsed {
     if (value === undefined || value.startsWith("--")) {
       throw new ConfigError(`Option --${name} needs a value.`);
     }
-    values[name] = value;
+    if (REPEATABLE.has(name)) {
+      (lists[name] ??= []).push(value);
+    } else {
+      values[name] = value;
+    }
     index += 1;
   }
-  return { command, values, flags };
+  return { command, values, lists, flags };
 }
 
 function requireValue(parsed: Parsed, name: string): string {
@@ -150,11 +165,26 @@ async function main(argv: string[]): Promise<number> {
       );
     }
     const baseUrl = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL ?? DEFAULT_BASE_URL;
-    const port = await createSdkPort({ apiKey, baseUrl });
+    // Derived, not coordinated: every runner holding this key gets the same code
+    // for this request, so no runner ends up checking a call against a code the
+    // approver was never shown.
+    const codeKey = resolveCodeKey({
+      binding: request.policy.binding,
+      file: parsed.values["code-key-file"],
+      env: process.env.CALLE_APPROVAL_CODE_KEY,
+    });
+    // https alone would only prove the transport is encrypted, so a host that is
+    // neither CALL-E nor loopback has to be named before the key can travel.
+    const allowedHosts = parseAllowedHosts([
+      ...(parsed.lists["allow-host"] ?? []),
+      process.env.CALLE_ALLOWED_HOSTS,
+    ]);
+    const port = await createSdkPort({ apiKey, baseUrl, allowedHosts });
     const result = await runGate({
       request,
       port,
       auditPath,
+      codeKey,
       ...(parsed.values["state"] === undefined ? {} : { stateDir: parsed.values["state"] }),
       onProgress: (line) => process.stderr.write(`${line}\n`),
       onSecret: (approver, display) =>

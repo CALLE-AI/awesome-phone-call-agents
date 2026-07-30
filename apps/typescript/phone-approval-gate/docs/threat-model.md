@@ -73,9 +73,10 @@ Read this list before putting the gate in front of anything expensive.
 | Instructions injected during the call | The call script refuses every request other than this one approval and the gate treats transcript text as evidence to read, never as an instruction to follow. |
 | Change details left on a machine | The script ends the call on voicemail or a menu system without describing the change and without leaving a message. |
 | Change details read to whoever picks up | The caller asks who is on the line first and reads nothing about the change until the expected approver has said they are on it. Possession of the handset still stands unproven, so this bounds disclosure rather than proving identity. |
-| The credential sent to a host the operator did not mean | `--base-url` and `CALLE_BASE_URL` are refused unless they are https or a loopback host, before any client holds the key. An operator who needs a private host uses https on it. |
+| The credential sent to a host the operator did not mean | `--base-url` and `CALLE_BASE_URL` are refused unless the host is `api.heycall-e.com`, a loopback address or one the operator named with `--allow-host` or `CALLE_ALLOWED_HOSTS`, before any client holds the key. https alone is not accepted as trust: it proves the transport and says nothing about who answers, so a mistyped or supplied https host is refused too. Matching is exact, so a suffix like `api.heycall-e.com.attacker.example` fails and a wildcard entry is refused rather than read literally. |
+| The approval code key material leaks | Every code for every request that key covers becomes predictable, which is the trade for needing no shared state between runners. So the key is refused when its file is readable by other accounts, refused under 128 bits, never written to a record, a log or the provider payload. It can be rotated: every derived code changes with it. Hold it the way the API key is held. `liveness_phrase` needs no key at all. |
 | An accepted call the gate never heard about | A create or a poll that fails without saying whether the call exists is reconciled by replaying the same idempotency key. If that does not settle it, the attempt is recorded as `call_state_unknown` and the ladder stops, so a second approver is not rung while a call may be live. |
-| Two runs of one request racing | The secret for an attempt is reserved with an exclusive file create before the call, so the second run adopts the first run's code and its key instead of ringing the same handset with a code the approver never saw. Record appends take a lock, so the hash chain cannot fork. Both live on one filesystem: two runners with separate checkouts still hold separate state. |
+| Two runs of one request racing | The code is derived from the request and the operator key rather than drawn at random, so two runners that share no filesystem still derive the same code and neither can ring a handset with a code the other one holds. On one filesystem the secret is also reserved with an exclusive file create before the call, which is the local audit trail. Record appends take a lock so the hash chain cannot fork. What is still not coordinated is the record file itself: two runners with separate checkouts keep separate chains and the provider idempotency key is what stops the second call. A call that comes back decided against a code this run does not hold stops the ladder instead of walking it. |
 | A stale approval replayed on a later run | The window is checked against the call's own completion time as well as the local clock, so a call that finished outside this run's window cannot approve. |
 
 ## PSTN is a restricted channel
@@ -122,10 +123,15 @@ Not stored:
 - the full phone number
 - the full transcript
 - the code or phrase in plain text
+- a code somebody read back that this run does not hold, which is replaced by
+  `[digits]` because it is still live for whoever does hold it
 - the API key, which the gate only reads from the environment
+- the approval code key material, which the gate only reads from the environment
+  or a file the operator points it at
 
-Records are appended with mode `0600`. Rotate and retain them the way your change
-management policy already says to.
+Records are appended with mode `0600` and the mode is re-applied on every append,
+so a file that was widened after it was created does not stay widened. Rotate and
+retain them the way your change management policy already says to.
 
 Held for the life of the request, outside the record:
 
@@ -133,5 +139,6 @@ Held for the life of the request, outside the record:
   `.phone-approval-gate` beside the record file or under `--state <dir>`. It is
   what lets a retried run accept the code the approver was actually shown. The
   same code is already printed on the request channel, so this is not a new
-  exposure. It stops being useful when the window closes. Delete the directory
-  when the request is done.
+  exposure. A reservation whose mode is wider than `0600` is refused rather than
+  adopted, since this app never writes one that way. It stops being useful when
+  the window closes. Delete the directory when the request is done.

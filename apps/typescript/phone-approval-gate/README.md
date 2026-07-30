@@ -97,14 +97,25 @@ npm run gate -- preview --request examples/request.example.json
 ## One live run
 
 Live mode needs a CALL-E API key in the environment and the `--live` flag. The
-gate never reads a key from the request file. It only sends that key to an https
-host or to loopback, so a mistyped `--base-url` cannot walk off with it.
+gate never reads a key from the request file. It only sends that key to
+`api.heycall-e.com`, to a loopback address for a local fake or to a host you
+named yourself with `--allow-host` or `CALLE_ALLOWED_HOSTS`, so a mistyped
+`--base-url` cannot walk off with it. https on its own is not enough: it says the
+connection is encrypted, not who answers it.
 
 ```bash
 export CALLE_API_KEY="<CALL_E_API_KEY>"
+export CALLE_APPROVAL_CODE_KEY="<32 random bytes, the same on every runner>"
 npm run gate -- request --request your-request.json --live --audit approvals.jsonl
 npm run gate -- verify --audit approvals.jsonl
 ```
+
+`CALLE_APPROVAL_CODE_KEY` (or `--code-key-file`) is what the approval code is
+derived from in the default `code_from_request` binding. Every runner holding the
+same key derives the same code for the same request, which is what stops two runs
+on two machines showing two different codes for one call. A live run refuses to
+start without it. `liveness_phrase` needs no key, because the phrase is spoken on
+the call rather than read off the request channel.
 
 `--audit` is required on a live run. Every run appends one record, including the
 runs nobody approved, because those are the ones you are asked about later.
@@ -117,19 +128,27 @@ decision.
 ## Retries and two runs at once
 
 A retried workflow step must not ring the approver again. Two runs of one request
-must not expect two different codes. Three things hold that together.
+must not expect two different codes. Four things hold that together.
 
 - The provider idempotency key carries the request id, the approver, the attempt
   and a digest of the payload the call is created from. A retry lands on the same
   key. An edited request gets a different one instead of replaying a call about
   something else.
-- Before the phone rings, the run reserves the secret for that attempt in a file
-  created with O_CREAT and O_EXCL, under `.phone-approval-gate` next to the
-  record file or under `--state <dir>`. The first run owns the attempt and any
-  later run reads its code back, so the code the approver was shown is the code
-  the gate checks.
+- The code is derived, not drawn fresh: HMAC over the request digest, the
+  approver and the attempt number, keyed with `CALLE_APPROVAL_CODE_KEY`. Two
+  runners that share nothing but that key still derive the same code, so neither
+  ends up checking a call against a code the approver was never shown.
+- Before the phone rings, the run also reserves that secret in a file created
+  with O_CREAT and O_EXCL, under `.phone-approval-gate` next to the record file or
+  under `--state <dir>`. On one filesystem that is the faster answer and the local
+  audit trail. A reservation other accounts can read is refused rather than
+  adopted, since it holds the code in clear.
 - Appends to the record file happen under a lock file, because adding a record
   reads the tail of the chain first.
+
+If a call does come back decided against a code this run does not hold, the
+ladder stops there rather than ringing the next approver behind that person's
+back.
 
 ## In GitHub Actions
 
@@ -193,11 +212,13 @@ belongs to an earlier run.
 
 `call_state_unknown`: the gate could not settle what the call did. A create or a
 poll failed without saying whether the call exists and reading it back under the
-same key did not settle it, or the read came back queued, ringing or still
-talking. Only `completed`, `failed`, `canceled`, `no_answer`, `busy` and
-`voicemail` count as a finished call. The ladder stops there rather than ringing
-the next approver while a call may be live. Reconcile that call before running
-the gate again.
+same key did not settle it. It also covers a read that came back queued or still
+in progress. Only `completed`, `failed` and `canceled` count as a finished call,
+which is every terminal value in CALL-E's own call status enum, so anything else
+leaves the attempt unresolved. A no answer or a voicemail arrives as `failed`
+with a failure code rather than as a status of its own. The ladder stops there
+rather than ringing the next approver while a call may be live. Reconcile that
+call before running the gate again.
 
 ## The request file
 
@@ -220,9 +241,15 @@ the gate again.
   a call already in flight finishes on the CALL-E side.
 - Preview and `verify` place no calls and need no credentials.
 - `CALLE_API_KEY` is read from the environment only. `CALLE_BASE_URL` and
-  `--base-url` select the environment. Both are refused unless they are https or a
-  loopback host, so the key never travels to an arbitrary host.
-- Records are appended to the file you name, with mode `0600`. Numbers are masked,
+  `--base-url` select the environment. Both are refused unless the host is
+  `api.heycall-e.com`, a loopback address or one named in `--allow-host` or
+  `CALLE_ALLOWED_HOSTS`, so the key never travels to a host nobody chose. An
+  entry with a wildcard in it is refused rather than read literally.
+- `CALLE_APPROVAL_CODE_KEY` and `--code-key-file` are read from the environment
+  and the filesystem only. A key file other accounts can read is refused and the
+  key itself is never written to a record, a log or the provider payload.
+- Records are appended to the file you name and the file is put back to mode
+  `0600` on every append, not only when it is created. Numbers are masked,
   transcripts are trimmed to the decisive turns and the code is never stored.
 - Secret reservations are written with mode `0600` under `.phone-approval-gate`
   beside the record file. They hold the code in clear for as long as the request

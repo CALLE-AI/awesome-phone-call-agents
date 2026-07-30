@@ -5,6 +5,7 @@ import {
   PHRASE_LENGTH,
   containsCode,
   containsPhrase,
+  deriveSecret,
   generateCode,
   generatePhrase,
   phraseEntropyBits,
@@ -13,6 +14,9 @@ import {
   spokenCode,
   spokenDigits,
 } from "../src/secret.js";
+
+const KEY = Buffer.from("operator key material for the tests, 44 bytes", "utf8");
+const CONTEXT = { requestDigest: "sha256:aaaa", approverId: "alice", attempt: 1 };
 
 test("generated codes are six digits from the platform CSPRNG", () => {
   for (let index = 0; index < 200; index += 1) {
@@ -77,4 +81,45 @@ test("redaction removes spoken codes and phrase words before they are stored", (
     "[phrase] [phrase] [phrase], approved",
   );
   assert.equal(redactSecret("I approve", "472913", []), "I approve");
+});
+
+test("a code that is not ours is redacted too, so a record never carries one", () => {
+  assert.equal(redactSecret("819274, approved", "472913", []), "[digits], approved");
+  assert.equal(
+    redactSecret("eight one nine two seven four, approved", "472913", []),
+    "[digits], approved",
+  );
+  // Too short to be a code read-back, so it stays readable.
+  assert.equal(redactSecret("I am on extension 4155", "472913", []), "I am on extension 4155");
+});
+
+test("a derived secret is the same on every runner and different for anything else", () => {
+  const derived = deriveSecret(KEY, CONTEXT);
+  assert.match(derived.code, /^\d{6}$/);
+  assert.equal(derived.phrase.length, PHRASE_LENGTH);
+  assert.equal(new Set(derived.phrase).size, PHRASE_LENGTH);
+
+  // No coordination, no shared filesystem, same code. That is the point.
+  const other = deriveSecret(Buffer.from(KEY), { ...CONTEXT });
+  assert.equal(other.code, derived.code);
+  assert.deepEqual(other.phrase, derived.phrase);
+
+  assert.notEqual(deriveSecret(KEY, { ...CONTEXT, attempt: 2 }).code, derived.code);
+  assert.notEqual(deriveSecret(KEY, { ...CONTEXT, approverId: "bob" }).code, derived.code);
+  assert.notEqual(deriveSecret(KEY, { ...CONTEXT, requestDigest: "sha256:bbbb" }).code, derived.code);
+  assert.notEqual(deriveSecret(Buffer.from(`${KEY.toString()} rotated`), CONTEXT).code, derived.code);
+  assert.notDeepEqual(deriveSecret(KEY, { ...CONTEXT, attempt: 2 }).phrase, derived.phrase);
+});
+
+test("derived codes spread across the code space", () => {
+  const codes = new Set(
+    Array.from({ length: 200 }, (_ignored, index) =>
+      deriveSecret(KEY, { ...CONTEXT, requestDigest: `sha256:${index}` }).code,
+    ),
+  );
+  assert.ok(codes.size > 190, `expected varied codes, saw ${codes.size} distinct`);
+});
+
+test("key material too short to derive from is refused", () => {
+  assert.throws(() => deriveSecret(Buffer.from("too short"), CONTEXT), /128 bits/);
 });

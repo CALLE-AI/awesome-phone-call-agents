@@ -2,13 +2,16 @@
  * Request file loading and validation.
  *
  * Nothing here guesses. A missing phone number, an unenrolled approver or a
- * window longer than the policy allows is an error, not a default.
+ * window longer than the policy allows is an error, not a default. Operator
+ * secrets are read here too and refused rather than patched around.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { CODE_KEY_MIN_BYTES } from "./secret.js";
 import type {
   Approver,
   ApprovalRequest,
+  Binding,
   Policy,
   PolicyInput,
 } from "./types.js";
@@ -261,4 +264,58 @@ export function loadRequest(path: string): ApprovalRequest {
     throw new ConfigError(`Request file ${path} is not valid JSON: ${(error as Error).message}`);
   }
   return parseRequest(parsed);
+}
+
+function readKeyFile(path: string): Buffer {
+  let mode: number;
+  try {
+    mode = statSync(path).mode & 0o777;
+  } catch (error) {
+    throw new ConfigError(`Cannot read key file ${path}: ${(error as Error).message}`);
+  }
+  if ((mode & 0o077) !== 0) {
+    // Refused rather than fixed. A key other accounts could read has already been
+    // exposed and only the operator can decide whether it needs rotating.
+    throw new ConfigError(
+      `Key file ${path} is mode 0${mode.toString(8)}, which other accounts can read. Run chmod 600 ${path} and rotate the key if anyone else had it. The key was not read.`,
+    );
+  }
+  return Buffer.from(readFileSync(path, "utf8").trim(), "utf8");
+}
+
+/**
+ * Resolve the key material approval codes are derived from.
+ *
+ * `code_from_request` cannot run without it. The code is what binds an approval
+ * to one request, so two runners that derive two different codes for one call put
+ * the losing runner in front of a mismatch it cannot explain. One shared key on
+ * every runner removes the disagreement instead of coordinating it. A phrase is
+ * read out on the call and never printed on the request channel, so
+ * `liveness_phrase` runs without a key.
+ */
+export function resolveCodeKey(options: {
+  binding: Binding;
+  file?: string | undefined;
+  env?: string | undefined;
+}): Buffer | null {
+  const key =
+    options.file !== undefined && options.file.length > 0
+      ? readKeyFile(options.file)
+      : options.env !== undefined && options.env.length > 0
+        ? Buffer.from(options.env, "utf8")
+        : null;
+  if (key === null) {
+    if (options.binding === "code_from_request") {
+      throw new ConfigError(
+        "code_from_request derives the approval code from operator key material and none was given. Set CALLE_APPROVAL_CODE_KEY or pass --code-key-file <path>, with at least 32 bytes of random material and the same value on every runner of this request. Without it two runners can show two different codes for one call.",
+      );
+    }
+    return null;
+  }
+  if (key.length < CODE_KEY_MIN_BYTES) {
+    throw new ConfigError(
+      `Approval code key material is ${key.length} bytes. RFC 4226 sets 128 bits as the floor for a shared secret, so at least ${CODE_KEY_MIN_BYTES} bytes are required and 32 are recommended.`,
+    );
+  }
+  return key;
 }

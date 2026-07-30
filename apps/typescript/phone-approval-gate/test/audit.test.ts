@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -119,6 +128,30 @@ test("records keep the code out of the file", () => {
   const text = readFileSync(path, "utf8");
   assert.equal(text.includes(FIXED_SECRET.code), false);
   assert.match(text, /sha256:[0-9a-f]{64}/);
+});
+
+test("an append puts the record file back to 0600, not only a create", () => {
+  const path = tempAudit();
+  writeChain(path, 1);
+  assert.equal(statSync(path).mode & 0o777, 0o600);
+  // What an operator with a loose umask, a restored backup or a chmod -R leaves
+  // behind. The mode handed to open does nothing once the file exists.
+  chmodSync(path, 0o644);
+  writeChain(path, 1);
+  assert.equal(statSync(path).mode & 0o777, 0o600);
+  assert.equal(readRecords(path).length, 2);
+});
+
+test("a record file that is not a regular file is refused", () => {
+  const [record] = writeChain(tempAudit(), 1);
+  const directory = mkdtempSync(join(tmpdir(), "pag-audit-dir-"));
+  assert.throws(
+    () => appendRecord(directory, record!),
+    (error: unknown) => {
+      assert.match((error as Error).message, /EISDIR|not a regular file/);
+      return true;
+    },
+  );
 });
 
 test("editing a hash is caught", () => {
