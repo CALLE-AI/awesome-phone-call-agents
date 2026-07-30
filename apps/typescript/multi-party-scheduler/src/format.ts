@@ -13,6 +13,18 @@ function pad(text: string, width: number): string {
   return text.length >= width ? text : `${text}${" ".repeat(width - text.length)}`;
 }
 
+/**
+ * The request as it goes into `--json`, with numbers masked the way the ledger
+ * masks them. JSON output is what people paste into an issue or a log, so it gets
+ * the same treatment as everything else that leaves the process.
+ */
+export function redactRequest(request: CoordinationRequest): CoordinationRequest {
+  return {
+    ...request,
+    parties: request.parties.map((party) => ({ ...party, phone: maskPhone(party.phone) })),
+  };
+}
+
 export function renderPlan(request: CoordinationRequest): string {
   const lines: string[] = [];
   lines.push("Plan only. No call is placed and no credentials are used.");
@@ -33,7 +45,9 @@ export function renderPlan(request: CoordinationRequest): string {
   lines.push("");
   lines.push("Call order, one gather call each, then one confirm call each");
   for (const [index, party] of request.parties.entries()) {
-    lines.push(`  ${index + 1}. ${party.name} (${party.role}) ${maskPhone(party.phone)}`);
+    lines.push(
+      `  ${index + 1}. ${party.name} (${party.role}) ${maskPhone(party.phone)}, callable ${party.callingHours.start} to ${party.callingHours.end} ${party.callingHours.timezone}, consent recorded`,
+    );
   }
   lines.push("");
   lines.push(
@@ -119,8 +133,9 @@ export function renderResult(result: RunResult): string {
   const lines: string[] = [];
   lines.push(`Outcome      ${result.outcome}`);
   if (result.slot_spoken !== null) {
-    lines.push(`Booked       ${result.slot_spoken}`);
-    lines.push(`With         ${result.booked_with.join(", ")}`);
+    lines.push(`Agreed       ${result.slot_spoken}`);
+    lines.push(`With         ${result.confirmed_with.join(", ")}`);
+    lines.push("             every party said yes on a call. Nothing is booked in any system.");
   }
   if (result.unreleased.length > 0) {
     lines.push(`Follow up    ${result.unreleased.join(", ")} confirmed but could not be told it is off`);

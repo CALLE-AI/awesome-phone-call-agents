@@ -8,12 +8,13 @@
  * the recorded answers do not intersect on Thursday, replay says so.
  */
 
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { chooseSlot, intersect } from "./slots.js";
 import type {
   CoordinationRequest,
   LedgerEntry,
+  Outcome,
   ReplayIssue,
   ReplayVerification,
   Slot,
@@ -49,6 +50,53 @@ export function appendEntry(path: string, entry: LedgerEntry): void {
   appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: "utf8", mode: 0o600 });
 }
 
+export class LedgerLockError extends Error {}
+
+export interface LedgerLock {
+  path: string;
+  release: () => void;
+}
+
+/**
+ * One writer per ledger.
+ *
+ * The idempotency key is what stops two runs dialling the same person twice: it
+ * is the reservation and it lives at CALL-E, not here. This lock is narrower and
+ * local. It stops two processes interleaving lines into one ledger file, which
+ * would leave a history that replays as nonsense. The lock is created with
+ * `O_EXCL`, so the create either wins or fails.
+ */
+export function acquireLedgerLock(path: string): LedgerLock {
+  const lockPath = `${path}.lock`;
+  let handle: number;
+  try {
+    handle = openSync(lockPath, "wx", 0o600);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      throw error;
+    }
+    let holder = "";
+    try {
+      holder = ` Held by ${readFileSync(lockPath, "utf8").trim()}.`;
+    } catch {
+      holder = "";
+    }
+    throw new LedgerLockError(
+      `Another run holds ${path}.${holder} Wait for it to finish, or delete ${lockPath} if that process is gone.`,
+    );
+  }
+  writeSync(handle, `pid ${process.pid} since ${new Date().toISOString()}`);
+  closeSync(handle);
+  return {
+    path: lockPath,
+    release: () => {
+      if (existsSync(lockPath)) {
+        unlinkSync(lockPath);
+      }
+    },
+  };
+}
+
 export function readEntries(path: string): LedgerEntry[] {
   if (!existsSync(path)) {
     return [];
@@ -70,6 +118,11 @@ function ids(slots: Slot[]): string[] {
  * This is the check a plain log cannot do. It re-derives the feasible set after
  * every gather call, the slot that choice implies and whether the recorded
  * outcome follows from the confirm and release calls.
+ *
+ * A ledger can hold more than one round. A crashed or cancelled run is picked up
+ * by `resume`, which opens a `resume_started` entry and closes with a fresh
+ * outcome, so replay folds every round in order and reports the last outcome.
+ * Entries after an outcome that no `resume_started` opened are a problem.
  */
 export function replay(entries: LedgerEntry[]): ReplayVerification {
   const issues: ReplayIssue[] = [];
@@ -86,9 +139,26 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
   const confirmed: string[] = [];
   const released: string[] = [];
   let chosen: string | null = null;
+  let outcome: Outcome | null = null;
+  let closed = false;
+
+  const creditConfirm = (partyId: string): void => {
+    if (!confirmed.includes(partyId)) {
+      confirmed.push(partyId);
+    }
+  };
 
   for (const entry of entries) {
     index += 1;
+    if (closed && entry.kind !== "resume_started") {
+      issues.push({
+        entry: index,
+        problem: `${entry.kind} follows outcome ${String(outcome)} with no resume_started entry opening a new round`,
+      });
+    }
+    if (entry.kind === "resume_started") {
+      closed = false;
+    }
     if (entry.kind === "gather") {
       calls += 1;
       if (canonicalJson(entry.feasible_before) !== canonicalJson(ids(feasible))) {
@@ -121,7 +191,20 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
         issues.push({ entry: index, problem: `confirm call for ${entry.result.party_id} names slot ${entry.result.slot_id}, not the chosen ${chosen}` });
       }
       if (entry.result.confirmed) {
-        confirmed.push(entry.result.party_id);
+        creditConfirm(entry.result.party_id);
+      }
+    }
+    if (entry.kind === "reconcile") {
+      // Looking a call up by its idempotency key places no call. Only a
+      // reconciliation that had to create the call counts against the budget.
+      if (entry.placed_call) {
+        calls += 1;
+      }
+      if (entry.result.phase === "confirm" && entry.result.confirmed) {
+        creditConfirm(entry.result.party_id);
+      }
+      if (entry.result.phase === "release") {
+        released.push(entry.result.party_id);
       }
     }
     if (entry.kind === "release") {
@@ -132,16 +215,17 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       if (entry.calls_placed !== calls) {
         issues.push({ entry: index, problem: `calls_placed ${entry.calls_placed} does not match the ${calls} call entries in this ledger` });
       }
-      if (entry.outcome === "booked") {
+      if (entry.outcome === "verbally_confirmed") {
         const missing = parties.filter((party) => !confirmed.includes(party));
         if (missing.length > 0) {
-          issues.push({ entry: index, problem: `booked, but ${missing.join(", ")} never confirmed` });
+          issues.push({ entry: index, problem: `verbally_confirmed, but ${missing.join(", ")} never confirmed` });
         }
         if (entry.slot_id !== chosen) {
-          issues.push({ entry: index, problem: `booked slot ${String(entry.slot_id)} is not the chosen slot ${String(chosen)}` });
+          issues.push({ entry: index, problem: `confirmed slot ${String(entry.slot_id)} is not the chosen slot ${String(chosen)}` });
         }
-      }
-      if (entry.outcome === "not_confirmed") {
+      } else {
+        // Nothing is going ahead, so everybody who said yes has to have been
+        // told, or named as still owed a call.
         const owed = confirmed.filter((party) => !released.includes(party) && !entry.unreleased.includes(party));
         if (owed.length > 0) {
           issues.push({
@@ -153,12 +237,16 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       if (entry.outcome === "no_common_slot" && chosen !== null) {
         issues.push({ entry: index, problem: "no_common_slot, but a slot was chosen" });
       }
-      return { ok: issues.length === 0, entries: entries.length, outcome: entry.outcome, issues };
+      outcome = entry.outcome;
+      closed = true;
     }
   }
 
-  issues.push({ entry: index, problem: "no outcome entry, the run did not finish" });
-  return { ok: false, entries: entries.length, outcome: null, issues };
+  if (outcome === null) {
+    issues.push({ entry: index, problem: "no outcome entry, the run did not finish" });
+    return { ok: false, entries: entries.length, outcome: null, issues };
+  }
+  return { ok: issues.length === 0, entries: entries.length, outcome, issues };
 }
 
 export function replayFile(path: string): ReplayVerification {

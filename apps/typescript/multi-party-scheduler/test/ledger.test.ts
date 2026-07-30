@@ -11,7 +11,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { createSdkPort } from "../src/calle.js";
 import { runCoordination } from "../src/coordinate.js";
-import { canonicalJson, digestOf, readEntries, replay, requestDigest } from "../src/ledger.js";
+import { canonicalJson, acquireLedgerLock, digestOf, LedgerLockError, readEntries, replay, requestDigest } from "../src/ledger.js";
 import type { LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
 import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
@@ -34,7 +34,7 @@ function confirmYes(phone: string): FakeScript {
   };
 }
 
-async function bookedLedger(): Promise<{ path: string; entries: LedgerEntry[] }> {
+async function confirmedLedger(): Promise<{ path: string; entries: LedgerEntry[] }> {
   const fake = await startFakeCalle([
     gather(PLUMBER, [1, 2], "Option one and option two work for me."),
     gather(TENANT, [2], "Option two works."),
@@ -61,17 +61,48 @@ test("canonical json ignores key order and digests are stable", () => {
 });
 
 test("a real run replays cleanly and keeps the codes out of the file", async () => {
-  const { path, entries } = await bookedLedger();
+  const { path, entries } = await confirmedLedger();
   const verification = replay(entries);
   assert.equal(verification.ok, true, JSON.stringify(verification.issues));
-  assert.equal(verification.outcome, "booked");
+  assert.equal(verification.outcome, "verbally_confirmed");
   const text = readFileSync(path, "utf8");
   assert.equal(text.includes("+14155550101"), false, "full numbers must not reach the ledger");
   assert.match(text, /\+14\*+01/);
+  assert.equal(text.includes("booked"), false, "the ledger never claims a booking exists");
+});
+
+test("one writer per ledger, and the lock is taken before any call", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "mps-lock-")), "ledger.jsonl");
+  const lock = acquireLedgerLock(path);
+  assert.throws(
+    () => acquireLedgerLock(path),
+    (error: unknown) => {
+      assert.ok(error instanceof LedgerLockError);
+      assert.match(error.message, /Another run holds/);
+      assert.match(error.message, /pid \d+/);
+      return true;
+    },
+  );
+  lock.release();
+  acquireLedgerLock(path).release();
+});
+
+test("a run refuses a ledger another run holds, before it dials anybody", async () => {
+  const path = join(mkdtempSync(join(tmpdir(), "mps-lock-")), "ledger.jsonl");
+  const lock = acquireLedgerLock(path);
+  const fake = await startFakeCalle([gather(PLUMBER, [2], "Option two works.")]);
+  const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+  await assert.rejects(
+    () => runCoordination({ request: coordinationRequest(), port, ledgerPath: path, pollIntervalMs: 5 }),
+    LedgerLockError,
+  );
+  assert.equal(fake.created.length, 0, "not one call while another run holds the ledger");
+  lock.release();
+  await fake.close();
 });
 
 test("widening a recorded feasible set is caught", async () => {
-  const { path, entries } = await bookedLedger();
+  const { path, entries } = await confirmedLedger();
   const tampered = entries.map((entry) =>
     entry.kind === "gather" && entry.result.party_id === "tenant"
       ? { ...entry, feasible_after: ["thu-10", "thu-14"] }
@@ -87,7 +118,7 @@ test("widening a recorded feasible set is caught", async () => {
 });
 
 test("booking a slot the answers do not support is caught", async () => {
-  const { path, entries } = await bookedLedger();
+  const { path, entries } = await confirmedLedger();
   const tampered = entries.map((entry) =>
     entry.kind === "slot_chosen" ? { ...entry, slot_id: "fri-09" } : entry,
   );
@@ -97,8 +128,8 @@ test("booking a slot the answers do not support is caught", async () => {
   assert.ok(verification.issues.some((issue) => issue.problem.includes("is not the earliest slot")));
 });
 
-test("a booked outcome with a missing confirmation is caught", async () => {
-  const { path, entries } = await bookedLedger();
+test("a confirmed outcome with a missing confirmation is caught", async () => {
+  const { path, entries } = await confirmedLedger();
   const tampered = entries.filter(
     (entry) => !(entry.kind === "commit" && entry.result.party_id === "superintendent"),
   );
@@ -140,7 +171,7 @@ test("a failed run that never released a party who said yes is caught", async ()
 });
 
 test("a ledger with no outcome entry is an unfinished run", async () => {
-  const { path, entries } = await bookedLedger();
+  const { path, entries } = await confirmedLedger();
   rewrite(path, entries.filter((entry) => entry.kind !== "outcome"));
   const verification = replay(readEntries(path));
   assert.equal(verification.ok, false);
@@ -148,7 +179,7 @@ test("a ledger with no outcome entry is an unfinished run", async () => {
 });
 
 test("a call count that does not match the entries is caught", async () => {
-  const { path, entries } = await bookedLedger();
+  const { path, entries } = await confirmedLedger();
   const tampered = entries.map((entry) =>
     entry.kind === "outcome" ? { ...entry, calls_placed: 3 } : entry,
   );

@@ -25,6 +25,33 @@ test("a valid request resolves policy defaults and keeps call order", () => {
   assert.equal(worstCaseCalls(request), 8);
 });
 
+test("a party without recorded consent is refused", () => {
+  const parties = requestInput().parties.map((party) => ({ ...party }) as Record<string, unknown>);
+  delete parties[1]!.consent_recorded;
+  expectError(requestInput({ parties: parties as never }), "consent_recorded must be true");
+  parties[1]!.consent_recorded = false;
+  expectError(requestInput({ parties: parties as never }), "consent_recorded must be true");
+});
+
+test("a calling window that is not a real window is refused", () => {
+  const parties = requestInput().parties.map((party) => ({ ...party }));
+  parties[0]!.calling_hours = { start: "21:00", end: "07:00" };
+  expectError(requestInput({ parties }), "must be earlier than");
+  parties[0]!.calling_hours = { start: "9am", end: "18:00" };
+  expectError(requestInput({ parties }), "HH:MM");
+  parties[0]!.calling_hours = { start: "09:00", end: "18:00", timezone: "PDT" };
+  expectError(requestInput({ parties }), "IANA name");
+});
+
+test("calling hours fall back to a daytime window in the meeting timezone", () => {
+  const parties = requestInput().parties.map((party) => ({ ...party }) as Record<string, unknown>);
+  delete parties[0]!.calling_hours;
+  const request = parseRequest(requestInput({ parties: parties as never }));
+  assert.equal(request.parties[0]!.callingHours.start, "09:00");
+  assert.equal(request.parties[0]!.callingHours.end, "20:00");
+  assert.equal(request.parties[0]!.callingHours.timezone, "America/Los_Angeles");
+});
+
 test("a phone number that is not E.164 is refused", () => {
   const parties = requestInput().parties.map((party) => ({ ...party }));
   parties[0]!.phone = "415 555 0101";

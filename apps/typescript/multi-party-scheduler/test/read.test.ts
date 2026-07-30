@@ -65,17 +65,40 @@ test("voicemail and menus are detected", () => {
   assert.equal(looksLikeMachine(turns(["user", "Hello, Marcus speaking."])), false);
 });
 
-test("a confirmation needs a person saying it", () => {
-  assert.equal(readConfirm(turns(["user", "Confirm, see you then."])).answer, "confirm");
-  assert.equal(readConfirm(turns(["user", "Yes that works."])).answer, "confirm");
+const ASK: [TranscriptTurn["speaker"], string] = [
+  "bot",
+  "Can I confirm that time? Please say confirm or say no if it does not work.",
+];
+
+test("a confirmation needs a person saying it after the question", () => {
+  assert.equal(readConfirm(turns(ASK, ["user", "Confirm, see you then."])).answer, "confirm");
+  assert.equal(readConfirm(turns(ASK, ["user", "Yes that works."])).answer, "confirm");
   assert.equal(readConfirm(turns(["bot", "Please say confirm."])).answer, "unknown");
-  assert.equal(readConfirm(turns(["user", "Hmm, let me think about it."])).answer, "unknown");
+  assert.equal(readConfirm(turns(ASK, ["user", "Hmm, let me think about it."])).answer, "unknown");
 });
 
-test("a decline outranks a confirmation in the same call", () => {
-  assert.equal(readConfirm(turns(["user", "Yes, well, no, something came up."])).answer, "decline");
-  assert.equal(readConfirm(turns(["user", "I cannot make that anymore."])).answer, "decline");
-  assert.equal(readConfirm(turns(["user", "Can we reschedule?"])).answer, "decline");
+test("a yes before the confirmation question is not a confirmation", () => {
+  const early = readConfirm(
+    turns(["user", "Yes, speaking."], ASK, ["user", "Hmm, I will have to check my diary."]),
+  );
+  assert.equal(early.answer, "unknown");
+  assert.equal(early.questionAsked, true);
+});
+
+test("a yes in a call that never asked the question is not a confirmation", () => {
+  const reading = readConfirm(
+    turns(["bot", "Hello, this is an automated scheduling call."], ["user", "Yes, speaking."]),
+  );
+  assert.equal(reading.answer, "unknown");
+  assert.equal(reading.questionAsked, false);
+});
+
+test("a decline outranks a confirmation and counts wherever it is said", () => {
+  assert.equal(readConfirm(turns(ASK, ["user", "Yes, well, no, something came up."])).answer, "decline");
+  assert.equal(readConfirm(turns(ASK, ["user", "I cannot make that anymore."])).answer, "decline");
+  assert.equal(readConfirm(turns(ASK, ["user", "Can we reschedule?"])).answer, "decline");
+  // No question was asked, so a confirmation is impossible, but a no is still a no.
+  assert.equal(readConfirm(turns(["user", "No, wrong number."])).answer, "decline");
 });
 
 test("a release call only needs an acknowledgement", () => {

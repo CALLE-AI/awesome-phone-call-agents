@@ -7,7 +7,9 @@
  * confirm calls this reader leads instead.
  *
  * Only `user` turns are read. A list of options the caller read out must never be
- * scored as the person choosing them.
+ * scored as the person choosing them, and a confirmation has to come after the
+ * confirmation question, so a greeting cannot be read as agreement to a time the
+ * person has not heard yet.
  */
 
 import type { Slot, TranscriptTurn } from "./types.js";
@@ -64,6 +66,16 @@ const DECLINE_PATTERNS: RegExp[] = [
   /\bnot anymore\b/i,
   /\bdecline\b/i,
   /\bno\b/i,
+];
+
+/**
+ * The confirmation question the confirm script reads out. A yes only counts when
+ * it comes after one of these, so an early "yes, speaking" is not a commitment.
+ */
+const CONFIRM_QUESTION_PATTERNS: RegExp[] = [
+  /\bcan i confirm that time\b/i,
+  /\bplease say confirm\b/i,
+  /\bsay confirm or say no\b/i,
 ];
 
 const ACK_PATTERNS: RegExp[] = [
@@ -207,34 +219,57 @@ export function readGather(turns: TranscriptTurn[], slots: Slot[]): GatherReadin
 
 export interface CommitReading {
   answer: "confirm" | "decline" | "unknown";
+  /** Did the call read the confirmation question at all. */
+  questionAsked: boolean;
   userTurnCount: number;
   machineAnswered: boolean;
   excerpt: string[];
 }
 
+/** The first turn where the caller asked the confirmation question, or -1. */
+function confirmQuestionAt(turns: TranscriptTurn[]): number {
+  return turns.findIndex(
+    (turn) =>
+      turn.speaker !== "user" && CONFIRM_QUESTION_PATTERNS.some((pattern) => pattern.test(turn.text)),
+  );
+}
+
+/**
+ * A confirmation is bound to the question.
+ *
+ * Only a turn after the caller asked "can I confirm that time" can confirm it,
+ * so "Yes, speaking" while the caller is still saying hello is not an agreement
+ * to a time the person has not heard yet. A decline still counts wherever it
+ * appears in the call: it can only stop a commitment, never create one.
+ */
 export function readConfirm(turns: TranscriptTurn[]): CommitReading {
+  const questionAt = confirmQuestionAt(turns);
+  const spoken = userTurns(turns);
   let answer: CommitReading["answer"] = "unknown";
   const excerpt: string[] = [];
-  for (const turn of userTurns(turns)) {
-    const declined = DECLINE_PATTERNS.some((pattern) => pattern.test(turn.text));
-    const confirmed = CONFIRM_PATTERNS.some((pattern) => pattern.test(turn.text));
-    if (declined) {
+  for (const [index, turn] of turns.entries()) {
+    if (turn.speaker !== "user") {
+      continue;
+    }
+    if (DECLINE_PATTERNS.some((pattern) => pattern.test(turn.text))) {
       excerpt.push(turn.text);
       return {
         answer: "decline",
-        userTurnCount: userTurns(turns).length,
+        questionAsked: questionAt >= 0,
+        userTurnCount: spoken.length,
         machineAnswered: looksLikeMachine(turns),
         excerpt,
       };
     }
-    if (confirmed) {
+    if (questionAt >= 0 && index > questionAt && CONFIRM_PATTERNS.some((pattern) => pattern.test(turn.text))) {
       answer = "confirm";
       excerpt.push(turn.text);
     }
   }
   return {
     answer,
-    userTurnCount: userTurns(turns).length,
+    questionAsked: questionAt >= 0,
+    userTurnCount: spoken.length,
     machineAnswered: looksLikeMachine(turns),
     excerpt,
   };
@@ -246,6 +281,7 @@ export function readRelease(turns: TranscriptTurn[]): CommitReading {
   );
   return {
     answer: acknowledged ? "confirm" : "unknown",
+    questionAsked: false,
     userTurnCount: userTurns(turns).length,
     machineAnswered: looksLikeMachine(turns),
     excerpt: userTurns(turns).map((turn) => turn.text).slice(0, 2),

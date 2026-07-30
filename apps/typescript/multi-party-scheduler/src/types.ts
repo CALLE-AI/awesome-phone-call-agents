@@ -11,13 +11,19 @@
 
 export type Phase = "gather" | "confirm" | "release";
 
+/**
+ * `verbally_confirmed` is the best this app can claim. Every party said yes on a
+ * call and that is all: no calendar, no booking system, nothing reserved
+ * anywhere. Calling it `booked` would say a record exists that does not.
+ */
 export type Outcome =
-  | "booked"
+  | "verbally_confirmed"
   | "no_common_slot"
   | "not_confirmed"
   | "window_expired"
   | "budget_exhausted"
   | "not_reached"
+  | "canceled"
   | "api_error";
 
 export interface SlotInput {
@@ -36,6 +42,22 @@ export interface Slot {
   spoken: string;
 }
 
+export interface CallingHoursInput {
+  /** Local wall clock, 24 hour HH:MM. */
+  start: string;
+  end: string;
+  /** IANA name. Falls back to the meeting timezone when the party omits it. */
+  timezone?: string;
+}
+
+export interface CallingHours {
+  start: string;
+  end: string;
+  timezone: string;
+  startMinutes: number;
+  endMinutes: number;
+}
+
 export interface PartyInput {
   id: string;
   name: string;
@@ -43,6 +65,9 @@ export interface PartyInput {
   role: string;
   region?: string;
   locale?: string;
+  /** Must be true. Nobody is dialled on an unrecorded consent. */
+  consent_recorded?: boolean;
+  calling_hours?: CallingHoursInput;
 }
 
 export interface Party {
@@ -52,6 +77,8 @@ export interface Party {
   role: string;
   region?: string;
   locale?: string;
+  consentRecorded: boolean;
+  callingHours: CallingHours;
 }
 
 export interface MeetingInput {
@@ -186,6 +213,8 @@ export interface CommitResult {
   confirmed: boolean;
   declined: boolean;
   acknowledged: boolean;
+  /** Confirm calls only: did the call actually ask the confirmation question. */
+  question_asked: boolean;
   reached_person: boolean;
   machine_answered: boolean;
   structured_answer: string | null;
@@ -202,14 +231,16 @@ export type LedgerEntry =
   | { kind: "slot_chosen"; at: string; slot_id: string; feasible: string[] }
   | { kind: "commit"; at: string; result: CommitResult }
   | { kind: "release"; at: string; result: CommitResult }
-  | { kind: "outcome"; at: string; outcome: Outcome; slot_id: string | null; booked_with: string[]; unreleased: string[]; calls_placed: number; note: string };
+  | { kind: "resume_started"; at: string; entries_before: number; ambiguous: string[]; owed_releases: string[] }
+  | { kind: "reconcile"; at: string; placed_call: boolean; result: CommitResult }
+  | { kind: "outcome"; at: string; outcome: Outcome; slot_id: string | null; confirmed_with: string[]; unreleased: string[]; calls_placed: number; note: string };
 
 export interface RunResult {
   request_id: string;
   outcome: Outcome;
   slot_id: string | null;
   slot_spoken: string | null;
-  booked_with: string[];
+  confirmed_with: string[];
   unreleased: string[];
   calls_placed: number;
   calls_saved: number;

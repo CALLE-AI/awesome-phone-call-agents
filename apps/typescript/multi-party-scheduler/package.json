@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Two-phase booking over phone calls: gather availability, confirm one time with everyone, release everyone if the commit fails.",
+  "description": "Two-phase appointment scheduling over phone calls: gather availability, confirm one time with everybody by voice, release everybody who confirmed if the commit fails.",
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "demo": "tsx demo/run-local.ts",
     "schedule": "tsx src/cli.ts",
     "plan": "tsx src/cli.ts plan --request examples/request.example.json"

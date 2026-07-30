@@ -3,10 +3,11 @@
  * Command line entry point.
  *
  * Exit codes:
- *   0  booked
+ *   0  every party confirmed the time by voice
  *   10 no time works for everyone, which is a real answer
- *   20 not booked for another reason (a party did not confirm, was not reached,
- *      the window closed, the call budget ran out or CALL-E returned an error)
+ *   20 not confirmed for another reason (a party did not confirm, was not
+ *      reached, the window closed, the call budget ran out, the run was canceled
+ *      or CALL-E returned an error)
  *   30 usage or request file error
  *   40 replay found a problem in a ledger
  *
@@ -16,30 +17,39 @@
 import { ConfigError, loadRequest } from "./config.js";
 import { createSdkPort, DEFAULT_BASE_URL } from "./calle.js";
 import { runCoordination } from "./coordinate.js";
-import { renderMatrix, renderPlan, renderResult } from "./format.js";
-import { readEntries, replay } from "./ledger.js";
+import { redactRequest, renderMatrix, renderPlan, renderResult } from "./format.js";
+import { LedgerLockError, readEntries, replay } from "./ledger.js";
+import { ResumeError, resumeCoordination } from "./resume.js";
 
-const EXIT_BOOKED = 0;
+const EXIT_CONFIRMED = 0;
 const EXIT_NO_COMMON_SLOT = 10;
-const EXIT_NOT_BOOKED = 20;
+const EXIT_NOT_CONFIRMED = 20;
 const EXIT_USAGE = 30;
 const EXIT_REPLAY_FAILED = 40;
 
 const USAGE = `Multi-party scheduler
 
   plan --request <file> [--json]
-      Print the options, the call order, the call budget and every call script.
-      Places no call and needs no credentials.
+      Print the options, the call order, the calling hours, the call budget and
+      every call script. Places no call and needs no credentials.
 
   run --request <file> --live [--ledger <file>] [--json] [--base-url <url>]
       Gather availability, confirm one slot with everybody, release everyone who
-      confirmed if the commit fails. Needs CALLE_API_KEY.
+      confirmed if the commit fails. Needs CALLE_API_KEY. Ctrl-C stops the run
+      and still places the release calls that are owed.
+
+  resume --request <file> --ledger <file> --live [--json] [--base-url <url>]
+      Finish an interrupted run: settle every call the ledger cannot account for
+      and place the release calls that are still owed. Needs CALLE_API_KEY.
 
   replay --ledger <file> [--json]
       Recompute the feasible set, the chosen slot and the outcome from the
       recorded answers and print the availability grid.
 
-Exit codes: 0 booked, 10 no common slot, 20 not booked, 30 usage error, 40 replay failed.`;
+An appointment this app arranges is a verbal confirmation from every party. It
+writes to no calendar and creates no booking anywhere.
+
+Exit codes: 0 confirmed by every party, 10 no common slot, 20 not confirmed, 30 usage error, 40 replay failed.`;
 
 interface Parsed {
   command: string;
@@ -83,17 +93,18 @@ async function main(argv: string[]): Promise<number> {
   const parsed = parseArgs(argv);
   if (parsed.command === "" || parsed.command === "help" || parsed.flags.has("help")) {
     process.stdout.write(`${USAGE}\n`);
-    return parsed.command === "" ? EXIT_USAGE : EXIT_BOOKED;
+    return parsed.command === "" ? EXIT_USAGE : EXIT_CONFIRMED;
   }
 
   if (parsed.command === "plan") {
     const request = loadRequest(requireValue(parsed, "request"));
     if (parsed.flags.has("json")) {
-      process.stdout.write(`${JSON.stringify(request, null, 2)}\n`);
-      return EXIT_BOOKED;
+      // Masked, like every other output. A plan is meant to be shared.
+      process.stdout.write(`${JSON.stringify(redactRequest(request), null, 2)}\n`);
+      return EXIT_CONFIRMED;
     }
     process.stdout.write(`${renderPlan(request)}\n`);
-    return EXIT_BOOKED;
+    return EXIT_CONFIRMED;
   }
 
   if (parsed.command === "replay") {
@@ -113,14 +124,14 @@ async function main(argv: string[]): Promise<number> {
         process.stdout.write(`  entry ${issue.entry}: ${issue.problem}\n`);
       }
     }
-    return verification.ok ? EXIT_BOOKED : EXIT_REPLAY_FAILED;
+    return verification.ok ? EXIT_CONFIRMED : EXIT_REPLAY_FAILED;
   }
 
-  if (parsed.command === "run") {
+  if (parsed.command === "run" || parsed.command === "resume") {
     const request = loadRequest(requireValue(parsed, "request"));
     if (!parsed.flags.has("live")) {
       throw new ConfigError(
-        "run places real phone calls. Look at plan first, then add --live when the options and the order are right.",
+        `${parsed.command} places real phone calls. Look at plan first, then add --live when the options and the order are right.`,
       );
     }
     const apiKey = process.env.CALLE_API_KEY;
@@ -129,21 +140,54 @@ async function main(argv: string[]): Promise<number> {
     }
     const baseUrl = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL ?? DEFAULT_BASE_URL;
     const port = await createSdkPort({ apiKey, baseUrl });
-    const result = await runCoordination({
-      request,
-      port,
-      ledgerPath: parsed.values["ledger"] ?? null,
-      onProgress: (line) => process.stderr.write(`${line}\n`),
-    });
+    const progress = (line: string): void => {
+      process.stderr.write(`${line}\n`);
+    };
+    let result;
+    if (parsed.command === "resume") {
+      result = await resumeCoordination({
+        request,
+        port,
+        ledgerPath: requireValue(parsed, "ledger"),
+        onProgress: progress,
+      });
+    } else {
+      // Ctrl-C cancels the coordination. It does not cancel the release calls
+      // owed to anybody who already said yes, so the first signal asks the run to
+      // stop and a second one gives up on that too.
+      const canceling = new AbortController();
+      const onSignal = (): void => {
+        if (canceling.signal.aborted) {
+          process.stderr.write("Second interrupt, stopping without the release calls.\n");
+          process.exit(EXIT_NOT_CONFIRMED);
+        }
+        process.stderr.write("Canceling. No new call will be placed and anybody who said yes is being told.\n");
+        canceling.abort();
+      };
+      process.on("SIGINT", onSignal);
+      process.on("SIGTERM", onSignal);
+      try {
+        result = await runCoordination({
+          request,
+          port,
+          ledgerPath: parsed.values["ledger"] ?? null,
+          signal: canceling.signal,
+          onProgress: progress,
+        });
+      } finally {
+        process.off("SIGINT", onSignal);
+        process.off("SIGTERM", onSignal);
+      }
+    }
     if (parsed.flags.has("json")) {
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     } else {
       process.stdout.write(`${renderResult(result)}\n`);
     }
-    if (result.outcome === "booked") {
-      return EXIT_BOOKED;
+    if (result.outcome === "verbally_confirmed") {
+      return EXIT_CONFIRMED;
     }
-    return result.outcome === "no_common_slot" ? EXIT_NO_COMMON_SLOT : EXIT_NOT_BOOKED;
+    return result.outcome === "no_common_slot" ? EXIT_NO_COMMON_SLOT : EXIT_NOT_CONFIRMED;
   }
 
   throw new ConfigError(`Unknown command: ${parsed.command}`);
@@ -154,7 +198,7 @@ main(process.argv.slice(2))
     process.exitCode = code;
   })
   .catch((error: unknown) => {
-    if (error instanceof ConfigError) {
+    if (error instanceof ConfigError || error instanceof LedgerLockError || error instanceof ResumeError) {
       process.stderr.write(`${error.message}\n`);
       process.exitCode = EXIT_USAGE;
       return;

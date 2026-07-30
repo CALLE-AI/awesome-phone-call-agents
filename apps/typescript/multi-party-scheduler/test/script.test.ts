@@ -63,15 +63,39 @@ test("result contracts are strict and shaped for the answer", () => {
   assert.deepEqual(releaseSchema().properties?.acknowledged?.enum, ["yes", "no", "unknown"]);
 });
 
-test("idempotency keys are stable and specific to phase and slot", () => {
-  assert.equal(idempotencyKey(request, "gather", plumber), "mps-ash-lane-3b-leak-gather-plumber");
-  assert.equal(
-    idempotencyKey(request, "confirm", plumber, request.slots[1]!),
-    "mps-ash-lane-3b-leak-confirm-plumber-thu-14",
-  );
+test("every call script refuses advice, emergencies and payment details", () => {
+  const tasks = [
+    gatherTask(request, plumber, request.slots),
+    confirmTask(request, plumber, request.slots[1]!),
+    releaseTask(request, plumber, request.slots[1]!),
+  ];
+  for (const task of tasks) {
+    assert.match(task, /Give no medical, legal or financial advice/);
+    assert.match(task, /If the person says this is an emergency/);
+    assert.match(task, /call their local emergency number/);
+    assert.match(task, /Ask for no payment detail/);
+  }
+});
+
+test("idempotency keys are stable, specific to phase and slot, and bound to the content", () => {
+  const gather = { task: gatherTask(request, plumber, request.slots), schema: gatherSchema(3) };
+  const key = idempotencyKey(request, "gather", plumber, undefined, gather);
+  assert.match(key, /^mps-ash-lane-3b-leak-gather-plumber-[0-9a-f]{12}$/);
+  assert.equal(idempotencyKey(request, "gather", plumber, undefined, gather), key);
+
+  // A shorter option list is a different call, so it must not reuse the key.
+  const narrowed = { task: gatherTask(request, plumber, request.slots.slice(1)), schema: gatherSchema(3) };
+  assert.notEqual(idempotencyKey(request, "gather", plumber, undefined, narrowed), key);
+
+  const confirm = { task: confirmTask(request, plumber, request.slots[1]!), schema: confirmSchema() };
+  const confirmKey = idempotencyKey(request, "confirm", plumber, request.slots[1]!, confirm);
+  assert.match(confirmKey, /^mps-ash-lane-3b-leak-confirm-plumber-thu-14-[0-9a-f]{12}$/);
   assert.notEqual(
-    idempotencyKey(request, "confirm", plumber, request.slots[1]!),
-    idempotencyKey(request, "release", plumber, request.slots[1]!),
+    confirmKey,
+    idempotencyKey(request, "release", plumber, request.slots[1]!, {
+      task: releaseTask(request, plumber, request.slots[1]!),
+      schema: releaseSchema(),
+    }),
   );
 });
 

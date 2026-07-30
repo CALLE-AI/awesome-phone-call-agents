@@ -7,8 +7,10 @@
  */
 
 import { readFileSync } from "node:fs";
+import { HoursError, resolveCallingHours } from "./hours.js";
 import { MAX_SLOTS, parseSlots, SlotError } from "./slots.js";
 import type {
+  CallingHoursInput,
   CoordinationRequest,
   MeetingInput,
   Party,
@@ -75,7 +77,7 @@ function resolvePolicy(input: PolicyInput | undefined): Policy {
   return { windowMinutes, perCallTimeoutSeconds, maxCalls, minConfidence };
 }
 
-function validateParty(value: unknown, index: number): Party {
+function validateParty(value: unknown, index: number, meetingTimezone: string): Party {
   if (typeof value !== "object" || value === null) {
     throw new ConfigError(`parties[${index}] must be an object.`);
   }
@@ -86,11 +88,31 @@ function validateParty(value: unknown, index: number): Party {
       `parties[${index}].phone must be E.164, for example +14155550100. Received ${phone}.`,
     );
   }
+  if (raw.consent_recorded !== true) {
+    throw new ConfigError(
+      `parties[${index}].consent_recorded must be true. This app dials people, so every party needs recorded consent to be called about this appointment.`,
+    );
+  }
+  let callingHours;
+  try {
+    callingHours = resolveCallingHours(
+      raw.calling_hours as CallingHoursInput | undefined,
+      meetingTimezone,
+      `parties[${index}].calling_hours`,
+    );
+  } catch (error) {
+    if (error instanceof HoursError) {
+      throw new ConfigError(error.message);
+    }
+    throw error;
+  }
   const party: Party = {
     id: requireString(raw.id, `parties[${index}].id`, 40),
     name: requireString(raw.name, `parties[${index}].name`, 60),
     phone,
     role: requireString(raw.role, `parties[${index}].role`, 60),
+    consentRecorded: true,
+    callingHours,
   };
   if (raw.region !== undefined) {
     party.region = requireString(raw.region, `parties[${index}].region`, 8);
@@ -146,7 +168,9 @@ export function parseRequest(input: unknown): CoordinationRequest {
       `parties must list between ${MIN_PARTIES} and ${MAX_PARTIES} people. One party needs a call, not a protocol.`,
     );
   }
-  const parties = (raw.parties as PartyInput[]).map((party, index) => validateParty(party, index));
+  const parties = (raw.parties as PartyInput[]).map((party, index) =>
+    validateParty(party, index, meeting.timezone),
+  );
   if (new Set(parties.map((party) => party.id)).size !== parties.length) {
     throw new ConfigError("parties must have unique ids.");
   }

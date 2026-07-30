@@ -4,10 +4,10 @@
  *
  *   npm run demo
  *
- * Three runs: one that books, one that finds no common time and stops early, one
- * where the last party pulls out and everybody who had said yes gets a release
- * call. Then the ledger is replayed and a tampered copy is replayed to show what
- * replay actually catches.
+ * Five parts: a run where everybody confirms one time, a run where no time works
+ * and the last party is never called, a run where the last party pulls out and
+ * everybody who said yes gets a release call, a run that is killed mid-commit and
+ * finished by `resume`, then a replay of the clean ledger and of a tampered copy.
  */
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -18,6 +18,7 @@ import { loadRequest } from "../src/config.js";
 import { runCoordination } from "../src/coordinate.js";
 import { renderMatrix, renderResult } from "../src/format.js";
 import { readEntries, replay } from "../src/ledger.js";
+import { resumeCoordination } from "../src/resume.js";
 import type { LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
 
@@ -28,6 +29,13 @@ const results = join(appRoot, "results");
 const PLUMBER = "+14155550101";
 const TENANT = "+14155550100";
 const SUPER = "+14155550102";
+
+/**
+ * A fixed clock, 10am Pacific, so the demo reads the same at any hour. The
+ * example request only allows calls inside each party's calling hours and a demo
+ * that refused to dial at midnight would look broken rather than careful.
+ */
+const CLOCK = Date.parse("2026-08-04T17:00:00Z");
 
 function gather(phone: string, options: number[], spoken: string): FakeScript {
   return {
@@ -69,9 +77,9 @@ interface DemoCase {
 
 const cases: DemoCase[] = [
   {
-    title: "1. Three parties, one time that works, booked",
+    title: "1. Three parties, one time that works, confirmed by voice with all three",
     note: "The plumber can do two of the three. That answer shortens every later call.",
-    ledger: join(results, "booked.jsonl"),
+    ledger: join(results, "verbally-confirmed.jsonl"),
     scripts: [
       gather(PLUMBER, [1, 2], "Option one and option two work for me."),
       gather(TENANT, [2], "Option two works, I am at work in the morning."),
@@ -107,6 +115,68 @@ const cases: DemoCase[] = [
   },
 ];
 
+/**
+ * A run that dies between the yes and the release call, then `resume` finishing
+ * what it owed. This is the failure a ledger can prove and only recovery can fix.
+ */
+async function crashThenResume(request: ReturnType<typeof loadRequest>): Promise<void> {
+  const ledger = join(results, "crash-then-resume.jsonl");
+  if (existsSync(ledger)) {
+    rmSync(ledger);
+  }
+  const title = "4. A crash between the yes and the release call, then resume";
+  process.stdout.write(`\n${title}\n${"-".repeat(title.length)}\n`);
+  process.stdout.write("Two parties have said yes when the process is killed. Nobody has been told.\n\n");
+  const fake = await startFakeCalle([
+    gather(PLUMBER, [2], "Option two works."),
+    gather(TENANT, [2], "Option two works."),
+    gather(SUPER, [2], "Option two works."),
+    confirm(PLUMBER, "confirm", "Confirm."),
+    confirm(TENANT, "confirm", "Confirm, see you then."),
+    confirm(SUPER, "confirm", "Confirm."),
+    release(TENANT),
+    release(PLUMBER),
+  ]);
+  const port = await createSdkPort({ apiKey: "calle_demo_key", baseUrl: fake.baseUrl });
+  try {
+    await runCoordination({
+      request,
+      port,
+      ledgerPath: ledger,
+      pollIntervalMs: 5,
+      now: () => CLOCK,
+      onProgress: (line) => {
+        process.stdout.write(`  ${line}\n`);
+        if (line === "  tenant: confirmed.") {
+          throw new Error("the process is killed here");
+        }
+      },
+    });
+  } catch (error) {
+    process.stdout.write(`  ${(error as Error).message}\n\n`);
+  }
+  const crashed = replay(readEntries(ledger));
+  process.stdout.write(`  replay of the crashed ledger: ok=${crashed.ok}\n`);
+  for (const issue of crashed.issues) {
+    process.stdout.write(`   entry ${issue.entry}: ${issue.problem}\n`);
+  }
+  process.stdout.write("\n");
+  const resumed = await resumeCoordination({
+    request,
+    port,
+    ledgerPath: ledger,
+    pollIntervalMs: 5,
+    now: () => CLOCK,
+    onProgress: (line) => process.stdout.write(`  ${line}\n`),
+  });
+  await fake.close();
+  process.stdout.write(`\n${renderResult(resumed)}\n`);
+  const after = replay(readEntries(ledger));
+  process.stdout.write(
+    `\n  replay after resume: ok=${after.ok}, ${after.entries} entries, outcome ${String(after.outcome)}\n`,
+  );
+}
+
 async function main(): Promise<void> {
   mkdirSync(results, { recursive: true });
   const request = loadRequest(join(appRoot, "examples", "request.example.json"));
@@ -123,6 +193,7 @@ async function main(): Promise<void> {
       port,
       ledgerPath: demo.ledger,
       pollIntervalMs: 5,
+      now: () => CLOCK,
       onProgress: (line) => process.stdout.write(`  ${line}\n`),
     });
     await fake.close();
@@ -130,12 +201,14 @@ async function main(): Promise<void> {
     process.stdout.write(`${renderMatrix(readEntries(demo.ledger))}\n`);
   }
 
-  const bookedLedger = cases[0]!.ledger;
-  const entries = readEntries(bookedLedger);
+  await crashThenResume(request);
+
+  const confirmedLedger = cases[0]!.ledger;
+  const entries = readEntries(confirmedLedger);
   const clean = replay(entries);
   process.stdout.write(
-    `\n4. Replaying the booked run\n---------------------------\n${clean.entries} entries, ${
-      clean.ok ? "the recorded answers do imply that booking" : "PROBLEMS FOUND"
+    `\n5. Replaying the confirmed run\n------------------------------\n${clean.entries} entries, ${
+      clean.ok ? "the recorded answers do imply that confirmation" : "PROBLEMS FOUND"
     }\n`,
   );
   for (const issue of clean.issues) {
@@ -147,11 +220,11 @@ async function main(): Promise<void> {
       ? { ...entry, feasible_after: ["thu-10", "thu-14"] }
       : entry,
   );
-  const tamperedPath = join(results, "booked-tampered.jsonl");
+  const tamperedPath = join(results, "verbally-confirmed-tampered.jsonl");
   writeFileSync(tamperedPath, `${tampered.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
   const tamperedCheck = replay(readEntries(tamperedPath));
   process.stdout.write(
-    `\n5. Same ledger, one recorded answer widened to keep a time the tenant ruled out\n   replays cleanly: ${tamperedCheck.ok}\n`,
+    `\n6. Same ledger, one recorded answer widened to keep a time the tenant ruled out\n   replays cleanly: ${tamperedCheck.ok}\n`,
   );
   for (const issue of tamperedCheck.issues) {
     process.stdout.write(`   entry ${issue.entry}: ${issue.problem}\n`);

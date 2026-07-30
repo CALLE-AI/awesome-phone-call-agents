@@ -13,7 +13,7 @@ import { runCoordination } from "../src/coordinate.js";
 import { readEntries, replay } from "../src/ledger.js";
 import type { CoordinationRequest } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
-import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
+import { coordinationRequest, PLUMBER, requestInput, SUPER, TENANT } from "./fixtures.js";
 
 const WORDS = ["", "one", "two", "three", "four"];
 
@@ -99,9 +99,9 @@ test("everyone answers, one time survives and it is confirmed with all three", a
         ledgerPath: path,
         pollIntervalMs: 5,
       });
-      assert.equal(result.outcome, "booked");
+      assert.equal(result.outcome, "verbally_confirmed");
       assert.equal(result.slot_id, "thu-14");
-      assert.deepEqual(result.booked_with, ["plumber", "tenant", "superintendent"]);
+      assert.deepEqual(result.confirmed_with, ["plumber", "tenant", "superintendent"]);
       assert.equal(result.calls_placed, 6);
       assert.equal(result.calls_saved, 2);
 
@@ -111,14 +111,14 @@ test("everyone answers, one time survives and it is confirmed with all three", a
       );
       assert.ok(tenantGather !== undefined);
       assert.equal(tenantGather.task.includes("option 3,"), false);
-      assert.equal(tenantGather.idempotencyKey, "mps-ash-lane-3b-leak-gather-tenant");
+      assert.match(tenantGather.idempotencyKey ?? "", /^mps-ash-lane-3b-leak-gather-tenant-[0-9a-f]{12}$/);
       const confirm = fake.created.find((call) => call.phase === "confirm");
       assert.equal(confirm?.slotId, "thu-14");
       assert.equal(confirm?.resultSchema?.additionalProperties, false);
 
       const verification = replay(readEntries(path));
       assert.equal(verification.ok, true, JSON.stringify(verification.issues));
-      assert.equal(verification.outcome, "booked");
+      assert.equal(verification.outcome, "verbally_confirmed");
     },
   );
 });
@@ -255,8 +255,8 @@ test("a retried run reuses the calls it already placed", async () => {
       const request = coordinationRequest();
       const first = await runCoordination({ request, port, pollIntervalMs: 5 });
       const second = await runCoordination({ request, port, pollIntervalMs: 5 });
-      assert.equal(first.outcome, "booked");
-      assert.equal(second.outcome, "booked");
+      assert.equal(first.outcome, "verbally_confirmed");
+      assert.equal(second.outcome, "verbally_confirmed");
       assert.equal(fake.created.length, 6, "the same idempotency keys must not create new calls");
     },
   );
@@ -285,7 +285,7 @@ test("the extracted list and the transcript must agree before a slot counts", as
         ledgerPath: path,
         pollIntervalMs: 5,
       });
-      assert.equal(result.outcome, "booked");
+      assert.equal(result.outcome, "verbally_confirmed");
       const entries = readEntries(path);
       const first = entries.find((entry) => entry.kind === "gather");
       assert.ok(first !== undefined && first.kind === "gather");
@@ -319,7 +319,7 @@ test("no extracted result falls back to the transcript rather than failing", asy
         port,
         pollIntervalMs: 5,
       });
-      assert.equal(result.outcome, "booked");
+      assert.equal(result.outcome, "verbally_confirmed");
       assert.equal(result.slot_id, "thu-14");
     },
   );
@@ -361,4 +361,68 @@ test("the window closes the run before the next party is called", async () => {
     assert.equal(result.outcome, "window_expired");
     assert.equal(fake.created.length, 1);
   });
+});
+
+test("a party outside their calling hours is not dialled at all", async () => {
+  await withFake([gather(PLUMBER, [1, 2])], async (port, fake) => {
+    const parties = requestInput().parties.map((party) => ({ ...party }));
+    parties[1]!.calling_hours = { start: "09:00", end: "17:00", timezone: "America/Los_Angeles" };
+    const result = await runCoordination({
+      request: coordinationRequest({ parties }),
+      port,
+      pollIntervalMs: 5,
+      // 22:00 Pacific. Nobody rings a tenant then, whatever the protocol wants.
+      now: () => Date.parse("2026-08-04T05:00:00Z"),
+    });
+    assert.equal(result.outcome, "not_reached");
+    assert.equal(fake.created.length, 1, "the tenant must not be dialled at 10pm");
+    assert.equal(result.calls_placed, 1, "a call that was never placed costs no budget");
+  });
+});
+
+test("canceling in flight stops new calls and still releases everyone who said yes", async () => {
+  await withFake(
+    [
+      gather(PLUMBER, [2]),
+      gather(TENANT, [2]),
+      gather(SUPER, [2]),
+      confirmYes(PLUMBER),
+      confirmYes(TENANT),
+      confirmYes(SUPER),
+      releaseOk(PLUMBER),
+      releaseOk(TENANT),
+    ],
+    async (port, fake) => {
+      const canceling = new AbortController();
+      const path = ledgerPath();
+      const result = await runCoordination({
+        request: coordinationRequest(),
+        port,
+        ledgerPath: path,
+        pollIntervalMs: 5,
+        signal: canceling.signal,
+        onProgress: (line) => {
+          if (line === "  tenant: confirmed.") {
+            canceling.abort();
+          }
+        },
+      });
+      assert.equal(result.outcome, "canceled");
+      assert.equal(result.slot_id, null);
+      assert.deepEqual(result.unreleased, []);
+      assert.equal(
+        fake.created.filter((call) => call.phase === "confirm").length,
+        2,
+        "the third confirm call must never be placed",
+      );
+      assert.deepEqual(
+        fake.created.filter((call) => call.phase === "release").map((call) => call.phones[0]),
+        [TENANT, PLUMBER],
+        "canceling the booking does not cancel the duty to tell people",
+      );
+      const verification = replay(readEntries(path));
+      assert.equal(verification.ok, true, JSON.stringify(verification.issues));
+      assert.equal(verification.outcome, "canceled");
+    },
+  );
 });

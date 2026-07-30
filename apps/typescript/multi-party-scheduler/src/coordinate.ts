@@ -14,11 +14,16 @@
  * availability needs the extracted list and the transcript to agree and a
  * commitment needs the transcript to say it. The extracted answer can veto a
  * commitment, it can never create one.
+ *
+ * What happens when this process dies mid-commit lives in `resume.ts`, which
+ * reuses `placeCall` and `releaseRound` from here so a recovered call is the same
+ * call under the same idempotency key.
  */
 
-import { CalleCallError, CalleWaitTimeout, type CallePort } from "./calle.js";
+import { CalleCallError, CalleWaitTimeout, type CallePort, type CreateCallInput } from "./calle.js";
 import { worstCaseCalls } from "./config.js";
-import { appendEntry, requestDigest } from "./ledger.js";
+import { clockOf, withinCallingHours } from "./hours.js";
+import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
 import {
@@ -36,6 +41,7 @@ import type {
   CommitResult,
   CoordinationRequest,
   GatherResult,
+  JsonSchema,
   LedgerEntry,
   Outcome,
   Party,
@@ -51,6 +57,14 @@ export interface RunOptions {
   pollIntervalMs?: number;
   now?: () => number;
   onProgress?: (line: string) => void;
+  /**
+   * Cancels the run in flight. No new gather or confirm call is placed once it
+   * fires. Release calls still go out: cancelling the booking does not cancel the
+   * duty to tell somebody who already said yes. A call already connected cannot
+   * be hung up, the API has no cancel, so it is recorded as unfinished and
+   * `resume` reconciles it.
+   */
+  signal?: AbortSignal;
 }
 
 export function maskPhone(phone: string): string {
@@ -64,9 +78,104 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-interface CallOutcome {
+export interface CallOutcome {
   call: CallSnapshot | null;
   errorCode: string | null;
+}
+
+/** Statuses a call can no longer move out of. Anything else is still in flight. */
+export const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled"]);
+
+class Aborted extends Error {}
+
+/** The exact body one call sends. The idempotency key is a digest of this. */
+export function callInput(
+  request: CoordinationRequest,
+  party: Party,
+  phase: Phase,
+  slot: Slot | undefined,
+  task: string,
+  schema: JsonSchema,
+): CreateCallInput {
+  return {
+    task,
+    recipients: [
+      {
+        phones: [party.phone],
+        ...(party.region === undefined ? {} : { region: party.region }),
+        ...(party.locale === undefined ? {} : { locale: party.locale }),
+      },
+    ],
+    resultSchema: schema,
+    metadata: metadata(request, phase, party, slot),
+  };
+}
+
+export interface PlaceOptions {
+  request: CoordinationRequest;
+  port: CallePort;
+  party: Party;
+  phase: Phase;
+  slot: Slot | undefined;
+  task: string;
+  schema: JsonSchema;
+  timeoutMs: number;
+  pollIntervalMs: number;
+  signal?: AbortSignal;
+}
+
+async function waitOrAbort(
+  port: CallePort,
+  callId: string,
+  wait: { timeoutMs: number; intervalMs: number },
+  signal: AbortSignal | undefined,
+): Promise<CallSnapshot> {
+  const waiting = port.waitForResult(callId, wait);
+  if (signal === undefined) {
+    return waiting;
+  }
+  if (signal.aborted) {
+    throw new Aborted();
+  }
+  const aborted = new Promise<never>((_, reject) => {
+    signal.addEventListener("abort", () => reject(new Aborted()), { once: true });
+  });
+  return Promise.race([waiting, aborted]);
+}
+
+/**
+ * Create one call and wait for it. Shared by a fresh run and by `resume`, so both
+ * send the same body under the same idempotency key and a resumed call is the
+ * same call rather than a second one.
+ */
+export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
+  const { request, port, party, phase, slot } = options;
+  const input = callInput(request, party, phase, slot, options.task, options.schema);
+  try {
+    const created = await port.createCall(input, idempotencyKey(request, phase, party, slot, input));
+    try {
+      const call = await waitOrAbort(
+        port,
+        created.id,
+        { timeoutMs: options.timeoutMs, intervalMs: options.pollIntervalMs },
+        options.signal,
+      );
+      return { call, errorCode: null };
+    } catch (error) {
+      if (error instanceof CalleWaitTimeout) {
+        return { call: await port.getCall(created.id), errorCode: "timed_out" };
+      }
+      if (error instanceof Aborted) {
+        // The call is still running. Record what it looks like now and let
+        // `resume` settle it, rather than guessing an answer nobody gave.
+        return { call: await port.getCall(created.id), errorCode: "canceled" };
+      }
+      throw error;
+    }
+  } catch (error) {
+    const code = error instanceof CalleCallError ? error.code : "sdk_error";
+    return { call: null, errorCode: code };
+  }
 }
 
 function readIntArray(value: unknown, max: number): number[] {
@@ -110,7 +219,7 @@ function evaluateGather(
   if (outcome.call === null) {
     return {
       ...base,
-      call_status: "api_error",
+      call_status: outcome.errorCode === "outside_calling_hours" ? "not_placed" : "api_error",
       reached_person: false,
       machine_answered: false,
       structured_options: [],
@@ -184,7 +293,7 @@ function evaluateGather(
   };
 }
 
-function evaluateCommit(
+export function evaluateCommit(
   request: CoordinationRequest,
   party: Party,
   slot: Slot,
@@ -202,10 +311,11 @@ function evaluateCommit(
   if (outcome.call === null) {
     return {
       ...base,
-      call_status: "api_error",
+      call_status: outcome.errorCode === "outside_calling_hours" ? "not_placed" : "api_error",
       confirmed: false,
       declined: false,
       acknowledged: false,
+      question_asked: false,
       reached_person: false,
       machine_answered: false,
       structured_answer: null,
@@ -251,6 +361,7 @@ function evaluateCommit(
     confirmed,
     declined,
     acknowledged,
+    question_asked: reading.questionAsked,
     reached_person: reachedPerson,
     machine_answered: machineAnswered,
     structured_answer: structuredAnswer,
@@ -262,7 +373,87 @@ function evaluateCommit(
   };
 }
 
+export interface ReleaseRoundOptions {
+  request: CoordinationRequest;
+  port: CallePort;
+  slot: Slot;
+  /** Who is owed a release call, in the order to call them. */
+  parties: Party[];
+  callsPlaced: number;
+  pollIntervalMs: number;
+  now: () => number;
+  progress: (line: string) => void;
+  record: (entry: LedgerEntry) => void;
+}
+
+export interface ReleaseRoundResult {
+  callsPlaced: number;
+  unreleased: string[];
+}
+
+/**
+ * Tell everybody who said yes that it is off.
+ *
+ * The coordination window does not apply here: telling somebody their afternoon
+ * is free again is a duty and it does not expire because a timer did. The call
+ * budget and the party's calling hours do apply, and a party who cannot be called
+ * inside either is reported as still owed the call rather than rung at 3am. The
+ * same round runs from a fresh coordination and from `resume`.
+ */
+export async function releaseRound(options: ReleaseRoundOptions): Promise<ReleaseRoundResult> {
+  const { request, port, slot } = options;
+  let calls = options.callsPlaced;
+  const unreleased: string[] = [];
+  for (const party of options.parties) {
+    if (calls >= request.policy.maxCalls) {
+      options.progress(`  ${party.id} is still owed a release call, the call budget is spent.`);
+      unreleased.push(party.id);
+      continue;
+    }
+    const at = options.now();
+    if (!withinCallingHours(party.callingHours, at)) {
+      options.progress(
+        `  ${party.id} is still owed a release call, ${clockOf(at, party.callingHours.timezone)} is outside ${party.callingHours.start} to ${party.callingHours.end} ${party.callingHours.timezone}.`,
+      );
+      unreleased.push(party.id);
+      continue;
+    }
+    calls += 1;
+    const outcome = await placeCall({
+      request,
+      port,
+      party,
+      phase: "release",
+      slot,
+      task: releaseTask(request, party, slot),
+      schema: releaseSchema(),
+      timeoutMs: Math.max(request.policy.perCallTimeoutSeconds * 1000, 1_000),
+      pollIntervalMs: options.pollIntervalMs,
+    });
+    const result = evaluateCommit(request, party, slot, "release", outcome);
+    options.record({ kind: "release", at: new Date(at).toISOString(), result });
+    if (!result.acknowledged) {
+      unreleased.push(party.id);
+    }
+    options.progress(`  released ${party.id}${result.acknowledged ? "" : " (no person on the line, follow up)"}.`);
+  }
+  return { callsPlaced: calls, unreleased };
+}
+
+/**
+ * Run the protocol. One writer per ledger: the lock is held for the whole run, so
+ * a second process cannot interleave its lines into the same history.
+ */
 export async function runCoordination(options: RunOptions): Promise<RunResult> {
+  const lock = options.ledgerPath == null ? null : acquireLedgerLock(options.ledgerPath);
+  try {
+    return await coordinate(options);
+  } finally {
+    lock?.release();
+  }
+}
+
+async function coordinate(options: RunOptions): Promise<RunResult> {
   const { request, port } = options;
   const now = options.now ?? (() => Date.now());
   const progress = options.onProgress ?? (() => {});
@@ -290,47 +481,44 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
   let calls = 0;
   const place = async (
     task: string,
-    schema: ReturnType<typeof gatherSchema>,
+    schema: JsonSchema,
     party: Party,
     phase: Phase,
     slot: Slot | undefined,
     ignoreWindow = false,
   ): Promise<CallOutcome> => {
-    const remaining = ignoreWindow ? request.policy.perCallTimeoutSeconds * 1000 : deadline - now();
+    const at = now();
+    if (!withinCallingHours(party.callingHours, at)) {
+      // No call is placed, so this costs nothing from the budget. It is not a
+      // failure either: the person simply may not be rung at this hour.
+      progress(
+        `  ${party.id}: not called, ${clockOf(at, party.callingHours.timezone)} is outside ${party.callingHours.start} to ${party.callingHours.end} ${party.callingHours.timezone}.`,
+      );
+      return { call: null, errorCode: "outside_calling_hours" };
+    }
+    const remaining = ignoreWindow ? request.policy.perCallTimeoutSeconds * 1000 : deadline - at;
     const timeoutMs = Math.max(
       Math.min(request.policy.perCallTimeoutSeconds * 1000, remaining),
       1_000,
     );
     calls += 1;
-    try {
-      const created = await port.createCall(
-        {
-          task,
-          recipients: [
-            {
-              phones: [party.phone],
-              ...(party.region === undefined ? {} : { region: party.region }),
-              ...(party.locale === undefined ? {} : { locale: party.locale }),
-            },
-          ],
-          resultSchema: schema,
-          metadata: metadata(request, phase, party, slot),
-        },
-        idempotencyKey(request, phase, party, slot),
-      );
-      try {
-        return { call: await port.waitForResult(created.id, { timeoutMs, intervalMs: pollIntervalMs }), errorCode: null };
-      } catch (error) {
-        if (error instanceof CalleWaitTimeout) {
-          return { call: await port.getCall(created.id), errorCode: "timed_out" };
-        }
-        throw error;
-      }
-    } catch (error) {
-      const code = error instanceof CalleCallError ? error.code : "sdk_error";
-      progress(`CALL-E returned ${code} for ${party.id}.`);
-      return { call: null, errorCode: code };
+    const outcome = await placeCall({
+      request,
+      port,
+      party,
+      phase,
+      slot,
+      task,
+      schema,
+      timeoutMs,
+      pollIntervalMs,
+      // A release call is a duty. Cancelling the coordination does not cancel it.
+      signal: phase === "release" ? undefined : options.signal,
+    });
+    if (outcome.call === null && outcome.errorCode !== null) {
+      progress(`CALL-E returned ${outcome.errorCode} for ${party.id}.`);
     }
+    return outcome;
   };
 
   let feasible: Slot[] = request.slots;
@@ -338,6 +526,10 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
   let lastGather: GatherResult | null = null;
 
   for (const party of request.parties) {
+    if (options.signal?.aborted === true) {
+      stopped = "canceled";
+      break;
+    }
     if (now() >= deadline) {
       stopped = "window_expired";
       break;
@@ -381,7 +573,7 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
   const confirmedParties: Party[] = [];
   const unreleased: string[] = [];
   let chosen: Slot | null = null;
-  let outcome: Outcome = stopped ?? "booked";
+  let outcome: Outcome = stopped ?? "verbally_confirmed";
   let note = "";
 
   if (stopped === null) {
@@ -392,6 +584,11 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
       record({ kind: "slot_chosen", at: stamp(), slot_id: chosen.id, feasible: feasible.map((slot) => slot.id) });
       progress(`Everyone can do ${chosen.spoken}. Confirming it.`);
       for (const party of request.parties) {
+        if (options.signal?.aborted === true) {
+          outcome = "canceled";
+          note = "canceled during confirmation";
+          break;
+        }
         if (calls >= request.policy.maxCalls) {
           outcome = "budget_exhausted";
           note = "ran out of call budget during confirmation";
@@ -416,15 +613,15 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
           progress(`  ${party.id}: confirmed.`);
           continue;
         }
-        outcome = "not_confirmed";
+        outcome = commitOutcome.errorCode === "canceled" ? "canceled" : "not_confirmed";
         note = result.declined
           ? `${party.id} declined the time`
           : `${party.id} did not confirm (${result.failure_code ?? result.call_status})`;
         progress(`  ${party.id}: not confirmed. Releasing everyone who had confirmed.`);
         break;
       }
-      if (outcome === "booked" && confirmedParties.length === request.parties.length) {
-        note = `booked with ${confirmedParties.length} parties`;
+      if (outcome === "verbally_confirmed" && confirmedParties.length === request.parties.length) {
+        note = `every party confirmed the time by voice, ${confirmedParties.length} of ${request.parties.length}`;
       }
     }
   } else {
@@ -432,44 +629,38 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
       stopped === "no_common_slot"
         ? `no time works for everyone, ${lastGather?.party_id ?? "the last party"} ruled out the rest`
         : stopped === "not_reached"
-          ? `${lastGather?.party_id ?? "a party"} could not be reached, so nothing was booked`
+          ? `${lastGather?.party_id ?? "a party"} could not be reached, so nothing was arranged`
           : stopped === "window_expired"
             ? "the window closed before every party answered"
-            : "ran out of call budget while gathering availability";
+            : stopped === "canceled"
+              ? "canceled while gathering availability"
+              : "ran out of call budget while gathering availability";
   }
 
-  // A release call is a duty, not part of the booking window, so the window does
-  // not block it. The call budget still does.
-  if (outcome !== "booked" && chosen !== null && confirmedParties.length > 0) {
-    for (const party of [...confirmedParties].reverse()) {
-      if (calls >= request.policy.maxCalls) {
-        unreleased.push(party.id);
-        continue;
-      }
-      const releaseOutcome = await place(
-        releaseTask(request, party, chosen),
-        releaseSchema(),
-        party,
-        "release",
-        chosen,
-        true,
-      );
-      const result = evaluateCommit(request, party, chosen, "release", releaseOutcome);
-      record({ kind: "release", at: stamp(), result });
-      if (!result.acknowledged) {
-        unreleased.push(party.id);
-      }
-      progress(`  released ${party.id}${result.acknowledged ? "" : " (no person on the line, follow up)"}.`);
-    }
+  if (outcome !== "verbally_confirmed" && chosen !== null && confirmedParties.length > 0) {
+    const round = await releaseRound({
+      request,
+      port,
+      slot: chosen,
+      // Most recent yes first: that person changed their day most recently.
+      parties: [...confirmedParties].reverse(),
+      callsPlaced: calls,
+      pollIntervalMs,
+      now,
+      progress,
+      record,
+    });
+    calls = round.callsPlaced;
+    unreleased.push(...round.unreleased);
   }
 
-  const bookedWith = outcome === "booked" ? request.parties.map((party) => party.id) : [];
+  const confirmedWith = outcome === "verbally_confirmed" ? request.parties.map((party) => party.id) : [];
   record({
     kind: "outcome",
     at: stamp(),
     outcome,
-    slot_id: outcome === "booked" ? (chosen?.id ?? null) : null,
-    booked_with: bookedWith,
+    slot_id: outcome === "verbally_confirmed" ? (chosen?.id ?? null) : null,
+    confirmed_with: confirmedWith,
     unreleased,
     calls_placed: calls,
     note,
@@ -478,9 +669,9 @@ export async function runCoordination(options: RunOptions): Promise<RunResult> {
   return {
     request_id: request.requestId,
     outcome,
-    slot_id: outcome === "booked" ? (chosen?.id ?? null) : null,
-    slot_spoken: outcome === "booked" ? (chosen?.spoken ?? null) : null,
-    booked_with: bookedWith,
+    slot_id: outcome === "verbally_confirmed" ? (chosen?.id ?? null) : null,
+    slot_spoken: outcome === "verbally_confirmed" ? (chosen?.spoken ?? null) : null,
+    confirmed_with: confirmedWith,
     unreleased,
     calls_placed: calls,
     calls_saved: Math.max(worstCaseCalls(request) - calls, 0),

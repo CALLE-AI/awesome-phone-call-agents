@@ -56,11 +56,31 @@ function envelope(code: string, message: string): string {
   return JSON.stringify({ error: { code, message, details: {} } });
 }
 
+/**
+ * What the caller says when a script does not override it. These are the lines
+ * the real scripts ask for, so a confirm transcript contains the confirmation
+ * question and a reader can bind an answer to it.
+ */
+const BOT_LINES: Record<FakePhase, string[]> = {
+  gather: [
+    "This is an automated scheduling call. Nothing is booked yet.",
+    "Which of those could you do? You can say more than one option number or say none of them.",
+  ],
+  confirm: [
+    "This is an automated scheduling call. I am confirming one appointment.",
+    "Can I confirm that time? Please say confirm or say no if it does not work.",
+  ],
+  release: [
+    "This is an automated scheduling call. This is a short update, no action needed.",
+    "The appointment we discussed is not going ahead and nothing is booked.",
+  ],
+};
+
 function turns(script: FakeScript): unknown[] {
   if (script.transcript === false) {
     return [];
   }
-  const bot = script.botLines ?? ["This is an automated scheduling call."];
+  const bot = script.botLines ?? BOT_LINES[script.phase];
   const user = script.userLines ?? [];
   const output: unknown[] = [];
   let offset = 0;

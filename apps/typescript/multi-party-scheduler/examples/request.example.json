@@ -19,7 +19,9 @@
       "phone": "+14155550101",
       "role": "plumber",
       "region": "US",
-      "locale": "en-US"
+      "locale": "en-US",
+      "consent_recorded": true,
+      "calling_hours": { "start": "07:00", "end": "18:00", "timezone": "America/Los_Angeles" }
     },
     {
       "id": "tenant",
@@ -27,7 +29,8 @@
       "phone": "+14155550100",
       "role": "tenant",
       "region": "US",
-      "locale": "en-US"
+      "locale": "en-US",
+      "consent_recorded": true
     },
     {
       "id": "superintendent",
@@ -35,7 +38,9 @@
       "phone": "+14155550102",
       "role": "building superintendent",
       "region": "US",
-      "locale": "en-US"
+      "locale": "en-US",
+      "consent_recorded": true,
+      "calling_hours": { "start": "08:00", "end": "20:00", "timezone": "America/Los_Angeles" }
     }
   ],
   "policy": {
