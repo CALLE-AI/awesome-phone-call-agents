@@ -6,10 +6,10 @@
   "description": "Delegated errand caller with a disclosure budget: make the call somebody cannot make, say only what they authorized, hand back the transcript.",
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
-    "demo": "tsx demo/run-local.ts",
-    "errand": "tsx src/cli.ts",
-    "preview": "tsx src/cli.ts preview --errand examples/errand.example.json"
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "errand": "node --import tsx src/cli.ts",
+    "preview": "node --import tsx src/cli.ts preview --errand examples/errand.example.json"
   },
   "dependencies": {
     "@call-e/calle": "0.2.2"
