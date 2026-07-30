@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GateApiError, type CallePort, type CreateCallInput } from "../src/calle.js";
+import { GateApiError, GateTimeoutError, type CallePort, type CreateCallInput } from "../src/calle.js";
 import { decidedInWindow, runGate } from "../src/gate.js";
 import type { CallSnapshot, TranscriptTurn } from "../src/types.js";
 import { BOB_PHONE, FIXED_SECRET, approvalRequest, requestInput } from "./fixtures.js";
@@ -112,6 +112,42 @@ test("a poll that cannot be read back leaves the state unknown and stops the lad
   assert.equal(result.reason, "call_state_unknown");
   assert.equal(result.attempts.length, 1, "bob must not be called while alice's call may be live");
   assert.equal(result.attempts[0]!.call_id, "call_stub1", "the record keeps the id to reconcile");
+  assert.equal(created.length, 1);
+});
+
+test("a read-back that is still running leaves the attempt unresolved", async () => {
+  const created: string[] = [];
+  const port: CallePort = {
+    async createCall(input: CreateCallInput, key: string) {
+      created.push(key);
+      return snapshot({ id: "call_stub4", completedAt: new Date().toISOString(), status: "queued" });
+    },
+    async waitForResult() {
+      throw new GateTimeoutError("the call did not finish in time");
+    },
+    async getCall() {
+      // The read succeeded and the call is still ringing the first approver. A
+      // reply is not a settled call.
+      return snapshot({
+        id: "call_stub4",
+        completedAt: new Date().toISOString(),
+        status: "in_progress",
+      });
+    },
+  };
+  const result = await runGate({
+    request: twoApprovers(),
+    port,
+    stateDir: null,
+    pollIntervalMs: 1,
+    makeSecret: () => FIXED_SECRET,
+  });
+  assert.equal(result.verdict, "not_approved");
+  assert.equal(result.reason, "call_state_unknown");
+  assert.equal(result.attempts.length, 1, "bob must not be called while alice's call is running");
+  assert.equal(result.attempts[0]!.evidence.call_status, "state_unknown");
+  assert.equal(result.attempts[0]!.evidence.failure_code, "call_in_progress");
+  assert.equal(result.attempts[0]!.call_id, "call_stub4", "the record keeps the id to reconcile");
   assert.equal(created.length, 1);
 });
 

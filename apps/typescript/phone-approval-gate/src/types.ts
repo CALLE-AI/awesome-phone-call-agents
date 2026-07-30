@@ -28,12 +28,12 @@ export type NotApprovedReason =
   | "attempt_limit"
   | "quorum_not_met"
   | "not_reached"
-  | "timed_out"
   | "api_error"
   /**
-   * A create or a poll failed without saying whether the call exists, and
-   * reading it back under the same idempotency key did not settle it. A call
-   * may be live, so the ladder stops here.
+   * A create or a poll failed without saying whether the call exists, or a call
+   * read back after a poll gave up was still queued, ringing or talking.
+   * Reading it under the same idempotency key did not settle it. A call may be
+   * live, so the ladder stops here.
    */
   | "call_state_unknown";
 

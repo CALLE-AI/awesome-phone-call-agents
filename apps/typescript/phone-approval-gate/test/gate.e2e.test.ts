@@ -229,17 +229,28 @@ test("a second run adopts the reserved secret instead of inventing one", async (
   );
 });
 
-test("a call that never finishes times out and does not approve", async () => {
-  await withFake([{ phone: ALICE_PHONE, stall: true, userLines: APPROVE_LINES }], async (port) => {
-    const base = approvalRequest();
-    const request: ApprovalRequest = {
-      ...base,
-      policy: { ...base.policy, perCallTimeoutSeconds: 1, windowSeconds: 60 },
-    };
-    const result = await gate({ request, port, pollIntervalMs: 5, makeSecret: () => FIXED_SECRET });
-    assert.equal(result.verdict, "not_approved");
-    assert.equal(result.reason, "timed_out");
-  });
+test("a call that never finishes stays unresolved and holds the ladder", async () => {
+  await withFake(
+    [
+      { phone: ALICE_PHONE, stall: true, userLines: APPROVE_LINES },
+      { phone: BOB_PHONE, userLines: APPROVE_LINES },
+    ],
+    async (port, fake) => {
+      const base = twoApprovers("single");
+      const request: ApprovalRequest = {
+        ...base,
+        policy: { ...base.policy, perCallTimeoutSeconds: 1, windowSeconds: 60 },
+      };
+      const result = await gate({ request, port, pollIntervalMs: 5, makeSecret: () => FIXED_SECRET });
+      assert.equal(result.verdict, "not_approved");
+      // The wait timed out and the read-back came back in_progress. Alice's call
+      // is still live, so Bob's handset must stay quiet.
+      assert.equal(result.reason, "call_state_unknown");
+      assert.equal(result.attempts.length, 1);
+      assert.equal(result.attempts[0]!.call_id, fake.created[0]!.id);
+      assert.equal(fake.created.length, 1, "bob must not be called over a live call");
+    },
+  );
 });
 
 test("an API error is recorded with its CALL-E code", async () => {

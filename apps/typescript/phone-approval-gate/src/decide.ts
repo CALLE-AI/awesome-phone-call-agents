@@ -36,6 +36,29 @@ import type {
 const NO_ANSWER_HINTS = ["no_answer", "noanswer", "busy", "unreachable", "declined", "rejected_by_recipient", "not_answered"];
 const MACHINE_HINTS = ["voicemail", "machine", "ivr", "answering"];
 
+/**
+ * The statuses CALL-E ends a call on.
+ *
+ * Everything else (queued, scheduled, ringing, in_progress, a status this gate
+ * has never seen) means the call may still be talking to the approver, so it can
+ * never resolve an attempt. The set lives here because both readers need the
+ * same answer: the gate, when it reads a call back after a poll gave up, and
+ * this module, when it turns a status into an outcome. Two copies would drift
+ * and a drift here rings a second handset over a live call.
+ */
+export const TERMINAL_CALL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "canceled",
+  "no_answer",
+  "busy",
+  "voicemail",
+]);
+
+export function isTerminalCallStatus(status: string): boolean {
+  return TERMINAL_CALL_STATUSES.has(status.trim().toLowerCase());
+}
+
 function hints(code: string | null, table: string[]): boolean {
   if (code === null) {
     return false;
@@ -73,18 +96,22 @@ export function attemptOutcome(
     // CALL-E refused the request, so no call reached a handset.
     return { outcome: "not_approved", reason: "api_error" };
   }
-  if (inputs.call_status === "failed" || inputs.call_status === "canceled") {
-    if (hints(inputs.failure_code, MACHINE_HINTS)) {
+  if (!isTerminalCallStatus(inputs.call_status)) {
+    // Still queued, ringing or talking. The call may be live, so nothing in this
+    // snapshot resolves the attempt, whatever else the snapshot carries, and the
+    // ladder stops on it.
+    return { outcome: "not_approved", reason: "call_state_unknown" };
+  }
+  if (inputs.call_status !== "completed") {
+    // The call is over and nobody decided. The status and the failure code are
+    // read the same way, because a provider can put the same fact in either.
+    if (hints(inputs.failure_code, MACHINE_HINTS) || hints(inputs.call_status, MACHINE_HINTS)) {
       return { outcome: "not_approved", reason: "voicemail" };
     }
-    if (hints(inputs.failure_code, NO_ANSWER_HINTS)) {
+    if (hints(inputs.failure_code, NO_ANSWER_HINTS) || hints(inputs.call_status, NO_ANSWER_HINTS)) {
       return { outcome: "not_approved", reason: "no_answer" };
     }
     return { outcome: "not_approved", reason: "call_failed" };
-  }
-  if (inputs.call_status !== "completed") {
-    // Still queued, dialing or talking when the clock ran out.
-    return { outcome: "not_approved", reason: "timed_out" };
   }
   if (inputs.machine_answered) {
     return { outcome: "not_approved", reason: "voicemail" };

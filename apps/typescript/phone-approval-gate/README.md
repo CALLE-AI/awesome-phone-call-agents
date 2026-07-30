@@ -173,7 +173,7 @@ changed.
 ## What blocks an approval
 
 Every path other than a live person returning the code lands on `not_approved`
-with a reason: `no_answer`, `voicemail`, `call_failed`, `timed_out`,
+with a reason: `no_answer`, `voicemail`, `call_failed`,
 `not_reached`, `code_mismatch`, `no_decision`, `no_transcript_evidence`,
 `low_confidence`, `disagreement`, `window_expired`, `attempt_limit`,
 `quorum_not_met`, `api_error`, `call_state_unknown`.
@@ -191,10 +191,13 @@ against the local clock and against the call's own completion time. A decision
 that arrives after the window closed does not open the gate. Nor does one that
 belongs to an earlier run.
 
-`call_state_unknown`: a create or a poll failed without saying whether the call
-exists. Reading it back under the same key did not settle it either. The ladder
-stops there rather than ringing the next approver while a call may be live.
-Reconcile that call before running the gate again.
+`call_state_unknown`: the gate could not settle what the call did. A create or a
+poll failed without saying whether the call exists and reading it back under the
+same key did not settle it, or the read came back queued, ringing or still
+talking. Only `completed`, `failed`, `canceled`, `no_answer`, `busy` and
+`voicemail` count as a finished call. The ladder stops there rather than ringing
+the next approver while a call may be live. Reconcile that call before running
+the gate again.
 
 ## The request file
 

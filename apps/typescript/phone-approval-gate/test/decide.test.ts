@@ -210,7 +210,24 @@ test("failure codes map to the reason an operator needs", () => {
   assert.equal(evaluate({ status: "failed", failureCode: "no_answer" }).reason, "no_answer");
   assert.equal(evaluate({ status: "failed", failureCode: "voicemail_detected" }).reason, "voicemail");
   assert.equal(evaluate({ status: "failed", failureCode: "carrier_error" }).reason, "call_failed");
-  assert.equal(evaluate({ status: "in_progress" }).reason, "timed_out");
+  assert.equal(evaluate({ status: "no_answer" }).reason, "no_answer");
+  assert.equal(evaluate({ status: "busy" }).reason, "no_answer");
+  assert.equal(evaluate({ status: "voicemail" }).reason, "voicemail");
+});
+
+test("a status that is not terminal resolves nothing, whatever else the call says", () => {
+  // Every one of these read back a call that may still be talking to the
+  // approver. An approval in the transcript cannot settle it and neither can a
+  // clean failure, so the attempt stays unresolved and the ladder stops.
+  for (const status of ["queued", "scheduled", "ringing", "in_progress", "dialing", "surprise"]) {
+    const result = evaluate({
+      status,
+      userLines: ["Four seven two nine one three, I approve."],
+      structured: { decision: "approve", spoken_code: "472913", reason: "ok" },
+    });
+    assert.equal(result.outcome, "not_approved", status);
+    assert.equal(result.reason, "call_state_unknown", status);
+  }
 });
 
 test("an API failure with no call is recorded, not swallowed", () => {

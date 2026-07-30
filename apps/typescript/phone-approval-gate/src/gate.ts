@@ -8,10 +8,11 @@
  *
  * Two rules keep a retry honest. The secret is reserved on disk before the call,
  * so a second run of the same request uses the code the approver was shown
- * instead of inventing a new one for the same provider key. And a create or a
- * poll that fails without saying whether the call exists stops the ladder rather
- * than moving to the next approver, because an accepted call may still be
- * ringing the first one.
+ * instead of inventing a new one for the same provider key. And a call the gate
+ * cannot settle stops the ladder rather than moving to the next approver, because
+ * an accepted call may still be ringing the first one. A create or a poll that
+ * fails without saying whether the call exists counts as unsettled, and so does a
+ * call that reads back as still queued, ringing or talking.
  */
 
 import {
@@ -23,7 +24,7 @@ import {
   withAuditLock,
 } from "./audit.js";
 import { GateApiError, GateTimeoutError, type CallePort, type CreateCallInput } from "./calle.js";
-import { evaluateAttempt, verdictFromAttempts } from "./decide.js";
+import { evaluateAttempt, isTerminalCallStatus, verdictFromAttempts } from "./decide.js";
 import { defaultStateDir, reserveSecret } from "./reserve.js";
 import {
   buildMetadata,
@@ -172,9 +173,21 @@ async function placeCall(options: {
       progress(`Polling ${created.id} failed with ${failureOf(error).code}.`);
     }
     // The call exists either way, so its state is read once before the ladder is
-    // allowed to move on.
+    // allowed to move on. A reply is not a settled call: a read that comes back
+    // queued, ringing or talking says the approver may still be on the line.
     try {
       const call = await port.getCall(created.id);
+      if (!isTerminalCallStatus(call.status)) {
+        progress(
+          `Call ${created.id} read back as ${call.status}, which is not a finished call. Its state is unresolved.`,
+        );
+        return {
+          call: null,
+          callId: created.id,
+          errorCode: `call_${call.status}`,
+          unresolved: true,
+        };
+      }
       return { call, callId: created.id, errorCode: null, unresolved: false };
     } catch (readError) {
       const failure = failureOf(readError);
