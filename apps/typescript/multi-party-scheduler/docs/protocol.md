@@ -39,6 +39,16 @@ caller asked "can I confirm that time" and only a later turn can confirm it, so
 the person has not heard yet. A decline counts wherever it appears in the call: it
 can only stop a commitment, never create one.
 
+A confirmation is bound to the window as well. The window is checked before the
+call goes out and again on the result that comes back, on two clocks. This run's
+clock catches an answer that landed after the round could act on it. The call's own
+`completed_at` catches a call that finished outside this window at all, which is
+what a replayed idempotency key hands back. The provider timestamp is allowed a
+minute of skew at each end, because it is somebody else's clock. A confirmation
+outside the window is not a confirmation and the run ends as `window_expired`. The
+person still said yes on a phone call, so they are still owed the release call that
+says it is off.
+
 ## Phase 3, release
 
 If any party does not confirm, nothing is arranged and every party who already

@@ -48,7 +48,7 @@ test("nothing is suffix matched, so a host that ends in a trusted name is refuse
   }
 });
 
-test("another host is opted in by flag or by environment, and only exactly", () => {
+test("another host is opted in by flag or by environment, exact match only", () => {
   const url = "https://calle.internal.example";
   assert.match(refusal(url), /is not a trusted host/);
   assert.equal(assertTrustedBaseUrl(url, ["calle.internal.example"]), url);

@@ -114,7 +114,7 @@ export function assertDurableState(port: CallePort, ledgerPath: string | null): 
   }
   if (ledgerPath === null || ledgerPath.length === 0) {
     throw new ConfigError(
-      "This port places real calls, so it needs a ledger: pass --ledger <file>, or ledgerPath. That file is what resume reads to settle a call this run could not finish and to place the release calls it owes. Nothing was dialled.",
+      "This port places real calls, so it needs a ledger: pass --ledger <file> or ledgerPath. That file is what resume reads to settle a call this run could not finish and to place the release calls it owes. Nothing was dialled.",
     );
   }
 }
@@ -391,7 +391,7 @@ export function evaluateCommit(
   const lowConfidence = confidence !== null && confidence.score < request.policy.minConfidence;
 
   const declined = reading.answer === "decline" || structuredAnswer === "decline";
-  // Late is not confirmed. The person may well have said yes, and this run can no
+  // Late is not confirmed. The person may well have said yes. This run can no
   // longer act on it, so the yes leaves a release call owed instead.
   const withinWindow = inWindow(call.completedAt ?? attempt?.completedAt ?? null);
   const confirmed =
@@ -625,7 +625,7 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
   const confirmedParties: Party[] = [];
   /**
    * Everybody who said yes on a confirm call, in the order they said it. This is
-   * the release list, and it is not the same as the list above: a yes the window
+   * the release list. It is not the same as the list above: a yes the window
    * arrived too late for still leaves a person expecting an appointment.
    */
   const saidYesParties: Party[] = [];

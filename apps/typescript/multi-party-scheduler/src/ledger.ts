@@ -68,7 +68,7 @@ export const LEDGER_MODE = 0o600;
  * Append one entry, with the mode enforced on the way in.
  *
  * A mode handed to `open` only applies when `open` creates the file, so a ledger
- * that already exists keeps whatever mode it had, and documenting 0600 while
+ * that already exists keeps whatever mode it had. Documenting 0600 while
  * leaving a 0644 file alone is a claim the code does not keep. Every append opens
  * the file and chmods the descriptor, which is the same file the write goes to, so
  * there is no window between the check and the write for a path to be swapped. A
@@ -153,7 +153,7 @@ export interface LedgerRead {
  *
  * A line that is not an entry is a broken history and it is reported, with one
  * exception: the last line. A crash mid append leaves half an entry there, that
- * record never landed, and refusing to read the rest would mean refusing to
+ * record never landed. Refusing to read the rest would mean refusing to
  * recover exactly the run that needs recovering.
  */
 export function readLedger(path: string): LedgerRead {
@@ -187,9 +187,9 @@ export function readEntries(path: string): LedgerEntry[] {
 /**
  * Drop a torn last line so the file can be appended to again.
  *
- * Half an entry records nothing that replays, and leaving it in place would put a
+ * Half an entry records nothing that replays. Leaving it in place would put a
  * broken line in the middle of the history the moment anything else is appended.
- * Only `resume` calls this, under the ledger lock, and it says so in its note.
+ * Only `resume` calls this. It runs under the ledger lock and says so in its note.
  * Returns whether anything was dropped.
  */
 export function repairTornTail(path: string): boolean {

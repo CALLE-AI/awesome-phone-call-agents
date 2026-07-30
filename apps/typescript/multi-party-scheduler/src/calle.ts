@@ -70,7 +70,7 @@ export function isLoopbackHost(hostname: string): boolean {
  *
  * The default list is CALL-E itself plus this machine, which is what the fake
  * server and the demo use. Anything else has to be named, in
- * `CALLE_ALLOWED_HOSTS` or with `--allow-host`, and every name is compared
+ * `CALLE_ALLOWED_HOSTS` or with `--allow-host`. Every name is compared
  * exactly: no wildcard and no suffix match. Suffix matching is how
  * `localhost.attacker.example` gets treated as localhost.
  */
@@ -121,7 +121,7 @@ export function assertTrustedBaseUrl(baseUrl: string, allowHosts: string[] = [])
   }
   const host = normalizeHost(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopbackHost(host))) {
-    refuse(baseUrl, "Only https may carry the key, and plain http only to this machine.");
+    refuse(baseUrl, "Only https may carry the key. Plain http reaches this machine only.");
   }
   if (!trustedHosts(allowHosts).has(host)) {
     refuse(baseUrl, `${url.hostname} is not a trusted host.`);

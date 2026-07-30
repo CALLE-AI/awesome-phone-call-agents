@@ -195,7 +195,7 @@ test("resume refuses a ledger another request wrote", async () => {
 
 /**
  * A run where the one release call it owed reached an answering machine. The
- * call completed, so nothing is left to settle, and the person still has not been
+ * call completed, so nothing is left to settle. The person still has not been
  * told. That gap is what the debt rules below are about.
  */
 const MACHINE_RELEASE: FakeScript[] = [

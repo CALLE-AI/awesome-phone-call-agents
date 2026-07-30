@@ -211,11 +211,17 @@ confirmation has to show every party who said yes either released or named in
 - `plan` and `replay` place no calls and need no credentials.
 - `CALLE_API_KEY` is read from the environment only, never from the request file.
   `CALLE_BASE_URL` and `--base-url` select the environment and both are checked
-  before the key is sent: https or plain http only for `localhost`, `127.0.0.1`
-  and `::1`. Anything else is refused rather than warned about.
+  before the key is sent. The host has to be `api.heycall-e.com`, one of
+  `localhost`, `127.0.0.1` or `::1` for a local fake, or a host named in
+  `CALLE_ALLOWED_HOSTS` or with `--allow-host`. Names are matched exactly, with no
+  suffix match and no wildcard. An opted in host still has to be https, because
+  https on its own is not trust: it says the wire is encrypted, not who answers.
+  Anything else is refused rather than warned about.
 - Every idempotency key carries a short sha256 of the call payload, so a call is
   reused only when it would say the same words.
-- Ledgers are appended with mode `0600`. Numbers are masked to the country code
+- Ledgers are appended with mode `0600`, re-applied on every append rather than
+  only when the file is created. A target that is not a regular file is refused.
+  Numbers are masked to the country code
   plus the last two digits, in `--json` output too and only the decisive turns
   are kept.
 

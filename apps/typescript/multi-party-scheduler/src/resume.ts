@@ -123,7 +123,7 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
         // settling the same call replaces it rather than adding to it. A yes
         // recorded outside the window is not credit at all.
         credited.set(result.party_id, result.confirmed && result.within_window !== false);
-        // A debt only grows. Somebody who said yes has to be told, and no later
+        // A debt only grows. Somebody who said yes has to be told. No later
         // entry talks this app out of placing that call.
         if (saidYes(result) && !spokenYes.includes(result.party_id)) {
           spokenYes.push(result.party_id);

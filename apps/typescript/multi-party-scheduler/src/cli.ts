@@ -53,7 +53,7 @@ writes to no calendar and creates no booking anywhere.
 CALLE_API_KEY is read from the environment only. --base-url and CALLE_BASE_URL
 pick the host and only api.heycall-e.com, localhost, 127.0.0.1 and ::1 are
 trusted with the key. Name another with --allow-host <host>, which can be
-repeated, or with CALLE_ALLOWED_HOSTS. Hostnames are matched exactly.
+repeated or with CALLE_ALLOWED_HOSTS. Hostnames are matched exactly.
 
 Exit codes: 0 confirmed by every party, 10 no common slot, 20 not confirmed, 30 usage error, 40 replay failed.`;
 

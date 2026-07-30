@@ -61,7 +61,7 @@ export function decidedInWindow(check: WindowCheck): boolean {
 /**
  * Did this party put the phone down believing the time is on.
  *
- * A person who said yes is owed the call that says it is off, and that is true
+ * A person who said yes is owed the call that says it is off. That is true
  * whether or not the run acted on the yes. A yes this window refuses, a yes below
  * the confidence floor and a yes the extracted result contradicts are all still a
  * person who agreed to keep an afternoon free. The window decides what can be
