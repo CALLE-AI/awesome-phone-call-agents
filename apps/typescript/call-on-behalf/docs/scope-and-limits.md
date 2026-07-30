@@ -117,8 +117,10 @@ call. Editing the file first makes it a different call, so the next step says no
 to.
 
 A call CALL-E has not finished with lands in the same place. Only a terminal status
-is read as a result: `completed`, `failed`, `canceled`, `no_answer`, `busy` or
-`voicemail`. A call that is still `queued` or `in_progress` when the timeout runs
+is read as a result: `completed`, `failed` or `canceled`, which is every terminal
+value in the SDK's own `CallStatus`. A no answer or a voicemail arrives as `failed`
+with a failure code or as a completed call whose transcript is a machine, so neither
+needs a status of its own. A call that is still `queued` or `in_progress` when the timeout runs
 out has a transcript that is still being written, so the app reports
 `outcome_unknown` with `call_status` unknown and the call id kept. It states no
 verdict, no commitment and no privacy finding. Reading a call in flight as a result

@@ -53,21 +53,15 @@ export class CalleWaitTimeout extends Error {}
  *
  * `CallStatus` in the SDK's generated schema is `queued`, `in_progress`,
  * `completed`, `failed` or `canceled`. The SDK's own `waitForResult` returns on
- * exactly the last three. The three end of call states are listed with them because
- * a call that ended in voicemail, a busy line or no answer has ended: it is a result
- * to read, not a call still in flight.
+ * exactly the last three, so those three are the whole set here. A no answer, a
+ * busy line or a voicemail is not a status of its own: it arrives as `failed` with
+ * a failure code or as a completed call whose transcript is a machine, both of
+ * which are read further down.
  *
  * Anything not in this list is a call with no result yet. A call with no result
  * is not something to report an outcome from.
  */
-export const TERMINAL_CALL_STATUSES: readonly string[] = [
-  "completed",
-  "failed",
-  "canceled",
-  "no_answer",
-  "busy",
-  "voicemail",
-];
+export const TERMINAL_CALL_STATUSES: readonly string[] = ["completed", "failed", "canceled"];
 
 export function isTerminalCallStatus(status: string | null | undefined): boolean {
   return typeof status === "string" && TERMINAL_CALL_STATUSES.includes(status.trim().toLowerCase());

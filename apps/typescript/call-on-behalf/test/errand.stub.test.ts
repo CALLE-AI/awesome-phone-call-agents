@@ -109,7 +109,21 @@ test("a call CALL-E has not finished with is no result, whatever the extraction 
 });
 
 test("no state short of finished is evaluated, whichever one it is", async () => {
-  for (const status of ["queued", "in_progress", "ringing", "scheduled", "dialing", "unknown", ""]) {
+  // The last three are not CallStatus values at all. A no answer, a busy line or a
+  // voicemail arrives as a failure code on a failed call or as a machine on the
+  // transcript, so a status spelled this way is one this app does not understand.
+  for (const status of [
+    "queued",
+    "in_progress",
+    "ringing",
+    "scheduled",
+    "dialing",
+    "unknown",
+    "",
+    "no_answer",
+    "busy",
+    "voicemail",
+  ]) {
     const report = await run(snapshot(status, conversation(), goodResult()), true);
     assert.equal(report.outcome, "outcome_unknown", `status ${status}`);
     assert.equal(report.call_status, "unknown", `status ${status}`);
@@ -201,9 +215,6 @@ test("the model's own note is labelled as the model's", async () => {
 
 test("a call that ended without a conversation is read from its own status", async () => {
   const cases: [string, string][] = [
-    ["no_answer", "not_reached"],
-    ["busy", "not_reached"],
-    ["voicemail", "voicemail"],
     ["failed", "call_failed"],
     ["canceled", "call_failed"],
   ];
