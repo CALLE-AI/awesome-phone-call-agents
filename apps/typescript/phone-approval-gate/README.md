@@ -55,8 +55,8 @@ Verdict  not_approved (no_answer)
 Verdict  approved
 
 4. The reply to the create is lost, so the call state is unknown
-  CALL-E returned service_unavailable for release-owner without saying whether the call exists. Reconciling pag-deploy-1842-release-owner-1-7ca8652e41de.
-  Reconciled pag-deploy-1842-release-owner-1-7ca8652e41de to call call_fake1.
+  CALL-E returned service_unavailable for release-owner without saying whether the call exists. Reconciling pag-deploy-1842-release-owner-1-80f0a5013320.
+  Reconciled pag-deploy-1842-release-owner-1-80f0a5013320 to call call_fake1.
   Attempt for release-owner: approved.
 Verdict  approved
 
