@@ -6,7 +6,7 @@
  * imported lazily for that reason.
  *
  * `assertTrustedBaseUrl` runs before the client exists, so no request that
- * carries the API key can be built against an untrusted host.
+ * carries the API key can be built against a host that is not trusted with it.
  */
 
 import { ConfigError } from "./config.js";
@@ -44,6 +44,9 @@ export class CalleWaitTimeout extends Error {}
 
 export const DEFAULT_BASE_URL = "https://api.heycall-e.com";
 
+/** The CALL-E host this app talks to unless somebody opts in to another one. */
+export const CALLE_HOST = "api.heycall-e.com";
+
 /** Loopback names the local fake CALL-E can bind to. */
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -63,15 +66,51 @@ export function isLoopbackHost(hostname: string): boolean {
 }
 
 /**
+ * Every host allowed to carry the API key.
+ *
+ * The default list is CALL-E itself plus this machine, which is what the fake
+ * server and the demo use. Anything else has to be named, in
+ * `CALLE_ALLOWED_HOSTS` or with `--allow-host`, and every name is compared
+ * exactly: no wildcard and no suffix match. Suffix matching is how
+ * `localhost.attacker.example` gets treated as localhost.
+ */
+export function trustedHosts(allowHosts: string[] = []): Set<string> {
+  const hosts = new Set([CALLE_HOST, ...LOOPBACK_HOSTS]);
+  const named = [process.env.CALLE_ALLOWED_HOSTS ?? "", ...allowHosts].flatMap((entry) =>
+    entry.split(","),
+  );
+  for (const entry of named) {
+    const host = normalizeHost(entry.trim());
+    if (host.length === 0) {
+      continue;
+    }
+    if (/[*/\s?#]/.test(host)) {
+      throw new ConfigError(
+        `${entry.trim()} is not a hostname. CALLE_ALLOWED_HOSTS and --allow-host take one exact hostname each, so no wildcard and no URL.`,
+      );
+    }
+    hosts.add(host);
+  }
+  return hosts;
+}
+
+function refuse(baseUrl: string, why: string): never {
+  throw new ConfigError(
+    `Refusing to send CALLE_API_KEY to ${baseUrl}. ${why} --base-url and CALLE_BASE_URL pick the host and only ${CALLE_HOST}, localhost, 127.0.0.1 and ::1 are trusted with the key. Name another with CALLE_ALLOWED_HOSTS or --allow-host, one exact hostname each. Nothing was sent.`,
+  );
+}
+
+/**
  * Decide whether a base URL may carry the API key, before any request is made.
  *
  * Every request to CALL-E sends `Authorization: Bearer <key>`, so an arbitrary
- * base URL is a way to post the credential somewhere else in plain text. Plain
- * http is allowed only for loopback, which is what the local fake server and the
- * demo use. Anything else is refused rather than warned about: the point is that
- * the key never leaves the process.
+ * base URL is a way to post the credential somewhere else. https on its own only
+ * proves the wire is encrypted, not who is on the other end of it, so the host has
+ * to be on the trusted list as well. Plain http is allowed only for loopback,
+ * which is what the local fake server and the demo use. Anything else is refused
+ * rather than warned about: the point is that the key never leaves the process.
  */
-export function assertTrustedBaseUrl(baseUrl: string): string {
+export function assertTrustedBaseUrl(baseUrl: string, allowHosts: string[] = []): string {
   let url: URL;
   try {
     url = new URL(baseUrl);
@@ -80,20 +119,23 @@ export function assertTrustedBaseUrl(baseUrl: string): string {
       `${baseUrl} is not a URL. Set --base-url or CALLE_BASE_URL to an https URL such as ${DEFAULT_BASE_URL}.`,
     );
   }
-  const loopback = isLoopbackHost(url.hostname);
-  if (url.protocol === "https:" || (url.protocol === "http:" && loopback)) {
-    return baseUrl;
+  const host = normalizeHost(url.hostname);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopbackHost(host))) {
+    refuse(baseUrl, "Only https may carry the key, and plain http only to this machine.");
   }
-  throw new ConfigError(
-    `Refusing to send CALLE_API_KEY to ${baseUrl}. --base-url and CALLE_BASE_URL must use https or http only for localhost, 127.0.0.1 or ::1. Nothing was sent.`,
-  );
+  if (!trustedHosts(allowHosts).has(host)) {
+    refuse(baseUrl, `${url.hostname} is not a trusted host.`);
+  }
+  return baseUrl;
 }
 
 export async function createSdkPort(options: {
   apiKey: string;
   baseUrl?: string;
+  /** Hosts opted in with `--allow-host`, on top of `CALLE_ALLOWED_HOSTS`. */
+  allowHosts?: string[];
 }): Promise<CallePort> {
-  const baseUrl = assertTrustedBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
+  const baseUrl = assertTrustedBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL, options.allowHosts ?? []);
   const { CalleClient, CalleTimeoutError } = await import("@call-e/calle");
   const client = new CalleClient({
     apiKey: options.apiKey,

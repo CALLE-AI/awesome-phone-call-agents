@@ -24,7 +24,7 @@ import {
   TERMINAL_STATUSES,
 } from "./coordinate.js";
 import { withinCallingHours } from "./hours.js";
-import { acquireLedgerLock, appendEntry, readEntries, requestDigest } from "./ledger.js";
+import { acquireLedgerLock, appendEntry, readEntries, repairTornTail, requestDigest } from "./ledger.js";
 import { confirmSchema, confirmTask, releaseSchema, releaseTask } from "./script.js";
 import { slotById } from "./slots.js";
 import { saidYes, type WindowSpan } from "./window.js";
@@ -252,6 +252,13 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   const now = options.now ?? (() => Date.now());
   const progress = options.onProgress ?? (() => {});
   const pollIntervalMs = options.pollIntervalMs ?? 2000;
+  // A crash between the write and the newline leaves half an entry at the end of
+  // the file. Dropping it here, under the lock, is what lets the rest of the
+  // history be read and appended to. What it described is gone, so say so.
+  const torn = repairTornTail(options.ledgerPath);
+  if (torn) {
+    progress("The last ledger line was half written, which is what a crash during an append leaves. It was dropped.");
+  }
   const entries = readEntries(options.ledgerPath);
   const started = entries.find((entry) => entry.kind === "run_started");
   if (started === undefined || started.kind !== "run_started") {
@@ -280,7 +287,15 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
 
   if (state.finished && state.unsettled.length === 0 && state.owedReleases.length === 0) {
     progress("Nothing to resume: every call is settled and nobody is owed a release call.");
-    return finish(request, state.outcome ?? "not_confirmed", chosen, [], state.callsPlaced, "nothing to resume", options.ledgerPath);
+    return finish(
+      request,
+      state.outcome ?? "not_confirmed",
+      chosen,
+      [],
+      state.callsPlaced,
+      torn ? "nothing to resume, the half written last line was dropped" : "nothing to resume",
+      options.ledgerPath,
+    );
   }
 
   record({
@@ -420,6 +435,9 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   ];
   if (stuck.length > 0) {
     notes.push(`still unsettled, check by hand: ${[...new Set(stuck)].join(", ")}`);
+  }
+  if (torn) {
+    notes.push("the last line was half written and was dropped, so a call it may have recorded is not settled here");
   }
   if (unreleased.length > 0) {
     notes.push(`still owed a release call: ${unreleased.join(", ")}`);

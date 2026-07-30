@@ -18,7 +18,7 @@ import { ConfigError, loadRequest } from "./config.js";
 import { createSdkPort, DEFAULT_BASE_URL } from "./calle.js";
 import { runCoordination } from "./coordinate.js";
 import { redactRequest, renderMatrix, renderPlan, renderResult } from "./format.js";
-import { LedgerLockError, readEntries, replay } from "./ledger.js";
+import { LedgerError, readLedger, replay } from "./ledger.js";
 import { ResumeError, resumeCoordination } from "./resume.js";
 
 const EXIT_CONFIRMED = 0;
@@ -33,13 +33,13 @@ const USAGE = `Multi-party scheduler
       Print the options, the call order, the calling hours, the call budget and
       every call script. Places no call and needs no credentials.
 
-  run --request <file> --live --ledger <file> [--json] [--base-url <url>]
+  run --request <file> --live --ledger <file> [--json] [--base-url <url>] [--allow-host <host>]
       Gather availability, confirm one slot with everybody, release everyone who
       confirmed if the commit fails. Needs CALLE_API_KEY. The ledger is required:
       it is the durable state resume reads if this run does not finish. Ctrl-C
       stops the run and still places the release calls that are owed.
 
-  resume --request <file> --ledger <file> --live [--json] [--base-url <url>]
+  resume --request <file> --ledger <file> --live [--json] [--base-url <url>] [--allow-host <host>]
       Finish an interrupted run: settle every call the ledger cannot account for
       and place the release calls that are still owed. Needs CALLE_API_KEY.
 
@@ -50,16 +50,27 @@ const USAGE = `Multi-party scheduler
 An appointment this app arranges is a verbal confirmation from every party. It
 writes to no calendar and creates no booking anywhere.
 
+CALLE_API_KEY is read from the environment only. --base-url and CALLE_BASE_URL
+pick the host and only api.heycall-e.com, localhost, 127.0.0.1 and ::1 are
+trusted with the key. Name another with --allow-host <host>, which can be
+repeated, or with CALLE_ALLOWED_HOSTS. Hostnames are matched exactly.
+
 Exit codes: 0 confirmed by every party, 10 no common slot, 20 not confirmed, 30 usage error, 40 replay failed.`;
 
 interface Parsed {
   command: string;
   values: Record<string, string>;
+  /** Options that may be given more than once, in the order they were given. */
+  repeated: Record<string, string[]>;
   flags: Set<string>;
 }
 
+/** Options where a second use adds to the first rather than replacing it. */
+const REPEATABLE = new Set(["allow-host"]);
+
 function parseArgs(argv: string[]): Parsed {
   const values: Record<string, string> = {};
+  const repeated: Record<string, string[]> = {};
   const flags = new Set<string>();
   const command = argv[0] ?? "";
   for (let index = 1; index < argv.length; index += 1) {
@@ -76,10 +87,14 @@ function parseArgs(argv: string[]): Parsed {
     if (value === undefined || value.startsWith("--")) {
       throw new ConfigError(`Option --${name} needs a value.`);
     }
-    values[name] = value;
+    if (REPEATABLE.has(name)) {
+      (repeated[name] ??= []).push(value);
+    } else {
+      values[name] = value;
+    }
     index += 1;
   }
-  return { command, values, flags };
+  return { command, values, repeated, flags };
 }
 
 function requireValue(parsed: Parsed, name: string): string {
@@ -128,12 +143,17 @@ async function main(argv: string[]): Promise<number> {
 
   if (parsed.command === "replay") {
     const path = requireValue(parsed, "ledger");
-    const entries = readEntries(path);
+    const { entries, truncatedTail } = readLedger(path);
     const verification = replay(entries);
     if (parsed.flags.has("json")) {
-      process.stdout.write(`${JSON.stringify(verification, null, 2)}\n`);
+      process.stdout.write(`${JSON.stringify({ ...verification, truncated_tail: truncatedTail }, null, 2)}\n`);
     } else {
       process.stdout.write(`${renderMatrix(entries)}\n\n`);
+      if (truncatedTail) {
+        process.stdout.write(
+          "The last line is half an entry, which is what a crash during an append leaves. It is not counted below.\n",
+        );
+      }
       process.stdout.write(
         verification.ok
           ? `${verification.entries} entries replay cleanly, outcome ${String(verification.outcome)}.\n`
@@ -159,7 +179,11 @@ async function main(argv: string[]): Promise<number> {
       throw new ConfigError("CALLE_API_KEY is not set. The scheduler never reads keys from the request file.");
     }
     const baseUrl = parsed.values["base-url"] ?? process.env.CALLE_BASE_URL ?? DEFAULT_BASE_URL;
-    const port = await createSdkPort({ apiKey, baseUrl });
+    const port = await createSdkPort({
+      apiKey,
+      baseUrl,
+      allowHosts: parsed.repeated["allow-host"] ?? [],
+    });
     const progress = (line: string): void => {
       process.stderr.write(`${line}\n`);
     };
@@ -218,7 +242,7 @@ main(process.argv.slice(2))
     process.exitCode = code;
   })
   .catch((error: unknown) => {
-    if (error instanceof ConfigError || error instanceof LedgerLockError || error instanceof ResumeError) {
+    if (error instanceof ConfigError || error instanceof LedgerError || error instanceof ResumeError) {
       process.stderr.write(`${error.message}\n`);
       process.exitCode = EXIT_USAGE;
       return;

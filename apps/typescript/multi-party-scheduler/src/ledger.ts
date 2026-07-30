@@ -8,7 +8,17 @@
  * the recorded answers do not intersect on Thursday, replay says so.
  */
 
-import { appendFileSync, closeSync, existsSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  fchmodSync,
+  fstatSync,
+  openSync,
+  readFileSync,
+  truncateSync,
+  unlinkSync,
+  writeSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { chooseSlot, intersect } from "./slots.js";
 import { saidYes } from "./window.js";
@@ -48,11 +58,38 @@ export function requestDigest(request: CoordinationRequest): string {
   });
 }
 
-export function appendEntry(path: string, entry: LedgerEntry): void {
-  appendFileSync(path, `${JSON.stringify(entry)}\n`, { encoding: "utf8", mode: 0o600 });
-}
+export class LedgerError extends Error {}
+export class LedgerLockError extends LedgerError {}
 
-export class LedgerLockError extends Error {}
+/** A ledger holds masked numbers, call ids and answers. Only its owner reads it. */
+export const LEDGER_MODE = 0o600;
+
+/**
+ * Append one entry, with the mode enforced on the way in.
+ *
+ * A mode handed to `open` only applies when `open` creates the file, so a ledger
+ * that already exists keeps whatever mode it had, and documenting 0600 while
+ * leaving a 0644 file alone is a claim the code does not keep. Every append opens
+ * the file and chmods the descriptor, which is the same file the write goes to, so
+ * there is no window between the check and the write for a path to be swapped. A
+ * target that is not a regular file is refused rather than written to: a ledger is
+ * a file, not a pipe into somebody else's process.
+ */
+export function appendEntry(path: string, entry: LedgerEntry): void {
+  const handle = openSync(path, "a", LEDGER_MODE);
+  try {
+    const stats = fstatSync(handle);
+    if (!stats.isFile()) {
+      throw new LedgerError(`${path} is not a regular file, so it is not a ledger this app will write to.`);
+    }
+    if ((stats.mode & 0o777) !== LEDGER_MODE) {
+      fchmodSync(handle, LEDGER_MODE);
+    }
+    writeSync(handle, `${JSON.stringify(entry)}\n`);
+  } finally {
+    closeSync(handle);
+  }
+}
 
 export interface LedgerLock {
   path: string;
@@ -72,7 +109,7 @@ export function acquireLedgerLock(path: string): LedgerLock {
   const lockPath = `${path}.lock`;
   let handle: number;
   try {
-    handle = openSync(lockPath, "wx", 0o600);
+    handle = openSync(lockPath, "wx", LEDGER_MODE);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
       throw error;
@@ -87,6 +124,9 @@ export function acquireLedgerLock(path: string): LedgerLock {
       `Another run holds ${path}.${holder} Wait for it to finish or delete ${lockPath} if that process is gone.`,
     );
   }
+  // The lock names the process holding the ledger, so it gets the same mode as the
+  // ledger. O_EXCL created it, so this cannot be somebody else's file.
+  fchmodSync(handle, LEDGER_MODE);
   writeSync(handle, `pid ${process.pid} since ${new Date().toISOString()}`);
   closeSync(handle);
   return {
@@ -99,15 +139,75 @@ export function acquireLedgerLock(path: string): LedgerLock {
   };
 }
 
-export function readEntries(path: string): LedgerEntry[] {
+export interface LedgerRead {
+  entries: LedgerEntry[];
+  /**
+   * True when the last line is not a whole entry, which is what a crash between
+   * the write and the newline leaves. It is dropped rather than guessed at.
+   */
+  truncatedTail: boolean;
+}
+
+/**
+ * Read a ledger.
+ *
+ * A line that is not an entry is a broken history and it is reported, with one
+ * exception: the last line. A crash mid append leaves half an entry there, that
+ * record never landed, and refusing to read the rest would mean refusing to
+ * recover exactly the run that needs recovering.
+ */
+export function readLedger(path: string): LedgerRead {
   if (!existsSync(path)) {
-    return [];
+    return { entries: [], truncatedTail: false };
   }
-  return readFileSync(path, "utf8")
+  const lines = readFileSync(path, "utf8")
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as LedgerEntry);
+    .filter((line) => line.length > 0);
+  const entries: LedgerEntry[] = [];
+  for (const [index, line] of lines.entries()) {
+    try {
+      entries.push(JSON.parse(line) as LedgerEntry);
+    } catch (error) {
+      if (index === lines.length - 1) {
+        return { entries, truncatedTail: true };
+      }
+      throw new LedgerError(
+        `${path} line ${index + 1} is not a ledger entry: ${(error as Error).message}`,
+      );
+    }
+  }
+  return { entries, truncatedTail: false };
+}
+
+export function readEntries(path: string): LedgerEntry[] {
+  return readLedger(path).entries;
+}
+
+/**
+ * Drop a torn last line so the file can be appended to again.
+ *
+ * Half an entry records nothing that replays, and leaving it in place would put a
+ * broken line in the middle of the history the moment anything else is appended.
+ * Only `resume` calls this, under the ledger lock, and it says so in its note.
+ * Returns whether anything was dropped.
+ */
+export function repairTornTail(path: string): boolean {
+  if (!existsSync(path)) {
+    return false;
+  }
+  const buffer = readFileSync(path);
+  const last = buffer.toString("utf8").split("\n").at(-1) ?? "";
+  if (last.trim().length === 0) {
+    return false;
+  }
+  try {
+    JSON.parse(last);
+    return false;
+  } catch {
+    truncateSync(path, buffer.length - Buffer.byteLength(last, "utf8"));
+    return true;
+  }
 }
 
 function ids(slots: Slot[]): string[] {

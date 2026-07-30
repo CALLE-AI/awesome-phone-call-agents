@@ -5,13 +5,25 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createSdkPort } from "../src/calle.js";
 import { runCoordination } from "../src/coordinate.js";
-import { canonicalJson, acquireLedgerLock, digestOf, LedgerLockError, readEntries, replay, requestDigest } from "../src/ledger.js";
+import {
+  canonicalJson,
+  acquireLedgerLock,
+  appendEntry,
+  digestOf,
+  LedgerError,
+  LedgerLockError,
+  LEDGER_MODE,
+  readEntries,
+  readLedger,
+  replay,
+  requestDigest,
+} from "../src/ledger.js";
 import type { LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
 import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
@@ -221,6 +233,76 @@ test("a confirmation credited from a late answer is caught", async () => {
   assert.ok(
     verification.issues.some((issue) => issue.problem.includes("landed outside the window")),
     JSON.stringify(verification.issues),
+  );
+});
+
+function tempLedgerPath(prefix: string): string {
+  return join(mkdtempSync(join(tmpdir(), prefix)), "ledger.jsonl");
+}
+
+const RESUME_ENTRY: LedgerEntry = {
+  kind: "resume_started",
+  at: "2026-08-04T17:05:00.000Z",
+  entries_before: 0,
+  ambiguous: [],
+  owed_releases: [],
+};
+
+test("a ledger that already exists is put back to 0600 on the next append", () => {
+  const path = tempLedgerPath("mps-mode-");
+  writeFileSync(path, "");
+  chmodSync(path, 0o644);
+  assert.equal(statSync(path).mode & 0o777, 0o644, "a file somebody else can read");
+  appendEntry(path, RESUME_ENTRY);
+  assert.equal(statSync(path).mode & 0o777, LEDGER_MODE, "and it is not after an append");
+  appendEntry(path, RESUME_ENTRY);
+  assert.equal(statSync(path).mode & 0o777, LEDGER_MODE);
+  assert.equal(readEntries(path).length, 2, "the entries still landed");
+});
+
+test("the lock file carries the ledger mode too", () => {
+  const path = tempLedgerPath("mps-mode-");
+  const lock = acquireLedgerLock(path);
+  assert.equal(statSync(lock.path).mode & 0o777, LEDGER_MODE);
+  lock.release();
+});
+
+test("a target that is not a regular file is refused rather than written to", () => {
+  assert.throws(
+    () => appendEntry("/dev/null", RESUME_ENTRY),
+    (error: unknown) => {
+      assert.ok(error instanceof LedgerError, `expected LedgerError, got ${String(error)}`);
+      assert.match(error.message, /not a regular file/);
+      return true;
+    },
+  );
+});
+
+test("a ledger torn by a crash mid append is read without that last half line", async () => {
+  const { path, entries } = await confirmedLedger();
+  const text = readFileSync(path, "utf8");
+  writeFileSync(path, text.slice(0, text.length - 40));
+  const read = readLedger(path);
+  assert.equal(read.truncatedTail, true);
+  assert.equal(read.entries.length, entries.length - 1, "the half written entry is not counted");
+  const verification = replay(read.entries);
+  assert.equal(verification.ok, false, "and the run reads as unfinished, which it is");
+  assert.ok(verification.issues.some((issue) => issue.problem.includes("did not finish")));
+});
+
+test("a broken line anywhere but the end is a broken history", async () => {
+  const { entries } = await confirmedLedger();
+  const path = tempLedgerPath("mps-torn-");
+  const lines = entries.map((entry) => JSON.stringify(entry));
+  lines[2] = lines[2]!.slice(0, 30);
+  writeFileSync(path, `${lines.join("\n")}\n`);
+  assert.throws(
+    () => readEntries(path),
+    (error: unknown) => {
+      assert.ok(error instanceof LedgerError, `expected LedgerError, got ${String(error)}`);
+      assert.match(error.message, /line 3 is not a ledger entry/);
+      return true;
+    },
   );
 });
 
