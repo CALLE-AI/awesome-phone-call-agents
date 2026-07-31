@@ -1,0 +1,25 @@
+{
+  "claim_id": "northgate-voicemail-0912",
+  "customer": {
+    "name": "Dana Whitfield"
+  },
+  "contact": {
+    "claimed_to_be": "Northgate Credit Union",
+    "channel": "voicemail",
+    "arrived_at": "2026-07-31T09:12:00-07:00",
+    "claimed_about": "a card that had been blocked",
+    "number_shown": "+14155550188",
+    "asked_for": "ring back on that number and read out the card number to unblock the card"
+  },
+  "trusted_number": {
+    "phone": "+14155550100",
+    "printed_on": "the back of the debit card",
+    "region": "US"
+  },
+  "policy": {
+    "per_call_timeout_seconds": 240,
+    "recent_window_minutes": 60,
+    "language": "en-US",
+    "min_confidence": 0.5
+  }
+}
