@@ -3,7 +3,6 @@ load_dotenv()
 
 import os
 import re
-import secrets
 import time
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, field_validator
@@ -14,31 +13,40 @@ app = FastAPI()
 
 DRY_RUN = os.environ.get("DRY_RUN", "true").lower() != "false"
 DEMO_PATIENT_ID = os.environ.get("DEMO_PATIENT_ID", "137240223")
-
-# --------------------------------------------------------------------------
-# FIX 1: Authentication + idempotency + consent for the live POST endpoint.
-# --------------------------------------------------------------------------
 API_KEY = os.environ.get("SENTINELCALL_API_KEY", "")
 E164_PATTERN = re.compile(r"^\+[1-9]\d{6,14}$")
 
-# In-memory idempotency store: {idempotency_key: (timestamp, response)}.
-# A real deployment should use Redis or a DB with TTL; this is sufficient
-# for a demo app and is documented as such.
-_seen_requests: dict[str, tuple[float, dict]] = {}
+# --------------------------------------------------------------------------
+# KNOWN, STATED LIMITATION (not silently hidden): this is a single-process,
+# in-memory store. It does not solve cross-worker races or survive a
+# restart. A production deployment needs a real datastore (Redis/DB) with
+# atomic reserve-then-confirm semantics. This demo fixes the *ordering*
+# bug (reserving before the external call, not after) but does not claim
+# to be safe under multi-worker concurrency.
+# --------------------------------------------------------------------------
+_call_requests: dict[str, dict] = {}  # idempotency_key -> {"status": "pending"|"done", "ts": float, "response": dict|None}
+_escalated_runs: dict[str, dict] = {}  # run_id -> escalation record
 IDEMPOTENCY_WINDOW_SECONDS = 3600
 
-# Tracks which run_ids have already been escalated, so escalation only
-# ever fires once per call, regardless of how many times a client polls.
-_escalated_runs: set[str] = set()
 
-
-def require_api_key(x_api_key: str | None):
+def require_api_key(x_api_key: str | None, allow_if_dry_run: bool = False):
+    """
+    allow_if_dry_run: only relevant to endpoints that themselves check
+    DRY_RUN before doing anything real. The /escalate endpoint MUST NOT
+    pass allow_if_dry_run=True, because escalation performs a real FHIR
+    write regardless of the app's DRY_RUN setting -- that was the bug
+    flagged in review: DRY_RUN gated call-placing but never gated
+    escalation, so escalation was reachable unauthenticated whenever no
+    key was configured.
+    """
     if not API_KEY:
-        # No key configured -- fine for local dry-run testing, but block
-        # any real call from going out unauthenticated.
-        if not DRY_RUN:
-            raise HTTPException(500, "SENTINELCALL_API_KEY must be set before placing real calls.")
-        return
+        if allow_if_dry_run and DRY_RUN:
+            return
+        raise HTTPException(
+            500,
+            "SENTINELCALL_API_KEY must be set. This endpoint performs a real "
+            "action (a call or a clinical data write) and cannot run unauthenticated.",
+        )
     if x_api_key != API_KEY:
         raise HTTPException(401, "Invalid or missing X-API-Key.")
 
@@ -50,12 +58,11 @@ def mask_phone(phone: str) -> str:
 
 
 # --------------------------------------------------------------------------
-# FIX 2: Speaker- and negation-aware danger-sign extraction.
-# The old version substring-matched the ENTIRE transcript, so the bot's own
-# question ("any vaginal bleeding?") would false-positive regardless of the
-# patient's answer. This version pairs each known bot question with the
-# immediately following USER line and only counts it positive if that
-# specific answer is affirmative.
+# Speaker- and negation-aware extraction, round 2: broader negation
+# coverage. "Yes, I do not have bleeding" previously slipped through
+# because only whole-word "no/nope/none/never/negative/not really" were
+# checked. Now also catches "not", "n't", "don't", "doesn't", "didn't",
+# "isn't", "haven't", "without".
 # --------------------------------------------------------------------------
 QUESTION_TO_SIGN = [
     (re.compile(r"vaginal bleeding", re.I), "vaginal_bleeding"),
@@ -64,40 +71,44 @@ QUESTION_TO_SIGN = [
     (re.compile(r"swelling", re.I), "swelling_face_or_hands"),
     (re.compile(r"fever", re.I), "high_fever"),
 ]
-NEGATIVE_PATTERN = re.compile(r"\b(no|nope|not really|none|never|negative)\b", re.I)
+NEGATIVE_PATTERN = re.compile(
+    r"\b(no|nope|none|never|negative|not|n't|don'?t|doesn'?t|didn'?t|isn'?t|haven'?t|without)\b",
+    re.I,
+)
 AFFIRMATIVE_PATTERN = re.compile(r"\b(yes|yeah|yep|correct|i do|i have|i am)\b", re.I)
 
+# A blunt, deliberately conservative emergency keyword set. If matched
+# alongside an affirmative bleeding/headache answer, this is flagged
+# separately as urgent -- distinct from the routine "call back today"
+# framing, because that framing is not safe for a genuinely acute symptom.
+EMERGENCY_PATTERN = re.compile(r"\b(heavy|severe|a lot|soaking|can'?t see|passed out|fainted)\b", re.I)
 
-def extract_danger_signs_from_transcript(transcript: str) -> list[str]:
+
+def extract_danger_signs_from_transcript(transcript: str) -> tuple[list[str], list[str]]:
+    """Returns (danger_signs, urgent_signs). urgent_signs is a subset."""
     if not transcript:
-        return []
+        return [], []
 
-    lines = [l.strip() for l in transcript.splitlines() if l.strip()]
-    # Strip leading "[hh:mm:ss] " timestamps if present.
-    cleaned = []
-    for line in lines:
-        line = re.sub(r"^\[\d{2}:\d{2}:\d{2}\]\s*", "", line)
-        cleaned.append(line)
+    lines = [re.sub(r"^\[\d{2}:\d{2}:\d{2}\]\s*", "", l.strip()) for l in transcript.splitlines() if l.strip()]
 
-    found = []
-    for i, line in enumerate(cleaned):
+    found, urgent = [], []
+    for i, line in enumerate(lines):
         if not line.upper().startswith("BOT:"):
             continue
         for pattern, sign_key in QUESTION_TO_SIGN:
             if not pattern.search(line):
                 continue
-            # Find the next USER line after this BOT question.
-            for j in range(i + 1, len(cleaned)):
-                if cleaned[j].upper().startswith("USER:"):
-                    answer = cleaned[j]
+            for j in range(i + 1, len(lines)):
+                if lines[j].upper().startswith("USER:"):
+                    answer = lines[j]
                     is_negative = NEGATIVE_PATTERN.search(answer)
                     is_affirmative = AFFIRMATIVE_PATTERN.search(answer)
-                    # Only count as positive if affirmative and NOT also
-                    # negative (handles "No" appearing before "yes" noise).
                     if is_affirmative and not is_negative:
                         found.append(sign_key)
+                        if EMERGENCY_PATTERN.search(answer):
+                            urgent.append(sign_key)
                     break
-    return found
+    return found, urgent
 
 
 class FollowUpRequest(BaseModel):
@@ -106,7 +117,7 @@ class FollowUpRequest(BaseModel):
     patient_first_name: str
     missed_visit_date: str
     language: str = "English"
-    consent_confirmed: bool = False  # required True for any live call
+    consent_confirmed: bool = False
 
     @field_validator("phone")
     @classmethod
@@ -117,17 +128,31 @@ class FollowUpRequest(BaseModel):
 
 
 def build_goal(patient_first_name: str, missed_visit_date: str) -> str:
+    # FIX (review round 2, point 4): identity is now verified BEFORE any
+    # clinic-specific or clinical context is revealed. Also adds an
+    # explicit emergency branch: severe/heavy symptoms get told to seek
+    # care immediately, not "call back today."
     return (
-        f"You are an AI voice assistant calling on behalf of a maternal "
-        f"health clinic. Say clearly at the start of the call that you are "
-        f"an AI assistant, not a human. This is a follow-up for "
-        f"{patient_first_name}, who missed a scheduled antenatal visit on "
-        f"{missed_visit_date}. Confirm you're speaking with the right "
-        f"person, then ask one at a time: any vaginal bleeding, severe "
-        f"headache or vision changes, reduced baby movement, swelling in "
-        f"the face or hands, or high fever. If any answer is yes, say a "
-        f"health worker will call back today -- do not give medical "
-        f"advice. Finally ask if they'd like to reschedule their visit."
+        f"You are an AI voice assistant. Start by saying you are an AI "
+        f"assistant, not a human, and ask to confirm you are speaking with "
+        f"{patient_first_name} -- do not say anything about a clinic, a "
+        f"missed visit, or health topics until identity is confirmed. If "
+        f"the person says they are not {patient_first_name}, do not reveal "
+        f"any further details; politely end the call and report that "
+        f"{patient_first_name} was not reached. "
+        f"If identity is confirmed, say you're calling on behalf of a "
+        f"maternal health clinic following up on a missed antenatal visit "
+        f"on {missed_visit_date}. Ask one at a time: any vaginal bleeding, "
+        f"severe headache or vision changes, reduced baby movement, "
+        f"swelling in the face or hands, or high fever. "
+        f"If the person describes a symptom as heavy, severe, soaking, "
+        f"loss of vision, or fainting, do NOT say a health worker will "
+        f"call back today -- instead say this sounds urgent and they "
+        f"should seek emergency medical care right now or call local "
+        f"emergency services, and end the call promptly. "
+        f"For any other yes answer, say a health worker will call back "
+        f"today. Do not give medical advice yourself. Finally ask if "
+        f"they'd like to reschedule their visit."
     )
 
 
@@ -137,65 +162,70 @@ async def trigger_followup(
     x_api_key: str | None = Header(None),
     idempotency_key: str | None = Header(None),
 ):
-    require_api_key(x_api_key)
+    require_api_key(x_api_key, allow_if_dry_run=True)
 
     if not DRY_RUN:
         if not req.consent_confirmed:
-            raise HTTPException(
-                400,
-                "consent_confirmed must be true to place a real call. "
-                "Confirm the recipient has agreed to receive this call before setting DRY_RUN=false.",
-            )
+            raise HTTPException(400, "consent_confirmed must be true to place a real call.")
         if not idempotency_key:
             raise HTTPException(400, "Idempotency-Key header is required for live calls.")
 
         now = time.time()
-        # Clean expired entries and check for a duplicate request.
-        expired = [k for k, (ts, _) in _seen_requests.items() if now - ts > IDEMPOTENCY_WINDOW_SECONDS]
+        expired = [k for k, v in _call_requests.items() if now - v["ts"] > IDEMPOTENCY_WINDOW_SECONDS]
         for k in expired:
-            del _seen_requests[k]
-        if idempotency_key in _seen_requests:
-            return _seen_requests[idempotency_key][1]
+            del _call_requests[k]
+
+        existing = _call_requests.get(idempotency_key)
+        if existing:
+            if existing["status"] == "pending":
+                raise HTTPException(409, "A request with this Idempotency-Key is already in flight.")
+            return existing["response"]
+
+        # FIX (review round 2, point 2): reserve the key as "pending"
+        # BEFORE calling run_call, not after. Previously a lost/ambiguous
+        # response from run_call could result in a retry placing a second
+        # real call, because nothing was recorded until after a response
+        # was received.
+        _call_requests[idempotency_key] = {"status": "pending", "ts": now, "response": None}
 
     goal = build_goal(req.patient_first_name, req.missed_visit_date)
 
     if DRY_RUN:
-        response = {
+        return {
             "status": "dry_run",
             "would_call": mask_phone(req.phone),
             "region": req.region,
             "goal_preview": goal,
-            "note": "DRY_RUN is enabled by default. Set DRY_RUN=false, provide consent_confirmed=true, and an Idempotency-Key header to place a real call.",
         }
+
+    try:
+        plan = plan_call(phone=req.phone, goal=goal, region=req.region, language=req.language)
+        if not plan.get("ready_to_run"):
+            response = {"status": "needs_more_info", "clarifying_questions": plan.get("clarifying_questions", [])}
+        else:
+            run = run_call(plan_id=plan["plan_id"], confirm_token=plan["confirm_token"])
+            response = {
+                "status": "call_started",
+                "run_id": run.get("run_id"),
+                "plan_id": plan["plan_id"],
+                "called": mask_phone(req.phone),
+            }
+        _call_requests[idempotency_key] = {"status": "done", "ts": time.time(), "response": response}
         return response
-
-    plan = plan_call(phone=req.phone, goal=goal, region=req.region, language=req.language)
-    if not plan.get("ready_to_run"):
-        response = {"status": "needs_more_info", "clarifying_questions": plan.get("clarifying_questions", [])}
-        _seen_requests[idempotency_key] = (time.time(), response)
-        return response
-
-    run = run_call(plan_id=plan["plan_id"], confirm_token=plan["confirm_token"])
-    response = {
-        "status": "call_started",
-        "run_id": run.get("run_id"),
-        "plan_id": plan["plan_id"],
-        "called": mask_phone(req.phone),
-    }
-    _seen_requests[idempotency_key] = (time.time(), response)
-    return response
+    except Exception:
+        # Do not leave the key stuck as "pending" forever on failure --
+        # mark it failed explicitly so a human can check before any
+        # automatic retry, rather than silently clearing it.
+        _call_requests[idempotency_key] = {"status": "done", "ts": time.time(), "response": {"status": "error_uncertain_outcome"}}
+        raise
 
 
-# --------------------------------------------------------------------------
-# FIX 3: GET is now read-only. It reports the call status, transcript, and
-# a PREVIEW of detected danger signs, but does NOT write to CliniqBridge.
-# --------------------------------------------------------------------------
 @app.get("/followups/{run_id}")
 async def check_followup(run_id: str, x_api_key: str | None = Header(None)):
-    require_api_key(x_api_key)
+    require_api_key(x_api_key, allow_if_dry_run=True)
 
     if DRY_RUN:
-        return {"status": "dry_run", "note": "No live run exists in dry-run mode."}
+        return {"status": "dry_run"}
 
     try:
         result = wait_for_call_result(run_id, poll_interval_seconds=3, max_wait_seconds=120)
@@ -203,26 +233,20 @@ async def check_followup(run_id: str, x_api_key: str | None = Header(None)):
         return {"status": "still_running_or_error", "detail": str(e)}
 
     transcript = result.get("result", {}).get("transcript", "")
-    danger_signs = extract_danger_signs_from_transcript(transcript)
+    danger_signs, urgent_signs = extract_danger_signs_from_transcript(transcript)
 
     return {
         "call_status": result.get("status"),
         "danger_signs_detected_preview": danger_signs,
+        "urgent_signs_preview": urgent_signs,
         "already_escalated": run_id in _escalated_runs,
-        "note": "This endpoint is read-only. Call POST /followups/{run_id}/escalate to commit an escalation after human review.",
+        "note": "Read-only. Use POST /followups/{run_id}/escalate to commit, after human review.",
     }
 
 
-# --------------------------------------------------------------------------
-# FIX 3 (cont'd) + FIX 4: Escalation is now an explicit, separate,
-# idempotent action -- not a side effect of polling. It requires a human
-# to have reviewed the detected signs, and writes the FHIR Observation with
-# status "preliminary" (not "final"), since the SNOMED codes used here are
-# unverified against an authoritative terminology source (see README).
-# --------------------------------------------------------------------------
 class EscalationConfirmRequest(BaseModel):
-    reviewed_by: str  # name/ID of the human who reviewed the transcript
-    confirmed_signs: list[str]  # signs the reviewer confirms are real, from the preview list
+    reviewed_by: str
+    confirmed_signs: list[str]
 
 
 @app.post("/followups/{run_id}/escalate")
@@ -231,25 +255,58 @@ async def confirm_escalation(
     req: EscalationConfirmRequest,
     x_api_key: str | None = Header(None),
 ):
+    # FIX (review round 2, point 1 -- the critical one): escalation is a
+    # real, unconditional FHIR write. It must ALWAYS require a real key,
+    # regardless of the app's DRY_RUN setting. allow_if_dry_run is
+    # deliberately NOT passed here.
     require_api_key(x_api_key)
 
     if run_id in _escalated_runs:
-        return {"status": "already_escalated", "run_id": run_id}
+        return {"status": "already_escalated", "run_id": run_id, "record": _escalated_runs[run_id]}
 
+    # FIX (review round 2, point 3): escalation must be bound to the
+    # actual run -- re-fetch the real result and recompute the preview
+    # ourselves, rather than trusting arbitrary client-supplied signs for
+    # an arbitrary run_id.
+    try:
+        result = wait_for_call_result(run_id, poll_interval_seconds=3, max_wait_seconds=30)
+    except CalleError as e:
+        raise HTTPException(404, f"Could not verify run {run_id}: {e}")
+
+    if result.get("status") != "COMPLETED":
+        raise HTTPException(409, f"Run {run_id} is not in a COMPLETED state; cannot escalate.")
+
+    transcript = result.get("result", {}).get("transcript", "")
+    actual_signs, actual_urgent = extract_danger_signs_from_transcript(transcript)
+    actual_signs_set = set(actual_signs)
+
+    # Confirmed signs must be a subset of what's actually verifiable from
+    # this run's real transcript -- the reviewer cannot invent findings.
+    invalid = set(req.confirmed_signs) - actual_signs_set
+    if invalid:
+        raise HTTPException(
+            400,
+            f"confirmed_signs {sorted(invalid)} are not present in this run's actual transcript "
+            f"({sorted(actual_signs_set)}). Escalation must match verified evidence.",
+        )
     if not req.confirmed_signs:
-        raise HTTPException(400, "confirmed_signs must be non-empty -- nothing to escalate.")
+        raise HTTPException(400, "confirmed_signs must be non-empty.")
+
+    deduped_signs = sorted(set(req.confirmed_signs))
 
     results = await escalate_danger_signs(
         patient_id=DEMO_PATIENT_ID,
-        danger_signs=req.confirmed_signs,
-        call_id=run_id,
-        status="preliminary",  # not "final" -- unverified codes, human-reviewed but not clinically validated
+        danger_signs=deduped_signs,
+        call_id=result.get("result", {}).get("call_id", run_id),
+        status="preliminary",
     )
-    _escalated_runs.add(run_id)
 
-    return {
-        "status": "escalated",
-        "run_id": run_id,
+    record = {
         "reviewed_by": req.reviewed_by,
+        "confirmed_signs": deduped_signs,
+        "urgent_at_call_time": actual_urgent,
         "escalation_results": results,
     }
+    _escalated_runs[run_id] = record
+
+    return {"status": "escalated", "run_id": run_id, **record}
