@@ -6,7 +6,8 @@
   "description": "AI receptionist that keeps a service business's calendar full: confirms appointments, backfills freed slots from a priority waitlist, and qualifies new leads — all over real CALL-E phone calls.",
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "node --import tsx --test test/*.test.ts",
+    "pretest": "node --env-file=test/test.env test/migrate.mjs",
+    "test": "node --env-file=test/test.env --import tsx --test --test-concurrency=1 test/*.test.ts",
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
     "start": "node --env-file-if-exists=.env --import tsx src/server.ts",
     "db:migrate": "prisma migrate dev",
