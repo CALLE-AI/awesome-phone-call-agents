@@ -176,7 +176,7 @@ function refuseSecretsAndPersonas(raw: Record<string, unknown>, knownNumbers: st
   const secret = secretFindings(raw, { knownNumbers })[0];
   if (secret !== undefined) {
     throw new ClaimError(
-      `${secret.field} carries what looks like a ${secret.kind} (${secret.masked}). This app never repeats what the caller asked for: the call says who the customer is, who the message claimed to be from and what it was about, and nothing else. Take it out of the claim file and keep it to yourself. No call was placed.`,
+      `${secret.field} carries what looks like a ${secret.kind} (${secret.masked}). This app never repeats what the caller asked for: the call says who the customer is, who the message claimed to be from and what it was about, nothing else. Take it out of the claim file and keep it to yourself. No call was placed.`,
     );
   }
   const persona = impersonationFindings(raw)[0];

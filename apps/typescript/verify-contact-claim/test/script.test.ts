@@ -9,6 +9,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import { impersonationFindings, secretFindings } from "../src/scan.js";
 import {
   buildCallInput,
   buildResultSchema,
@@ -20,7 +21,7 @@ import {
   spokenNumber,
   spokenWindow,
 } from "../src/script.js";
-import { claim, claimInput, SHOWN, TRUSTED, withContact } from "./fixtures.js";
+import { CALLBACK, claim, claimInput, SHOWN, TRUSTED, withContact } from "./fixtures.js";
 
 const CLAIM = claim();
 const TASK = buildTask(CLAIM);
@@ -101,6 +102,15 @@ test("the script refuses to be the customer and says so on the line", () => {
   assert.match(TASK, /say no plainly/);
   assert.match(TASK, /cannot answer security questions/);
   assert.match(TASK, /I do not have that with me/);
+});
+
+test("the script this app sends passes this app's own scan", () => {
+  // `preflight` scans the finished task before placing the call, so the rule that
+  // forbids impersonation has to be worded without the phrases the scan looks for.
+  // Word it the other way and the app refuses its own script on every run.
+  const script = { script: TASK, question: questionText(CLAIM) };
+  assert.deepEqual(secretFindings(script, { knownNumbers: [TRUSTED, SHOWN, CALLBACK] }), []);
+  assert.deepEqual(impersonationFindings(script), []);
 });
 
 test("the script treats a refusal to discuss the account as a complete answer", () => {

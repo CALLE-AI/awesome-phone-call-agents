@@ -41,6 +41,9 @@ export const CLOCK_SKEW_MS = 60_000;
  * persona or that names the number which made contact as the trusted one. This is
  * the same check on the words that are about to be sent, so a script that picked up
  * something on the way cannot leave the machine.
+ *
+ * The scan covers the whole task, this app's own rules included, which is why those
+ * rules are worded to pass it. See the note above the rules in `script.ts`.
  */
 export function preflight(claim: Claim): void {
   if (sameNumber(claim.contact.number_shown, claim.trustedNumber.phone)) {

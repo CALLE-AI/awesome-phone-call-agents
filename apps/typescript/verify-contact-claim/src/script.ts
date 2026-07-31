@@ -117,8 +117,14 @@ export function buildTask(claim: Claim): string {
   lines.push(`Then ask exactly this and wait for the answer: "${questionText(claim)}"`);
   lines.push("");
   lines.push("Rules you must follow:");
+  // These rules are this app's own words and they are written to pass this app's
+  // own scan. `preflight` runs the impersonation scan over the finished task before
+  // the call is placed. That scan cannot read a negation: "never say that you are
+  // Dana" and "say you are Dana" look the same to it. So the rule that forbids
+  // impersonation is worded without the phrases the scan looks for. A test in
+  // `script.test.ts` holds it that way.
   lines.push(
-    `- You are not ${name} and you must never say that you are. If you are asked whether you are ${name} or whether you are the customer, say no plainly. You are an automated assistant calling on their behalf.`,
+    `- You are not ${name} and you must never say otherwise. If you are asked whether you are ${name} or whether the account is yours, say no plainly. You are an automated assistant calling on their behalf.`,
   );
   lines.push(
     `- You cannot answer security questions and you must not try. If you are asked to confirm an account, a card number, a date of birth, a code or a password, say exactly: "I do not have that with me. ${name} will call you on the number printed on their card if you need to check who they are."`,
