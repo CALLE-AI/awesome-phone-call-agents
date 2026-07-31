@@ -117,15 +117,16 @@ Exhaustive. Nothing else comes back from a run.
 | `confirmed_genuine` | 0 | A finished call plus a callee turn supporting "yes we contacted them". | The contact looks real. Use the printed number anyway, never the one that called. |
 | `no_such_contact` | 10 | A finished call plus a callee turn supporting "no record of that". | Treat the contact as fake. Do not ring it back. Report it on the printed number. |
 | `refused_to_confirm` | 20 | A finished call where the institution declines to discuss a third party's account. | Expected at a bank. It proves nothing either way. Here is the number to call yourself. |
-| `unreachable` | 20 | A finished call that reached nobody, reached a machine or ended before the question. | Nobody answered, so nothing was checked. |
+| `unreachable` | 30 | A finished call that reached nobody, reached a machine or ended before the question. | Nobody answered, so nothing was checked. |
 | `outcome_unknown` | 40 | A non-terminal call status, an unreadable call or an ambiguous create. | The call may have run. Nothing was decided. The call id is in the record. |
 
 `refused_to_confirm` is a useful answer rather than a failure. It still hands the
 customer the number they should be using.
 
-Exit 30 is a refusal or a usage error, including a receipt that does not match the
-claim file. Exit 40 also covers a `verify` run that found a broken chain or a verdict
-that does not follow from the stored evidence.
+Exit 50 is a usage error: a refused claim file, a missing or mismatched `--receipt`, a
+missing API key, or an unknown command. Exit 60 is a `verify` run that found a problem
+in the record chain, which includes a verdict that does not follow from the stored
+evidence. A successful `preview` or `verify` exits 0.
 
 ## Evidence rules you must not soften
 
