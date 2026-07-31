@@ -93,39 +93,85 @@ this exchange.
 
 ---
 
-## Example 5 — low confidence surfaced, not smoothed over
+## Example 5 — a confident "no" outranks an unreliable "yes"
 
 ```
-Riverside Pharmacy (…0100)   yes   —   —   Rx: unknown   —   conf 0.41  ⚠ verify
+Pharmacy                Stock    Qty  Price  Conf
+Oakhill Chemist (…0101) no        —      —   0.95
+Riverside (…0100)       yes       —      —   0.31  ⚠ unverified
     Call quality was poor; several answers were unclear.
 ```
 
-**Agent:** Riverside said yes, but confidence is low — the line was bad and
-several answers were unclear. I'd ring them yourself before travelling.
+**Agent:** Oakhill definitely doesn't have it — that's a clear answer.
+Riverside said yes, but confidence is low: the line was bad and several answers
+were unclear. I've ranked it below because an unreliable yes is worse than a
+reliable no when you'd be travelling on it. Ring Riverside yourself before you
+set off.
 
-Confidence below about 0.6 gets flagged rather than reported as fact. Someone
-may be about to travel while unwell on the strength of this.
+Verification is the **primary** sort key, ahead of stock status. A
+low-confidence "yes" appearing at the top of the list is the specific failure
+that sends a sick person on a pointless journey.
 
 ---
 
-## Example 6 — dry run before spending anything
+## Example 6 — a call that didn't complete reports nothing
+
+```
+Station Road Pharmacy (…0102)   unknown   —   —   —   ⚠ unverified
+    Call did not complete (no answer). No stock information obtained.
+```
+
+The run ended `NO ANSWER` with `task_completed: false`. Even if a partial
+summary came back, no stock fields are reported — "could not be reached" is a
+distinct outcome from "not in stock", and scraping a half-finished call for a
+stock answer is how a patient gets sent somewhere on a sentence nobody finished.
+
+---
+
+## Example 7 — a number that isn't E.164
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv
+Invalid phone number: '07700900123' is not E.164. Expected + followed by
+country code and number, 8-15 digits total, e.g. +15550100. Do not guess a
+country code — ask the user.
+```
+
+Validation runs before anything else, in both dry run and live mode. Nothing is
+dialled and no plan is created.
+
+---
+
+## Example 8 — dry run, fully offline
 
 ```bash
 $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv
 
-amoxicillin 500mg — 21 capsules · 3 pharmacies · dry run, no calls
+DRY RUN — offline. No credentials read, nothing sent.
 
-  DRY RUN Riverside Pharmacy (…0100) — plan pX70PPR62, would spend 1 call
-  DRY RUN Oakhill Chemist (…0101) — plan p8KM2QW41, would spend 1 call
-  DRY RUN Station Road Pharmacy (…0102) — plan pT39LLV87, would spend 1 call
+  Riverside Pharmacy (…0100) — would send:
+  {
+    "tool": "plan_call",
+    "goal": "You are calling a pharmacy on behalf of a patient…",
+    "to_phones": ["+15550100"],
+    "region": "US"
+  }
+  …
+
+  3 call(s) would be placed. Add --live to dial.
 ```
 
-`plan_call` is free, so this validates the goal wording, the numbers and the
-region without placing a call. Add `--live` when you're ready to dial.
+No token is read and no socket is opened. The numbers are validated and the
+payload is printed locally.
+
+Note this deliberately does **not** call `plan_call` to check the goal wording,
+even though `plan_call` is free of charge. Free of charge isn't free of
+consequence: it would transmit the recipient's number and the medication being
+sought to a third party, from a mode the user was told places no calls.
 
 ---
 
-## Example 7 — budget refuses before dialling
+## Example 9 — budget refuses before dialling
 
 ```bash
 $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live --max-calls 2

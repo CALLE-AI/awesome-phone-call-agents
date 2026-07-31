@@ -3,19 +3,20 @@
 Pharmacy stock check — reference implementation for the pharmacy-stock-check
 Agent Skill.
 
-Dry-run by default. Nothing is dialled without --live.
+Dry run is FULLY OFFLINE. It loads no credentials, opens no socket, and sends
+no phone number or medication context anywhere. It validates the input and
+prints the exact payload it would send. Only --live touches the network.
 
-    python3 pharmacy_search.py --pharmacies pharmacies.csv           # no calls
+    python3 pharmacy_search.py --pharmacies pharmacies.csv           # offline
     python3 pharmacy_search.py --pharmacies pharmacies.csv --live    # calls
 
-Requires the CALL-E CLI to be authenticated (`calle auth login`) and fastmcp:
+Live mode requires the CALL-E CLI to be authenticated and fastmcp installed:
 
     npm install -g @call-e/cli && calle auth login
     pip install fastmcp
 
-Sample numbers in this directory use the reserved fictional range
-+1 555 0100–0199. Replace them with real E.164 numbers you have permission to
-call.
+Sample numbers use the reserved fictional range +1 555 0100–0199. Replace them
+with real E.164 numbers you have permission to call.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import hashlib
 import json
 import logging
 import re
@@ -32,9 +34,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastmcp import Client
-from fastmcp.client.transports import StreamableHttpTransport
-
 log = logging.getLogger("pharmacy-stock-check")
 
 SERVER_URL = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
@@ -43,6 +42,12 @@ TOKEN_CACHE = Path.home() / ".calle-mcp" / "cli"
 TERMINAL_STATUSES = {"COMPLETED", "NO ANSWER", "DECLINED", "FAILED", "CANCELLED"}
 TERMINAL_ACTIONS = {"report_result", "report_blocked", "none"}
 BLOCKED_ACTIONS = {"ask_user_for_missing_info", "ask_user_for_retry_confirmation"}
+
+# E.164: a plus, a non-zero country code digit, then 7-14 more digits.
+E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+
+# Below this, a result is reported but never allowed to outrank a verified one.
+MIN_CONFIDENCE = 0.6
 
 FIELDS = [
     "in_stock", "form_available", "quantity_available", "unit_price", "currency",
@@ -60,8 +65,28 @@ NULLISH = {"", "unknown", "unclear", "n/a", "na", "none", "not stated"}
 
 
 # --------------------------------------------------------------------------
-# Safety helpers
+# Validation
 # --------------------------------------------------------------------------
+
+
+class InvalidPhoneNumber(ValueError):
+    pass
+
+
+def validate_e164(phone: str) -> str:
+    """Reject anything that isn't E.164 before it can be dialled.
+
+    Documenting the requirement isn't enough — a local-format number silently
+    reaching the planner is how the wrong person gets called.
+    """
+    cleaned = (phone or "").strip().replace(" ", "").replace("-", "")
+    if not E164_RE.match(cleaned):
+        raise InvalidPhoneNumber(
+            f"{phone!r} is not E.164. Expected + followed by country code and "
+            f"number, 8-15 digits total, e.g. +15550100. Do not guess a "
+            f"country code — ask the user."
+        )
+    return cleaned
 
 
 def mask(phone: str) -> str:
@@ -69,22 +94,9 @@ def mask(phone: str) -> str:
     return f"…{phone[-4:]}" if len(phone) >= 4 else "…"
 
 
-def load_token() -> str:
-    """Reuse the CALL-E CLI's cached token. The file shape is undocumented,
-    so probe the likely key names rather than assuming one."""
-    candidates = sorted(TOKEN_CACHE.glob("*/token.json"))
-    if not candidates:
-        raise SystemExit(f"No CALL-E token under {TOKEN_CACHE}. Run: calle auth login")
-    data = json.loads(candidates[-1].read_text())
-    for key in ("access_token", "accessToken", "token", "bearer"):
-        value = data.get(key)
-        if isinstance(value, str):
-            return value
-        if isinstance(value, dict):
-            for inner in ("access_token", "accessToken", "token"):
-                if isinstance(value.get(inner), str):
-                    return value[inner]
-    raise SystemExit(f"No access token found in {candidates[-1]}")
+# --------------------------------------------------------------------------
+# Budget
+# --------------------------------------------------------------------------
 
 
 class BudgetExceeded(RuntimeError):
@@ -122,6 +134,51 @@ class CallBudget:
         self.spent += n
         self.ledger.write_text(json.dumps({"spent": self.spent}))
         log.warning("Placed %s call(s) — %s/%s used", n, self.spent, self.max_calls)
+
+
+# --------------------------------------------------------------------------
+# Durable run state
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class RunStore:
+    """Persisted plan and run IDs, so an interruption resumes instead of redials.
+
+    Without this, a lost response or a killed process means the next invocation
+    plans afresh and calls the pharmacist a second time — spending a call and
+    bothering a real person. `plan_id` is CALL-E's idempotency key, so it only
+    protects you if it survives the crash.
+    """
+
+    path: Path = field(default=Path(".pharmacy_runs.json"))
+
+    def _load(self) -> dict[str, Any]:
+        if not self.path.exists():
+            return {}
+        try:
+            return json.loads(self.path.read_text())
+        except json.JSONDecodeError:
+            return {}
+
+    @staticmethod
+    def key(phone: str, goal: str) -> str:
+        return hashlib.sha256(f"{phone}|{goal}".encode()).hexdigest()[:32]
+
+    def get(self, key: str) -> dict[str, Any]:
+        return self._load().get(key, {})
+
+    def put(self, key: str, **fields: Any) -> None:
+        data = self._load()
+        entry = data.setdefault(key, {})
+        entry.update(fields)
+        entry["updated_at"] = datetime.now(timezone.utc).isoformat()
+        self.path.write_text(json.dumps(data, indent=2))
+
+    def clear(self, key: str) -> None:
+        data = self._load()
+        data.pop(key, None)
+        self.path.write_text(json.dumps(data, indent=2))
 
 
 # --------------------------------------------------------------------------
@@ -164,15 +221,18 @@ _FIELD_RE = re.compile(
 
 def parse_summary(summary: str) -> dict[str, str]:
     """Extraction arrives in result.summary as key=value pairs, not in
-    result.extracted. Values contain commas, so split on key= boundaries."""
+    result.extracted. Values contain commas, so split on key= boundaries.
+
+    The separator between fields is not stable — both ", " and "; " observed.
+    """
     if not summary:
         return {}
     matches = list(_FIELD_RE.finditer(summary))
     out: dict[str, str] = {}
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(summary)
-        value = summary[m.end():end].strip().strip(",").strip()
-        out[m.group(1).lower()] = value.rstrip(".") if len(value) < 40 else value
+        value = summary[m.end():end].strip().strip(",;").strip()
+        out[m.group(1).lower()] = value.rstrip(".;,") if len(value) < 40 else value
     return out
 
 
@@ -192,17 +252,40 @@ def normalise(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def to_record(final: dict[str, Any], pharmacy: dict[str, str]) -> dict[str, Any]:
-    result = final.get("result") or {}
-    summary = result.get("summary") or result.get("post_summary") or ""
-    record = normalise(parse_summary(summary))
+    """Build a record, refusing to report stock fields from an incomplete call.
 
+    A call that failed, went to voicemail, or was cut off can still carry a
+    partially filled summary. Treating that as a stock check is how a patient
+    gets sent somewhere on the strength of a sentence nobody finished.
+    """
+    result = final.get("result") or {}
     outcome = result.get("outcome") or {}
-    confidence = outcome.get("completion_confidence") or {}
+    confidence = (outcome.get("completion_confidence") or {}).get("score")
+    completed = outcome.get("task_completed") is True
+    status = (final.get("status") or "").upper()
+
+    reached = completed and status == "COMPLETED"
+    verified = reached and (confidence is not None and confidence >= MIN_CONFIDENCE)
+
+    if reached:
+        summary = result.get("summary") or result.get("post_summary") or ""
+        record = normalise(parse_summary(summary))
+    else:
+        # Not a stock check. Say so rather than reporting whatever was scraped.
+        record = {name: ("unknown" if name in ENUMS else None) for name in FIELDS}
+        record["pharmacist_notes"] = (
+            f"Call did not complete ({status.lower() or 'unknown status'}). "
+            f"No stock information obtained."
+        )
+
     record.update(
         pharmacy=pharmacy.get("name"),
         phone_masked=mask(pharmacy.get("phone", "")),
         run_status=final.get("status"),
-        confidence=confidence.get("score"),
+        task_completed=completed,
+        confidence=confidence,
+        reached=reached,
+        verified=verified,
         evidence=outcome.get("evidence") or [],
         transcript=result.get("transcript"),
     )
@@ -210,18 +293,18 @@ def to_record(final: dict[str, Any], pharmacy: dict[str, str]) -> dict[str, Any]
 
 
 def rank(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """In stock first, then cheapest, then whoever will hold it.
+    """Verified results first, then stock, then price, then hold.
 
-    Low-confidence results sink: a reliable "no" beats an unreliable "yes"
-    that sends someone across town while unwell.
+    Verification outranks stock status deliberately. A confident "no" is more
+    useful than an unreliable "yes" that sends someone across town while
+    unwell — so a low-confidence yes must never outrank a high-confidence no.
     """
     order = {"yes": 0, "partial": 1, "unknown": 2, "no": 3}
 
     def key(r: dict[str, Any]):
-        conf = r.get("confidence")
         return (
+            0 if r.get("verified") else 1,          # verified beats everything
             order.get(r.get("in_stock"), 3),
-            0 if (conf is None or conf >= 0.6) else 1,
             r["unit_price"] if r.get("unit_price") is not None else float("inf"),
             0 if r.get("can_hold") == "yes" else 1,
         )
@@ -230,18 +313,43 @@ def rank(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------
-# CALL-E
+# CALL-E — live only. Nothing here is imported or touched in dry run.
 # --------------------------------------------------------------------------
 
 
+def load_token() -> str:
+    """Reuse the CALL-E CLI's cached token. Live mode only."""
+    candidates = sorted(TOKEN_CACHE.glob("*/token.json"))
+    if not candidates:
+        raise SystemExit(f"No CALL-E token under {TOKEN_CACHE}. Run: calle auth login")
+    data = json.loads(candidates[-1].read_text())
+    for key in ("access_token", "accessToken", "token", "bearer"):
+        value = data.get(key)
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            for inner in ("access_token", "accessToken", "token"):
+                if isinstance(value.get(inner), str):
+                    return value[inner]
+    raise SystemExit(f"No access token found in {candidates[-1]}")
+
+
 class Caller:
-    def __init__(self, budget: CallBudget, *, dry_run: bool = True) -> None:
+    """Live caller. Constructing this loads credentials, so it is only ever
+    instantiated under --live."""
+
+    def __init__(self, budget: CallBudget, store: RunStore) -> None:
+        from fastmcp import Client
+        from fastmcp.client.transports import StreamableHttpTransport
+
+        self._Client = Client
+        self._Transport = StreamableHttpTransport
         self.budget = budget
-        self.dry_run = dry_run
+        self.store = store
         self._token = load_token()
 
-    def _client(self) -> Client:
-        return Client(StreamableHttpTransport(
+    def _client(self):
+        return self._Client(self._Transport(
             SERVER_URL, headers={"Authorization": f"Bearer {self._token}"}
         ))
 
@@ -256,76 +364,158 @@ class Caller:
             return json.loads(blocks[0].text)
         return {}
 
+    @staticmethod
+    def _token_live(expires_at: str | None) -> bool:
+        if not expires_at:
+            return True
+        return datetime.fromisoformat(
+            expires_at.replace("Z", "+00:00")
+        ) > datetime.now(timezone.utc)
+
+    async def _poll(self, client, run_id: str, phone: str) -> dict[str, Any] | None:
+        seen: set[str] = set()
+        deadline = time.time() + 900
+        delay = 2.0
+        while time.time() < deadline:
+            final = self._unwrap(
+                await client.call_tool("get_call_run", {"run_id": run_id})
+            )
+            status = (final.get("status") or "").upper()
+            nxt = final.get("next_step")
+            nxt = nxt if isinstance(nxt, dict) else {}
+
+            # The activity feed is cumulative on every poll — dedupe.
+            for entry in final.get("activity", []):
+                key = f"{entry.get('ts')}|{entry.get('message')}"
+                if key not in seen:
+                    seen.add(key)
+                    log.info("    %s", entry.get("message"))
+
+            action = nxt.get("action")
+            if status in TERMINAL_STATUSES or action in TERMINAL_ACTIONS:
+                return final
+            if action in BLOCKED_ACTIONS:
+                log.warning("  %s: needs user input — %s",
+                            mask(phone), nxt.get("instruction"))
+                return final
+
+            delay = float(nxt.get("poll_after_seconds") or delay)
+            await asyncio.sleep(min(delay, 15.0))
+        return None
+
     async def call(self, pharmacy: dict[str, str], goal: str, region: str
                    ) -> dict[str, Any] | None:
-        phone = pharmacy["phone"]
+        phone = validate_e164(pharmacy["phone"])
+        key = self.store.key(phone, goal)
+        saved = self.store.get(key)
 
         async with self._client() as client:
-            plan = self._unwrap(await client.call_tool("plan_call", {
-                "goal": goal, "to_phones": [phone], "region": region,
-                "language": "English", "ttl_seconds": 0, "user_input": goal,
-            }))
+            # Resume an in-flight run rather than planning again. Without this,
+            # an interrupted poll causes a second call to the same pharmacist.
+            if saved.get("run_id"):
+                log.info("  %s: resuming run %s", mask(phone), saved["run_id"][:12])
+                final = await self._poll(client, saved["run_id"], phone)
+                if final is None:
+                    return None
+                self.store.clear(key)
+                return to_record(final, pharmacy)
 
-        if not plan.get("ready_to_run"):
-            log.warning("  %s: planner needs more detail — %s",
-                        mask(phone), plan.get("clarifying_questions"))
-            return None
+            # Reuse a stored plan if its confirm_token is still valid.
+            plan = None
+            if saved.get("plan_id") and self._token_live(saved.get("confirm_expires_at")):
+                plan = {
+                    "plan_id": saved["plan_id"],
+                    "confirm_token": saved["confirm_token"],
+                    "ready_to_run": True,
+                }
+                log.info("  %s: reusing plan %s", mask(phone), saved["plan_id"])
 
-        if self.dry_run:
-            print(f"  DRY RUN {pharmacy['name']} ({mask(phone)}) — "
-                  f"plan {plan['plan_id']}, would spend 1 call")
-            return None
+            if plan is None:
+                plan = self._unwrap(await client.call_tool("plan_call", {
+                    "goal": goal, "to_phones": [phone], "region": region,
+                    "language": "English", "ttl_seconds": 0, "user_input": goal,
+                }))
+                if not plan.get("ready_to_run"):
+                    log.warning("  %s: planner needs more detail — %s",
+                                mask(phone), plan.get("clarifying_questions"))
+                    return None
+                self.store.put(
+                    key,
+                    plan_id=plan["plan_id"],
+                    confirm_token=plan["confirm_token"],
+                    confirm_expires_at=plan.get("confirm_expires_at"),
+                    phone_masked=mask(phone),
+                )
 
-        expires = plan.get("confirm_expires_at")
-        if expires:
-            exp = datetime.fromisoformat(expires.replace("Z", "+00:00"))
-            if exp < datetime.now(timezone.utc):
-                log.error("  %s: confirm_token expired", mask(phone))
-                return None
-
-        self.budget.charge(1)
-        async with self._client() as client:
+            self.budget.charge(1)
             run = self._unwrap(await client.call_tool("run_call", {
                 "plan_id": plan["plan_id"], "confirm_token": plan["confirm_token"],
             }))
             run_id = run.get("run_id")
             if not run_id:
                 return None
+            self.store.put(key, run_id=run_id)
 
-            seen: set[str] = set()
-            deadline = time.time() + 900
-            delay = 2.0
-            while time.time() < deadline:
-                final = self._unwrap(
-                    await client.call_tool("get_call_run", {"run_id": run_id})
-                )
-                status = (final.get("status") or "").upper()
-                nxt = final.get("next_step")
-                nxt = nxt if isinstance(nxt, dict) else {}
+            final = await self._poll(client, run_id, phone)
+            if final is None:
+                log.error("  %s: poll timed out — rerun to resume, not redial",
+                          mask(phone))
+                return None
+            self.store.clear(key)
+            return to_record(final, pharmacy)
 
-                # The activity feed is cumulative on every poll — dedupe.
-                for entry in final.get("activity", []):
-                    key = f"{entry.get('ts')}|{entry.get('message')}"
-                    if key not in seen:
-                        seen.add(key)
-                        log.info("    %s", entry.get("message"))
 
-                action = nxt.get("action")
-                if status in TERMINAL_STATUSES or action in TERMINAL_ACTIONS:
-                    return to_record(final, pharmacy)
-                if action in BLOCKED_ACTIONS:
-                    log.warning("  %s: needs user input — %s",
-                                mask(phone), nxt.get("instruction"))
-                    return None
+# --------------------------------------------------------------------------
+# Dry run — fully offline
+# --------------------------------------------------------------------------
 
-                delay = float(nxt.get("poll_after_seconds") or delay)
-                await asyncio.sleep(min(delay, 15.0))
-        return None
+
+def dry_run(pharmacies: list[dict[str, str]], goal: str, region: str) -> None:
+    """Validate and print. No credentials read, no socket opened, no data sent.
+
+    The point of a dry run in a workflow that calls real people is to be able
+    to inspect exactly what would happen without anything leaving the machine.
+    A dry run that still transmits the recipient's number and the medication
+    being sought is not a dry run.
+    """
+    print(f"\nDRY RUN — offline. No credentials read, nothing sent.\n")
+    for pharmacy in pharmacies:
+        phone = validate_e164(pharmacy["phone"])
+        payload = {
+            "tool": "plan_call",
+            "goal": goal,
+            "to_phones": [phone],
+            "region": region,
+            "language": "English",
+            "ttl_seconds": 0,
+        }
+        print(f"  {pharmacy.get('name', '?')} ({mask(phone)}) — would send:")
+        print("  " + json.dumps(payload, indent=2)[:400].replace("\n", "\n  "))
+        print()
+    print(f"  {len(pharmacies)} call(s) would be placed. Add --live to dial.\n")
 
 
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
+
+
+def render(records: list[dict[str, Any]]) -> None:
+    print(f"\n{'Pharmacy':<24} {'Stock':<9} {'Qty':>5} {'Price':>10} "
+          f"{'Rx':<8} {'Hold':>6} {'Conf':>6}")
+    print("-" * 74)
+    for r in rank(records):
+        hold = f"{r['hold_duration_hours']:.0f}h" if r.get("hold_duration_hours") else "—"
+        price = (f"{r['unit_price']:g} {r.get('currency') or ''}".strip()
+                 if r.get("unit_price") is not None else "—")
+        conf = f"{r['confidence']:.2f}" if r.get("confidence") is not None else "—"
+        flag = "" if r.get("verified") else "  ⚠ unverified"
+        print(f"{(r['pharmacy'] or '?')[:24]:<24} {r['in_stock']:<9} "
+              f"{r['quantity_available'] or '—':>5} {price:>10} "
+              f"{r['requires_prescription']:<8} {hold:>6} {conf:>6}{flag}")
+        if r.get("pharmacist_notes"):
+            print(f"    {r['pharmacist_notes']}")
+    print()
 
 
 async def main() -> None:
@@ -338,7 +528,8 @@ async def main() -> None:
     parser.add_argument("--max-calls", type=int, default=3)
     parser.add_argument("--concurrency", type=int, default=3)
     parser.add_argument("--live", action="store_true",
-                        help="ACTUALLY PLACE CALLS. Without this, nothing is dialled.")
+                        help="ACTUALLY PLACE CALLS. Without this the run is "
+                             "fully offline: no credentials, no network.")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -349,17 +540,26 @@ async def main() -> None:
     with args.pharmacies.open() as fh:
         pharmacies = [row for row in csv.DictReader(fh) if row.get("phone")]
 
-    budget = CallBudget(max_calls=args.max_calls)
-    if args.live:
-        # Fail before dialling anything, not halfway through the batch.
-        budget.check(len(pharmacies))
+    # Validate every number before anything else happens, in either mode.
+    try:
+        for pharmacy in pharmacies:
+            pharmacy["phone"] = validate_e164(pharmacy["phone"])
+    except InvalidPhoneNumber as exc:
+        raise SystemExit(f"Invalid phone number: {exc}")
 
-    caller = Caller(budget, dry_run=not args.live)
     goal = build_goal(args.drug, args.dosage, args.quantity)
 
+    if not args.live:
+        dry_run(pharmacies, goal, args.region)
+        return
+
+    budget = CallBudget(max_calls=args.max_calls)
+    store = RunStore()
+    budget.check(len(pharmacies))     # fail before dialling, not halfway
+
+    caller = Caller(budget, store)
     print(f"\n{args.drug} {args.dosage} — {args.quantity} · "
-          f"{len(pharmacies)} pharmacies · "
-          f"{'LIVE' if args.live else 'dry run, no calls'}\n")
+          f"{len(pharmacies)} pharmacies · LIVE\n")
 
     semaphore = asyncio.Semaphore(args.concurrency)
 
@@ -372,23 +572,8 @@ async def main() -> None:
                 return None
 
     results = [r for r in await asyncio.gather(*(one(p) for p in pharmacies)) if r]
-    if not results:
-        return
-
-    print(f"\n{'Pharmacy':<26} {'Stock':<9} {'Qty':>5} {'Price':>10} "
-          f"{'Rx':<8} {'Hold':>6} {'Conf':>6}")
-    print("-" * 76)
-    for r in rank(results):
-        hold = f"{r['hold_duration_hours']:.0f}h" if r.get("hold_duration_hours") else "—"
-        price = (f"{r['unit_price']:g} {r.get('currency') or ''}".strip()
-                 if r.get("unit_price") is not None else "—")
-        print(f"{(r['pharmacy'] or '?')[:26]:<26} {r['in_stock']:<9} "
-              f"{r['quantity_available'] or '—':>5} {price:>10} "
-              f"{r['requires_prescription']:<8} {hold:>6} "
-              f"{r['confidence'] if r['confidence'] is not None else '—':>6}")
-        if r.get("pharmacist_notes"):
-            print(f"    {r['pharmacist_notes']}")
-    print()
+    if results:
+        render(results)
 
 
 if __name__ == "__main__":

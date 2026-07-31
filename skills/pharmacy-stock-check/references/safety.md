@@ -58,12 +58,31 @@ one, or imply the user has a prescription they have not confirmed.
 The user may travel somewhere while unwell on the strength of a result. That
 raises the cost of overconfidence well above the usual.
 
+- **Gate on completion before reporting anything.** A call that failed, hit
+  voicemail or was cut off can still carry a partially filled summary. If
+  `task_completed` isn't true and the run didn't reach `COMPLETED`, emit no
+  stock fields at all — report that the pharmacy could not be reached.
+- **Verification must outrank stock status in any ranking.** A low-confidence
+  "yes" appearing above a high-confidence "no" is the specific failure that
+  sends a sick person on a pointless journey. Rank verified results first,
+  then by stock.
 - Surface the confidence score. Do not average it away or hide it behind a tick.
 - Show low-confidence results as needing verification, not as facts.
 - Offer the transcript. Everything reported should be checkable against what was
   actually said.
 - "Could not be reached" is a distinct outcome from "not in stock". Never
   collapse them.
+
+## A dry run must not transmit anything
+
+If a workflow advertises a dry run, that has to mean nothing leaves the machine
+— no credentials read, no socket opened, no payload sent.
+
+Calling a planning or validation endpoint during a "dry run" transmits the
+recipient's phone number and, here, the medication someone is looking for. That
+is health-adjacent information about an identifiable person going to a third
+party, from a mode the user was told was inert. Validate and print locally
+instead.
 
 ---
 

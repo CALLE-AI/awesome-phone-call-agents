@@ -46,8 +46,10 @@ This skill gathers **availability and pricing information only**.
 Required: medication name, dosage, quantity, recipient region, and the list of
 pharmacy phone numbers in E.164 format.
 
-If a number is local or ambiguous, ask the user for the full E.164 form. Do not
-guess a country code.
+**Validate every number before anything else happens.** E.164 is a plus, a
+non-zero country code digit, then 7–14 more digits — `^\+[1-9]\d{7,14}$`.
+Reject anything else and ask the user; never guess a country code. A local
+number silently reaching the planner is how the wrong person gets called.
 
 ### 2. Build the goal
 
@@ -103,20 +105,32 @@ get_call_run → poll until terminal, following next_step.action
 `plan_call` is free. Iterate on the goal text as much as you like before
 spending anything.
 
-### 5. Read the result
+### 5. Read the result — but only if the call actually completed
 
-The extracted fields arrive in `result.summary` as `key=value` pairs, **not** in
-`result.extracted` — see `references/calle-mcp-integration.md`. Values contain
-commas, so split on `key=` boundaries rather than on commas.
+**Check `result.outcome.task_completed` and the run status first.** A call that
+failed, went to voicemail or was cut off can still carry a partially filled
+summary. Treating that as a stock check is how a patient gets sent somewhere on
+the strength of a sentence nobody finished.
 
-Also read `result.outcome`, which gives `task_completed`, a confidence score and
-specific evidence strings. Surface the confidence to the user.
+If the run did not reach `COMPLETED` with `task_completed: true`, report *"could
+not be reached"* and emit **no stock fields at all**. Do not scrape what's there.
+
+Only when the call completed, parse the extracted fields from `result.summary`
+as `key=value` pairs — **not** from `result.extracted`, see
+`references/calle-mcp-integration.md`. Values contain commas and the separator
+is not stable (both `, ` and `; ` observed), so split on `key=` boundaries.
+
+`result.outcome` also gives a confidence score and specific evidence strings.
 
 ### 6. Report
 
-Rank in-stock first, then by price, then by whether they will hold it. Sink
-low-confidence results below high-confidence ones: a reliable "no" is more
-useful than an unreliable "yes" that sends someone across town.
+**Verification outranks stock status.** Rank verified results first — those that
+completed with confidence at or above 0.6 — then by stock, then price, then
+hold. A low-confidence "yes" must never outrank a high-confidence "no". Someone
+may travel while unwell on the strength of this, which makes an unreliable
+positive worse than a reliable negative.
+
+Mark anything unverified as such, visibly.
 
 Mask phone numbers in summaries — show the pharmacy name and the last four
 digits.
@@ -130,20 +144,28 @@ Offer the transcript. Every claim should be checkable against what was said.
 - **Check the budget for the whole search up front**, so five pharmacies against
   three remaining calls fails before anything is dialled rather than halfway
   through.
-- **`plan_id` is the idempotency key.** Never issue `run_call` twice for the
-  same plan.
-- **Persist every response immediately.** Never re-dial to recover data you
-  already paid for.
+- **Persist `plan_id` and `run_id` to disk as soon as you receive them.**
+  `plan_id` is CALL-E's idempotency key, but it only protects you if it survives
+  a crash. An interrupted poll with no persisted run means the next invocation
+  plans afresh and calls the same pharmacist a second time — spending a call and
+  bothering a real person. On restart, resume the stored run instead of
+  re-planning; only clear the entry once the run reaches a terminal state.
+- **Never re-dial to recover data you already paid for.**
 - **No recurring schedules.** This is a one-shot workflow. If a user wants
   repeat checks, create them explicitly and tell the user how to cancel.
 
 ## Dry run
 
-`scripts/pharmacy_search.py` is dry-run by default and prints the exact payload
-it would send without placing a call. Live calls require `--live`.
+`scripts/pharmacy_search.py` is dry-run by default, and the dry run is **fully
+offline**: it reads no credentials, opens no socket, and sends nothing anywhere.
+It validates every number and prints the exact payload it would send.
+
+That matters here. A dry run that still transmits the recipient's phone number
+and the medication being sought — by calling the planning endpoint — is not a
+dry run. In a medical-adjacent workflow it leaks who is looking for what.
 
 ```bash
-python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv        # no calls
+python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv        # offline
 python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live # calls
 ```
 
