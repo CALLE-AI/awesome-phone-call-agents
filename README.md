@@ -130,6 +130,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | App | Language | Purpose |
 | --- | --- | --- |
 | [`apps/typescript/phone-approval-gate`](apps/typescript/phone-approval-gate/) | TypeScript | Phone-verified approval gate for irreversible automation, with a one-time spoken code, an escalation ladder, dual control and a verifiable approval record. |
+| [`apps/typescript/call-on-behalf`](apps/typescript/call-on-behalf/) | TypeScript | Delegated errand caller with a disclosure budget: says only the details the person authorized, commits only inside authorized windows, and returns the answers plus the transcript. |
 | [`apps/python/callback-window-coordinator`](apps/python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/python/batch-runner`](apps/python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
 | [`apps/python/broker-login-client`](apps/python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
@@ -157,6 +158,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 
 - [`Safety reference`](skills/call-reminder/references/safety.md) - Consent, E.164 phone-number handling, credential boundaries, cancellation, duplicate-job prevention, and medical reminder boundaries.
 - [`Approval threat model`](apps/typescript/phone-approval-gate/docs/threat-model.md) - What a phone approval proves and does not prove, out-of-band secret handling, and why the phone network is a restricted verification channel.
+- [`Disclosure budget`](apps/typescript/call-on-behalf/docs/privacy-budget.md) - Authorizing what a caller may say about a person, checking the script before the call and checking what was actually said after it.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 
 ## Contributing
