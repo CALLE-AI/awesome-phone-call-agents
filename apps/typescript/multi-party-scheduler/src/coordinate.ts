@@ -189,13 +189,18 @@ function asCallError(error: unknown): CalleCallError {
  * same call rather than a second one.
  *
  * Every failure is sorted into one of two kinds. A refusal the server chose to
- * send means no call exists, so it comes back as a plain error code and the
- * caller may carry on. Anything that leaves the call unknown, so no reply, a
- * timeout, a rate limit, a conflict on the key, a server error, a read that
- * failed after the create got through or a call CALL-E has not finished with,
- * comes back `unresolved` with whatever call id is known. The first thing tried
- * on an ambiguous create is the same key again: that hands back the call CALL-E
- * already holds for it and can never ring a second time.
+ * send on the first attempt means no call exists, so it comes back as a plain
+ * error code and the caller may carry on. Anything that leaves the call unknown,
+ * so no reply, a timeout, a rate limit, a conflict on the key, a server error, a
+ * read that failed after the create got through or a call CALL-E has not
+ * finished with, comes back `unresolved` with whatever call id is known.
+ *
+ * The first thing tried on an ambiguous create is the same key again: that hands
+ * back the call CALL-E already holds for it and can never ring a second time.
+ * Getting the call back is the only thing that resolves the ambiguity. A second
+ * failure of any class, definite ones included, stays `unresolved`, because a
+ * refusal can be decided before the idempotency lookup and says nothing about
+ * the request that went unanswered.
  */
 export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
   const { request, port, party, phase, slot } = options;
@@ -212,15 +217,14 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
     try {
       callId = (await port.createCall(input, key)).id;
     } catch (secondError) {
-      const second = asCallError(secondError);
-      if (!second.ambiguous) {
-        // The second answer is definite, so there is no call after all.
-        return { call: null, callId: null, errorCode: second.code, unresolved: false };
-      }
+      // Only getting the call back resolves this. The first request may already
+      // have been accepted, and a definite refusal here can be decided before
+      // the idempotency lookup ever happens, so it is no evidence that no call
+      // exists. Whatever the second answer is, the call stays unaccounted for.
       return {
         call: null,
         callId: null,
-        errorCode: `${problem.code}, then ${second.code}`,
+        errorCode: `${problem.code}, then ${asCallError(secondError).code}`,
         unresolved: true,
       };
     }

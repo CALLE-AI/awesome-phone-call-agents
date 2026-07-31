@@ -6,7 +6,9 @@
  * idempotency key or a server error can each sit on top of a call that was
  * accepted, and so can a read that fails after the create got through. Those
  * leave a call that may be ringing somebody right now, so the same key is
- * re-issued to find it and nobody else is called until it is settled.
+ * re-issued to find it and nobody else is called until it is settled. Finding the
+ * call is the only thing that settles it: a second failure of any class, definite
+ * ones included, keeps it unresolved.
  */
 
 import assert from "node:assert/strict";
@@ -115,6 +117,38 @@ test("a create nobody can reconcile stops the round with the call unresolved", a
   assert.match(result.note, /internal_error/);
   assert.match(result.note, /by hand/);
   assert.equal(replay(entries).ok, true, JSON.stringify(replay(entries).issues));
+});
+
+test("a definite refusal on the second attempt resolves nothing", async () => {
+  // 401 and 403 can be decided before the idempotency lookup ever happens, so a
+  // definite answer to the reconciliation says nothing about the create that went
+  // unanswered. Only getting the call back settles it.
+  const definite = [
+    new CalleCallError("unauthorized", "the key was rejected", 401),
+    new CalleCallError("forbidden", "this key cannot place calls", 403),
+    new CalleCallError("bad_request", "the payload was rejected", 400),
+    new CalleCallError("insufficient_balance", "no credit", 402),
+  ];
+  for (const second of definite) {
+    const scripts = [...HAPPY];
+    scripts[0] = gather(PLUMBER, { createErrors: [noReply(), second] });
+    const { result, port, entries } = await run(scripts);
+    assert.equal(result.outcome, "unresolved", `${second.status} was read as proof of no call`);
+    assert.equal(port.creates.length, 2, "one attempt, then the reconciliation");
+    assert.equal(
+      port.creates.some((call) => call.phone !== PLUMBER),
+      false,
+      "nobody else is called while the first call may be live",
+    );
+    const first = entries.find((entry) => entry.kind === "gather");
+    assert.ok(first !== undefined && first.kind === "gather");
+    assert.equal(first.result.call_status, "unresolved");
+    assert.equal(first.result.call_id, null, "no answer ever named the call");
+    assert.equal(first.result.failure_code, `connection_error, then ${second.code}`);
+    assert.deepEqual(first.feasible_after, first.feasible_before, "an open call narrows nothing");
+    assert.match(result.note, new RegExp(second.code));
+    assert.equal(replay(entries).ok, true, JSON.stringify(replay(entries).issues));
+  }
 });
 
 test("a reply the server chose to send is definite and the round reads it as a refusal", async () => {

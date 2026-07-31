@@ -64,8 +64,9 @@ a plain expired window.
 
 CALL-E failures split in two and the split is the whole point.
 
-A reply the server chose to send is definite. A 400, a 402 or a 404 says the call
-was not created, so the phase reads it as a refusal and the protocol carries on.
+A reply the server chose to send to a first attempt is definite. A 400, a 402 or a
+404 says the call was not created, so the phase reads it as a refusal and the
+protocol carries on.
 
 Anything else may be sitting on top of a call that is live. No reply at all, a
 request timeout, a 429, a 409 on the idempotency key, a 5xx, a read that fails
@@ -74,13 +75,17 @@ handled the same way: re-issue the same idempotency key. That is the one request
 that cannot ring a second time, because the key is the reservation, so CALL-E
 answers with the call it already holds for it.
 
-Only when that also fails is the call `unresolved`. Then the run stops. It keeps
-the call id, records the status as `unresolved` rather than as an error or as a
-normal nonterminal result, names the call in the outcome note and calls nobody
-else. In the confirm phase that ordering is the safety property: a call that might
-still agree the time must not be followed by release calls saying it is off.
-Everybody who already said yes is recorded in `unreleased` and `resume` places
-those calls once the open one is settled.
+Getting that call back is the only thing that resolves the ambiguity. Once one
+attempt is unanswered, the class of the second answer stops carrying information:
+a 401 or a 403 can be decided before the idempotency lookup, and the request that
+went unanswered may already have been accepted. So any second failure leaves the
+call `unresolved`. Then the run stops. It keeps whatever call id is known, records
+the status as `unresolved` rather than as an error or as a normal nonterminal
+result, names the call in the outcome note and calls nobody else. In the confirm
+phase that ordering is the safety property: a call that might still agree the time
+must not be followed by release calls saying it is off. Everybody who already said
+yes is recorded in `unreleased` and `resume` places those calls once the open one is
+settled.
 
 The release phase is the exception to stopping. Once the appointment is off, each
 release call is a separate duty to a separate person, so an unresolved release call

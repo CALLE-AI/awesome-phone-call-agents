@@ -43,6 +43,11 @@ export class CalleCallError extends Error {
    * conflict on the idempotency key and a server error can each sit on top of a
    * call that was accepted, so the call may exist and has to be reconciled under
    * the same key rather than dialled again.
+   *
+   * The distinction only holds for the first attempt. Once one attempt is
+   * ambiguous, a definite refusal on the reconciliation can be decided before
+   * the idempotency lookup, so it says nothing about the request that went
+   * unanswered and the call stays unresolved either way.
    */
   readonly ambiguous: boolean;
 

@@ -172,17 +172,20 @@ have said yes, so that yes still earns the release call.
 
 ## When a call cannot be accounted for
 
-A failure that the server chose to send is definite: no call was created, so the
-round carries on. No reply at all, a request timeout, a rate limit, a conflict on
-the idempotency key, a server error, a read that fails after the create got
-through and a call CALL-E has not finished with are all different. Any of them can
-sit on top of a call that is ringing somebody right now.
+A failure that the server chose to send on the first attempt is definite: no call
+was created, so the round carries on. No reply at all, a request timeout, a rate
+limit, a conflict on the idempotency key, a server error, a read that fails after
+the create got through and a call CALL-E has not finished with are all different.
+Any of them can sit on top of a call that is ringing somebody right now.
 
 Those are reconciled, never guessed. The same idempotency key goes back to CALL-E
 first, which returns the call it already holds for that key and cannot place a
-second one. Only when that fails too is the call `unresolved`: the run stops with
-the outcome `unresolved`, the ledger records the call id and the status
-`unresolved` and the note names the call to reconcile. Nobody else is called.
+second one. Getting that call back is the only thing that settles it. Any other
+answer, a definite 401 or 403 included, leaves the call `unresolved`, because a
+refusal can be decided before the idempotency lookup and so says nothing about the
+request that went unanswered. Then the run stops with the outcome `unresolved`, the
+ledger records whatever call id is known and the status `unresolved` and the note
+names the call to reconcile. Nobody else is called.
 That matters most in the confirm phase: a call that might still agree the time
 must not be followed by calls telling everybody it is off. Anybody who already
 said yes is recorded as owed a call and `resume` places it once the open call is
