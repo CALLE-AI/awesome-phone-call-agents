@@ -10,23 +10,62 @@ schema to the call task so the provider returns typed fields you can write strai
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "business_name":       { "type": "string" },
-    "business_type":       { "type": "string", "description": "e.g. Retail Grocery, Restaurant, Office" },
-    "goal":                { "type": "string", "description": "Primary reason they signed up" },
-    "pain_points":         { "type": "array", "items": { "type": "string" } },
-    "used_similar_before": { "type": "boolean" },
-    "sentiment":           { "type": "string", "enum": ["Positive", "Neutral", "Confused", "Frustrated", "Angry"] },
-    "activation_status":   { "type": "string", "enum": ["Activated", "Interested", "NotInterested", "NeedsHumanFollowUp"] },
-    "wants_human_contact": { "type": "boolean" },
-    "follow_up_required":  { "type": "boolean" },
-    "notes":               { "type": "string" }
+    "consent_granted":       { "type": "boolean", "description": "Did the customer agree to continue at the consent checkpoint" },
+    "disposition":           { "type": "string", "enum": ["Completed", "EndedEarly", "Declined", "DoNotCall", "NotReached"] },
+    "disposition_evidence":  { "type": "string", "description": "What the customer actually said that supports the disposition. Quote or close paraphrase. Never inferred from tone or silence." },
+    "business_name":         { "type": "string" },
+    "business_type":         { "type": "string", "description": "e.g. Retail Grocery, Restaurant, Office" },
+    "goal":                  { "type": "string", "description": "Primary reason they signed up" },
+    "pain_points":           { "type": "array", "items": { "type": "string" } },
+    "used_similar_before":   { "type": "boolean" },
+    "sentiment":             { "type": "string", "enum": ["Positive", "Neutral", "Confused", "Frustrated", "Angry"] },
+    "activation_status":     { "type": "string", "enum": ["Activated", "Interested", "NotInterested", "NeedsHumanFollowUp"] },
+    "wants_human_contact":   { "type": "boolean" },
+    "follow_up_required":    { "type": "boolean" },
+    "notes":                 { "type": "string" }
   },
-  "required": ["sentiment", "activation_status", "follow_up_required"]
+  "required": ["consent_granted", "disposition", "disposition_evidence"]
 }
 ```
 
-Keep `required` small. A customer may end the call early, and a schema that demands nine fields
-from a ninety-second conversation will either fail validation or invite invented values.
+The three required fields are the safety fields, not the analysis fields. A result is worthless —
+and dangerous — if you cannot tell whether the customer agreed to take part, so consent and
+disposition must always be present even when discovery collected nothing.
+
+Everything else is optional by design. A customer may end the call after ten seconds, and a schema
+that demands nine analysis fields from a ninety-second conversation will either fail validation or
+invite invented values. `sentiment` and `activation_status` are only meaningful when `disposition`
+is `Completed`; treat them as absent otherwise.
+
+## Consent and disposition
+
+`disposition` is the field the outcome classification in `SKILL.md` is built on. Define it for the
+model precisely:
+
+| Value | Meaning |
+| --- | --- |
+| `Completed` | The customer consented and the conversation ran to its natural end. |
+| `EndedEarly` | The customer consented, then the call ended before wrap-up — hung up, cut off, or asked to stop partway. |
+| `Declined` | The customer refused at the consent checkpoint, or asked to end the call. |
+| `DoNotCall` | The customer asked not to be contacted again. Stronger than `Declined` and must suppress future calls. |
+| `NotReached` | No human took part: voicemail, carrier message, silence. |
+
+`disposition_evidence` must contain what the customer actually said. It exists so a human can audit
+a refusal that was recorded as consent, or a consent that was recorded as a refusal. Reject a
+result whose disposition is `Completed` but whose evidence does not show agreement — an empty or
+generic evidence string is a validation failure, not a formatting problem.
+
+Do not infer consent from silence, from the customer continuing to answer questions, or from a
+warm tone. Infer it only from an affirmative answer at the consent checkpoint.
+
+## Precedence
+
+`declined` outranks the presence of a result. A call can produce a complete, well-formed structured
+result and still be a refusal — the agent asks its consent question, the customer says "no, take me
+off your list", and the provider returns a populated object anyway.
+
+Classify on `disposition` and `consent_granted` first, then look at the analysis fields. Never the
+other way round. See the ordered table in `SKILL.md`.
 
 ## Example (fictional)
 
@@ -34,6 +73,9 @@ A fictional customer answering a fictional onboarding call:
 
 ```json
 {
+  "consent_granted": true,
+  "disposition": "Completed",
+  "disposition_evidence": "Asked if now was a good time, customer said 'yes, that's fine', and stayed to the end of the call.",
   "business_type": "Retail Grocery",
   "goal": "Reach more customers who order online rather than in person.",
   "pain_points": ["Online orders are a small share of total sales."],
@@ -45,6 +87,23 @@ A fictional customer answering a fictional onboarding call:
   "notes": "Asked for help placing a first order."
 }
 ```
+
+A refusal, which must never become an onboarding no matter how much else the model fills in:
+
+```json
+{
+  "consent_granted": false,
+  "disposition": "DoNotCall",
+  "disposition_evidence": "Customer said 'no, please don't call me about this' at the consent question.",
+  "business_type": "Retail Grocery",
+  "sentiment": "Neutral"
+}
+```
+
+Note that the second example still carries `business_type` — the provider inferred it from the
+signup context. Classifying on the presence of a result would treat this refusal as an onboarding
+and create a follow-up task for someone who just asked to be left alone. Classifying on
+`disposition` does not.
 
 Note what happened in that example: the customer never said the words "needs human follow-up". They
 agreed when the agent offered help. The mapping from a spoken "yes, that would be great" to
@@ -61,11 +120,19 @@ Prefer closed enums over free text for anything you will filter, count, or route
 
 ## Ingestion Rules
 
-- Treat webhook delivery as at-least-once. Key writes on the provider event id or your own call id.
+- Treat webhook delivery as at-least-once. Key writes on the provider event id, and key attempts on
+  `(signup_id, attempt_no)`, so redelivery cannot advance state twice.
 - Read the per-recipient structured result first, then fall back to the call-level one.
+- **Classify before you write.** Resolve the outcome from `disposition` and `consent_granted` using
+  the ordered table in `SKILL.md`, then write only what that outcome permits.
 - An empty or absent structured result means the customer was not reached. Do not coerce it into an
   empty insight row, and do not let it count as an onboarding.
-- Store the transcript alongside the fields so a human can audit any extraction they doubt.
+- Reject a result missing `disposition`, `consent_granted`, or `disposition_evidence`. Treat a
+  malformed result as `not-reached` rather than guessing consent.
+- A later result must never overwrite a `Declined` or `DoNotCall` disposition already on record.
+  Refusals are terminal for the signup.
+- Store the transcript alongside the fields so a human can audit any extraction they doubt,
+  especially the disposition.
 
 ## Reporting
 
