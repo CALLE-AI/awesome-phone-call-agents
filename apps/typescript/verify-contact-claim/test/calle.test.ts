@@ -26,7 +26,7 @@ function refuses(baseUrl: string, fragment: string): void {
   );
 }
 
-test("the CALL-E host and loopback are trusted, and loopback may be plain http", () => {
+test("the CALL-E host and loopback are trusted, with plain http for loopback", () => {
   assert.equal(assertTrustedBaseUrl("https://api.heycall-e.com").protocol, "https:");
   assert.equal(assertTrustedBaseUrl("https://API.HeyCall-E.com/v1").protocol, "https:");
   assert.equal(assertTrustedBaseUrl("http://localhost:8080").hostname, "localhost");

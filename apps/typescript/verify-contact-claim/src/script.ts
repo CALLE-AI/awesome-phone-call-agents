@@ -219,7 +219,7 @@ export function idempotencyKey(claim: Claim): string {
  * Exactly what the receipt covers, as canonical JSON.
  *
  * Exported so the claim is checkable rather than asserted: every value the preview
- * prints has to appear in here, and a test walks the preview to prove it.
+ * prints has to appear in here. A test walks the preview to prove it.
  *
  * The claim goes in as the app parsed it, so nothing the preview shows is left
  * out. `asked_for` and `number_shown` are in here because the preview prints them.

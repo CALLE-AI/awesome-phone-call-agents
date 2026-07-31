@@ -217,7 +217,7 @@ export interface TranscriptReading {
  * edited by hand fails verification even when its hash chain is intact.
  */
 export interface OutcomeInputs {
-  /** The provider status, or `api_error` when nothing was placed, or `state_unknown`. */
+  /** The provider status: `api_error` when nothing was placed, `state_unknown` when unknown. */
   call_status: string;
   failure_code: string | null;
   transcript_available: boolean;
@@ -225,7 +225,7 @@ export interface OutcomeInputs {
   machine_answered: boolean;
   question_asked: boolean;
   signal: ContactSignal;
-  /** CALL-E's own reading. Corroboration only, and null on a healthy call. */
+  /** CALL-E's own reading. Corroboration only. Null on a healthy call. */
   structured_signal: ContactSignal | null;
   /** False when the call reported no completion time this app could use. */
   completion_time_usable: boolean;
@@ -246,7 +246,7 @@ export interface RecordedClaim {
   trusted_number_masked: string;
   trusted_number_digest: string;
   trusted_printed_on: string;
-  /** The number given out on the call for the responsible party, or null when none was. */
+  /** The number given out on the call for the responsible party. Null when none was. */
   callback_number_masked: string | null;
 }
 

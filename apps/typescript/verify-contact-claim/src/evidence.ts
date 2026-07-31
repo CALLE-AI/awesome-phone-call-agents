@@ -36,11 +36,11 @@ export function isTerminalCallStatus(status: string): boolean {
 }
 
 /**
- * The provider's completion time in milliseconds, or null when it cannot be used.
+ * The provider's completion time in milliseconds. Null when it cannot be used.
  *
  * A JSON field arrives as whatever the provider sent, so this is the one place
  * that decides whether there is a usable timestamp at all. Missing, null, empty,
- * unparseable, non finite and the wrong type all come back null, and null fails
+ * unparseable, non finite and the wrong type all come back null. Null fails
  * closed everywhere it is read: without the call's own clock a replay of a call
  * that finished hours ago cannot be told from an answer given just now.
  */

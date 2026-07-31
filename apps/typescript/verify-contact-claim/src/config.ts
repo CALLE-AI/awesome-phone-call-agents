@@ -5,9 +5,9 @@
  *
  * The trusted number is checked first, before anything else in the file is read.
  * It is the whole trust anchor: the number printed on the customer's own card or
- * bill. A file that does not carry one, or that carries the number which contacted
- * them, has nothing this app can verify against, so it refuses there rather than
- * getting as far as a call.
+ * bill. A file that carries no trusted number has nothing this app can verify
+ * against. Neither does one that puts the number which contacted them in that
+ * field, so it refuses there rather than getting as far as a call.
  *
  * Then the file is scanned for a secret somebody was asked to read out and for an
  * instruction to impersonate the customer. Both refuse.

@@ -9,9 +9,9 @@
  * Everything about it fails closed. A verdict comes only from a terminal call
  * status. An answer comes only from a callee turn that supports it, after our
  * question was asked. CALL-E's own reading corroborates that turn and never
- * replaces it, so the two disagreeing is not an answer. A call whose completion
- * time cannot be read, or whose answer landed outside the window this run opened,
- * is not an answer either.
+ * replaces it, so the two disagreeing is not an answer. Two more cases are not
+ * answers either: a call whose completion time cannot be read at all, then a call
+ * whose answer landed outside the window this run opened.
  *
  * `refused_to_confirm` is not a failure. An institution that will not discuss a
  * third party's account is complying with the rules it is under, so the app records

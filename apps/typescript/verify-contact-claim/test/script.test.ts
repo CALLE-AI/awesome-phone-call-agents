@@ -3,7 +3,7 @@
  *
  * The script is the product. It says what it is in its first sentence, states the
  * contact being checked, asks one question and refuses everything else. Two things
- * it must never carry: what the caller asked the customer to do, and any number at
+ * it must never carry: what the caller asked the customer to do, plus any number at
  * all.
  */
 
