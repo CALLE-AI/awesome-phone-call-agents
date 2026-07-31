@@ -49,6 +49,41 @@ outside the window is not a confirmation and the run ends as `window_expired`. T
 person still said yes on a phone call, so they are still owed the release call that
 says it is off.
 
+Both clocks have to be readable for that check to mean anything. A `completed_at`
+that is missing, null, empty, unparseable or not a string at all is refused rather
+than waved through, because otherwise a replayed call with no usable timestamp
+would satisfy any window it was measured against. Each refusal records its own
+reason in the ledger, `no_window`, `late_result`, `no_completion_time` or
+`outside_window`, so a line that failed for want of a timestamp does not read like
+a plain expired window.
+
+## When a call cannot be accounted for
+
+CALL-E failures split in two and the split is the whole point.
+
+A reply the server chose to send is definite. A 400, a 402 or a 404 says the call
+was not created, so the phase reads it as a refusal and the protocol carries on.
+
+Anything else may be sitting on top of a call that is live. No reply at all, a
+request timeout, a 429, a 409 on the idempotency key, a 5xx, a read that fails
+after the create got through and a call CALL-E has not finished with are all
+handled the same way: re-issue the same idempotency key. That is the one request
+that cannot ring a second time, because the key is the reservation, so CALL-E
+answers with the call it already holds for it.
+
+Only when that also fails is the call `unresolved`. Then the run stops. It keeps
+the call id, records the status as `unresolved` rather than as an error or as a
+normal nonterminal result, names the call in the outcome note and calls nobody
+else. In the confirm phase that ordering is the safety property: a call that might
+still agree the time must not be followed by release calls saying it is off.
+Everybody who already said yes is recorded in `unreleased` and `resume` places
+those calls once the open one is settled.
+
+The release phase is the exception to stopping. Once the appointment is off, each
+release call is a separate duty to a separate person, so an unresolved release call
+leaves that party listed as still owed and the round carries on to the others.
+Stopping there would leave people who agreed to a time believing it is going ahead.
+
 ## Phase 3, release
 
 If any party does not confirm, nothing is arranged and every party who already
@@ -98,6 +133,14 @@ release call has gone out the appointment stays off, so a yes discovered late
 cannot bring it back. A confirm call for a slot that has already started is not
 placed at all. Anything it cannot settle is named in the outcome note for a person
 to check by hand.
+
+Recovery owns exactly the confirm and release calls the ledger cannot account for,
+which includes every call recorded as `unresolved`. While one of those is a confirm
+call, `resume` decides nothing and places no release call either: it reports the
+outcome as `unresolved` again, with the debt still recorded, so a later run can
+settle it. An unresolved gather call is not recovery's to finish, because nothing is
+owed to anybody from a gather call and `resume` never gathers again, so the run
+names that call for a person to check instead.
 
 ## Consent and calling hours
 

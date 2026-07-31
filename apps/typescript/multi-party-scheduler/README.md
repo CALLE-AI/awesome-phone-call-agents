@@ -151,15 +151,40 @@ cannot settle is named in the note for a human to check.
 
 | Phase | One call per party | What can happen |
 | --- | --- | --- |
-| gather | "Which of these could you do?" Nothing is booked and the script says so. | An answer narrows the feasible set. An empty set ends the run as `no_common_slot`. A machine, a silence or an API error ends it as `not_reached`. |
+| gather | "Which of these could you do?" Nothing is booked and the script says so. | An answer narrows the feasible set. An empty set ends the run as `no_common_slot`. A machine, a silence or a refusal from the API ends it as `not_reached`. |
 | confirm | "Can I confirm Thursday at 2?" One time, one word back. | Everybody confirms and the outcome is `verbally_confirmed`. Anybody does not and the outcome is `not_confirmed`. |
-| release | "That time is not going ahead, nothing is booked." | Sent to every party who confirmed, most recent first. A party the release call cannot reach or cannot be called inside their hours is reported in `unreleased` for a human to chase. |
+| release | "That time is not going ahead, nothing is booked." | Sent to every party who said yes, most recent first. A party the release call cannot reach or cannot be called inside their hours is reported in `unreleased` for a human to chase. Only a person acknowledging the call clears that debt. |
 
 Two reading rules, both conservative in the same direction. Availability is
 credited only when CALL-E's extracted list and this app's own read of the
 transcript agree, so a mishearing cannot invent a free slot. A confirmation has to
 come from the transcript, after the turn where the caller asked the confirmation
 question and the extracted answer can veto a confirmation but never create one.
+
+A confirmation also has to have landed in time. The window is checked again when
+the result comes back, against the local clock and against the completion time
+CALL-E reports, so a late answer and a replayed idempotency key from an older
+round are both refused. A completion time that is missing or unreadable is
+refused the same way, with `window_reason` recording which check said no. The
+person may well have said yes, so that yes still earns the release call.
+
+## When a call cannot be accounted for
+
+A failure that the server chose to send is definite: no call was created, so the
+round carries on. No reply at all, a request timeout, a rate limit, a conflict on
+the idempotency key, a server error, a read that fails after the create got
+through and a call CALL-E has not finished with are all different. Any of them can
+sit on top of a call that is ringing somebody right now.
+
+Those are reconciled, never guessed. The same idempotency key goes back to CALL-E
+first, which returns the call it already holds for that key and cannot place a
+second one. Only when that fails too is the call `unresolved`: the run stops with
+the outcome `unresolved`, the ledger records the call id and the status
+`unresolved` and the note names the call to reconcile. Nobody else is called.
+That matters most in the confirm phase: a call that might still agree the time
+must not be followed by calls telling everybody it is off. Anybody who already
+said yes is recorded as owed a call and `resume` places it once the open call is
+settled.
 
 Every script refuses the same things: no medical, legal or financial advice, no
 payment or card details and anybody who says there is an emergency is told to
@@ -197,7 +222,7 @@ confirmation has to show every party who said yes either released or named in
 | --- | --- |
 | 0 | every party confirmed the time by voice |
 | 10 | no time works for everyone, which is a real answer |
-| 20 | not confirmed: a party did not confirm, was not reached, the window closed, the budget ran out, the run was canceled or CALL-E returned an error |
+| 20 | not confirmed: a party did not confirm, was not reached, the window closed, the budget ran out, the run was canceled, a call could not be accounted for or CALL-E refused the call |
 | 30 | usage, request file, ledger lock or resume error |
 | 40 | replay found a problem in a ledger |
 
@@ -211,8 +236,8 @@ confirmation has to show every party who said yes either released or named in
 - `plan` and `replay` place no calls and need no credentials.
 - `CALLE_API_KEY` is read from the environment only, never from the request file.
   `CALLE_BASE_URL` and `--base-url` select the environment and both are checked
-  before the key is sent. The host has to be `api.heycall-e.com`, one of
-  `localhost`, `127.0.0.1` or `::1` for a local fake, or a host named in
+  before the key is sent. The host has to be `api.heycall-e.com`. A local fake may
+  use `localhost`, `127.0.0.1` or `::1`. Any other host has to be named in
   `CALLE_ALLOWED_HOSTS` or with `--allow-host`. Names are matched exactly, with no
   suffix match and no wildcard. An opted in host still has to be https, because
   https on its own is not trust: it says the wire is encrypted, not who answers.
