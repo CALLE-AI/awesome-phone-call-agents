@@ -11,8 +11,8 @@ firm, a school or a clinic. They want to know whether it was real before they ri
 anybody back.
 
 This skill checks a **contact event**, not a standing fact. It does not ask whether
-the institution exists. It asks whether that institution contacted this person in
-the last hour about this subject.
+the institution exists. It asks whether that institution contacted this person about
+this subject inside the window the claim file names, an hour by default.
 
 It drives the runnable
 [`verify-contact-claim`](../../apps/typescript/verify-contact-claim/) app, which
