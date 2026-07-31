@@ -17,7 +17,7 @@
  * --live` demands back and which covers every field the preview prints.
  */
 
-import { canonicalJson, shortHash } from "./hash.js";
+import { canonicalJson, digestOf, shortHash } from "./hash.js";
 import type { Claim, ContactChannel, CreateCallInput, JsonSchema } from "./types.js";
 
 /** Minutes as a person says them. The question has to sound like a question. */
@@ -215,6 +215,22 @@ export function receiptMaterial(claim: Claim): string {
     },
     question: questionText(claim),
     call: buildCallInput(claim),
+  });
+}
+
+/**
+ * The claim as the app parsed it, hashed.
+ *
+ * A record carries this, so a record can be matched to a claim file without
+ * carrying what the message asked the customer to do.
+ */
+export function claimDigest(claim: Claim): string {
+  return digestOf({
+    claim_id: claim.claimId,
+    customer: claim.customer,
+    contact: claim.contact,
+    trusted_number: claim.trustedNumber,
+    policy: claim.policy,
   });
 }
 

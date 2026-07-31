@@ -26,7 +26,6 @@ import type {
   ContactSignal,
   Outcome,
   OutcomeInputs,
-  Policy,
   Reason,
   TranscriptTurn,
 } from "./types.js";
@@ -56,7 +55,7 @@ export function readStructuredSignal(value: unknown): ContactSignal | null {
   return value === "unclear" ? "unclear" : null;
 }
 
-export function outcomeFrom(inputs: OutcomeInputs, policy: Policy): { outcome: Outcome; reason: Reason | null } {
+export function outcomeFrom(inputs: OutcomeInputs, policy: { minConfidence: number }): { outcome: Outcome; reason: Reason | null } {
   if (inputs.call_status === "api_error") {
     // CALL-E refused the create, so no call was placed and nothing was asked.
     // Nothing is known about the claim, which is not the same as reaching nobody.
