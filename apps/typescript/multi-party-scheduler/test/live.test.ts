@@ -59,10 +59,13 @@ test("a live resume with an empty ledger path is refused the same way", async ()
 test("the same run against a port that dials nothing real is allowed to proceed", async () => {
   // The in memory path is for unit tests and for the local fake server. Proving
   // it still runs is what makes the test above a check on live ports rather than
-  // on a missing ledger.
+  // on a missing ledger. The stub throws with no status, which is a failure that
+  // could sit on top of a call, so the run reconciles the same key once and then
+  // stops rather than reading it as a call that never happened.
   const { port, dialed } = stubPort(false);
   const result = await runCoordination({ request: coordinationRequest(), port, pollIntervalMs: 5 });
-  assert.equal(result.outcome, "not_reached");
-  assert.equal(dialed.length, 1, "it got as far as asking for the first call");
+  assert.equal(result.outcome, "unresolved");
+  assert.equal(dialed.length, 2, "the first attempt, then the same key again");
+  assert.equal(dialed[0], dialed[1], "reconciling reuses the key rather than dialling again");
   assert.equal(result.ledger_path, null);
 });

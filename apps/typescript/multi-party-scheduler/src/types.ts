@@ -24,6 +24,7 @@ export type Outcome =
   | "budget_exhausted"
   | "not_reached"
   | "canceled"
+  | "unresolved"
   | "api_error";
 
 export interface SlotInput {

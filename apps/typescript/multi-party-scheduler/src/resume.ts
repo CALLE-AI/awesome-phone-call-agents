@@ -22,6 +22,7 @@ import {
   placeCall,
   releaseRound,
   TERMINAL_STATUSES,
+  UNRESOLVED_STATUS,
 } from "./coordinate.js";
 import { withinCallingHours } from "./hours.js";
 import { acquireLedgerLock, appendEntry, readEntries, repairTornTail, requestDigest } from "./ledger.js";
@@ -29,6 +30,7 @@ import { confirmSchema, confirmTask, releaseSchema, releaseTask } from "./script
 import { slotById } from "./slots.js";
 import { saidYes, type WindowSpan } from "./window.js";
 import type {
+  CallSnapshot,
   CommitResult,
   CoordinationRequest,
   LedgerEntry,
@@ -178,21 +180,40 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
   };
 }
 
-/** Wait out a call that already exists. This places nothing. */
+/**
+ * Wait out a call that already exists. This places nothing.
+ *
+ * The same two kinds as a fresh call. A read that fails, and a call CALL-E has
+ * not finished with, leave it unresolved with its id kept, so it stays this
+ * app's to settle rather than becoming an answer.
+ */
 async function settleExisting(
   port: CallePort,
   callId: string,
   timeoutMs: number,
   pollIntervalMs: number,
 ): Promise<CallOutcome> {
+  const settle = (call: CallSnapshot, errorCode: string | null): CallOutcome => ({
+    call,
+    callId,
+    errorCode: errorCode ?? (TERMINAL_STATUSES.has(call.status) ? null : "not_finished"),
+    unresolved: !TERMINAL_STATUSES.has(call.status),
+  });
+  const read = async (errorCode: string): Promise<CallOutcome> => {
+    try {
+      return settle(await port.getCall(callId), errorCode);
+    } catch (error) {
+      const code = error instanceof CalleCallError ? error.code : "sdk_error";
+      return { call: null, callId, errorCode: `${errorCode}, then ${code}`, unresolved: true };
+    }
+  };
   try {
-    return { call: await port.waitForResult(callId, { timeoutMs, intervalMs: pollIntervalMs }), errorCode: null };
+    return settle(await port.waitForResult(callId, { timeoutMs, intervalMs: pollIntervalMs }), null);
   } catch (error) {
     if (error instanceof CalleWaitTimeout) {
-      return { call: await port.getCall(callId), errorCode: "timed_out" };
+      return read("timed_out");
     }
-    const code = error instanceof CalleCallError ? error.code : "sdk_error";
-    return { call: null, errorCode: code };
+    return read(error instanceof CalleCallError ? error.code : "sdk_error");
   }
 }
 
@@ -211,6 +232,9 @@ export async function resumeCoordination(options: ResumeOptions): Promise<RunRes
 }
 
 function describe(result: CommitResult): string {
+  if (result.call_status === UNRESOLVED_STATUS) {
+    return `still cannot be accounted for (${result.failure_code ?? "no answer from CALL-E"})`;
+  }
   if (result.phase === "release") {
     return result.acknowledged ? "reached a person" : "reached no person";
   }
@@ -315,6 +339,10 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   /** Everybody the ledger says is owed a release call, plus anybody this round finds. */
   const owedNow = new Set(state.owedReleases);
   const stuck: string[] = [];
+  /** Confirm calls this round still cannot account for. Nothing is decided while one stands. */
+  const openConfirms: string[] = [];
+  /** Release calls this round already re-issued, so the round below does not repeat them. */
+  const handledReleases = new Set<string>();
   const timeoutMs = Math.max(request.policy.perCallTimeoutSeconds * 1000, 1_000);
 
   for (const previous of state.unsettled) {
@@ -372,6 +400,12 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     record({ kind: "reconcile", at: stamp(), placed_call: placedCall, result });
     if (unsettledCall(result)) {
       stuck.push(party.id);
+      if (result.phase === "confirm") {
+        openConfirms.push(party.id);
+      }
+    }
+    if (result.phase === "release") {
+      handledReleases.add(party.id);
     }
     if (result.phase === "confirm" && result.confirmed && !confirmed.includes(party.id)) {
       confirmed.push(party.id);
@@ -393,20 +427,33 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   if (chosen !== undefined && allConfirmed && stuck.length === 0 && state.releasesRecorded === 0) {
     // Nobody has been told it is off yet, so a full set of yeses still stands.
     outcome = "verbally_confirmed";
-  } else if (state.outcome !== null && state.outcome !== "verbally_confirmed") {
+  } else if (openConfirms.length > 0) {
+    // A confirm call that may still be live could yet agree the time, so nothing
+    // is decided and nobody is told it is off. The debt is recorded and the next
+    // `resume` settles it.
+    outcome = "unresolved";
+  } else if (
+    state.outcome !== null &&
+    state.outcome !== "verbally_confirmed" &&
+    state.outcome !== "unresolved"
+  ) {
     outcome = state.outcome;
   } else {
     outcome = "not_confirmed";
   }
 
   const unreleased: string[] = [];
-  if (outcome !== "verbally_confirmed" && chosen !== undefined) {
-    // Everybody who said yes, plus every debt the ledger already recorded, minus
-    // the people a release call actually reached. A debt is not written off
-    // because a call ended.
-    const debt = [...new Set([...confirmed, ...owedNow])];
+  // Everybody who said yes, plus every debt the ledger already recorded, minus
+  // the people a release call actually reached. A debt is not written off because
+  // a call ended.
+  const debt = [...new Set([...confirmed, ...owedNow])].filter((party) => !released.has(party));
+  if (outcome === "unresolved") {
+    unreleased.push(...debt);
+  } else if (outcome !== "verbally_confirmed" && chosen !== undefined) {
     const owed = debt
-      .filter((party) => !released.has(party))
+      // A release call this round already re-issued is not called a second time in
+      // the same pass. It is still owed and it is reported as owed.
+      .filter((party) => !handledReleases.has(party))
       .map((party) => partyById(request, party))
       .filter((party): party is Party => party !== undefined)
       .reverse();
@@ -425,7 +472,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       record,
     });
     calls = round.callsPlaced;
-    unreleased.push(...round.unreleased);
+    unreleased.push(...round.unreleased, ...debt.filter((party) => handledReleases.has(party)));
   }
 
   const notes: string[] = [

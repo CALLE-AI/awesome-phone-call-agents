@@ -26,6 +26,7 @@ import { clockOf, withinCallingHours } from "./hours.js";
 import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
+import { TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
 import { judgeWindow, saidYes, type WindowSpan, type WindowVerdict } from "./window.js";
 import {
   confirmSchema,
@@ -82,20 +83,22 @@ function plural(count: number, noun: string): string {
 export interface CallOutcome {
   call: CallSnapshot | null;
   errorCode: string | null;
+  /**
+   * True when a call may exist and this app cannot say what it did. The round
+   * stops on one of these: the same key is re-issued to find the call and
+   * nothing is decided off it.
+   */
+  unresolved: boolean;
+  /** The call id whenever one is known, even when nothing could be read from it. */
+  callId: string | null;
 }
 
 /**
- * Statuses a call can no longer move out of.
- *
- * The API's `CallStatus` is `queued`, `in_progress`, `completed`, `failed` or
- * `canceled` (`@call-e/calle` 0.2.2,
- * `dist/generated/schema.d.ts:125`), so exactly three of them are terminal.
- * Anything else, a status still in flight or one this app has never seen, means
- * the call is unresolved: it keeps its call id, `resume` owns it and no phase
- * result is decided off it. One set for the coordinator and for recovery, so the
- * two cannot drift apart on what finished means.
+ * Statuses a call can no longer move out of, and the status this app records for
+ * a call it cannot account for. Both live in `call-state.ts` so the coordinator,
+ * recovery and replay cannot drift apart on what finished means.
  */
-export const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled"]);
+export { TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
 
 /**
  * A port that dials real phones may not place its first call with no durable
@@ -176,38 +179,96 @@ async function waitOrAbort(
   return Promise.race([waiting, aborted]);
 }
 
+function asCallError(error: unknown): CalleCallError {
+  return error instanceof CalleCallError ? error : new CalleCallError("sdk_error", String(error));
+}
+
 /**
  * Create one call and wait for it. Shared by a fresh run and by `resume`, so both
  * send the same body under the same idempotency key and a resumed call is the
  * same call rather than a second one.
+ *
+ * Every failure is sorted into one of two kinds. A refusal the server chose to
+ * send means no call exists, so it comes back as a plain error code and the
+ * caller may carry on. Anything that leaves the call unknown, so no reply, a
+ * timeout, a rate limit, a conflict on the key, a server error, a read that
+ * failed after the create got through or a call CALL-E has not finished with,
+ * comes back `unresolved` with whatever call id is known. The first thing tried
+ * on an ambiguous create is the same key again: that hands back the call CALL-E
+ * already holds for it and can never ring a second time.
  */
 export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
   const { request, port, party, phase, slot } = options;
   const input = callInput(request, party, phase, slot, options.task, options.schema);
+  const key = idempotencyKey(request, phase, party, slot, input);
+  let callId: string | null = null;
   try {
-    const created = await port.createCall(input, idempotencyKey(request, phase, party, slot, input));
+    callId = (await port.createCall(input, key)).id;
+  } catch (error) {
+    const problem = asCallError(error);
+    if (!problem.ambiguous) {
+      return { call: null, callId: null, errorCode: problem.code, unresolved: false };
+    }
     try {
-      const call = await waitOrAbort(
+      callId = (await port.createCall(input, key)).id;
+    } catch (secondError) {
+      const second = asCallError(secondError);
+      if (!second.ambiguous) {
+        // The second answer is definite, so there is no call after all.
+        return { call: null, callId: null, errorCode: second.code, unresolved: false };
+      }
+      return {
+        call: null,
+        callId: null,
+        errorCode: `${problem.code}, then ${second.code}`,
+        unresolved: true,
+      };
+    }
+  }
+
+  const settle = (call: CallSnapshot, errorCode: string | null): CallOutcome => ({
+    call,
+    callId: call.id,
+    // A call CALL-E has not finished with is not an answer. Its transcript is
+    // still being written, so reading one as a result is how a call that is still
+    // ringing gets scored as somebody agreeing to a time.
+    errorCode: errorCode ?? (TERMINAL_STATUSES.has(call.status) ? null : "not_finished"),
+    unresolved: !TERMINAL_STATUSES.has(call.status),
+  });
+  const read = async (errorCode: string): Promise<CallOutcome> => {
+    try {
+      return settle(await port.getCall(callId), errorCode);
+    } catch (error) {
+      // The call was created and its state cannot be read, so it stays open.
+      return {
+        call: null,
+        callId,
+        errorCode: `${errorCode}, then ${asCallError(error).code}`,
+        unresolved: true,
+      };
+    }
+  };
+
+  try {
+    return settle(
+      await waitOrAbort(
         port,
-        created.id,
+        callId,
         { timeoutMs: options.timeoutMs, intervalMs: options.pollIntervalMs },
         options.signal,
-      );
-      return { call, errorCode: null };
-    } catch (error) {
-      if (error instanceof CalleWaitTimeout) {
-        return { call: await port.getCall(created.id), errorCode: "timed_out" };
-      }
-      if (error instanceof Aborted) {
-        // The call is still running. Record what it looks like now and let
-        // `resume` settle it, rather than guessing an answer nobody gave.
-        return { call: await port.getCall(created.id), errorCode: "canceled" };
-      }
-      throw error;
-    }
+      ),
+      null,
+    );
   } catch (error) {
-    const code = error instanceof CalleCallError ? error.code : "sdk_error";
-    return { call: null, errorCode: code };
+    if (error instanceof CalleWaitTimeout) {
+      return read("timed_out");
+    }
+    if (error instanceof Aborted) {
+      // The call is still running and the API has no cancel. Record what it looks
+      // like now and let `resume` settle it, rather than guessing an answer.
+      return read("canceled");
+    }
+    return read(asCallError(error).code);
   }
 }
 
@@ -237,6 +298,13 @@ function sameOptions(left: number[], right: number[]): boolean {
   return left.length === right.length && left.every((option, index) => option === right[index]);
 }
 
+function statusOf(outcome: CallOutcome, known: string): string {
+  if (outcome.unresolved) {
+    return UNRESOLVED_STATUS;
+  }
+  return outcome.errorCode === "outside_calling_hours" ? "not_placed" : known;
+}
+
 function evaluateGather(
   request: CoordinationRequest,
   party: Party,
@@ -246,13 +314,13 @@ function evaluateGather(
   const base = {
     party_id: party.id,
     phone_masked: maskPhone(party.phone),
-    call_id: outcome.call?.id ?? null,
+    call_id: outcome.callId ?? outcome.call?.id ?? null,
     provider_call_id: lastAttempt(outcome.call)?.providerCallId ?? null,
   };
   if (outcome.call === null) {
     return {
       ...base,
-      call_status: outcome.errorCode === "outside_calling_hours" ? "not_placed" : "api_error",
+      call_status: statusOf(outcome, "api_error"),
       reached_person: false,
       machine_answered: false,
       structured_options: [],
@@ -309,9 +377,13 @@ function evaluateGather(
     );
   }
 
+  if (outcome.unresolved) {
+    notes.push(`CALL-E last had this call as ${call.status || "no status"}, so it is not an answer`);
+  }
+
   return {
     ...base,
-    call_status: call.status,
+    call_status: statusOf(outcome, call.status),
     reached_person: reachedPerson,
     machine_answered: machineAnswered,
     structured_options: structuredOptions,
@@ -322,7 +394,9 @@ function evaluateGather(
     confidence,
     notes: notes.join("; "),
     transcript_excerpt: reading.excerpt,
-    failure_code: attempt?.failureCode ?? call.failureCode ?? null,
+    failure_code: outcome.unresolved
+      ? outcome.errorCode
+      : (attempt?.failureCode ?? call.failureCode ?? null),
   };
 }
 
@@ -347,7 +421,7 @@ export function evaluateCommit(
     phone_masked: maskPhone(party.phone),
     phase,
     slot_id: slot.id,
-    call_id: outcome.call?.id ?? null,
+    call_id: outcome.callId ?? outcome.call?.id ?? null,
     provider_call_id: lastAttempt(outcome.call)?.providerCallId ?? null,
   };
   const verdict = (completedAt: unknown): WindowVerdict =>
@@ -360,7 +434,7 @@ export function evaluateCommit(
     const missing = verdict(undefined);
     return {
       ...base,
-      call_status: outcome.errorCode === "outside_calling_hours" ? "not_placed" : "api_error",
+      call_status: statusOf(outcome, "api_error"),
       confirmed: false,
       declined: false,
       acknowledged: false,
@@ -413,7 +487,7 @@ export function evaluateCommit(
 
   return {
     ...base,
-    call_status: call.status,
+    call_status: statusOf(outcome, call.status),
     confirmed,
     declined,
     acknowledged,
@@ -427,7 +501,9 @@ export function evaluateCommit(
     disagreement: phase === "confirm" && reading.answer === "confirm" && structuredAnswer === "decline",
     confidence,
     transcript_excerpt: reading.excerpt,
-    failure_code: attempt?.failureCode ?? call.failureCode ?? null,
+    failure_code: outcome.unresolved
+      ? outcome.errorCode
+      : (attempt?.failureCode ?? call.failureCode ?? null),
   };
 }
 
@@ -554,7 +630,7 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
       progress(
         `  ${party.id}: not called, ${clockOf(at, party.callingHours.timezone)} is outside ${party.callingHours.start} to ${party.callingHours.end} ${party.callingHours.timezone}.`,
       );
-      return { call: null, errorCode: "outside_calling_hours" };
+      return { call: null, callId: null, errorCode: "outside_calling_hours", unresolved: false };
     }
     const remaining = ignoreWindow ? request.policy.perCallTimeoutSeconds * 1000 : deadline - at;
     const timeoutMs = Math.max(
@@ -584,6 +660,18 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
   let feasible: Slot[] = request.slots;
   let stopped: Outcome | null = null;
   let lastGather: GatherResult | null = null;
+  /** The call that stopped the run because nobody can say what it is doing. */
+  let openCall: string | null = null;
+  let gatherNote = "";
+
+  const nameOpenCall = (partyId: string, phase: Phase, callId: string | null, why: string | null): string => {
+    openCall = callId;
+    return `${partyId}'s ${phase} call may still be live (${why ?? "no answer from CALL-E"}), ${
+      callId === null
+        ? "and CALL-E returned no call id"
+        : `reconcile ${callId}`
+    } before anybody else is called${phase === "gather" ? ", by hand: resume settles confirm and release calls only" : " and run resume"}`;
+  };
 
   for (const party of request.parties) {
     if (options.signal?.aborted === true) {
@@ -609,6 +697,15 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
     const before = feasible.map((slot) => slot.id);
     const result = evaluateGather(request, party, feasible, outcome);
     lastGather = result;
+    if (outcome.unresolved) {
+      // The call may be on the phone to somebody right now. It says nothing about
+      // availability, so the feasible set does not move and nobody else is rung.
+      record({ kind: "gather", at: stamp(), feasible_before: before, result, feasible_after: before });
+      stopped = "unresolved";
+      gatherNote = nameOpenCall(party.id, "gather", result.call_id, result.failure_code);
+      progress(`  ${party.id}: ${gatherNote}.`);
+      break;
+    }
     const after = result.reached_person ? intersect(feasible, result.available_options) : [];
     record({ kind: "gather", at: stamp(), feasible_before: before, result, feasible_after: after.map((slot) => slot.id) });
     progress(
@@ -681,6 +778,15 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
         if (saidYes(result)) {
           saidYesParties.push(party);
         }
+        if (commitOutcome.unresolved) {
+          // This call may still be asking somebody to agree to the time. Telling
+          // the parties who already said yes that it is off, while a call that
+          // could confirm it is live, is the one thing worse than stopping here.
+          outcome = "unresolved";
+          note = nameOpenCall(party.id, "confirm", result.call_id, result.failure_code);
+          progress(`  ${party.id}: ${note}.`);
+          break;
+        }
         if (result.confirmed) {
           confirmedParties.push(party);
           progress(`  ${party.id}: confirmed.`);
@@ -710,16 +816,27 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
     note =
       stopped === "no_common_slot"
         ? `no time works for everyone, ${lastGather?.party_id ?? "the last party"} ruled out the rest`
-        : stopped === "not_reached"
-          ? `${lastGather?.party_id ?? "a party"} could not be reached, so nothing was arranged`
-          : stopped === "window_expired"
-            ? "the window closed before every party answered"
-            : stopped === "canceled"
-              ? "canceled while gathering availability"
-              : "ran out of call budget while gathering availability";
+        : stopped === "unresolved"
+          ? gatherNote
+          : stopped === "not_reached"
+            ? `${lastGather?.party_id ?? "a party"} could not be reached, so nothing was arranged`
+            : stopped === "window_expired"
+              ? "the window closed before every party answered"
+              : stopped === "canceled"
+                ? "canceled while gathering availability"
+                : "ran out of call budget while gathering availability";
   }
 
-  if (outcome !== "verbally_confirmed" && chosen !== null && saidYesParties.length > 0) {
+  if (outcome === "unresolved") {
+    // Nobody is called while a call may be live, and everybody who said yes is
+    // named as owed so the debt survives into the ledger for `resume` to settle.
+    unreleased.push(...saidYesParties.map((party) => party.id));
+    if (saidYesParties.length > 0) {
+      progress(
+        `  ${plural(saidYesParties.length, "party")} said yes and ${saidYesParties.length === 1 ? "is" : "are"} still owed a call, which resume places once ${openCall ?? "that call"} is settled.`,
+      );
+    }
+  } else if (chosen !== null && outcome !== "verbally_confirmed" && saidYesParties.length > 0) {
     const round = await releaseRound({
       request,
       port,

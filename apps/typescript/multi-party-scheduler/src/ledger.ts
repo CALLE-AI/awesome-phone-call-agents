@@ -20,6 +20,7 @@ import {
   writeSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
+import { UNRESOLVED_STATUS } from "./call-state.js";
 import { chooseSlot, intersect } from "./slots.js";
 import { saidYes } from "./window.js";
 import type {
@@ -283,9 +284,12 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       if (canonicalJson(entry.feasible_before) !== canonicalJson(ids(feasible))) {
         issues.push({ entry: index, problem: `feasible_before ${entry.feasible_before.join(",")} does not match the run so far (${ids(feasible).join(",")})` });
       }
-      const expected = entry.result.reached_person
-        ? intersect(feasible, entry.result.available_options)
-        : [];
+      const expected =
+        entry.result.call_status === UNRESOLVED_STATUS
+          ? feasible
+          : entry.result.reached_person
+            ? intersect(feasible, entry.result.available_options)
+            : [];
       if (canonicalJson(entry.feasible_after) !== canonicalJson(ids(expected))) {
         issues.push({
           entry: index,

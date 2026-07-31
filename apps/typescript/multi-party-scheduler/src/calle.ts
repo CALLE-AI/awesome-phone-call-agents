@@ -33,10 +33,25 @@ export interface CallePort {
 
 export class CalleCallError extends Error {
   readonly code: string;
+  /** The HTTP status. Null when the request never got an answer at all. */
+  readonly status: number | null;
+  /**
+   * Whether this leaves the state of the call unknown.
+   *
+   * A reply the server chose to send is definite: the call was not created and
+   * the round can carry on. No reply, a request timeout, a rate limit, a
+   * conflict on the idempotency key and a server error can each sit on top of a
+   * call that was accepted, so the call may exist and has to be reconciled under
+   * the same key rather than dialled again.
+   */
+  readonly ambiguous: boolean;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, status: number | null = null) {
     super(message);
     this.code = code;
+    this.status = status;
+    this.ambiguous =
+      status === null || status === 408 || status === 409 || status === 429 || status >= 500;
   }
 }
 
@@ -146,8 +161,14 @@ export async function createSdkPort(options: {
     if (error instanceof CalleTimeoutError) {
       throw new CalleWaitTimeout(error.message);
     }
-    const value = error as { code?: string; message?: string };
-    throw new CalleCallError(value?.code ?? "sdk_error", value?.message ?? String(error));
+    // `CalleAPIError` carries the status, a connection error has none, and no
+    // status is what makes a failure ambiguous.
+    const value = error as { code?: string; message?: string; status?: number };
+    throw new CalleCallError(
+      value?.code ?? "sdk_error",
+      value?.message ?? String(error),
+      typeof value?.status === "number" ? value.status : null,
+    );
   };
 
   return {

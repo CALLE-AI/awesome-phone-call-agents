@@ -117,7 +117,7 @@ test("a crash between the yes and the release call is finished by resume", async
   });
 });
 
-test("a confirm whose create response was lost is settled and that party is released", async () => {
+test("a confirm whose create response was lost stops the round, then resume finds the yes", async () => {
   await withFake(async (port, fake) => {
     const request = coordinationRequest();
     const path = ledgerPath();
@@ -134,20 +134,20 @@ test("a confirm whose create response was lost is settled and that party is rele
     };
 
     const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5 });
-    assert.equal(first.outcome, "not_confirmed");
-    assert.deepEqual(first.unreleased, []);
+    assert.equal(first.outcome, "unresolved");
+    assert.deepEqual(first.unreleased, ["plumber", "tenant"], "both yeses are recorded as owed");
     assert.equal(phones(fake, "confirm").length, 3, "the superintendent was called, we just never saw it");
-    assert.deepEqual(phones(fake, "release"), [TENANT, PLUMBER]);
-
-    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
-    assert.equal(resumed.outcome, "not_confirmed");
-    assert.deepEqual(resumed.unreleased, []);
-    assert.match(resumed.note, /resumed an unfinished run/);
     assert.deepEqual(
       phones(fake, "release"),
-      [TENANT, PLUMBER, SUPER],
-      "the party who said yes on the call we lost is told too",
+      [],
+      "nobody is told it is off while a call that could confirm it may be live",
     );
+    assert.match(first.note, /may still be live/);
+
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(resumed.outcome, "verbally_confirmed", "the lost call had said yes all along");
+    assert.deepEqual(resumed.unreleased, []);
+    assert.deepEqual(phones(fake, "release"), [], "so there was never anything to undo");
     const entries = readEntries(path);
     const reconciled = entries.find((entry) => entry.kind === "reconcile");
     assert.ok(reconciled !== undefined && reconciled.kind === "reconcile");
