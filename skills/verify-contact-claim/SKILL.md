@@ -87,7 +87,7 @@ ships.
 
 ## The three refusals
 
-These fire before any client exists. All three exit 30, place nothing and end with
+These fire before any client exists. All three exit 50, place nothing and end with
 "No call was placed."
 
 1. **The number that called is never dialled.** The only number rung is
@@ -124,7 +124,7 @@ Exhaustive. Nothing else comes back from a run.
 customer the number they should be using.
 
 Exit 50 is a usage error: a refused claim file, a missing or mismatched `--receipt`, a
-missing API key, or an unknown command. Exit 60 is a `verify` run that found a problem
+missing API key or an unknown command. Exit 60 is a `verify` run that found a problem
 in the record chain, which includes a verdict that does not follow from the stored
 evidence. A successful `preview` or `verify` exits 0.
 

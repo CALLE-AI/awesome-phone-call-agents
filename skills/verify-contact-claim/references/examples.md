@@ -109,7 +109,7 @@ The customer pasted the whole text message in, including the code the scammer wa
 }
 ```
 
-Exit 30, nothing dialled. The refusal names the field (`contact.asked_for`), gives the
+Exit 50, nothing dialled. The refusal names the field (`contact.asked_for`), gives the
 kind (a one time code), masks the value and ends with "No call was placed." It never
 repeats the code it is refusing to carry.
 
