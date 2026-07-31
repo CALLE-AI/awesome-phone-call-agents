@@ -1,0 +1,14 @@
+[project]
+name = "calle-python-clinic-stock-reporter-app"
+version = "0.0.0"
+description = "Python CALL-E app that interviews rural clinics by phone and ingests weekly HMIS stock and cold-chain reports into a dashboard."
+requires-python = ">=3.10"
+dependencies = [
+  "fastmcp>=3.2,<4",
+  "rich>=13",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
