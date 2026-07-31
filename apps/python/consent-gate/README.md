@@ -17,10 +17,17 @@ redacted audit manifest, and never places a call. Live execution is deliberately
 separate and requires the `execute` command plus either `CALLE_API_KEY` or
 `CALLE_API_KEY_FILE`.
 
+## Demo video
+
+The public 1080p demonstration uses the privacy-safe offline simulator and
+honestly reports the unsuccessful CN-region API test: no call ID was created
+and no call was placed.
+
+https://github.com/ILoveBuns/calle-consent-gate/releases/download/v0.1.0-demo/consentgate-demo-1080p-with-voice.mp4
+
 ## Quick start
 
 ```bash
-cd apps/python/consent-gate
 python3 -m consent_gate validate examples/consented_test_call.json
 python3 -m consent_gate manifest examples/consented_test_call.json
 python3 -m consent_gate simulate examples/consented_test_call.json
@@ -38,7 +45,6 @@ reporting that no network was used and no call was placed.
 Live use is intentionally guarded:
 
 ```bash
-python3 -m pip install -e '.[live]'
 export CALLE_API_KEY_FILE="/path/to/restricted/calle-api-key"
 python3 -m consent_gate execute plan.json --confirm "I reviewed this call plan"
 ```
@@ -59,34 +65,27 @@ Pass a redacted outcome ledger when validating or executing:
 python3 -m consent_gate validate plan.json --history call-history.json
 ```
 
+Live execution requires a durable ledger and refuses to dispatch outside the
+recipient's local window. A reservation is atomically persisted before the
+provider request, counts against `max_attempts`, and remains blocked for manual
+reconciliation if the request is interrupted:
+
+```bash
+python3 -m consent_gate execute plan.json \
+  --state private/call-ledger.json \
+  --confirm "I reviewed this call plan"
+```
+
+Because the current provider SDK does not expose verifiable recording and
+retention controls, live execution also requires `recording: false` and
+`retention_days: 0`.
+
 If that phone fingerprint has a `rejected` event less than 24 hours old,
 ConsentGate blocks the call and reports the earliest permitted retry time.
 
 Only call a number you control or a recipient who has explicitly agreed to the
 call. Comply with applicable calling, recording, privacy, and consumer
 protection laws.
-
-## Side effects and cancellation
-
-`validate`, `manifest`, and `simulate` are offline and never create a call.
-`execute` creates one real outbound CALL-E call after every policy check, the
-`execution_allowed` flag, and exact human confirmation succeed. It creates no
-recurring schedule.
-
-Before dispatch, cancel by omitting `execute`, `execution_allowed`, or the
-confirmation phrase. After CALL-E accepts the call, ConsentGate cannot
-guarantee cancellation; use provider controls if available. A recipient can
-decline or hang up, and recording stays disabled unless the plan includes
-explicit recording consent.
-
-Do not use this example for emergency, medical, legal, financial, political,
-collections, or unsolicited marketing calls.
-
-## Compatibility
-
-- Python 3.11 or later
-- `calle-ai==0.2.0` for opt-in live execution
-- CALL-E regions and languages listed by the provider
 
 ## Design
 

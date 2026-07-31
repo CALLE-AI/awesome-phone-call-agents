@@ -7,6 +7,8 @@ from consent_gate.policy import (
     PolicyError,
     build_manifest,
     record_outcome,
+    validate_attempt_limit,
+    validate_dispatch_window,
     validate_plan,
     validate_rejection_cooldown,
 )
@@ -39,10 +41,54 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(
             PolicyError, "live execution requires execution_allowed"
         ):
-            _execute(plan, "I reviewed this call plan", [])
+            _execute(plan, "I reviewed this call plan", None)
 
     def test_valid_plan_passes(self):
         self.assertEqual(validate_plan(valid_plan()), [])
+
+    def test_timezone_must_exist_in_iana_database(self):
+        plan = valid_plan()
+        plan["timezone"] = "Mars/Olympus_Mons"
+        self.assertIn("valid IANA", " ".join(validate_plan(plan)))
+
+    def test_dispatch_window_uses_recipient_local_time(self):
+        plan = valid_plan()
+        now = datetime(2026, 7, 29, 0, tzinfo=timezone.utc)  # 09:00 Seoul
+        self.assertEqual(validate_dispatch_window(plan, now=now), [])
+        outside = datetime(2026, 7, 29, 12, tzinfo=timezone.utc)  # 21:00 Seoul
+        self.assertIn("outside", " ".join(validate_dispatch_window(plan, now=outside)))
+
+    def test_dispatch_reservations_enforce_attempt_limit(self):
+        plan = valid_plan()
+        history = [
+            {
+                "event": "dispatch_reserved",
+                "phone_fingerprint": record_outcome(plan["phone"], "failed")[
+                    "phone_fingerprint"
+                ],
+            }
+        ]
+        self.assertIn("max_attempts", " ".join(validate_attempt_limit(plan, history)))
+
+    def test_unresolved_dispatch_requires_reconciliation_even_with_attempts_left(self):
+        plan = valid_plan()
+        plan["max_attempts"] = 2
+        history = [
+            {
+                "event": "dispatch_reserved",
+                "state": "reconciliation_required",
+                "phone_fingerprint": record_outcome(plan["phone"], "failed")[
+                    "phone_fingerprint"
+                ],
+            }
+        ]
+        self.assertIn("reconcile", " ".join(validate_attempt_limit(plan, history)))
+
+    def test_live_execution_requires_durable_state(self):
+        plan = valid_plan()
+        plan["execution_allowed"] = True
+        with self.assertRaisesRegex(PolicyError, "durable ledger"):
+            _execute(plan, "I reviewed this call plan", None)
 
     def test_offline_simulation_is_redacted_and_places_no_call(self):
         plan = valid_plan()

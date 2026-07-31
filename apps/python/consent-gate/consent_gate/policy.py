@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class PolicyError(ValueError):
@@ -97,8 +98,13 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
     ):
         errors.append("allowed_window must be between 08:00 and 20:00 local time")
 
-    if not isinstance(plan["timezone"], str) or "/" not in plan["timezone"]:
+    if not isinstance(plan["timezone"], str):
         errors.append("timezone must be an IANA timezone such as Asia/Seoul")
+    else:
+        try:
+            ZoneInfo(plan["timezone"])
+        except (ZoneInfoNotFoundError, ValueError):
+            errors.append("timezone must be a valid IANA timezone such as Asia/Seoul")
 
     region = plan["region"]
     locale = str(plan.get("locale", "en-US"))
@@ -120,6 +126,52 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
         errors.append("retention_days must be between 0 and 30")
 
     return errors
+
+
+def validate_dispatch_window(
+    plan: dict[str, Any], *, now: datetime | None = None
+) -> list[str]:
+    """Enforce the recipient's local calling window immediately before dispatch."""
+    try:
+        recipient_tz = ZoneInfo(str(plan["timezone"]))
+        window = plan["allowed_window"]
+        start = int(window["start_hour"])
+        end = int(window["end_hour"])
+    except (KeyError, TypeError, ValueError, ZoneInfoNotFoundError):
+        return ["cannot evaluate recipient local calling window"]
+
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        return ["dispatch time must include a timezone"]
+    local_now = current.astimezone(recipient_tz)
+    if not start <= local_now.hour < end:
+        return [
+            "recipient local time is outside allowed_window "
+            f"({start:02d}:00-{end:02d}:00 {plan['timezone']})"
+        ]
+    return []
+
+
+def validate_attempt_limit(
+    plan: dict[str, Any], history: list[dict[str, Any]]
+) -> list[str]:
+    """Count durable dispatch reservations, not only completed calls."""
+    fingerprint = _phone_fingerprint(str(plan.get("phone", "")))
+    if any(
+        event.get("phone_fingerprint") == fingerprint
+        and event.get("state") in {"dispatching", "reconciliation_required"}
+        for event in history
+    ):
+        return ["an earlier dispatch is unresolved; reconcile it before retrying"]
+    attempts = sum(
+        1
+        for event in history
+        if event.get("phone_fingerprint") == fingerprint
+        and event.get("event") == "dispatch_reserved"
+    )
+    if attempts >= int(plan.get("max_attempts", 0)):
+        return [f"max_attempts reached ({attempts})"]
+    return []
 
 
 def _phone_fingerprint(phone: str) -> str:
