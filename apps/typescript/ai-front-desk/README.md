@@ -22,6 +22,14 @@ A dashboard shows the appointments, the waitlist, the leads inbox, and a
 call-activity log with every goal sent to CALL-E, the structured result that
 came back, and the transcript — so it's visible, not a black box.
 
+<p>
+  <img src="docs/screenshots/appointments.png" alt="Appointments dashboard" width="800">
+</p>
+
+Active development happens at
+[github.com/LihanCanCode/Ai_FrontDesk](https://github.com/LihanCanCode/Ai_FrontDesk); this
+directory is kept in sync with it at submission checkpoints.
+
 ## Try it without spending a call
 
 Everything below runs with `CALLE_DRY_RUN=true` (the default). No SDK call is
