@@ -1,0 +1,37 @@
+{
+  "name": "calle-ai-front-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI receptionist that keeps a service business's calendar full: confirms appointments, backfills freed slots from a priority waitlist, and qualifies new leads — all over real CALL-E phone calls.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
+    "start": "node --env-file-if-exists=.env --import tsx src/server.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force",
+    "hello-call": "node --env-file-if-exists=.env --import tsx scripts/call-hello-world.ts",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "build": "npm --prefix web run build && tsc --noEmit"
+  },
+  "prisma": {
+    "seed": "node --import tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2",
+    "@prisma/client": "^6.8.0",
+    "express": "^5.1.0",
+    "node-cron": "^4.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "prisma": "^6.8.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
