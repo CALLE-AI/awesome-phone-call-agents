@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { api, type WaitlistEntry } from "../api";
-import { StatusBadge, maskPhone } from "../components";
+import { StatusBadge, AvatarName, maskPhone } from "../components";
+import type { LiveCall } from "../App";
 
 interface Props {
   refreshKey: number;
   onRefresh: () => void;
-  setCalling: (message: string | null) => void;
+  setLiveCall: (call: LiveCall | null) => void;
 }
+
+const COLUMNS = "70px 2fr 1.4fr 1.4fr 1fr";
+
+const PRIORITY_COLOR: Record<number, string> = { 1: "var(--color-accent-2-700)" };
 
 export function WaitlistPage({ refreshKey }: Props) {
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
@@ -17,46 +22,36 @@ export function WaitlistPage({ refreshKey }: Props) {
   }, [refreshKey]);
 
   return (
-    <>
-      <h2>Waitlist</h2>
-      <p className="subtitle">
+    <div className="page">
+      <h1>Waitlist</h1>
+      <p className="page-subtitle">
         Priority-ordered. When a slot frees up, the backfill waterfall calls each WAITING contact in order until
         someone accepts. Trigger it from an appointment's "Cancel &amp; backfill" button.
       </p>
       {error !== null && <div className="error-banner">{error}</div>}
-      <div className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Priority</th>
-              <th>Contact</th>
-              <th>Phone</th>
-              <th>Wants</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td>#{entry.priority}</td>
-                <td>{entry.contact.name}</td>
-                <td className="mono">{maskPhone(entry.contact.phone)}</td>
-                <td>{entry.desiredServiceType}</td>
-                <td>
-                  <StatusBadge status={entry.status} />
-                </td>
-              </tr>
-            ))}
-            {entries.length === 0 && (
-              <tr>
-                <td colSpan={5} className="muted">
-                  Waitlist is empty.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+
+      <div className="data-grid-stacked">
+        {entries.map((entry) => (
+          <div className="grid-row" key={entry.id} style={{ gridTemplateColumns: COLUMNS, padding: "18px 20px" }}>
+            <div style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 20, color: PRIORITY_COLOR[entry.priority] ?? "var(--color-text)" }}>
+              #{entry.priority}
+            </div>
+            <AvatarName name={entry.contact.name} />
+            <div className="mono text-muted" style={{ fontSize: 13.5 }}>
+              {maskPhone(entry.contact.phone)}
+            </div>
+            <div style={{ fontSize: 13.5 }}>{entry.desiredServiceType}</div>
+            <div>
+              <StatusBadge status={entry.status} />
+            </div>
+          </div>
+        ))}
+        {entries.length === 0 && (
+          <div className="grid-row" style={{ gridTemplateColumns: "1fr" }}>
+            <span className="text-muted">Waitlist is empty.</span>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
