@@ -1,19 +1,24 @@
-import { createHash } from "node:crypto";
-
 import {
   CalleAPIError,
   CalleClient,
+  CalleConnectionError,
   CalleTimeoutError,
+  type CreateCallInput,
   type Call,
 } from "@call-e/calle";
 import dotenv from "dotenv";
 
 import {
   buildTask,
+  buildRequestFingerprint,
   isSupportedRegion,
   isValidPhone,
   maskPhone,
   normalizePhone,
+  RECIPIENT_RESULT_SCHEMA,
+  resolveCalleBaseUrl,
+  safeFailureCode,
+  verifiedFounderRelayResult,
 } from "./workflow.js";
 
 dotenv.config();
@@ -36,6 +41,27 @@ function networkCode(error: unknown) {
   if (!(error instanceof Error)) return undefined;
   const cause = (error as Error & { cause?: { code?: unknown } }).cause;
   return typeof cause?.code === "string" ? cause.code : undefined;
+}
+
+function isAmbiguousCreateError(error: unknown) {
+  return error instanceof CalleConnectionError || error instanceof TypeError || Boolean(networkCode(error));
+}
+
+async function createWithReconciliation(
+  client: CalleClient,
+  input: CreateCallInput,
+  idempotencyKey: string,
+) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await client.calls.create(input, { idempotencyKey });
+    } catch (error) {
+      if (!isAmbiguousCreateError(error) || attempt === 3) throw error;
+      console.warn("CALL-E create response was ambiguous; reconciling with the same idempotency key.");
+      await sleep(attempt * 400);
+    }
+  }
+  throw new CalleConnectionError("CALL-E create reconciliation failed.");
 }
 
 async function waitForResult(client: CalleClient, callId: string): Promise<Call> {
@@ -76,47 +102,64 @@ async function main() {
 
   const client = new CalleClient({
     apiKey: process.env.CALLE_API_KEY,
-    baseUrl: process.env.CALLE_BASE_URL || "https://api.heycall-e.com",
+    baseUrl: resolveCalleBaseUrl(process.env.CALLE_BASE_URL),
   });
-  const phoneHash = createHash("sha256").update(phone).digest("hex").slice(0, 16);
+  const requestHash = buildRequestFingerprint({ runId, phone, region: regionInput, candidate, goal, task });
+  const idempotencyKey = `vibehub-founder-relay-${requestHash.slice(0, 32)}`;
 
-  const created = await client.calls.create(
+  const created = await createWithReconciliation(
+    client,
     {
       task,
       recipients: [{ phones: [phone], region: regionInput, locale: "en-US" }],
-      recipientResultSchema: {
-        type: "object",
-        required: ["available_now", "interest", "focus", "start_window"],
-        properties: {
-          available_now: { type: "string", enum: ["yes", "no", "unclear"] },
-          interest: { type: "string", enum: ["yes", "no", "unsure"] },
-          focus: { type: "string", enum: ["product", "engineering", "growth", "research", "other", "unclear"] },
-          start_window: { type: "string", enum: ["within_three_days", "this_week", "next_week", "later", "unclear"] },
-        },
-      },
-      metadata: { purpose: "vibehub_founder_relay", run_id: runId },
+      recipientResultSchema: RECIPIENT_RESULT_SCHEMA,
+      metadata: { purpose: "vibehub_founder_relay", run_id: runId, request_hash: requestHash },
     },
-    { idempotencyKey: `vibehub-founder-relay-${runId}-${phoneHash}` },
+    idempotencyKey,
   );
+
+  if (created.metadata.request_hash !== requestHash || created.task !== task) {
+    throw new Error("CALL-E returned a call that does not match this request fingerprint.");
+  }
 
   console.log(`\nCall created. Call ID: ${created.id}`);
   const call = terminal.has(created.status) ? created : await waitForResult(client, created.id);
+  const recipient = call.recipients[0];
+  const result = verifiedFounderRelayResult({
+    status: call.status,
+    taskCompleted: call.taskCompleted,
+    completionConfidence: call.completionConfidence,
+    recipientStatus: recipient?.status,
+    structuredResult: recipient?.structuredResult,
+  });
+
+  if (!result) {
+    console.log(JSON.stringify({
+      callId: call.id,
+      status: call.status,
+      taskCompleted: call.taskCompleted === true,
+      result: null,
+      failureCode: safeFailureCode(call.failureCode) ?? "UNVERIFIED_RESULT",
+    }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+
   console.log(JSON.stringify({
     callId: call.id,
     status: call.status,
-    taskCompleted: call.taskCompleted,
-    summary: call.summary,
-    result: call.recipients[0]?.structuredResult ?? null,
-    failureCode: call.failureCode,
-    failureMessage: call.failureMessage,
+    taskCompleted: true,
+    completionConfidence: call.completionConfidence?.score,
+    summary: `Interest: ${result.interest}; focus: ${result.focus}; start window: ${result.start_window}.`,
+    result,
   }, null, 2));
 }
 
 main().catch((error) => {
   if (error instanceof CalleAPIError) {
-    console.error(`CALL-E error (${error.code}, HTTP ${error.status}): ${error.message}`);
+    console.error(`CALL-E request failed (${safeFailureCode(error.code) ?? "API_ERROR"}, HTTP ${error.status}).`);
   } else {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error("Founder Relay stopped safely before producing a verified result.");
   }
   process.exitCode = 1;
 });
