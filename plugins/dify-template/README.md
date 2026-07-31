@@ -2,11 +2,11 @@
 
 This plugin contains an importable Dify workflow DSL template for a one-shot CALL-E outbound call tool.
 
-The workflow validates one authorized phone/task pair, supports a dry-run preview, checks CALL-E API connectivity, creates one live call only when `dry_run=false`, polls the call result, masks phone numbers in outputs, and returns a compact user-facing report.
+The workflow validates one authorized phone/task pair, performs a read-only `GET /v1/goals?limit=1` API preflight, supports a dry-run preview, creates one live call only when `dry_run=false`, polls the call result, masks phone numbers in outputs, and returns a compact user-facing report.
 
 ## Files
 
-- `examples/call-e-dify-workflow.dsl.yaml` - Dify workflow DSL import file.
+- `examples/call-e-dify-workflow.dsl.yml` - Dify workflow DSL import file.
 - `manifest.json` - plugin metadata for this repository.
 
 ## What The Workflow Does
@@ -15,9 +15,9 @@ The workflow is intentionally small and visible:
 
 1. `Start` accepts `base_url`, `dry_run`, `request_id`, `phone_number`, and `task`; only the HTTP request nodes read the Dify secret environment variable `CALL_E_API_KEY`.
 2. `Prepare one-shot call` validates required fields, normalizes the CALL-E base URL, rejects non-HTTPS or untrusted API hosts, enforces E.164 phone number format, rejects placeholder phone numbers for live calls, and prepares a masked preview.
-3. `Check API connectivity` calls `GET /health` on the configured CALL-E API host. Transport and forced HTTP failures use an explicit Dify default-value error strategy so the health gate can return a final report instead of terminating the workflow.
-4. `Gate live calls after health` allows live-call creation only when `GET /health` returns a 2xx status code.
-5. `Run one-shot call` creates one CALL-E call only when `dry_run=false` and the health gate passes.
+3. `Check API connectivity` calls the documented, read-only `GET /v1/goals?limit=1` endpoint on the configured CALL-E API host. Transport and forced HTTP failures use an explicit Dify default-value error strategy so the preflight gate can return a final report instead of terminating the workflow.
+4. `Gate live calls after API preflight` allows live-call creation only when `GET /v1/goals?limit=1` returns a 2xx status code.
+5. `Run one-shot call` creates one CALL-E call only when `dry_run=false` and the API preflight passes.
 6. `Build per-call payload` creates the CALL-E request body, prepends non-overridable safety boundaries to the task, builds the result schema, recipient schema, metadata, and stable idempotency key.
 7. `Create CALL-E call` calls `POST /v1/calls`. An indeterminate transport or forced HTTP failure is reported as unknown and possibly created with the original idempotency key.
 8. `Extract call lookup id` finds the returned call ID and prepares the result lookup URL. A 2xx response without a recognized ID is reported as unknown and possibly created, with reconciliation restricted to the same idempotency key.
@@ -27,10 +27,10 @@ The workflow is intentionally small and visible:
 
 ## Setup
 
-1. Open Dify and import `examples/call-e-dify-workflow.dsl.yaml`.
+1. Open Dify and import `examples/call-e-dify-workflow.dsl.yml`.
 2. Open the workflow app environment variables and set `CALL_E_API_KEY` as a Dify secret environment variable.
 3. Keep `CALL-E API base URL` as `https://api.heycall-e.com` for production. Only `https://api.heycall-e.com` is enabled by default.
-4. Add a CALL-E-managed test host to the `TRUSTED_BASE_URLS` set in `Prepare one-shot call` before using a non-production base URL. This is the workflow's single host allowlist. Do not run this template with arbitrary hosts because the workflow sends the Bearer API key from `CALL_E_API_KEY` to `GET /health` and `POST /v1/calls`.
+4. Add a CALL-E-managed test host to the `TRUSTED_BASE_URLS` set in `Prepare one-shot call` before using a non-production base URL. This is the workflow's single host allowlist. Do not run this template with arbitrary hosts because the workflow sends the Bearer API key from `CALL_E_API_KEY` to `GET /v1/goals?limit=1` and `POST /v1/calls`.
 5. Keep `Dry run?` set to `true` for the first run.
 6. Fill `request_id` with a stable value for this intended call. It must be 8-120 characters and may contain only ASCII letters, numbers, dot, underscore, colon, or hyphen (`[A-Za-z0-9._:-]`). Reuse the same value only when replaying the same call after an ambiguous create result; use a new value for a new live call.
 7. Fill one owned or explicitly authorized destination number in E.164 format, for example `+15555550123`.
@@ -66,11 +66,11 @@ The Dify End node exposes only:
 
 ## Side Effects
 
-With `dry_run=true`, the workflow checks CALL-E API connectivity with `GET /health` and does not create a call.
+With `dry_run=true`, the workflow performs a read-only CALL-E API preflight with `GET /v1/goals?limit=1` and does not create a call.
 
-With `dry_run=false`, the workflow creates one outbound phone call through CALL-E only after `GET /health` returns a 2xx status code, then polls for the result. It does not create recurring schedules or provider-side recurrence.
+With `dry_run=false`, the workflow creates one outbound phone call through CALL-E only after `GET /v1/goals?limit=1` returns a 2xx status code, then polls for the result. It does not create recurring schedules or provider-side recurrence.
 
-The health, create, and poll HTTP nodes disable automatic retries and use Dify's `default-value` error strategy with an empty JSON body and status code `0`. This lets downstream code return a final report for Dify transport errors and force-failed HTTP responses instead of terminating the workflow.
+The API preflight, create, and poll HTTP nodes disable automatic retries and use Dify's `default-value` error strategy with an empty JSON body and status code `0`. This lets downstream code return a final report for Dify transport errors and force-failed HTTP responses instead of terminating the workflow.
 
 The polling sleep is capped below Dify's default 5-second code-node timeout. Each polling round uses five serial four-second wait slices, and the workflow runs at most 45 rounds over approximately 15 minutes. Counting the loop-start node conservatively, the graph uses at most 419 workflow steps, below Dify's default limits of 100 loop rounds and 500 workflow steps.
 

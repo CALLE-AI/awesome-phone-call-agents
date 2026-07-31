@@ -128,6 +128,37 @@ test("API failure messages do not stringify unredacted response bodies", async (
   assert.match(output.json.apiError.message, /Response body omitted/);
 });
 
+test("Create CALL-E Call and Wait rejects a successful response without a documented call ID", async () => {
+  const [output] = await runCodeNode(
+    "Create CALL-E Call and Wait",
+    [
+      {
+        json: {
+          calleConfig: {
+            apiKey: "test_api_key",
+            baseUrl: "https://api.heycall-e.com",
+            pollIntervalSeconds: 5,
+            waitTimeoutMinutes: 4,
+          },
+          createInput: { recipients: [{ phones: ["+14155550100"] }] },
+          idempotencyKey: "test-key",
+          callItemId: "ivr_sample_001",
+        },
+      },
+    ],
+    {
+      httpRequest: async () => ({
+        statusCode: 201,
+        statusMessage: "Created",
+        body: { id: "job_123", object: "call_task", status: "completed" },
+      }),
+    },
+  );
+
+  assert.equal(output.json.ok, false);
+  assert.match(output.json.apiError.message, /documented call ID/);
+});
+
 test("the Code-node polling timeout stays below the stock runner task limit", async () => {
   const [configured] = await runCodeNode("CALL-E Config");
   assert.equal(configured.json.calleConfig.waitTimeoutMinutes, 4);
@@ -192,7 +223,7 @@ test("polling stays within its deadline when the final interval is partial", asy
         return {
           statusCode: 200,
           statusMessage: "OK",
-          body: { id: "call_123", status: "running" },
+          body: { id: "call_123", object: "call_task", status: "in_progress" },
         };
       },
     },

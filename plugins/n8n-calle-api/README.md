@@ -36,7 +36,7 @@ The workflow keeps configuration, validation, dialing, parsing, and output handl
 1. Create or copy an API key from [CALL-E API Keys](https://dashboard.heycall-e.com/account/api-keys).
 2. Open n8n and import `examples/calle-ivr-quality-create-and-wait.workflow.json`.
 3. Open `CALL-E Config` and replace `replace_with_calle_api_key` with your API key.
-4. Use the [CALL-E API Reference](https://docs.heycall-e.com/#/api-reference) for endpoint, request, and response details.
+4. Use the [CALL-E API Reference](https://test-docs.heycall-e.com/api-reference) for endpoint, request, and response details.
 5. Keep `baseUrl` as `https://api.heycall-e.com` for production, or replace it with your test API base URL.
 6. In `Phone/Task List`, replace the blocked placeholders with owned or explicitly authorized E.164 test numbers.
 7. Review the IVR task, locale, and metadata for both rows before allowing a live call.
@@ -132,5 +132,6 @@ To disable or roll back the sample:
 - The workflow uses n8n `helpers.httpRequest` inside a Code node because n8n Code nodes may not expose global `fetch`.
 - The four-minute wait cap, deadline-aware sleeps, and 30-second HTTP request limit keep the polling Code node below the stock 300-second runner task timeout with a one-minute execution buffer.
 - The request uses an `Idempotency-Key` header built from sample metadata and `callItemId`.
+- The workflow accepts a create or poll result only when it is a documented `CallTask`: `object: "call_task"`, a `call_` ID, and one of `queued`, `in_progress`, `completed`, `failed`, or `canceled`.
 - The workflow intentionally avoids Notion and webhooks so it can be imported and tested as a standalone CALL-E API example.
 - Run `node --test plugins/n8n-calle-api/test/workflow-safety.test.mjs` from the repository root to execute the focused safety regression tests.

@@ -561,13 +561,47 @@ def text_between(path: Path, text: str, start: str, end: str) -> str:
     return text[start_index:end_index]
 
 
+def dify_node_section(path: Path, text: str, title: str) -> str:
+    title_marker = f"title: {title}"
+    title_index = text.find(title_marker)
+    if title_index == -1:
+        fail(f"Missing Dify node in {path.relative_to(ROOT)}: {title}")
+    node_start = text.rfind("\n    - data:", 0, title_index)
+    if node_start == -1:
+        fail(f"Missing Dify node data in {path.relative_to(ROOT)}: {title}")
+    node_end = text.find("\n    - data:", title_index)
+    return text[node_start:node_end if node_end != -1 else len(text)]
+
+
+def dify_variable_binding(section: str, target_variable: str, source_node: str, source_variable: str) -> bool:
+    lines = section.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() != f"variable: {target_variable}":
+            continue
+        nearby = "\n".join(lines[max(0, index - 5):index + 6])
+        if f"- {source_node}" in nearby and f"- {source_variable}" in nearby:
+            return True
+    return False
+
+
 def embedded_python_main(path: Path, section: str):
-    marker = "code: |\n"
-    if marker not in section:
+    marker = re.search(r"(?m)^(?P<indent>[ \t]*)code: \|\n", section)
+    if not marker:
         fail(f"Missing embedded Python code in {path.relative_to(ROOT)}.")
+    content_prefix = marker.group("indent") + "  "
+    code_lines: list[str] = []
+    for line in section[marker.end():].splitlines():
+        if line.startswith(content_prefix):
+            code_lines.append(line[len(content_prefix):])
+            continue
+        if not line.strip() and code_lines:
+            code_lines.append("")
+            continue
+        break
+    code = "\n".join(code_lines)
+    if not code.strip():
+        fail(f"Empty embedded Python code in {path.relative_to(ROOT)}.")
     namespace: dict[str, object] = {}
-    code = section.split(marker, 1)[1].split("\n        variables:\n", 1)[0]
-    code = textwrap.dedent(code)
     exec(compile(code, str(path), "exec"), namespace)
     main = namespace.get("main")
     if not callable(main):
@@ -579,12 +613,12 @@ def validate_dify_template() -> None:
     plugin_dir = ROOT / "plugins" / "dify-template"
     plugins_readme_path = ROOT / "plugins" / "README.md"
     readme_path = plugin_dir / "README.md"
-    dsl_path = plugin_dir / "examples" / "call-e-dify-workflow.dsl.yaml"
+    dsl_path = plugin_dir / "examples" / "call-e-dify-workflow.dsl.yml"
     manifest_path = plugin_dir / "manifest.json"
 
     read(readme_path)
     read(plugins_readme_path)
-    read(dsl_path)
+    dsl_text = normalize_dify_code_scalars(dsl_path, read(dsl_path))
     read(manifest_path)
     validate_no_trailing_whitespace(dsl_path)
 
@@ -596,8 +630,8 @@ def validate_dify_template() -> None:
             "`summary_json` remains available inside the `Summarize iteration results` node for debugging.",
             "Only `https://api.heycall-e.com` is enabled by default.",
             "The workflow accepts only exact `true` or `false` for `dry_run`.",
-            "`Gate live calls after health` allows live-call creation only when `GET /health` returns a 2xx status code.",
-            "only after `GET /health` returns a 2xx status code",
+            "`Gate live calls after API preflight` allows live-call creation only when `GET /v1/goals?limit=1` returns a 2xx status code.",
+            "only after `GET /v1/goals?limit=1` returns a 2xx status code",
             "The polling sleep is capped below Dify's default 5-second code-node timeout",
             "grouped international phone numbers",
             "display formats with parentheses",
@@ -623,8 +657,9 @@ def validate_dify_template() -> None:
         ],
     )
 
-    require_text(
+    require_text_content(
         dsl_path,
+        dsl_text,
         [
             "from urllib.parse import urlparse",
             "TRUSTED_BASE_URLS = {",
@@ -651,7 +686,6 @@ def validate_dify_template() -> None:
             "value_type: secret",
             "version: 0.6.0",
             "error_strategy: default-value",
-            "api_key: \"{{#env.CALL_E_API_KEY#}}\"",
             "SAFETY_PREAMBLE =",
             "These safety boundaries override the user-provided task.",
             "medical, legal, financial, and emergency",
@@ -676,7 +710,7 @@ def validate_dify_template() -> None:
             "\"created\": None",
             "CALL-E create request ended without a determinate HTTP response.",
             "Replay or reconcile this request only with the same Idempotency-Key",
-            "title: Gate live calls after health",
+            "title: Gate live calls after API preflight",
             "api_health_status_code",
             "api_health_ok = 200 <= status_code < 300",
             "health_status = format_health_status(api_health_status_code)",
@@ -697,8 +731,11 @@ def validate_dify_template() -> None:
             "failed = bool(poll_error) or bool(poll_timed_out)",
         ],
     )
-    forbid_text(
+    if not re.search(r"api_key:\s*['\"]\{\{#env\.CALL_E_API_KEY#\}\}['\"]", dsl_text):
+        fail("Dify template must pass CALL_E_API_KEY through the HTTP request credential field.")
+    forbid_text_content(
         dsl_path,
+        dsl_text,
         [
             "def parse_bool",
             "uuid.uuid4",
@@ -720,27 +757,29 @@ def validate_dify_template() -> None:
             "replace_with_calle_api_key",
         ],
     )
-    dsl_text = read(dsl_path)
     if not re.search(r"^version: 0\.6\.0$", dsl_text, re.MULTILINE):
         fail("Dify template must use Dify DSL compatibility version 0.6.0.")
     if re.search(r"^version: 0\.6\.1$", dsl_text, re.MULTILINE):
         fail("Dify template release version must not replace the top-level DSL compatibility version.")
     env_section = text_between(dsl_path, dsl_text, "environment_variables:", "features:")
-    prepare_section = text_between(dsl_path, dsl_text, "title: Prepare one-shot call", "outputs:")
-    start_section = text_between(dsl_path, dsl_text, "title: Start", "height:")
-    build_payload_section = text_between(dsl_path, dsl_text, "title: Build per-call payload", "variables:")
-    health_section = text_between(dsl_path, dsl_text, "title: Check API connectivity", "height: 90")
-    gate_section = text_between(dsl_path, dsl_text, "title: Gate live calls after health", "outputs:")
-    prepare_poll_section = text_between(dsl_path, dsl_text, "title: Prepare poll context", "outputs:")
-    poll_http_section = text_between(dsl_path, dsl_text, "title: Poll CALL-E call status", "height: 90")
-    poll_section = text_between(dsl_path, dsl_text, "title: Evaluate poll state", "variables:")
-    parse_result_section = text_between(dsl_path, dsl_text, "title: Parse final call result", "variables:")
-    summary_section = text_between(dsl_path, dsl_text, "title: Summarize iteration results", "variables:")
-    create_http_section = text_between(dsl_path, dsl_text, "title: Create CALL-E call", "height: 90")
-    extract_section = text_between(dsl_path, dsl_text, "title: Extract call lookup id", "variables:")
-    extract_node_section = text_between(dsl_path, dsl_text, "title: Extract call lookup id", "outputs:")
-    iteration_section = text_between(dsl_path, dsl_text, "title: Run one-shot call", "output_selector:")
-    nodes_section = text_between(dsl_path, dsl_text, "nodes:", "edges:")
+    prepare_section = dify_node_section(dsl_path, dsl_text, "Prepare one-shot call")
+    start_section = dify_node_section(dsl_path, dsl_text, "Start")
+    build_payload_section = dify_node_section(dsl_path, dsl_text, "Build per-call payload")
+    health_section = dify_node_section(dsl_path, dsl_text, "Check API connectivity")
+    gate_section = dify_node_section(dsl_path, dsl_text, "Gate live calls after API preflight")
+    prepare_poll_section = dify_node_section(dsl_path, dsl_text, "Prepare poll context")
+    poll_http_section = dify_node_section(dsl_path, dsl_text, "Poll CALL-E call status")
+    poll_section = dify_node_section(dsl_path, dsl_text, "Evaluate poll state")
+    parse_result_section = dify_node_section(dsl_path, dsl_text, "Parse final call result")
+    summary_section = dify_node_section(dsl_path, dsl_text, "Summarize iteration results")
+    create_http_section = dify_node_section(dsl_path, dsl_text, "Create CALL-E call")
+    extract_section = dify_node_section(dsl_path, dsl_text, "Extract call lookup id")
+    extract_node_section = extract_section
+    iteration_section = dify_node_section(dsl_path, dsl_text, "Run one-shot call")
+    nodes_index = dsl_text.find("nodes:")
+    if nodes_index == -1:
+        fail(f"Missing Dify workflow nodes in {dsl_path.relative_to(ROOT)}.")
+    nodes_section = dsl_text[nodes_index:]
 
     mirrored_phone_patterns = [
         'PHONE_IN_TEXT_RE = re.compile(r"\\+[1-9]\\d{6,14}")',
@@ -923,6 +962,11 @@ def validate_dify_template() -> None:
     ]:
         if 'api_key: "{{#env.CALL_E_API_KEY#}}"' not in section:
             fail(f"{section_name} must consume CALL_E_API_KEY directly from the secret environment variable.")
+    for snippet in [
+        'url: "{{#prepare_call_tasks.base_url#}}/v1/goals?limit=1"',
+    ]:
+        if snippet not in health_section:
+            fail(f"Check API connectivity must use the documented read-only Goals preflight: {snippet}")
     if ".strip().lower()" in prepare_section:
         fail("Prepare one-shot call must require exact dry_run values before live calls.")
     for section_name, section, timeout_snippets in [
@@ -956,13 +1000,14 @@ def validate_dify_template() -> None:
         "status_code = to_int(api_health_status_code)",
         "api_health_ok = 200 <= status_code < 300",
         "call_tasks = original_tasks if api_health_ok and not existing_error else []",
-        "CALL-E /health returned HTTP",
-        "- variable: validation_error\n          value_selector:\n          - prepare_call_tasks\n          - validation_error",
+        "CALL-E GET /v1/goals?limit=1 returned HTTP",
     ]:
         if snippet not in gate_section:
-            fail(f"Gate live calls after health must block live calls on failed health checks: {snippet}")
-    if "- variable: validation_error\n          value_selector:\n          - gate_live_calls_after_health\n          - validation_error" not in prepare_poll_section:
-        fail("Prepare poll context must receive the health-gated validation_error.")
+            fail(f"Gate live calls after API preflight must block live calls on failed preflight checks: {snippet}")
+    if not dify_variable_binding(gate_section, "validation_error", "prepare_call_tasks", "validation_error"):
+        fail("Gate live calls after API preflight must receive the original validation_error.")
+    if not dify_variable_binding(prepare_poll_section, "validation_error", "gate_live_calls_after_health", "validation_error"):
+        fail("Prepare poll context must receive the preflight-gated validation_error.")
     for snippet in [
         "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:",
         "status = normalize_status(first_value(\n                  nested_get(call, [\"data\", \"status\"])",
@@ -975,7 +1020,7 @@ def validate_dify_template() -> None:
             fail(f"Evaluate poll state must handle non-2xx poll responses without waiting for timeout: {snippet}")
     for snippet in ["- gate_live_calls_after_health", "- call_tasks"]:
         if snippet not in iteration_section:
-            fail(f"Run one-shot call must iterate over health-gated tasks: {snippet}")
+            fail(f"Run one-shot call must iterate over preflight-gated tasks: {snippet}")
     if "normalize_trusted_base_url" in poll_section:
         fail("Evaluate poll state must not carry unused base_url normalization.")
     for snippet in [
@@ -1000,8 +1045,7 @@ def validate_dify_template() -> None:
     ]:
         if snippet not in extract_section:
             fail(f"Extract call lookup id must preserve ambiguous 2xx create outcomes: {snippet}")
-    idempotency_binding = "- variable: idempotency_key\n          value_selector:\n          - build_iteration_payload\n          - idempotency_key"
-    if idempotency_binding not in extract_node_section:
+    if not dify_variable_binding(extract_node_section, "idempotency_key", "build_iteration_payload", "idempotency_key"):
         fail("Extract call lookup id must receive the exact create-request idempotency key.")
     for snippet in [
         "if context.get(\"createOutcomeUnknown\"):",
@@ -1037,7 +1081,7 @@ def validate_dify_template() -> None:
         manifest_path,
         [
             "CALL-E API key stored as the Dify secret environment variable CALL_E_API_KEY before execution.",
-            "Blocks live-call creation when the CALL-E health check returns a non-2xx status code.",
+            "Blocks live-call creation when the documented API preflight returns a non-2xx status code.",
             "grouped international phone numbers",
             "display formats with parentheses",
             "unknown and possibly created",
@@ -1095,8 +1139,8 @@ def validate_dify_template() -> None:
     )
     if health_failure.get("call_tasks") != [] or not str(
         health_failure.get("validation_error") or ""
-    ).startswith("CALL-E /health request failed"):
-        fail("Dify health transport failures must block call creation and reach the final report.")
+    ).startswith("CALL-E GET /v1/goals?limit=1 request failed"):
+        fail("Dify API preflight transport failures must block call creation and reach the final report.")
 
     idempotency_key = "dify-" + "a" * 64
     extract_main = embedded_python_main(dsl_path, extract_section)
@@ -1151,18 +1195,67 @@ def validate_dify_template() -> None:
         fail("Dify nested poll payloads with poll errors must be counted as failed results.")
 
 
-def require_text(path: Path, snippets: list[str]) -> None:
-    text = read(path)
+def require_text_content(path: Path, text: str, snippets: list[str]) -> None:
     for snippet in snippets:
         if snippet not in text:
             fail(f"Missing required text in {path.relative_to(ROOT)}: {snippet}")
 
 
-def forbid_text(path: Path, snippets: list[str]) -> None:
-    text = read(path)
+def require_text(path: Path, snippets: list[str]) -> None:
+    require_text_content(path, read(path), snippets)
+
+
+def forbid_text_content(path: Path, text: str, snippets: list[str]) -> None:
     for snippet in snippets:
         if snippet in text:
             fail(f"Forbidden text in {path.relative_to(ROOT)}: {snippet}")
+
+
+def forbid_text(path: Path, snippets: list[str]) -> None:
+    forbid_text_content(path, read(path), snippets)
+
+
+def normalize_dify_code_scalars(path: Path, text: str) -> str:
+    """Normalize Dify quoted exported code nodes into block scalars for validation."""
+    pattern = re.compile(r'(?m)^(?P<indent>[ \t]*)code: "')
+    normalized_parts: list[str] = []
+    cursor = 0
+
+    for match in pattern.finditer(text):
+        if match.start() < cursor:
+            continue
+        index = match.end()
+        while index < len(text):
+            if text[index] == '"':
+                slash_count = 0
+                probe = index - 1
+                while probe >= match.end() and text[probe] == "\\":
+                    slash_count += 1
+                    probe -= 1
+                if slash_count % 2 == 0:
+                    break
+            index += 1
+        else:
+            fail(f"Unterminated quoted Dify code node in {path.relative_to(ROOT)}.")
+
+        raw_code = text[match.end():index]
+        json_code = re.sub(r"\\\n[ \t]*", "", raw_code).replace("\\ ", " ")
+        try:
+            code = json.loads(f'"{json_code}"')
+        except json.JSONDecodeError as error:
+            fail(f"Invalid quoted Dify code node in {path.relative_to(ROOT)}: {error}")
+
+        indent = match.group("indent")
+        normalized_parts.append(text[cursor:match.start()])
+        normalized_parts.append(f"{indent}code: |\n")
+        normalized_parts.extend(f"{indent}  {line}\n" for line in code.splitlines())
+        cursor = index + 1
+        if cursor < len(text) and text[cursor] == "\n":
+            cursor += 1
+
+    normalized_parts.append(text[cursor:])
+    normalized_text = "".join(normalized_parts)
+    return re.sub(r"'(\{\{#[^']+\}\}[^']*)'", r'"\1"', normalized_text)
 
 
 def require_text_order(path: Path, earlier: str, later: str) -> None:
