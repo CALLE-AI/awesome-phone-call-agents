@@ -36,11 +36,15 @@ async def escalate_danger_signs(
     danger_signs: list[str],
     call_id: str,
     fhir_base_url: str = DEMO_FHIR_BASE_URL,
+    status: str = "preliminary",
 ) -> list[dict]:
     """
-    Writes one Observation per real danger sign reported on a call, via
-    CliniqBridge's create_observation tool. Returns the list of results
-    (one per sign) so the caller can confirm success/failure per item.
+    Writes one Observation per human-confirmed danger sign, via
+    CliniqBridge's create_observation tool. Defaults to status
+    "preliminary" rather than "final" -- the SNOMED codes used here have
+    not been independently verified against an authoritative terminology
+    source, and this data has not undergone clinical validation. Do not
+    pass status="final" without that verification in place.
     """
     results = []
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -60,8 +64,8 @@ async def escalate_danger_signs(
                         "patient_id": patient_id,
                         "code": sign_info["code"],
                         "display": sign_info["display"],
-                        "value": "Reported positive via SentinelCall follow-up",
-                        "status": "final",
+                        "value": "Reported positive via SentinelCall follow-up (human-reviewed)",
+                        "status": status,
                         "fhir_base_url": fhir_base_url,
                     },
                 },
