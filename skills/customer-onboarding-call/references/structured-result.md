@@ -49,7 +49,7 @@ model precisely:
 | `Completed` | The customer consented and the conversation ran to its natural end. |
 | `EndedEarly` | The customer consented, then the call ended before wrap-up — hung up, cut off, or asked to stop partway. |
 | `Declined` | The customer refused at the consent checkpoint, or asked to end the call. |
-| `DoNotCall` | The customer asked not to be contacted again. Stronger than `Declined` and must suppress future calls. |
+| `DoNotCall` | The customer asked not to be contacted again. Broader than `Declined`: it suppresses all outbound calling to the number across every workflow, not just this onboarding run. See *Suppression scope* in `SKILL.md`. When you cannot tell which the customer meant, record `DoNotCall`. |
 | `NotReached` | No human took part: voicemail, carrier message, silence. |
 
 `disposition_evidence` must contain what the customer actually said. It exists so a human can audit

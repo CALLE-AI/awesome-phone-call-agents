@@ -98,6 +98,58 @@ The agent may answer only from `companyDescription` and any knowledge base you e
 For anything else — price, delivery time, policy, availability — it must say it will have a human
 follow up. Inventing these is the most common failure mode of onboarding-call agents.
 
+## State Machine
+
+The full contract in one view. Every arrow that ends in a call is guarded; every terminal state
+says what it permits.
+
+```text
+                         signup
+                            |
+                            v
+              [ allocate attempt  no >  cap? ]---- yes -->( manual handling )
+                            |                                   ^
+                            no                                  |
+                            v                                   |
+                  [ attempt live (leased) ]                     |
+                            |                                   |
+        +-------------------+--------------------+              |
+        |                   |                    |              |
+   terminal result    lease expires       create failed         |
+        |                   |                    |              |
+        |                   v                    |              |
+        |            [ reconcile with provider ] |              |
+        |             |         |        |       |              |
+        |      terminal    still live  unknown   |              |
+        |             |         |        |       |              |
+        +<------------+         v        |       |              |
+        |                  ( ambiguous )-+-------+              |
+        |                       |  (late result re-enters)      |
+        v                       |                               |
+  == STAGE A: was a human reached? ==                           |
+        |                                                       |
+   no human --> ( not-reached ) ( failed ) --- retry allowed ----+
+        |
+       yes
+        v
+  == STAGE B: consent governs ==
+        |
+        +--> ( declined )     terminal. suppress per scope. no follow-up, no retry, ever.
+        +--> ( needs-review ) terminal until a human decides. no automatic retry.
+        +--> ( partial )      write captured fields only. retry ONLY with callback consent
+        |                     or human authorisation, and only under the cap.
+        +--> ( onboarded )    write insight. follow-up only if requested.
+```
+
+Invariants the diagram encodes:
+
+- **Nothing reaches Stage B without a human.** Consent is never read before that.
+- **Only Stage B can suppress a number**, and only via `declined`.
+- **Only Stage A outcomes retry automatically.** Every Stage B redial needs consent or a human.
+- **No state is permanent-by-accident.** A live attempt is leased, and `ambiguous` is provisional —
+  a late result re-enters classification from the top.
+- **The cap bounds every path**, including callback-consented redials.
+
 ## Outcome Classification
 
 A call that reaches a terminal state has not necessarily reached a consenting human. Providers
@@ -133,10 +185,27 @@ If none of A1–A3 match, a human took part. Continue to Stage B.
 
 | # | Outcome | Condition | Action |
 | --- | --- | --- | --- |
-| B1 | `declined` | `disposition` is `Declined` or `DoNotCall`, **or** `consent_granted` is false | record the refusal and its evidence; write no onboarding insight; queue **no** follow-up; cancel any pending retry; suppress future onboarding calls to this number |
+| B1 | `declined` | `disposition` is `Declined` or `DoNotCall`, **or** `consent_granted` is false | record the refusal and its evidence; write no onboarding insight; queue **no** follow-up; cancel any pending retry; apply the suppression scope below |
 | B2 | `needs-review` | required consent or disposition fields are missing, malformed, or contradict the transcript | write nothing beyond the raw record; **no automatic retry**; route to a human |
 | B3 | `partial` | `disposition` is `EndedEarly` | write only the fields actually captured and mark the record partial; queue **no** follow-up unless the customer explicitly asked and evidence supports it; retry only under the callback-consent rule below |
 | B4 | `onboarded` | `disposition` is `Completed` **and** `consent_granted` is true **and** a structured result is present | write insight; queue a follow-up only when requested |
+
+### Suppression scope
+
+`Declined` and `DoNotCall` both end this signup, but they are not the same instruction and must not
+be recorded identically.
+
+| Disposition | The customer said | Scope |
+| --- | --- | --- |
+| `Declined` | not now, not this call | Suppress **this onboarding workflow** for this signup. Other contact the customer has separately opted into — transactional notices, support replies, a channel they initiated — is unaffected. |
+| `DoNotCall` | stop calling me | Suppress **all outbound calling** to that number, across every workflow, indefinitely. Propagate it to the shared do-not-call record, not just this signup's row. |
+
+If you cannot tell which the customer meant, record `DoNotCall`. Over-suppressing costs a
+conversation; under-suppressing means calling someone who told you to stop.
+
+Neither may be lifted by a later call result. Only an explicit opt-in from the customer through
+another channel can reverse a suppression, and that reversal belongs to whatever system owns
+consent — not to this skill.
 
 Rules that follow from the staging and must not be relaxed:
 
@@ -182,12 +251,39 @@ Retries are only safe if each attempt is durably recorded **before** the call is
 1. Allocate the next `attempt_no` for the signup and persist an attempt record under a uniqueness
    constraint on `(signup_id, attempt_no)`. If the insert conflicts, another worker owns this
    attempt — stop.
-2. Refuse to allocate a new attempt while any attempt for that signup is in a non-terminal state.
+2. Enforce **at most one live attempt per signup** with its own constraint — a partial uniqueness
+   constraint on `signup_id` restricted to non-terminal states. Uniqueness on
+   `(signup_id, attempt_no)` alone does not provide this: two workers can allocate attempt 2 and
+   attempt 3 concurrently and both dial.
 3. Derive the provider idempotency key deterministically from that record, for example
    `onboarding:<signup_id>:<attempt_no>`.
 4. Never derive an idempotency key from a timestamp, a random value, or a retry counter held only
    in memory. A key that changes on redelivery is not an idempotency key.
 5. Key webhook ingestion on the provider event id so redelivery cannot advance state twice.
+6. **If placing the call fails after the attempt record exists — provider rejection, timeout,
+   crash — close that attempt out before returning.** An attempt left live because the call was
+   never actually placed blocks the signup forever.
+
+### Stuck attempts must expire
+
+Blocking new attempts while one is live is only safe if a live attempt cannot last forever. A
+terminal webhook can be lost to a deploy, a signature change, or a provider outage. Without an
+expiry the signup is stranded permanently: never resolved, never retried, and invisible because
+nothing failed.
+
+- Give every attempt a **lease** — a deadline by which it must reach a terminal state. A few
+  minutes beyond the provider's maximum call duration is enough.
+- When the lease expires, **reconcile before concluding anything.** Ask the provider for that
+  attempt's state by its idempotency key.
+  - Terminal at the provider: ingest that result through the normal path. The webhook was lost,
+    not the call.
+  - Still live at the provider: extend the lease once, then treat it as `ambiguous`.
+  - Unknown to the provider, or the provider is unreachable past a hard cap: close the attempt as
+    `failed` and release the signup so a retry can proceed.
+- Expiry must never invent an outcome. A lapsed lease means *we do not know*, which is
+  `ambiguous` or `failed` — never `declined`, and never `onboarded`.
+- Surface stranded attempts to operators. A signup silently stuck is the failure mode this whole
+  section exists to prevent.
 
 ### Ambiguous outcomes must be reconciled before retrying
 
@@ -203,6 +299,12 @@ report failure and dial minutes later.
 - Only promote `ambiguous` to `failed`, and only then schedule a retry, once reconciliation shows
   no call occurred.
 
+**`ambiguous` is provisional, not a verdict.** If a late result arrives — from the delayed webhook
+or from reconciliation — re-run the full classification on it, Stage A then Stage B. A call that
+looked failed can turn out to have been a real conversation, including a refusal, and that refusal
+must take effect exactly as if it had arrived on time. Never let a provisional `ambiguous` or a
+scheduled retry outrank a real outcome that shows up late; cancel the retry instead.
+
 ### Retry rules
 
 Automatic retries are permitted **only for Stage A outcomes**, where no human took part and so no
@@ -210,10 +312,17 @@ conversation has happened:
 
 - Retry `not-reached` and reconciled `failed`.
 - **Never** automatically retry `declined`, `partial`, or `needs-review`.
-- Cap at three attempts per signup, including the first.
+- Cap at three attempts per signup, including the first. **The cap is absolute.** When it is
+  reached, stop and surface the signup for manual handling — including when the customer requested
+  a callback. A callback request is permission to call, not extra budget.
 - Space attempts by at least 30 minutes.
 - Confine attempts to the recipient's local working hours. A call at 01:40 local proves nothing
   about reachability; it only proves the person was asleep.
+- **Working hours require a known timezone.** Take it from an explicit `timezone` field, or derive
+  it from the `region` supplied with the signup. Do not guess from the phone number's country code
+  when that country spans several zones, and do not fall back to the operator's own clock. If the
+  timezone cannot be established, do not schedule an automatic retry — surface it for manual
+  scheduling instead. An unknown timezone is a reason to ask, not a reason to dial.
 - Stop retrying the moment any attempt reaches Stage B.
 
 ### Redialling after a conversation

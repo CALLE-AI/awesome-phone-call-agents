@@ -14,8 +14,9 @@ All numbers in this document are fictional.
 - Disclose recording at the top of the call when you record, and comply with the recording law of
   both the caller's and the recipient's jurisdiction. Some jurisdictions require all-party consent.
 - Honour a refusal permanently, not just for the current call. Write the refusal and its supporting
-  evidence to the customer record, cancel any pending retry, and suppress future onboarding calls to
-  that number. A later result must never overwrite a recorded refusal.
+  evidence to the customer record, cancel any pending retry, and suppress future calls at the scope
+  the customer asked for — this workflow for "not now", all outbound calling for "stop calling me".
+  A later result must never overwrite a recorded refusal.
 - A refusal outranks anything else the call produced. A declined call can still return a populated
   structured result; it is still a refusal, and it must never create a follow-up task or represent
   the customer as onboarded or interested.
@@ -79,6 +80,13 @@ acknowledge it and route to a human. Never advise.
   anyway, and an immediate retry then calls the customer twice.
 - Every scheduled retry must be cancellable, and must be cancelled on refusal, on a completed
   conversation, on opt-out or deletion, and at the attempt cap.
+- **Blocking new attempts while one is live requires that live attempts expire.** Lease every
+  attempt and reconcile when the lease lapses, or a lost terminal webhook strands the signup
+  permanently — never called again, and invisible because nothing reported a failure. An expired
+  lease means the outcome is unknown, never that the customer refused.
+- **Match the suppression to what the customer asked for.** "Not now" ends this workflow; "stop
+  calling me" ends all outbound calling to that number. When it is unclear, choose the broader
+  one — over-suppressing costs a conversation, under-suppressing calls someone who told you to stop.
 - Respect local working hours for the recipient's region, not the operator's. Calling at 01:40 local
   is a harm, not a test.
 - This skill creates no recurring schedule. If a host scheduler drives it, cancellation belongs to

@@ -284,6 +284,53 @@ retry: attempt 2 of 3 scheduled after 30 minutes
 Had the workflow retried immediately on the failure report, the delayed original would have
 arrived while the retry was in flight, and the customer would have been called twice.
 
+## Lost webhook — a leased attempt must not strand the signup
+
+The provider accepted the call, but the terminal webhook never arrived: it was sent during a
+deploy. The attempt sits live, and because a live attempt blocks new ones, the signup would never
+be called again.
+
+The lease expires, so reconciliation asks the provider directly:
+
+```text
+attempt 1: live past its lease
+reconcile: provider reports the call completed 12 minutes ago with a structured result
+```
+
+Expected handling:
+
+```text
+action: ingest the provider's result through the normal path
+outcome: classified normally, Stage A then Stage B
+retry: none, a conversation took place
+note: the webhook was lost, not the call
+```
+
+If instead the provider had no record of the attempt:
+
+```text
+outcome: failed
+attempt: closed, signup released
+retry: attempt 2 of 3 scheduled after 30 minutes
+```
+
+An expired lease means the outcome is **unknown**. It is resolved by asking the provider, never by
+assuming — and never by inferring a refusal.
+
+## Attempt cap reached with a callback request
+
+The customer asked to be called back, but this was already attempt 3 of 3.
+
+```text
+outcome: partial
+callback consent: granted, "try me tomorrow morning"
+retry: none, attempt cap reached
+next: surfaced for manual handling, with the callback request and time attached
+```
+
+A callback request is permission to call, not additional budget. The cap is absolute, and the
+request is handed to a human rather than silently dropped.
+
 ## Missing Phone Number
 
 Signup event:
