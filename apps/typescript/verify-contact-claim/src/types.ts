@@ -129,6 +129,20 @@ export interface JsonSchema {
   additionalProperties?: boolean;
 }
 
+export interface CallRecipientInput {
+  phones: string[];
+  region?: string;
+  locale?: string;
+}
+
+/** Exactly what gets sent to CALL-E. Built in one place so it can be hashed. */
+export interface CreateCallInput {
+  task: string;
+  recipients: CallRecipientInput[];
+  resultSchema: JsonSchema;
+  metadata: Record<string, string | number>;
+}
+
 export interface TranscriptTurn {
   offset_seconds: number | null;
   speaker: "bot" | "user" | "unknown";

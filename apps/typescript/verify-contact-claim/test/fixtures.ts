@@ -4,7 +4,8 @@
  */
 
 import { parseClaim } from "../src/config.js";
-import type { Claim, ClaimInput } from "../src/types.js";
+import { questionText } from "../src/script.js";
+import type { CallSnapshot, Claim, ClaimInput, TranscriptTurn } from "../src/types.js";
 
 /** The number printed on the customer's card. The only number this app dials. */
 export const TRUSTED = "+14155550100";
@@ -45,4 +46,89 @@ export function claim(overrides: Partial<ClaimInput> = {}): Claim {
 /** A claim with one field of `contact` replaced, which is where most refusals live. */
 export function withContact(overrides: Partial<ClaimInput["contact"]>): ClaimInput {
   return claimInput({ contact: { ...claimInput().contact, ...overrides } });
+}
+
+/** The question as the app puts it, so no fixture can drift from the script. */
+export function question(subject: Claim = claim()): string {
+  return questionText(subject);
+}
+
+export const GREETING =
+  "Hello, I am an automated assistant calling on behalf of Dana Whitfield. I am not a person.";
+export const PICK_UP = "Northgate Credit Union, how can I help?";
+
+/** Caller turns and callee turns, interleaved the way a real transcript arrives. */
+export function turns(bot: string[], callee: string[]): TranscriptTurn[] {
+  const output: TranscriptTurn[] = [];
+  let offset = 0;
+  for (let index = 0; index < Math.max(bot.length, callee.length); index += 1) {
+    if (bot[index] !== undefined) {
+      output.push({ offset_seconds: offset, speaker: "bot", text: bot[index]! });
+      offset += 6;
+    }
+    if (callee[index] !== undefined) {
+      output.push({ offset_seconds: offset, speaker: "user", text: callee[index]! });
+      offset += 7;
+    }
+  }
+  return output;
+}
+
+/** The question asked once, then answered. The shape every outcome test starts from. */
+export function answered(answer: string, subject: Claim = claim()): TranscriptTurn[] {
+  return turns([GREETING, question(subject)], [PICK_UP, answer]);
+}
+
+export interface SnapshotOptions {
+  status?: string;
+  turns?: TranscriptTurn[];
+  structured?: Record<string, unknown> | null;
+  confidence?: { score: number; label: string } | null;
+  failureCode?: string | null;
+  /** Unknown on purpose, because a provider can put anything in a JSON field. */
+  completedAt?: unknown;
+}
+
+export function snapshot(options: SnapshotOptions = {}): CallSnapshot {
+  const transcript = options.turns ?? answered("No, we have no record of contacting her today.");
+  const structured = options.structured === undefined ? null : options.structured;
+  const completedAt = (
+    options.completedAt === undefined ? "2026-07-31T16:20:00Z" : options.completedAt
+  ) as string | null;
+  return {
+    id: "call_test1",
+    status: options.status ?? "completed",
+    recipients: [
+      {
+        id: "rcp_1",
+        phones: [TRUSTED],
+        status: "completed",
+        structuredResult: structured,
+        summary: "Call finished.",
+        attempts: [
+          {
+            id: "att_1",
+            phone: TRUSTED,
+            status: options.status ?? "completed",
+            startedAt: "2026-07-31T16:19:00Z",
+            completedAt,
+            summary: null,
+            transcriptTurns: transcript,
+            providerCallId: "provider_1",
+            failureCode: options.failureCode ?? null,
+            failureMessage: null,
+          },
+        ],
+      },
+    ],
+    structuredResult: structured,
+    summary: "Call finished.",
+    taskCompleted: true,
+    completionConfidence: options.confidence === undefined ? { score: 0.92, label: "high" } : options.confidence,
+    evidence: [],
+    failureCode: options.failureCode ?? null,
+    failureMessage: null,
+    createdAt: "2026-07-31T16:18:00Z",
+    completedAt,
+  };
 }
