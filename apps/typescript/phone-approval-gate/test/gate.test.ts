@@ -75,7 +75,6 @@ test("the window is checked against the local clock and against the call itself"
   const deadline = windowStart + 600_000;
   const inside = new Date(windowStart + 60_000).toISOString();
   assert.equal(decidedInWindow({ completedAt: inside, windowStart, deadline, now: windowStart + 90_000 }), true);
-  assert.equal(decidedInWindow({ completedAt: null, windowStart, deadline, now: windowStart + 90_000 }), true);
   assert.equal(decidedInWindow({ completedAt: inside, windowStart, deadline, now: deadline + 1 }), false);
   assert.equal(
     decidedInWindow({
@@ -86,8 +85,35 @@ test("the window is checked against the local clock and against the call itself"
     }),
     false,
   );
+});
+
+test("a completion time the gate cannot read fails closed", () => {
+  const windowStart = 1_700_000_000_000;
+  const deadline = windowStart + 600_000;
+  const now = windowStart + 60_000;
+  // Every one of these used to be read as "no reason to doubt it", which let a
+  // replayed call from an old window approve inside a fresh one.
+  const unusable: unknown[] = [
+    undefined,
+    null,
+    "",
+    "   ",
+    "not a date",
+    Number.NaN,
+    now,
+    {},
+    [new Date(now).toISOString()],
+    true,
+  ];
+  for (const completedAt of unusable) {
+    assert.equal(
+      decidedInWindow({ completedAt, windowStart, deadline, now }),
+      false,
+      `expected ${JSON.stringify(completedAt) ?? String(completedAt)} to fail closed`,
+    );
+  }
   assert.equal(
-    decidedInWindow({ completedAt: "not a date", windowStart, deadline, now: windowStart + 1_000 }),
+    decidedInWindow({ completedAt: new Date(now).toISOString(), windowStart, deadline, now }),
     true,
   );
 });

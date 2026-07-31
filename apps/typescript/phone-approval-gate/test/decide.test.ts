@@ -14,6 +14,8 @@ function snapshot(options: {
   confidence?: { score: number; label: string } | null;
   failureCode?: string | null;
   attemptStatus?: string;
+  /** Unknown, because a provider can put anything in a JSON field. */
+  completedAt?: unknown;
 }): CallSnapshot {
   const turns: TranscriptTurn[] = [];
   let offset = 0;
@@ -30,6 +32,9 @@ function snapshot(options: {
     }
   }
   const structured = options.structured === undefined ? null : options.structured;
+  const completedAt = (
+    options.completedAt === undefined ? "2026-07-29T10:01:00Z" : options.completedAt
+  ) as string | null;
   return {
     id: "call_test1",
     status: options.status ?? "completed",
@@ -46,7 +51,7 @@ function snapshot(options: {
             phone: "+14155550100",
             status: options.attemptStatus ?? "completed",
             startedAt: "2026-07-29T10:00:05Z",
-            completedAt: "2026-07-29T10:01:00Z",
+            completedAt,
             summary: null,
             transcriptTurns: turns,
             providerCallId: "provider_1",
@@ -64,7 +69,7 @@ function snapshot(options: {
     failureCode: options.failureCode ?? null,
     failureMessage: null,
     createdAt: "2026-07-29T10:00:00Z",
-    completedAt: "2026-07-29T10:01:00Z",
+    completedAt,
   };
 }
 
@@ -185,6 +190,23 @@ test("a missing transcript blocks approval, whatever the extracted result says",
   assert.equal(result.spoken_secret_digest, null);
 });
 
+test("a completed call with no usable completion time refuses with its own reason", () => {
+  // A provider that sends no completion time, an empty one or the wrong type
+  // leaves the gate unable to tell a fresh decision from an idempotent replay of
+  // an old call, so it refuses and says which of the two checks failed.
+  for (const completedAt of [null, undefined, "", "not a date", 42, {}]) {
+    const result = evaluate({
+      userLines: ["Four seven two nine one three, I approve."],
+      structured: { decision: "approve", spoken_code: "472913", reason: "ok" },
+      completedAt: completedAt === undefined ? null : completedAt,
+    });
+    assert.equal(result.outcome, "not_approved", String(completedAt));
+    assert.equal(result.reason, "completion_time_unknown", String(completedAt));
+    assert.equal(result.evidence.completion_time_usable, false);
+    assert.equal(result.evidence.within_window, false);
+  }
+});
+
 test("a decision that landed outside the window cannot approve", () => {
   const late = evaluate({
     userLines: ["Four seven two nine one three, I approve."],
@@ -286,6 +308,7 @@ function attempt(id: string, outcome: AttemptEvaluation["outcome"], reason: Atte
     reached_person: true,
     machine_answered: false,
     within_window: true,
+    completion_time_usable: true,
     transcript_available: true,
     code_match: outcome === "approved",
     unmatched_code_spoken: false,
@@ -353,6 +376,7 @@ test("outcome inputs alone decide the outcome, which is what verification replay
     reached_person: true,
     machine_answered: false,
     within_window: true,
+    completion_time_usable: true,
     transcript_available: true,
     code_match: true,
     unmatched_code_spoken: false,
@@ -372,6 +396,11 @@ test("outcome inputs alone decide the outcome, which is what verification replay
   assert.equal(attemptOutcome({ ...inputs, decision: "unknown" }, singlePolicy).reason, "no_decision");
   assert.equal(attemptOutcome({ ...inputs, decision: "reject" }, singlePolicy).outcome, "rejected");
   assert.equal(attemptOutcome({ ...inputs, within_window: false }, singlePolicy).reason, "window_expired");
+  assert.equal(
+    attemptOutcome({ ...inputs, within_window: false, completion_time_usable: false }, singlePolicy)
+      .reason,
+    "completion_time_unknown",
+  );
   assert.equal(
     attemptOutcome({ ...inputs, call_status: "state_unknown" }, singlePolicy).reason,
     "call_state_unknown",

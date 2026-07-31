@@ -26,6 +26,12 @@ export type NotApprovedReason =
   | "low_confidence"
   | "disagreement"
   | "window_expired"
+  /**
+   * The call reported a completion time the gate could not use: missing, empty,
+   * unparseable or the wrong type. Without it a replay of an older call cannot be
+   * told from a decision made in this window, so it refuses.
+   */
+  | "completion_time_unknown"
   | "attempt_limit"
   | "quorum_not_met"
   | "not_reached"
@@ -174,6 +180,11 @@ export interface OutcomeInputs {
   machine_answered: boolean;
   /** False when the decision landed outside the window this run opened. */
   within_window: boolean;
+  /**
+   * False when the call reported no completion time the gate could parse. Kept
+   * apart from `within_window` so a record shows which of the two checks refused.
+   */
+  completion_time_usable: boolean;
   transcript_available: boolean;
   code_match: boolean;
   /**

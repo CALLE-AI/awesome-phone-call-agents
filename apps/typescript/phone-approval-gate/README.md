@@ -196,11 +196,12 @@ changed.
 
 Every path other than a live person returning the code lands on `not_approved`
 with a reason: `no_answer`, `voicemail`, `call_failed`,
-`not_reached`, `code_mismatch`, `no_decision`, `no_transcript_evidence`,
-`low_confidence`, `disagreement`, `window_expired`, `attempt_limit`,
-`quorum_not_met`, `api_error`, `call_state_unknown`.
+`not_reached`, `code_mismatch`, `secret_not_returned`, `no_decision`,
+`no_transcript_evidence`, `low_confidence`, `disagreement`, `window_expired`,
+`completion_time_unknown`, `attempt_limit`, `quorum_not_met`, `api_error`,
+`call_state_unknown`.
 
-Three of them are worth calling out.
+Four of them are worth calling out.
 
 `disagreement`: the gate reads the recipient turns itself and treats CALL-E's
 extracted `structured_result` as corroboration. When the two disagree, it
@@ -212,6 +213,12 @@ lands on `no_transcript_evidence` however confident the extraction is.
 against the local clock and against the call's own completion time. A decision
 that arrives after the window closed does not open the gate. Nor does one that
 belongs to an earlier run.
+
+`completion_time_unknown`: the call said it completed and gave no completion time
+the gate could read, so one of the two clocks is missing. A call replayed under an
+old idempotency key looks exactly like a fresh one without it, so the gate refuses
+rather than falling back on its own clock. Missing, empty, unparseable and the
+wrong JSON type all land here.
 
 `call_state_unknown`: the gate could not settle what the call did. A create or a
 poll failed without saying whether the call exists and reading it back under the

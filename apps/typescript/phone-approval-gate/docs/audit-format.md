@@ -60,8 +60,10 @@ reject it.
         "reached_person": true,
         "machine_answered": false,
         "within_window": true,
+        "completion_time_usable": true,
         "transcript_available": true,
         "code_match": true,
+        "unmatched_code_spoken": false,
         "decision": "approve",
         "structured_decision": "approve",
         "confidence": { "score": 0.94, "label": "high" }
@@ -93,6 +95,18 @@ window, so this digest is a binding aid and not a place to hide a lasting value.
 opened, either after it closed or on a call from an earlier run. It is part of the
 evidence rather than something recomputed later, because the clock it was read
 from has moved on by the time anybody verifies the record.
+
+`completion_time_usable` is false when the call reported no completion time the
+gate could parse: missing, empty, unparseable or the wrong JSON type. The two
+fields move together, so `within_window` is never true on a record whose
+completion time could not be read, and the outcome is
+`completion_time_unknown` rather than `window_expired` so a reader can see which
+check refused.
+
+`unmatched_code_spoken` is true when a person read a code back and it was not the
+one this run holds. It separates a call nobody completed (`secret_not_returned`)
+from a call somebody completed against a secret this run never had
+(`code_mismatch`), which is the case that stops the ladder.
 
 `call_status` carries two values the CALL-E API never sends. `api_error` means
 CALL-E refused the request, so no call was placed. `state_unknown` means a create

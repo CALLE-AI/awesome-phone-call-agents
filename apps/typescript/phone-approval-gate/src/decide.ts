@@ -59,6 +59,29 @@ export function isTerminalCallStatus(status: string): boolean {
   return TERMINAL_CALL_STATUSES.has(status.trim().toLowerCase());
 }
 
+/**
+ * The provider's completion time as milliseconds, or null when it cannot be
+ * used.
+ *
+ * A JSON field arrives as whatever the provider sent, so this is the one place
+ * that decides whether there is a usable timestamp at all. Missing, null, empty,
+ * unparseable and the wrong type all come back null, and null fails closed
+ * everywhere it is read: without the call's own clock the gate cannot tell a
+ * decision made in this window from an idempotent replay of a call that finished
+ * in an older one.
+ */
+export function completionTime(value: unknown): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const text = value.trim();
+  if (text.length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function hints(code: string | null, table: string[]): boolean {
   if (code === null) {
     return false;
@@ -115,6 +138,13 @@ export function attemptOutcome(
   }
   if (inputs.machine_answered) {
     return { outcome: "not_approved", reason: "voicemail" };
+  }
+  if (!inputs.completion_time_usable) {
+    // The call says it completed and gives no usable time for it. Recorded on its
+    // own rather than as an expired window, because the window is not what
+    // failed: the provider's clock is missing and a replayed call cannot be told
+    // apart from a fresh one without it.
+    return { outcome: "not_approved", reason: "completion_time_unknown" };
   }
   if (!inputs.within_window) {
     // The decision landed outside the window this run opened, either late or on
@@ -196,6 +226,8 @@ export function evaluateAttempt(options: {
       reached_person: false,
       machine_answered: false,
       within_window: withinWindow,
+      // No call came back, so there is no completion time to read.
+      completion_time_usable: false,
       transcript_available: false,
       code_match: false,
       unmatched_code_spoken: false,
@@ -248,12 +280,18 @@ export function evaluateAttempt(options: {
   const decision = reading.decisionSignal;
 
   const confidence: Confidence | null = call.completionConfidence ?? null;
+  // Read from the same field the window check reads, so a record cannot claim the
+  // window was checked against a time the gate could not use.
+  const completionUsable = completionTime(attempt?.completedAt ?? call.completedAt) !== null;
   const evidence: OutcomeInputs = {
     call_status: call.status,
     failure_code: attempt?.failureCode ?? call.failureCode ?? null,
     reached_person: reachedPerson,
     machine_answered: machineAnswered,
-    within_window: withinWindow,
+    // A window cannot be judged against a time the gate could not read, so the
+    // two facts move together in a record and never contradict each other.
+    within_window: withinWindow && completionUsable,
+    completion_time_usable: completionUsable,
     transcript_available: transcriptAvailable,
     code_match: codeMatch,
     unmatched_code_spoken: unmatchedCodeSpoken,

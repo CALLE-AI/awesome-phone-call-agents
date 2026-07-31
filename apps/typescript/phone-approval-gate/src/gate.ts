@@ -27,7 +27,7 @@ import {
   withAuditLock,
 } from "./audit.js";
 import { GateApiError, GateTimeoutError, type CallePort, type CreateCallInput } from "./calle.js";
-import { evaluateAttempt, isTerminalCallStatus, verdictFromAttempts } from "./decide.js";
+import { completionTime, evaluateAttempt, isTerminalCallStatus, verdictFromAttempts } from "./decide.js";
 import { defaultStateDir, reserveSecret } from "./reserve.js";
 import {
   buildMetadata,
@@ -82,24 +82,24 @@ export const CLOCK_SKEW_MS = 60_000;
  * a result that arrived after the window closed, which is the late approval. The
  * call's own completion time catches a call that finished outside this window
  * altogether, which is what an idempotency key replayed on a later run returns.
+ *
+ * A completion time the gate cannot read fails closed. Borrowing the local
+ * clock's answer instead would let a replay of a call that finished hours ago
+ * approve inside a fresh window, which is the one thing the second clock is here
+ * to stop. `completionTime` decides what counts as readable.
  */
 export function decidedInWindow(options: {
-  completedAt: string | null;
+  completedAt: unknown;
   windowStart: number;
   deadline: number;
   now: number;
 }): boolean {
-  if (options.now > options.deadline) {
+  const finished = completionTime(options.completedAt);
+  if (finished === null) {
     return false;
   }
-  if (options.completedAt === null) {
-    return true;
-  }
-  const finished = Date.parse(options.completedAt);
-  if (Number.isNaN(finished)) {
-    // No usable timestamp from the provider, so the local clock above is all
-    // there is and it already agreed.
-    return true;
+  if (options.now > options.deadline) {
+    return false;
   }
   return (
     finished >= options.windowStart - CLOCK_SKEW_MS && finished <= options.deadline + CLOCK_SKEW_MS
