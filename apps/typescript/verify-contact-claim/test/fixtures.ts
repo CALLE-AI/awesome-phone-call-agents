@@ -11,18 +11,20 @@ import type { CallSnapshot, Claim, ClaimInput, TranscriptTurn } from "../src/typ
 export const TRUSTED = "+14155550100";
 /** The number the message came from. Never dialled. */
 export const SHOWN = "+14155550188";
+/** The customer's own number, given out on the call for the responsible party. */
+export const CALLBACK = "+14155550199";
 
 export function claimInput(overrides: Partial<ClaimInput> = {}): ClaimInput {
   return {
     claim_id: "northgate-voicemail-0912",
-    customer: { name: "Dana Whitfield" },
+    customer: { name: "Dana Whitfield", callback_number: CALLBACK },
     contact: {
       claimed_to_be: "Northgate Credit Union",
       channel: "voicemail",
       arrived_at: "2026-07-31T09:12:00-07:00",
       claimed_about: "a card that had been blocked",
       number_shown: SHOWN,
-      asked_for: "ring back and read out the card number to unblock the card",
+      asked_for: "ring back on that number and read out the card number to unblock the card",
     },
     trusted_number: {
       phone: TRUSTED,

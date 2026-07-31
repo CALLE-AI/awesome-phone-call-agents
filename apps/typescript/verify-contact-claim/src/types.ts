@@ -95,7 +95,7 @@ export interface Policy {
 /** Shape of the claim file on disk. */
 export interface ClaimInput {
   claim_id: string;
-  customer: { name: string };
+  customer: { name: string; callback_number?: string };
   contact: ClaimContact;
   trusted_number: TrustedNumber;
   policy?: PolicyInput;
@@ -104,7 +104,12 @@ export interface ClaimInput {
 /** Validated claim with policy defaults resolved. */
 export interface Claim {
   claimId: string;
-  customer: { name: string };
+  /**
+   * The person the call is made for. `callback_number` is their own number, given
+   * out on the call so the institution can reach a responsible party rather than
+   * the machine that dialled them.
+   */
+  customer: { name: string; callback_number?: string };
   contact: ClaimContact;
   trustedNumber: TrustedNumber;
   policy: Policy;
@@ -241,6 +246,8 @@ export interface RecordedClaim {
   trusted_number_masked: string;
   trusted_number_digest: string;
   trusted_printed_on: string;
+  /** The number given out on the call for the responsible party, or null when none was. */
+  callback_number_masked: string | null;
 }
 
 export interface CheckResult {
@@ -260,6 +267,8 @@ export interface CheckResult {
   evidence: OutcomeInputs;
   transcript_excerpt: string[];
   transcript: TranscriptTurn[];
+  /** CALL-E's own note, printed with its name on it. Never treated as evidence. */
+  callee_note: string;
   call_id: string | null;
   provider_call_id: string | null;
   started_at: string | null;

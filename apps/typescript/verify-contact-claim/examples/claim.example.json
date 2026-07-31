@@ -1,7 +1,8 @@
 {
   "claim_id": "northgate-voicemail-0912",
   "customer": {
-    "name": "Dana Whitfield"
+    "name": "Dana Whitfield",
+    "callback_number": "+14155550199"
   },
   "contact": {
     "claimed_to_be": "Northgate Credit Union",

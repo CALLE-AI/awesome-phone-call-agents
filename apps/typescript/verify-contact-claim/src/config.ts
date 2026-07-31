@@ -47,7 +47,7 @@ export const SOURCE_MAX = 120;
 const CHANNELS: ContactChannel[] = ["voicemail", "text_message", "missed_call", "answered_call"];
 
 const CLAIM_KEYS = ["claim_id", "customer", "contact", "trusted_number", "policy"];
-const CUSTOMER_KEYS = ["name"];
+const CUSTOMER_KEYS = ["name", "callback_number"];
 const CONTACT_KEYS = [
   "claimed_to_be",
   "channel",
@@ -273,7 +273,11 @@ export function parseClaim(input: unknown): Claim {
   const trustedNumber = requireTrustedNumber(raw);
   const contactRaw = typeof raw.contact === "object" && raw.contact !== null ? (raw.contact as Record<string, unknown>) : {};
   const shown = typeof contactRaw.number_shown === "string" ? contactRaw.number_shown : "";
-  refuseSecretsAndPersonas(raw, [trustedNumber.phone, shown].filter((value) => value.length > 0));
+  const customerRaw = typeof raw.customer === "object" && raw.customer !== null ? (raw.customer as Record<string, unknown>) : {};
+  // The customer's own number is theirs, given out on the call so the institution
+  // can reach a person rather than this machine, so it is not a secret to refuse.
+  const callback = typeof customerRaw.callback_number === "string" ? customerRaw.callback_number : "";
+  refuseSecretsAndPersonas(raw, [trustedNumber.phone, shown, callback].filter((value) => value.length > 0));
 
   requireKnownKeys(raw, CLAIM_KEYS, "");
   const claimId = requireString(raw.claim_id, "claim_id", 64);
@@ -284,12 +288,25 @@ export function parseClaim(input: unknown): Claim {
   }
   const customer = requireObject(raw.customer, "customer");
   requireKnownKeys(customer, CUSTOMER_KEYS, "customer");
+  if (customer.callback_number !== undefined) {
+    const callbackNumber = requireString(customer.callback_number, "customer.callback_number", 20);
+    if (!E164.test(callbackNumber)) {
+      throw new ClaimError(
+        `customer.callback_number must be E.164, for example +14155550199. Received ${callbackNumber}.`,
+      );
+    }
+  }
   const trusted = requireObject(raw.trusted_number, "trusted_number");
   requireKnownKeys(trusted, TRUSTED_KEYS, "trusted_number");
 
   return {
     claimId,
-    customer: { name: requireString(customer.name, "customer.name", NAME_MAX) },
+    customer: {
+      name: requireString(customer.name, "customer.name", NAME_MAX),
+      ...(customer.callback_number === undefined
+        ? {}
+        : { callback_number: String(customer.callback_number).trim() }),
+    },
     contact: validateContact(raw.contact),
     trustedNumber,
     policy: resolvePolicy(raw.policy),

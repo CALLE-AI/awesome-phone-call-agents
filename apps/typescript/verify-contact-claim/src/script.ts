@@ -68,6 +68,15 @@ export function spokenChannel(channel: ContactChannel): string {
 }
 
 /**
+ * A number read out one digit at a time, which is how a number said on a call has
+ * to arrive if the other side is going to write it down.
+ */
+export function spokenNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, "").split("").join(" ");
+  return phone.trim().startsWith("+") ? `plus ${digits}` : digits;
+}
+
+/**
  * The one question, word for word.
  *
  * One question, because this app verifies a contact event rather than
@@ -83,13 +92,20 @@ export function questionText(claim: Claim): string {
 export function buildTask(claim: Claim): string {
   const name = claim.customer.name;
   const institution = claim.contact.claimed_to_be;
+  const callback = claim.customer.callback_number;
   const lines: string[] = [];
   lines.push(
     `You are placing one automated call on behalf of ${name}, who asked you to make it. You are calling ${institution} on a number ${name} read off their own card or bill. Speak ${claim.policy.language}. Be brief and polite. Keep the call under two minutes.`,
   );
   lines.push("");
+  // The opening carries a number for the responsible party when the claim file
+  // gives one. 47 CFR 64.1200(b)(2) requires an artificial or prerecorded message
+  // to state a number for the party responsible, which is the customer here rather
+  // than the machine that dialled.
   lines.push(
-    `Open with exactly this: "Hello, I am an automated assistant calling on behalf of ${name}. I am not a person. I have one short question about a message they were sent."`,
+    `Open with exactly this: "Hello, I am an automated assistant calling on behalf of ${name}. I am not a person.${
+      callback === undefined ? "" : ` If you need to reach them about this call, their number is ${spokenNumber(callback)}.`
+    } I have one short question about a message they were sent."`,
   );
   lines.push("");
   lines.push(

@@ -65,6 +65,8 @@ export function recordedClaim(claim: Claim): RecordedClaim {
     trusted_number_masked: maskPhone(claim.trustedNumber.phone),
     trusted_number_digest: numberDigest(claim.claimId, claim.trustedNumber.phone),
     trusted_printed_on: claim.trustedNumber.printed_on,
+    callback_number_masked:
+      claim.customer.callback_number === undefined ? null : maskPhone(claim.customer.callback_number),
   };
 }
 

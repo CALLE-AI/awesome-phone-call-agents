@@ -17,6 +17,7 @@ import {
   metadata,
   questionText,
   spokenLocal,
+  spokenNumber,
   spokenWindow,
 } from "../src/script.js";
 import { claim, claimInput, SHOWN, TRUSTED, withContact } from "./fixtures.js";
@@ -70,12 +71,29 @@ test("nothing the caller asked for is repeated in the script", () => {
   assert.match(TASK, /Do not say what the message asked/);
 });
 
-test("no phone number goes into the script, not even the trusted one", () => {
-  // CALL-E dials the recipient, so the script has no reason to hold a number and
-  // every reason not to: a number in the words is a number that can be read out.
+test("no number from the claim's contact goes into the script, nor the trusted one", () => {
+  // CALL-E dials the recipient, so reading the trusted number back to the party
+  // that just answered it buys nothing and risks everything.
   assert.equal(TASK.includes(TRUSTED), false);
   assert.equal(TASK.includes(SHOWN), false);
-  assert.equal(/\d{7,}/.test(TASK.replace(/\s/g, "")), false);
+  const spaced = TASK.replace(/\s/g, "");
+  for (const number of [TRUSTED, SHOWN]) {
+    assert.equal(spaced.includes(number.replace(/\D/g, "")), false, number);
+  }
+  // With no callback number in the claim there is no number in the script at all.
+  const bare = buildTask(claim(claimInput({ customer: { name: "Dana Whitfield" } })));
+  assert.equal(/\d{7,}/.test(bare.replace(/\s/g, "")), false);
+});
+
+test("the customer's own callback number is spoken, because the rule requires one", () => {
+  // 47 CFR 64.1200(b)(2) makes an artificial or prerecorded message state a
+  // telephone number for the party responsible for the call. That is the customer
+  // here, not the machine that dialled, so this one number is read out on purpose.
+  assert.match(TASK, /If you need to reach them about this call, their number is plus 1 4 1 5 5 5 5 0 1 9 9\./);
+  assert.equal(spokenNumber("+14155550199"), "plus 1 4 1 5 5 5 5 0 1 9 9");
+  assert.equal(spokenNumber("4155550199"), "4 1 5 5 5 5 0 1 9 9");
+  const bare = buildTask(claim(claimInput({ customer: { name: "Dana Whitfield" } })));
+  assert.equal(bare.includes("If you need to reach them"), false);
 });
 
 test("the script refuses to be the customer and says so on the line", () => {
