@@ -49,11 +49,14 @@ outside the window is not a confirmation and the run ends as `window_expired`. T
 person still said yes on a phone call, so they are still owed the release call that
 says it is off.
 
-Both clocks have to be readable for that check to mean anything. A `completed_at`
-that is missing, null, empty, unparseable or not a string at all is refused rather
-than waved through, because otherwise a replayed call with no usable timestamp
-would satisfy any window it was measured against. Each refusal records its own
-reason in the ledger, `no_window`, `late_result`, `no_completion_time` or
+Both clocks have to be readable for that check to mean anything. The completion
+time is read first, before either clock. A `completed_at` that is missing, null,
+empty, unparseable or not a string at all is refused as `completion_time_unknown`
+rather than waved through, because otherwise a replayed call with no usable
+timestamp would satisfy any window it was measured against. Checking it first is
+what stops a ledger line claiming the window was weighed against a time nobody
+could read. `completion_time_usable` records that alongside the verdict. The
+other refusals keep their own reasons, `no_window`, `late_result` or
 `outside_window`, so a line that failed for want of a timestamp does not read like
 a plain expired window.
 

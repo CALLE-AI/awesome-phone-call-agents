@@ -27,7 +27,7 @@ import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
 import { TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
-import { judgeWindow, saidYes, type WindowSpan, type WindowVerdict } from "./window.js";
+import { completionInstant, judgeWindow, saidYes, type WindowSpan, type WindowVerdict } from "./window.js";
 import {
   confirmSchema,
   confirmTask,
@@ -426,9 +426,17 @@ export function evaluateCommit(
   };
   const verdict = (completedAt: unknown): WindowVerdict =>
     phase === "release"
-      ? { within: true, reason: null }
+      ? {
+          within: true,
+          reason: null,
+          completionTimeUsable: completionInstant(completedAt) !== null,
+        }
       : window === null
-        ? { within: false, reason: "no_window" }
+        ? {
+            within: false,
+            reason: "no_window",
+            completionTimeUsable: completionInstant(completedAt) !== null,
+          }
         : judgeWindow({ ...window, completedAt });
   if (outcome.call === null) {
     const missing = verdict(undefined);
@@ -440,6 +448,7 @@ export function evaluateCommit(
       acknowledged: false,
       within_window: missing.within,
       window_reason: missing.reason,
+      completion_time_usable: missing.completionTimeUsable,
       question_asked: false,
       reached_person: false,
       machine_answered: false,
@@ -493,6 +502,7 @@ export function evaluateCommit(
     acknowledged,
     within_window: withinWindow,
     window_reason: window_.reason,
+    completion_time_usable: window_.completionTimeUsable,
     question_asked: reading.questionAsked,
     reached_person: reachedPerson,
     machine_answered: machineAnswered,

@@ -205,12 +205,18 @@ export interface GatherResult {
 /**
  * Why a window check refused an answer.
  *
- * `no_window` means the window itself could not be computed, `late_result` that
- * the local clock was past the deadline when the answer came back,
- * `no_completion_time` that CALL-E gave no usable completion time to place the
- * answer with and `outside_window` that it gave one and it sat outside this run.
+ * `completion_time_unknown` means CALL-E gave no completion time this app could
+ * read, which is checked before either clock so a record can never claim the
+ * window was checked against a time nobody could read. `no_window` means the
+ * window itself could not be computed, `late_result` that the local clock was
+ * past the deadline when the answer came back and `outside_window` that the
+ * completion time sat outside this run.
  */
-export type WindowRefusal = "no_window" | "late_result" | "no_completion_time" | "outside_window";
+export type WindowRefusal =
+  | "completion_time_unknown"
+  | "no_window"
+  | "late_result"
+  | "outside_window";
 
 /** What one confirm or release call established for one party. */
 export interface CommitResult {
@@ -236,6 +242,12 @@ export interface CommitResult {
    * release call, which the window does not govern.
    */
   window_reason: WindowRefusal | null;
+  /**
+   * Whether CALL-E gave a completion time this app could read. False means the
+   * window was never weighed against a real instant, which is why the answer was
+   * refused rather than trusted.
+   */
+  completion_time_usable: boolean;
   /** Confirm calls only: did the call actually ask the confirmation question. */
   question_asked: boolean;
   reached_person: boolean;

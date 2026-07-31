@@ -164,9 +164,11 @@ question and the extracted answer can veto a confirmation but never create one.
 A confirmation also has to have landed in time. The window is checked again when
 the result comes back, against the local clock and against the completion time
 CALL-E reports, so a late answer and a replayed idempotency key from an older
-round are both refused. A completion time that is missing or unreadable is
-refused the same way, with `window_reason` recording which check said no. The
-person may well have said yes, so that yes still earns the release call.
+round are both refused. The completion time is read before either clock: one that
+is missing or unreadable is refused as `completion_time_unknown`, with
+`completion_time_usable` recorded next to the verdict so a ledger line can never
+claim the window was weighed against a time nobody could read. The person may well
+have said yes, so that yes still earns the release call.
 
 ## When a call cannot be accounted for
 

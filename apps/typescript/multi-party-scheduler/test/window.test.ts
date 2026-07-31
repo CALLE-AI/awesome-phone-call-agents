@@ -60,13 +60,31 @@ test("a provider completion time that is missing or malformed fails closed", () 
     ["an object", { completed_at: "2026-08-04T17:20:00Z" }],
   ];
   for (const [label, completedAt] of unusable) {
-    assert.equal(landed(completedAt, inside), false, `${label} must not satisfy the window`);
-    assert.equal(reasonFor(completedAt, inside), "no_completion_time", label);
+    const verdict = judgeWindow({ completedAt, windowStart, deadline, now: inside });
+    assert.equal(verdict.within, false, `${label} must not satisfy the window`);
+    assert.equal(verdict.reason, "completion_time_unknown", label);
+    assert.equal(verdict.completionTimeUsable, false, label);
   }
 });
 
+test("the completion time is checked before either clock", () => {
+  // Otherwise a record can say the window was checked against a time nobody
+  // could read.
+  const late = judgeWindow({ completedAt: null, windowStart, deadline, now: deadline + 1 });
+  assert.equal(late.reason, "completion_time_unknown");
+  const noSpan = judgeWindow({ completedAt: "", windowStart: Number.NaN, deadline, now: windowStart });
+  assert.equal(noSpan.reason, "completion_time_unknown");
+});
+
 test("each refusal carries its own reason", () => {
-  assert.equal(reasonFor("2026-08-04T17:20:00Z", windowStart + 20 * 60_000), null);
+  const good = judgeWindow({
+    completedAt: "2026-08-04T17:20:00Z",
+    windowStart,
+    deadline,
+    now: windowStart + 20 * 60_000,
+  });
+  assert.equal(good.reason, null);
+  assert.equal(good.completionTimeUsable, true);
   assert.equal(reasonFor("2026-08-04T17:44:00Z", deadline + 1), "late_result");
   assert.equal(reasonFor("2026-08-04T15:01:20Z", windowStart + 60_000), "outside_window");
   assert.equal(reasonFor("2026-08-04T17:20:00Z", Number.NaN), "no_window");

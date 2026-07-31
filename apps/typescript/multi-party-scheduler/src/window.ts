@@ -42,41 +42,55 @@ export interface WindowVerdict {
   within: boolean;
   /** Why it was refused, so a ledger entry says which check said no. */
   reason: WindowRefusal | null;
+  /**
+   * Whether CALL-E gave a completion time this app could read at all. Recorded
+   * next to the verdict, so a line can never claim the window was checked
+   * against a time nobody could read.
+   */
+  completionTimeUsable: boolean;
+}
+
+/** The instant CALL-E says the call finished, or null when it gave nothing usable. */
+export function completionInstant(completedAt: unknown): number | null {
+  if (typeof completedAt !== "string" || completedAt.trim().length === 0) {
+    return null;
+  }
+  const finished = Date.parse(completedAt);
+  return Number.isFinite(finished) ? finished : null;
 }
 
 /**
  * Could this answer still be acted on, and if not, why not.
  *
- * Both clocks have to agree and both have to be readable. A window this app
- * cannot compute, a result that came back late and a completion time the
- * provider did not give are all refusals: a confirmation is worth acting on
- * because it landed in time, so an answer that cannot be placed in time is not
- * one. That matters most for a replayed idempotency key, which hands back a
- * final yes from a round that closed long ago and can arrive with no usable
- * timestamp at all.
+ * The provider's completion time is checked first, before either clock. A
+ * missing, empty, unparseable or wrongly typed one is refused as
+ * `completion_time_unknown` rather than waved through, because otherwise a
+ * replayed idempotency key with no usable timestamp would satisfy any window it
+ * was measured against. Then the window itself has to be computable and the
+ * local clock has to still be inside it, which catches an answer that came back
+ * after this round could act on it. Last, the completion time has to sit inside
+ * the window, with a minute of skew at each end because it is somebody else's
+ * clock.
  */
 export function judgeWindow(check: WindowCheck): WindowVerdict {
+  const finished = completionInstant(check.completedAt);
+  if (finished === null) {
+    return { within: false, reason: "completion_time_unknown", completionTimeUsable: false };
+  }
   if (
     !Number.isFinite(check.windowStart) ||
     !Number.isFinite(check.deadline) ||
     !Number.isFinite(check.now)
   ) {
-    return { within: false, reason: "no_window" };
+    return { within: false, reason: "no_window", completionTimeUsable: true };
   }
   if (check.now >= check.deadline) {
-    return { within: false, reason: "late_result" };
-  }
-  if (typeof check.completedAt !== "string" || check.completedAt.trim().length === 0) {
-    return { within: false, reason: "no_completion_time" };
-  }
-  const finished = Date.parse(check.completedAt);
-  if (!Number.isFinite(finished)) {
-    return { within: false, reason: "no_completion_time" };
+    return { within: false, reason: "late_result", completionTimeUsable: true };
   }
   if (finished < check.windowStart - CLOCK_SKEW_MS || finished > check.deadline + CLOCK_SKEW_MS) {
-    return { within: false, reason: "outside_window" };
+    return { within: false, reason: "outside_window", completionTimeUsable: true };
   }
-  return { within: true, reason: null };
+  return { within: true, reason: null, completionTimeUsable: true };
 }
 
 export function decidedInWindow(check: WindowCheck): boolean {
