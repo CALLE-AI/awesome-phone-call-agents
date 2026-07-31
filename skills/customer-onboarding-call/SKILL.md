@@ -68,8 +68,8 @@ locale, an IP address, an email domain, or unrelated prior context.
 5. Place the call for that attempt.
 6. Receive the terminal result on a webhook. Treat delivery as at-least-once and key ingestion on
    the provider event id.
-7. Classify the outcome before writing anything, using `disposition` and `consent_granted`. See
-   *Outcome Classification* below.
+7. Classify the outcome before writing anything: Stage A decides whether a human took part, and only
+   then does Stage B read consent. See *Outcome Classification* below.
 8. Write only what the outcome permits, then queue a follow-up task only when the outcome is
    `onboarded` and the customer asked for one.
 9. Schedule or cancel a retry according to *Attempts, Retries, and Cancellation*.
@@ -109,24 +109,48 @@ while the customer was refusing to take part.
 driven by an evidence-backed `disposition` field, not by whether a result exists. See
 [`references/structured-result.md`](references/structured-result.md).
 
-Evaluate these rules **in order, first match wins**. The ordering is the contract: `declined`
-outranks everything, so a refusal can never be overwritten by a populated result.
+Classify in **two stages, in this order**. Stage A decides whether a human took part at all.
+Only if one did does Stage B read consent.
+
+The staging is the contract, not a presentation choice. Consent fields are meaningless when nobody
+answered — a voicemail grants no consent, so `consent_granted` is `false` there. Reading consent
+before establishing that a human was reached turns every no-answer into a refusal.
+
+### Stage A — was a human reached?
 
 | # | Outcome | Condition | Action |
 | --- | --- | --- | --- |
-| 1 | `declined` | `disposition` is `Declined` or `DoNotCall`, **or** `consent_granted` is false | record the refusal and its evidence; write no onboarding insight; queue **no** follow-up; cancel any pending retry; suppress future onboarding calls to this number |
-| 2 | `failed` | provider reported failure **and** reconciliation confirms no conversation occurred | write no insight; retry only after reconciliation |
-| 3 | `not-reached` | terminal with no structured result, or `disposition` is `NotReached` | write no insight; queue a retry |
-| 4 | `partial` | `disposition` is `EndedEarly` | write only the fields actually captured and mark the record partial; queue **no** follow-up unless the customer explicitly asked for one and `disposition_evidence` supports it; a retry is permitted only to complete discovery |
-| 5 | `onboarded` | `disposition` is `Completed` **and** `consent_granted` is true **and** a structured result is present | write insight; queue a follow-up only when requested |
+| A1 | `not-reached` | no structured result, **or** `disposition` is `NotReached` | write no insight; queue a retry; **never** suppress the number |
+| A2 | `ambiguous` | provider reported failure and reconciliation has not completed | write nothing; schedule reconciliation, not a retry |
+| A3 | `failed` | provider reported failure **and** reconciliation confirms no call occurred | write no insight; queue a retry; **never** suppress the number |
 
-Two rules follow from the ordering and must not be relaxed:
+Stage A never suppresses a number and never records a refusal. A customer who did not answer has
+not refused anything.
 
-- **A follow-up task may only be created from outcome `onboarded`, or from `partial` with explicit
-  evidence of a request.** Never from `declined`, `failed`, or `not-reached`.
-- **A CRM write that would represent the customer as onboarded, interested, or requesting contact
-  requires outcome `onboarded`.** A `declined` or `partial` call may only write its disposition and
-  evidence.
+If none of A1–A3 match, a human took part. Continue to Stage B.
+
+### Stage B — a human took part, so consent governs
+
+| # | Outcome | Condition | Action |
+| --- | --- | --- | --- |
+| B1 | `declined` | `disposition` is `Declined` or `DoNotCall`, **or** `consent_granted` is false | record the refusal and its evidence; write no onboarding insight; queue **no** follow-up; cancel any pending retry; suppress future onboarding calls to this number |
+| B2 | `needs-review` | required consent or disposition fields are missing, malformed, or contradict the transcript | write nothing beyond the raw record; **no automatic retry**; route to a human |
+| B3 | `partial` | `disposition` is `EndedEarly` | write only the fields actually captured and mark the record partial; queue **no** follow-up unless the customer explicitly asked and evidence supports it; retry only under the callback-consent rule below |
+| B4 | `onboarded` | `disposition` is `Completed` **and** `consent_granted` is true **and** a structured result is present | write insight; queue a follow-up only when requested |
+
+Rules that follow from the staging and must not be relaxed:
+
+- **Only Stage B can suppress a number.** A refusal requires a human who refused. `not-reached`,
+  `ambiguous`, and `failed` must never mark a number do-not-call.
+- **A follow-up task may only be created from `onboarded`, or from `partial` with explicit evidence
+  of a request.** Never from `declined`, `needs-review`, `not-reached`, `ambiguous`, or `failed`.
+- **A CRM write representing the customer as onboarded, interested, or requesting contact requires
+  `onboarded`.** `declined` and `partial` may write only their disposition and evidence.
+- **A malformed result from a call a human took part in is `needs-review`, never `not-reached`.**
+  Coercing it to `not-reached` would queue an automatic retry and could redial someone who actually
+  refused. When you cannot tell whether a human took part, treat the call as reached and route to
+  review — the failure mode of a needless manual check is trivial; the failure mode of redialling a
+  refusal is not.
 
 Never present `not-reached` as a success. A dropped signup that displays as onboarded is worse than
 a visible failure, because nobody follows up.
@@ -145,6 +169,11 @@ It may take up to three *attempts* to obtain that one conversation.
 "One call per signup" would be the wrong guarantee — it cannot survive a corridor that drops half
 its calls. The guarantee that matters is that a customer is never called while another attempt for
 the same signup is live, and never called again once a conversation has happened.
+
+**A conversation is any call a human took part in — Stage B — including `partial`.** Retries exist
+to obtain a conversation, never to resume one. Once Stage B is reached, the attempt budget is spent
+and further automatic calling stops. The single exception is an explicit, evidence-backed callback
+request; see *Redialling after a conversation* below.
 
 ### Durable per-attempt idempotency
 
@@ -176,13 +205,36 @@ report failure and dial minutes later.
 
 ### Retry rules
 
-- Retry `not-reached` and reconciled `failed`. Retry `partial` only to complete discovery.
-- **Never retry `declined`.**
+Automatic retries are permitted **only for Stage A outcomes**, where no human took part and so no
+conversation has happened:
+
+- Retry `not-reached` and reconciled `failed`.
+- **Never** automatically retry `declined`, `partial`, or `needs-review`.
 - Cap at three attempts per signup, including the first.
 - Space attempts by at least 30 minutes.
 - Confine attempts to the recipient's local working hours. A call at 01:40 local proves nothing
   about reachability; it only proves the person was asleep.
-- Stop retrying the moment any attempt yields a conversation.
+- Stop retrying the moment any attempt reaches Stage B.
+
+### Redialling after a conversation
+
+A `partial` call is a conversation that ended early. The customer may have hung up *because* they
+did not want to continue, and the workflow cannot tell the difference from a dropped line. So a
+partial does not license another call.
+
+Redialling after any Stage B outcome requires **one** of:
+
+1. **Evidence-backed callback consent.** The customer explicitly asked to be called back, captured
+   in `callback_consent` with supporting words in `callback_consent_evidence`. Honour a stated time
+   or window. Absent or generic evidence does not qualify — silence, politeness, and an
+   unfinished answer are not a callback request.
+2. **Manual review.** A human inspects the record and authorises the call. Record who authorised it.
+
+`needs-review` always takes route 2. A malformed or contradictory consent record must never be
+resolved by calling the customer again to find out.
+
+A redial authorised this way is a new attempt against the same cap. It never resets the budget, and
+`declined` remains terminal regardless of any later callback claim.
 
 ### Cancelling a pending retry
 
@@ -217,14 +269,16 @@ Read [`references/safety.md`](references/safety.md) for the full contract. Alway
 
 After an attempt, report:
 
-- outcome, one of `onboarded`, `partial`, `not-reached`, `failed`, `declined`, or `ambiguous`
-  while reconciliation is pending
+- outcome, one of `onboarded`, `partial`, `declined`, `needs-review`, `not-reached`, `failed`, or
+  `ambiguous` while reconciliation is pending
+- the stage that decided it, so a suppression is always traceable to a human who refused
 - masked phone number
 - `disposition` and the `disposition_evidence` that supports it
 - structured result fields the outcome permits you to write
 - whether a follow-up task was created, and why — or explicitly why not
 - attempt number out of the cap, and the retry decision: scheduled with its window, cancelled with
-  the trigger, or not permitted
+  the trigger, blocked pending review, or not permitted
+- for any redial after a conversation, the callback consent evidence or the human who authorised it
 
 If no call was placed, report `status: not called`, the exact blocker, and what the user must
 supply next.

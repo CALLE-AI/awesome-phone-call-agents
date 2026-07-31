@@ -10,9 +10,11 @@ schema to the call task so the provider returns typed fields you can write strai
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "consent_granted":       { "type": "boolean", "description": "Did the customer agree to continue at the consent checkpoint" },
-    "disposition":           { "type": "string", "enum": ["Completed", "EndedEarly", "Declined", "DoNotCall", "NotReached"] },
-    "disposition_evidence":  { "type": "string", "description": "What the customer actually said that supports the disposition. Quote or close paraphrase. Never inferred from tone or silence." },
+    "consent_granted":            { "type": "boolean", "description": "Did a human agree to continue at the consent checkpoint. Only meaningful when a human took part; false on NotReached because nobody was there to grant it." },
+    "disposition":                { "type": "string", "enum": ["Completed", "EndedEarly", "Declined", "DoNotCall", "NotReached"] },
+    "disposition_evidence":       { "type": "string", "description": "What the customer actually said that supports the disposition. Quote or close paraphrase. Never inferred from tone or silence." },
+    "callback_consent":           { "type": "boolean", "description": "Did the customer explicitly ask to be called back. Required before any redial after a conversation." },
+    "callback_consent_evidence":  { "type": "string", "description": "The customer's own words requesting a callback, with any time or window they gave." },
     "business_name":         { "type": "string" },
     "business_type":         { "type": "string", "description": "e.g. Retail Grocery, Restaurant, Office" },
     "goal":                  { "type": "string", "description": "Primary reason they signed up" },
@@ -58,14 +60,38 @@ generic evidence string is a validation failure, not a formatting problem.
 Do not infer consent from silence, from the customer continuing to answer questions, or from a
 warm tone. Infer it only from an affirmative answer at the consent checkpoint.
 
+### `consent_granted` is not a refusal signal on its own
+
+`consent_granted` is `false` on a `NotReached` result, because a voicemail cannot grant consent.
+That is an absence of consent, not a refusal.
+
+Treating `consent_granted: false` as a refusal on its own turns every unanswered call into a
+permanent do-not-call, silently destroying reachable customers. The field is only evaluated once a
+human is known to have taken part — Stage B in `SKILL.md`. Stage A never reads it.
+
 ## Precedence
 
-`declined` outranks the presence of a result. A call can produce a complete, well-formed structured
-result and still be a refusal — the agent asks its consent question, the customer says "no, take me
-off your list", and the provider returns a populated object anyway.
+Classification runs in two stages: **was a human reached**, then **did they consent**. Never merge
+them into one ordered list — that is what makes a no-answer look like a refusal.
 
-Classify on `disposition` and `consent_granted` first, then look at the analysis fields. Never the
-other way round. See the ordered table in `SKILL.md`.
+Within Stage B, `declined` outranks the presence of a result. A call can produce a complete,
+well-formed structured result and still be a refusal — the agent asks its consent question, the
+customer says "no, take me off your list", and the provider returns a populated object anyway.
+
+Never classify on the analysis fields. See the staged tables in `SKILL.md`.
+
+## Callback consent
+
+`callback_consent` governs whether the customer may be called again after a conversation. It is
+separate from `consent_granted`, which only covers the call in progress.
+
+Set it `true` only when the customer asked to be called back in their own words, captured in
+`callback_consent_evidence`, along with any time or window they specified. An unfinished answer, a
+polite goodbye, or a dropped line is not a callback request.
+
+A `partial` call carries no implicit permission to redial. The customer may have ended the call
+precisely because they did not want to continue, and nothing in the transcript distinguishes that
+from a dropped connection.
 
 ## Example (fictional)
 
@@ -123,12 +149,18 @@ Prefer closed enums over free text for anything you will filter, count, or route
 - Treat webhook delivery as at-least-once. Key writes on the provider event id, and key attempts on
   `(signup_id, attempt_no)`, so redelivery cannot advance state twice.
 - Read the per-recipient structured result first, then fall back to the call-level one.
-- **Classify before you write.** Resolve the outcome from `disposition` and `consent_granted` using
-  the ordered table in `SKILL.md`, then write only what that outcome permits.
+- **Classify before you write.** Run Stage A, then Stage B, using the tables in `SKILL.md`, then
+  write only what that outcome permits.
 - An empty or absent structured result means the customer was not reached. Do not coerce it into an
   empty insight row, and do not let it count as an onboarding.
-- Reject a result missing `disposition`, `consent_granted`, or `disposition_evidence`. Treat a
-  malformed result as `not-reached` rather than guessing consent.
+- **A result missing or malforming `disposition`, `consent_granted`, or `disposition_evidence` is
+  `needs-review`, not `not-reached`.** `not-reached` queues an automatic retry, so coercing a
+  malformed record into it can redial someone who actually refused. Route it to a human instead.
+- Apply the same rule when the evidence contradicts the disposition, for example `Completed` with
+  evidence showing a refusal. Contradiction is a review trigger, never a classification to resolve
+  by calling the customer again.
+- When you cannot determine whether a human took part, treat the call as reached and send it to
+  review. An unnecessary manual check costs a minute; an unwanted redial costs a customer.
 - A later result must never overwrite a `Declined` or `DoNotCall` disposition already on record.
   Refusals are terminal for the signup.
 - Store the transcript alongside the fields so a human can audit any extraction they doubt,

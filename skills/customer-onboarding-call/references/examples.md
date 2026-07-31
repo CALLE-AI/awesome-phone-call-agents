@@ -88,11 +88,66 @@ outcome: not-reached
 phone: +1******1234
 structured result: none
 follow-up: none
+suppression: none
 retry: attempt 2 of 3 scheduled after 30 minutes, within recipient working hours
 ```
 
 This must not be reported as an onboarding. A signup that displays as onboarded but was never
 reached is worse than a visible failure, because nobody follows up.
+
+## Voicemail — absence of consent is not refusal
+
+The agent reached voicemail. The provider returned a result with `consent_granted: false`, because
+nobody was there to grant consent.
+
+```json
+{
+  "consent_granted": false,
+  "disposition": "NotReached",
+  "disposition_evidence": "Answered by voicemail greeting; no human spoke."
+}
+```
+
+Expected report:
+
+```text
+outcome: not-reached
+phone: +1******1234
+suppression: none
+retry: attempt 2 of 3 scheduled after 30 minutes
+```
+
+**This is the case a single ordered table gets wrong.** `consent_granted` is `false`, so a rule that
+checks consent before establishing that a human took part would classify a routine voicemail as
+`declined` and permanently suppress the number. Every customer who simply missed the call would be
+silently lost. Stage A resolves `NotReached` before consent is ever read.
+
+## Malformed result — review, never redial
+
+A human clearly took part, but the consent fields are unusable: `disposition` is `Completed` while
+the evidence shows the customer objecting.
+
+```json
+{
+  "consent_granted": true,
+  "disposition": "Completed",
+  "disposition_evidence": "I said I'm not interested, stop calling."
+}
+```
+
+Expected report:
+
+```text
+outcome: needs-review
+phone: +1******1234
+reason: disposition_evidence contradicts disposition
+crm write: raw record only
+follow-up: none
+retry: none, manual review required
+```
+
+Coercing this to `not-reached` would queue an automatic retry and redial a customer who appears to
+have refused. When consent is unreadable, a human decides — never another call.
 
 ## Declined, with a populated result
 
@@ -130,8 +185,7 @@ retry: none, pending retries cancelled, future onboarding calls suppressed for t
 
 **This is the case that classification on "a result exists" gets wrong.** A result is present and
 `business_type` is populated, so a naive rule reports this as onboarded and creates a follow-up task
-for someone who just asked to be left alone. Rule 1 in the outcome table exists to prevent exactly
-this. Discovery must stop immediately, and the refusal must not be treated as an objection to answer.
+for someone who just asked to be left alone. Rule B1 exists to prevent exactly this. Discovery must stop immediately, and the refusal must not be treated as an objection to answer.
 
 ## Ended early
 
@@ -151,6 +205,7 @@ Structured result:
   "consent_granted": true,
   "disposition": "EndedEarly",
   "disposition_evidence": "Customer said 'sorry, I have to go' during discovery and ended the call.",
+  "callback_consent": false,
   "business_type": "Retail Grocery"
 }
 ```
@@ -162,11 +217,45 @@ outcome: partial
 phone: +1******1234
 crm write: business type only, record marked partial
 follow-up: none, the customer did not ask for one
-retry: attempt 2 of 3 scheduled to complete discovery, within working hours
+retry: none, a conversation took place and no callback was requested
+next: manual review if the team wants to finish discovery
 ```
 
-No follow-up task is created. The customer never requested contact, and a partial call must not
-manufacture one.
+No follow-up task is created, and **no automatic retry is scheduled**. A `partial` is a
+conversation, so the attempt budget is spent. The customer may have ended the call precisely
+because they did not want to continue, and nothing in the transcript distinguishes that from a
+dropped line.
+
+## Ended early, with a callback request
+
+Same shape, except the customer asked to be called back.
+
+```text
+customer  Sorry, I'm with a customer — can you call me back this afternoon?
+```
+
+```json
+{
+  "consent_granted": true,
+  "disposition": "EndedEarly",
+  "disposition_evidence": "Customer asked to continue later because they were serving a customer.",
+  "callback_consent": true,
+  "callback_consent_evidence": "Can you call me back this afternoon?",
+  "business_type": "Retail Grocery"
+}
+```
+
+Expected report:
+
+```text
+outcome: partial
+phone: +1******1234
+callback consent: granted, "can you call me back this afternoon?"
+retry: attempt 2 of 3 scheduled this afternoon, local time, against the same cap
+```
+
+This is the only route to an automatic redial after a conversation: the customer asked, in their
+own words, and the request is on record. The redial does not reset the attempt budget.
 
 ## Ambiguous failure, reconciled before retrying
 

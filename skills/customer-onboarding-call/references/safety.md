@@ -21,6 +21,15 @@ All numbers in this document are fictional.
   the customer as onboarded or interested.
 - Record consent as an explicit field backed by what the customer said. Never infer it from silence,
   from continued answers, or from a friendly tone.
+- **Only a human who refused can suppress a number.** Absence of consent is not refusal: a voicemail
+  grants no consent, and treating that as a do-not-call would permanently block every customer who
+  simply missed the call. Suppression may only follow a Stage B `declined`, never `not-reached`,
+  `ambiguous`, or `failed`.
+- **A conversation that ended early is not permission to call again.** The customer may have hung up
+  because they did not want to continue. Redialling after any conversation requires either explicit
+  evidence-backed callback consent in the customer's own words, or a human authorisation on record.
+- Never resolve an ambiguous or contradictory consent record by calling the customer again to find
+  out. Route it to a human.
 - Never re-frame a refusal as an objection to overcome. This workflow is not sales.
 
 ## Phone numbers
