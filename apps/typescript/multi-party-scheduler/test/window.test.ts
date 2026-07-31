@@ -9,13 +9,17 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CLOCK_SKEW_MS, decidedInWindow } from "../src/window.js";
+import { CLOCK_SKEW_MS, decidedInWindow, judgeWindow } from "../src/window.js";
 
 const windowStart = Date.parse("2026-08-04T17:00:00Z");
 const deadline = windowStart + 45 * 60_000;
 
-function landed(completedAt: string | null, now: number): boolean {
+function landed(completedAt: unknown, now: number): boolean {
   return decidedInWindow({ completedAt, windowStart, deadline, now });
+}
+
+function reasonFor(completedAt: unknown, now: number): string | null {
+  return judgeWindow({ completedAt, windowStart, deadline, now }).reason;
 }
 
 test("an answer inside the window on both clocks is inside it", () => {
@@ -41,8 +45,33 @@ test("a minute of provider clock skew is tolerated at both ends", () => {
   assert.equal(landed(new Date(windowStart - 90_000).toISOString(), windowStart + 1000), false);
 });
 
-test("no usable completion time leaves the local clock to decide", () => {
-  assert.equal(landed(null, windowStart + 1000), true);
-  assert.equal(landed("some time on Thursday", windowStart + 1000), true);
-  assert.equal(landed("some time on Thursday", deadline + 1000), false);
+test("a provider completion time that is missing or malformed fails closed", () => {
+  const inside = windowStart + 60_000;
+  const unusable: [string, unknown][] = [
+    ["missing", undefined],
+    ["null", null],
+    ["empty", ""],
+    ["blank", "   "],
+    ["garbage text", "some time on Thursday"],
+    ["NaN", Number.NaN],
+    ["infinity", Number.POSITIVE_INFINITY],
+    ["a number of milliseconds", inside],
+    ["a Date", new Date(inside)],
+    ["an object", { completed_at: "2026-08-04T17:20:00Z" }],
+  ];
+  for (const [label, completedAt] of unusable) {
+    assert.equal(landed(completedAt, inside), false, `${label} must not satisfy the window`);
+    assert.equal(reasonFor(completedAt, inside), "no_completion_time", label);
+  }
+});
+
+test("each refusal carries its own reason", () => {
+  assert.equal(reasonFor("2026-08-04T17:20:00Z", windowStart + 20 * 60_000), null);
+  assert.equal(reasonFor("2026-08-04T17:44:00Z", deadline + 1), "late_result");
+  assert.equal(reasonFor("2026-08-04T15:01:20Z", windowStart + 60_000), "outside_window");
+  assert.equal(reasonFor("2026-08-04T17:20:00Z", Number.NaN), "no_window");
+  assert.equal(
+    judgeWindow({ completedAt: "2026-08-04T17:20:00Z", windowStart: Number.NaN, deadline, now: windowStart }).reason,
+    "no_window",
+  );
 });

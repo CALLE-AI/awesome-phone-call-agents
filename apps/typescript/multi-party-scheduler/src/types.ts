@@ -201,6 +201,16 @@ export interface GatherResult {
   failure_code: string | null;
 }
 
+/**
+ * Why a window check refused an answer.
+ *
+ * `no_window` means the window itself could not be computed, `late_result` that
+ * the local clock was past the deadline when the answer came back,
+ * `no_completion_time` that CALL-E gave no usable completion time to place the
+ * answer with and `outside_window` that it gave one and it sat outside this run.
+ */
+export type WindowRefusal = "no_window" | "late_result" | "no_completion_time" | "outside_window";
+
 /** What one confirm or release call established for one party. */
 export interface CommitResult {
   party_id: string;
@@ -219,6 +229,12 @@ export interface CommitResult {
    * is not governed by the window, so it records true.
    */
   within_window: boolean;
+  /**
+   * Which check refused the answer, so a ledger line says why rather than
+   * looking like a plain expired window. Null when it landed in time and on a
+   * release call, which the window does not govern.
+   */
+  window_reason: WindowRefusal | null;
   /** Confirm calls only: did the call actually ask the confirmation question. */
   question_asked: boolean;
   reached_person: boolean;

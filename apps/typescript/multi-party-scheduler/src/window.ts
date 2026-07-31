@@ -14,7 +14,7 @@
  * skew at each end, because it is somebody else's clock.
  */
 
-import type { CommitResult } from "./types.js";
+import type { CommitResult, WindowRefusal } from "./types.js";
 
 /** How far outside the window a provider timestamp may sit and still count. */
 export const CLOCK_SKEW_MS = 60_000;
@@ -29,33 +29,58 @@ export interface WindowSpan {
 }
 
 export interface WindowCheck extends WindowSpan {
-  /** When CALL-E says the call finished, if it says anything usable. */
-  completedAt: string | null;
+  /**
+   * What CALL-E said about when the call finished. Typed as unknown because it
+   * is somebody else's field: it arrives missing, null, empty or as a number
+   * often enough that this has to be checked rather than trusted.
+   */
+  completedAt: unknown;
+}
+
+export interface WindowVerdict {
+  /** True only when the answer landed in time and this run may act on it. */
+  within: boolean;
+  /** Why it was refused, so a ledger entry says which check said no. */
+  reason: WindowRefusal | null;
 }
 
 /**
- * Could this answer still be acted on.
+ * Could this answer still be acted on, and if not, why not.
  *
- * With no window to check against the answer to that is no. A confirmation is
- * only worth acting on because it landed in time, so a caller that cannot say
- * when it landed does not get to claim one.
+ * Both clocks have to agree and both have to be readable. A window this app
+ * cannot compute, a result that came back late and a completion time the
+ * provider did not give are all refusals: a confirmation is worth acting on
+ * because it landed in time, so an answer that cannot be placed in time is not
+ * one. That matters most for a replayed idempotency key, which hands back a
+ * final yes from a round that closed long ago and can arrive with no usable
+ * timestamp at all.
  */
-export function decidedInWindow(check: WindowCheck): boolean {
-  if (!Number.isFinite(check.windowStart) || !Number.isFinite(check.deadline)) {
-    return false;
+export function judgeWindow(check: WindowCheck): WindowVerdict {
+  if (
+    !Number.isFinite(check.windowStart) ||
+    !Number.isFinite(check.deadline) ||
+    !Number.isFinite(check.now)
+  ) {
+    return { within: false, reason: "no_window" };
   }
   if (check.now >= check.deadline) {
-    return false;
+    return { within: false, reason: "late_result" };
   }
-  const finished = check.completedAt === null ? Number.NaN : Date.parse(check.completedAt);
-  if (Number.isNaN(finished)) {
-    // No usable provider timestamp. The local clock has already said the result
-    // arrived in time and there is nothing else to weigh it against.
-    return true;
+  if (typeof check.completedAt !== "string" || check.completedAt.trim().length === 0) {
+    return { within: false, reason: "no_completion_time" };
   }
-  return (
-    finished >= check.windowStart - CLOCK_SKEW_MS && finished <= check.deadline + CLOCK_SKEW_MS
-  );
+  const finished = Date.parse(check.completedAt);
+  if (!Number.isFinite(finished)) {
+    return { within: false, reason: "no_completion_time" };
+  }
+  if (finished < check.windowStart - CLOCK_SKEW_MS || finished > check.deadline + CLOCK_SKEW_MS) {
+    return { within: false, reason: "outside_window" };
+  }
+  return { within: true, reason: null };
+}
+
+export function decidedInWindow(check: WindowCheck): boolean {
+  return judgeWindow(check).within;
 }
 
 /**

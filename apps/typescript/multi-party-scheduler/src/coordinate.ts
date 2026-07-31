@@ -26,7 +26,7 @@ import { clockOf, withinCallingHours } from "./hours.js";
 import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
-import { decidedInWindow, saidYes, type WindowSpan } from "./window.js";
+import { judgeWindow, saidYes, type WindowSpan, type WindowVerdict } from "./window.js";
 import {
   confirmSchema,
   confirmTask,
@@ -350,16 +350,22 @@ export function evaluateCommit(
     call_id: outcome.call?.id ?? null,
     provider_call_id: lastAttempt(outcome.call)?.providerCallId ?? null,
   };
-  const inWindow = (completedAt: string | null): boolean =>
-    phase === "release" ? true : window !== null && decidedInWindow({ ...window, completedAt });
+  const verdict = (completedAt: unknown): WindowVerdict =>
+    phase === "release"
+      ? { within: true, reason: null }
+      : window === null
+        ? { within: false, reason: "no_window" }
+        : judgeWindow({ ...window, completedAt });
   if (outcome.call === null) {
+    const missing = verdict(undefined);
     return {
       ...base,
       call_status: outcome.errorCode === "outside_calling_hours" ? "not_placed" : "api_error",
       confirmed: false,
       declined: false,
       acknowledged: false,
-      within_window: inWindow(null),
+      within_window: missing.within,
+      window_reason: missing.reason,
       question_asked: false,
       reached_person: false,
       machine_answered: false,
@@ -393,7 +399,8 @@ export function evaluateCommit(
   const declined = reading.answer === "decline" || structuredAnswer === "decline";
   // Late is not confirmed. The person may well have said yes. This run can no
   // longer act on it, so the yes leaves a release call owed instead.
-  const withinWindow = inWindow(call.completedAt ?? attempt?.completedAt ?? null);
+  const window_ = verdict(call.completedAt ?? attempt?.completedAt ?? null);
+  const withinWindow = window_.within;
   const confirmed =
     phase === "confirm" &&
     withinWindow &&
@@ -411,6 +418,7 @@ export function evaluateCommit(
     declined,
     acknowledged,
     within_window: withinWindow,
+    window_reason: window_.reason,
     question_asked: reading.questionAsked,
     reached_person: reachedPerson,
     machine_answered: machineAnswered,
