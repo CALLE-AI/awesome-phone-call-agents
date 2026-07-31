@@ -12,16 +12,18 @@ or bill. Not the number that called. Not a number from the message. Not a search
 result, because a search result is something an attacker can buy. If the claim file
 carries no trusted number the app refuses before it does anything else.
 
-`claimed_org.trusted_number_source` is required for that reason. Somebody has to
-write down where the number came from, so the anchor is on the record instead of in
-somebody's head.
+`trusted_number.printed_on` is required for that reason. Somebody has to write down
+where the number came from, so the anchor is on the record instead of in somebody's
+head.
 
 ## Never dial the number that made contact
 
 Not even when the user asks for it. A scammer who controls that line will confirm
 anything you put to them. The confirmation is worth nothing. If
-`contact.suspicious_number` equals `claimed_org.trusted_phone` the app refuses: one
-of the two is wrong and neither is safe to ring.
+`contact.number_shown` is the same number as `trusted_number.phone` the app refuses:
+a message spoofing the printed number would be checked by calling itself. The
+comparison is on digits, so writing the same number a different way does not get
+past it.
 
 ## Never repeat what the caller asked for
 

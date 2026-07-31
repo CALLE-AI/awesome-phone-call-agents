@@ -44,17 +44,23 @@ callee's own words and the number the customer should be using.
 
 | Field | Notes |
 | --- | --- |
-| `claim_id` | Stable per claim. Part of the idempotency key, so a retry reuses the call instead of ringing twice. |
-| `customer.name` | Spoken on the call as the person the question is about. |
-| `claimed_org.name` | Who the contact claimed to be. Spoken. |
-| `claimed_org.trusted_phone` | E.164. The only number that gets dialled. It comes from the customer's card, statement or bill. |
-| `claimed_org.trusted_number_source` | Where that number came from, in the customer's words. Required, so somebody has to write it down. |
-| `contact.channel` | `voicemail`, `text`, `missed_call` or `live_call`. |
-| `contact.received_at` | ISO 8601 with an offset. The window the question asks about. |
-| `contact.suspicious_number` | The number that appeared. An empty string when none was shown. Never dialled. Masked in output. |
-| `contact.claimed_subject` | What the contact said it was about, in one line. Spoken. |
-| `contact.asked_for` | What the caller wanted the person to do. Scanned for secrets and never spoken. |
+| `claim_id` | 3 to 64 characters of letters, digits, dot, dash or underscore. It travels into the idempotency key, so a retry reuses the call instead of ringing twice. |
+| `customer.name` | Who the contact was about. Spoken on the call. |
+| `contact.claimed_to_be` | Who the message said it was. Spoken. |
+| `contact.channel` | `voicemail`, `text_message`, `missed_call` or `answered_call`. |
+| `contact.arrived_at` | ISO 8601 with an offset, for example `2026-07-31T09:12:00-07:00`. |
+| `contact.claimed_about` | The subject in a few neutral words, 80 characters. Spoken. |
+| `contact.number_shown` | The number the handset showed. Never dialled. Masked in output. |
+| `contact.asked_for` | What the caller wanted the customer to do. Scanned, never spoken, never sent. |
+| `trusted_number.phone` | E.164. The only number that gets dialled. Read off the customer's own card or bill. |
+| `trusted_number.printed_on` | Where they read it, in their own words. Required, so the anchor is written down. |
+| `trusted_number.region` | Optional, for example `US`. |
+| `policy.recent_window_minutes` | The window the question asks about. 60 by default, 15 to 240. |
+| `policy.per_call_timeout_seconds` | 240 by default, 60 to 600. |
+| `policy.language` | BCP 47, `en-US` by default. |
+| `policy.min_confidence` | Floor on CALL-E's completion confidence. 0.5 by default. |
 
+A field this app does not read is refused rather than ignored, so do not invent one.
 A worked file is in [`references/examples.md`](references/examples.md).
 
 ## Running it
@@ -64,38 +70,43 @@ cd apps/typescript/verify-contact-claim
 npm install
 
 # No key, no call. Always first.
-node --import tsx src/cli.ts preview --claim /tmp/claim.json
+npm run vcc -- preview --claim /tmp/claim.json
 
 # One call. Needs CALLE_API_KEY and the receipt the preview printed.
-node --import tsx src/cli.ts check --claim /tmp/claim.json --live \
-  --receipt <hash> --record record.jsonl
+npm run vcc -- check --claim /tmp/claim.json --live --receipt <hash> --record record.jsonl
 
 # Replays the chain and recomputes every verdict. No key, no call.
-node --import tsx src/cli.ts verify --record record.jsonl
+npm run vcc -- verify --record record.jsonl
 ```
 
-`preview` prints the number it would dial, the exact words, the privacy scan and a
+`preview` prints the number it would dial, the exact words, the scan result and a
 receipt. Show the user the number plus the words, then wait for a go-ahead. The
 live command refuses without the receipt for the claim file as it stands, so an
-edited claim needs a fresh preview. The app README lists the npm script shortcuts
-for the same three commands.
+edited claim needs a fresh preview. `npm run preview` runs the example the app
+ships.
 
 ## The three refusals
 
-These fire before any call. All three exit 30 and place nothing.
+These fire before any client exists. All three exit 30, place nothing and end with
+"No call was placed."
 
 1. **The number that called is never dialled.** The only number rung is
-   `claimed_org.trusted_phone`. A missing trusted number is refused. So is a trusted
-   number equal to `contact.suspicious_number`. The trust anchor is the card in the
-   customer's hand. Do not edit the file to get past this.
-2. **Nothing the caller asked for is repeated.** The whole claim file is scanned for
-   account numbers, card numbers, one time codes, PINs, passwords, dates of birth and
-   national ids. A hit names the field and stops the run. Tell the user which field to
-   clear. Never move the value into another field.
-3. **The app never claims to be the customer.** The script opens by saying it is an
-   automated assistant calling on behalf of a named person. A claim file that sets an
-   impersonating persona or asks the caller to authenticate as the account holder is
-   rejected at load.
+   `trusted_number.phone`. A claim file with no trusted number refuses rather than
+   guessing one. So does a file where `contact.number_shown` is that same number,
+   because a message spoofing the printed number would be checked by calling itself.
+   The comparison is on digits, so `415-555-0100` and `+14155550100` count as one
+   handset. Read the number off the card by hand and put that in
+   `trusted_number.phone`.
+2. **Nothing the caller asked for is repeated.** The whole file is scanned for card
+   numbers, account numbers, one time codes, PINs, passwords, dates of birth and
+   national identifiers. A hit names the field, masks the value and stops the run.
+   Naming the category is fine, so "they wanted my card number" passes and the digits
+   do not. Tell the user which field to clear. Never move the value somewhere else in
+   the file.
+3. **The app never claims to be the customer.** A field that sets a persona is
+   refused by name. An instruction such as "pretend to be the account holder" or
+   "pass security as me" is refused by the words it used. Every call opens by saying
+   it is an automated assistant calling on behalf of a named person.
 
 ## The five outcomes
 
@@ -143,8 +154,9 @@ that does not follow from the stored evidence.
 - One run places one call. Do not re-run for a friendlier answer.
 - Do not print the API key and do not put it in the claim file.
 - Mask phone numbers in everything you show the user.
-- After a live run, give the verdict, the callee's own words, the trusted number and
-  the record hash. Say plainly when nothing was decided.
+- After a live run, relay what the result carries: `outcome`, `callee_quote` word for
+  word, `use_number` with `use_number_printed_on`, `what_to_do` and `record_hash`. Say
+  plainly when nothing was decided.
 
 ## More
 
