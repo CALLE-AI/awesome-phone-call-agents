@@ -37,7 +37,7 @@ const USAGE = `Phone approval gate
           [--state <dir>] [--code-key-file <path>] [--allow-host <host>]
       Place one call per approver until someone decides. Needs CALLE_API_KEY.
       Every live run appends an approval record, so --audit is required.
-      code_from_request derives the code from CALLE_APPROVAL_CODE_KEY or
+      Both bindings derive the secret from CALLE_APPROVAL_CODE_KEY or
       --code-key-file, the same key on every runner of one request.
       A base URL outside https://api.heycall-e.com and loopback needs its host
       named in --allow-host or CALLE_ALLOWED_HOSTS. The key goes nowhere else.
@@ -169,7 +169,6 @@ async function main(argv: string[]): Promise<number> {
     // for this request, so no runner ends up checking a call against a code the
     // approver was never shown.
     const codeKey = resolveCodeKey({
-      binding: request.policy.binding,
       file: parsed.values["code-key-file"],
       env: process.env.CALLE_APPROVAL_CODE_KEY,
     });

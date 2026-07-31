@@ -10,6 +10,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { verifyAudit } from "../src/audit.js";
 import { createSdkPort } from "../src/calle.js";
+import { resolveCodeKey } from "../src/config.js";
 import { runGate, type RunGateOptions } from "../src/gate.js";
 import type { ApprovalRequest, GateResult } from "../src/types.js";
 import { startFakeCalle, type FakeScenario } from "../fake/calle-server.js";
@@ -293,6 +294,21 @@ test("an approval code is derived per approver and per attempt", async () => {
       }
     },
   );
+});
+
+test("two runners in phrase mode place one call, not two", async () => {
+  const request = approvalRequest({ policy: { binding: "liveness_phrase" } });
+  await withFake([{ phone: ALICE_PHONE, userLines: ["Hello? Who is this?"] }], async (port, fake) => {
+    const codeKey = resolveCodeKey({ env: "shared operator key material for two runners" });
+    // The phrase is read out on the call, so it sits in the task text, so it sits
+    // in the payload digest and the idempotency key. Two runners inventing two
+    // phrases would place two calls at one handset.
+    const first = await runGate({ request, port, stateDir: statePath(), pollIntervalMs: 5, codeKey });
+    const second = await runGate({ request, port, stateDir: statePath(), pollIntervalMs: 5, codeKey });
+    assert.equal(second.attempts[0]!.secret_digest, first.attempts[0]!.secret_digest);
+    assert.equal(fake.created.length, 1, "one derived phrase means one provider key and one call");
+    assert.equal(second.attempts[0]!.call_id, first.attempts[0]!.call_id);
+  });
 });
 
 test("an API error is recorded with its CALL-E code", async () => {

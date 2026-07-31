@@ -110,12 +110,13 @@ npm run gate -- request --request your-request.json --live --audit approvals.jso
 npm run gate -- verify --audit approvals.jsonl
 ```
 
-`CALLE_APPROVAL_CODE_KEY` (or `--code-key-file`) is what the approval code is
-derived from in the default `code_from_request` binding. Every runner holding the
-same key derives the same code for the same request, which is what stops two runs
-on two machines showing two different codes for one call. A live run refuses to
-start without it. `liveness_phrase` needs no key, because the phrase is spoken on
-the call rather than read off the request channel.
+`CALLE_APPROVAL_CODE_KEY` (or `--code-key-file`) is what the approval secret is
+derived from. Every runner holding the same key derives the same code, or the same
+phrase, for the same request, which is what stops two runs on two machines
+showing two different codes for one call. It matters in `liveness_phrase` too:
+the caller speaks the phrase, so the phrase is part of the call payload and of the
+provider idempotency key, and two phrases mean two calls to one handset. A live
+run refuses to start without the key in either binding.
 
 `--audit` is required on a live run. Every run appends one record, including the
 runs nobody approved, because those are the ones you are asked about later.
@@ -134,10 +135,12 @@ must not expect two different codes. Four things hold that together.
   and a digest of the payload the call is created from. A retry lands on the same
   key. An edited request gets a different one instead of replaying a call about
   something else.
-- The code is derived, not drawn fresh: HMAC over the request digest, the
-  approver and the attempt number, keyed with `CALLE_APPROVAL_CODE_KEY`. Two
-  runners that share nothing but that key still derive the same code, so neither
-  ends up checking a call against a code the approver was never shown.
+- The secret is derived, not drawn fresh: HMAC over the request digest, the
+  approver and the attempt number, keyed with `CALLE_APPROVAL_CODE_KEY`. Both the
+  code and the phrase come out of it, because the phrase travels in the call
+  payload and a payload that differs per runner is a second call. Two runners that
+  share nothing but that key still derive the same secret, so neither ends up
+  checking a call against a code the approver was never shown.
 - Before the phone rings, the run also reserves that secret in a file created
   with O_CREAT and O_EXCL, under `.phone-approval-gate` next to the record file or
   under `--state <dir>`. On one filesystem that is the faster answer and the local

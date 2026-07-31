@@ -102,34 +102,27 @@ test("a missing request id or change field is refused", () => {
   );
 });
 
-test("code_from_request will not run without shared key material", () => {
-  assert.throws(
-    () => resolveCodeKey({ binding: "code_from_request" }),
-    (error: unknown) => {
-      assert.ok(error instanceof ConfigError, `expected ConfigError, got ${String(error)}`);
-      assert.match(error.message, /CALLE_APPROVAL_CODE_KEY/);
-      assert.match(error.message, /--code-key-file/);
-      return true;
-    },
-  );
-  // The phrase is spoken on the call, so it is not a secret an operator has to hold.
-  assert.equal(resolveCodeKey({ binding: "liveness_phrase" }), null);
-  assert.equal(resolveCodeKey({ binding: "code_from_request", env: "k".repeat(32) })?.length, 32);
-  assert.throws(
-    () => resolveCodeKey({ binding: "code_from_request", env: "too short" }),
-    /128 bits/,
-  );
+test("every binding needs shared key material for a live run", () => {
+  for (const missing of [{}, { env: "" }, { file: "" }]) {
+    assert.throws(
+      () => resolveCodeKey(missing),
+      (error: unknown) => {
+        assert.ok(error instanceof ConfigError, `expected ConfigError, got ${String(error)}`);
+        assert.match(error.message, /CALLE_APPROVAL_CODE_KEY/);
+        assert.match(error.message, /--code-key-file/);
+        return true;
+      },
+    );
+  }
+  assert.equal(resolveCodeKey({ env: "k".repeat(32) }).length, 32);
+  assert.throws(() => resolveCodeKey({ env: "too short" }), /128 bits/);
 });
 
 test("a key file other accounts can read is refused before the key is read", () => {
   const path = join(mkdtempSync(join(tmpdir(), "pag-key-")), "approval-code.key");
   writeFileSync(path, `${"k".repeat(40)}\n`, "utf8");
   chmodSync(path, 0o644);
-  assert.throws(
-    () => resolveCodeKey({ binding: "code_from_request", file: path }),
-    /0644/,
-  );
+  assert.throws(() => resolveCodeKey({ file: path }), /0644/);
   chmodSync(path, 0o600);
-  const key = resolveCodeKey({ binding: "code_from_request", file: path });
-  assert.equal(key?.toString("utf8"), "k".repeat(40));
+  assert.equal(resolveCodeKey({ file: path }).toString("utf8"), "k".repeat(40));
 });

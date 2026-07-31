@@ -11,7 +11,6 @@ import { CODE_KEY_MIN_BYTES } from "./secret.js";
 import type {
   Approver,
   ApprovalRequest,
-  Binding,
   Policy,
   PolicyInput,
 } from "./types.js";
@@ -284,20 +283,20 @@ function readKeyFile(path: string): Buffer {
 }
 
 /**
- * Resolve the key material approval codes are derived from.
+ * Resolve the key material the approval secret is derived from.
  *
- * `code_from_request` cannot run without it. The code is what binds an approval
- * to one request, so two runners that derive two different codes for one call put
- * the losing runner in front of a mismatch it cannot explain. One shared key on
- * every runner removes the disagreement instead of coordinating it. A phrase is
- * read out on the call and never printed on the request channel, so
- * `liveness_phrase` runs without a key.
+ * Neither binding runs without it. The secret is what binds an approval to one
+ * request, so two runners that derive two different secrets for one call are
+ * already in trouble: with a code, the losing runner faces a mismatch it cannot
+ * explain, and with a phrase, the phrase is spoken by the caller, so it sits in
+ * the call payload, changes the payload digest and therefore the idempotency key,
+ * and the second runner places a second call at the same handset. One shared key
+ * on every runner removes the disagreement instead of coordinating it.
  */
 export function resolveCodeKey(options: {
-  binding: Binding;
   file?: string | undefined;
   env?: string | undefined;
-}): Buffer | null {
+}): Buffer {
   const key =
     options.file !== undefined && options.file.length > 0
       ? readKeyFile(options.file)
@@ -305,12 +304,9 @@ export function resolveCodeKey(options: {
         ? Buffer.from(options.env, "utf8")
         : null;
   if (key === null) {
-    if (options.binding === "code_from_request") {
-      throw new ConfigError(
-        "code_from_request derives the approval code from operator key material and none was given. Set CALLE_APPROVAL_CODE_KEY or pass --code-key-file <path>, with at least 32 bytes of random material and the same value on every runner of this request. Without it two runners can show two different codes for one call.",
-      );
-    }
-    return null;
+    throw new ConfigError(
+      "The approval secret is derived from operator key material and none was given. Set CALLE_APPROVAL_CODE_KEY or pass --code-key-file <path>, with at least 32 bytes of random material and the same value on every runner of this request. Without it two runners derive two different secrets for one call: in code_from_request that shows two codes for one call, and in liveness_phrase the phrase goes into the call payload, so the two runs get two idempotency keys and place two calls.",
+    );
   }
   if (key.length < CODE_KEY_MIN_BYTES) {
     throw new ConfigError(
