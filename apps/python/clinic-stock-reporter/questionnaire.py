@@ -1,41 +1,94 @@
-"""Clinic stock-report interview prompt, REPORT parser, and red-flag logic.
+"""Clinic stock-report task, result schema, and red-flag classifier.
 
-This module is the domain core of the clinic-stock-reporter app. It is
-intentionally free of CALL-E and network concerns so it can be unit-tested in
-isolation. See README.md for the DHIS2/HMIS field subset and safety boundaries.
+This module is the domain core of the clinic-stock-reporter app. It is free of
+CALL-E and network concerns so it can be unit-tested in isolation. See
+README.md for the DHIS2/HMIS field subset and safety boundaries.
 
-The interview relies on CALL-E's `post_summary` as the structured-result
-channel: the agent is instructed to end the call by stating a single
-machine-parseable REPORT line, which `parse_report` extracts into a dict.
+Structured results are native to the CALL-E Developer API: we send
+`RESULT_SCHEMA` (a JSON Schema) on call creation, and CALL-E extracts a
+schema-valid `structured_result` from the call transcript/ASR/summary. When
+CALL-E cannot produce one, `structured_result` is null and `classify` records
+an empty report instead of dropping the call.
 """
 
 from __future__ import annotations
 
-import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any
 
-# Representative subset of Uganda HMIS105 / DVDMIS weekly reporting fields.
-# These mirror real DHIS2 indicators (cold-chain temperature, ARV/antimalarial
-# stockouts, malaria and ANC case counts) but should be confirmed against the
-# live DHIS2 instance before any production use. See README.md.
-FIELD_DEFS: tuple[tuple[str, type], ...] = (
-    ("fridge_temp_c", float),
-    ("arv_stockout", bool),
-    ("antimalarial_stockout", bool),
-    ("malaria_cases", int),
-    ("anc_visits", int),
-    ("stockout_items", str),
-)
-
-# Safe vaccine cold-chain range in degrees Celsius (WHO +2 to +8).
+# Representative subset of Uganda HMIS105 / DVDMIS weekly reporting indicators.
+# These mirror real DHIS2 fields but should be confirmed against the live DHIS2
+# instance before any production use. See README.md.
 COLD_CHAIN_MIN_C = 2.0
 COLD_CHAIN_MAX_C = 8.0
+UNKNOWN_COUNT = -1
 
-REPORT_PREFIX = "REPORT"
-REPORT_RE = re.compile(r"REPORT\b\s*(?P<body>[A-Za-z0-9_.=,\s-]+)", re.IGNORECASE)
-KV_RE = re.compile(r"(?P<key>[A-Za-z0-9_]+)\s*=\s*(?P<value>[^=,]+?)(?=\s+[A-Za-z0-9_]+\s*=|$)")
+# JSON Schema sent to CALL-E as `result_schema`. CALL-E extracts a
+# schema-valid object from the call evidence and validates it before
+# returning the terminal call. Object schemas are strict by default, so
+# undeclared fields are rejected.
+RESULT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": [
+        "fridge_temp_c",
+        "arv_stockout",
+        "antimalarial_stockout",
+        "malaria_cases",
+        "anc_visits",
+        "stockout_items",
+    ],
+    "properties": {
+        "fridge_temp_c": {
+            "type": "number",
+            "description": (
+                "Vaccine fridge temperature in degrees Celsius reported by the "
+                "clinic right now. Use -999 if the clinic has no vaccine fridge "
+                "or the reading is unavailable."
+            ),
+        },
+        "arv_stockout": {
+            "type": "string",
+            "enum": ["yes", "no", "unknown"],
+            "description": (
+                "yes if the clinic is out of stock of ARVs (antiretrovirals) "
+                "today; no if ARVs are in stock; unknown if the answer is unclear."
+            ),
+        },
+        "antimalarial_stockout": {
+            "type": "string",
+            "enum": ["yes", "no", "unknown"],
+            "description": (
+                "yes if the clinic is out of stock of antimalarials (ACT) today; "
+                "no if in stock; unknown if the answer is unclear."
+            ),
+        },
+        "malaria_cases": {
+            "type": "integer",
+            "description": (
+                "Number of confirmed malaria cases the clinic saw this week. "
+                "Use -1 if the count is unknown."
+            ),
+        },
+        "anc_visits": {
+            "type": "integer",
+            "description": (
+                "Number of new antenatal care first visits (ANC1) the clinic saw "
+                "this week. Use -1 if the count is unknown."
+            ),
+        },
+        "stockout_items": {
+            "type": "string",
+            "description": (
+                "Other essential medicines out of stock today, comma separated "
+                "by name, or 'none' if there are no other stockouts."
+            ),
+        },
+    },
+    "additionalProperties": False,
+}
+
+REQUIRED_FIELDS = tuple(RESULT_SCHEMA["required"])
 
 
 @dataclass
@@ -43,105 +96,67 @@ class ParsedReport:
     clinic_id: str | None
     fields: dict[str, Any] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
-    invalid: dict[str, str] = field(default_factory=dict)
     red_flags: list[str] = field(default_factory=list)
     severity: str = "green"  # green | amber | red
-    raw: str | None = None
+    structured_result: dict[str, Any] | None = None
 
 
-def build_goal(clinic_id: str, clinic_name: str, nurse_name: str | None = None) -> str:
-    """Build the CALL-E `goal` instruction for a clinic stock-report call.
+def build_task(clinic_id: str, clinic_name: str, nurse_name: str | None = None) -> str:
+    """Build the CALL-E `task` instruction for a clinic stock-report call.
 
-    The goal tells the agent to run a short structured interview and end the
-    call by stating the REPORT line exactly once. Keep it deterministic so the
-    post_summary is machine-parseable.
+    Keep the questions explicit and outcome-oriented so CALL-E can extract the
+    structured result from the transcript. Do not ask the recipient to produce
+    a machine-formatted line; the result schema handles structuring.
     """
-    addressee = f"the nurse in charge" if not nurse_name else nurse_name
+    addressee = "the nurse in charge" if not nurse_name else nurse_name
     return (
-        f"You are calling {clinic_name} ({clinic_id}) on behalf of the district "
-        f"health office for the weekly HMIS stock and cold-chain report. Speak "
-        f"to {addressee}. Keep the call under three minutes.\n\n"
-        "Ask these questions one at a time and wait for the answer each time:\n"
+        f"Call {clinic_name} ({clinic_id}) on behalf of the district health "
+        f"office for the weekly HMIS stock and cold-chain report. Speak to "
+        f"{addressee}. Keep the call under three minutes.\n\n"
+        "Ask these questions one at a time and wait for each answer:\n"
         "1. What is the vaccine fridge temperature in degrees Celsius right now?\n"
-        "2. Are you out of stock of ARVs (antiretrovirals) today? Answer yes or no.\n"
-        "3. Are you out of stock of antimalarials (ACT) today? Answer yes or no.\n"
+        "2. Are you out of stock of ARVs (antiretrovirals) today?\n"
+        "3. Are you out of stock of antimalarials (ACT) today?\n"
         "4. How many confirmed malaria cases did you see this week?\n"
         "5. How many new antenatal care first visits (ANC1) did you see this week?\n"
-        "6. Are any other essential medicines out of stock today? List them by "
-        "name, comma separated, or say none.\n\n"
-        "After the last answer, read all answers back briefly for confirmation, "
-        "then end the call by saying exactly once, on its own line:\n"
-        "REPORT fridge_temp_c=<number> arv_stockout=<yes|no> "
-        "antimalarial_stockout=<yes|no> malaria_cases=<integer> "
-        "anc_visits=<integer> stockout_items=<comma list or none>\n"
-        "Then say goodbye and hang up. Do not add commentary after the REPORT "
-        "line. Do not ask follow-up questions after the REPORT line."
+        "6. Are any other essential medicines out of stock today? List them by name.\n\n"
+        "Be courteous, confirm you are speaking to clinic staff, and thank them "
+        "before ending the call. Do not give medical advice or diagnose."
     )
 
 
-def _coerce(key: str, raw_value: str, type_: type) -> Any:
-    value = raw_value.strip()
-    if type_ is bool:
-        lowered = value.lower()
-        if lowered in {"yes", "y", "true", "1"}:
-            return True
-        if lowered in {"no", "n", "false", "0"}:
-            return False
-        raise ValueError(f"expected yes/no, got {value!r}")
-    if type_ is int:
-        return int(value)
-    if type_ is float:
-        return float(value)
-    return value
+def classify(structured_result: dict[str, Any] | None, clinic_id: str | None = None) -> ParsedReport:
+    """Classify a CALL-E structured_result into a ParsedReport with red flags.
 
-
-def parse_report(text: str, clinic_id: str | None = None) -> ParsedReport:
-    """Parse a REPORT line out of a post_summary or transcript string.
-
-    Returns a ParsedReport even when no REPORT line is found: `missing` lists
-    every required field so the caller can record an unparseable call rather
-    than silently dropping it.
+    A null structured_result (CALL-E could not produce a schema-valid result)
+    yields an empty report with all fields missing but is still recorded, not
+    dropped.
     """
-    result = ParsedReport(clinic_id=clinic_id, missing=list(name for name, _ in FIELD_DEFS))
-    if not text:
-        result.raw = text
-        return result
+    report = ParsedReport(clinic_id=clinic_id, structured_result=structured_result)
+    if not isinstance(structured_result, dict):
+        report.missing = list(REQUIRED_FIELDS)
+        return report
 
-    match = REPORT_RE.search(text)
-    if not match:
-        result.raw = text
-        return result
-
-    body = match.group("body").strip()
-    result.raw = body
-    parsed: dict[str, Any] = {}
-    for kv in KV_RE.finditer(body):
-        key = kv.group("key").lower()
-        value = kv.group("value").strip()
-        type_map = dict(FIELD_DEFS)
-        if key not in type_map:
-            continue
-        try:
-            parsed[key] = _coerce(key, value, type_map[key])
-        except ValueError as error:
-            result.invalid[key] = str(error)
-
-    result.fields = parsed
-    result.missing = [name for name, _ in FIELD_DEFS if name not in parsed]
-    _apply_red_flags(result)
-    return result
+    fields: dict[str, Any] = {}
+    for name in REQUIRED_FIELDS:
+        if name in structured_result:
+            fields[name] = structured_result[name]
+    report.fields = fields
+    report.missing = [name for name in REQUIRED_FIELDS if name not in fields]
+    _apply_red_flags(report)
+    return report
 
 
 def _apply_red_flags(report: ParsedReport) -> None:
     flags: list[str] = []
     f = report.fields
-    if "fridge_temp_c" in f and isinstance(f["fridge_temp_c"], (int, float)):
-        temp = float(f["fridge_temp_c"])
+    temp = f.get("fridge_temp_c")
+    if isinstance(temp, (int, float)) and temp != -999:
         if temp < COLD_CHAIN_MIN_C or temp > COLD_CHAIN_MAX_C:
             flags.append(f"cold_chain_break:{temp}C")
-    if f.get("arv_stockout") is True:
+    if f.get("arv_stockout") == "yes":
         flags.append("arv_stockout")
-    if f.get("antimalarial_stockout") is True:
+    if f.get("antimalarial_stockout") == "yes":
         flags.append("antimalarial_stockout")
     items = f.get("stockout_items")
     if isinstance(items, str) and items.strip().lower() not in {"", "none"}:
@@ -156,27 +171,37 @@ def _apply_red_flags(report: ParsedReport) -> None:
 
 
 def demo() -> None:
-    """ponytail: smallest self-check that fails if the parser breaks."""
-    sample = (
-        "[00:00:00] BOT: Hello from CALL-E. [00:00:30] USER: fridge 4.5, no ARV "
-        "stockout, antimalarial stockout yes, 12 malaria, 3 ANC, ACT out of stock. "
-        "REPORT fridge_temp_c=4.5 arv_stockout=no antimalarial_stockout=yes "
-        "malaria_cases=12 anc_visits=3 stockout_items=ACT"
+    """ponytail: smallest self-check that fails if the classifier breaks."""
+    ok = classify(
+        {
+            "fridge_temp_c": 4.5,
+            "arv_stockout": "no",
+            "antimalarial_stockout": "yes",
+            "malaria_cases": 12,
+            "anc_visits": 3,
+            "stockout_items": "ACT",
+        },
+        clinic_id="hcii-kapeeka",
     )
-    report = parse_report(sample, clinic_id="hcii-kapeeka")
-    assert report.fields["fridge_temp_c"] == 4.5, report.fields
-    assert report.fields["arv_stockout"] is False
-    assert report.fields["antimalarial_stockout"] is True
-    assert report.fields["malaria_cases"] == 12
-    assert report.fields["anc_visits"] == 3
-    assert report.fields["stockout_items"] == "ACT"
-    assert report.missing == [], report.missing
-    assert report.severity == "red", report.severity
-    assert "antimalarial_stockout" in report.red_flags
-    assert "stockout_items:ACT" in report.red_flags
+    assert ok.fields["fridge_temp_c"] == 4.5, ok.fields
+    assert ok.fields["arv_stockout"] == "no"
+    assert ok.fields["antimalarial_stockout"] == "yes"
+    assert ok.fields["malaria_cases"] == 12
+    assert ok.missing == [], ok.missing
+    assert ok.severity == "red", ok.severity
+    assert "antimalarial_stockout" in ok.red_flags
+    assert "stockout_items:ACT" in ok.red_flags
 
-    broken = parse_report("Call failed, no answer.", clinic_id="hcii-x")
-    assert broken.fields == {} and broken.missing and broken.severity == "green"
+    cold = classify({"fridge_temp_c": 10.0, "arv_stockout": "no", "antimalarial_stockout": "no",
+                     "malaria_cases": 5, "anc_visits": 1, "stockout_items": "none"}, clinic_id="x")
+    assert cold.severity == "red" and any(s.startswith("cold_chain_break") for s in cold.red_flags)
+
+    amber = classify({"fridge_temp_c": 4.0, "arv_stockout": "no", "antimalarial_stockout": "no",
+                      "malaria_cases": 5, "anc_visits": 1, "stockout_items": "Amoxicillin"}, clinic_id="x")
+    assert amber.severity == "amber", amber.severity
+
+    empty = classify(None, clinic_id="y")
+    assert empty.fields == {} and empty.missing and empty.severity == "green"
     print("questionnaire.demo ok")
 
 

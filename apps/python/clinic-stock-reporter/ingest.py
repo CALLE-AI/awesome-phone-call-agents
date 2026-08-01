@@ -45,15 +45,14 @@ class Store:
                     severity TEXT NOT NULL,
                     red_flags TEXT NOT NULL,
                     fridge_temp_c REAL,
-                    arv_stockout INTEGER,
-                    antimalarial_stockout INTEGER,
+                    arv_stockout TEXT,
+                    antimalarial_stockout TEXT,
                     malaria_cases INTEGER,
                     anc_visits INTEGER,
                     stockout_items TEXT,
                     missing_fields TEXT,
-                    invalid_fields TEXT,
                     final_status TEXT,
-                    run_id TEXT,
+                    call_id TEXT,
                     duration_seconds REAL,
                     ingested_at TEXT NOT NULL,
                     post_summary TEXT
@@ -80,34 +79,33 @@ class Store:
 
     def ingest(self, clinic_meta: dict[str, Any], report: ParsedReport, call_record: dict[str, Any]) -> None:
         f = report.fields
-        metadata = (clinic_meta.get("district") or {})
+        district = clinic_meta.get("district")
         with self._lock, self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO reports (
                     clinic_id, clinic_name, nurse_name, district, severity, red_flags,
                     fridge_temp_c, arv_stockout, antimalarial_stockout, malaria_cases,
-                    anc_visits, stockout_items, missing_fields, invalid_fields,
-                    final_status, run_id, duration_seconds, ingested_at, post_summary
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    anc_visits, stockout_items, missing_fields,
+                    final_status, call_id, duration_seconds, ingested_at, post_summary
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     clinic_meta.get("clinic_id"),
                     clinic_meta.get("clinic_name"),
                     clinic_meta.get("nurse_name"),
-                    metadata if isinstance(metadata, str) else None,
+                    district if isinstance(district, str) else None,
                     report.severity,
                     ",".join(report.red_flags),
                     f.get("fridge_temp_c") if isinstance(f.get("fridge_temp_c"), (int, float)) else None,
-                    int(f.get("arv_stockout")) if isinstance(f.get("arv_stockout"), bool) else None,
-                    int(f.get("antimalarial_stockout")) if isinstance(f.get("antimalarial_stockout"), bool) else None,
+                    f.get("arv_stockout") if isinstance(f.get("arv_stockout"), str) else None,
+                    f.get("antimalarial_stockout") if isinstance(f.get("antimalarial_stockout"), str) else None,
                     f.get("malaria_cases") if isinstance(f.get("malaria_cases"), int) else None,
                     f.get("anc_visits") if isinstance(f.get("anc_visits"), int) else None,
                     f.get("stockout_items") if isinstance(f.get("stockout_items"), str) else None,
                     ",".join(report.missing),
-                    ",".join(f"{k}={v}" for k, v in report.invalid.items()),
                     call_record.get("final_status"),
-                    call_record.get("run_id"),
+                    call_record.get("call_id") or call_record.get("run_id"),
                     call_record.get("duration_seconds"),
                     utc_now_iso(),
                     call_record.get("post_summary"),
@@ -250,19 +248,25 @@ def serve_dashboard(store: Store, host: str = "127.0.0.1", port: int = 8787) -> 
 def demo() -> None:
     """ponytail: smallest self-check for the store + ingest path."""
     import tempfile
-    from questionnaire import parse_report
+    from questionnaire import classify
 
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(Path(tmp) / DEFAULT_DB_NAME)
-        report = parse_report(
-            "REPORT fridge_temp_c=10.0 arv_stockout=no antimalarial_stockout=yes "
-            "malaria_cases=7 anc_visits=2 stockout_items=ACT",
+        report = classify(
+            {
+                "fridge_temp_c": 10.0,
+                "arv_stockout": "no",
+                "antimalarial_stockout": "yes",
+                "malaria_cases": 7,
+                "anc_visits": 2,
+                "stockout_items": "ACT",
+            },
             clinic_id="hcii-test",
         )
         store.ingest(
             {"clinic_id": "hcii-test", "clinic_name": "Test HC II", "district": "Demo"},
             report,
-            {"final_status": "COMPLETED", "run_id": "run-1", "duration_seconds": 42.0, "post_summary": "REPORT ..."},
+            {"final_status": "completed", "call_id": "call_1", "duration_seconds": 42.0, "post_summary": "Stockout reported."},
         )
         rows = store.latest_reports()
         esc = store.pending_escalations()
