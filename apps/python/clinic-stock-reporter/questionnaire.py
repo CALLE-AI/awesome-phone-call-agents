@@ -159,7 +159,7 @@ def _apply_red_flags(report: ParsedReport) -> None:
     if f.get("antimalarial_stockout") == "yes":
         flags.append("antimalarial_stockout")
     items = f.get("stockout_items")
-    if isinstance(items, str) and items.strip().lower() not in {"", "none"}:
+    if isinstance(items, str) and items.strip().lower() not in {"", "none", "unknown"}:
         flags.append(f"stockout_items:{items.strip()}")
     report.red_flags = flags
     if any(flag.startswith("cold_chain_break") or flag in {"arv_stockout", "antimalarial_stockout"} for flag in flags):
@@ -202,6 +202,17 @@ def demo() -> None:
 
     empty = classify(None, clinic_id="y")
     assert empty.fields == {} and empty.missing and empty.severity == "green"
+    assert empty.red_flags == []
+
+    # A call that did not connect returns sentinel/unknown values; these must
+    # not raise red flags (no evidence, not a stockout).
+    no_answer = classify(
+        {"fridge_temp_c": -999, "arv_stockout": "unknown", "antimalarial_stockout": "unknown",
+         "malaria_cases": -1, "anc_visits": -1, "stockout_items": "unknown"},
+        clinic_id="z",
+    )
+    assert no_answer.severity == "green", (no_answer.severity, no_answer.red_flags)
+    assert no_answer.red_flags == [], no_answer.red_flags
     print("questionnaire.demo ok")
 
 

@@ -118,6 +118,16 @@ def test_classify_null_structured_result_recorded_not_dropped():
     assert report.red_flags == []
 
 
+def test_classify_no_answer_sentinels_not_flagged():
+    report = questionnaire.classify(
+        {"fridge_temp_c": -999, "arv_stockout": "unknown", "antimalarial_stockout": "unknown",
+         "malaria_cases": -1, "anc_visits": -1, "stockout_items": "unknown"},
+        clinic_id="z",
+    )
+    assert report.severity == "green"
+    assert report.red_flags == []
+
+
 def test_store_ingest_creates_red_escalation():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(Path(tmp) / "clinic_reports.db")
