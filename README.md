@@ -118,6 +118,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`accessproof`](skills/accessproof/) - User-authorized venue access-question workflow that returns condition-level staff-reported evidence with explicit unknowns.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
