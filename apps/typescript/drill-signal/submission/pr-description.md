@@ -20,7 +20,7 @@ Adds DrillSignal, a TypeScript demo app for consented business-continuity outage
 - [ ] New workflow plugin
 - [ ] New provider adapter
 - [ ] New scheduler recipe
-- [ ] README awesome-list entry
+- [x] README awesome-list entry
 - [ ] Safety or documentation update
 - [ ] Validation or tooling update
 
