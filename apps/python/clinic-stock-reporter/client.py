@@ -50,6 +50,7 @@ class Config:
     locale: str
     poll_interval_seconds: float
     poll_timeout_seconds: float
+    run_id: str
 
 
 def parse_positive_float(value: str) -> float:
@@ -73,6 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--locale", default="en-US", help="Default recipient locale if the roster omits one. Default en-US.")
     parser.add_argument("--poll-interval-seconds", type=parse_positive_float, default=2.0)
     parser.add_argument("--poll-timeout-seconds", type=parse_positive_float, default=600.0)
+    parser.add_argument("--run-id", default=None, help="Stable run identifier folded into each call's idempotency key so retries of the same run dedupe. Defaults to today's UTC date.")
     return parser
 
 
@@ -93,6 +95,7 @@ def read_config(argv: list[str] | None = None) -> Config:
         locale=args.locale,
         poll_interval_seconds=args.poll_interval_seconds,
         poll_timeout_seconds=args.poll_timeout_seconds,
+        run_id=args.run_id or datetime.now(timezone.utc).date().isoformat(),
     )
 
 
@@ -114,7 +117,7 @@ def load_jsonl(path: Path) -> list[tuple[int, dict[str, Any]]]:
     return items
 
 
-def normalize_roster_item(line_number: int, raw: dict[str, Any], default_region: str, default_locale: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def normalize_roster_item(line_number: int, raw: dict[str, Any], default_region: str, default_locale: str, run_id: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Split a roster line into a call payload, metadata, and clinic identity.
 
     Roster line shape:
@@ -147,7 +150,7 @@ def normalize_roster_item(line_number: int, raw: dict[str, Any], default_region:
         "recipient": {"phones": phones, "region": region, "locale": locale},
         "result_schema": questionnaire.RESULT_SCHEMA,
         "metadata": metadata,
-        "idempotency_key": f"clinic-stock-reporter-{clinic_meta['clinic_id']}-{int(time.time())}",
+        "idempotency_key": f"clinic-stock-reporter-{clinic_meta['clinic_id']}-{run_id}",
     }
     return payload, metadata, clinic_meta
 
@@ -180,7 +183,7 @@ def process_batch(config: Config, items: list[tuple[int, dict[str, Any]]], conso
     with config.output_path.open("w", encoding="utf-8") as output:
         for line_number, raw in items:
             try:
-                payload, metadata, clinic_meta = normalize_roster_item(line_number, raw, config.region, config.locale)
+                payload, metadata, clinic_meta = normalize_roster_item(line_number, raw, config.region, config.locale, config.run_id)
             except ValueError as error:
                 console.print(f"[red]Line {line_number} invalid:[/] {error}")
                 failures += 1

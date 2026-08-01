@@ -11,6 +11,7 @@ as apps/python/batch-runner (fastmcp + rich).
 
 from __future__ import annotations
 
+import html
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -156,27 +157,25 @@ class Store:
             conn.commit()
 
 
+def _esc(value: Any) -> str:
+    return html.escape(str(value)) if value is not None else ""
+
+
 def _rows_html(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return "<p>No reports yet.</p>"
-    cells = "".join(
-        f"<th>{col}</th>" for col in (
-            "clinic_id", "clinic_name", "district", "severity", "red_flags",
-            "fridge_temp_c", "arv_stockout", "antimalarial_stockout", "malaria_cases",
-            "anc_visits", "stockout_items", "final_status", "ingested_at",
-        )
+    cols = (
+        "clinic_id", "clinic_name", "district", "severity", "red_flags",
+        "fridge_temp_c", "arv_stockout", "antimalarial_stockout", "malaria_cases",
+        "anc_visits", "stockout_items", "final_status", "ingested_at",
     )
+    cells = "".join(f"<th>{col}</th>" for col in cols)
     body = ""
     for row in rows:
         sev = row.get("severity") or "green"
         cls = {"red": "red", "amber": "amber", "green": "green"}.get(sev, "")
         body += f"<tr class='{cls}'>" + "".join(
-            f"<td>{row.get(col) if row.get(col) is not None else ''}</td>"
-            for col in (
-                "clinic_id", "clinic_name", "district", "severity", "red_flags",
-                "fridge_temp_c", "arv_stockout", "antimalarial_stockout", "malaria_cases",
-                "anc_visits", "stockout_items", "final_status", "ingested_at",
-            )
+            f"<td>{_esc(row.get(col))}</td>" for col in cols
         ) + "</tr>"
     return f"<table><tr>{cells}</tr>{body}</table>"
 
@@ -187,9 +186,9 @@ def _escalations_html(rows: list[dict[str, Any]]) -> str:
     body = ""
     for row in rows:
         body += (
-            f"<tr class='red'><td>{row.get('id')}</td><td>{row.get('clinic_id')}</td>"
-            f"<td>{row.get('red_flags')}</td><td>{row.get('message')}</td>"
-            f"<td>{row.get('created_at')}</td></tr>"
+            f"<tr class='red'><td>{_esc(row.get('id'))}</td><td>{_esc(row.get('clinic_id'))}</td>"
+            f"<td>{_esc(row.get('red_flags'))}</td><td>{_esc(row.get('message'))}</td>"
+            f"<td>{_esc(row.get('created_at'))}</td></tr>"
         )
     return f"<table><tr><th>id</th><th>clinic_id</th><th>red_flags</th><th>message</th><th>created_at</th></tr>{body}</table>"
 
@@ -226,7 +225,7 @@ def serve_dashboard(store: Store, host: str = "127.0.0.1", port: int = 8787) -> 
             escalations = store.pending_escalations()
             title = "CALL-E Clinic Stock Reporter - District Health Office Dashboard"
             body = (
-                f"<html><head><meta charset='utf-8'><title>{title}</title>{_css}</head><body>"
+                f"<html><head><meta charset='utf-8'><title>{html.escape(title)}</title>{_CSS}</head><body>"
                 f"<h1>{title}</h1>"
                 f"<p class='note'>Last-mile HMIS reports collected by CALL-E phone interviews. "
                 f"Red rows raised an SMS escalation to the district health office.</p>"
