@@ -1,0 +1,9 @@
+{
+  "workflow_id": "REPLACE-WITH-UNIQUE-ID",
+  "phone": "+972000000000",
+  "recipient_consented": true,
+  "user_name": "Name",
+  "language": "ru",
+  "max_minutes": 5,
+  "include_demo_profile": false
+}
