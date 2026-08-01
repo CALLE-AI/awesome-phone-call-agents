@@ -1,8 +1,8 @@
 # DrillSignal demo video script
 
-**Target length:** 2:40-2:50 (under 3 minutes)
+**Target length:** 1:42 (under 3 minutes)
 **Scenario:** Simulation preset `primary-unavailable-backup-success`
-**Disclosure:** UI timing may be compressed; simulation steps are real. Any live call segment is clearly marked **[PLACEHOLDER - NOT YET RECORDED]** until performed with consent.
+**Disclosure:** This recording is simulation only; no live call occurs. UI timing may be compressed; simulation steps are real.
 
 ## Pre-recording checklist
 
@@ -18,20 +18,15 @@
 
 | Time | Visual | Audio / caption |
 | --- | --- | --- |
-| 0:00-0:15 | Title card: "DrillSignal - consented outage drills by phone" | "Teams need to know on-call roles can answer before the real incident." |
-| 0:15-0:35 | Terminal: `npm run dev`, browser opens `127.0.0.1:3847` | "Default mode is simulation - no live calls." |
-| 0:35-1:05 | Create Drill form: primary + backup labels, fictional numbers, consent checkboxes, preset **primary-unavailable-backup-success** | "Explicit consent and a locked simulation preset." |
-| 1:05-1:25 | Safety Preview: masked numbers, max-call disclosure, attestations | "Safety preview before any side effect." |
-| 1:25-1:50 | Mission Control: Launch, event log showing primary no-answer then backup success | "Deterministic escalation when primary is unavailable." |
-| 1:50-2:20 | After-Action Report: scores, masked attempts, evidence excerpts | "Evidence-backed readiness report with redacted phones." |
-| 2:20-2:40 | Architecture diagram (`public/architecture.svg`) or Docker one-liner | "Portable app: local simulation, fake-server SDK contract, opt-in live CALL-E." |
-| 2:40-2:50 | End card: repo path, "No live call in this recording" (simulation path) | "Built for Awesome Phone Call Agents." |
+| 0:00-0:10 | Create Drill form and problem framing | "Teams need to know on-call roles can answer before the real incident." |
+| 0:10-0:35 | Safety Preview: masked numbers, consent checkboxes, max-call disclosure, attestations | "Explicit consent and safety preview before any side effect." |
+| 0:35-0:55 | Mission Control: Launch, event log showing primary no-answer then backup success | "Deterministic primary-to-backup escalation when primary is unavailable." |
+| 0:55-1:15 | After-Action Report: score overview | "Readiness scores summarize drill outcomes." |
+| 1:15-1:42 | Recommendations, redacted evidence excerpts, masked attempts, close | "Evidence-backed recommendations with redacted phones; no live call in this recording." |
 
-## Live call segment (placeholder)
+## Optional live verification (separate evidence)
 
-**[PLACEHOLDER - NOT YET RECORDED]**
-
-If a live segment is added later:
+Live CALL-E verification is not included in the final recording. If captured later as optional separate evidence:
 
 - Separate chapter title: "Optional live verification"
 - Show live side-effect acknowledgment in Safety Preview
@@ -46,5 +41,5 @@ If a live segment is added later:
 - [ ] Simulation mode visible in UI during main flow
 - [ ] No full E.164 numbers in report or captions
 - [ ] Compression disclosure in description or opening caption
-- [ ] Live segment clearly labeled or omitted
+- [ ] Live verification omitted from final recording or supplied only as separate optional evidence
 - [ ] Audio levels balanced; no background music unless licensed

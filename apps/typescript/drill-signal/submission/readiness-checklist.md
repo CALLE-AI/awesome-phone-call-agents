@@ -24,21 +24,21 @@ The Official Rules say the Submission Period ends **2026-09-14 at 11:45 AM SGT**
 | --- | --- | --- |
 | App, tests, Docker | Complete | `npm run verify` passes locally; multi-stage Docker image and health check documented in `../README.md`. |
 | Local narrated video | Complete | See local video metadata below; public upload still pending. |
-| Upstream PR | Pending publication | Prepared in `pr-description.md`; public PR URL not yet available. |
-| Public video URL | Pending upload | Upload `drillsignal-demo-final.mp4` to YouTube or Vimeo. |
+| Upstream PR | Complete | Draft opened: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/56 |
+| Public video URL | Pending upload | Upload `drillsignal-demo-final-hd.mp4` to YouTube or Vimeo. |
 | CALL-E account email | Pending user | Supply only in the Devpost form. |
 | Hosted URL (optional) | Pending | Optional; add only if a reliable hosted demo is available. |
-| Live CALL-E evidence | Pending | Requires a rotated credential and an explicitly consented E.164 destination. Do not expose either in repository evidence. |
+| Live CALL-E evidence | Pending | Requires a securely configured CALL-E credential and an explicitly consented E.164 destination. Do not expose either in repository evidence. |
 
 ## Local video metadata
 
 External handoff artifact (not stored in this repository):
 
-- Name: `drillsignal-demo-final.mp4`
-- Duration: `1:44.84`
-- Frame size: `1440x810`
-- Codecs: `H.264/AAC`
-- SHA-256: `0B9D35674F66ED1AC842AB7FD139D8F7F71BF742B8C00CDCB973CB249F2F9776`
+- Name: `drillsignal-demo-final-hd.mp4`
+- Duration: `1:42.00`
+- Frame size: `1440x810` native-resolution capture (not upscaled)
+- Codecs: `H.264 High/AAC`
+- SHA-256: `D3D13CD77D5702387CF26ACBD5050854EA8B8812297E0E3851B6196E399749F5`
 
 ## Equally weighted judging matrix
 
@@ -47,7 +47,7 @@ External handoff artifact (not stored in this repository):
 | Real World Impact | 25% | `../README.md` defines the on-call readiness problem and safety boundary; `devpost.md` states user value and path beyond the hackathon; the recorded local demo shows the readiness workflow. |
 | Quality of Idea | 25% | `devpost.md` presents consented continuity drills, deterministic escalation, and masked audit evidence as a scoped reusable app; `judge-guide.md` gives a credentialless evaluation path. |
 | Technical Implementation | 25% | `../README.md` documents CALL-E SDK modes, idempotency, cancellation, privacy, Docker, and limitations; `../src/` and `../test/` provide implementation and tests, including the fake CALL-E runtime contract and end-to-end flows. Live cloud CALL-E evidence remains pending. |
-| Product Experience & Demo | 25% | `judge-guide.md` covers create, safety preview, launch, mission control, and after-action report; the recorded 1:44.84 local demo shows the functioning product; `devpost.md` supplies concise supporting copy. Public video upload remains pending. |
+| Product Experience & Demo | 25% | `judge-guide.md` covers create, safety preview, launch, mission control, and after-action report; the recorded 1:42.00 native-resolution local demo shows the functioning product; `devpost.md` supplies concise supporting copy. Public video upload remains pending. |
 
 ## Award positioning
 
@@ -58,9 +58,9 @@ External handoff artifact (not stored in this repository):
 ## Final submission sequence
 
 1. Recheck the [overview](https://call-e.devpost.com/) and [Official Rules](https://call-e.devpost.com/rules); plan around the **11:45 AM SGT** rules deadline.
-2. Rotate the CALL-E credential and, only with explicit consent, optionally capture live-call evidence using an authorized E.164 destination.
-3. Publish the upstream PR to `CALLE-AI/awesome-phone-call-agents` and retain its public URL.
-4. Upload `drillsignal-demo-final.mp4` publicly to YouTube or Vimeo; verify playback, visibility, English presentation, functionality footage, duration under 3 minutes, and IP compliance.
+2. Securely configure the CALL-E credential if and when optional live evidence is performed, with explicit consent.
+3. Use draft PR #56 and move it to ready for review when appropriate, retaining its URL: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/56.
+4. Upload `drillsignal-demo-final-hd.mp4` publicly to YouTube or Vimeo; verify playback, visibility, English presentation, functionality footage, duration under 3 minutes, and IP compliance.
 5. Complete Devpost with `devpost.md`, the PR URL, public video URL, and CALL-E account email; add a hosted URL only if reliable.
 6. Preview every field and link, submit well before the earlier deadline, and retain confirmation evidence.
 7. Optional prize action: complete the **Feedback Form** linked from the Devpost overview during the Feedback Period with actionable CALL-E feedback; one feedback submission per entrant.
