@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  analyzer:
+    build: ./call_analyzer
+    environment: &analyzer_environment
+      CALL_ANALYZER_DATABASE_PATH: /data/call_analyzer.db
+      CALL_ANALYZER_QUEUE_MODE: rq
+      CALL_ANALYZER_QUEUE_NAME: callproof
+      CALL_ANALYZER_DELIVER_WEBHOOKS: "false"
+      CALLPROOF_WEBHOOK_SECRET: development-secret
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    volumes:
+      - analyzer_data:/data
+
+  worker:
+    build: ./call_analyzer
+    command: python -m call_analyzer.worker
+    environment: *analyzer_environment
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - analyzer_data:/data
+
+volumes:
+  analyzer_data:
+

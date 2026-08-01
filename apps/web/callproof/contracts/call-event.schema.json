@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://callproof.dev/contracts/call-event.schema.json",
+  "title": "CallProof analyzer webhook event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "event", "occurred_at", "data"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "event": { "enum": ["analysis.completed", "analysis.failed"] },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "data": {
+      "oneOf": [
+        { "$ref": "call-analysis-result.schema.json" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["analysis_id", "request_id", "call_id", "status", "error"],
+          "properties": {
+            "analysis_id": { "type": "string", "format": "uuid" },
+            "request_id": { "type": "string", "format": "uuid" },
+            "call_id": { "type": "string", "minLength": 1 },
+            "status": { "const": "failed" },
+            "error": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code", "message", "retryable"],
+              "properties": {
+                "code": { "type": "string", "minLength": 1 },
+                "message": { "type": "string", "minLength": 1 },
+                "retryable": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

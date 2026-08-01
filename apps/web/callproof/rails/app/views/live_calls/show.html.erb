@@ -1,0 +1,72 @@
+<% content_for :title, "Confirm CALL-E call ##{@call_request.id} · CallProof" %>
+
+<main class="shell">
+  <nav><%= link_to "← Back to safe demo", root_path, class: "back-link" %></nav>
+
+  <header class="result-header">
+    <div>
+      <p class="eyebrow">Live workflow · step 2 of 2</p>
+      <h1>Inspect every boundary.</h1>
+    </div>
+    <span class="badge large <%= @call_request.status %>"><%= @call_request.status.humanize %></span>
+  </header>
+
+  <% if notice %><p class="notice success"><%= notice %></p><% end %>
+  <% if alert %><p class="notice error"><%= alert %></p><% end %>
+
+  <section class="result-grid">
+    <article class="panel compact">
+      <p class="step-label">Recipient and objective</p>
+      <h2><%= @call_request.masked_phone_number %></h2>
+      <p><%= @call_request.objective %></p>
+      <dl>
+        <dt>Region</dt><dd><%= @call_request.provider_profile.metadata.fetch("region") %></dd>
+        <dt>Locale</dt><dd><%= @call_request.provider_profile.metadata.fetch("locale") %></dd>
+      </dl>
+    </article>
+
+    <article class="panel compact">
+      <p class="step-label">Immutable contract</p>
+      <h2>$<%= format("%.2f", @call_request.call_policy.maximum_surcharge_cents / 100.0) %> maximum</h2>
+      <dl>
+        <dt>Success</dt><dd><%= @contract.success_conditions.join(", ") %></dd>
+        <dt>Forbidden</dt><dd><%= @contract.forbidden_commitments.join(", ") %></dd>
+        <dt>Escalate</dt><dd><%= @contract.escalation_conditions.join(", ") %></dd>
+        <dt>SHA-256</dt><dd class="mono"><%= @contract.snapshot_hash %></dd>
+      </dl>
+    </article>
+  </section>
+
+  <% if @call_request.status == "awaiting_confirmation" %>
+    <section class="panel danger-zone">
+      <p class="step-label">External side effect</p>
+      <h2>This action can place a real phone call.</h2>
+      <p>The recipient may incur attention or carrier costs. Confirm that you have permission to call and that the objective is appropriate.</p>
+
+      <div class="readiness">
+        <% @readiness.each do |name, ready| %>
+          <span class="readiness-item <%= ready ? "ready" : "blocked" %>"><%= ready ? "✓" : "×" %> <%= name.to_s.humanize %></span>
+        <% end %>
+      </div>
+
+      <%= form_with url: confirm_live_call_path(@call_request), class: "demo-form" do |form| %>
+        <label>
+          Type <code><%= @confirmation_phrase %></code> to confirm
+          <%= form.text_field :confirmation_phrase, required: true, autocomplete: "off" %>
+        </label>
+        <%= form.submit "Place real call with CALL-E",
+                        class: "danger-button",
+                        disabled: !@readiness.values.all?,
+                        data: { turbo_confirm: "This can place a real phone call. Continue?" } %>
+      <% end %>
+
+      <%= button_to "Cancel draft", cancel_live_call_path(@call_request), class: "secondary-button", data: { turbo_confirm: "Cancel this draft?" } %>
+    </section>
+  <% else %>
+    <section class="panel compact">
+      <p class="step-label">Final state</p>
+      <h2><%= @call_request.status.humanize %></h2>
+      <p>No confirmation action is available for this request.</p>
+    </section>
+  <% end %>
+</main>
