@@ -1,0 +1,22 @@
+# Secrets - never commit these
+.env
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Stray downloaded installers
+*.exe
+
+# Local databases
+*.db
+*.sqlite3
