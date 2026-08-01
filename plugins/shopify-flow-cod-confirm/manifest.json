@@ -1,0 +1,51 @@
+{
+  "name": "shopify-flow-cod-confirm",
+  "title": "Shopify cash-on-delivery confirmation gate",
+  "platform": "Shopify",
+  "type": "workflow-plugin",
+  "description": "Turns a CALL-E confirmation call into an auditable ship-or-hold decision on a Shopify cash-on-delivery order. Triggered by Shopify Flow or an orders/create webhook, it polls the call to a terminal state, applies an explicit decision table, and writes tags plus a timeline note back onto the order.",
+  "entrypoints": [
+    {
+      "name": "Webhook receiver for Shopify Flow and orders/create",
+      "path": "src/server.mjs"
+    },
+    {
+      "name": "Preview and run CLI",
+      "path": "src/cli.mjs"
+    },
+    {
+      "name": "Decision core",
+      "path": "src/decision.mjs"
+    },
+    {
+      "name": "Local fake CALL-E server for the no-call path",
+      "path": "test/fake-calle-server.mjs"
+    }
+  ],
+  "side_effects": [
+    "Creates one outbound CALL-E call per cash-on-delivery order when run in live mode, and at most one additional retry when the first attempt is not answered.",
+    "Writes tags and a timeline note onto the Shopify order when a Shopify Admin API access token is configured.",
+    "Creates no calls and performs no Shopify writes in preview mode.",
+    "Creates no recurring schedules."
+  ],
+  "credentials": [
+    "CALL_E_API_KEY for creating and reading CALL-E calls.",
+    "SHOPIFY_ACCESS_TOKEN with order read and write scope for the verdict writeback.",
+    "SHOPIFY_WEBHOOK_SECRET for verifying Shopify webhook signatures before any call can be created.",
+    "No credentials, real phone numbers or customer records are committed to this repository."
+  ],
+  "safety": [
+    "Requires E.164 phone numbers and holds the order instead of calling when the number is not E.164.",
+    "Prepends a fixed, non-overridable instruction that prohibits medical, legal, financial and emergency advice and forbids taking payment details.",
+    "The call script asks whether it is speaking to the named customer before disclosing any order contents, so a wrong number learns nothing about the order.",
+    "Uses a stable idempotency key derived from shop domain, order id and attempt number, so a Shopify webhook retry cannot place a second call.",
+    "Reports an ambiguous call creation as unknown and possibly created, holds the order, and preserves the idempotency key for reconciliation instead of dialling again.",
+    "Treats an answered call with a null structured result as a hold, never as a confirmation.",
+    "Polls GET /v1/calls/{id} for the result and does not depend on a result webhook.",
+    "Masks phone numbers in logs, notes, previews and run status responses.",
+    "Verifies the Shopify webhook HMAC before a call can be created, and warns loudly when the secret is unset.",
+    "Skips orders that are not cash on delivery without contacting anyone.",
+    "Disable the Shopify Flow action or the orders/create webhook, or rotate CALL_E_API_KEY, to prevent new calls. A call already accepted by CALL-E cannot be cancelled through this plugin."
+  ],
+  "template_version": "0.1.0"
+}

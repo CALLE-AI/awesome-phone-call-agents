@@ -153,6 +153,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/) | n8n | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes. |
 | [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
+| [`plugins/shopify-flow-cod-confirm`](plugins/shopify-flow-cod-confirm/) | Shopify | Cash-on-delivery confirmation gate that turns a CALL-E call into a ship-or-hold decision written back onto the order as tags and a timeline note, with a no-call preview path. |
 
 ### Safety patterns
 

@@ -1,0 +1,25 @@
+{
+  "id": 5551234567891,
+  "name": "#1043",
+  "gateway": "shopify_payments",
+  "payment_gateway_names": ["shopify_payments"],
+  "processing_method": "direct",
+  "financial_status": "paid",
+  "total_price": "890000",
+  "currency": "VND",
+  "tags": "",
+  "customer": {
+    "first_name": "Linh",
+    "last_name": "Pham",
+    "phone": "+15005550101"
+  },
+  "shipping_address": {
+    "address1": "42 Le Loi",
+    "city": "Da Nang",
+    "province": "Da Nang",
+    "zip": "550000",
+    "country": "Vietnam",
+    "phone": "+15005550101"
+  },
+  "line_items": [{ "title": "Desk lamp", "quantity": 2 }]
+}
