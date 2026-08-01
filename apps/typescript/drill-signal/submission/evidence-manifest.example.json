@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "project": "drill-signal",
+  "generatedAt": null,
+  "verifiedLocal": {
+    "npmCi": null,
+    "npmRunVerify": null,
+    "typecheck": null,
+    "tests": {
+      "total": 53,
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0,
+      "notes": "npm test; verify also runs 2 post-build dist static-serving tests and smoke:production"
+    },
+    "build": null,
+    "demoNoNetwork": null,
+    "repositoryValidator": {
+      "command": "python3 scripts/validate_repository.py",
+      "status": null,
+      "notes": "Run from repository root"
+    },
+    "docker": {
+      "imageBuilt": true,
+      "healthEndpoint": "GET /api/health -> 200 ok, authRequired true on 0.0.0.0 bind",
+      "staticUi": "GET / -> 200 DrillSignal HTML; GET /favicon.svg -> 200",
+      "operatorTokenRequired": true,
+      "simulationVerified": "primary-unavailable-backup-success with masked after-action report",
+      "notes": "Verified image drillsignal-verify:local; unauthenticated POST /api/drills -> 401"
+    },
+    "sdkContractFakeServer": null,
+    "desktopBrowserQa": null,
+    "mobileBrowserQa": null
+  },
+  "pendingExternal": {
+    "pullRequestUrl": null,
+    "videoUrl": null,
+    "hostedUrl": null,
+    "devpostSubmitted": null,
+    "devpostAccountEmail": null,
+    "realCloudCall": {
+      "callId": null,
+      "status": null,
+      "dateUtc": null,
+      "region": null,
+      "redactedResultSummary": null,
+      "notes": "Do not store API keys, full phone numbers, transcripts, or personal data in this file"
+    }
+  }
+}

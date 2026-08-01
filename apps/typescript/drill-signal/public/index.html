@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DrillSignal — Business Continuity Drills</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <p class="eyebrow">Business continuity</p>
+        <h1>DrillSignal</h1>
+      </div>
+    </div>
+    <div class="mode-pill" id="mode-pill">Mode: simulation</div>
+    <div class="operator-auth" id="operator-auth-wrap" hidden>
+      <label class="operator-token" id="operator-token-wrap" hidden>
+        Operator token
+        <input
+          type="password"
+          id="operator-token"
+          name="operator-token"
+          autocomplete="off"
+          aria-label="Operator bearer token for remote host"
+          placeholder="Bearer token for remote host"
+        />
+      </label>
+      <p id="auth-health-status" class="auth-health-status" role="status" aria-live="polite" hidden></p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <nav class="stepper" aria-label="Drill flow">
+      <button class="step active" data-step="create">1. Create Drill</button>
+      <button class="step" data-step="preview">2. Safety Preview</button>
+      <button class="step" data-step="control">3. Mission Control</button>
+      <button class="step" data-step="report">4. After-Action Report</button>
+    </nav>
+
+    <section id="panel-create" class="panel active">
+      <header class="panel-head">
+        <h2>Create outage drill</h2>
+        <p>One scoped production-outage scenario. Simulation is the default and never contacts a network service.</p>
+      </header>
+      <form id="create-form" class="form-grid">
+        <label>
+          Primary role label
+          <input name="primaryLabel" required value="Platform On-Call" />
+        </label>
+        <label>
+          Primary phone (E.164)
+          <input name="primaryPhone" required placeholder="+15550100001" value="+15550100001" />
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="primaryConsented" required checked />
+          Primary contact consented to this drill
+        </label>
+        <label>
+          Backup role label (optional)
+          <input name="backupLabel" placeholder="Backup On-Call" value="Backup On-Call" />
+        </label>
+        <label>
+          Backup phone (optional)
+          <input name="backupPhone" placeholder="+15550100003" value="+15550100003" />
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="backupConsented" checked />
+          Backup contact consented to escalation if primary is unavailable
+        </label>
+        <label>
+          Simulation preset
+          <select name="simulationPreset" id="simulation-preset"></select>
+        </label>
+        <label>
+          Run mode
+          <select name="mode">
+            <option value="simulation" selected>Simulation (default, no network)</option>
+            <option value="fake-server">Fake CALL-E server (local HTTP)</option>
+            <option value="live">Live CALL-E (requires CALLE_API_KEY on server)</option>
+          </select>
+        </label>
+        <div class="actions sticky-actions">
+          <button type="submit" class="btn primary btn-create">Create drill &amp; open preview</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="panel-preview" class="panel">
+      <header class="panel-head">
+        <h2>Safety preview</h2>
+        <p>Review masked contacts, call cap, and consent before arming the drill.</p>
+      </header>
+      <div id="preview-plan" class="plan-card"></div>
+      <form id="preview-form" class="consent-block">
+        <label class="checkbox">
+          <input type="checkbox" name="operatorConfirmedDrillPurpose" required />
+          I confirm this is a consented business-continuity drill, not a real incident or emergency call
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="maxCallsDisclosed" required />
+          I understand the maximum call count for this drill (shown above)
+        </label>
+        <label class="checkbox" id="live-ack-wrap" hidden>
+          <input type="checkbox" name="liveSideEffectAcknowledged" />
+          I understand live mode places real outbound phone calls with telephony side effects
+        </label>
+        <div class="actions">
+          <button type="submit" class="btn primary">Acknowledge preview &amp; arm drill</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="panel-control" class="panel">
+      <header class="panel-head">
+        <h2>Mission control</h2>
+        <p>Launch only after explicit confirmation. Cancel is always available.</p>
+      </header>
+      <div id="status-board" class="status-board"></div>
+      <div id="event-log" class="event-log" aria-live="polite"></div>
+      <form id="launch-form" class="consent-block">
+        <label class="checkbox">
+          <input type="checkbox" name="launchConfirmed" required />
+          I confirm launch of this drill with the settings shown in preview
+        </label>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="launch-btn">Launch drill</button>
+          <button type="button" class="btn danger" id="cancel-btn">Cancel drill</button>
+        </div>
+      </form>
+      <p id="fake-server-error" class="boundary-note" role="alert"></p>
+      <p id="cancel-boundary" class="boundary-note"></p>
+    </section>
+
+    <section id="panel-report" class="panel">
+      <header class="panel-head">
+        <h2>After-action report</h2>
+        <p>Evidence-backed readiness scoring with masked audit data.</p>
+      </header>
+      <div id="report-content" class="report-grid"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>DrillSignal stores masked audit data only. No emergency calls. Default mode never places a live call.</p>
+  </footer>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

@@ -27,3 +27,9 @@ callback-writeback.json
 skills-lock.json
 docs/codex-implementation-plan.md
 docs/superpowers/
+.codegraph/
+.cursor/
+apps/typescript/drill-signal/.data/
+apps/typescript/drill-signal/dist/
+apps/typescript/drill-signal/.playwright-cli/
+apps/typescript/drill-signal/.tmp-dev-*/
