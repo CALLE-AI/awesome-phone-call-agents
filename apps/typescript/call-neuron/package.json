@@ -1,0 +1,33 @@
+{
+  "name": "call-neuron",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview:operator": "npm run build && npx wrangler pages dev",
+    "deploy": "npm run build && npx wrangler pages deploy",
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "verify": "npm run check && npm test && npm run build"
+  },
+  "dependencies": {
+    "mammoth": "^1.12.0",
+    "papaparse": "^5.5.4",
+    "pdfjs-dist": "^6.2.108",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "read-excel-file": "^5.8.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "jszip": "^3.10.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.1.0"
+  }
+}
