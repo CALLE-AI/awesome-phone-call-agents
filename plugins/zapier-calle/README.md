@@ -4,6 +4,30 @@ A Zapier Platform CLI integration that places outbound CALL-E phone calls from
 a Zap and reports back a fail-closed disposition, transcript, summary, and
 any structured result the call extracted.
 
+## Install it
+
+This integration is published to Zapier as a **private** integration, not
+listed in Zapier's public app directory, so the invite link below is how
+you get access:
+
+https://zapier.com/developer/public-invite/244591/5987695714e8692147ff45fdcb3be684/
+
+Installing it requires a CALL-E API key, entered when you connect the
+account inside Zapier - see [Setup](#7-setup) for what the key needs.
+
+The quickest way to confirm it works end to end is
+[`examples/two-step-free-plan.md`](examples/two-step-free-plan.md): a
+two-step recipe that runs on Zapier's free plan and needs no third-party
+app connection beyond the CALL-E account itself.
+
+**Leave `Dry Run` set to `true` for the first run.** It returns a masked
+preview and places no call. Only turn it off deliberately, as its own
+step, and only with a phone number you are authorized to call.
+
+Building from source is not required to try it. The source lives in this
+directory; `npm install && npm test` runs the full suite with no
+credentials required.
+
 ## 1. What it does
 
 The integration places a phone call through the CALL-E Developer API, then
@@ -216,7 +240,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 119 tests across 13 files against a bundled
+`npm install && npm test` runs 121 tests across 13 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/e2e-app.test.js` additionally drives the real app definition
 (`index.js`) through `zapier-platform-core`'s `createAppTester`, exercising
