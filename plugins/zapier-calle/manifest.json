@@ -1,0 +1,40 @@
+{
+  "name": "zapier-calle",
+  "title": "Zapier CALL-E integration",
+  "platform": "Zapier",
+  "type": "platform-integration",
+  "description": "Zapier Platform CLI integration that places CALL-E phone calls, waits for the terminal outcome through a Zapier callback URL, and returns a fail-closed disposition alongside the transcript, summary, and structured result.",
+  "entrypoints": [
+    {
+      "name": "Place Call and Wait for Outcome",
+      "path": "creates/place-call-and-wait.js"
+    },
+    {
+      "name": "Start Call (No Wait)",
+      "path": "creates/start-call.js"
+    },
+    {
+      "name": "Find Call Result",
+      "path": "searches/find-call-result.js"
+    }
+  ],
+  "side_effects": [
+    "Creates one outbound phone call per Zap run when Dry Run is false, a valid CALL-E API key is connected, and an authorized E.164 phone number is supplied."
+  ],
+  "safety": [
+    "Dry Run returns a masked preview, never generates a Zapier callback URL, and sends no request to CALL-E.",
+    "Requires E.164 phone numbers and never infers region or locale from the number.",
+    "Derives the Idempotency-Key from a SHA-256 digest of the canonical call payload, excluding the per-run webhook URL, so an edited retry cannot replay an older call.",
+    "Classifies every outcome fail-closed: unrecognized statuses and event types resolve to needs_human, never to a successful disposition.",
+    "Distinguishes outcome_unknown from failed so an ambiguous result does not trigger a second call.",
+    "Rejects a resumed callback whose call id does not match the call the step started.",
+    "Masks phone numbers in previews, outputs, and error messages.",
+    "Does not create recurring schedules; Zapier owns scheduling."
+  ],
+  "credentials": [
+    "CALL-E API key stored in the Zapier connection as a password-typed field."
+  ],
+  "tested_with": {
+    "zapier-platform-core": "19.1.0"
+  }
+}
