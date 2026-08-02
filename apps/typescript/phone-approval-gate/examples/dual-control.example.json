@@ -1,0 +1,49 @@
+{
+  "request_id": "db-restore-2026-07-29",
+  "organization": "Acme Payments",
+  "system": "runbook-agent",
+  "change": {
+    "title": "Restore the payments database from the 03:00 snapshot",
+    "summary": "Drops and restores the primary payments database. Roughly forty minutes of write downtime. This cannot be undone once it starts.",
+    "environment": "production-database",
+    "requested_by": "incident INC-4471",
+    "links": ["https://example.com/acme/incidents/INC-4471"]
+  },
+  "policy": {
+    "mode": "dual",
+    "binding": "code_from_request",
+    "per_call_timeout_seconds": 300,
+    "window_seconds": 600,
+    "min_confidence": 0.6,
+    "max_failed_attempts": 2
+  },
+  "approvers": [
+    {
+      "id": "dba-on-call",
+      "name": "Alice Okafor",
+      "phone": "+14155550100",
+      "region": "US",
+      "locale": "en-US",
+      "enrolled_at": "2026-07-01",
+      "authorized_for": ["production-database"]
+    },
+    {
+      "id": "engineering-manager",
+      "name": "Bo Chen",
+      "phone": "+14155550101",
+      "region": "US",
+      "locale": "en-US",
+      "enrolled_at": "2026-07-01",
+      "authorized_for": ["production-database"]
+    },
+    {
+      "id": "cto",
+      "name": "Dana Reyes",
+      "phone": "+14155550102",
+      "region": "US",
+      "locale": "en-US",
+      "enrolled_at": "2026-07-01",
+      "authorized_for": ["production-database"]
+    }
+  ]
+}
