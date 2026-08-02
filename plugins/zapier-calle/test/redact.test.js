@@ -40,6 +40,18 @@ describe('maskPhone', () => {
     expect(maskPhone('Call 5550123456 back.')).toBe('Call ******3456 back.');
     expect(maskPhone('5550123456')).toBe('******3456');
   });
+
+  it('hides a majority of digits for a mid-length international number', () => {
+    // Previously only 2 of 7 digits were masked ('+5**0123'); the last-4 rule revealed too much
+    // once the number was short enough that first+last4 covered most of it.
+    expect(maskPhone('+5550123')).toBe('+*****23');
+  });
+
+  it('fully masks an international number with fewer than 4 digits', () => {
+    // Previously these were validated as too short to mask and passed through raw.
+    expect(maskPhone('+123')).toBe('+***');
+    expect(maskPhone('+12')).toBe('+**');
+  });
 });
 
 describe('redactDeep', () => {

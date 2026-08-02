@@ -2,9 +2,29 @@
 // Does not attempt every international format (e.g., parentheses in country code). Trade-off:
 // short non-phone digit runs (e.g., 'offset 42 seconds') survive unmasked; leaked numbers do not.
 // Bare domestic matching deliberately limited to standalone 10-digit runs via word-boundary checks
-// to avoid corrupting identifiers (e.g., 'evt_1754091234567' remains intact).
+// to avoid corrupting identifiers (e.g., 'evt_1754091234567' remains intact) - the same trade-off
+// means a standalone 10-digit non-phone value (a tracking or confirmation number, say) is still
+// masked if nothing word-like is adjacent to it, since it is indistinguishable from a real number.
 const PHONE_RE = /\+\d[\d\s.\-()]*\d(?!\w)|(?<!\w)(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}(?!\w)|(?<!\w)\d{10}(?!\w)/g;
 const SECRET_KEYS = new Set(['apikey', 'api_key', 'authorization']);
+
+// International masking: the fewer digits there are, the larger a share any fixed "show the
+// last N" rule would reveal, so the visible portion shrinks (instead of staying at a fixed
+// last-4) as the number gets shorter, so a majority of digits stay hidden at every length.
+function maskInternational(digits) {
+  const length = digits.length;
+  if (length <= 3) return `+${'*'.repeat(length)}`;
+  if (length <= 5) return `+${digits[0]}${'*'.repeat(length - 1)}`;
+  if (length <= 10) return `+${'*'.repeat(length - 2)}${digits.slice(-2)}`;
+  const first = digits[0];
+  const last4 = digits.slice(-4);
+  return `+${first}${'*'.repeat(length - 5)}${last4}`;
+}
+
+function maskDomestic(digits) {
+  const last4 = digits.slice(-4);
+  return `${'*'.repeat(digits.length - 4)}${last4}`;
+}
 
 export function maskPhone(value) {
   if (typeof value !== 'string') return value;
@@ -12,25 +32,12 @@ export function maskPhone(value) {
     const digits = match.replace(/\D/g, '');
     const isInternational = match.startsWith('+');
 
-    // Validate digit count: international 4-20, domestic exactly 10.
     if (isInternational) {
-      if (digits.length < 4 || digits.length > 20) return match;
-    } else {
-      if (digits.length !== 10) return match;
+      if (digits.length > 20) return match;
+      return maskInternational(digits);
     }
-
-    // Apply masking rules.
-    if (isInternational) {
-      if (digits.length <= 5) return `+${digits[0]}${'*'.repeat(digits.length - 1)}`;
-      const first = digits[0];
-      const last4 = digits.slice(-4);
-      const stars = '*'.repeat(digits.length - 5);
-      return `+${first}${stars}${last4}`;
-    } else {
-      const last4 = digits.slice(-4);
-      const stars = '*'.repeat(digits.length - 4);
-      return `${stars}${last4}`;
-    }
+    if (digits.length !== 10) return match;
+    return maskDomestic(digits);
   });
 }
 
