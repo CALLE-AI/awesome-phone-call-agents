@@ -210,7 +210,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 109 tests across 13 files against a bundled
+`npm install && npm test` runs 119 tests across 13 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/e2e-app.test.js` additionally drives the real app definition
 (`index.js`) through `zapier-platform-core`'s `createAppTester`, exercising
