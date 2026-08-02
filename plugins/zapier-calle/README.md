@@ -225,26 +225,69 @@ callback URL and sends it to CALL-E as `webhook_url`, and that `performResume`
 runs correctly through the real platform once it receives a callback body -
 just not the live HTTP delivery leg in between.
 
-**Live verification:** performed 2026-08-02 against the production CALL-E API
-with `zapier-platform-core` 19.1.0.
+**Live verification:** performed 2026-08-02 against `https://api.heycall-e.com`
+with `zapier-platform-core` 19.1.0. Two real outbound calls were placed to a
+phone number the tester owns. The number itself is not recorded here.
 
-- Authentication verified against the production API: `GET /v1/goals`
-  returned HTTP 200. This probe places no call.
-- Dry-run verified with real credentials against the production base URL:
-  zero network requests, zero callback URLs generated, and the phone number
-  masked in the preview with no raw digits present.
-- E.164 validation and masking confirmed against a real number the tester
-  owns. The number itself is not recorded.
-- Call creation verified: `POST /v1/calls` returned HTTP 201 and the
-  recipient handset rang.
-- **Known limitation observed:** the call task remained at status `queued`
-  for a 300-second polling window, through ringing and answering, and did
-  not transition to `in_progress` or reach a terminal status within that
-  window. Consequently no terminal disposition was recorded from a live
-  call.
-- **What this demonstrated:** with a real call in a genuinely ambiguous
-  state, the integration returned `disposition: outcome_unknown`,
-  `is_actionable: false`, reason "Call is still queued; no terminal outcome
-  yet." It reported neither success nor failure, which is the fail-closed
-  behavior the design intends and the behavior that prevents a workflow from
-  redialing a person who may already have been reached.
+Preflight, no calls consumed:
+
+- Authentication: `GET /v1/goals` returned HTTP 200.
+- Dry run with real credentials pointed at the production base URL: zero
+  network requests issued, zero Zapier callback URLs generated, and the
+  recipient number masked in the preview with no raw digits present.
+- E.164 validation and masking confirmed against the real number.
+
+Call 1 - recipient declined:
+
+- `POST /v1/calls` returned HTTP 201; the handset rang.
+- The recipient hung up without answering. CALL-E retried, then the call
+  task reached terminal `status: failed` with `failure_code` reporting
+  `DECLINED (Hangup by: user)`.
+- CALL-E still returned an extracted `structured_result` of
+  `{"heard_clearly": "unknown"}`, but `task_completed` was `false`.
+- The integration classified this as `disposition: failed`,
+  `is_actionable: false`. It did not treat the presence of a structured
+  result as success. No raw digits appeared anywhere in the flattened
+  output.
+
+Call 2 - recipient answered:
+
+- `POST /v1/calls` returned HTTP 201. The call rang, connected, CALL-E held
+  the conversation in Vietnamese, and the recipient confirmed.
+- Terminal `status: completed` was reached about 50 seconds after creation.
+- `task_completed: true`, `completion_confidence` `high` at 0.95, and
+  `structured_result` of `{"heard_clearly": "yes"}` matching the schema
+  supplied on the request.
+- Six transcript turns were returned.
+- The integration classified this as `disposition: confirmed`,
+  `is_actionable: true`. No raw digits appeared anywhere in the flattened
+  output.
+
+**What this demonstrates:** both the success path and a real non-success
+path were exercised end to end against production, and the fail-closed
+classifier produced the correct verdict for each. Call 1 is the more
+important of the two: CALL-E returned a structured result, and the
+integration still refused to mark the call actionable because
+`task_completed` was false.
+
+**Observed platform behavior worth knowing:**
+
+- A call task's top-level `status` from `GET /v1/calls/{id}` read `queued`
+  while the call was in flight, whereas `GET /v1/calls/{id}/events` reported
+  the real progression: `call.started`, `call.in_progress`, `Call is
+  ringing`, `Call connected`, `Bot is speaking`, `Callee said`, `Call ended`.
+  Use the events endpoint when you need live progress; do not infer failure
+  from a non-terminal `status`.
+- CALL-E retries after a declined call, so a declined call takes materially
+  longer to reach a terminal state than an answered one.
+- A call task for a Vietnamese number was rejected at creation with HTTP 422
+  and error code `call_not_ready`, carrying a `details.questions` array
+  asking whether the call should be placed in Vietnamese. Setting `Region`
+  and `Locale` explicitly avoids this. This integration surfaces those
+  questions rather than reporting a generic failure.
+
+**Not covered by automated tests:** `z.generateCallbackUrl()` under
+`createAppTester` targets a fixed Zapier-hosted URL that cannot be
+redirected to the local fake server, so the live HTTP delivery leg of the
+webhook is exercised only by Zapier itself in production, not by this
+repository's test suite.
