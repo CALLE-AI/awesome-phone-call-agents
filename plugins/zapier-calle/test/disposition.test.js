@@ -99,7 +99,7 @@ describe('deriveDisposition', () => {
     expect(dispositions.every((entry) => entry.is_actionable === false)).toBe(true);
   });
 
-  it('exports exactly the seven documented dispositions', () => {
+  it('exports exactly the eight documented dispositions', () => {
     expect(DISPOSITIONS).toEqual([
       'confirmed',
       'review_required',
@@ -108,6 +108,7 @@ describe('deriveDisposition', () => {
       'canceled',
       'outcome_unknown',
       'needs_human',
+      'outside_calling_window',
     ]);
   });
 

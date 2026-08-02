@@ -2,10 +2,25 @@ import { buildPayload, isDryRun } from '../lib/build-payload.js';
 import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { redactDeep } from '../lib/redact.js';
 import { baseUrl } from '../lib/client.js';
+import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
 
 export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   const { payload, key, errors } = buildPayload(bundle.inputData, { webhookUrl });
   if (errors.length) throw new Error(errors.join(' '));
+
+  const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
+  if (!windowCheck.allowed) {
+    return {
+      dry_run: false,
+      call_id: null,
+      disposition: 'outside_calling_window',
+      disposition_reason: windowCheck.reason,
+      is_actionable: false,
+      calling_window_enforced: true,
+      local_hour: windowCheck.localHour,
+      correlation_id: payload.metadata.correlation_id,
+    };
+  }
 
   if (isDryRun(bundle.inputData.dry_run)) {
     return {

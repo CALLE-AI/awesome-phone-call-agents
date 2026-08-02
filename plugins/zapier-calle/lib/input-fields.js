@@ -29,6 +29,40 @@ export const INPUT_FIELDS = [
     helpText: 'Optional locale such as en-US. Leave blank if unknown; it is never inferred.',
   },
   {
+    key: 'calling_window_timezone',
+    label: 'Recipient Timezone (IANA)',
+    type: 'string',
+    required: false,
+    helpText:
+      'Supplying this enables calling-window enforcement: the call is refused outside the configured local hours. Must be an IANA name such as America/New_York or Asia/Ho_Chi_Minh. It is never inferred from the phone number. Leave blank to disable enforcement.',
+  },
+  {
+    key: 'calling_window_earliest_hour',
+    label: 'Earliest Local Hour',
+    type: 'integer',
+    required: false,
+    default: '8',
+    helpText: 'Earliest local hour (0-23) the call is allowed to start. Only applies when Recipient Timezone is set.',
+  },
+  {
+    key: 'calling_window_latest_hour',
+    label: 'Latest Local Hour',
+    type: 'integer',
+    required: false,
+    default: '21',
+    helpText:
+      'Latest local hour (0-23) the call is allowed to start; calls are blocked at and after this hour. The US federal TCPA window is 8 to 21 local (47 CFR 64.1200). Florida and Oklahoma require 20. Only applies when Recipient Timezone is set.',
+  },
+  {
+    key: 'calling_window_block_sunday',
+    label: 'Block Sunday Calls',
+    type: 'boolean',
+    required: false,
+    default: 'false',
+    helpText:
+      'When true, refuses to call on Sunday in the recipient local timezone. Florida prohibits Sunday solicitation calls. Only applies when Recipient Timezone is set.',
+  },
+  {
     key: 'result_schema',
     label: 'Result Schema (JSON)',
     type: 'text',

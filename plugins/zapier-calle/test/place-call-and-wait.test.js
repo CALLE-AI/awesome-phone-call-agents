@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { startFakeCalle } from './fake-calle-server.js';
 import placeCallAndWait from '../creates/place-call-and-wait.js';
 
@@ -51,6 +51,32 @@ describe('place-call-and-wait perform', () => {
     expect(generated).toEqual([]);
     expect(output.dry_run).toBe(true);
     expect(server.lastRequest()).toBe(null);
+  });
+
+  it('generates no callback url and makes no request outside the calling window', async () => {
+    server = await startFakeCalle({});
+    const generated = [];
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 03:00 UTC is 22:00 EST the prior day - outside 8-21.
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 14, 3, 0, 0)));
+    try {
+      const output = await placeCallAndWait.operation.perform(zFor(generated), {
+        authData: { apiKey: 'k', baseUrl: server.url },
+        inputData: {
+          ...input,
+          calling_window_timezone: 'America/New_York',
+          calling_window_earliest_hour: 8,
+          calling_window_latest_hour: 21,
+        },
+      });
+
+      expect(generated).toEqual([]);
+      expect(output.disposition).toBe('outside_calling_window');
+      expect(output.is_actionable).toBe(false);
+      expect(server.lastRequest()).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

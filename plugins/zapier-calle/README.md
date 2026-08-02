@@ -33,7 +33,7 @@ credentials required.
 The integration places a phone call through the CALL-E Developer API, then
 either waits inside the Zap for the call to finish or returns immediately so
 a later step can look the result up. Every terminal outcome is classified
-into one of seven dispositions (see [Dispositions](#5-dispositions)) so a
+into one of eight dispositions (see [Dispositions](#5-dispositions)) so a
 downstream step can branch on `is_actionable` instead of parsing free-text
 status strings.
 
@@ -75,7 +75,7 @@ rather than a set of visual-builder actions.
 
 | Name | Type | Key inputs |
 | --- | --- | --- |
-| `Place Call and Wait for Outcome` | Create | Call Task, Recipient Phone Number, Region (optional), Locale (optional), Result Schema (optional), Correlation ID (optional), Dry Run |
+| `Place Call and Wait for Outcome` | Create | Call Task, Recipient Phone Number, Region (optional), Locale (optional), Recipient Timezone (optional, see [Calling windows](#calling-windows)), Result Schema (optional), Correlation ID (optional), Dry Run |
 | `Start Call (No Wait)` | Create | Same inputs as above |
 | `Find Call Result` | Search | Call ID |
 
@@ -93,6 +93,10 @@ All input fields for the two create actions:
 implies a language requirement (observed live for a Vietnamese number).
 Setting `Region` and `Locale` explicitly avoids this. The integration never
 infers either from the phone number.
+| `calling_window_timezone` (Recipient Timezone (IANA)) | No | IANA name such as `America/New_York`. Opts into calling-window enforcement. Never inferred. See [Calling windows](#calling-windows). |
+| `calling_window_earliest_hour` (Earliest Local Hour) | No | Defaults to `8`. Only applies when Recipient Timezone is set. |
+| `calling_window_latest_hour` (Latest Local Hour) | No | Defaults to `21`. Only applies when Recipient Timezone is set. |
+| `calling_window_block_sunday` (Block Sunday Calls) | No | Defaults to `false`. Only applies when Recipient Timezone is set. |
 | `result_schema` (Result Schema (JSON)) | No | JSON Schema for the structured result. See the allowlist in [Result schema support](#result-schema-support). |
 | `correlation_id` (Correlation ID) | No | Your own record id, echoed back on the result as `correlation_id`. |
 | `dry_run` (Dry Run) | No | Defaults to `false`. See [Dry run](#8-dry-run). |
@@ -125,6 +129,41 @@ ignored. Nesting is capped at 20 levels, so a schema built from a cyclic
 object reference produces a validation error instead of hanging or
 overflowing the stack.
 
+### Calling windows
+
+The CALL-E `CreateCallRequest` has no scheduling or quiet-hours controls of
+its own, so a Zap on a schedule trigger has nothing stopping it from dialing
+someone at 3am. Setting `Recipient Timezone (IANA)` opts a call into a
+calling-window guard: before either create action sends a request to CALL-E,
+it checks whether the current time in that timezone falls inside
+`Earliest Local Hour` through `Latest Local Hour`, and optionally blocks
+Sunday. If the call is outside the window, no request is sent to CALL-E and
+`Place Call and Wait for Outcome` never generates a Zapier callback URL -
+the call is refused before either would happen.
+
+**The timezone is never inferred** from the phone number, region, locale, or
+any other input - per this project's [design
+principles](../../docs/design-principles.md), guessing a timezone is not
+allowed. Supplying `Recipient Timezone (IANA)` is the opt-in: leaving it
+blank disables enforcement entirely and preserves the integration's prior
+behavior. A raw UTC offset (`+07:00`, `UTC-5`) is rejected rather than
+accepted, because an offset does not shift for daylight saving the way an
+IANA name such as `America/New_York` does.
+
+The default window, 8am-9pm, matches the US federal TCPA (47 U.S.C. 227,
+implementing rules at 47 CFR 64.1200), which restricts telephone
+solicitation calls to 8:00am-9:00pm in the **called party's** local time.
+Some states are stricter: Florida and Oklahoma cut the window off at 8:00pm
+(set `Latest Local Hour` to `20`), and Florida additionally prohibits
+solicitation calls on Sunday (set `Block Sunday Calls` to `true`).
+
+**This is a guard rail, not legal advice.** It enforces only the hours and
+day you configure; it does not know which of your calls are "solicitation"
+calls, does not track state-by-state rules beyond what you configure, and
+does not know which state the recipient is actually in. The operator
+configuring this integration is responsible for determining which rules
+apply to their calls and configuring the fields accordingly.
+
 ## 4. Outputs
 
 Every action returns this shape. `structured_result` fields are also
@@ -135,7 +174,7 @@ steps.
 
 | Field | Description |
 | --- | --- |
-| `disposition` | One of the seven values in [Dispositions](#5-dispositions). |
+| `disposition` | One of the eight values in [Dispositions](#5-dispositions). |
 | `disposition_reason` | Human-readable reason the disposition was chosen. |
 | `is_actionable` | `true` only when `disposition` is `confirmed`. |
 | `event_id` | The CALL-E webhook event id, when available. |
@@ -177,6 +216,7 @@ the integration.
 | `canceled` | `false` | The call was canceled before completion. |
 | `outcome_unknown` | `false` | The call is still `queued` or `in_progress`, or the webhook payload itself was unreadable. Deliberately distinct from `failed` - treating an ambiguous result as a failure is how a workflow ends up dialing someone twice. |
 | `needs_human` | `false` | Default, fail-closed branch: a malformed event, an unrecognized event type, a missing or unrecognized call status, or a callback that fails id verification (see [Callback verification](#callback-verification)). |
+| `outside_calling_window` | `false` | The call was refused before dialing because the current time in the recipient's configured timezone fell outside the calling window (see [Calling windows](#calling-windows)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
 
 Only `confirmed` sets `is_actionable` to `true`. An unrecognized status or
 event type is never treated as a success - it always resolves to
@@ -252,7 +292,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 121 tests across 13 files against a bundled
+`npm install && npm test` runs 135 tests across 14 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/e2e-app.test.js` additionally drives the real app definition
 (`index.js`) through `zapier-platform-core`'s `createAppTester`, exercising

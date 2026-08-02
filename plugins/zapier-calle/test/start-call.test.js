@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { startFakeCalle } from './fake-calle-server.js';
 import startCall from '../creates/start-call.js';
 import { isDryRun } from '../lib/build-payload.js';
@@ -71,6 +71,55 @@ describe('start-call', () => {
     );
     expect(output.dry_run).toBe(true);
     expect(server.lastRequest()).toBe(null);
+  });
+
+  it('refuses to dial outside the configured calling window and makes no request', async () => {
+    server = await startFakeCalle({});
+    // Fixed instant: 03:00 UTC is 22:00 EST the prior day - outside 8-21.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 14, 3, 0, 0)));
+    try {
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, {
+          ...input,
+          calling_window_timezone: 'America/New_York',
+          calling_window_earliest_hour: 8,
+          calling_window_latest_hour: 21,
+        }),
+      );
+
+      expect(output.disposition).toBe('outside_calling_window');
+      expect(output.is_actionable).toBe(false);
+      expect(output.call_id).toBe(null);
+      expect(server.lastRequest()).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('places the call normally when inside the configured calling window', async () => {
+    server = await startFakeCalle({});
+    // Same fixture, shifted to 15:00 UTC = 10:00 EST - inside 8-21.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 14, 15, 0, 0)));
+    try {
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, {
+          ...input,
+          calling_window_timezone: 'America/New_York',
+          calling_window_earliest_hour: 8,
+          calling_window_latest_hour: 21,
+        }),
+      );
+
+      expect(output.disposition).toBe('outcome_unknown');
+      expect(output.call_id).toMatch(/^call_/);
+      expect(server.lastRequest().path).toBe('/v1/calls');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

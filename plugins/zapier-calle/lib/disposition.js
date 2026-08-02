@@ -1,3 +1,7 @@
+// 'outside_calling_window' is produced by the create action before dialing
+// (see lib/calling-window.js), never by this webhook classifier. It is
+// listed here only so DISPOSITIONS stays the single source of truth for
+// every value a Zap can see; deriveDisposition below must never return it.
 export const DISPOSITIONS = Object.freeze([
   'confirmed',
   'review_required',
@@ -6,6 +10,7 @@ export const DISPOSITIONS = Object.freeze([
   'canceled',
   'outcome_unknown',
   'needs_human',
+  'outside_calling_window',
 ]);
 
 const KNOWN_EVENT_TYPES = new Set([

@@ -28,6 +28,7 @@
     "Classifies every outcome fail-closed: unrecognized statuses and event types resolve to needs_human, never to a successful disposition.",
     "Distinguishes outcome_unknown from failed so an ambiguous result does not trigger a second call.",
     "Rejects a resumed callback whose call id does not match the call the step started.",
+    "Refuses to dial outside a configured calling window: when Recipient Timezone (IANA) is set, both create actions check the recipient's local hour (and optionally block Sunday) before any request is sent to CALL-E, and Place Call and Wait for Outcome never generates a Zapier callback URL for a call it refused. The timezone is never inferred from the phone number, region, or locale, and a raw UTC offset is rejected rather than accepted, per this repository's design-principles.md.",
     "Masks phone numbers in previews, outputs, and error messages.",
     "Does not create recurring schedules; Zapier owns scheduling."
   ],

@@ -2,10 +2,16 @@ import { createCall } from './start-call.js';
 import { isDryRun } from '../lib/build-payload.js';
 import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { flattenResult } from '../lib/flatten-result.js';
+import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
 
 const perform = async (z, bundle) => {
   const dryRun = isDryRun(bundle.inputData.dry_run);
-  const webhookUrl = dryRun ? undefined : z.generateCallbackUrl();
+  // A callback URL is only useful if createCall is actually going to dial,
+  // so both gates that stop it from dialing - dry run and calling-window
+  // enforcement - must also stop the URL from being minted here. Otherwise
+  // the Zap would strand itself waiting on a callback that never arrives.
+  const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
+  const webhookUrl = dryRun || !windowCheck.allowed ? undefined : z.generateCallbackUrl();
   return createCall(z, bundle, { webhookUrl });
 };
 
