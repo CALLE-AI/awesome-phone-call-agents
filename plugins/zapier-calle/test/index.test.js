@@ -51,9 +51,10 @@ describe('app definition', () => {
     expect(App.version).toBe(pkg.version);
   });
 
-  it('does not declare "type": "module", which breaks the Zapier build wrapper', async () => {
+  it('declares ESM with an exports map, which the Zapier wrapper requires', async () => {
     const { readFileSync } = await import('node:fs');
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-    expect(pkg.type).toBeUndefined();
+    expect(pkg.type).toBe('module');
+    expect(pkg.exports).toEqual({ '.': './index.js' });
   });
 });

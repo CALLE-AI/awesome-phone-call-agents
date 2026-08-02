@@ -259,6 +259,14 @@ placed. `test/e2e-app.test.js` additionally drives the real app definition
 the actual `beforeRequest`/`afterResponse` middleware chain rather than
 calling `operation.perform` in isolation.
 
+**`package.json` must declare both `"type": "module"` and an `"exports"`
+map.** Without `"type": "module"`, Zapier's Lambda loads this ESM source as
+CommonJS and the app fails at load with `Cannot use import statement outside
+a module`. Without `"exports"`, Zapier's build wrapper cannot self-resolve
+`import('zapier-calle')` (a package self-reference, which Node only permits
+via `exports`) and `zapier push` fails. Both fields are required together -
+removing either one breaks the app in production, in different ways.
+
 **Known limitation:** under `createAppTester`, `z.generateCallbackUrl()`
 returns a fixed Zapier-hosted URL rather than one that routes back to the
 fake server, so the automated tests cannot drive an actual HTTP delivery of
