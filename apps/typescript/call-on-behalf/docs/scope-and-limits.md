@@ -93,7 +93,10 @@ next step says "another time" rather than a time nobody said. An agreement with 
 time at all cannot be checked against the windows, so it reads `unconfirmed` too.
 CALL-E's own note is printed with its name on it, because nothing here checked that
 sentence. The one claim left standing on the extraction alone is
-`declined_by_callee`, which says less than the extraction did rather than more.
+`declined_by_callee`, which says less than the extraction did rather than more. It
+is labelled in the notes as CALL-E's reading and it does not settle the errand: a
+booking that was refused is not a goal met, so the outcome is `partially_met` at
+best and the next step says plainly that nothing is booked.
 
 When nothing supports the claim, the report says not answered or `unconfirmed` and
 notes that CALL-E claimed otherwise. It will sometimes be too strict, in two ways.
@@ -110,11 +113,14 @@ lost connection, a timeout, a server error. The call may be ringing right now.
 
 In that case the app reconciles under the same idempotency key first, which returns
 the existing call rather than placing a second one. If it still cannot read the
-call, the outcome is `outcome_unknown` with exit code 40. The report says the
-outcome is not known instead of saying nothing was said. Running the same errand
-file again reads the same call back, because the key covers the content of the
-call. Editing the file first makes it a different call, so the next step says not
-to.
+call, the outcome is `outcome_unknown` with exit code 40. Getting the call back is
+the only thing that settles it. A refusal to the reconciliation, a definite one such
+as 401 or 402 included, can be decided before the idempotency lookup ever happens,
+so it says nothing about the request that went unanswered and the call stays
+unknown. The report says the outcome is not known instead of saying nothing was
+said. Running the same errand file again reads the same call back, because the key
+covers the content of the call. Editing the file first makes it a different call, so
+the next step says not to.
 
 A call CALL-E has not finished with lands in the same place. Only a terminal status
 is read as a result: `completed`, `failed` or `canceled`, which is every terminal
@@ -127,8 +133,18 @@ verdict, no commitment and no privacy finding. Reading a call in flight as a res
 is how a call still ringing gets reported as an errand that is done. The next step
 is the same: run the same errand file again and it reads that same call back.
 
-A refusal is different. When CALL-E declines to create the call at all, nothing was
-placed, the outcome is `api_error` and the report can say so plainly.
+A refusal on the first attempt is different. CALL-E declined to create the call and
+nothing was placed, so the outcome is `api_error` and the report can say so plainly.
+
+A call that ended before the conversation did is the other way round. `failed` and
+`canceled` are terminal, so there is a transcript to read. A line that dropped after
+the slot was held carries the whole errand: the questions, the answers and the
+agreement. That status is not read as nobody having answered. What was said comes
+from the transcript and the notes name the status as `call_failed` or
+`call_canceled` with the failure code beside it. The outcome is never `goal_met`,
+because a call that ended early may have been cut off partway through. A call with
+nobody on its transcript is still read from its failure code, which is where
+`voicemail` and `not_reached` come from.
 
 ## Who you may call
 

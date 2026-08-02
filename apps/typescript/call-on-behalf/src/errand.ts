@@ -13,6 +13,13 @@
  * is a claim of its own. Only a call CALL-E has finished with is read at all: a
  * queued, ringing or running call is an unknown outcome too, because its transcript
  * is still being written.
+ *
+ * The other half of that rule is that a status is not a claim either. A call CALL-E
+ * ended as failed or canceled can still have carried the whole errand, so what was
+ * said is read from the transcript and the status goes in the notes. A create
+ * nobody could reconcile stays unknown whatever the second answer was, because a
+ * refusal to the reconciliation can be decided before the idempotency lookup and is
+ * no evidence that the first request never landed.
  */
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
@@ -130,6 +137,11 @@ function nextStep(
   if (commitment === "committed") {
     return "That is arranged. The confirmation, if they gave one, is in the report above.";
   }
+  if (commitment === "declined_by_callee") {
+    // Whatever else came back, the thing the errand asked for did not happen, so
+    // the next step says that instead of reporting the errand as done.
+    return `${request.callee.name} would not arrange it on this call, so nothing is booked. Anything they did answer is above and the transcript is below.`;
+  }
   if (outcome === "goal_met") {
     return "Everything you asked was answered. Nothing was agreed, because this errand did not ask for anything to be agreed.";
   }
@@ -182,12 +194,14 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
         callId = reconciled.id;
         progress(`Reconciled to call ${reconciled.id}.`);
       } catch (secondError) {
+        // Getting the call back is the only thing that resolves this. The first
+        // request may already have been accepted. A definite refusal here can be
+        // decided before the idempotency lookup ever happens, so it is no evidence
+        // that no call exists. Whatever class the second answer is, the call stays
+        // unaccounted for.
         const second = asCallError(secondError);
-        if (second.ambiguous) {
-          unknown = `the call could not be reconciled (${problem.code}, then ${second.code})`;
-        } else {
-          refusal = second;
-        }
+        progress(`Reconciling returned ${second.code}, so a call may be live under that key.`);
+        unknown = `the call could not be reconciled (${problem.code}, then ${second.code})`;
       }
     } else {
       refusal = problem;
@@ -352,27 +366,31 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const confirmationCode = codeNamedAround(turns, agreedIndex, claimedCode) ? claimedCode : "";
 
   const answered = answers.filter((answer) => answer.answered).length;
+  // Terminal and not completed, so CALL-E ended the call before the conversation
+  // was done. That says the line went, not that nothing was said on it.
+  const endedEarly = call.status !== "completed";
   let outcome: ErrandOutcome;
-  if (call.status !== "completed") {
-    // Terminal and not completed, so the call ended before the conversation did.
-    // The failure code says why when there is one and the status says it otherwise.
-    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode ?? call.status);
-  } else if (reading.declinedAutomated) {
+  if (reading.declinedAutomated) {
     outcome = "callee_declined_automated";
   } else if (reading.machineAnswered) {
     outcome = "voicemail";
+  } else if (endedEarly && !reading.reachedPerson) {
+    // Nobody was on the line and the call is over, so nothing was asked. The
+    // failure code says why when there is one and the status says it otherwise.
+    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode ?? call.status);
   } else if (!reading.reachedPerson) {
     outcome = "not_reached";
   } else {
-    const commitmentSettled =
-      request.goal.commitment === "none" || commitment === "committed" || commitment === "declined_by_callee";
+    const commitmentSettled = request.goal.commitment === "none" || commitment === "committed";
     outcome =
       answered === answers.length && commitmentSettled
         ? "goal_met"
         : answered > 0 || commitment !== "none_sought"
           ? "partially_met"
           : "not_met";
-    if (lowConfidence && outcome === "goal_met") {
+    // A call that ended early may have been cut off partway through the errand, so
+    // what the transcript holds is reported and the errand is not called done.
+    if ((lowConfidence || endedEarly) && outcome === "goal_met") {
       outcome = "partially_met";
     }
   }
@@ -388,6 +406,12 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const notes = [claimedNote.length > 0 ? `CALL-E's note, unchecked: "${claimedNote}"` : ""];
   if (lowConfidence) {
     notes.push(`CALL-E scored its own completion low (${String(confidence?.score)}), so treat the answers with care.`);
+  }
+  if (endedEarly && reading.reachedPerson) {
+    const why = attempt?.failureCode ?? call.failureCode ?? "";
+    notes.push(
+      `CALL-E ended this call as call_${call.status}${why.length > 0 ? ` (${why})` : ""} and somebody was on the line, so everything above is read from the transcript and not from that status.`,
+    );
   }
   if (unsupported > 0) {
     notes.push(
@@ -407,6 +431,13 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
       unconfirmedNote.length > 0
         ? unconfirmedNote
         : "CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.",
+    );
+  }
+  if (commitment === "declined_by_callee" && !reading.declinedAutomated) {
+    // The one claim the report still stands on the extraction alone, so it says
+    // whose claim it is rather than passing it off as a checked fact.
+    notes.push(
+      "CALL-E reported that they would not arrange it. Nothing in the transcript was checked against that, so it is CALL-E's reading.",
     );
   }
   if (reading.declineQuote.length > 0) {

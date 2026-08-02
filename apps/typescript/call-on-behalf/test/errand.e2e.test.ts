@@ -410,3 +410,142 @@ test("an errand that cannot be created at all is unknown, not a refusal", async 
     },
   );
 });
+
+/**
+ * The three claims below are the same kind of mistake: a fact stated on evidence
+ * that does not carry it. A definite answer to a reconciliation is read as proof
+ * that no call was ever placed. A status CALL-E ended a call with is read as proof
+ * that nothing was said on it. An extraction saying the callee refused is read as
+ * the errand being done.
+ */
+
+test("a definite refusal on the reconcile is not proof the call was never made", async () => {
+  // 401, 403, 400 and 402 can each be decided before the idempotency lookup ever
+  // happens, so none of them says anything about the create that went unanswered.
+  // Only getting the call back settles that.
+  const definite = [
+    { status: 401, code: "unauthorized" },
+    { status: 403, code: "forbidden" },
+    { status: 400, code: "bad_request" },
+    { status: 402, code: "insufficient_balance" },
+  ];
+  for (const second of definite) {
+    await withFake(
+      [{ phone: CLINIC, createErrors: [{ status: 503, code: "service_unavailable" }, second] }],
+      async (port, fake) => {
+        const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+        assert.equal(report.outcome, "outcome_unknown", `${second.code} was read as proof of no call`);
+        assert.equal(report.call_status, "unknown", second.code);
+        assert.equal(report.call_id, null, "no answer ever named the call");
+        assert.equal(
+          report.callee_notes,
+          `the call could not be reconciled (service_unavailable, then ${second.code})`,
+        );
+        assert.equal(report.commitment, "unconfirmed", "a call nobody can account for may have agreed something");
+        assert.deepEqual(report.authorized_but_unused, [], "what the caller said is not known either");
+        assert.match(report.next_step, /nobody knows yet whether the call was made/);
+        assert.equal(report.next_step.includes("Nothing was said"), false, second.code);
+        assert.equal(report.next_step.includes("refused to create the call"), false, second.code);
+        assert.equal(fake.created.length, 0, "no second call was ever placed");
+      },
+    );
+  }
+});
+
+test("a call that ended early still reports the conversation it carried", async () => {
+  // A line that drops after the booking comes back as `failed`, sometimes with a
+  // code that reads like nobody answered. The transcript holds the questions, the
+  // answers and the slot, so the status cannot unsay any of it.
+  const cases: [string, string | null][] = [
+    ["failed", "line_dropped"],
+    ["failed", "no_answer"],
+    ["canceled", null],
+  ];
+  for (const [status, failureCode] of cases) {
+    await withFake(
+      [
+        {
+          phone: CLINIC,
+          status: status as "failed" | "canceled",
+          failureCode,
+          botLines: BOT_LINES,
+          userLines: USER_LINES,
+          structuredResult: goodResult(),
+        },
+      ],
+      async (port) => {
+        const label = `${status}/${String(failureCode)}`;
+        const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+        assert.equal(report.call_status, status, label);
+        assert.equal(report.reached_person, true, `${label} was read as nobody on the line`);
+        assert.equal(report.outcome, "partially_met", label);
+        assert.equal(report.answers.every((answer) => answer.answered), true, `${label} lost the answers`);
+        assert.equal(report.commitment, "committed", label);
+        assert.equal(report.committed_datetime, "2026-08-13T09:40:00-07:00", label);
+        assert.equal(report.confirmation_code, "4471", label);
+        assert.match(report.callee_notes, new RegExp(`call_${status}`), label);
+        assert.match(report.next_step, /That is arranged/, label);
+        assert.equal(report.next_step.includes("Nothing was said on your behalf"), false, label);
+        assert.equal(report.next_step.includes("did not connect to a person"), false, label);
+      },
+    );
+  }
+});
+
+test("the transcript says who was on the line, not the failure code beside it", async () => {
+  // A machine on the transcript is a machine, whatever code CALL-E filed the call
+  // under. The ordering is the point here: the transcript is read before the code.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        status: "failed",
+        failureCode: "busy",
+        botLines: ["Hello, I am an automated assistant."],
+        userLines: ["You have reached Bayview Family Clinic. Please leave a message after the tone."],
+        structuredResult: null,
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.outcome, "voicemail");
+      assert.equal(report.reached_person, false);
+      assert.match(report.next_step, /went to a machine/);
+    },
+  );
+});
+
+test("a refusal CALL-E reported does not make the errand done", async () => {
+  // Nobody agreed to anything, so the appointment the errand asked for was not
+  // made. Every question was answered, which is partly met and not met in full.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "Earliest is Thursday the thirteenth at nine forty in the morning.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: {
+          ...goodResult(),
+          commitment_made: "declined_by_callee",
+          offered_datetime: "",
+          confirmation_code: "",
+        },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "declined_by_callee");
+      assert.equal(report.answers.every((answer) => answer.answered), true);
+      assert.equal(report.outcome, "partially_met");
+      assert.match(report.next_step, /would not arrange it/);
+      assert.equal(report.next_step.includes("did not ask for anything to be agreed"), false);
+      assert.match(report.callee_notes, /CALL-E reported that they would not arrange it/);
+    },
+  );
+});

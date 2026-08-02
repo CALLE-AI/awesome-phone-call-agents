@@ -64,7 +64,15 @@ The extraction proposes. The transcript decides.
   with: only a terminal status is read as a result. A call still `queued` or
   `in_progress` gets no verdict, no commitment and no privacy finding. Re-running the
   same errand file reads the same call back, because the idempotency key covers the
-  content of the call and has not changed.
+  content of the call and has not changed. A reconciliation that fails proves
+  nothing either, whatever class the second answer was: a definite refusal to it can
+  be decided before the idempotency lookup, so it is no evidence that the first
+  request never landed.
+- A status is not a claim about what was said. A call CALL-E ended as `failed` or
+  `canceled` can still have carried the questions, the answers and the slot, so the
+  report is read from the transcript and the notes name the status. It is not read
+  as everything done either, because a call that ended early may have been cut off
+  partway through.
 
 ## Try it without an account
 
