@@ -1,0 +1,22 @@
+{
+  "name": "calle-wellness-checkin-call",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Three-question wellness check-in call for an elderly or at-risk person, with ok/mild_concern/escalate classification and a masked, consent-gated preview by default.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "checkin": "node --import tsx src/cli.ts",
+    "preview": "node --import tsx src/cli.ts --request examples/recipient.example.json"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
