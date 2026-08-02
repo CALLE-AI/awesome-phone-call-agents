@@ -83,6 +83,7 @@ the call step to convert it, or the call step will reject the number.
 | `canceled` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. |
 | `outcome_unknown` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. Do not conclude the call failed - it may simply not have reached a terminal state yet (see the note below). |
 | `needs_human` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. |
+| `outside_calling_window` | No call was placed. Create a HubSpot task to call back during the allowed window and write `disposition_reason` to the note - do not treat a fresh lead this way as uninterested. |
 
 Only `confirmed` writes the qualification data onto the record as
 authoritative. Every other disposition routes to a human task instead of

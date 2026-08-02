@@ -87,6 +87,18 @@ explicitly on both call steps - see
 | `outcome_unknown` | - | Escalate: continue to the backup engineer call. Do not treat this as a failed page - it means the call has not reached a terminal state yet (see the note below). |
 | `needs_human` | - | Escalate: continue to the backup engineer call. |
 
+This table has no row for `outside_calling_window` on purpose: leave
+`Recipient Timezone (IANA)` blank on both call steps in this recipe. The
+calling-window guard exists to stop a solicitation-style call from dialing
+someone at 3am; a page for a live incident is the opposite case - an outage
+does not respect business hours, and a guard that silently deferred the
+primary's page until 8am would turn "escalate immediately" into "escalate
+after sleeping on it." If you do set a timezone here anyway (for example, a
+non-urgent, business-hours-only rotation), route `outside_calling_window`
+the same as every other non-`confirmed` disposition above: escalate to the
+backup engineer, since a page that never dialed is exactly as unacknowledged
+as one that failed.
+
 Escalating on ambiguity is deliberate. Only `confirmed` with
 `result_acknowledged = yes` stops the ladder; every other outcome, including
 an outcome that simply could not be classified, pages the backup engineer.

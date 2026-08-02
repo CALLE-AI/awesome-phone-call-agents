@@ -80,6 +80,7 @@ disposition - not an action the Zap takes on your behalf.
 | `canceled` | Read `disposition_reason`. The call was canceled before it completed. |
 | `outcome_unknown` | Read `disposition_reason`. The call has not reached a terminal state, or the callback payload was unreadable. Do not conclude the call failed or that the person was not reached - see the note below - and check back later with `Find Call Result` using the run's `call_id`. |
 | `needs_human` | Read `disposition_reason`. The fail-closed default: a malformed event, an unrecognized status, or a callback that failed identity verification. Treat it as unresolved, not as a specific known outcome. |
+| `outside_calling_window` | Read `disposition_reason`. No call was placed at all - it was refused before dialing because the current local time in the recipient's configured timezone fell outside the calling window. Run the Zap again during the allowed window; only reachable if you set `Recipient Timezone (IANA)` on this step. |
 
 **Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
 at status `queued` for a 300-second polling window while the phone was

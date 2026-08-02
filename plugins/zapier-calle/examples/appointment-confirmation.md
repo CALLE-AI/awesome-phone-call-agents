@@ -78,6 +78,7 @@ must already be in E.164 format, for example `+15550123456`.
 | `canceled` | - | Log a "Call canceled" row with `disposition_reason`. A human decides whether to retry. |
 | `outcome_unknown` | - | Log a "Still in progress - recheck" row. Do not treat this as a failed or missed call - see the note below. |
 | `needs_human` | - | Log a "Needs review" row with `disposition_reason`. A human calls back. |
+| `outside_calling_window` | - | Log a "Not called - outside calling window" row with `disposition_reason`. No call was placed; a human reschedules the confirmation call for the next allowed hour rather than treating a no-show as a decline. |
 
 Only `confirmed` with `result_confirmed = yes` needs no follow-up. Every
 other outcome, including an ambiguous `confirmed` result, gets logged for a
