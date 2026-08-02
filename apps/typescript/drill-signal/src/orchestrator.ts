@@ -43,6 +43,13 @@ export interface OrchestratorContext {
   isCancelled: () => boolean;
 }
 
+/** Local result-monitoring window per placed call (not telephony ring duration). */
+export const DEFAULT_PER_CALL_RESULT_MONITORING_TIMEOUT_MS = 1_800_000;
+
+export function resolvePerCallTimeoutMs(perCallTimeoutMs?: number): number {
+  return perCallTimeoutMs ?? DEFAULT_PER_CALL_RESULT_MONITORING_TIMEOUT_MS;
+}
+
 export interface OrchestratorOptions {
   port: CallePort;
   pollIntervalMs?: number;
@@ -189,7 +196,7 @@ async function placeCall(
       options.port,
       created.id,
       {
-        timeoutMs: options.perCallTimeoutMs ?? 45_000,
+        timeoutMs: resolvePerCallTimeoutMs(options.perCallTimeoutMs),
         intervalMs: options.pollIntervalMs ?? 500,
       },
       ctx,

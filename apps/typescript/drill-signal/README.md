@@ -234,7 +234,7 @@ Hackathon and upstream submission materials live in [`submission/`](submission/R
 - JSON file store is suitable for demo/local use, not multi-tenant production.
 - Launch claims are process-safe on one host; multiple instances sharing one data directory are unsupported.
 - Live cancel cannot stop provider-side calls once accepted.
-- `timeout-unknown` simulation may finish as ambiguous when wait limits are hit.
+- Local per-call result monitoring waits up to 30 minutes for a terminal CALL-E status; if monitoring ends without a terminal result the drill is marked ambiguous. The `timeout-unknown` simulation may exercise this path.
 
 ## Static demo artifact
 
