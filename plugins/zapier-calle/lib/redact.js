@@ -1,15 +1,34 @@
-const PHONE_RE = /\+\d{4,20}/g;
-const SECRET_KEYS = new Set(['apikey', 'api_key', 'authorization', 'idempotency-key']);
+// NOTE: Matches international formats (+CC with flexible separators) and domestic NANP (10-digit).
+// Does not attempt every international format (e.g., parentheses in country code). Trade-off:
+// short non-phone digit runs (e.g., 'offset 42 seconds') survive unmasked; leaked numbers do not.
+const PHONE_RE = /\+\d[\d\s.\-()]*\d(?!\d)|(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}|(?<!\d)\d{10}(?!\d)/g;
+const SECRET_KEYS = new Set(['apikey', 'api_key', 'authorization']);
 
 export function maskPhone(value) {
   if (typeof value !== 'string') return value;
   return value.replace(PHONE_RE, (match) => {
-    const digits = match.slice(1);
-    if (digits.length <= 5) return `+${digits[0]}${'*'.repeat(digits.length - 1)}`;
-    const country = digits.slice(0, 1);
-    const tail = digits.slice(-4);
-    const hidden = '*'.repeat(digits.length - 5);
-    return `+${country}${hidden}${tail}`;
+    const digits = match.replace(/\D/g, '');
+    const isInternational = match.startsWith('+');
+
+    // Validate digit count: international 4-20, domestic exactly 10.
+    if (isInternational) {
+      if (digits.length < 4 || digits.length > 20) return match;
+    } else {
+      if (digits.length !== 10) return match;
+    }
+
+    // Apply masking rules.
+    if (isInternational) {
+      if (digits.length <= 5) return `+${digits[0]}${'*'.repeat(digits.length - 1)}`;
+      const first = digits[0];
+      const last4 = digits.slice(-4);
+      const stars = '*'.repeat(digits.length - 5);
+      return `+${first}${stars}${last4}`;
+    } else {
+      const last4 = digits.slice(-4);
+      const stars = '*'.repeat(digits.length - 4);
+      return `${stars}${last4}`;
+    }
   });
 }
 

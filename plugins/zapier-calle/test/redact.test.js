@@ -13,6 +13,22 @@ describe('maskPhone', () => {
   it('handles a short number without throwing', () => {
     expect(maskPhone('+1234')).toBe('+1***');
   });
+
+  it('masks grouped and parenthesized international formats', () => {
+    expect(maskPhone('Call +1 (555) 012-3456 tomorrow.')).toBe('Call +1******3456 tomorrow.');
+    expect(maskPhone('+44 20 7946 0958')).toBe('+4*******0958');
+  });
+
+  it('masks domestic formats with and without separators', () => {
+    expect(maskPhone('5550123456')).toBe('******3456');
+    expect(maskPhone('(555) 012-3456')).toBe('******3456');
+    expect(maskPhone('555-012-3456')).toBe('******3456');
+  });
+
+  it('does not mask short digit runs that are not phone numbers', () => {
+    expect(maskPhone('order 12345')).toBe('order 12345');
+    expect(maskPhone('offset 42 seconds')).toBe('offset 42 seconds');
+  });
 });
 
 describe('redactDeep', () => {
