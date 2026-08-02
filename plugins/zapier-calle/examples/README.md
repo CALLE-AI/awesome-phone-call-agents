@@ -1,16 +1,23 @@
 # Example recipes
 
-Three concrete, runnable Zap recipes built on the Zapier CALL-E integration.
+Four concrete, runnable Zap recipes built on the Zapier CALL-E integration.
 Each one names the exact apps, trigger, and actions to use; gives
 copy-pasteable Call Task text; a complete Result Schema; a routing table
 covering all seven dispositions; the Zapier plan you need; and what to
 verify before you let it place real calls.
 
-| Recipe | Purpose |
-| --- | --- |
-| [`incident-escalation.md`](./incident-escalation.md) | Page an on-call engineer by phone and automatically escalate to a backup if they do not clearly acknowledge. |
-| [`lead-qualification.md`](./lead-qualification.md) | Call a new CRM contact to gauge interest and timeline, and hand off to a human on anything less than a clean result. |
-| [`appointment-confirmation.md`](./appointment-confirmation.md) | Call ahead of a calendar event to confirm, reschedule, or cancel, and log the outcome to a sheet. |
+| Recipe | Purpose | Zapier plan |
+| --- | --- | --- |
+| [`two-step-free-plan.md`](./two-step-free-plan.md) | Place a call on a schedule and read the outcome from the Zap's run history. No writeback step. Run this one first to confirm the integration works end to end. | Free |
+| [`incident-escalation.md`](./incident-escalation.md) | Page an on-call engineer by phone and automatically escalate to a backup if they do not clearly acknowledge. | Paid |
+| [`lead-qualification.md`](./lead-qualification.md) | Call a new CRM contact to gauge interest and timeline, and hand off to a human on anything less than a clean result. | Paid |
+| [`appointment-confirmation.md`](./appointment-confirmation.md) | Call ahead of a calendar event to confirm, reschedule, or cancel, and log the outcome to a sheet. | Paid |
+
+Only `two-step-free-plan.md` runs on Zapier's free plan - it is a two-step
+Zap (trigger, then call) with no writeback step. The other three each add a
+third step that writes the outcome somewhere (a filter plus escalation
+call, a CRM update, a sheet row), and a three-or-more-step Zap requires a
+paid Zapier plan regardless of which apps those steps use.
 
 ## Shared note
 
