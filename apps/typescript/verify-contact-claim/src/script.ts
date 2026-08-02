@@ -2,10 +2,12 @@
  * The call script, the one question, the result contract and the two hashes.
  *
  * The script is the product. It says in its first sentence that it is an automated
- * assistant calling on behalf of a named person. It states the contact being
- * checked. It asks one question. Then it refuses everything else: it cannot be the
- * customer, it cannot answer a security question, it has no number or code to read
- * out and it will not say what the message asked the customer to do.
+ * assistant calling on behalf of a named person, with their permission, that it is not
+ * a person and that the answer is written down. It states the contact being checked.
+ * It asks one question. Then it refuses everything else: it cannot be the customer, it
+ * cannot answer a security question, it has no number or code to read out, it will not
+ * say what the message asked the customer to do and it stays off clinical, legal and
+ * financial ground.
  *
  * Two fields of the claim never leave the machine. What the caller asked for stays
  * in the claim file, because repeating it is repeating the scam. The number that
@@ -102,8 +104,13 @@ export function buildTask(claim: Claim): string {
   // gives one. 47 CFR 64.1200(b)(2) requires an artificial or prerecorded message
   // to state a number for the party responsible, which is the customer here rather
   // than the machine that dialled.
+  //
+  // It also says the answer is written down, because it is: the record keeps the
+  // callee turn the outcome was read from, verbatim. `phone-approval-gate` says the
+  // same thing about its change log and the person on the line deserves it here for
+  // the same reason.
   lines.push(
-    `Open with exactly this: "Hello, I am an automated assistant calling on behalf of ${name}. I am not a person.${
+    `Open with exactly this: "Hello, I am an automated assistant calling on behalf of ${name}, with their permission. I am not a person and what you tell me is written down for them.${
       callback === undefined ? "" : ` If you need to reach them about this call, their number is ${spokenNumber(callback)}.`
     } I have one short question about a message they were sent."`,
   );
@@ -134,6 +141,15 @@ export function buildTask(claim: Claim): string {
   );
   lines.push(
     "- You were given no numbers, no codes and no personal details, so there is nothing for you to read out. Do not offer any.",
+  );
+  // The boundaries CONTRIBUTING.md asks of anything in this repository that can place
+  // a call. The institution on the line may be a clinic or a solicitor, so the caller
+  // holding one fact about one message has to stay inside it.
+  lines.push(
+    `- Never give clinical, legal or financial detail and never offer an opinion on any of it. Do not discuss symptoms, a condition, treatment, a case or money. You hold none of it, so say ${name} will answer that directly.`,
+  );
+  lines.push(
+    "- If anybody says there is an emergency, that somebody is hurt or that a fire, a gas leak or a flood is happening now, tell them to hang up and call their local emergency number, then end the call.",
   );
   lines.push(
     `- If they say they cannot discuss another person's account, that is a full answer. Thank them, tell them ${name} will call them directly on the printed number then end the call.`,

@@ -97,6 +97,27 @@ test("the customer's own callback number is spoken, because the rule requires on
   assert.equal(bare.includes("If you need to reach them"), false);
 });
 
+test("the call says it has permission and that the answer is written down", () => {
+  // The record keeps the callee turn the outcome was read from, verbatim, so the
+  // person on the line is told. `phone-approval-gate` says the same thing about its
+  // change log and this app owes it for the same reason.
+  assert.match(TASK, /calling on behalf of Dana Whitfield, with their permission/);
+  assert.match(TASK, /what you tell me is written down for them/);
+});
+
+test("the script stays off clinical, legal and financial ground", () => {
+  // CONTRIBUTING.md asks this of anything here that can place a call. The institution
+  // on the line may be a clinic or a solicitor.
+  assert.match(TASK, /Never give clinical, legal or financial detail/);
+  assert.match(TASK, /Do not discuss symptoms, a condition, treatment, a case or money/);
+  assert.match(TASK, /Dana Whitfield will answer that directly/);
+});
+
+test("an emergency on the line ends the call and hands it to the emergency number", () => {
+  assert.match(TASK, /somebody is hurt or that a fire, a gas leak or a flood is happening now/);
+  assert.match(TASK, /hang up and call their local emergency number, then end the call/);
+});
+
 test("the script refuses to be the customer and says so on the line", () => {
   assert.match(TASK, /You are not Dana Whitfield/);
   assert.match(TASK, /say no plainly/);
