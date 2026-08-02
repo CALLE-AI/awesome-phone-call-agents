@@ -11,7 +11,7 @@ describe('maskPhone', () => {
   });
 
   it('handles a short number without throwing', () => {
-    expect(maskPhone('+1234')).toBe('+1****');
+    expect(maskPhone('+1234')).toBe('+1***');
   });
 });
 
