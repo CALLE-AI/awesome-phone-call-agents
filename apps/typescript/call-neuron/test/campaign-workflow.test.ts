@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { onRequest } from "../functions/api/[[path]]";
-import { buildCampaignCsv, campaignMetrics, maskPhone, safeCsvCell, type CampaignResult, type Recipient } from "../src/campaign";
+import { buildCampaignCsv, canPlanRecipient, campaignMetrics, maskPhone, safeCsvCell, type CampaignResult, type Recipient } from "../src/campaign";
 import { buildCallInstruction, type OfferBrief } from "../src/live";
 
 const recipients: Recipient[] = [
@@ -69,6 +69,13 @@ test("resolution metrics require operator dispositions", () => {
     followUp: 1,
     resolutionRate: 50,
   });
+});
+
+test("opted-out and durably attempted recipients cannot enter planning", () => {
+  assert.equal(canPlanRecipient(recipients[0], undefined, false), true);
+  assert.equal(canPlanRecipient(recipients[0], "opted_out", false), false);
+  assert.equal(canPlanRecipient(recipients[0], "unreviewed", true), false);
+  assert.equal(canPlanRecipient({ ...recipients[0], status: "blocked" }, "unreviewed", false), false);
 });
 
 test("voicemail policy is neutral and off by default", () => {

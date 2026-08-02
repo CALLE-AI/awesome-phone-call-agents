@@ -34,6 +34,10 @@ export function maskPhone(phone: string) {
   return `${phone.slice(0, 2)}${"•".repeat(Math.max(0, phone.length - 6))}${phone.slice(-4)}`;
 }
 
+export function canPlanRecipient(recipient: Recipient, disposition: Disposition | undefined, hasDispatchRecord: boolean) {
+  return recipient.status === "eligible" && disposition !== "opted_out" && !hasDispatchRecord;
+}
+
 const resolvedDispositions = new Set<Disposition>([
   "interested",
   "needs_information",

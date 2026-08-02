@@ -25,6 +25,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "fake-indexeddb": "^6.2.5",
     "jszip": "^3.10.1",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0",

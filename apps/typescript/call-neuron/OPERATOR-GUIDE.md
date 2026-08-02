@@ -31,11 +31,12 @@ Use this checklist for every real call.
 - the brief asks the automated caller to decide eligibility or promise an award;
 - sensitive personal, financial, application or payment data would be requested;
 - a previous call is still unresolved or another tab is dispatching.
+- CallNeuron shows an **acceptance unresolved — locked** state; inspect CALL-E provider records and never create a replacement plan.
 
 ## After each call
 
 - Record **Interested**, **Needs information**, **Not interested**, **Opted out** or **Unreachable**.
 - Contact interested recipients through a human using the captured preferred time and question.
 - Treat **Opted out** as do-not-call.
-- Export the privacy-minimal CSV before refreshing if the run result is needed locally.
-- Remember that resetting CallNeuron does not delete CALL-E's provider-side record.
+- Export the privacy-minimal CSV before refreshing if transcript-derived details are needed; the accepted run ID/status will survive but transcript text will not.
+- Remember that resetting CallNeuron preserves durable dispatch locks and does not delete CALL-E's provider-side record.

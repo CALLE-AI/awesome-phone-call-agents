@@ -28,6 +28,7 @@ CallNeuron is a functional, consent-first operator prototype for scholarship and
 - Voicemail is off by default. When enabled, it contains only the organization and public callback number.
 - Provider result and human disposition remain separate. A privacy-minimal CSV can be exported for follow-up.
 - Multiple recipients can be handled sequentially in one browser tab while the CALL-E connection remains in memory.
+- Content-bound dispatch reservations, acceptance state and accepted run IDs persist in IndexedDB, block duplicate planning across refreshes/tabs, and preserve same-run status reconciliation.
 
 There is no automatic ranking, award decision, batch dispatch, hidden scheduling or automatic retry.
 
@@ -71,11 +72,11 @@ In **Call**:
 4. Select **Create CALL-E plan · no call**.
 5. Review the recipient ending, language/region, voicemail rule, confirmation expiry and exact CALL-E instruction.
 
-Nothing rings during these steps.
+Nothing rings during these steps. Before `plan_call`, CallNeuron writes a content-bound local reservation. If the tab is refreshed before dispatch, its unstarted reservation can be discarded safely; confirmation secrets are never persisted.
 
 ### 5. Place one call
 
-Select the real-call checkbox only after the plan is correct, then select **Confirm and place one call**. Keep the tab open while CallNeuron reads status. It checks the same run for up to ten minutes and never creates a retry.
+Select the real-call checkbox only after the plan is correct, then select **Confirm and place one call**. CallNeuron persists `dispatching` before `run_call`, then persists the accepted run ID before monitoring. If the response is lost, the recipient stays locked and must be reconciled in CALL-E provider records—CallNeuron never retries an ambiguously accepted call.
 
 After CALL-E reaches a terminal state, assign the human disposition, review any requested callback details, and export the privacy-minimal CSV when needed. **Prepare another recipient** returns to the one-person selection flow without retaining a reusable call confirmation.
 
@@ -84,9 +85,10 @@ After CALL-E reaches a terminal state, assign the human disposition, review any 
 | Data | Location and lifetime |
 |---|---|
 | Imported/manual recipient rows, approved brief, dispositions | Browser IndexedDB until **Reset local campaign** |
+| Content hash, recipient identity hash, dispatch phase, plan ID, accepted run ID/status | Browser IndexedDB safety ledger; retained when the campaign draft is reset |
 | Original CSV/XLSX/DOCX/PDF | Parsed locally and never uploaded or retained |
 | Selected recipient and approved call instruction | Sent to CALL-E only after the operator creates a plan |
-| CALL-E token, MCP session, plan/confirmation and transcript view | Browser memory; lost when the tab closes or refreshes |
+| CALL-E token, MCP session, confirmation secret and transcript view | Browser memory; lost when the tab closes or refreshes |
 | Provider-side call record | CALL-E; not deleted by resetting CallNeuron |
 | Export | Student/employee codes, provider signal, disposition, follow-up flag, attempt count and timestamp only |
 
@@ -122,16 +124,16 @@ npm run verify
 python3 ../../../scripts/validate_repository.py
 ```
 
-`npm run verify` runs TypeScript, twelve focused Node tests, the shared fake broker/MCP sequence and a Vite production build. Tests use reserved fictional numbers and cannot place a call.
+`npm run verify` runs TypeScript, seventeen focused Node tests, the shared fake broker/MCP sequence and a Vite production build. Tests use reserved fictional numbers and cannot place a call.
 
-The test suite covers stateless and session-based MCP initialization, the plan/run/status sequence, rejection of expanded `run_call` contracts, manual and file intake validation, withdrawn consent, privacy-minimal export, disposition metrics, voicemail policy and the disabled-server gate.
+The test suite covers stateless and session-based MCP initialization, the plan/run/status sequence, rejection of expanded `run_call` contracts, refresh/second-tab dispatch persistence, ambiguous acceptance, accepted-run recovery, opt-out checks, manual and file intake validation, withdrawn consent, privacy-minimal export, disposition metrics, voicemail policy and the disabled-server gate.
 
 ## Current limits
 
 - English calls and Malaysia region are fixed in this prototype.
-- One live call is monitored at a time; each recipient can be attempted once per local campaign.
+- One live call is monitored at a time; a durable browser safety ledger prevents replanning the same recipient after dispatch, including after draft reset or re-import.
 - A CALL-E call already accepted by the provider cannot be cancelled from CallNeuron because no active cancellation tool is exposed.
-- Live tokens, run identifiers and transcripts are intentionally not recoverable after a refresh.
+- Accepted run IDs and latest provider status are recoverable after refresh; live tokens, confirmation secrets and transcripts are intentionally not stored.
 - There is no shared team database, role management, audit log, call-credit counter or server-side campaign history.
 - Physical iOS Safari and Android Chrome verification remains required before claiming production phone-browser support.
 - Real student or guardian use still requires the operator's applicable consent, privacy, safeguarding and calling-law review.
