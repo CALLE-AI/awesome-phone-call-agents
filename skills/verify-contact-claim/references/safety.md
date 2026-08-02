@@ -14,7 +14,17 @@ carries no trusted number the app refuses before it does anything else.
 
 `trusted_number.printed_on` is required for that reason. Somebody has to write down
 where the number came from, so the anchor is on the record instead of in somebody's
-head.
+head. The app reads that field and refuses a source that is the thing being checked:
+the message, the voicemail, the text, an email, the handset, a caller id, a link or a
+search result. It also refuses when the number to dial turns up in any field that
+describes the contact, because then the file itself says where the number came from.
+That is the case comparing it with the caller id misses: a voicemail that says "ring
+us straight back on this other number" leaves two different numbers behind and only
+one of them is the bank's.
+
+Both of those read words rather than meaning, so they catch the realistic mistake
+rather than proving the anchor is independent. Whether the number was really read off
+the card is still the customer's word.
 
 ## Never dial the number that made contact
 

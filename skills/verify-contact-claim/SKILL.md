@@ -53,7 +53,7 @@ callee's own words and the number the customer should be using.
 | `contact.number_shown` | The number the handset showed. Never dialled. Masked in output. |
 | `contact.asked_for` | What the caller wanted the customer to do. Scanned, never spoken, never sent. |
 | `trusted_number.phone` | E.164. The only number that gets dialled. Read off the customer's own card or bill. |
-| `trusted_number.printed_on` | Where they read it, in their own words. Required, so the anchor is written down. |
+| `trusted_number.printed_on` | Where they read it, in their own words. Required, so the anchor is written down. A source that is the message, the handset, a caller id, a link or a search result is refused. |
 | `trusted_number.region` | Optional, for example `US`. |
 | `policy.recent_window_minutes` | The window the question asks about. 60 by default, 15 to 240. |
 | `policy.per_call_timeout_seconds` | 240 by default, 60 to 600. |
@@ -95,8 +95,12 @@ These fire before any client exists. All three exit 50, place nothing and end wi
    guessing one. So does a file where `contact.number_shown` is that same number,
    because a message spoofing the printed number would be checked by calling itself.
    The comparison is on digits, so `415-555-0100` and `+14155550100` count as one
-   handset. Read the number off the card by hand and put that in
-   `trusted_number.phone`.
+   handset. Two more ways the same mistake arrives are refused with it: the number to
+   dial turning up in any field that describes the contact, which is what a "ring us
+   straight back on this other number" voicemail leaves behind, and
+   `trusted_number.printed_on` saying the number was read off the message, the
+   handset, a caller id, a link or a search result. Read the number off the card by
+   hand and put that in `trusted_number.phone`.
 2. **Nothing the caller asked for is repeated.** The whole file is scanned for card
    numbers, account numbers, one time codes, PINs, passwords, dates of birth and
    national identifiers. A hit names the field, masks the value and stops the run.

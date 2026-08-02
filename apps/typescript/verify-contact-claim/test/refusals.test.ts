@@ -70,6 +70,64 @@ test("refusal 1: the number shown is kept in the claim file and never dialled", 
   assert.notEqual(parsed.contact.number_shown, parsed.trustedNumber.phone);
 });
 
+test("refusal 1: a number the message handed over is not an anchor either", () => {
+  // The case the same-number comparison misses. It is also the commonest one. A
+  // voicemail says "ring us straight back on this other number". That number goes into
+  // trusted_number.phone, the caller id goes into number_shown, so the two differ and
+  // the app would dial the scammer's callback line.
+  const error = refuses(
+    withContact({ asked_for: "ring them straight back on 415 555 0100 to unblock the card" }),
+    /contact\.asked_for carries the same number as trusted_number\.phone/,
+  );
+  assert.match(error.message, /came out of the contact rather than off the customer's own card/);
+  assert.match(error.message, /No call was placed/);
+  refuses(
+    withContact({ claimed_about: "the card, ring 4155550100" }),
+    /contact\.claimed_about carries the same number/,
+  );
+  // Written the way somebody copies it off a screen. Then as the national form.
+  for (const asked of ["call +1 (415) 555-0100 back", "call 415-555-0100 back", "call 555 0100 back"]) {
+    refuses(withContact({ asked_for: asked }), /carries the same number as trusted_number\.phone/);
+  }
+});
+
+test("refusal 1: the anchor cannot be the message, the handset or a search result", () => {
+  const sources: [string, RegExp][] = [
+    ["the number the voicemail gave", /read off a voicemail/],
+    ["the text message they sent", /read off a text message/],
+    ["the email that arrived this morning", /read off an email/],
+    ["the message on her phone", /read off the message being checked/],
+    ["the missed call on the handset", /read off the contact itself/],
+    ["the caller id on the screen", /read off the contact itself/],
+    ["the number that called her", /read off the contact itself/],
+    ["a google search for the bank", /a search result or a link/],
+    ["the link in the alert", /read off the message being checked/],
+  ];
+  for (const [printedOn, expected] of sources) {
+    const error = refuses(
+      claimInput({ trusted_number: { phone: TRUSTED, printed_on: printedOn } }),
+      expected,
+    );
+    assert.match(error.message, /Read the number printed on the customer's own card, statement or bill/);
+    assert.match(error.message, /No call was placed/);
+  }
+});
+
+test("refusal 1: the sources a customer actually reads a number off still parse", () => {
+  // The check above refuses on words, so it has to leave the real anchors alone.
+  for (const printedOn of [
+    "the back of the debit card",
+    "the last statement",
+    "the paper bill that came in the post",
+    "the card in her wallet",
+    "her banking app",
+    "the letter from the branch",
+  ]) {
+    const parsed = parseClaim(claimInput({ trusted_number: { phone: TRUSTED, printed_on: printedOn } }));
+    assert.equal(parsed.trustedNumber.printed_on, printedOn);
+  }
+});
+
 test("refusal 2: a card number anywhere in the claim file refuses and names the field", () => {
   // A valid test card number from the ranges card brands publish for testing.
   const error = refuses(

@@ -7,7 +7,10 @@
  * It is the whole trust anchor: the number printed on the customer's own card or
  * bill. A file that carries no trusted number has nothing this app can verify
  * against. Neither does one that puts the number which contacted them in that
- * field, so it refuses there rather than getting as far as a call.
+ * field, so it refuses there rather than getting as far as a call. Neither does one
+ * where the number to dial turns up in a field describing the contact. Neither does
+ * one whose `printed_on` says it was read off the message. Both of those mean the
+ * number came from the thing being checked.
  *
  * Then the file is scanned for a secret somebody was asked to read out and for an
  * instruction to impersonate the customer. Both refuse.
@@ -18,7 +21,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { impersonationFindings, isPersonaKey, secretFindings } from "./scan.js";
+import { impersonationFindings, isPersonaKey, secretFindings, withoutTimestamps } from "./scan.js";
 import type { Claim, ClaimContact, ContactChannel, Policy, PolicyInput, TrustedNumber } from "./types.js";
 
 export class ClaimError extends Error {}
@@ -82,6 +85,79 @@ export function sameNumber(left: string, right: string): boolean {
   }
   const tail = Math.min(one.length, two.length, 10);
   return one.slice(-tail) === two.slice(-tail);
+}
+
+/**
+ * Where the anchor may not have come from.
+ *
+ * `trusted_number.printed_on` is the only provenance this app has for the number it
+ * dials. It is read back to the customer in every one of the five answers, so a file
+ * that names the suspect contact as the source turns each of those answers into
+ * advice to ring whoever sent the message. A search result is the same mistake by
+ * another route: it is something an attacker can buy.
+ *
+ * This is a pattern net over one short prose field rather than a proof of
+ * independence. It errs towards refusing. A note that mentions the message in
+ * passing is refused too. The refusal says to write down where the number was read,
+ * so the cost of being wrong here is one edit.
+ */
+const CONTACT_SOURCES: { pattern: RegExp; note: string }[] = [
+  { pattern: /\bvoice ?mails?\b|\banswer ?phones?\b/i, note: "a voicemail" },
+  { pattern: /\btexts?\b|\bsms\b|\bwhats ?app\b/i, note: "a text message" },
+  { pattern: /\be-?mails?\b/i, note: "an email" },
+  { pattern: /\bmessages?\b|\bnotifications?\b|\balerts?\b/i, note: "the message being checked" },
+  {
+    pattern:
+      /\bmissed calls?\b|\bcallers? ?id\b|\bthe calls?\b|\bthe number that (?:called|rang|contacted|texted)\b|\bthe screen\b|\bthe handset\b/i,
+    note: "the contact itself",
+  },
+  {
+    pattern: /\bgoogle\b|\bsearch(?:ed|ing|es)?\b|\blinks?\b/i,
+    note: "a search result or a link, which is something an attacker can buy",
+  },
+];
+
+/** Digit runs long enough to be a phone number, read out of ordinary prose. */
+function numbersIn(text: string): string[] {
+  return withoutTimestamps(text).match(/\+?\d[\d\s().-]{5,}\d/g) ?? [];
+}
+
+/**
+ * Whatever says the number about to be dialled came out of the contact being checked.
+ * Null when nothing does.
+ *
+ * Comparing the trusted number with `contact.number_shown` catches one version of
+ * that mistake and misses the commoner one. A voicemail says "ring us straight back
+ * on this other number". The customer writes that number into
+ * `trusted_number.phone` and the caller id into `contact.number_shown`, so the two
+ * differ, the comparison passes and the app dials the scammer's callback line.
+ * Wherever the number to dial also appears in a field describing the contact, the
+ * file itself says where it came from, so this reads every one of those fields on
+ * digits. Then `printed_on` is read, because the customer may simply have written it
+ * down.
+ *
+ * It runs at load and again on the claim the call is about to be built from.
+ */
+export function sourceProblem(contact: unknown, trusted: TrustedNumber): string | null {
+  const fields =
+    typeof contact === "object" && contact !== null && !Array.isArray(contact)
+      ? (contact as Record<string, unknown>)
+      : {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value !== "string" && typeof value !== "number") {
+      continue;
+    }
+    for (const run of numbersIn(String(value))) {
+      if (sameNumber(run, trusted.phone)) {
+        return `contact.${key} carries the same number as trusted_number.phone, so the number this app would dial came out of the contact rather than off the customer's own card. A number the message supplied verifies nothing: whoever controls that line will confirm whatever is put to them. Read the number printed on the card or the bill by hand, put that in trusted_number.phone, then run this again. No call was placed.`;
+      }
+    }
+  }
+  const source = CONTACT_SOURCES.find((candidate) => candidate.pattern.test(trusted.printed_on));
+  if (source !== undefined) {
+    return `trusted_number.printed_on says the number was read off ${source.note}, which is the contact being checked rather than something independent of it. Checking a message by ringing a number that message supplied proves nothing. Read the number printed on the customer's own card, statement or bill, write down where it was read, then run this again. No call was placed.`;
+  }
+  return null;
 }
 
 function requireString(value: unknown, field: string, max = 200): string {
@@ -164,11 +240,19 @@ function requireTrustedNumber(raw: Record<string, unknown>): TrustedNumber {
       `The number that contacted the customer is the same number as trusted_number.phone, so there is nothing left to verify against: a message spoofing the printed number would be checked by calling itself. Read the number printed on the card or the bill by hand, put that in trusted_number.phone, then run this again. No call was placed.`,
     );
   }
-  return {
+  const anchor: TrustedNumber = {
     phone,
     printed_on: requireString(trusted.printed_on, "trusted_number.printed_on", SOURCE_MAX),
     ...(trusted.region === undefined ? {} : { region: requireString(trusted.region, "trusted_number.region", 8) }),
   };
+  // The same number written another way is the loudest case and it has its own
+  // message above. This is every other way the file can say the number came out of
+  // the contact rather than off the card.
+  const source = sourceProblem(contact, anchor);
+  if (source !== null) {
+    throw new ClaimError(source);
+  }
+  return anchor;
 }
 
 /** The second refusal and the third, both read off the whole file. */

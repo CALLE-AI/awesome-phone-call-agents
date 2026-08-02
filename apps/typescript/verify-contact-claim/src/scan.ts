@@ -110,7 +110,7 @@ export function withoutKnownNumbers(text: string, numbers: string[]): string {
 }
 
 /** A timestamp is not an account number, so it is taken out before digits are read. */
-function withoutTimestamps(text: string): string {
+export function withoutTimestamps(text: string): string {
   return text.replace(
     /\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?/g,
     "[timestamp]",
