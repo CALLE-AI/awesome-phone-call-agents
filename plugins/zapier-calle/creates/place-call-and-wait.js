@@ -1,5 +1,6 @@
 import { createCall } from './start-call.js';
-import { INPUT_FIELDS, isDryRun } from '../lib/build-payload.js';
+import { isDryRun } from '../lib/build-payload.js';
+import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { flattenResult } from '../lib/flatten-result.js';
 
 const perform = async (z, bundle) => {

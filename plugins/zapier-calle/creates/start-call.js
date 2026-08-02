@@ -1,4 +1,5 @@
-import { buildPayload, INPUT_FIELDS, isDryRun } from '../lib/build-payload.js';
+import { buildPayload, isDryRun } from '../lib/build-payload.js';
+import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { redactDeep } from '../lib/redact.js';
 import { baseUrl } from '../lib/client.js';
 
