@@ -64,7 +64,6 @@ export default {
     label: 'Place Call and Wait for Outcome',
     description:
       'Places a CALL-E phone call, waits for the call to finish, and returns the transcript, summary, structured result, and a fail-closed disposition.',
-    important: true,
   },
   operation: {
     inputFields: INPUT_FIELDS,

@@ -39,7 +39,6 @@ export default {
     label: 'Start Call (No Wait)',
     description:
       'Places a CALL-E phone call and returns immediately without waiting for the outcome. Use Find Call Result later to reconcile.',
-    important: false,
   },
   operation: {
     inputFields: INPUT_FIELDS,

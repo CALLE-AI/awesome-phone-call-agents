@@ -33,7 +33,6 @@ export default {
     label: 'Find Call Result',
     description:
       'Looks up a CALL-E call by id and returns its current disposition. Use this to reconcile a call whose webhook was missed or whose waiting Zap step was interrupted.',
-    important: false,
   },
   operation: {
     inputFields: [
