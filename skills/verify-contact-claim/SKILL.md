@@ -118,11 +118,19 @@ Exhaustive. Nothing else comes back from a run.
 
 | Outcome | Exit | What it means | What you tell the user |
 | --- | --- | --- | --- |
-| `confirmed_genuine` | 0 | A finished call plus a callee turn supporting "yes we contacted them". | The contact looks real. Use the printed number anyway, never the one that called. |
+| `confirmed_genuine` | 0 | A call CALL-E finished cleanly plus a callee turn supporting "yes we contacted them". | The contact looks real. Use the printed number anyway, never the one that called. |
 | `no_such_contact` | 10 | A finished call plus a callee turn supporting "no record of that". | Treat the contact as fake. Do not ring it back. Report it on the printed number. |
 | `refused_to_confirm` | 20 | A finished call where the institution declines to discuss a third party's account. | Expected at a bank. It proves nothing either way. Here is the number to call yourself. |
-| `unreachable` | 30 | A finished call that reached nobody, reached a machine or ended before the question. | Nobody answered, so nothing was checked. |
+| `unreachable` | 30 | A finished call that reached nobody, reached a machine or ended before the question, holding no answer either way. | Nothing was checked. Read the reason before you say nobody answered: a machine may have. |
 | `outcome_unknown` | 40 | A non-terminal call status, an unreadable call or an ambiguous create. | The call may have run. Nothing was decided. The call id is in the record. |
+
+A provider status says how the call ended rather than what the transcript holds. A
+denial or a refusal already in the transcript stands on a call that ended `failed` or
+`canceled`, with the status and the failure code kept on the record. A confirmation
+needs a call CALL-E finished cleanly, because it is the one answer that could leave
+somebody trusting a message they should not. Do not report `unreachable` for a call that
+carried an answer. Do not tell the user nobody answered when the reason says a machine
+did.
 
 `refused_to_confirm` is a useful answer rather than a failure. It still hands the
 customer the number they should be using.

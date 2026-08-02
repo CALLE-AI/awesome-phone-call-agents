@@ -39,15 +39,20 @@ holding the one number worth ringing.
 
 ## What each answer is worth
 
-- `confirmed_genuine` means somebody at the institution said the contact was theirs.
-  It does not make the number in the message safe to call back. Nobody legitimate
-  needs a full card number, a PIN or a one time code on a call the customer did not
-  start.
+- `confirmed_genuine` means somebody at the institution said the contact was theirs on a
+  call CALL-E finished cleanly. It does not make the number in the message safe to call
+  back. Nobody legitimate needs a full card number, a PIN or a one time code on a call
+  the customer did not start.
 - `no_such_contact` is the strongest result this app produces. Nobody there has a
-  record of the contact, so the message should be treated as a scam.
+  record of the contact, so the message should be treated as a scam. It stands on a call
+  that ended on `failed` or `canceled` as well, because a status says how the call ended
+  rather than what the transcript holds. A denial cannot leave anybody trusting a
+  message they should not.
 - `refused_to_confirm` verifies nothing either way. It is still an answer.
 - `unreachable` and `outcome_unknown` verify nothing at all. They are reported as
-  such, never softened into a denial.
+  such, never softened into a denial. Their wording follows the reason as well as the
+  outcome, so neither claims nobody was reached when a machine answered or when somebody
+  picked up and the call ended early.
 
 ## What an operator has to supply
 

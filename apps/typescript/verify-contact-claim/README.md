@@ -54,14 +54,24 @@ them yourself on the printed number.
 
 | Outcome | When |
 | --- | --- |
-| `confirmed_genuine` | a finished call plus a turn from the person on the line that supports "yes we contacted them" |
+| `confirmed_genuine` | a call CALL-E finished cleanly plus a turn from the person on the line that supports "yes we contacted them" |
 | `no_such_contact` | a finished call plus a turn that supports "no record of that" |
 | `refused_to_confirm` | a finished call where the institution declines to discuss a third party's account |
-| `unreachable` | a finished call that reached nobody, reached a machine or ended before the question |
+| `unreachable` | a finished call that reached nobody, reached a machine or ended before the question, with no answer in it either way |
 | `outcome_unknown` | a call CALL-E has not finished with, a call this app could not read, an ambiguous create |
 
 Terminal statuses are `completed`, `failed` and `canceled`. A no answer or a
 voicemail arrives as `failed` with a failure code, so neither is a status of its own.
+
+A status says how the call ended. It is not a statement about what the transcript
+holds, so it is not read as one. A call that ended on `failed` or `canceled` can still
+carry the question and the answer to it: the line drops after the person speaks, the
+operator hangs up, a carrier error lands late. A denial or a refusal already in that
+transcript stands, with the status and the failure code kept on the record. A
+confirmation does not. That is the one answer which could leave somebody trusting a
+message they should not, so it needs a call CALL-E finished cleanly.
+`phone-approval-gate` draws the same line, reading a rejection before it looks at the
+call status at all.
 
 ## The three refusals
 
@@ -91,8 +101,13 @@ read off the card is still the customer's word.
 
 CALL-E's extraction proposes. The transcript decides.
 
-- A verdict comes only from a terminal call status. A call still `queued` or
-  `in_progress` is `outcome_unknown` with the call id kept, never a decision.
+- A verdict comes only from a terminal call status. A confirmation comes only from a
+  call CALL-E finished cleanly. A call still `queued` or `in_progress` is
+  `outcome_unknown` with the call id kept, never a decision.
+- The sentence the customer reads is a claim about the call, so it is written from the
+  reason rather than from the outcome alone. `unreachable` does not say nobody was
+  reached when a machine answered or when somebody picked up and the call ended before
+  the question.
 - An answer needs a specific turn from the person on the line that supports it. That
   turn has to come after our question was asked in the transcript. No supporting turn
   means no answer.
@@ -180,7 +195,7 @@ Node 20 or later.
 cd apps/typescript/verify-contact-claim
 npm install
 npm run check   # tsc --noEmit
-npm test        # 167 tests, no credentials, no outbound calls
+npm test        # 172 tests, no credentials, no outbound calls
 npm run demo    # six calls against the local fake CALL-E
 ```
 
