@@ -23,6 +23,24 @@ from .policy import (
 CONFIRMATION = "I reviewed this call plan"
 
 
+def _verified_outcome(result: dict) -> str:
+    """Derive a retry-safe outcome from provider and structured evidence."""
+    provider_status = str(result.get("status", "unknown")).lower()
+    structured = result.get("structured_result")
+    reachability = (
+        str(structured.get("can_hear_clearly", "unknown")).lower()
+        if isinstance(structured, dict)
+        else "unknown"
+    )
+    if reachability == "no" or provider_status == "rejected":
+        return "rejected"
+    if provider_status in {"no_answer", "failed"}:
+        return provider_status
+    if provider_status == "completed" and reachability == "yes":
+        return "completed"
+    return "unknown"
+
+
 def _load_api_key() -> str:
     api_key = os.environ.get("CALLE_API_KEY", "").strip()
     if api_key:
@@ -128,17 +146,14 @@ def _execute(
     with ledger.locked_events() as history:
         for event in history:
             if event.get("reservation_id") == reservation["reservation_id"]:
-                event["state"] = "accepted"
+                outcome = _verified_outcome(result)
+                event["state"] = (
+                    "accepted" if outcome != "unknown" else "reconciliation_required"
+                )
                 event["updated_at"] = datetime.now(timezone.utc).isoformat()
                 event["provider_status"] = result.get("status")
                 event["task_completed"] = result.get("task_completed")
-                provider_status = str(result.get("status", "unknown")).lower()
-                event["outcome"] = (
-                    provider_status
-                    if provider_status
-                    in {"completed", "rejected", "no_answer", "failed"}
-                    else "unknown"
-                )
+                event["outcome"] = outcome
     return {
         "status": result.get("status"),
         "task_completed": result.get("task_completed"),

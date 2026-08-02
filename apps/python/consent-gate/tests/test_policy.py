@@ -12,8 +12,7 @@ from consent_gate.policy import (
     validate_plan,
     validate_rejection_cooldown,
 )
-from consent_gate.__main__ import _simulate
-from consent_gate.__main__ import _execute
+from consent_gate.__main__ import _execute, _simulate, _verified_outcome
 
 
 def valid_plan():
@@ -156,6 +155,23 @@ class PolicyTests(unittest.TestCase):
         event = record_outcome(valid_plan()["phone"], "rejected")
         self.assertNotIn("phone", event)
         self.assertNotIn(valid_plan()["phone"], str(event))
+
+    def test_completed_provider_status_with_recipient_refusal_is_rejected(self):
+        result = {
+            "status": "completed",
+            "structured_result": {"can_hear_clearly": "no"},
+        }
+        self.assertEqual(_verified_outcome(result), "rejected")
+
+    def test_completed_provider_status_without_reachability_is_unknown(self):
+        self.assertEqual(_verified_outcome({"status": "completed"}), "unknown")
+
+    def test_completed_provider_status_requires_verified_reachability(self):
+        result = {
+            "status": "completed",
+            "structured_result": {"can_hear_clearly": "yes"},
+        }
+        self.assertEqual(_verified_outcome(result), "completed")
 
 
 if __name__ == "__main__":

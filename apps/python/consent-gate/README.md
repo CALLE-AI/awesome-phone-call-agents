@@ -82,6 +82,10 @@ retention controls, live execution also requires `recording: false` and
 
 If that phone fingerprint has a `rejected` event less than 24 hours old,
 ConsentGate blocks the call and reports the earliest permitted retry time.
+Recipient refusal is derived from the structured reachability result even when
+the provider reports a completed call. A completed status without verified
+reachability remains blocked for manual reconciliation rather than permitting a
+retry.
 
 Only call a number you control or a recipient who has explicitly agreed to the
 call. Comply with applicable calling, recording, privacy, and consumer
