@@ -7,8 +7,9 @@ or bill. That tells you which number to dial. It does not tell you what to ask w
 somebody picks up. It leaves you with nothing you can keep either.
 
 This app dials that number once. It says in its first sentence that it is an
-automated assistant calling on behalf of a named person. It asks one question: did
-anyone there contact this customer in the last hour about this. Then it hands back
+automated assistant calling on behalf of a named person, with their permission, that
+it is not a person and that what they tell it is written down. It asks one question:
+did anyone there contact this customer in the last hour about this. Then it hands back
 the verdict, the words the person on the line actually said and the number the
 customer should be using.
 
@@ -65,17 +66,26 @@ voicemail arrives as `failed` with a failure code, so neither is a status of its
 ## The three refusals
 
 These are the product, so each one runs twice: once when the claim file is loaded,
-then again on the words that are about to be sent. A claim assembled any other way
-than through the loader still cannot get past the second one.
+then again on the claim and the words that are about to be sent. A claim assembled any
+other way than through the loader still cannot get past the second one.
 
 | Refusal | What it does |
 | --- | --- |
-| The number that made contact is never dialled | The only number this app rings is `trusted_number.phone`. A file whose `number_shown` is that same number is refused. So is a file that carries no trusted number. The message explains that the trust anchor is the card in the customer's hand. |
+| The number dialled never comes out of the contact | The only number this app rings is `trusted_number.phone`. A file whose `number_shown` is that same number is refused. So is a file that carries no trusted number. So is one where the number to dial also appears in a field describing the contact, which is what a "ring us straight back on this other number" voicemail leaves behind. So is one whose `trusted_number.printed_on` says the number was read off the message, the handset, a caller id, a link or a search result. The message explains that the trust anchor is the card in the customer's hand. |
 | Nothing the caller asked for is repeated | The whole file is scanned for card numbers, account numbers, one time codes, PINs, passwords, dates of birth and national identifiers. A hit names the field it was found in and masks the value. `asked_for` stays in the file and is never spoken on the call. |
 | The app never claims to be the customer | A field that sets a persona is refused. So is prose asking the caller to be the account holder. The script says it is an automated assistant calling for a named person, it cannot answer a security question and it says so on the line. |
 
 The scan reads values rather than subject matter. "They wanted my card number" is
 fine to write down. "They wanted 4111 1111 1111 1111" is the one that refuses.
+
+Comparing the number to dial with the number that made contact catches one version of
+a missing anchor and misses the commoner one. A voicemail that says to ring back on a
+different number leaves two numbers behind. They do not match each other, so the app
+would dial the one the scammer chose. So the number to dial is also read out of every
+field describing the contact, on digits. Then `printed_on` is read for a source that is
+the thing being checked. That second half reads words rather than meaning, so a note
+that mentions the message in passing is refused too. Whether the number was really
+read off the card is still the customer's word.
 
 ## What this app will not claim
 
@@ -93,7 +103,11 @@ CALL-E's extraction proposes. The transcript decides.
   run records the reason and refuses to decide the window on it.
 - A create that came back ambiguous is replayed under the same idempotency key, which
   returns the call CALL-E already has for that key rather than ringing the line
-  twice.
+  twice. Reading the call back is then the only thing that resolves it: any failure of
+  that replay leaves the state unknown with both failure codes in the record, whatever
+  class the second failure is. A definite refusal on the replay says nothing about the
+  request that went unanswered, because that one may already have been accepted and a
+  401 or a 403 can be decided before the key is looked up.
 
 ## What already exists
 
@@ -166,7 +180,7 @@ Node 20 or later.
 cd apps/typescript/verify-contact-claim
 npm install
 npm run check   # tsc --noEmit
-npm test        # 156 tests, no credentials, no outbound calls
+npm test        # 167 tests, no credentials, no outbound calls
 npm run demo    # six calls against the local fake CALL-E
 ```
 
@@ -212,6 +226,11 @@ written with mode `0600` re-applied on every append. `verify` re-links the chain
 re-reads the stored words and recomputes every outcome with the same functions that
 ran live, so a verdict edited by hand fails.
 
+[`examples/record.example.jsonl`](examples/record.example.jsonl) is the demo's own
+output, unedited: six records covering all five outcomes, from six calls to a local
+fake server about a fictional customer. Replay it with
+`npm run vcc -- verify --record examples/record.example.jsonl`.
+
 ## The claim file
 
 | Field | Notes |
@@ -226,7 +245,7 @@ ran live, so a verdict edited by hand fails.
 | `contact.number_shown` | The number that made contact. Kept in the file, printed in the preview, never dialled. |
 | `contact.asked_for` | What the message wanted the customer to do, up to 300 characters. Never spoken, never sent to CALL-E. It is scanned. |
 | `trusted_number.phone` | E.164. The only number this app dials. |
-| `trusted_number.printed_on` | Where the customer read it, for example "the back of the debit card". It is printed in every result. |
+| `trusted_number.printed_on` | Where the customer read it, for example "the back of the debit card". It is printed in every result, so a source that is the message, the handset, a caller id, a link or a search result is refused. |
 | `trusted_number.region` | Optional, passed to CALL-E with the recipient. |
 | `policy.recent_window_minutes` | 15 to 240, default 60. The window the question asks about, read out in words. |
 | `policy.per_call_timeout_seconds` | 60 to 600, default 240. |
@@ -266,6 +285,16 @@ not a person. 47 CFR 64.1200(b)(2) wants a callback number for that responsible
 party, which is the customer rather than the machine, so `customer.callback_number`
 is the one number the script reads out loud.
 
+The opening also says that what the person tells it is written down, because it is:
+the record keeps the callee turn the outcome was read from, verbatim.
+`phone-approval-gate` tells its approver the call goes into the change log and the
+person answering here is owed the same. Two rules keep the call inside the boundaries
+`CONTRIBUTING.md` asks of anything in this repository that can place a call. The
+caller gives no clinical, legal or financial detail and no opinion on any of it, since
+it holds none. Anybody who says there is an emergency, that somebody is hurt or that a
+fire, a gas leak or a flood is happening now is told to hang up and call their local
+emergency number. Then the call ends.
+
 The same ruling that makes a scammer's cloned voice unlawful classifies this app's
 voice as artificial too. That is why the script never claims to be the customer, and
 why refusal 3 is checked twice.
@@ -293,6 +322,8 @@ why refusal 3 is checked twice.
   bank refusing is the expected outcome and what has never been tested live.
 - [`examples/claim.example.json`](examples/claim.example.json): the claim file the
   preview and the demo run on.
+- [`examples/record.example.jsonl`](examples/record.example.jsonl): the record chain
+  the demo wrote, which `verify` replays.
 
 This is a demo app for a workflow pattern, not a CALL-E SDK and not a supported
 product API.

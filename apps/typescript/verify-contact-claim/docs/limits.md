@@ -58,13 +58,37 @@ The responsible party here is the customer, not the machine, so a live run has t
 one number the script reads out loud, digit by digit.
 
 47 CFR 64.1200(b)(1) wants the opening to say who is responsible. The script does
-that in its first sentence and says it is not a person.
+that in its first sentence, says it is calling with that person's permission and says
+it is not a person. It also says that what the person on the line tells it is written
+down, because the record keeps that turn verbatim. `phone-approval-gate` tells its
+approver the same thing about its change log.
 
-This app cannot check that the callback number belongs to the customer, that the
-trusted number was really read off their card or that the number that made contact was
-not theirs. Those three facts come from whoever wrote the claim file. The app checks
-what it can: the number that made contact is never the number dialled, nothing the
-caller asked for is repeated on the line, no persona is carried.
+The script carries the boundaries `CONTRIBUTING.md` asks of anything here that can
+place a call. No clinical, legal or financial detail and no opinion on any of it, since
+the caller holds none. An emergency, somebody hurt, a fire, a gas leak or a flood ends
+the call with the person told to ring their local emergency number.
+
+## What the claim file has to be right about
+
+Three things about the anchor are the customer's word and the app cannot go behind
+them. That the callback number is really theirs. That the number in
+`trusted_number.phone` was really read off their own card or bill. That the contact
+being checked was not theirs after all.
+
+What the app does check, before anything is dialled and again on the claim the call is
+built from:
+
+- the number that made contact is never the number dialled, compared on digits so two
+  spellings of one number are one number
+- the number to dial does not also appear in any field describing the contact. That is
+  the case the comparison above misses. A voicemail that says to ring back on a
+  different number leaves two numbers behind. Neither matches the other, so without
+  this check the app would dial the one the scammer chose
+- `trusted_number.printed_on` does not name the thing being checked as the source: the
+  message, the voicemail, the text, an email, the handset, a caller id, a link or a
+  search result. A search result counts because it is something an attacker can buy
+- nothing the caller asked for is repeated on the line
+- no persona is carried
 
 ## Where the detectors stop
 
@@ -76,6 +100,18 @@ written as ordinary prose. It is a safety net rather than a proof, so read the p
 The scan also reads values rather than subject matter, on purpose. Somebody writing
 down what a scam asked them for has to be able to say "they wanted my card number"
 without the app refusing to help.
+
+The check on `trusted_number.printed_on` reads words too. It errs the other way. A
+note that mentions the message in passing is refused along with a note that names it as
+the source, because reading a negation off one short prose field is exactly the trap
+the impersonation scan already documents. The refusal says to write down where the
+number was read, so the cost of being wrong there is one edit.
+
+The floor in `policy.min_confidence` only bites when CALL-E reports a completion
+confidence. A finished call that comes back without one is decided on the callee turn
+alone, because that turn is the evidence and the score only corroborates it. Requiring
+a score would fail a healthy call for the wrong reason, which is the same reason
+`structured_result` being null blocks nothing.
 
 ## What has never been tested live
 
