@@ -281,7 +281,7 @@ export async function runCheck(options: RunCheckOptions): Promise<CheckResult> {
     dialled_masked: maskPhone(claim.trustedNumber.phone),
     use_number: maskPhone(claim.trustedNumber.phone),
     use_number_printed_on: claim.trustedNumber.printed_on,
-    what_to_do: whatToDo(evaluation.outcome, claim),
+    what_to_do: whatToDo(evaluation.outcome, evaluation.reason, claim),
     evidence: evaluation.evidence,
     transcript_excerpt: evaluation.excerpt,
     transcript: evaluation.transcript,

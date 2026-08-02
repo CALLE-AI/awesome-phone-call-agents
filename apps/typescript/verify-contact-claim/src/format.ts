@@ -24,7 +24,7 @@ import {
   spokenLocal,
   spokenWindow,
 } from "./script.js";
-import type { CheckResult, Claim, Outcome, TranscriptTurn } from "./types.js";
+import type { CheckResult, Claim, Outcome, Reason, TranscriptTurn } from "./types.js";
 
 const COLUMN = 14;
 
@@ -37,7 +37,15 @@ function printedNumber(claim: Claim): string {
   return `the number printed on ${claim.trustedNumber.printed_on}`;
 }
 
-export function whatToDo(outcome: Outcome, claim: Claim): string {
+/**
+ * What the customer does next.
+ *
+ * The reason is read as well as the outcome, because the sentence is a claim about what
+ * happened on the call and it has to hold against the evidence. "Did not reach anybody"
+ * is false when a machine answered or when somebody picked up and the call ended before
+ * the question.
+ */
+export function whatToDo(outcome: Outcome, reason: Reason | null, claim: Claim): string {
   const institution = claim.contact.claimed_to_be;
   const name = claim.customer.name;
   const printed = printedNumber(claim);
@@ -53,7 +61,13 @@ export function whatToDo(outcome: Outcome, claim: Claim): string {
     return `${institution} would not discuss another person's account, which is what the rules they are under require of them. Nothing was verified either way, so treat the message as unverified: call ${institution} yourself on ${printed} and ask them there.`;
   }
   if (outcome === "unreachable") {
-    return `The call did not reach anybody at ${institution}, so nothing was verified. Ring them yourself on ${printed}. Do not use the number that contacted ${name}.`;
+    const happened =
+      reason === "machine_answered"
+        ? `The call reached a machine at ${institution} rather than a person`
+        : reason === "ended_before_question"
+          ? `Somebody at ${institution} picked up and the call ended before the question was asked`
+          : `The call did not reach anybody at ${institution}`;
+    return `${happened}, so nothing was verified. Ring them yourself on ${printed}. Do not use the number that contacted ${name}.`;
   }
   return `This app could not read an answer, so nothing was verified. Ring ${institution} yourself on ${printed}. Do not use the number that contacted ${name}.`;
 }

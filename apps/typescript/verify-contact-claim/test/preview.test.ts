@@ -27,7 +27,7 @@ function result(overrides: Partial<CheckResult> = {}): CheckResult {
     dialled_masked: "+14*******00",
     use_number: "+14*******00",
     use_number_printed_on: "the back of the debit card",
-    what_to_do: whatToDo("no_such_contact", CLAIM),
+    what_to_do: whatToDo("no_such_contact", null, CLAIM),
     evidence: {
       call_status: "completed",
       failure_code: null,
@@ -172,21 +172,42 @@ test("every outcome tells the customer to use the number on their own card", () 
     "unreachable",
     "outcome_unknown",
   ] as const) {
-    const text = whatToDo(outcome, CLAIM);
+    const text = whatToDo(outcome, null, CLAIM);
     assert.match(text, /the back of the debit card/, outcome);
     assert.equal(text.includes(TRUSTED), false, outcome);
   }
 });
 
 test("a refusal to confirm is written up as the institution complying", () => {
-  const text = whatToDo("refused_to_confirm", CLAIM);
+  const text = whatToDo("refused_to_confirm", null, CLAIM);
   assert.match(text, /rules they are under|complying|not allowed/i);
   assert.equal(/failed|error/i.test(text), false);
 });
 
 test("an outcome with no answer says nothing was verified rather than nothing happened", () => {
   for (const outcome of ["unreachable", "outcome_unknown"] as const) {
-    assert.match(whatToDo(outcome, CLAIM), /nothing (?:was|has been) verified/i, outcome);
+    assert.match(whatToDo(outcome, null, CLAIM), /nothing (?:was|has been) verified/i, outcome);
+  }
+});
+
+test("the advice does not claim nobody was reached when somebody answered", () => {
+  // The sentence is a claim about what happened on the call, so it has to hold against
+  // the reason. Two of the five unreachable reasons are cases where something did answer.
+  const machine = whatToDo("unreachable", "machine_answered", CLAIM);
+  assert.match(machine, /reached a machine at Northgate Credit Union rather than a person/);
+  assert.equal(machine.includes("did not reach anybody"), false);
+
+  const early = whatToDo("unreachable", "ended_before_question", CLAIM);
+  assert.match(early, /picked up and the call ended before the question/);
+  assert.equal(early.includes("did not reach anybody"), false);
+
+  // The reasons where nobody was on the line keep saying so.
+  for (const reason of ["no_answer", "nobody_spoke", "call_failed"] as const) {
+    assert.match(whatToDo("unreachable", reason, CLAIM), /did not reach anybody/, reason);
+  }
+  for (const reason of ["machine_answered", "ended_before_question", "no_answer"] as const) {
+    assert.match(whatToDo("unreachable", reason, CLAIM), /the back of the debit card/, reason);
+    assert.match(whatToDo("unreachable", reason, CLAIM), /nothing was verified/, reason);
   }
 });
 
