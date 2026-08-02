@@ -28,6 +28,19 @@ describe('fake CALL-E server', () => {
     expect(server.lastRequest().headers['idempotency-key']).toBe('abc123');
   });
 
+  it('returns 400 instead of crashing on a malformed request body', async () => {
+    server = await startFakeCalle({});
+    const response = await fetch(`${server.url}/v1/calls`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer test-key' },
+      body: '{not json',
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe('invalid_json');
+  });
+
   it('rejects a request without a bearer token', async () => {
     server = await startFakeCalle({});
     const response = await fetch(`${server.url}/v1/goals?limit=1`);

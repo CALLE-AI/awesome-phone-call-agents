@@ -21,12 +21,20 @@ export async function startFakeCalle({ port = 0 } = {}) {
   const server = createServer(async (req, res) => {
     const raw = await readBody(req);
     const url = new URL(req.url, 'http://127.0.0.1');
-    lastRequest = {
-      method: req.method,
-      path: url.pathname,
-      headers: req.headers,
-      body: raw ? JSON.parse(raw) : null,
-    };
+    let body = null;
+    let malformed = false;
+    if (raw) {
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        malformed = true;
+      }
+    }
+    lastRequest = { method: req.method, path: url.pathname, headers: req.headers, body };
+
+    if (malformed) {
+      return send(res, 400, { error: { code: 'invalid_json', message: 'Request body is not valid JSON.' } });
+    }
 
     if (!String(req.headers.authorization || '').startsWith('Bearer ')) {
       return send(res, 401, { error: { code: 'unauthorized', message: 'Missing bearer token.' } });
