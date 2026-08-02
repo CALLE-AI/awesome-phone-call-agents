@@ -23,6 +23,24 @@ export function isDryRun(value) {
   return true;
 }
 
+const MAX_CORRELATION_ID_LENGTH = 200;
+
+// correlation_id is echoed back on the webhook so a user can match a call to their own
+// record, so only strings and numbers are coerced into one - anything else (an object, an
+// array, a boolean, NaN) has no sensible id form and would otherwise stringify to
+// something meaningless like "[object Object]" or "1,2". A literal 0 is a valid id and
+// must not be treated as absent, so this checks type rather than truthiness.
+function normalizeCorrelationId(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed.slice(0, MAX_CORRELATION_ID_LENGTH);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value).slice(0, MAX_CORRELATION_ID_LENGTH);
+  }
+  return null;
+}
+
 export function buildPayload(inputData, extras = {}) {
   const errors = [];
   const task = typeof inputData.task === 'string' ? inputData.task.trim() : '';
@@ -45,7 +63,7 @@ export function buildPayload(inputData, extras = {}) {
     recipients: [recipient],
     metadata: {
       source_platform: 'zapier',
-      correlation_id: inputData.correlation_id ? String(inputData.correlation_id) : null,
+      correlation_id: normalizeCorrelationId(inputData.correlation_id),
       ...(extras.zapMeta || {}),
     },
   };

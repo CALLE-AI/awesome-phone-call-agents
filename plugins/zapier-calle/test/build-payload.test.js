@@ -53,4 +53,22 @@ describe('buildPayload', () => {
     const b = buildPayload(input, { webhookUrl: 'https://hooks.zapier.com/b' });
     expect(a.key).toBe(b.key);
   });
+
+  it('treats a literal 0 correlation_id as the string "0", not absent', () => {
+    const { payload } = buildPayload({ ...input, correlation_id: 0 }, {});
+    expect(payload.metadata.correlation_id).toBe('0');
+  });
+
+  it('drops a non-string, non-number correlation_id instead of stringifying it', () => {
+    expect(buildPayload({ ...input, correlation_id: { row: 42 } }, {}).payload.metadata.correlation_id)
+      .toBe(null);
+    expect(buildPayload({ ...input, correlation_id: [1, 2] }, {}).payload.metadata.correlation_id)
+      .toBe(null);
+  });
+
+  it('caps correlation_id length at 200 characters', () => {
+    const long = 'x'.repeat(500);
+    const { payload } = buildPayload({ ...input, correlation_id: long }, {});
+    expect(payload.metadata.correlation_id).toBe('x'.repeat(200));
+  });
 });
