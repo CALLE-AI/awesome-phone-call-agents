@@ -101,6 +101,18 @@ infers either from the phone number.
 returned by either create action - and returns the same output shape as the
 create actions.
 
+**Not-found behavior:** when the supplied Call ID does not exist, CALL-E
+returns HTTP 404 and the integration raises an error reading `CALL-E request
+failed with status 404. Call not found.` It does not return an empty result
+set. This is a deliberate deviation from the usual Zapier search convention
+of returning no results when nothing is found. This search exists to
+reconcile a call that may already have happened, and silently returning
+nothing for a mistyped or stale Call ID would let a workflow conclude that
+no call took place - the same failure mode the rest of this integration is
+built to prevent. An error is louder and safer than a false negative.
+Supply a Call ID captured from `Start Call (No Wait)` or from a
+`Place Call and Wait for Outcome` step, rather than a hand-typed value.
+
 ### Result schema support
 
 `result_schema` is validated against an allowlist, not a blacklist. Only
@@ -310,15 +322,28 @@ produced the user-facing message:
 Note that the API key was not present anywhere in that message, confirming
 the redaction path holds on a real error response.
 
-**What this demonstrates:** the success path, a real non-success path, and
-the clarification path have all now been exercised against production, and
-the integration produced the correct outcome for each. Of the two call
-records, Call 1 remains the more important: CALL-E returned a structured
-result, and the integration still refused to mark the call actionable
-because `task_completed` was false. The clarification path adds a third
-data point: CALL-E can reject a call before dialing rather than guessing,
-this integration surfaces that as a fail-closed clarification request
-rather than a generic failure, and no call is consumed doing so.
+**Reconciliation path - no call consumed.** `Find Call Result` was run
+against the production API for both previously recorded calls. For the
+declined call it returned a single result with `disposition: failed` and
+`is_actionable: false`; for the answered call, a single result with
+`disposition: confirmed` and `is_actionable: true`. Both matched the
+disposition the live callback path produced for the same calls, confirming
+that a reconciled call and a live call cannot disagree - they share one
+classifier. No raw phone digits appeared in either output.
+
+**What this demonstrates:** the success path, a real non-success path, the
+clarification path, and the reconciliation path have all now been exercised
+against production, and the integration produced the correct outcome for
+each. Of the two call records, Call 1 remains the more important: CALL-E
+returned a structured result, and the integration still refused to mark the
+call actionable because `task_completed` was false. The clarification path
+adds a third data point: CALL-E can reject a call before dialing rather than
+guessing, this integration surfaces that as a fail-closed clarification
+request rather than a generic failure, and no call is consumed doing so.
+The reconciliation path adds a fourth: looking a call up after the fact
+through `Find Call Result` produces the same disposition the live callback
+path already produced for that same call, and doing so consumes no
+additional call.
 
 **Observed platform behavior worth knowing:**
 
