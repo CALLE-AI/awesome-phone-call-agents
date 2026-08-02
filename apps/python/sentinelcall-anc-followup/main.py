@@ -111,11 +111,21 @@ def extract_danger_signs_from_transcript(transcript: str) -> tuple[list[str], li
     return found, urgent
 
 
+# FIX (review round 3): each follow-up call is now bound to an explicit
+# patient_id at creation time -- no more silently defaulting every
+# escalation to one fixed demo patient regardless of which call it came
+# from. run_id -> patient_id is recorded the moment the call is planned,
+# and /escalate looks up the REAL bound patient for that run, not a
+# global constant.
+_run_to_patient: dict[str, str] = {}
+
+
 class FollowUpRequest(BaseModel):
     phone: str
     region: str
     patient_first_name: str
     missed_visit_date: str
+    patient_id: str  # REQUIRED: the real FHIR Patient ID this call is for
     language: str = "English"
     consent_confirmed: bool = False
 
@@ -204,9 +214,15 @@ async def trigger_followup(
             response = {"status": "needs_more_info", "clarifying_questions": plan.get("clarifying_questions", [])}
         else:
             run = run_call(plan_id=plan["plan_id"], confirm_token=plan["confirm_token"])
+            run_id = run.get("run_id")
+            if run_id:
+                # Bind this run to the real patient BEFORE returning --
+                # this is the record /escalate will trust later, not a
+                # hardcoded constant.
+                _run_to_patient[run_id] = req.patient_id
             response = {
                 "status": "call_started",
-                "run_id": run.get("run_id"),
+                "run_id": run_id,
                 "plan_id": plan["plan_id"],
                 "called": mask_phone(req.phone),
             }
@@ -264,10 +280,17 @@ async def confirm_escalation(
     if run_id in _escalated_runs:
         return {"status": "already_escalated", "run_id": run_id, "record": _escalated_runs[run_id]}
 
-    # FIX (review round 2, point 3): escalation must be bound to the
-    # actual run -- re-fetch the real result and recompute the preview
-    # ourselves, rather than trusting arbitrary client-supplied signs for
-    # an arbitrary run_id.
+    # FIX (review round 3): resolve the REAL patient this run was bound to
+    # at call-creation time. No more falling back to a fixed demo constant
+    # -- if a run has no recorded binding, refuse rather than guess.
+    bound_patient_id = _run_to_patient.get(run_id)
+    if not bound_patient_id:
+        raise HTTPException(
+            409,
+            f"No patient binding found for run {run_id}. Escalation requires a "
+            f"call that was created through this app's /followups endpoint.",
+        )
+
     try:
         result = wait_for_call_result(run_id, poll_interval_seconds=3, max_wait_seconds=30)
     except CalleError as e:
@@ -280,8 +303,6 @@ async def confirm_escalation(
     actual_signs, actual_urgent = extract_danger_signs_from_transcript(transcript)
     actual_signs_set = set(actual_signs)
 
-    # Confirmed signs must be a subset of what's actually verifiable from
-    # this run's real transcript -- the reviewer cannot invent findings.
     invalid = set(req.confirmed_signs) - actual_signs_set
     if invalid:
         raise HTTPException(
@@ -294,16 +315,25 @@ async def confirm_escalation(
 
     deduped_signs = sorted(set(req.confirmed_signs))
 
+    # FIX (review round 3): reserve BEFORE the external write, not after --
+    # same ordering fix already applied to call idempotency. A crash
+    # between the FHIR write and this line previously could not be
+    # distinguished from "never attempted," allowing a duplicate write on
+    # retry.
+    _escalated_runs[run_id] = {"status": "pending", "reviewed_by": req.reviewed_by, "confirmed_signs": deduped_signs}
+
     results = await escalate_danger_signs(
-        patient_id=DEMO_PATIENT_ID,
+        patient_id=bound_patient_id,
         danger_signs=deduped_signs,
         call_id=result.get("result", {}).get("call_id", run_id),
         status="preliminary",
     )
 
     record = {
+        "status": "done",
         "reviewed_by": req.reviewed_by,
         "confirmed_signs": deduped_signs,
+        "patient_id": bound_patient_id,
         "urgent_at_call_time": actual_urgent,
         "escalation_results": results,
     }
