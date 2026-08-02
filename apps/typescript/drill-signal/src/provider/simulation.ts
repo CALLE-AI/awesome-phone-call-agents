@@ -15,6 +15,8 @@ export interface SimulationScenario {
   transcript?: { speaker: "bot" | "user"; text: string }[];
   delayMs?: number;
   stall?: boolean;
+  /** When set, overrides inferred taskCompleted for terminal snapshots. */
+  taskCompleted?: boolean;
 }
 
 export const SIMULATION_PRESETS: Record<string, SimulationScenario[]> = {
@@ -89,6 +91,7 @@ export const SIMULATION_PRESETS: Record<string, SimulationScenario[]> = {
     {
       phone: "+15550100005",
       structuredResult: { reached_live_person: true, incomplete: true },
+      taskCompleted: true,
     },
   ],
   "timeout-unknown": [
@@ -232,7 +235,9 @@ export class SimulationProvider implements CallePort {
       ],
       structuredResult: structured,
       summary: terminal ? "Simulation call finished." : null,
-      taskCompleted: terminal ? parseStructuredResult(structured) !== null : null,
+      taskCompleted: terminal
+        ? (scenario.taskCompleted ?? (status === "completed" && parseStructuredResult(structured) !== null))
+        : null,
       completionConfidence: terminal ? { score: 0.95, label: "high" } : null,
       evidence: terminal
         ? (scenario.transcript ?? []).map((turn) => `${turn.speaker}: ${turn.text}`).slice(0, 3)

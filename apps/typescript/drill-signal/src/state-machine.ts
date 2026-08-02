@@ -37,9 +37,7 @@ export function canEscalateToBackup(drill: DrillRecord, primaryOutcome: CallOutc
   if (primaryOutcome === "success") {
     return false;
   }
-  return ["no_answer", "voicemail", "refused_ownership", "opt_out", "unknown", "timeout", "malformed_result"].includes(
-    primaryOutcome,
-  );
+  return ["no_answer", "voicemail", "refused_ownership", "opt_out"].includes(primaryOutcome);
 }
 
 export function classifyPrimaryOutcome(
@@ -68,14 +66,23 @@ export function nextStatusAfterPrimaryEvaluation(
   if (drill.cancelRequested) {
     return "cancelled";
   }
+  const lastAttempt = drill.attempts.at(-1);
+  if (lastAttempt?.ambiguous) {
+    return "ambiguous";
+  }
   if (primaryOutcome === "success") {
     return "completed";
   }
   if (canEscalateToBackup(drill, primaryOutcome)) {
     return "calling_backup";
   }
-  if (primaryOutcome === "api_error" || primaryOutcome === "timeout") {
-    return drill.callsPlaced >= drill.maxCalls ? "ambiguous" : "failed";
+  if (
+    primaryOutcome === "api_error" ||
+    primaryOutcome === "timeout" ||
+    primaryOutcome === "unknown" ||
+    primaryOutcome === "malformed_result"
+  ) {
+    return "ambiguous";
   }
   return "completed";
 }
@@ -84,7 +91,16 @@ export function nextStatusAfterBackupEvaluation(drill: DrillRecord, backupOutcom
   if (drill.cancelRequested) {
     return "cancelled";
   }
-  if (backupOutcome === "api_error" || backupOutcome === "timeout") {
+  const lastAttempt = drill.attempts.at(-1);
+  if (lastAttempt?.ambiguous) {
+    return "ambiguous";
+  }
+  if (
+    backupOutcome === "api_error" ||
+    backupOutcome === "timeout" ||
+    backupOutcome === "unknown" ||
+    backupOutcome === "malformed_result"
+  ) {
     return "ambiguous";
   }
   return "completed";

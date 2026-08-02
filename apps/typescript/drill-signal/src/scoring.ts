@@ -123,6 +123,14 @@ export function buildRecommendations(drill: DrillRecord, attempts: CallAttemptRe
   if (attempts.some((attempt) => attempt.ambiguous)) {
     recommendations.push("Reconcile ambiguous provider states before relying on this drill for compliance evidence.");
   }
+  const retainedCallIds = attempts
+    .filter((attempt) => attempt.ambiguous && attempt.callId !== null)
+    .map((attempt) => attempt.callId as string);
+  if (retainedCallIds.length > 0) {
+    recommendations.push(
+      `Reconcile the retained provider call ID (${retainedCallIds.join(", ")}) with CALL-E before placing any new call.`,
+    );
+  }
   if (recommendations.length === 0) {
     recommendations.push("Drill met readiness criteria for the configured scenario. Retain the masked audit record.");
   }

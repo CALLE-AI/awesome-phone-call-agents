@@ -93,5 +93,6 @@ test("malformed result is handled safely", async () => {
   });
   const finished = await service.launchDrill(deps, created.id, { launchConfirmed: true });
   assert.equal(finished.attempts[0]?.outcome, "malformed_result");
+  assert.equal(finished.status, "ambiguous");
   rmSync(dir, { recursive: true, force: true });
 });

@@ -4,7 +4,11 @@
 
 import { CalleApiError, CalleWaitTimeout, type CallePort } from "./calle.js";
 import { excerptTranscript, maskPhone, redactEvidenceLine } from "./masking.js";
-import { parseStructuredResult } from "./schema.js";
+import {
+  acceptedStructuredFromSnapshot,
+  isCompletedSnapshotAmbiguous,
+  structuredFromSnapshot,
+} from "./structured-trust.js";
 import { buildRecommendations, buildScores, buildSummary } from "./scoring.js";
 import { buildMetadata, buildTask, idempotencyKey, resultSchema } from "./script.js";
 import {
@@ -70,17 +74,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-function structuredFromSnapshot(snapshot: CallSnapshot): StructuredDrillResult | null {
-  const raw =
-    snapshot.structuredResult ??
-    snapshot.recipients[0]?.structuredResult ??
-    snapshot.recipients[0]?.attempts[0]?.transcriptTurns.length
-      ? snapshot.recipients[0]?.structuredResult
-      : null;
-  return parseStructuredResult(raw);
-}
-
-function outcomeFromSnapshot(snapshot: CallSnapshot, parsed: StructuredDrillResult | null): CallOutcomeKind {
+function outcomeFromSnapshot(snapshot: CallSnapshot, parsed: StructuredDrillResult | null, trusted: boolean): CallOutcomeKind {
   const status = snapshot.status.toLowerCase();
   if (status === "canceled") return "cancelled";
   if (status === "failed") {
@@ -90,6 +84,7 @@ function outcomeFromSnapshot(snapshot: CallSnapshot, parsed: StructuredDrillResu
     return "unknown";
   }
   if (!isTerminalCallStatus(snapshot.status)) return "unknown";
+  if (!trusted) return "unknown";
   if (parsed === null) return "malformed_result";
   if (parsed.opt_out) return "opt_out";
   if (!parsed.reached_live_person) return "no_answer";
@@ -103,7 +98,7 @@ function attemptFromSnapshot(
   outcome: CallOutcomeKind,
   ambiguous: boolean,
 ): CallAttemptRecord {
-  const parsed = structuredFromSnapshot(snapshot);
+  const parsed = acceptedStructuredFromSnapshot(snapshot);
   const attempt = snapshot.recipients[0]?.attempts[0];
   const turns = attempt?.transcriptTurns ?? [];
   const fromEvidence = snapshot.evidence?.map(redactEvidenceLine) ?? [];
@@ -166,14 +161,14 @@ async function placeCall(
   drill: DrillRecord,
   role: ContactRole,
   options: OrchestratorOptions,
-): Promise<{ snapshot: CallSnapshot | null; error: CallOutcomeKind | null; ambiguous: boolean }> {
+): Promise<{ snapshot: CallSnapshot | null; error: CallOutcomeKind | null; ambiguous: boolean; providerCallId: string | null }> {
   const ctx = options.context;
   if (ctx?.signal.aborted || ctx?.isCancelled()) {
-    return { snapshot: null, error: "cancelled", ambiguous: false };
+    return { snapshot: null, error: "cancelled", ambiguous: false, providerCallId: null };
   }
   const contact = contactForRole(drill, role);
   if (!contact?.phone) {
-    return { snapshot: null, error: "api_error", ambiguous: false };
+    return { snapshot: null, error: "api_error", ambiguous: false, providerCallId: null };
   }
   const input = {
     task: buildTask(drill, role),
@@ -182,11 +177,13 @@ async function placeCall(
     metadata: buildMetadata(drill, role),
   };
   const key = idempotencyKey(drill.id, role);
+  let providerCallId: string | null = null;
   try {
     if (ctx?.signal.aborted || ctx?.isCancelled()) {
-      return { snapshot: null, error: "cancelled", ambiguous: false };
+      return { snapshot: null, error: "cancelled", ambiguous: false, providerCallId: null };
     }
     const created = await options.port.createCall(input, key);
+    providerCallId = created.id;
     options.onActiveCall?.(created.id);
     const snapshot = await cancellableWaitForResult(
       options.port,
@@ -198,22 +195,39 @@ async function placeCall(
       ctx,
     );
     options.onActiveCall?.(null);
-    const parsed = structuredFromSnapshot(snapshot);
-    const outcome = outcomeFromSnapshot(snapshot, parsed);
-    return { snapshot, error: outcome, ambiguous: false };
+    const trusted = !isCompletedSnapshotAmbiguous(snapshot);
+    const parsed = trusted ? structuredFromSnapshot(snapshot) : null;
+    const outcome = outcomeFromSnapshot(snapshot, parsed, trusted);
+    // Untrusted completed snapshots are ambiguous; terminal unknown and
+    // malformed outcomes also require reconciliation even when the snapshot
+    // is failed or otherwise completed-with-trust metadata.
+    const ambiguous =
+      isCompletedSnapshotAmbiguous(snapshot) ||
+      outcome === "unknown" ||
+      outcome === "malformed_result";
+    return { snapshot, error: outcome, ambiguous, providerCallId };
   } catch (error) {
     options.onActiveCall?.(null);
     if (error instanceof OrchestrationCancelled) {
-      return { snapshot: null, error: "cancelled", ambiguous: false };
+      return { snapshot: null, error: "cancelled", ambiguous: false, providerCallId };
     }
     if (error instanceof CalleWaitTimeout) {
-      return { snapshot: null, error: "timeout", ambiguous: true };
+      return { snapshot: null, error: "timeout", ambiguous: true, providerCallId };
     }
     if (error instanceof CalleApiError) {
-      return { snapshot: null, error: "api_error", ambiguous: error.ambiguous };
+      return {
+        snapshot: null,
+        error: error.ambiguous ? "unknown" : "api_error",
+        ambiguous: error.ambiguous,
+        providerCallId,
+      };
     }
-    return { snapshot: null, error: "unknown", ambiguous: true };
+    return { snapshot: null, error: "unknown", ambiguous: true, providerCallId };
   }
+}
+
+function reconciliationDetail(providerCallId: string | null): string | undefined {
+  return providerCallId ? `providerCallId=${providerCallId}` : undefined;
 }
 
 export async function runDrill(drill: DrillRecord, options: OrchestratorOptions): Promise<DrillRecord> {
@@ -245,13 +259,24 @@ export async function runDrill(drill: DrillRecord, options: OrchestratorOptions)
   }
   if (primaryResult.snapshot) {
     const parsed = structuredFromSnapshot(primaryResult.snapshot);
-    const classified = classifyPrimaryOutcome(primaryResult.error ?? "unknown", parsed);
+    const trusted = !primaryResult.ambiguous;
+    const classified = classifyPrimaryOutcome(primaryResult.error ?? "unknown", trusted ? parsed : null);
     const attempt = attemptFromSnapshot("primary", primaryResult.snapshot, classified, primaryResult.ambiguous);
     current = push(recordAttempt(current, attempt), event("info", `Primary attempt finished: ${classified}.`));
+    if (primaryResult.ambiguous && primaryResult.providerCallId) {
+      current = push(
+        current,
+        event(
+          "warn",
+          "Reconcile the retained provider call ID with CALL-E before placing any new call.",
+          reconciliationDetail(primaryResult.providerCallId),
+        ),
+      );
+    }
   } else {
     const attempt: CallAttemptRecord = {
       role: "primary",
-      callId: null,
+      callId: primaryResult.providerCallId,
       phoneMasked: current.primary.phoneMasked,
       status: "failed",
       outcome: primaryResult.error ?? "api_error",
@@ -263,6 +288,16 @@ export async function runDrill(drill: DrillRecord, options: OrchestratorOptions)
       completedAt: null,
     };
     current = push(recordAttempt(current, attempt), event("error", `Primary attempt failed: ${attempt.outcome}.`));
+    if (primaryResult.ambiguous && primaryResult.providerCallId) {
+      current = push(
+        current,
+        event(
+          "warn",
+          "Reconcile the retained provider call ID with CALL-E before placing any new call.",
+          reconciliationDetail(primaryResult.providerCallId),
+        ),
+      );
+    }
   }
 
   current = push(transitionToEvaluating(current, "primary"), event("info", "Evaluating primary result."));
@@ -286,13 +321,24 @@ export async function runDrill(drill: DrillRecord, options: OrchestratorOptions)
     }
     if (backupResult.snapshot) {
       const parsed = structuredFromSnapshot(backupResult.snapshot);
-      const outcome = outcomeFromSnapshot(backupResult.snapshot, parsed);
+      const trusted = !backupResult.ambiguous;
+      const outcome = outcomeFromSnapshot(backupResult.snapshot, trusted ? parsed : null, trusted);
       const attempt = attemptFromSnapshot("backup", backupResult.snapshot, outcome, backupResult.ambiguous);
       current = push(recordAttempt(current, attempt), event("info", `Backup attempt finished: ${outcome}.`));
+      if (backupResult.ambiguous && backupResult.providerCallId) {
+        current = push(
+          current,
+          event(
+            "warn",
+            "Reconcile the retained provider call ID with CALL-E before placing any new call.",
+            reconciliationDetail(backupResult.providerCallId),
+          ),
+        );
+      }
     } else {
       const attempt: CallAttemptRecord = {
         role: "backup",
-        callId: null,
+        callId: backupResult.providerCallId,
         phoneMasked: current.backup?.phoneMasked ?? "****",
         status: "failed",
         outcome: backupResult.error ?? "api_error",
@@ -304,6 +350,16 @@ export async function runDrill(drill: DrillRecord, options: OrchestratorOptions)
         completedAt: null,
       };
       current = push(recordAttempt(current, attempt), event("error", `Backup attempt failed: ${attempt.outcome}.`));
+      if (backupResult.ambiguous && backupResult.providerCallId) {
+        current = push(
+          current,
+          event(
+            "warn",
+            "Reconcile the retained provider call ID with CALL-E before placing any new call.",
+            reconciliationDetail(backupResult.providerCallId),
+          ),
+        );
+      }
     }
     current = push(transitionToEvaluating(current, "backup"), event("info", "Evaluating backup result."));
     nextStatus = nextStatusAfterBackupEvaluation(current, current.attempts.at(-1)?.outcome ?? "unknown");

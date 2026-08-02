@@ -49,11 +49,15 @@ test("max calls is 2 only when backup is consented", () => {
   assert.equal(without, 1);
 });
 
-test("backup escalation allowed for primary unavailable outcomes", () => {
+test("backup escalation allowed only for definitive unavailable outcomes", () => {
   const drill = baseDrill();
   assert.equal(canEscalateToBackup(drill, "no_answer"), true);
   assert.equal(canEscalateToBackup(drill, "opt_out"), true);
   assert.equal(canEscalateToBackup(drill, "success"), false);
+  assert.equal(canEscalateToBackup(drill, "unknown"), false);
+  assert.equal(canEscalateToBackup(drill, "timeout"), false);
+  assert.equal(canEscalateToBackup(drill, "malformed_result"), false);
+  assert.equal(canEscalateToBackup(drill, "api_error"), false);
 });
 
 test("classify primary success requires ownership and no opt-out", () => {
