@@ -61,4 +61,54 @@ describe('checkForErrors', () => {
     const response = { status: 500, content: '{}', request: { url: 'x' } };
     expect(() => checkForErrors(response)).toThrow(/500/);
   });
+
+  it('surfaces call_not_ready questions instead of a generic 422', () => {
+    const response = {
+      status: 422,
+      content: JSON.stringify({
+        error: {
+          code: 'call_not_ready',
+          message: 'Call task creation was rejected.',
+          details: { questions: ['Should this call be placed in Vietnamese?'], region: 'VN' },
+        },
+      }),
+      request: { url: 'x' },
+    };
+    expect(() => checkForErrors(response)).toThrow(/Vietnamese/);
+    expect(() => checkForErrors(response)).toThrow(/Region/);
+  });
+
+  it('handles call_not_ready with no questions array', () => {
+    const response = {
+      status: 422,
+      content: JSON.stringify({ error: { code: 'call_not_ready', message: 'Needs more detail.' } }),
+      request: { url: 'x' },
+    };
+    expect(() => checkForErrors(response)).toThrow(/Needs more detail/);
+  });
+
+  it('caps the questions text', () => {
+    const response = {
+      status: 422,
+      content: JSON.stringify({
+        error: { code: 'call_not_ready', details: { questions: ['q'.repeat(2000)] } },
+      }),
+      request: { url: 'x' },
+    };
+    let message = '';
+    try { checkForErrors(response); } catch (error) { message = error.message; }
+    expect(message.length).toBeLessThan(900);
+  });
+
+  it('masks a phone number appearing in a clarification question', () => {
+    const response = {
+      status: 422,
+      content: JSON.stringify({
+        error: { code: 'call_not_ready', details: { questions: ['Is +15550123456 correct?'] } },
+      }),
+      request: { url: 'x' },
+    };
+    expect(() => checkForErrors(response)).toThrow(/\+1\*+3456/);
+    expect(() => checkForErrors(response)).not.toThrow(/0123456/);
+  });
 });
