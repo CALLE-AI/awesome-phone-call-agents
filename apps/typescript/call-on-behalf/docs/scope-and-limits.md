@@ -92,11 +92,18 @@ it and says it did. A time no callee turn named is not read back as an offer, so
 next step says "another time" rather than a time nobody said. An agreement with no
 time at all cannot be checked against the windows, so it reads `unconfirmed` too.
 CALL-E's own note is printed with its name on it, because nothing here checked that
-sentence. The one claim left standing on the extraction alone is
-`declined_by_callee`, which says less than the extraction did rather than more. It
-is labelled in the notes as CALL-E's reading and it does not settle the errand: a
-booking that was refused is not a goal met, so the outcome is `partially_met` at
-best and the next step says plainly that nothing is booked.
+sentence. A reported refusal is held to the same standard as a reported agreement:
+`declined_by_callee` needs a turn that plainly refuses the errand, or the business
+refusing to deal with an automated caller at all. Without one the commitment reads
+`unconfirmed` and the next step says nothing is settled either way, because telling
+somebody their errand was turned down is a claim about their errand and not a
+formatting choice. With one, the note quotes the turn. Either way a refusal does not
+settle the errand: a booking that was refused is not a goal met, so the outcome is
+`partially_met` at best.
+
+The refusal patterns are narrow on purpose. Missing a real refusal costs a softer
+report that says the outcome is unknown. Inventing one costs the person a fact about
+their own errand, so the checks are built to be wrong in the first direction.
 
 When nothing supports the claim, the report says not answered or `unconfirmed` and
 notes that CALL-E claimed otherwise. It will sometimes be too strict, in two ways.

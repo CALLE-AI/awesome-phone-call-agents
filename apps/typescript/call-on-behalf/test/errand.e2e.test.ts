@@ -540,12 +540,47 @@ test("a refusal CALL-E reported does not make the errand done", async () => {
     ],
     async (port) => {
       const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
-      assert.equal(report.commitment, "declined_by_callee");
+      // Nobody refused anything in this transcript, they offered a slot. So the
+      // refusal is the extraction's claim alone and the report will not state it.
+      assert.equal(report.commitment, "unconfirmed");
       assert.equal(report.answers.every((answer) => answer.answered), true);
       assert.equal(report.outcome, "partially_met");
-      assert.match(report.next_step, /would not arrange it/);
+      assert.match(report.next_step, /nothing is settled either way/);
       assert.equal(report.next_step.includes("did not ask for anything to be agreed"), false);
-      assert.match(report.callee_notes, /CALL-E reported that they would not arrange it/);
+      assert.match(report.callee_notes, /no turn in the transcript refuses anything/);
+    },
+  );
+});
+
+test("a refusal the callee actually voiced is reported as a refusal", async () => {
+  // The other side of the same coin. When a turn plainly refuses, the report
+  // stands behind it, names the quote and stops calling the errand done.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "I am afraid we cannot book that over the phone for somebody else.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: {
+          ...goodResult(),
+          commitment_made: "declined_by_callee",
+          offered_datetime: "",
+          confirmation_code: "",
+        },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "declined_by_callee");
+      assert.match(report.next_step, /would not arrange it/);
+      assert.match(report.callee_notes, /the transcript agrees/);
+      assert.match(report.callee_notes, /cannot book that over the phone/);
     },
   );
 });

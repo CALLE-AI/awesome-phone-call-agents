@@ -37,6 +37,24 @@ const DECLINE_AUTOMATED_PATTERNS: RegExp[] = [
   /\bwe only (?:speak|deal) with the (?:patient|customer|account holder)\b/i,
 ];
 
+/**
+ * A refusal of the errand itself, as opposed to a refusal to deal with a robot.
+ * Deliberately narrow: the point is to find a turn that plainly will not do the
+ * thing, so an extraction that reports a refusal nobody voiced comes back
+ * unsupported. Missing a real refusal costs a softer report, inventing one costs
+ * the person a fact about their own errand.
+ */
+const REFUSAL_PATTERNS: RegExp[] = [
+  /\b(?:we|i)\s*(?:'?re| are| am)?\s*(?:not able|unable)\s+to\b/i,
+  /\b(?:we|i)\s*(?:can'?t|cannot|won'?t)\s+(?:do|book|make|arrange|schedule|take|fit|offer|help with|accommodate)\b/i,
+  /\b(?:we|i)\s+(?:do not|don'?t)\s+(?:do|book|offer|handle|arrange|take)\b/i,
+  /\bthat(?:'?s| is) not something we\b/i,
+  /\b(?:nothing|no (?:slots?|appointments?|openings?|availability|times?))\s+(?:is |are )?available\b/i,
+  /\bwe(?:'?re| are)\s+(?:fully )?booked\b/i,
+  /\bwe have (?:nothing|no availability)\b/i,
+  /\byou(?:'?ll| will) (?:have to|need to) (?:go|call|try) (?:somewhere else|elsewhere|another)\b/i,
+];
+
 export interface TranscriptReading {
   userTurnCount: number;
   machineAnswered: boolean;
@@ -46,6 +64,11 @@ export interface TranscriptReading {
   botText: string;
   /** The turn where the callee declined, for the report. */
   declineQuote: string;
+  /**
+   * The turn where the callee refused the errand itself, empty when no turn
+   * says so. A claimed refusal with nothing here is the extraction's alone.
+   */
+  refusalQuote: string;
 }
 
 export function readTranscript(turns: TranscriptTurn[]): TranscriptReading {
@@ -60,6 +83,9 @@ export function readTranscript(turns: TranscriptTurn[]): TranscriptReading {
   const declineTurn = userTurns.find((turn) =>
     DECLINE_AUTOMATED_PATTERNS.some((pattern) => pattern.test(turn.text)),
   );
+  const refusalTurn = userTurns.find((turn) =>
+    REFUSAL_PATTERNS.some((pattern) => pattern.test(turn.text)),
+  );
   return {
     userTurnCount: userTurns.length,
     machineAnswered,
@@ -67,6 +93,7 @@ export function readTranscript(turns: TranscriptTurn[]): TranscriptReading {
     reachedPerson: userTurns.length > 0 && !machineAnswered,
     botText,
     declineQuote: declineTurn?.text ?? "",
+    refusalQuote: refusalTurn?.text ?? "",
   };
 }
 

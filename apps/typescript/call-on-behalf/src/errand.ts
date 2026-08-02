@@ -109,6 +109,8 @@ function nextStep(
   request: ErrandRequest,
   offered: string,
   stillOpen = false,
+  /** Which claim the transcript failed to support, when commitment is unconfirmed. */
+  unsupported: "agreement" | "refusal" = "agreement",
 ): string {
   if (outcome === "outcome_unknown") {
     return stillOpen ? UNFINISHED_NEXT_STEP : UNREAD_NEXT_STEP;
@@ -126,6 +128,12 @@ function nextStep(
     return "The call did not connect to a person. Nothing was said on your behalf and nothing was arranged.";
   }
   if (commitment === "unconfirmed") {
+    if (unsupported === "refusal") {
+      // A claimed refusal nobody voiced. The report will not tell somebody their
+      // errand was turned down on the extraction's word alone, so it says the
+      // outcome is unknown rather than picking a side.
+      return "CALL-E reported that they would not arrange it and the transcript does not show anybody refusing, so nothing is settled either way. Read the transcript below, then call to check.";
+    }
     return "Something was reported as agreed and the transcript does not show anybody agreeing to it, so treat nothing as booked. Read the transcript below, then call to check if you need it.";
   }
   if (commitment === "outside_authorized_window") {
@@ -326,6 +334,8 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   let agreedIndex = -1;
   /** Why the report will not stand behind a claimed agreement, for the note. */
   let unconfirmedNote = "";
+  /** Which claim went unsupported, so the next step can say the right thing. */
+  let unsupportedClaim: "agreement" | "refusal" = "agreement";
   if (request.goal.commitment !== "none") {
     if (madeRaw === "accepted") {
       const agreement = agreementEvidence(turns, request.goal.commitment, offered);
@@ -356,7 +366,19 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     } else if (madeRaw === "other_time_offered") {
       commitment = "proposal_only";
     } else if (madeRaw === "declined_by_callee") {
-      commitment = "declined_by_callee";
+      // A refusal is a claim about the errand's outcome, so it is held to the
+      // same standard as an agreement: somebody has to have said it. Without a
+      // turn behind it the report will not state as fact that they would not
+      // arrange it, because the next step is an instruction and an instruction
+      // built on the extraction alone is the thing this app exists to avoid.
+      if (reading.refusalQuote.length > 0 || reading.declinedAutomated) {
+        commitment = "declined_by_callee";
+      } else {
+        commitment = "unconfirmed";
+        unsupportedClaim = "refusal";
+        unconfirmedNote =
+          "CALL-E reported that they would not arrange it and no turn in the transcript refuses anything, so this report does not treat the errand as turned down.";
+      }
     }
   }
 
@@ -434,10 +456,8 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     );
   }
   if (commitment === "declined_by_callee" && !reading.declinedAutomated) {
-    // The one claim the report still stands on the extraction alone, so it says
-    // whose claim it is rather than passing it off as a checked fact.
     notes.push(
-      "CALL-E reported that they would not arrange it. Nothing in the transcript was checked against that, so it is CALL-E's reading.",
+      `CALL-E reported that they would not arrange it and the transcript agrees. They said: "${reading.refusalQuote}"`,
     );
   }
   if (reading.declineQuote.length > 0) {
@@ -460,7 +480,14 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     callee_notes: notes.filter((note) => note.length > 0).join(" "),
     // A time only the extraction knows about is not read back to the person as if
     // they had been offered it.
-    next_step: nextStep(outcome, commitment, request, commitment === "proposal_only" && !offeredSaid ? "" : offeredSpoken),
+    next_step: nextStep(
+      outcome,
+      commitment,
+      request,
+      commitment === "proposal_only" && !offeredSaid ? "" : offeredSpoken,
+      false,
+      unsupportedClaim,
+    ),
     call_id: call.id,
     provider_call_id: attempt?.providerCallId ?? null,
     call_status: call.status,
