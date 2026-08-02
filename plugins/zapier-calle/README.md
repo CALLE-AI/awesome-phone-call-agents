@@ -268,7 +268,7 @@ runs correctly through the real platform once it receives a callback body -
 just not the live HTTP delivery leg in between.
 
 **Live verification:** performed 2026-08-02 against `https://api.heycall-e.com`
-with `zapier-platform-core` 19.1.0. Two real outbound calls were placed to a
+with `zapier-platform-core` 19.1.0. Three real outbound calls were placed to a
 phone number the tester owns. The number itself is not recorded here.
 
 Preflight, no calls consumed:
@@ -331,19 +331,51 @@ disposition the live callback path produced for the same calls, confirming
 that a reconciled call and a live call cannot disagree - they share one
 classifier. No raw phone digits appeared in either output.
 
+Call 3 - recipient declined, started without waiting:
+
+- `Start Call (No Wait)` returned immediately with a `call_id`,
+  `status: queued`, and `disposition: outcome_unknown` - correct, since this
+  action does not wait for the call to finish. The `Idempotency-Key` it sent
+  was a 64-character hex digest.
+- `Find Call Result` was then polled against that `call_id`. It reported
+  `outcome_unknown` while the call was non-terminal, and reached a terminal
+  state at about 55 seconds.
+- The recipient declined the call, and CALL-E reported the call task as
+  `status: completed`, not `failed`.
+- The integration classified this as `disposition: review_required`,
+  `is_actionable: false`, with the reason "Call completed but no structured
+  result was extracted."
+- The `correlation_id` supplied on the request round-tripped back through
+  CALL-E's `metadata` and was present on the reconciled result.
+- No raw phone digits appeared in the output.
+
+**Why this call matters:** a declined call was reported by the platform with
+`status: completed`. An integration that branches on `status === 'completed'`
+- the obvious and common thing to write - would have treated a call the
+recipient refused as a success and let a workflow act on it. This integration
+did not, because `completed` alone is not sufficient: it also requires
+`task_completed`, a high confidence label, and a structured result that
+validates.
+
 **What this demonstrates:** the success path, a real non-success path, the
-clarification path, and the reconciliation path have all now been exercised
-against production, and the integration produced the correct outcome for
-each. Of the two call records, Call 1 remains the more important: CALL-E
-returned a structured result, and the integration still refused to mark the
-call actionable because `task_completed` was false. The clarification path
-adds a third data point: CALL-E can reject a call before dialing rather than
-guessing, this integration surfaces that as a fail-closed clarification
-request rather than a generic failure, and no call is consumed doing so.
-The reconciliation path adds a fourth: looking a call up after the fact
-through `Find Call Result` produces the same disposition the live callback
-path already produced for that same call, and doing so consumes no
-additional call.
+clarification path, the reconciliation path, and a declined call started
+without waiting have all now been exercised against production, and the
+integration produced the correct outcome for each. Of the three call
+records, Call 3 is now the most important: the platform reported a declined
+call as `status: completed`, and the integration still refused to mark it
+actionable because `task_completed`, the confidence label, and the
+structured result did not clear the bar `confirmed` requires. Call 1 remains
+the next most important: CALL-E returned a structured result, and the
+integration still refused to mark the call actionable because
+`task_completed` was false. The clarification path adds a data point of its
+own: CALL-E can reject a call before dialing rather than guessing, this
+integration surfaces that as a fail-closed clarification request rather than
+a generic failure, and no call is consumed doing so. The reconciliation path
+shows that looking a call up after the fact through `Find Call Result`
+produces the same disposition the live callback path already produced for
+that same call, and doing so consumes no additional call. Between the four
+records, all three operations this integration exposes - both create
+actions and the search - have now been exercised against production.
 
 **Observed platform behavior worth knowing:**
 
