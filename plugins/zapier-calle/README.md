@@ -293,12 +293,32 @@ Call 2 - recipient answered:
   `is_actionable: true`. No raw digits appeared anywhere in the flattened
   output.
 
-**What this demonstrates:** both the success path and a real non-success
-path were exercised end to end against production, and the fail-closed
-classifier produced the correct verdict for each. Call 1 is the more
-important of the two: CALL-E returned a structured result, and the
-integration still refused to mark the call actionable because
-`task_completed` was false.
+**Clarification path - no call consumed.** A `POST /v1/calls` for a Vietnamese
+number submitted with `Region` set but `Locale` omitted returned HTTP 422
+with error code `call_not_ready`, carrying a `details.questions` array.
+CALL-E asks before dialing rather than guessing, and spends no call doing
+so. Running that real response through the integration's `checkForErrors`
+produced the user-facing message:
+
+> CALL-E needs more information before it will place this call
+> (clarification requested): For this Vietnam number, the supported call
+> language is Vietnamese. Should the call be placed in Vietnamese? Answer
+> the question directly in the Call Task text, and set the Region and
+> Locale input fields explicitly - this integration never infers them from
+> the phone number.
+
+Note that the API key was not present anywhere in that message, confirming
+the redaction path holds on a real error response.
+
+**What this demonstrates:** the success path, a real non-success path, and
+the clarification path have all now been exercised against production, and
+the integration produced the correct outcome for each. Of the two call
+records, Call 1 remains the more important: CALL-E returned a structured
+result, and the integration still refused to mark the call actionable
+because `task_completed` was false. The clarification path adds a third
+data point: CALL-E can reject a call before dialing rather than guessing,
+this integration surfaces that as a fail-closed clarification request
+rather than a generic failure, and no call is consumed doing so.
 
 **Observed platform behavior worth knowing:**
 
