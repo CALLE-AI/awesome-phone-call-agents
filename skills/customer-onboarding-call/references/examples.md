@@ -86,11 +86,16 @@ Expected report:
 ```text
 outcome: not-reached
 phone: +1******1234
+reachability: no-human — carrier message, no customer speech
 structured result: none
 follow-up: none
 suppression: none
 retry: attempt 2 of 3 scheduled after 30 minutes, within recipient working hours
 ```
+
+What qualifies this as `not-reached` is the **carrier message**, not the missing result. The
+transcript contains no customer speech, which is positive evidence nobody took part. Retrying is
+safe here precisely because that evidence exists.
 
 This must not be reported as an onboarding. A signup that displays as onboarded but was never
 reached is worse than a visible failure, because nobody follows up.
@@ -121,6 +126,56 @@ retry: attempt 2 of 3 scheduled after 30 minutes
 checks consent before establishing that a human took part would classify a routine voicemail as
 `declined` and permanently suppress the number. Every customer who simply missed the call would be
 silently lost. Stage A resolves `NotReached` before consent is ever read.
+
+## Refusal with no structured result — still a refusal
+
+The customer refused and rang off. The provider returned **no structured result at all**, because
+the call ended before extraction ran.
+
+Transcript:
+
+```text
+0s  agent     Hi Ada, this is Example Supply. Is now a good time for a quick welcome call?
+3s  customer  No. Take me off your list.
+5s  (call ends)
+```
+
+Expected report:
+
+```text
+outcome: declined
+phone: +1******1234
+structured result: none
+evidence: transcript — "take me off your list"
+crm write: refusal and evidence only
+follow-up: none
+retry: none, pending retries cancelled, all outbound calling suppressed for this number
+```
+
+**This is the case that classifying on "is there a result" gets wrong.** A rule reading *no result
+means nobody was reached* would mark this `not-reached` and schedule an automatic retry — redialling
+someone who explicitly asked to be left alone, moments after they asked. Reachability comes from the
+transcript, and refusal evidence outranks the missing result.
+
+## Reached, but extraction produced nothing
+
+A full conversation took place; the provider's extraction failed and returned no result. Nothing in
+the transcript indicates a refusal.
+
+```text
+outcome: needs-review
+phone: +1******1234
+reachability: human — customer speech present in transcript
+structured result: none (extraction failed)
+crm write: raw record and transcript only
+follow-up: none
+retry: none, manual review required
+```
+
+The call is not retried. A human decides whether to re-extract from the transcript or to call again.
+Automatically redialling someone who already gave a full interview — because a downstream extraction
+step failed — wastes their time and risks contacting a customer who declined in words the classifier
+never saw.
 
 ## Malformed result — review, never redial
 

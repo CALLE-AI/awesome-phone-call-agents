@@ -151,8 +151,13 @@ Prefer closed enums over free text for anything you will filter, count, or route
 - Read the per-recipient structured result first, then fall back to the call-level one.
 - **Classify before you write.** Run Stage A, then Stage B, using the tables in `SKILL.md`, then
   write only what that outcome permits.
-- An empty or absent structured result means the customer was not reached. Do not coerce it into an
-  empty insight row, and do not let it count as an onboarding.
+- **An empty or absent structured result does not mean the customer was not reached.** Extraction
+  can fail, validation can reject the result, and a customer who refuses may ring off before the
+  model emits anything. Decide reachability from call evidence — a provider answered-by-human
+  signal, or customer speech in the transcript that is not carrier audio — and send a reached call
+  with no usable result to `needs-review`. Treating it as `not-reached` queues an automatic retry
+  and can redial someone who just refused.
+- Never coerce a missing result into an empty insight row, and never let one count as an onboarding.
 - **A result missing or malforming `disposition`, `consent_granted`, or `disposition_evidence` is
   `needs-review`, not `not-reached`.** `not-reached` queues an automatic retry, so coercing a
   malformed record into it can redial someone who actually refused. Route it to a human instead.

@@ -127,15 +127,21 @@ says what it permits.
         |                       |  (late result re-enters)      |
         v                       |                               |
   == STAGE A: was a human reached? ==                           |
+  reachability from CALL EVIDENCE, not from "is there a result" |
         |                                                       |
-   no human --> ( not-reached ) ( failed ) --- retry allowed ----+
+        +-- refusal evidence present? --> ( declined )          |
+        |                                                       |
+   no-human (positive evidence:                                 |
+   voicemail / carrier msg / no answer / silence)               |
+        +--> ( not-reached ) ( failed ) --- retry allowed -------+
         |
-       yes
+   human  OR  indeterminate
         v
   == STAGE B: consent governs ==
         |
         +--> ( declined )     terminal. suppress per scope. no follow-up, no retry, ever.
-        +--> ( needs-review ) terminal until a human decides. no automatic retry.
+        +--> ( needs-review ) no result at all, unusable consent fields, or indeterminate
+        |                     reachability. terminal until a human decides. NO auto retry.
         +--> ( partial )      write captured fields only. retry ONLY with callback consent
         |                     or human authorisation, and only under the cap.
         +--> ( onboarded )    write insight. follow-up only if requested.
@@ -143,9 +149,12 @@ says what it permits.
 
 Invariants the diagram encodes:
 
-- **Nothing reaches Stage B without a human.** Consent is never read before that.
+- **Nothing reaches Stage B without a human, and nothing lands in Stage A without positive evidence
+  there was none.** A missing structured result proves neither.
+- **Refusal evidence dominates.** It routes to `declined` from anywhere, with or without a result.
 - **Only Stage B can suppress a number**, and only via `declined`.
-- **Only Stage A outcomes retry automatically.** Every Stage B redial needs consent or a human.
+- **Only Stage A outcomes retry automatically.** Every Stage B redial needs consent or a human, and
+  anything uncertain lands in `needs-review`, which never retries.
 - **No state is permanent-by-accident.** A live attempt is leased, and `ambiguous` is provisional —
   a late result re-enters classification from the top.
 - **The cap bounds every path**, including callback-consented redials.
@@ -170,23 +179,45 @@ before establishing that a human was reached turns every no-answer into a refusa
 
 ### Stage A — was a human reached?
 
+**Reachability is decided on call evidence, never on whether a structured result exists.** A real
+conversation can return no result at all: extraction failed, the result failed validation, or the
+customer refused and rang off before the model emitted anything. Inferring "nobody answered" from a
+missing result would auto-retry those calls and redial a person who may have just refused.
+
+First establish reachability independently of the result:
+
+| Reachability | Evidence |
+| --- | --- |
+| `human` | the provider reports a human answered, **or** the transcript contains customer speech that is not carrier or IVR audio |
+| `no-human` | positive evidence nobody took part: voicemail greeting, carrier or network message, ring-out, no answer, silence throughout |
+| `indeterminate` | none of the above can be established |
+
+Then classify:
+
 | # | Outcome | Condition | Action |
 | --- | --- | --- | --- |
-| A1 | `not-reached` | no structured result, **or** `disposition` is `NotReached` | write no insight; queue a retry; **never** suppress the number |
+| A1 | `not-reached` | reachability is `no-human` — positive evidence — **or** `disposition` is `NotReached` and nothing contradicts it | write no insight; queue a retry; **never** suppress the number |
 | A2 | `ambiguous` | provider reported failure and reconciliation has not completed | write nothing; schedule reconciliation, not a retry |
 | A3 | `failed` | provider reported failure **and** reconciliation confirms no call occurred | write no insight; queue a retry; **never** suppress the number |
 
-Stage A never suppresses a number and never records a refusal. A customer who did not answer has
-not refused anything.
+**`not-reached` requires positive evidence that nobody took part. Absence of a result is not that
+evidence.** Where reachability is `human` or `indeterminate`, continue to Stage B — a missing or
+unusable result there resolves to `needs-review` (B2), which never retries automatically.
 
-If none of A1–A3 match, a human took part. Continue to Stage B.
+**Refusal evidence outranks everything in this stage.** If the transcript or provider summary shows
+the customer refusing or asking not to be called — even with no structured result, and even where
+the provider labelled the call `NotReached` — classify as `declined` (B1) and apply the suppression
+scope. A refusal that lost its structured result is still a refusal.
+
+Stage A never suppresses a number and never records a refusal of its own accord. A customer who did
+not answer has not refused anything.
 
 ### Stage B — a human took part, so consent governs
 
 | # | Outcome | Condition | Action |
 | --- | --- | --- | --- |
 | B1 | `declined` | `disposition` is `Declined` or `DoNotCall`, **or** `consent_granted` is false | record the refusal and its evidence; write no onboarding insight; queue **no** follow-up; cancel any pending retry; apply the suppression scope below |
-| B2 | `needs-review` | required consent or disposition fields are missing, malformed, or contradict the transcript | write nothing beyond the raw record; **no automatic retry**; route to a human |
+| B2 | `needs-review` | no structured result at all, **or** required consent or disposition fields are missing, malformed, or contradicting the transcript, **or** reachability was `indeterminate` | write nothing beyond the raw record; **no automatic retry**; route to a human |
 | B3 | `partial` | `disposition` is `EndedEarly` | write only the fields actually captured and mark the record partial; queue **no** follow-up unless the customer explicitly asked and evidence supports it; retry only under the callback-consent rule below |
 | B4 | `onboarded` | `disposition` is `Completed` **and** `consent_granted` is true **and** a structured result is present | write insight; queue a follow-up only when requested |
 

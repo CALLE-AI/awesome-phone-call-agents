@@ -105,8 +105,11 @@ acknowledge it and route to a human. Never advise.
 
 ## Honest reporting
 
-- Report `not-reached` when no structured result exists, even though the call reached a terminal
-  state. Do not let an unanswered call appear as an onboarding.
+- Report `not-reached` only with positive evidence that nobody took part — voicemail, a carrier
+  message, no answer, silence. Do not let an unanswered call appear as an onboarding, and do not
+  let a missing structured result stand in for evidence of no answer: a reached call whose result
+  is absent or unusable is `needs-review`, because `not-reached` retries and could redial someone
+  who refused.
 - Do not report a customer as onboarded, interested, or requesting follow-up without a structured
   result to support it.
 - Surface extraction the agent inferred rather than heard, so a human can check it.
