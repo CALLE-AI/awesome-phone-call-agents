@@ -254,7 +254,7 @@ function getBody(documentJson) {
 
 // --- Row content builders ---------------------------------------------------
 
-function buildRemarksParagraphs(intake) {
+function buildRemarksParagraphs(intake, { autoMatched = false } = {}) {
   const lines = [];
   if (intake.barrier_description) lines.push(intake.barrier_description);
   lines.push(`Remediation Priority: ${severityToPriority(intake.severity)} (severity: ${intake.severity})`);
@@ -269,6 +269,13 @@ function buildRemarksParagraphs(intake) {
     } else {
       lines.push("Follow-up Contact: Contact unconfirmed, verify manually.");
     }
+  }
+  if (autoMatched) {
+    // The row was selected by matching barrier_category to a WCAG *principle*
+    // (Perceivable/Operable/Understandable/Robust), not the specific success
+    // criterion -- this must never be mistaken for a final, human-reviewed
+    // placement in an audit deliverable.
+    lines.push("AUTO-MATCHED AT PRINCIPLE LEVEL, HUMAN REVIEW REQUIRED BEFORE AUDIT USE");
   }
   return lines;
 }
@@ -285,7 +292,7 @@ function applyMappedRow(table, intake) {
     if (getCriterionCategory(criteriaText) !== intake.barrier_category) continue;
     if (!isUnfilledConformancePlaceholder(cells[1])) continue;
     setCellText(cells[1], [severityToConformanceLevel(intake.severity)]);
-    setCellText(cells[2], buildRemarksParagraphs(intake));
+    setCellText(cells[2], buildRemarksParagraphs(intake, { autoMatched: true }));
     return { rowIndex: i, criteria: criteriaText };
   }
   return null;
