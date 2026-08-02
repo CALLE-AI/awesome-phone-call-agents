@@ -20,7 +20,7 @@ callproof/
 ├── rails/          # Rails product and AgentKit control plane
 ├── call_analyzer/  # FastAPI evaluation service with inline or RQ execution
 ├── contracts/      # Versioned JSON Schemas shared across both runtimes
-└── compose.yaml    # Redis, analyzer API, and analyzer worker
+└── compose.yaml    # Rails, PostgreSQL/pgvector, Redis, analyzer API, and worker
 ```
 
 This package is generated from the primary CallProof monorepo. Runtime files in
@@ -65,7 +65,10 @@ pip install -e '.[dev]'
 pytest -q
 ```
 
-`docker compose up --build` starts Redis, the analyzer API, and its RQ worker.
+`docker compose up --build` starts the complete safe stack: Rails at
+`http://localhost:3000`, PostgreSQL with pgvector, Redis, the analyzer API at
+`http://localhost:8001`, and its RQ worker. CALL-E and external webhook delivery
+remain disabled by default.
 Webhook delivery remains disabled unless explicitly enabled. Rails can run on
 the host and use the deterministic adapter while the service is inspected.
 
@@ -152,4 +155,3 @@ The analyzer currently uses SQLite for the local RQ stack; use PostgreSQL before
 deploying API and workers across multiple hosts. The accessible public CALL-E
 reference did not provide enough webhook-signature detail to implement a verifier
 without guessing, so terminal recovery uses the documented GET endpoint.
-

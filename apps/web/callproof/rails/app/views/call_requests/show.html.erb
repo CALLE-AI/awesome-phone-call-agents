@@ -34,7 +34,7 @@
     </article>
   </section>
 
-  <% if @analysis %>
+  <% if @analysis&.completed? %>
     <section class="panel verdict <%= @analysis.needs_human_review? ? "danger" : "success" %>">
       <div>
         <p class="step-label">03 · Call Analyzer verdict</p>
@@ -56,6 +56,18 @@
           <span>Transcript turns <%= evidence.transcript_turn_ids.join(", ") %></span>
         </div>
       <% end %>
+    </section>
+  <% elsif @analysis %>
+    <section class="panel compact">
+      <p class="step-label">03 · Call Analyzer</p>
+      <h2>Analysis pending</h2>
+      <p>The transcript was accepted and is being evaluated. This page will show the verdict and evidence after the signed callback arrives.</p>
+      <dl>
+        <dt>Status</dt><dd><%= @analysis.status.humanize %></dd>
+        <% if @analysis.external_analysis_id.present? %>
+          <dt>Analysis ID</dt><dd class="mono"><%= @analysis.external_analysis_id %></dd>
+        <% end %>
+      </dl>
     </section>
   <% end %>
 
