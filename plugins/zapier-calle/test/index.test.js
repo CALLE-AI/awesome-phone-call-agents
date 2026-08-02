@@ -44,4 +44,16 @@ describe('app definition', () => {
       expect(action.display.description.length).toBeGreaterThan(20);
     }
   });
+
+  it('declares a version matching package.json', async () => {
+    const { readFileSync } = await import('node:fs');
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(App.version).toBe(pkg.version);
+  });
+
+  it('is declared as an ES module so the runtime format is unambiguous', async () => {
+    const { readFileSync } = await import('node:fs');
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(pkg.type).toBe('module');
+  });
 });
