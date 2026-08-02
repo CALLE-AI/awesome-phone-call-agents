@@ -63,6 +63,12 @@ All input fields for the two create actions:
 | `phone` (Recipient Phone Number) | Yes | Must be E.164, for example `+15550123456`. |
 | `region` (Region) | No | Optional ISO country code. Never inferred from the number. |
 | `locale` (Locale) | No | Optional locale such as `en-US`. Never inferred from the number. |
+
+**Region and language:** CALL-E may reject a call task with HTTP 422
+`call_not_ready` and a clarifying question when the destination region
+implies a language requirement (observed live for a Vietnamese number).
+Setting `Region` and `Locale` explicitly avoids this. The integration never
+infers either from the phone number.
 | `result_schema` (Result Schema (JSON)) | No | JSON Schema for the structured result. See the allowlist in [Result schema support](#result-schema-support). |
 | `correlation_id` (Correlation ID) | No | Your own record id, echoed back on the result as `correlation_id`. |
 | `dry_run` (Dry Run) | No | Defaults to `false`. See [Dry run](#8-dry-run). |
@@ -219,7 +225,26 @@ callback URL and sends it to CALL-E as `webhook_url`, and that `performResume`
 runs correctly through the real platform once it receives a callback body -
 just not the live HTTP delivery leg in between.
 
-**Live verification:** not yet performed. Live verification against the real
-CALL-E API requires a real API key and a phone number you are authorized to
-call, and is opt-in - it is not part of the automated test suite and no
-result has been recorded here yet.
+**Live verification:** performed 2026-08-02 against the production CALL-E API
+with `zapier-platform-core` 19.1.0.
+
+- Authentication verified against the production API: `GET /v1/goals`
+  returned HTTP 200. This probe places no call.
+- Dry-run verified with real credentials against the production base URL:
+  zero network requests, zero callback URLs generated, and the phone number
+  masked in the preview with no raw digits present.
+- E.164 validation and masking confirmed against a real number the tester
+  owns. The number itself is not recorded.
+- Call creation verified: `POST /v1/calls` returned HTTP 201 and the
+  recipient handset rang.
+- **Known limitation observed:** the call task remained at status `queued`
+  for a 300-second polling window, through ringing and answering, and did
+  not transition to `in_progress` or reach a terminal status within that
+  window. Consequently no terminal disposition was recorded from a live
+  call.
+- **What this demonstrated:** with a real call in a genuinely ambiguous
+  state, the integration returned `disposition: outcome_unknown`,
+  `is_actionable: false`, reason "Call is still queued; no terminal outcome
+  yet." It reported neither success nor failure, which is the fail-closed
+  behavior the design intends and the behavior that prevents a workflow from
+  redialing a person who may already have been reached.
