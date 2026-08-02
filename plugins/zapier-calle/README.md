@@ -50,13 +50,24 @@ Two ways to wire it into a Zap:
   reconcile the outcome. Use this when the call and the reconciliation logic
   belong in different Zaps, or when a single long-waiting step is not a good
   fit for the rest of the workflow.
+- **Trigger-driven shape.** Use the `Call Completed` trigger to start a Zap
+  from any CALL-E call reaching a terminal state, including calls placed
+  outside Zapier entirely - from CALL-E's CLI, its MCP tools, or another
+  client. This is the only shape that reacts to those calls; the two shapes
+  above only see calls that a Zap itself placed. See
+  [Call Completed trigger](#call-completed-trigger) below.
 
 ## 2. Why the callback pattern
 
-The CALL-E Developer API has no endpoint that lists calls, so a polling
-trigger is not possible - there is nothing for Zapier to poll. Zapier create
-actions must also return in roughly 30 seconds, which is far shorter than a
-phone call takes to resolve.
+The CALL-E Developer API has no endpoint that lists calls, so a *polling*
+trigger is not possible - there is nothing for Zapier to poll. That is why
+`Place Call and Wait for Outcome` and `Start Call (No Wait)` use the
+callback pattern described below instead of a trigger. A *push-based*
+(webhook) trigger has no such limitation, since CALL-E delivers the event
+directly rather than being polled for it - see
+[Call Completed trigger](#call-completed-trigger). Zapier create actions
+must also return in roughly 30 seconds, which is far shorter than a phone
+call takes to resolve.
 
 `Place Call and Wait for Outcome` works around both limits with the Zapier
 Platform CLI's callback pattern: `perform` calls `z.generateCallbackUrl()` to
@@ -71,13 +82,14 @@ feature - they are not available to integrations built with the legacy
 Zapier web app editor, which is why this integration ships as a CLI app
 rather than a set of visual-builder actions.
 
-## 3. Actions and search
+## 3. Actions, search, and trigger
 
 | Name | Type | Key inputs |
 | --- | --- | --- |
 | `Place Call and Wait for Outcome` | Create | Call Task, Recipient Phone Number, Region (optional), Locale (optional), Recipient Timezone (optional, see [Calling windows](#calling-windows)), Result Schema (optional), Correlation ID (optional), Dry Run |
 | `Start Call (No Wait)` | Create | Same inputs as above |
 | `Find Call Result` | Search | Call ID |
+| `Call Completed` | Trigger (static webhook) | None - a URL you paste into CALL-E, see [Call Completed trigger](#call-completed-trigger) |
 
 All input fields for the two create actions:
 
@@ -116,6 +128,40 @@ no call took place - the same failure mode the rest of this integration is
 built to prevent. An error is louder and safer than a false negative.
 Supply a Call ID captured from `Start Call (No Wait)` or from a
 `Place Call and Wait for Outcome` step, rather than a hand-typed value.
+
+### Call Completed trigger
+
+`Call Completed` fires when any CALL-E call in your project reaches a
+terminal state - `call.completed`, `call.failed`, or
+`call.result_validation_failed` - and returns the same flattened output
+shape as the two create actions and the search, run through the same
+disposition classifier. Unlike every other entry point in this
+integration, it catches calls started **anywhere**, not just calls a Zap
+itself placed: a call started from CALL-E's CLI, one of CALL-E's MCP
+tools, or any other client all reach this trigger the same way a
+Zap-placed call does.
+
+CALL-E has no webhook subscription API for Zapier to call on your behalf,
+so `Call Completed` is a **static webhook trigger**: after you add it to a
+Zap, Zapier shows you a URL instead of registering one automatically.
+Setup is manual, one time, per CALL-E project:
+
+1. Copy the webhook URL Zapier shows for this trigger.
+2. In CALL-E, open your project's webhook settings.
+3. Paste the URL into the project's webhook URL field and save.
+
+From then on, every terminal call event in that CALL-E project is
+delivered to this Zap - the trigger does not filter by `disposition`, so
+branch on that field inside your Zap rather than assuming every event
+means success.
+
+**The webhook endpoint is unauthenticated.** CALL-E signs nothing and
+Zapier verifies nothing about who posts to a static webhook URL, so a
+`disposition` of `confirmed` is the only field this trigger fail-closes
+on - never treat `correlation_id` as proof that an event came from a real
+CALL-E call, since it is an echoed value a forged request could set to
+anything. Static webhook triggers like this one are only permitted on
+private Zapier integrations, which this one is.
 
 ### Result schema support
 
@@ -166,7 +212,8 @@ apply to their calls and configuring the fields accordingly.
 
 ## 4. Outputs
 
-Every action returns this shape. `structured_result` fields are also
+Every action, the search, and the `Call Completed` trigger return this
+shape. `structured_result` fields are also
 flattened onto the top level with a `result_` prefix (for example, a
 structured result field named `acknowledged` also appears as
 `result_acknowledged`) so they can be mapped individually into later Zap
@@ -292,7 +339,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 135 tests across 14 files against a bundled
+`npm install && npm test` runs 146 tests across 15 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/e2e-app.test.js` additionally drives the real app definition
 (`index.js`) through `zapier-platform-core`'s `createAppTester`, exercising

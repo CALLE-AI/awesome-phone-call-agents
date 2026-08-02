@@ -16,6 +16,10 @@
     {
       "name": "Find Call Result",
       "path": "searches/find-call-result.js"
+    },
+    {
+      "name": "Call Completed",
+      "path": "triggers/call-completed.js"
     }
   ],
   "side_effects": [
@@ -30,7 +34,8 @@
     "Rejects a resumed callback whose call id does not match the call the step started.",
     "Refuses to dial outside a configured calling window: when Recipient Timezone (IANA) is set, both create actions check the recipient's local hour (and optionally block Sunday) before any request is sent to CALL-E, and Place Call and Wait for Outcome never generates a Zapier callback URL for a call it refused. The timezone is never inferred from the phone number, region, or locale, and a raw UTC offset is rejected rather than accepted, per this repository's design-principles.md.",
     "Masks phone numbers in previews, outputs, and error messages.",
-    "Does not create recurring schedules; Zapier owns scheduling."
+    "Does not create recurring schedules; Zapier owns scheduling.",
+    "The Call Completed trigger is an unauthenticated static webhook: CALL-E has no webhook subscription API to verify a delivery against, so a forged POST to a discovered URL is indistinguishable from a real CALL-E event at the transport layer. It fails closed on malformed payloads (returns no result rather than throwing) and reuses the same disposition classifier as the create actions and search, but does not authenticate the caller; downstream Zaps should branch on disposition and must not treat correlation_id as proof of origin."
   ],
   "credentials": [
     "CALL-E API key stored in the Zapier connection as a password-typed field."

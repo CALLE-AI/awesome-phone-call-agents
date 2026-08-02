@@ -7,8 +7,18 @@ describe('app definition', () => {
     expect(Object.keys(App.searches)).toEqual(['find_call_result']);
   });
 
-  it('declares no triggers, because the API has no list endpoint to poll', () => {
-    expect(App.triggers).toEqual({});
+  it('declares exactly the call_completed trigger, because the API has no list endpoint to poll', () => {
+    expect(Object.keys(App.triggers)).toEqual(['call_completed']);
+  });
+
+  it('registers call_completed as a hook trigger', () => {
+    expect(App.triggers.call_completed.operation.type).toBe('hook');
+  });
+
+  it('omits performSubscribe/performUnsubscribe on call_completed so Zapier renders a static webhook', () => {
+    const operation = App.triggers.call_completed.operation;
+    expect(operation.performSubscribe).toBeUndefined();
+    expect(operation.performUnsubscribe).toBeUndefined();
   });
 
   it('wires the bearer middleware and error handler', () => {
