@@ -134,9 +134,60 @@ test("a status CALL-E has not finished with never decides anything", () => {
 
 test("only the three terminal statuses are read as a finished call", () => {
   assert.equal(outcomeFrom(inputs({ call_status: "completed" }), POLICY).outcome, "no_such_contact");
-  assert.equal(outcomeFrom(inputs({ call_status: "failed" }), POLICY).outcome, "unreachable");
-  assert.equal(outcomeFrom(inputs({ call_status: "canceled" }), POLICY).outcome, "unreachable");
   assert.equal(outcomeFrom(inputs({ call_status: "COMPLETED" }), POLICY).outcome, "no_such_contact");
+  // With nothing in the transcript to stand on, how the call ended is all there is to
+  // report. What a failed call that does hold an answer reports is the next test.
+  assert.equal(outcomeFrom(inputs({ call_status: "failed", signal: "unclear" }), POLICY).outcome, "unreachable");
+  assert.equal(outcomeFrom(inputs({ call_status: "canceled", signal: "unclear" }), POLICY).outcome, "unreachable");
+});
+
+test("a denial the call already carried is not thrown away by the status it ended on", () => {
+  // A provider status says how the call ended. It is not a statement about what the
+  // transcript holds. A line that drops after the person answers, an operator who hangs
+  // up or a carrier error that lands late all end on failed or canceled with the answer
+  // already in the call. Reporting unreachable there tells the customer nothing was
+  // verified while the transcript shows their bank denying the contact.
+  //
+  // The old assertion in the test above said failed plus a denial is unreachable. That
+  // pinned this hole, so it is gone and the case below replaces it.
+  for (const status of ["failed", "canceled"]) {
+    assert.equal(outcomeFrom(inputs({ call_status: status, signal: "denied" }), POLICY).outcome, "no_such_contact", status);
+    assert.equal(outcomeFrom(inputs({ call_status: status, signal: "denied" }), POLICY).reason, null, status);
+    assert.equal(
+      outcomeFrom(inputs({ call_status: status, signal: "refused" }), POLICY).outcome,
+      "refused_to_confirm",
+      status,
+    );
+  }
+  // The asymmetry, which is the point. A confirmation is the one answer that could leave
+  // somebody trusting a message they should not, so it still needs a clean finish.
+  const confirmed = outcomeFrom(inputs({ call_status: "failed", signal: "confirmed" }), POLICY);
+  assert.equal(confirmed.outcome, "unreachable");
+  assert.equal(confirmed.reason, "call_failed");
+  // A failure code still names how the call ended when nothing can stand on its own.
+  assert.equal(
+    outcomeFrom(inputs({ call_status: "failed", failure_code: "no_answer", signal: "unclear" }), POLICY).reason,
+    "no_answer",
+  );
+});
+
+test("an answer read off a failed call still faces every other check", () => {
+  // Falling through is what puts these in one place, so none of them are relaxed for a
+  // call that ended badly. A stale replay is the one this matters most for: without the
+  // window an old denial could answer a fresh run.
+  const base = { call_status: "failed", signal: "denied" as const };
+  assert.equal(
+    outcomeFrom(inputs({ ...base, completion_time_usable: false, answered_in_window: false }), POLICY).reason,
+    "completion_time_unknown",
+  );
+  assert.equal(outcomeFrom(inputs({ ...base, answered_in_window: false }), POLICY).reason, "answered_outside_window");
+  assert.equal(outcomeFrom(inputs({ ...base, transcript_available: false }), POLICY).reason, "call_not_read");
+  assert.equal(outcomeFrom(inputs({ ...base, question_asked: false }), POLICY).reason, "ended_before_question");
+  assert.equal(outcomeFrom(inputs({ ...base, structured_signal: "confirmed" }), POLICY).reason, "corroboration_disagrees");
+  assert.equal(
+    outcomeFrom(inputs({ ...base, confidence: { score: 0.1, label: "low" } }), POLICY).reason,
+    "low_confidence",
+  );
 });
 
 test("a completed call with no transcript at all is unreadable, not an empty line", () => {

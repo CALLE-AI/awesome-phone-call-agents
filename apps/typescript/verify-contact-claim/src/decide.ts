@@ -7,11 +7,14 @@
  * when its hash chain is intact.
  *
  * Everything about it fails closed. A verdict comes only from a terminal call
- * status. An answer comes only from a callee turn that supports it, after our
- * question was asked. CALL-E's own reading corroborates that turn and never
- * replaces it, so the two disagreeing is not an answer. Two more cases are not
- * answers either: a call whose completion time cannot be read at all, then a call
- * whose answer landed outside the window this run opened.
+ * status. A confirmation comes only from a call CALL-E finished cleanly, while a denial
+ * or a refusal the call already carried is read whatever status it ended on, because
+ * neither of those can leave somebody trusting a message they should not. An answer
+ * comes only from a callee turn that supports it, after our question was asked. CALL-E's
+ * own reading corroborates that turn and never replaces it, so the two disagreeing is
+ * not an answer. Two more cases are not answers either: a call whose completion time
+ * cannot be read at all, then a call whose answer landed outside the window this run
+ * opened.
  *
  * `refused_to_confirm` is not a failure. An institution that will not discuss a
  * third party's account is complying with the rules it is under, so the app records
@@ -55,6 +58,30 @@ export function readStructuredSignal(value: unknown): ContactSignal | null {
   return value === "unclear" ? "unclear" : null;
 }
 
+/**
+ * Answers that can only withhold reassurance, never grant it.
+ *
+ * A provider status says how the call ended. It is not a statement about what the
+ * transcript holds, so it must not be read as one. A call CALL-E ended on `failed` or
+ * `canceled` can still carry the question and an answer to it: the line drops after the
+ * person speaks, the operator hangs up, a carrier error lands late. Discarding that and
+ * reporting `unreachable` tells the customer nothing was verified while the transcript
+ * shows somebody denying the contact, which is the strongest result this app produces.
+ *
+ * So a denial or a refusal is read wherever the call ended up. A confirmation is not.
+ * That is the one answer which could leave somebody trusting a message they should not,
+ * so it still needs a call CALL-E finished cleanly. `phone-approval-gate` draws the same
+ * asymmetry in `attemptOutcome` (`src/decide.ts:110`): a rejection is read before the
+ * call status is looked at at all, because a rejection can only stop an approval.
+ *
+ * Nothing else is relaxed. An answer that stands here falls through to the checks below,
+ * so the provider's completion time, this run's window, the supporting turn, the
+ * confidence floor and the corroboration check all still decide it in one place.
+ */
+function withholdsAnswer(signal: ContactSignal): boolean {
+  return signal === "denied" || signal === "refused";
+}
+
 export function outcomeFrom(inputs: OutcomeInputs, policy: { minConfidence: number }): { outcome: Outcome; reason: Reason | null } {
   if (inputs.call_status === "api_error") {
     // CALL-E refused the create, so no call was placed and nothing was asked.
@@ -69,10 +96,10 @@ export function outcomeFrom(inputs: OutcomeInputs, policy: { minConfidence: numb
     // Still queued or in progress, so the transcript is still being written.
     return { outcome: "outcome_unknown", reason: "call_not_finished" };
   }
-  if (inputs.call_status.trim().toLowerCase() !== "completed") {
-    // The call is over and nobody answered the question. The status and the
-    // failure code are read the same way, because a provider can put the same
-    // fact in either.
+  if (inputs.call_status.trim().toLowerCase() !== "completed" && !withholdsAnswer(inputs.signal)) {
+    // The call is over and it holds no answer that can stand on its own, so how it
+    // ended is all there is to report. The status and the failure code are read the
+    // same way, because a provider can put the same fact in either.
     if (hints(inputs.failure_code, MACHINE_HINTS) || hints(inputs.call_status, MACHINE_HINTS)) {
       return { outcome: "unreachable", reason: "machine_answered" };
     }

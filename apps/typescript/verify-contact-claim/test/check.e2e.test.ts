@@ -216,6 +216,49 @@ test("the number that made contact is never dialled, even by a claim built by ha
   }
 });
 
+test("a call that ended badly after the answer still reports the answer", async () => {
+  // The line drops after the person has already said it. CALL-E ends the call on failed
+  // with the question and the denial in the transcript. Reporting unreachable there would
+  // tell the customer nothing was verified while their bank had denied the contact.
+  const path = recordPath();
+  const run = await check(
+    [
+      {
+        status: "failed",
+        failureCode: "carrier_error",
+        calleeLines: [PICK_UP, "No, there is nothing on her file from us today."],
+        structuredResult: { contact_confirmed: "no", callee_quote: "Nothing on file.", notes: "" },
+      },
+    ],
+    { recordPath: path },
+  );
+  assert.equal(run.result.outcome, "no_such_contact");
+  assert.equal(run.result.reason, null);
+  assert.equal(run.result.callee_quote, "No, there is nothing on her file from us today.");
+  // How the call ended is still on the record rather than smoothed over.
+  assert.equal(run.result.evidence.call_status, "failed");
+  assert.equal(run.result.evidence.failure_code, "carrier_error");
+  assert.match(run.result.what_to_do, /Treat that message as a scam/);
+  assert.equal(verifyRecord(path).ok, true);
+});
+
+test("a confirmation on a call that ended badly is not reported as a confirmation", async () => {
+  // The other half of the asymmetry, end to end. This is the answer that could leave
+  // somebody trusting a message they should not, so a call CALL-E did not finish cleanly
+  // cannot deliver it.
+  const run = await check([
+    {
+      status: "failed",
+      failureCode: "carrier_error",
+      calleeLines: [PICK_UP, "Yes, that was us. We rang her this morning."],
+      structuredResult: { contact_confirmed: "yes", callee_quote: "That was us.", notes: "" },
+    },
+  ]);
+  assert.equal(run.result.outcome, "unreachable");
+  assert.equal(run.result.reason, "call_failed");
+  assert.equal(run.result.what_to_do.includes("says the contact was theirs"), false);
+});
+
 test("a number the message handed over is refused at the point of dialling too", async () => {
   // The loader refuses both of these. This is the same pair on the claim the call
   // would be built from, so a claim assembled any other way cannot dial a number that
