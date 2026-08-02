@@ -49,6 +49,22 @@ outside the window is not a confirmation and the run ends as `window_expired`. T
 person still said yes on a phone call, so they are still owed the release call that
 says it is off.
 
+Who said yes is read from the transcript and never from the call status. A call
+CALL-E reports as `failed` or `canceled` can hold the confirmation question and a
+yes after it, which is what a line dropping after somebody agrees looks like.
+Reading the status as proof that nobody committed would let a provider error code
+cancel a duty to a person, which is the failure this whole protocol exists to
+prevent, so that yes earns its release call exactly like any other. The yes still
+has to come after the confirmation question with no machine on the line: what
+counts is what the person answered.
+
+Only a window check may be reported as a closed window. A yes refused because the
+completion time could not be read, because the confidence floor rejected it or
+because the call itself failed ends the run as `not_confirmed` with the refusal
+named in the note. `window_expired` is kept for `late_result` and
+`outside_window`, the two refusals the window is responsible for, so a record
+never names a check that did not happen.
+
 Both clocks have to be readable for that check to mean anything. The completion
 time is read first, before either clock. A `completed_at` that is missing, null,
 empty, unparseable or not a string at all is refused as `completion_time_unknown`
@@ -104,6 +120,14 @@ free again is a duty and it does not expire because a timer did. The call budget
 and the party's calling hours still apply and a party who cannot be called inside
 either is listed in `unreleased` for a human to chase. A duty to tell somebody is
 not a licence to ring them at 3am.
+
+The debt clears on delivery and nothing else. A person has to be on the line and
+the transcript has to carry the acknowledgment, the same way a commitment has to
+come from the transcript. The extracted answer can veto that acknowledgment and it
+can never create one: an extraction the recording does not support is not somebody
+being told. This is the single boolean that writes off what the app owes them.
+A release call that failed, that reached a machine or that ended with nothing
+acknowledged leaves the party owed. `resume` places that call again.
 
 ## Canceling in flight
 

@@ -495,8 +495,13 @@ export function evaluateCommit(
     !lowConfidence &&
     reading.answer === "confirm" &&
     structuredAnswer !== "decline";
+  // A release call is delivered only when the person on the line acknowledged it.
+  // The transcript leads, exactly as it does for a commitment. The extracted
+  // answer can veto that but never create it. An extraction the recording does not
+  // support is not somebody being told their afternoon is free again. It is also
+  // the one boolean that writes off a debt.
   const acknowledged =
-    phase === "release" && (reading.answer === "confirm" || structuredAnswer === "yes") && reachedPerson;
+    phase === "release" && reachedPerson && reading.answer === "confirm" && structuredAnswer !== "no";
 
   return {
     ...base,
@@ -519,6 +524,34 @@ export function evaluateCommit(
       ? outcome.errorCode
       : (attempt?.failureCode ?? call.failureCode ?? null),
   };
+}
+
+/** The refusals the window itself is responsible for. */
+const WINDOW_REFUSALS = new Set(["late_result", "outside_window"]);
+
+/**
+ * Why a yes on the phone was not credited as a confirmation.
+ *
+ * Read off the result rather than assumed, so a run reports the check that
+ * actually refused the answer. Only a window check may be reported as an expired
+ * window. A yes refused for want of a readable completion time, by the confidence
+ * floor or on a call CALL-E marked failed is not a timer running out. A record
+ * that said so would name a check that never happened.
+ */
+function whyNotCredited(request: CoordinationRequest, result: CommitResult): string {
+  if (result.window_reason !== null) {
+    return result.window_reason;
+  }
+  if (result.declined) {
+    return "extracted_decline";
+  }
+  if (result.confidence !== null && result.confidence.score < request.policy.minConfidence) {
+    return "low_confidence";
+  }
+  if (!result.reached_person) {
+    return `call_${result.call_status}`;
+  }
+  return "not_credited";
 }
 
 export interface ReleaseRoundOptions {
@@ -806,13 +839,26 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
           progress(`  ${party.id}: confirmed.`);
           continue;
         }
-        if (saidYes(result) && !result.within_window) {
-          // The answer came back too late to act on. Nothing is arranged and the
-          // person who said yes is told, which is the same duty as any other run
-          // that does not go ahead.
-          outcome = "window_expired";
-          note = `the window closed before ${party.id} answered, so nothing is going ahead`;
-          progress(`  ${party.id}: said yes after the window closed. Nothing is going ahead, releasing everyone who said yes.`);
+        if (saidYes(result)) {
+          // They said yes and this run cannot credit it. Nothing is arranged and
+          // the person who said yes is told, which is the same duty as any other
+          // run that does not go ahead. The refusal is named, so a call CALL-E
+          // marked failed and an answer with no readable completion time are not
+          // both filed as a window that closed.
+          const refusal = whyNotCredited(request, result);
+          const windowClosed = WINDOW_REFUSALS.has(refusal);
+          outcome =
+            commitOutcome.errorCode === "canceled"
+              ? "canceled"
+              : windowClosed
+                ? "window_expired"
+                : "not_confirmed";
+          note = windowClosed
+            ? `the window closed before ${party.id} answered, so nothing is going ahead`
+            : `${party.id} said yes and it could not be credited (${refusal}), so nothing is going ahead`;
+          progress(
+            `  ${party.id}: said yes and it could not be credited (${refusal}). Nothing is going ahead, releasing everyone who said yes.`,
+          );
           break;
         }
         outcome = commitOutcome.errorCode === "canceled" ? "canceled" : "not_confirmed";

@@ -105,7 +105,20 @@ export function decidedInWindow(check: WindowCheck): boolean {
  * the confidence floor and a yes the extracted result contradicts are all still a
  * person who agreed to keep an afternoon free. The window decides what can be
  * confirmed. This decides who has to be told.
+ *
+ * So it reads the transcript and nothing else. A call CALL-E reports as failed or
+ * canceled can still hold the confirmation question and a yes after it, which is a
+ * line that dropped after the person agreed. Reading a status as proof that nobody
+ * committed is how a provider error code silently cancels a duty. That duty is the
+ * whole reason this app exists. The yes still has to come after the
+ * confirmation question, with no machine on the line, so what counts is something
+ * the person answered rather than anything the caller said.
  */
 export function saidYes(result: CommitResult): boolean {
-  return result.phase === "confirm" && result.reached_person && result.heard_answer === "confirm";
+  return (
+    result.phase === "confirm" &&
+    result.question_asked &&
+    result.heard_answer === "confirm" &&
+    !result.machine_answered
+  );
 }

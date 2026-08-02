@@ -37,6 +37,12 @@ export interface StubScript {
   readError?: unknown;
   /** The status CALL-E reports once it answers. Not always terminal. */
   status?: string;
+  /**
+   * What CALL-E reports as the completion time. Omitted means the stub's own
+   * stamp. Null is a finished call the API gave no readable completion time for,
+   * which the window check has to refuse on its own terms.
+   */
+  completedAt?: string | null;
   userLines?: string[];
   structured?: Record<string, unknown> | null;
 }
@@ -78,6 +84,7 @@ export function stubSnapshot(id: string, script: StubScript, answered: boolean):
   const status = answered ? (script.status ?? "completed") : "queued";
   const terminal = status === "completed" || status === "failed" || status === "canceled";
   const structured = terminal ? (script.structured ?? null) : null;
+  const completedAt = script.completedAt === undefined ? STUB_COMPLETED_AT : script.completedAt;
   return {
     id,
     status,
@@ -94,7 +101,7 @@ export function stubSnapshot(id: string, script: StubScript, answered: boolean):
             phone: script.phone,
             status,
             startedAt: "2026-08-04T17:00:05Z",
-            completedAt: terminal ? STUB_COMPLETED_AT : null,
+            completedAt: terminal ? completedAt : null,
             summary: null,
             transcriptTurns: terminal ? turnsOf(script) : [],
             providerCallId: `provider_${id}`,
@@ -112,7 +119,7 @@ export function stubSnapshot(id: string, script: StubScript, answered: boolean):
     failureCode: null,
     failureMessage: null,
     createdAt: "2026-08-04T17:00:00Z",
-    completedAt: terminal ? STUB_COMPLETED_AT : null,
+    completedAt: terminal ? completedAt : null,
   };
 }
 

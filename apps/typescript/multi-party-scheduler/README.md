@@ -153,13 +153,15 @@ cannot settle is named in the note for a human to check.
 | --- | --- | --- |
 | gather | "Which of these could you do?" Nothing is booked and the script says so. | An answer narrows the feasible set. An empty set ends the run as `no_common_slot`. A machine, a silence or a refusal from the API ends it as `not_reached`. |
 | confirm | "Can I confirm Thursday at 2?" One time, one word back. | Everybody confirms and the outcome is `verbally_confirmed`. Anybody does not and the outcome is `not_confirmed`. |
-| release | "That time is not going ahead, nothing is booked." | Sent to every party who said yes, most recent first. A party the release call cannot reach or cannot be called inside their hours is reported in `unreleased` for a human to chase. Only a person acknowledging the call clears that debt. |
+| release | "That time is not going ahead, nothing is booked." | Sent to every party who said yes, most recent first. A party the release call cannot reach or cannot be called inside their hours is reported in `unreleased` for a human to chase. Only a person acknowledging the call on the transcript clears that debt. The extracted answer can veto that acknowledgment but never create one. |
 
 Two reading rules, both conservative in the same direction. Availability is
 credited only when CALL-E's extracted list and this app's own read of the
 transcript agree, so a mishearing cannot invent a free slot. A confirmation has to
 come from the transcript, after the turn where the caller asked the confirmation
 question and the extracted answer can veto a confirmation but never create one.
+Delivery of a release call follows the same rule, because writing off a debt is
+the one place an extraction could quietly decide somebody had been told.
 
 A confirmation also has to have landed in time. The window is checked again when
 the result comes back, against the local clock and against the completion time
@@ -169,6 +171,16 @@ is missing or unreadable is refused as `completion_time_unknown`, with
 `completion_time_usable` recorded next to the verdict so a ledger line can never
 claim the window was weighed against a time nobody could read. The person may well
 have said yes, so that yes still earns the release call.
+
+Who is owed that call is read from the transcript and never from the call status. A
+call CALL-E reports as `failed` or `canceled` can still hold the confirmation
+question and a yes after it, which is a line that dropped once the person had
+agreed. Treating the status as proof that nobody committed would let a provider
+error code cancel the one duty this app exists to keep, so the yes counts and the
+release call goes out. The outcome then names the check that refused the yes:
+`window_expired` only when a window check refused it, otherwise `not_confirmed`
+with the reason in the note, so a call that failed is never filed as a timer that
+ran out.
 
 ## When a call cannot be accounted for
 
