@@ -50,11 +50,30 @@ export function digestOf(value: unknown): string {
   return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
 }
 
+/**
+ * What a resume is allowed to assume has not changed.
+ *
+ * This has to bind every field that can change who gets dialled or what they
+ * hear, because an unresolved create with no call id is later rebuilt from the
+ * request in hand. Binding only party ids let somebody edit a phone number under
+ * the same request id: the digest still matched, the payload differed, the
+ * idempotency key differed with it, and resume would place a fresh call to a
+ * different number while the original ambiguous call might still be live.
+ *
+ * So parties go in whole rather than field by field. A new call-affecting field
+ * on Party is then bound by default, and the failure mode of forgetting one is a
+ * refused resume instead of a call to the wrong person.
+ *
+ * Slots drop `startMs` and `spoken`, which are pure functions of `start`,
+ * `option` and the meeting timezone, all of which are bound. `option` is kept
+ * because it is the number the callee hears, so slot order is part of the
+ * contract.
+ */
 export function requestDigest(request: CoordinationRequest): string {
   return digestOf({
     meeting: request.meeting,
-    slots: request.slots.map((slot) => ({ id: slot.id, start: slot.start })),
-    parties: request.parties.map((party) => party.id),
+    slots: request.slots.map((slot) => ({ id: slot.id, option: slot.option, start: slot.start })),
+    parties: request.parties,
     policy: request.policy,
   });
 }

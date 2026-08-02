@@ -151,7 +151,15 @@ to prevent.
 `resume --request <file> --ledger <file> --live` reads the ledger and:
 
 - refuses to touch it unless the request digest matches, because the same request
-  is what rebuilds the same idempotency keys
+  is what rebuilds the same idempotency keys. The digest binds the meeting, the
+  policy, every slot id, option and start, and every party in full: name, phone,
+  role, region, locale, recorded consent and calling hours. Parties go in whole
+  rather than field by field so that a new call-affecting field is bound by
+  default. That matters because a create with no call id is rebuilt from the
+  request in hand, so a digest that ignored the phone number would let an edited
+  party pass the check, build a different payload, take a different idempotency
+  key, and place a fresh call to somebody else while the original ambiguous call
+  might still be live
 - settles every call the ledger cannot account for. A call with an id is settled by
   asking for it, which places nothing. A call with no id, which is what a lost
   create response leaves, is settled by re-issuing the same idempotency key: CALL-E

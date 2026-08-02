@@ -72,6 +72,33 @@ test("canonical json ignores key order and digests are stable", () => {
   assert.equal(requestDigest(coordinationRequest()), requestDigest(coordinationRequest()));
 });
 
+// An unresolved create with no call id is rebuilt from the request in hand, so
+// anything that changes who gets dialled or what they hear has to move the
+// digest. Otherwise resume passes its check, builds a different payload, gets a
+// different idempotency key and places a second call to somebody else while the
+// first one may still be live.
+test("every call-affecting party field moves the request digest", () => {
+  const base = requestDigest(coordinationRequest());
+  const edits: [string, (request: ReturnType<typeof coordinationRequest>) => void][] = [
+    ["phone", (request) => void (request.parties[0]!.phone = "+15550001111")],
+    ["name", (request) => void (request.parties[0]!.name = "Someone Else")],
+    ["role", (request) => void (request.parties[0]!.role = "deputy")],
+    ["region", (request) => void (request.parties[0]!.region = "GB")],
+    ["locale", (request) => void (request.parties[0]!.locale = "en-GB")],
+    ["consentRecorded", (request) => void (request.parties[0]!.consentRecorded = !request.parties[0]!.consentRecorded)],
+    ["callingHours.start", (request) => void (request.parties[0]!.callingHours.start = "07:00")],
+    ["callingHours.timezone", (request) => void (request.parties[0]!.callingHours.timezone = "Europe/London")],
+    ["party order", (request) => void request.parties.reverse()],
+    ["slot start", (request) => void (request.slots[0]!.start = "2026-08-09T10:00:00-07:00")],
+    ["slot option", (request) => void (request.slots[0]!.option = 9)],
+  ];
+  for (const [what, edit] of edits) {
+    const request = coordinationRequest();
+    edit(request);
+    assert.notEqual(requestDigest(request), base, `editing ${what} must not pass a resume check`);
+  }
+});
+
 test("a real run replays cleanly and keeps the codes out of the file", async () => {
   const { path, entries } = await confirmedLedger();
   const verification = replay(entries);
