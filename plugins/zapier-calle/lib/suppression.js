@@ -52,20 +52,6 @@ function digitsMatch(targetDigits, entryDigits) {
   return longer.endsWith(shorter);
 }
 
-// maskPhone only recognizes a leading "+" or an unambiguous bare 10-digit
-// domestic run; a bare digit string of any other length (for example the
-// 11-digit "15550123456" this feature's own docs give as a valid entry) is
-// not international-looking or 10-digit-domestic-looking to it and would
-// pass through unmasked. Normalizing a bare non-10-digit run to look
-// international before masking keeps the "never leak raw digits" guarantee
-// for every entry shape this feature accepts, not just the ones maskPhone's
-// regex already anticipated.
-function maskEntry(rawEntry) {
-  const isBareDigits = /^\d+$/.test(rawEntry);
-  const candidate = isBareDigits && rawEntry.length !== 10 ? `+${rawEntry}` : rawEntry;
-  return maskPhone(candidate);
-}
-
 export function checkSuppression({ phone, suppressionList } = {}) {
   try {
     if (suppressionList === undefined || suppressionList === null) return notSupplied();
@@ -83,7 +69,7 @@ export function checkSuppression({ phone, suppressionList } = {}) {
         enforced: true,
         suppressed: true,
         reason: 'Recipient phone number matched an entry on the supplied do-not-call suppression list.',
-        matchedEntry: maskEntry(match),
+        matchedEntry: maskPhone(match),
       };
     }
 

@@ -77,6 +77,50 @@ describe('flattenResult', () => {
       .toBe('bot: Are you able to take this incident?\nuser: Yes, on it.');
   });
 
+  it('masks a bare digit-run phone number in free text summary and transcript', () => {
+    const bareDigitsEvent = {
+      id: 'evt_3',
+      type: 'call.completed',
+      created_at: '2026-08-02T00:01:00Z',
+      data: {
+        id: 'call_3',
+        object: 'call_task',
+        status: 'completed',
+        task: 'Reach the caller.',
+        task_completed: true,
+        completion_confidence: { score: 0.9, label: 'high' },
+        structured_result: {},
+        summary: 'Caller asked us to reach them on 15550123456 instead.',
+        evidence: [],
+        metadata: {},
+        failure_code: null,
+        failure_message: null,
+        completed_at: '2026-08-02T00:01:00Z',
+        recipients: [
+          {
+            id: 'rcp_3',
+            phones: ['+15550123456'],
+            status: 'completed',
+            structured_result: {},
+            summary: 'Left a message.',
+            attempts: [
+              {
+                id: 'att_3',
+                status: 'completed',
+                transcript_turns: [
+                  { offset_seconds: 0, speaker: 'user', text: 'my other number is 15550123456' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const serialized = JSON.stringify(flattenResult(bareDigitsEvent));
+    expect(serialized).not.toContain('15550123456');
+  });
+
   it('does not throw on a minimal failure event', () => {
     const out = flattenResult({
       id: 'evt_2',

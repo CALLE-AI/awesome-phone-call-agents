@@ -1,11 +1,13 @@
 // NOTE: Matches international formats (+CC with flexible separators) and domestic NANP (10-digit).
 // Does not attempt every international format (e.g., parentheses in country code). Trade-off:
 // short non-phone digit runs (e.g., 'offset 42 seconds') survive unmasked; leaked numbers do not.
-// Bare domestic matching deliberately limited to standalone 10-digit runs via word-boundary checks
-// to avoid corrupting identifiers (e.g., 'evt_1754091234567' remains intact) - the same trade-off
-// means a standalone 10-digit non-phone value (a tracking or confirmation number, say) is still
-// masked if nothing word-like is adjacent to it, since it is indistinguishable from a real number.
-const PHONE_RE = /\+\d[\d\s.\-()]*\d(?!\w)|(?<!\w)(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}(?!\w)|(?<!\w)\d{10}(?!\w)/g;
+// Bare domestic matching covers standalone runs of 10 to 15 digits via word-boundary checks: 10 is
+// the floor because shorter runs are not phone numbers, 15 is the ceiling because E.164 allows at
+// most 15 digits. The word-boundary guards keep identifiers intact (e.g., 'evt_1754091234567' is
+// preceded by '_', a word character, so it is not touched) - the same trade-off means a standalone
+// 10-to-15-digit non-phone value (a tracking or confirmation number, say) is still masked if
+// nothing word-like is adjacent to it, since it is indistinguishable from a real number.
+const PHONE_RE = /\+\d[\d\s.\-()]*\d(?!\w)|(?<!\w)(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}(?!\w)|(?<!\w)\d{10,15}(?!\w)/g;
 const SECRET_KEYS = new Set(['apikey', 'api_key', 'authorization']);
 
 // International masking: the fewer digits there are, the larger a share any fixed "show the
@@ -36,7 +38,7 @@ export function maskPhone(value) {
       if (digits.length > 20) return match;
       return maskInternational(digits);
     }
-    if (digits.length !== 10) return match;
+    if (digits.length < 10 || digits.length > 15) return match;
     return maskDomestic(digits);
   });
 }

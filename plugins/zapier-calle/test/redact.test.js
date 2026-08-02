@@ -52,6 +52,19 @@ describe('maskPhone', () => {
     expect(maskPhone('+123')).toBe('+***');
     expect(maskPhone('+12')).toBe('+**');
   });
+
+  it('masks bare digit runs longer than ten digits', () => {
+    // Previously only exactly-10-digit bare runs were masked; anything longer (a country code
+    // with no leading '+', e.g.) passed through raw.
+    expect(maskPhone('15550123456')).not.toContain('15550123456');
+    expect(maskPhone('845550123456')).not.toContain('845550123456');
+    expect(maskPhone('my other number is 15550123456')).not.toContain('15550123456');
+  });
+
+  it('leaves bare digit runs outside the 10-15 digit phone range unmasked', () => {
+    expect(maskPhone('123456789')).toBe('123456789');
+    expect(maskPhone('1234567890123456')).toBe('1234567890123456');
+  });
 });
 
 describe('redactDeep', () => {
