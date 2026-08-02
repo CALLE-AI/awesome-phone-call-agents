@@ -2,7 +2,6 @@
   "name": "zapier-calle",
   "version": "1.0.0",
   "description": "Zapier integration for CALL-E AI phone calls with fail-closed outcome dispositions.",
-  "type": "module",
   "private": true,
   "license": "MIT",
   "main": "index.js",
