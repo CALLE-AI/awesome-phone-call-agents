@@ -110,4 +110,52 @@ describe('deriveDisposition', () => {
       'needs_human',
     ]);
   });
+
+  it('never treats a falsy or empty structured result as confirmed', () => {
+    for (const value of [false, 0, '', [], {}, NaN]) {
+      const result = deriveDisposition(event({}, { structured_result: value }));
+      expect(result.disposition).toBe('review_required');
+      expect(result.is_actionable).toBe(false);
+    }
+  });
+
+  it('returns needs_human instead of throwing when a property access throws', () => {
+    const hostile = event();
+    Object.defineProperty(hostile.data, 'status', {
+      get() { throw new Error('boom'); },
+      configurable: true,
+    });
+    expect(() => deriveDisposition(hostile)).not.toThrow();
+    expect(deriveDisposition(hostile).disposition).toBe('needs_human');
+  });
+
+  it('returns needs_human when failure_code stringification throws', () => {
+    const hostile = event({ type: 'call.failed' }, {
+      status: 'failed',
+      failure_code: { toString() { throw new Error('boom'); } },
+    });
+    expect(() => deriveDisposition(hostile)).not.toThrow();
+    expect(deriveDisposition(hostile).disposition).toBe('needs_human');
+  });
+
+  it('ignores inherited properties when classifying', () => {
+    const inherited = Object.create({
+      status: 'completed',
+      task_completed: true,
+      completion_confidence: { label: 'high' },
+      structured_result: { a: 1 },
+    });
+    expect(deriveDisposition({ id: 'e', type: 'call.completed', data: inherited }).disposition)
+      .toBe('needs_human');
+  });
+
+  it('caps untrusted values echoed into the reason', () => {
+    const long = 'x'.repeat(500);
+    const result = deriveDisposition(event({ type: 'call.failed' }, { status: 'failed', failure_code: long }));
+    expect(result.reason.length).toBeLessThan(300);
+  });
+
+  it('exposes DISPOSITIONS as a frozen array', () => {
+    expect(Object.isFrozen(DISPOSITIONS)).toBe(true);
+  });
 });
