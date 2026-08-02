@@ -1,7 +1,9 @@
 // NOTE: Matches international formats (+CC with flexible separators) and domestic NANP (10-digit).
 // Does not attempt every international format (e.g., parentheses in country code). Trade-off:
 // short non-phone digit runs (e.g., 'offset 42 seconds') survive unmasked; leaked numbers do not.
-const PHONE_RE = /\+\d[\d\s.\-()]*\d(?!\d)|(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}|(?<!\d)\d{10}(?!\d)/g;
+// Bare domestic matching deliberately limited to standalone 10-digit runs via word-boundary checks
+// to avoid corrupting identifiers (e.g., 'evt_1754091234567' remains intact).
+const PHONE_RE = /\+\d[\d\s.\-()]*\d(?!\w)|(?<!\w)(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}(?!\w)|(?<!\w)\d{10}(?!\w)/g;
 const SECRET_KEYS = new Set(['apikey', 'api_key', 'authorization']);
 
 export function maskPhone(value) {

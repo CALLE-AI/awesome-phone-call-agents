@@ -29,6 +29,17 @@ describe('maskPhone', () => {
     expect(maskPhone('order 12345')).toBe('order 12345');
     expect(maskPhone('offset 42 seconds')).toBe('offset 42 seconds');
   });
+
+  it('leaves identifiers containing long digit runs intact', () => {
+    expect(maskPhone('evt_1754091234567')).toBe('evt_1754091234567');
+    expect(maskPhone('call_20260802000000')).toBe('call_20260802000000');
+    expect(maskPhone('provider_call_123')).toBe('provider_call_123');
+  });
+
+  it('still masks a standalone domestic number in surrounding text', () => {
+    expect(maskPhone('Call 5550123456 back.')).toBe('Call ******3456 back.');
+    expect(maskPhone('5550123456')).toBe('******3456');
+  });
 });
 
 describe('redactDeep', () => {
