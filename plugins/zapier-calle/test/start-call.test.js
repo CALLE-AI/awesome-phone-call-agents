@@ -98,6 +98,71 @@ describe('start-call', () => {
     }
   });
 
+  it('previews outside the configured calling window when dry_run is true', async () => {
+    server = await startFakeCalle({});
+    // Fixed instant: 03:00 UTC is 22:00 EST the prior day - outside 8-21.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 14, 3, 0, 0)));
+    try {
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, {
+          ...input,
+          dry_run: true,
+          calling_window_timezone: 'America/New_York',
+          calling_window_earliest_hour: 8,
+          calling_window_latest_hour: 21,
+        }),
+      );
+
+      expect(output.dry_run).toBe(true);
+      expect(output.call_id).toBe(null);
+      expect(output.preview).toBeDefined();
+      expect(output.calling_window.enforced).toBe(true);
+      expect(output.calling_window.allowed).toBe(false);
+      expect(server.lastRequest()).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports the calling window as allowed on a dry run made inside the window', async () => {
+    server = await startFakeCalle({});
+    // Same fixture, shifted to 15:00 UTC = 10:00 EST - inside 8-21.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 14, 15, 0, 0)));
+    try {
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, {
+          ...input,
+          dry_run: true,
+          calling_window_timezone: 'America/New_York',
+          calling_window_earliest_hour: 8,
+          calling_window_latest_hour: 21,
+        }),
+      );
+
+      expect(output.dry_run).toBe(true);
+      expect(output.calling_window.allowed).toBe(true);
+      expect(server.lastRequest()).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports the calling window as not enforced on a dry run with no timezone', async () => {
+    server = await startFakeCalle({});
+    const output = await startCall.operation.perform(
+      zFor(),
+      bundleFor(server, { ...input, dry_run: true }),
+    );
+
+    expect(output.dry_run).toBe(true);
+    expect(output.calling_window.enforced).toBe(false);
+    expect(output.calling_window.allowed).toBe(true);
+  });
+
   it('places the call normally when inside the configured calling window', async () => {
     server = await startFakeCalle({});
     // Same fixture, shifted to 15:00 UTC = 10:00 EST - inside 8-21.

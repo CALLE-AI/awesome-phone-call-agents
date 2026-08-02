@@ -53,6 +53,34 @@ describe('place-call-and-wait perform', () => {
     expect(server.lastRequest()).toBe(null);
   });
 
+  it('previews outside the calling window on a dry run, generating no callback url', async () => {
+    server = await startFakeCalle({});
+    const generated = [];
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 03:00 UTC is 22:00 EST the prior day - outside 8-21.
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 14, 3, 0, 0)));
+    try {
+      const output = await placeCallAndWait.operation.perform(zFor(generated), {
+        authData: { apiKey: 'k', baseUrl: server.url },
+        inputData: {
+          ...input,
+          dry_run: true,
+          calling_window_timezone: 'America/New_York',
+          calling_window_earliest_hour: 8,
+          calling_window_latest_hour: 21,
+        },
+      });
+
+      expect(generated).toEqual([]);
+      expect(output.dry_run).toBe(true);
+      expect(output.preview).toBeDefined();
+      expect(output.calling_window.allowed).toBe(false);
+      expect(server.lastRequest()).toBe(null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('generates no callback url and makes no request outside the calling window', async () => {
     server = await startFakeCalle({});
     const generated = [];

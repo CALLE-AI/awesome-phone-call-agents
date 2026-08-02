@@ -9,6 +9,27 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   if (errors.length) throw new Error(errors.join(' '));
 
   const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
+
+  // A dry run previews the request and places no call, so the calling-window
+  // guard - whose entire purpose is to stop a call from being placed - has
+  // nothing to protect here. Blocking the preview instead of just answering
+  // "would this be allowed?" makes it impossible to inspect a Zap outside the
+  // window, which is exactly when someone is likely to be building one.
+  if (isDryRun(bundle.inputData.dry_run)) {
+    return {
+      dry_run: true,
+      call_id: null,
+      disposition: 'outcome_unknown',
+      preview: redactDeep({ endpoint: `${baseUrl(bundle)}/v1/calls`, idempotency_key: key, payload }),
+      calling_window: {
+        enforced: windowCheck.enforced,
+        allowed: windowCheck.allowed,
+        local_hour: windowCheck.localHour,
+        reason: windowCheck.reason,
+      },
+    };
+  }
+
   if (!windowCheck.allowed) {
     return {
       dry_run: false,
@@ -19,15 +40,6 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
       calling_window_enforced: true,
       local_hour: windowCheck.localHour,
       correlation_id: payload.metadata.correlation_id,
-    };
-  }
-
-  if (isDryRun(bundle.inputData.dry_run)) {
-    return {
-      dry_run: true,
-      call_id: null,
-      disposition: 'outcome_unknown',
-      preview: redactDeep({ endpoint: `${baseUrl(bundle)}/v1/calls`, idempotency_key: key, payload }),
     };
   }
 
