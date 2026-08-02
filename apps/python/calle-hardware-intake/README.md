@@ -1,11 +1,12 @@
 # CALL-E Hardware Support Intake Agent
 
-Voice AI intake agent for technical-support desks and hardware repair shops.
+Voice AI intake agent for technical-support desks and hardware repair shops,
+built for the **CALL-E: Your Code Is Calling** hackathon.
+
 CALL-E owns the phone call (plan → dial → converse → structured result); a
-FastAPI backend drives CALL-E via its CLI/MCP and uses **Gemini function
-calling** to turn each conversation into a structured repair ticket, a
-diagnostic appointment, or a status lookup — persisted in SQLite and exposed
-over a small API.
+FastAPI backend drives CALL-E and uses **Gemini function calling** to turn each
+conversation into a structured repair ticket, a diagnostic appointment, or a
+status lookup — persisted in SQLite and exposed over a small API.
 
 ## Architecture
 
@@ -35,8 +36,8 @@ uv pip install -r requirements.txt
 npm install -g @call-e/cli
 calle auth login                          # opens browser, approve
 
-# 3. Gemini key
-cp .env.example .env                      # paste GEMINI_API_KEY
+# 3. Keys
+cp .env.example .env                      # paste GEMINI_API_KEY; set API_KEY
 ```
 
 ## Run
@@ -52,13 +53,18 @@ Then open http://127.0.0.1:8000/docs (auto-generated Swagger UI).
 | Method | Path | Purpose |
 |---|---|---|
 | GET  | `/health` | server + CALL-E auth status |
-| POST | `/api/intake` | `{"transcript": "..."}` → Gemini parses, logs a ticket |
+| POST | `/api/intake` | `{"transcript": "..."}` → Gemini parses, logs a ticket (no call) |
 | GET  | `/api/tickets` | list tickets |
 | GET  | `/api/tickets/{id}` | one ticket |
-| POST | `/api/calls` | `{"phone": "+15551234567", "goal": "..."}` → plan + run a real call |
+| POST | `/api/calls` | 🔒 `X-API-Key` · `{"phone":"+15551234567","goal":"...","idempotency_key":"..."}` → **plans only, never dials** |
+| POST | `/api/calls/{id}/run` | 🔒 `X-API-Key` · explicit confirmation that **executes** a planned call |
 | GET  | `/api/calls/{id}` | live call status |
 
-## Try it without making a call
+**Live-call auth:** planning (`POST /api/calls`) and executing (`POST
+/api/calls/{id}/run`) require the `X-API-Key` header set to your `API_KEY` env
+var. These endpoints fail closed (`503`) when `API_KEY` is empty.
+
+### Try it without a call
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/intake \
@@ -66,41 +72,36 @@ curl -X POST http://127.0.0.1:8000/api/intake \
   -d '{"transcript": "Customer named Alice says her Dell laptop won't boot after a Windows update. Agreed to drop it off Thursday at 10:30am. Priority urgent."}'
 ```
 
-`/api/intake` and `/health` never place calls. To check a CALL-E plan without
-dialing, run:
+### Make a real call (uses a CALL-E credit)
 
+Via the script (plans + runs + logs a ticket):
 ```bash
-python scripts/test_call.py +15551234567 "Confirm the appointment" --dry-plan
+python scripts/test_call.py +15551234567 "Confirm the 10:30am laptop diagnostic appointment"
+# add --dry-plan to only plan without dialing
 ```
 
-## Making a real call (live verification)
-
+Via the API — **two-step, so a call is never placed without confirmation**:
 ```bash
-python scripts/test_call.py +15551234567 "Intake a hardware repair request: ask the device, the issue, and urgency"
+# 1. Plan (never dials)
+curl -X POST http://127.0.0.1:8000/api/calls -H "Content-Type: application/json" \
+  -H "X-API-Key: $API_KEY" \
+  -d '{"phone":"+15551234567","goal":"Confirm the appointment","idempotency_key":"call-1"}'
+# -> returns {"id":1,"status":"planned",...}
+
+# 2. Explicitly execute
+curl -X POST http://127.0.0.1:8000/api/calls/1/run -H "X-API-Key: $API_KEY"
 ```
-
-This is the opt-in live path. Run it only when you explicitly want CALL-E to
-dial a real phone number.
-
-## Side effects & safety
-
-- **Each outbound call spends one CALL-E credit** and dials a real phone
-  number in E.164 format (e.g. `+15551234567`). It may reach voicemail.
-- **Use `--dry-plan` or `/api/intake` for a no-call path.** Planning only
-  validates the goal and never dials.
-- **Credentials:** CALL-E uses OAuth via `calle auth login` (no API key). The
-  Gemini key lives in `.env`, which is gitignored — never commit it.
-- **Phone numbers:** samples above are fictional reserved numbers. Mask any
-  real numbers in transcripts/summaries you share.
-- **No recurring jobs:** this app places one-off calls only; there is nothing
-  scheduled or recurring to cancel.
-- **Boundaries:** CALL-E governs outbound behavior; keep goals to legitimate
-  business calls and avoid medical/legal/financial/emergency content.
 
 ## Notes
 
 - **IPv4 fix:** `app/netfix.py` forces IPv4 name resolution because the dev
   machine's IPv6 route is broken; harmless elsewhere.
-- **Model:** `gemini-flash-latest` (older Gemini models are retired for new
-  accounts).
-- Tickets live in `calle_agent.db` (SQLite).
+- **Model:** `gemini-flash-latest` (older Gemini models are retired for new accounts).
+- Tickets live in `calle_agent.db` (SQLite). Never commit `.env`.
+
+## Submission (awesome-phone-call-agents)
+
+The `templates/agent_skills/SKILL.md` is the Agent-Skill layout for the PR.
+Adapt this app into `apps/python/` of the
+[awesome-phone-call-agents](https://github.com/CALLE-AI/awesome-phone-call-agents)
+repo, then open the PR and link it on Devpost with the demo video.

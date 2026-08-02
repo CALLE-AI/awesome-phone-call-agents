@@ -79,6 +79,8 @@ def _run(args: list[str], timeout: int = 600) -> dict:
         cli_command(args),
         capture_output=True,
         text=True,
+        encoding="utf-8",  # calle emits UTF-8; cp1252 would crash on typographic chars
+        errors="replace",
         timeout=timeout,
     )
     if proc.returncode != 0:

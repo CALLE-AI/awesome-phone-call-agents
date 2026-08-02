@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # Newer models are retired for new accounts; use the -latest alias.
     gemini_model: str = "gemini-flash-latest"
 
+    # Shared secret required to plan/run live calls (X-API-Key header).
+    # Live-call endpoints fail closed when this is empty.
+    api_key: str = ""
+
     # SQLite file created next to the app.
     database_url: str = "sqlite:///./calle_agent.db"
 

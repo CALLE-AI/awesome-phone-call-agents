@@ -49,6 +49,7 @@ class CallSession(Base):
     run_id = Column(String, unique=True, index=True, nullable=True)
     plan_id = Column(String, nullable=True)
     confirm_token = Column(String, nullable=True)
+    idempotency_key = Column(String, unique=True, index=True, nullable=True)
     phone = Column(String)
     goal = Column(Text)
     # created -> planned -> running -> completed | failed | plan_not_ready

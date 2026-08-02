@@ -19,6 +19,13 @@ sys.path.insert(0, ".")  # allow `import app.*`
 from app import calle_client, gemini_engine  # noqa: E402
 
 
+def _mask_phone(phone: str) -> str:
+    """Show only the country prefix + last 4 digits (e.g. +91******0746)."""
+    if len(phone) >= 7 and phone.startswith("+"):
+        return phone[:3] + "******" + phone[-4:]
+    return "<masked>"
+
+
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     dry_plan = "--dry-plan" in sys.argv
@@ -27,9 +34,12 @@ def main() -> int:
         return 2
     phone, goal = args[0], " ".join(args[1:])
 
-    print(f"== Planning call to {phone}: {goal}")
+    print(f"== Planning call to {_mask_phone(phone)}: {goal}")
     plan = calle_client.extract_plan(calle_client.plan_call(phone, goal))
-    print(json.dumps(plan, indent=2))
+    redacted = dict(plan)
+    if redacted.get("confirm_token"):
+        redacted["confirm_token"] = "********"  # never print the run token
+    print(json.dumps(redacted, indent=2))
 
     if dry_plan or not plan["ready_to_run"]:
         print("(dry-plan or plan needs clarification — not dialing)")

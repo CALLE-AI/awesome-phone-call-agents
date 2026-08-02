@@ -29,8 +29,16 @@ class TicketOut(BaseModel):
 
 
 class CallCreate(BaseModel):
-    phone: str = Field(description="Destination number in E.164, e.g. +15551234567")
+    phone: str = Field(
+        pattern=r"^\+[1-9]\d{1,14}$",
+        description="Destination number in E.164, e.g. +15551234567",
+    )
     goal: str = Field(description="What the agent should accomplish on the call")
+    idempotency_key: Optional[str] = Field(
+        default=None,
+        description="Optional client-supplied key; reusing it returns the "
+        "existing plan instead of creating a duplicate call",
+    )
 
 
 class CallOut(BaseModel):

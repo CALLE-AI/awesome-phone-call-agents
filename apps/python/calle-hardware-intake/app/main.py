@@ -14,7 +14,7 @@ Run:  uvicorn app.main:app --reload
 import asyncio
 import json
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from . import netfix  # noqa: F401  (force IPv4 for Python networking)
@@ -44,6 +44,17 @@ TERMINAL = {"completed", "done", "finished", "failed", "error", "cancelled", "ca
 _background_tasks: set[asyncio.Task] = set()
 
 
+def require_api_key(x_api_key: str = Header(default="")) -> None:
+    """Gate live-call endpoints. Fails closed when no API key is configured."""
+    if not settings.api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Live-call API not configured: set API_KEY in .env",
+        )
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+
 def _is_terminal(status: str | None) -> bool:
     if not status:
         return False
@@ -64,7 +75,7 @@ async def _execute_call(session_id: int) -> None:
         run_info = await asyncio.to_thread(
             calle_client.run_call, session.plan_id, session.confirm_token
         )
-        run = calle_client.extract_run(run_info)
+        current = run = calle_client.extract_run(run_info)
         run_id = run["run_id"]
         if run_id:
             session.run_id = run_id
@@ -94,9 +105,14 @@ async def _execute_call(session_id: int) -> None:
             if _is_terminal(current["status"]):
                 break
 
-        # Feed whatever CALL-E returned into Gemini to log a ticket.
+        # Log a ticket ONLY from a call that COMPLETED with a successful
+        # outcome. Voicemail / declined / failed calls must not auto-create
+        # tickets from incomplete provider output.
+        outcome = (current.get("outcome") or {})
+        task_completed = outcome.get("task_completed") is True
+        completed = "complete" in (current.get("status") or "").lower()
         text = session.summary or session.transcript
-        if text:
+        if text and completed and task_completed:
             try:
                 result = await asyncio.to_thread(gemini_engine.analyze_call, text)
                 if result.get("ticket") is not None:
@@ -174,13 +190,36 @@ async def get_ticket(ticket_id: int, db: Session = Depends(get_db)) -> Ticket:
 
 # --- Calls --------------------------------------------------------------------
 
-@app.post("/api/calls", response_model=CallOut, status_code=201)
+@app.post(
+    "/api/calls",
+    response_model=CallOut,
+    status_code=201,
+    dependencies=[Depends(require_api_key)],
+)
 async def create_call(body: CallCreate, db: Session = Depends(get_db)) -> CallSession:
-    session = CallSession(phone=body.phone, goal=body.goal, status="created")
+    # Idempotency: a client-supplied key returns the existing plan instead of
+    # creating a duplicate call on retries.
+    if body.idempotency_key:
+        existing = (
+            db.query(CallSession)
+            .filter_by(idempotency_key=body.idempotency_key)
+            .first()
+        )
+        if existing is not None:
+            return existing
+
+    session = CallSession(
+        phone=body.phone,
+        goal=body.goal,
+        idempotency_key=body.idempotency_key,
+        status="created",
+    )
     db.add(session)
     db.commit()
     db.refresh(session)
 
+    # Planning NEVER dials. Execution requires an explicit confirmation call to
+    # POST /api/calls/{id}/run.
     try:
         plan_data = await asyncio.to_thread(calle_client.plan_call, body.phone, body.goal)
     except calle_client.CalleError as exc:
@@ -194,14 +233,37 @@ async def create_call(body: CallCreate, db: Session = Depends(get_db)) -> CallSe
     session.confirm_token = plan["confirm_token"] or ""
 
     if not plan["ready_to_run"]:
-        session.status = "plan_not_ready"
-        db.commit()
-        return session  # CALL-E needs clarification; check plan card / ask user
+        session.status = "plan_not_ready"  # CALL-E needs clarification
+    else:
+        session.status = "planned"         # dialable, but not dialed yet
+    db.commit()
+    return session
+
+
+@app.post(
+    "/api/calls/{session_id}/run",
+    response_model=CallOut,
+    dependencies=[Depends(require_api_key)],
+)
+async def run_call_endpoint(session_id: int, db: Session = Depends(get_db)) -> CallSession:
+    """Explicit confirmation step: execute a previously planned call."""
+    session = db.get(CallSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="call session not found")
+    if not session.plan_id:
+        raise HTTPException(status_code=400, detail="no plan for this session")
+    if session.status == "running":
+        return session
+    if session.status in {"completed", "failed"}:
+        raise HTTPException(status_code=409, detail=f"session already {session.status}")
+    if session.status == "plan_not_ready":
+        raise HTTPException(
+            status_code=400,
+            detail="plan needs clarification and is not dialable",
+        )
 
     session.status = "planned"
     db.commit()
-
-    # Fire the call in the background so the request returns immediately.
     task = asyncio.create_task(_execute_call(session.id))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
