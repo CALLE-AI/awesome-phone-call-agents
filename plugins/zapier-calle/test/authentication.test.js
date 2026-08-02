@@ -44,4 +44,21 @@ describe('checkForErrors', () => {
     expect(() => checkForErrors(response)).toThrow(/\+1\*+3456/);
     expect(() => checkForErrors(response)).not.toThrow(/0123456/);
   });
+
+  it('redacts the API key if the upstream error echoes it', () => {
+    const response = {
+      status: 401,
+      content: JSON.stringify({ error: { message: 'Invalid key calle_live_secret123' } }),
+      request: { url: 'x' },
+    };
+    expect(() => checkForErrors(response, null, { authData: { apiKey: 'calle_live_secret123' } }))
+      .toThrow(/\[redacted\]/);
+    expect(() => checkForErrors(response, null, { authData: { apiKey: 'calle_live_secret123' } }))
+      .not.toThrow(/calle_live_secret123/);
+  });
+
+  it('still works when no bundle is supplied', () => {
+    const response = { status: 500, content: '{}', request: { url: 'x' } };
+    expect(() => checkForErrors(response)).toThrow(/500/);
+  });
 });

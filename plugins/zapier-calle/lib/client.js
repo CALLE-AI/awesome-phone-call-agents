@@ -2,6 +2,8 @@ import { maskPhone } from './redact.js';
 
 export const DEFAULT_BASE_URL = 'https://api.heycall-e.com';
 
+// Test-only affordance: lets tests point requests at a local server. Must never be added to
+// authentication.fields - exposing it would let a user redirect calls to an arbitrary host.
 export function baseUrl(bundle) {
   const override = bundle && bundle.authData && bundle.authData.baseUrl;
   return override || DEFAULT_BASE_URL;
@@ -16,7 +18,7 @@ export function addBearerHeader(request, z, bundle) {
   return request;
 }
 
-export function checkForErrors(response) {
+export function checkForErrors(response, z, bundle) {
   if (response.status < 400) return response;
 
   let detail = '';
@@ -26,6 +28,12 @@ export function checkForErrors(response) {
   } catch {
     detail = '';
   }
+
+  const apiKey = bundle && bundle.authData && bundle.authData.apiKey;
+  if (apiKey) {
+    detail = detail.split(apiKey).join('[redacted]');
+  }
+
   const safeDetail = maskPhone(detail);
 
   if (response.status === 401 || response.status === 403) {
