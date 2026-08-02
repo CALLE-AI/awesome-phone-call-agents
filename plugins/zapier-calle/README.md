@@ -203,10 +203,16 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 - If a `Place Call and Wait for Outcome` step is interrupted, or a webhook
   from CALL-E is missed, use `Find Call Result` with the recorded `call_id`
   to reconcile the outcome afterward.
-- Repeated runs with the same call payload reuse the same `Idempotency-Key`
-  (a SHA-256 digest of the task, recipients, result schema, and metadata,
-  excluding the per-run webhook URL), so retrying an unmodified Zap run does
-  not place a second call.
+- This integration derives a stable `Idempotency-Key` for each call: a
+  SHA-256 digest of the task, recipients, result schema, recipient result
+  schema, and metadata, computed before the per-run `webhook_url` is
+  attached so the key stays constant across retries of the same logical
+  call. Per CALL-E's documented `Idempotency-Key` contract, reusing the
+  same key with the same request returns the original call instead of
+  creating a duplicate. A changed payload - a different phone number, task
+  text, or schema - produces a different key and is therefore correctly
+  treated as a new call. This project has not exercised that behavior
+  against a live CALL-E instance.
 
 ## 10. Testing
 
