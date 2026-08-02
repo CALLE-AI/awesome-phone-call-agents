@@ -3,6 +3,26 @@ import { idempotencyKey } from './idempotency.js';
 
 const E164_RE = /^\+[1-9]\d{7,14}$/;
 
+const FALSY_DRY_RUN = new Set(['false', '0', '']);
+const TRUTHY_DRY_RUN = new Set(['true', 'yes', 'y', 'on', '1']);
+
+// Fail closed: only an unambiguous negative places a real call. Anything else
+// (an unrecognized string, an object, a number other than 0/1, ...) is treated
+// as a dry run so an unclear intent never results in an unintended phone call.
+export function isDryRun(value) {
+  if (value === false || value === null || value === undefined) return false;
+  if (value === true) return true;
+  if (value === 0) return false;
+  if (value === 1) return true;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (FALSY_DRY_RUN.has(normalized)) return false;
+    if (TRUTHY_DRY_RUN.has(normalized)) return true;
+    return true;
+  }
+  return true;
+}
+
 export const INPUT_FIELDS = [
   {
     key: 'task',
@@ -54,7 +74,8 @@ export const INPUT_FIELDS = [
     type: 'boolean',
     required: false,
     default: 'false',
-    helpText: 'When true, returns a masked preview and places no call.',
+    helpText:
+      'When true, returns a masked preview and places no call. Any unrecognized value is also treated as a dry run so no unintended call is placed.',
   },
 ];
 

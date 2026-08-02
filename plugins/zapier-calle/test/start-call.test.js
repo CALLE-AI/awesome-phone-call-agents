@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { startFakeCalle } from './fake-calle-server.js';
 import startCall from '../creates/start-call.js';
+import { isDryRun } from '../lib/build-payload.js';
 
 let server;
 afterEach(async () => {
@@ -60,5 +61,35 @@ describe('start-call', () => {
       startCall.operation.perform(zFor(), bundleFor(server, { ...input, phone: '5550123' })),
     ).rejects.toThrow(/E\.164/);
     expect(server.lastRequest()).toBe(null);
+  });
+
+  it('does not place a call for an ambiguous dry_run value', async () => {
+    server = await startFakeCalle({});
+    const output = await startCall.operation.perform(
+      zFor(),
+      bundleFor(server, { ...input, dry_run: 'TRUE' }),
+    );
+    expect(output.dry_run).toBe(true);
+    expect(server.lastRequest()).toBe(null);
+  });
+});
+
+describe('isDryRun', () => {
+  it('treats explicit negatives as a real call', () => {
+    for (const value of [false, 'false', 'FALSE', 0, '0', '', '   ', null, undefined]) {
+      expect(isDryRun(value)).toBe(false);
+    }
+  });
+
+  it('treats affirmative values as a dry run', () => {
+    for (const value of [true, 'true', 'TRUE', 'True', 'yes', 'Y', 'on', '1', 1]) {
+      expect(isDryRun(value)).toBe(true);
+    }
+  });
+
+  it('treats unrecognized values as a dry run so no unintended call is placed', () => {
+    for (const value of ['maybe', 'nope!', {}, [], 42, 'undefined']) {
+      expect(isDryRun(value)).toBe(true);
+    }
   });
 });

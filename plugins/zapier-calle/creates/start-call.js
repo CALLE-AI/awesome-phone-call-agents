@@ -1,4 +1,4 @@
-import { buildPayload, INPUT_FIELDS } from '../lib/build-payload.js';
+import { buildPayload, INPUT_FIELDS, isDryRun } from '../lib/build-payload.js';
 import { redactDeep } from '../lib/redact.js';
 import { baseUrl } from '../lib/client.js';
 
@@ -6,7 +6,7 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   const { payload, key, errors } = buildPayload(bundle.inputData, { webhookUrl });
   if (errors.length) throw new Error(errors.join(' '));
 
-  if (bundle.inputData.dry_run === true || bundle.inputData.dry_run === 'true') {
+  if (isDryRun(bundle.inputData.dry_run)) {
     return {
       dry_run: true,
       call_id: null,
