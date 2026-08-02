@@ -4,7 +4,8 @@
  *
  *   npm run demo
  *
- * Nine beats: six calls that reach all five outcomes, then the three refusals. Every
+ * Nine beats: six calls that reach all five outcomes, then the three refusals. Refusal
+ * 1 is shown four ways, because it is four checks. Every
  * number is from the 555-01xx range kept aside for examples, so nothing here can ring
  * a handset. Nothing is asserted. Each beat prints what actually came back and the
  * counts at the end are added up from these runs, so a broken build prints a short
@@ -38,7 +39,8 @@ const BOT_LINES = [
 
 /** Everything the counts at the end are read off. */
 const reached: Outcome[] = [];
-const refusals: string[] = [];
+/** Which of the three refusals fired, by number, so one refusal shown twice counts once. */
+const refusals = new Set<string>();
 let placed = 0;
 let placedAfterRefusal = 0;
 
@@ -81,7 +83,13 @@ function edited(patch: Record<string, unknown>): unknown {
   return { ...file, contact: { ...(file.contact as Record<string, unknown>), ...patch } };
 }
 
-function refusedAtLoad(label: string, input: unknown): void {
+/** The same, for the trusted number, which is where the anchor is described. */
+function editedTrusted(patch: Record<string, unknown>): unknown {
+  const file = JSON.parse(readFileSync(claimFile, "utf8")) as Record<string, unknown>;
+  return { ...file, trusted_number: { ...(file.trusted_number as Record<string, unknown>), ...patch } };
+}
+
+function refusedAtLoad(refusal: string, label: string, input: unknown): void {
   try {
     parseClaim(input);
     process.stdout.write(`  ${label} did not refuse, which is a bug\n`);
@@ -89,7 +97,7 @@ function refusedAtLoad(label: string, input: unknown): void {
     if (!(error instanceof ClaimError)) {
       throw error;
     }
-    refusals.push(label);
+    refusals.add(refusal);
     process.stdout.write(`  refused at load: ${error.message}\n`);
   }
 }
@@ -148,7 +156,7 @@ async function main(): Promise<void> {
   process.stdout.write("  A call this app cannot read is never reported as a call that did not happen.\n");
 
   heading("7. Refusal 1: the number that made contact is never dialled");
-  refusedAtLoad("the number shown is the trusted number", edited({ number_shown: CLAIM.trustedNumber.phone }));
+  refusedAtLoad("1", "the number shown is the trusted number", edited({ number_shown: CLAIM.trustedNumber.phone }));
   // The same refusal at the point of dialling, with a fake that would answer on the
   // suspicious number. A claim built any other way than through the loader still
   // cannot ring it.
@@ -168,9 +176,23 @@ async function main(): Promise<void> {
   }
   placedAfterRefusal += fake.created.length;
   await fake.close();
+  // Two more ways the file can say the number came out of the contact. Comparing it
+  // with the caller id catches neither. Both end with this app ringing the line the
+  // message handed over.
+  refusedAtLoad(
+    "1",
+    "the number the message gave is the trusted number",
+    edited({ asked_for: `ring them straight back on ${CLAIM.trustedNumber.phone} to unblock the card` }),
+  );
+  refusedAtLoad(
+    "1",
+    "the trusted number was read off the message",
+    editedTrusted({ printed_on: "the voicemail they left" }),
+  );
 
   heading("8. Refusal 2: nothing the caller asked for is ever repeated");
   refusedAtLoad(
+    "2",
     "a card number in the claim file",
     edited({ asked_for: "read back 4111 1111 1111 1111 to unblock the card" }),
   );
@@ -178,6 +200,7 @@ async function main(): Promise<void> {
 
   heading("9. Refusal 3: this app never claims to be the customer");
   refusedAtLoad(
+    "3",
     "an instruction to be the customer",
     edited({ asked_for: "say you are Dana Whitfield when they ask" }),
   );
@@ -188,7 +211,7 @@ async function main(): Promise<void> {
   heading("Counts from this run");
   process.stdout.write(`  calls placed                 ${placed}\n`);
   process.stdout.write(`  outcomes reached             ${unique.length} of 5: ${unique.join(", ")}\n`);
-  process.stdout.write(`  refusals fired               ${refusals.length} of 3\n`);
+  process.stdout.write(`  refusals fired               ${refusals.size} of 3\n`);
   process.stdout.write(`  calls placed after a refusal ${placedAfterRefusal}\n`);
   process.stdout.write(`  records appended             ${verification.records}\n`);
   process.stdout.write(`  outcomes recomputed and held ${verification.ok ? verification.records : 0}\n`);

@@ -1,18 +1,20 @@
 /**
  * One claim, one call, one record.
  *
- * The three refusals ran when the claim file was loaded. Two of them run again
- * here, on the script this run is about to send, because the point where a call is
+ * The three refusals ran when the claim file was loaded. They run again here, on the
+ * claim and on the script this run is about to send, because the point where a call is
  * placed is the point that has to hold. A claim built any other way than through
- * the loader still cannot dial the number that made contact.
+ * the loader still cannot dial a number that came out of the contact.
  *
  * A call that cannot be settled is never reported as a call that did not happen. An
  * ambiguous create is replayed under the same idempotency key, which returns the
- * call CALL-E already has for that key rather than ringing the line twice.
+ * call CALL-E already has for that key rather than ringing the line twice. Once that
+ * create is ambiguous, reading the call back is the only thing that resolves it: any
+ * failure of the replay leaves the state unknown, whatever class of failure it is.
  */
 
 import { CalleApiError, CalleWaitTimeout, type CallePort } from "./calle.js";
-import { ClaimError, sameNumber } from "./config.js";
+import { ClaimError, sameNumber, sourceProblem } from "./config.js";
 import { evaluateCall, maskPhone } from "./decide.js";
 import { completionTime, isTerminalCallStatus } from "./evidence.js";
 import { whatToDo } from "./format.js";
@@ -35,12 +37,12 @@ export class RefusalError extends ClaimError {}
 export const CLOCK_SKEW_MS = 60_000;
 
 /**
- * The two refusals that have to hold at the moment of dialling.
+ * The refusals that have to hold at the moment of dialling.
  *
- * The loader already refused a claim file that carries a secret, that sets a
- * persona or that names the number which made contact as the trusted one. This is
- * the same check on the words that are about to be sent, so a script that picked up
- * something on the way cannot leave the machine.
+ * The loader already refused a claim file with no trust anchor left, one that carries
+ * a secret or one that sets a persona. This is the same set of checks on the claim the
+ * call is about to be built from, so a claim assembled any other way than through the
+ * loader cannot reach the line either.
  *
  * The scan covers the whole task, this app's own rules included, which is why those
  * rules are worded to pass it. See the note above the rules in `script.ts`.
@@ -50,6 +52,13 @@ export function preflight(claim: Claim): void {
     throw new RefusalError(
       "The only number this app dials is the trusted one from the claim file and it is the same number that made contact, so there is nothing to verify against. No call was placed.",
     );
+  }
+  // Every other way the claim can say the number to dial came out of the contact:
+  // either the number sitting in one of the contact fields or `printed_on` naming the
+  // message as the place it was read.
+  const source = sourceProblem(claim.contact, claim.trustedNumber);
+  if (source !== null) {
+    throw new RefusalError(source);
   }
   const known = [claim.trustedNumber.phone, claim.contact.number_shown];
   if (claim.customer.callback_number !== undefined) {
@@ -108,12 +117,21 @@ interface PlacedCall {
 }
 
 function failureOf(error: unknown): { code: string; ambiguous: boolean } {
+  if (error instanceof CalleWaitTimeout) {
+    // The wait gave up. The call is still CALL-E's and may still be talking.
+    return { code: "wait_timeout", ambiguous: true };
+  }
   if (error instanceof CalleApiError) {
     return { code: error.code, ambiguous: error.ambiguous };
   }
   // An error the adapter could not classify says nothing about the call, so it is
   // read as ambiguous rather than as a request that never landed.
   return { code: "sdk_error", ambiguous: true };
+}
+
+/** Both failures, in order, so a record names what actually happened rather than the last of it. */
+function chain(first: string, second: string): string {
+  return `${first}, then ${second}`;
 }
 
 async function placeCall(options: {
@@ -139,9 +157,14 @@ async function placeCall(options: {
     try {
       created = await port.createCall(input, key);
     } catch (retryError) {
+      // Reading the call back is the only thing that can resolve an ambiguous create.
+      // The class of this second failure says nothing about the first request: that
+      // one may already have been accepted. A 401 or a 403 here can be decided before
+      // the idempotency key is ever looked up. So every failure of the replay leaves
+      // the state unknown and both codes go into the record.
       const second = failureOf(retryError);
       progress(`Reconciling ${key} failed with ${second.code}. A call may be live under that key.`);
-      return { call: null, callId: null, errorCode: second.code, unresolved: true };
+      return { call: null, callId: null, errorCode: chain(failure.code, second.code), unresolved: true };
     }
     progress(`Reconciled ${key} to call ${created.id}.`);
   }
@@ -153,10 +176,11 @@ async function placeCall(options: {
     });
     return { call, callId: created.id, errorCode: null, unresolved: false };
   } catch (error) {
+    const waited = failureOf(error);
     progress(
       error instanceof CalleWaitTimeout
         ? `Call ${created.id} did not finish within ${Math.round(options.timeoutMs / 1000)}s.`
-        : `Polling ${created.id} failed with ${failureOf(error).code}.`,
+        : `Polling ${created.id} failed with ${waited.code}.`,
     );
     // The call exists either way, so its state is read once. A reply is not a
     // settled call: a read that comes back queued or in progress says the line may
@@ -165,13 +189,18 @@ async function placeCall(options: {
       const call = await port.getCall(created.id);
       if (!isTerminalCallStatus(call.status)) {
         progress(`Call ${created.id} read back as ${call.status || "no status"}, which is not a finished call.`);
-        return { call: null, callId: created.id, errorCode: `call_${call.status}`, unresolved: true };
+        return {
+          call: null,
+          callId: created.id,
+          errorCode: chain(waited.code, `call_${call.status}`),
+          unresolved: true,
+        };
       }
       return { call, callId: created.id, errorCode: null, unresolved: false };
     } catch (readError) {
       const failure = failureOf(readError);
       progress(`Reading ${created.id} failed with ${failure.code}. Its state is unknown.`);
-      return { call: null, callId: created.id, errorCode: failure.code, unresolved: true };
+      return { call: null, callId: created.id, errorCode: chain(waited.code, failure.code), unresolved: true };
     }
   }
 }

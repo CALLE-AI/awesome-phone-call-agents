@@ -216,6 +216,39 @@ test("the number that made contact is never dialled, even by a claim built by ha
   }
 });
 
+test("a number the message handed over is refused at the point of dialling too", async () => {
+  // The loader refuses both of these. This is the same pair on the claim the call
+  // would be built from, so a claim assembled any other way cannot dial a number that
+  // came out of the contact.
+  const cases: [Claim, RegExp][] = [
+    [
+      { ...CLAIM, contact: { ...CLAIM.contact, asked_for: `ring back on ${TRUSTED} to unblock it` } },
+      /contact\.asked_for carries the same number as trusted_number\.phone/,
+    ],
+    [
+      { ...CLAIM, trustedNumber: { ...CLAIM.trustedNumber, printed_on: "the voicemail they left" } },
+      /read off a voicemail/,
+    ],
+  ];
+  for (const [built, expected] of cases) {
+    const fake = await startFakeCalle([{ phone: TRUSTED, botLines: BOT_LINES, calleeLines: [PICK_UP, "Yes, that was us."] }]);
+    const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+    try {
+      await assert.rejects(
+        () => runCheck({ claim: built, port, pollIntervalMs: 5 }),
+        (error: unknown) => {
+          assert.ok(error instanceof RefusalError);
+          assert.match(error.message, expected);
+          return true;
+        },
+      );
+      assert.equal(fake.created.length, 0, "nothing may be placed once the refusal fires");
+    } finally {
+      await fake.close();
+    }
+  }
+});
+
 test("a script that would carry a secret refuses at the point of dialling", async () => {
   // The claim file loader refuses this too. Checking the built script as well means
   // a secret that arrived some other way still cannot be read out on a call.
