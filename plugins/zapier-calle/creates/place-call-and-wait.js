@@ -8,6 +8,8 @@ const perform = async (z, bundle) => {
   return createCall(z, bundle, { webhookUrl });
 };
 
+const isNonEmptyId = (value) => typeof value === 'string' && value.length > 0;
+
 const performResume = async (z, bundle) => {
   const event = bundle.cleanedRequest;
   const startedCallId = bundle.outputData && bundle.outputData.call_id;
@@ -21,8 +23,29 @@ const performResume = async (z, bundle) => {
     };
   }
 
+  // A callback URL is unauthenticated, so an unverifiable callback must fail
+  // closed to needs_human rather than fall through to a confirmed result.
   const eventCallId = event.data && event.data.id;
-  if (startedCallId && eventCallId && eventCallId !== startedCallId) {
+  const startedIdKnown = isNonEmptyId(startedCallId);
+  const eventIdPresent = isNonEmptyId(eventCallId);
+
+  if (!startedIdKnown) {
+    return {
+      ...bundle.outputData,
+      disposition: 'needs_human',
+      disposition_reason: 'Could not verify the callback: the call id this step started is unknown.',
+      is_actionable: false,
+    };
+  }
+  if (!eventIdPresent) {
+    return {
+      ...bundle.outputData,
+      disposition: 'needs_human',
+      disposition_reason: 'Could not verify the callback: it carried no call id.',
+      is_actionable: false,
+    };
+  }
+  if (eventCallId !== startedCallId) {
     return {
       ...bundle.outputData,
       disposition: 'needs_human',

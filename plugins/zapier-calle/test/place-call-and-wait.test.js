@@ -95,4 +95,31 @@ describe('place-call-and-wait performResume', () => {
     expect(output.disposition).toBe('needs_human');
     expect(output.disposition_reason).toMatch(/different call/i);
   });
+
+  it('fails closed when the started call id is unknown', async () => {
+    const output = await placeCallAndWait.operation.performResume(null, {
+      outputData: {},
+      cleanedRequest: completed,
+    });
+    expect(output.disposition).toBe('needs_human');
+    expect(output.is_actionable).toBe(false);
+  });
+
+  it('fails closed when the callback carries no call id', async () => {
+    const output = await placeCallAndWait.operation.performResume(null, {
+      outputData: { call_id: 'call_9' },
+      cleanedRequest: { ...completed, data: { ...completed.data, id: undefined } },
+    });
+    expect(output.disposition).toBe('needs_human');
+    expect(output.is_actionable).toBe(false);
+  });
+
+  it('still classifies normally when the ids match', async () => {
+    const output = await placeCallAndWait.operation.performResume(null, {
+      outputData: { call_id: 'call_9' },
+      cleanedRequest: completed,
+    });
+    expect(output.disposition).toBe('confirmed');
+    expect(output.is_actionable).toBe(true);
+  });
 });
