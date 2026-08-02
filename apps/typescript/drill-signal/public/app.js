@@ -5,6 +5,7 @@ const state = {
   authRequired: false,
   authHealthKnown: false,
   fakeServerReady: true,
+  liveReady: false,
 };
 
 const panels = ["create", "preview", "control", "report"];
@@ -173,7 +174,24 @@ async function loadHealth() {
 async function loadConfig() {
   const config = await api("/api/config");
   state.fakeServerReady = config.fakeServerReady !== false;
+  state.liveReady = config.liveReady === true;
+  renderLiveReadinessUI();
 }
+
+function renderLiveReadinessUI() {
+  const form = document.getElementById("create-form");
+  const mode = form.mode.value;
+  const warning = document.getElementById("live-readiness-warning");
+  const createBtn = form.querySelector(".btn-create");
+  const blocked = mode === "live" && !state.liveReady;
+  warning.hidden = !blocked;
+  warning.textContent = blocked
+    ? "Live mode is not ready. Configure CALLE_API_KEY on the server and restart, then reload this page."
+    : "";
+  createBtn.disabled = blocked;
+}
+
+document.getElementById("run-mode").addEventListener("change", renderLiveReadinessUI);
 
 document.getElementById("operator-token").addEventListener("change", (event) => {
   const value = event.target.value.trim();
@@ -187,6 +205,10 @@ document.getElementById("operator-token").addEventListener("change", (event) => 
 document.getElementById("create-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  if (form.mode.value === "live" && !state.liveReady) {
+    renderLiveReadinessUI();
+    return;
+  }
   const body = {
     primaryLabel: form.primaryLabel.value,
     primaryPhone: form.primaryPhone.value,
@@ -232,17 +254,19 @@ document.getElementById("launch-form").addEventListener("submit", async (event) 
     alert("Fake-server mode is not configured on the server. Set CALLE_BASE_URL or enable the embedded fake provider.");
     return;
   }
+  const launchErr = document.getElementById("launch-error");
   document.getElementById("launch-btn").disabled = true;
   try {
     const drill = await api(`/api/drills/${state.drillId}/launch`, {
       method: "POST",
       body: JSON.stringify({ launchConfirmed: form.launchConfirmed.checked }),
     });
+    launchErr.textContent = "";
     state.drill = drill;
     renderStatus(drill);
     startPoll();
   } catch (error) {
-    alert(error.message);
+    launchErr.textContent = error.message;
     document.getElementById("launch-btn").disabled = false;
   }
 });

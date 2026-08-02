@@ -86,6 +86,12 @@ export function validateCreateBody(body: CreateDrillBody): void {
   }
 }
 
+/** True when the server has a non-empty CALLE_API_KEY for live mode. */
+export function liveReady(): boolean {
+  const key = process.env.CALLE_API_KEY?.trim();
+  return Boolean(key && key.length > 0);
+}
+
 export function validateFakeServerBaseUrl(baseUrl: string | undefined): void {
   if (baseUrl === undefined || baseUrl.trim().length === 0 || baseUrl === "http://127.0.0.1:0") {
     throw new ConfigError(

@@ -9,6 +9,7 @@ import { resolvePublicDirectory } from "./public-dir.js";
 import {
   assertOperatorAuthConfigured,
   defaultPort,
+  liveReady,
   mutatingApiRequiresAuth,
   serverBindHost,
   serverOperatorToken,
@@ -138,11 +139,19 @@ export function createAppServer() {
           authRequired: mutatingApiRequiresAuth(),
           fakeServerReady: fakeReady,
           embeddedFakeAvailable: process.env.DRILL_SIGNAL_EMBEDDED_FAKE !== "0",
+          liveReady: liveReady(),
         });
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/drills") {
         const body = (await readBody(request)) as CreateDrillBody;
+        if (body.mode === "live" && !liveReady()) {
+          sendJson(response, 400, {
+            error:
+              "Live mode is not ready. Configure CALLE_API_KEY on the server and restart, then try again.",
+          });
+          return;
+        }
         const drill = service.createDrill(deps, body);
         sendJson(response, 201, service.publicDrillView(drill));
         return;

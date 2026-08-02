@@ -28,3 +28,21 @@ test("client preview payload omits live acknowledgment outside live mode", () =>
   );
   assert.ok(liveAckBlock, "live acknowledgment is only sent inside live-mode guard");
 });
+
+test("client consumes liveReady from /api/config and blocks live create when not ready", () => {
+  assert.match(appJs, /state\.liveReady = config\.liveReady === true/);
+  assert.match(appJs, /function renderLiveReadinessUI\(\)/);
+  assert.match(appJs, /mode === "live" && !state\.liveReady/);
+  assert.match(appJs, /live-readiness-warning/);
+  assert.match(indexHtml, /id="live-readiness-warning"/);
+  assert.match(indexHtml, /id="run-mode"/);
+  assert.doesNotMatch(appJs, /apiKey|CALLE_API_KEY.*input/i);
+});
+
+test("launch retry errors stay rendered in launch-error instead of transient alert", () => {
+  const launchHandler = appJs.slice(appJs.indexOf('getElementById("launch-form")'));
+  assert.match(launchHandler, /getElementById\("launch-error"\)/);
+  assert.match(launchHandler, /launchErr\.textContent = error\.message/);
+  assert.doesNotMatch(launchHandler, /alert\(error\.message\)/);
+  assert.match(indexHtml, /id="launch-error"/);
+});

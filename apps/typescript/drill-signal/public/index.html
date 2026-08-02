@@ -77,12 +77,13 @@
         </label>
         <label>
           Run mode
-          <select name="mode">
+          <select name="mode" id="run-mode">
             <option value="simulation" selected>Simulation (default, no network)</option>
             <option value="fake-server">Fake CALL-E server (local HTTP)</option>
             <option value="live">Live CALL-E (requires CALLE_API_KEY on server)</option>
           </select>
         </label>
+        <p id="live-readiness-warning" class="boundary-note" role="alert" hidden></p>
         <div class="actions sticky-actions">
           <button type="submit" class="btn primary btn-create">Create drill &amp; open preview</button>
         </div>
@@ -132,6 +133,7 @@
         </div>
       </form>
       <p id="fake-server-error" class="boundary-note" role="alert"></p>
+      <p id="launch-error" class="boundary-note" role="alert"></p>
       <p id="cancel-boundary" class="boundary-note"></p>
     </section>
 
