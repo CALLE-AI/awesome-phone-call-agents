@@ -163,6 +163,48 @@ describe('start-call', () => {
     expect(output.calling_window.allowed).toBe(true);
   });
 
+  it('refuses to dial a number on the suppression list and makes no request', async () => {
+    server = await startFakeCalle({});
+    const output = await startCall.operation.perform(
+      zFor(),
+      bundleFor(server, { ...input, suppression_list: '+15550123456' }),
+    );
+
+    expect(output.disposition).toBe('suppressed');
+    expect(output.is_actionable).toBe(false);
+    expect(output.call_id).toBe(null);
+    expect(output.suppression_enforced).toBe(true);
+    expect(output.matched_entry).not.toContain('5550123456');
+    expect(server.lastRequest()).toBe(null);
+  });
+
+  it('refuses to preview a suppressed number even on a dry run', async () => {
+    server = await startFakeCalle({});
+    const output = await startCall.operation.perform(
+      zFor(),
+      bundleFor(server, { ...input, dry_run: true, suppression_list: '+15550123456' }),
+    );
+
+    expect(output.dry_run).toBe(true);
+    expect(output.disposition).toBe('suppressed');
+    expect(output.is_actionable).toBe(false);
+    expect(output.call_id).toBe(null);
+    expect(output.preview).toBeUndefined();
+    expect(server.lastRequest()).toBe(null);
+  });
+
+  it('places the call normally when the suppression list does not match', async () => {
+    server = await startFakeCalle({});
+    const output = await startCall.operation.perform(
+      zFor(),
+      bundleFor(server, { ...input, suppression_list: '+15550199999' }),
+    );
+
+    expect(output.disposition).toBe('outcome_unknown');
+    expect(output.call_id).toMatch(/^call_/);
+    expect(server.lastRequest().path).toBe('/v1/calls');
+  });
+
   it('places the call normally when inside the configured calling window', async () => {
     server = await startFakeCalle({});
     // Same fixture, shifted to 15:00 UTC = 10:00 EST - inside 8-21.

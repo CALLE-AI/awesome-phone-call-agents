@@ -81,12 +81,12 @@ happens to look plausible but actually belongs to the other vocabulary is
 how a wrong branch gets taken: a status meant for a human reading a CLI
 table gets fed into a machine comparison it was never designed for.
 
-## 4. The eight dispositions
+## 4. The nine dispositions
 
 Rather than exposing raw provider fields to the rest of your workflow,
 collapse them into a small, closed set of dispositions and make every
 downstream branch key off that set instead of the raw fields. CALL-E's
-integration uses eight:
+integration uses nine:
 
 | Disposition | Actionable? | When it applies |
 | --- | --- | --- |
@@ -98,6 +98,7 @@ integration uses eight:
 | `outcome_unknown` | No | The call is still in a non-terminal state, or the payload describing it was unreadable. |
 | `needs_human` | No | Fail-closed default: a malformed event, an unrecognized event type, a missing or unrecognized status, or a callback that failed identity verification. |
 | `outside_calling_window` | No | The integration refused to place the call at all, because doing so would fall outside a configured quiet-hours window. See [Pre-flight refusals](#pre-flight-refusals) below - this one is not like the other seven. |
+| `suppressed` | No | The integration refused to place the call at all, because the recipient matched an entry on a caller-supplied do-not-call list. See [Pre-flight refusals](#pre-flight-refusals) below - like `outside_calling_window`, this one is not like the other seven. |
 
 Only one disposition is actionable without a human in the loop. Every
 other disposition, including a `confirmed` call whose extracted data is
@@ -110,27 +111,28 @@ silent no-op.
 
 ### Pre-flight refusals
 
-Seven of these eight dispositions classify a call that happened: the
+Seven of these nine dispositions classify a call that happened: the
 provider ran it, and the result - success, failure, ambiguity - is being
-read back. `outside_calling_window` is a different kind of thing. It is
-produced **before dialing**, by the integration itself rather than by the
-provider, when a policy the integration enforces (a quiet-hours window, in
-this case) says the call should not be placed right now. CALL-E's
-`deriveDisposition` classifier - the function that turns a webhook event
-into one of the other seven values - never returns it; nothing about it
-comes from a call outcome, because no call was placed.
+read back. `outside_calling_window` and `suppressed` are a different kind
+of thing. Each is produced **before dialing**, by the integration itself
+rather than by the provider, when a policy the integration enforces - a
+quiet-hours window, or a do-not-call list - says the call should not be
+placed right now. CALL-E's `deriveDisposition` classifier - the function
+that turns a webhook event into one of the other seven values - never
+returns either of them; nothing about either one comes from a call
+outcome, because no call was placed.
 
-This distinction generalizes past CALL-E: a refusal to place a call is a
-distinct outcome from any result of a call, and collapsing the two loses
+The general principle behind both: a refusal to place a call is a distinct
+outcome from any result of a call, and collapsing the two loses
 information the workflow needs. A workflow that cannot tell "the call
 failed" from "the call was never attempted because it would have violated
 policy" ends up either retrying a policy refusal on the next scheduled run
 (masking the policy as a transient failure) or, worse, treating a policy
 refusal as equivalent to a successful call because neither one is
-`failed`. Give a pre-flight refusal its own disposition, keep it out of
-the vocabulary your provider's callback can produce, and route it
-somewhere a human or a later retry step can see why the call never
-happened.
+`failed`. Give every pre-flight refusal its own disposition, keep all of
+them out of the vocabulary your provider's callback can produce, and route
+each one somewhere a human or a later retry step can see why the call
+never happened.
 
 ## 5. Three rules
 

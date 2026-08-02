@@ -3,10 +3,37 @@ import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { redactDeep } from '../lib/redact.js';
 import { baseUrl } from '../lib/client.js';
 import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
+import { checkSuppression } from '../lib/suppression.js';
 
 export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   const { payload, key, errors } = buildPayload(bundle.inputData, { webhookUrl });
   if (errors.length) throw new Error(errors.join(' '));
+
+  // A suppressed number must never be dialled, and that includes a dry run.
+  // This is the deliberate opposite of the calling-window guard just below:
+  // a dry run's purpose is to preview what would happen, and a preview has
+  // no timing, so it is safe to show what the calling window would decide at
+  // any hour. Suppression is not about timing - it is about the number
+  // itself - so echoing back a preview for a number that has been placed on
+  // a do-not-call list is not a harmless preview, it is the wrong behavior
+  // dressed up as one. Do not "fix" this asymmetry to match the window guard.
+  const suppressionCheck = checkSuppression({
+    phone: payload.recipients[0].phones[0],
+    suppressionList: bundle.inputData.suppression_list,
+  });
+
+  if (suppressionCheck.suppressed) {
+    return {
+      dry_run: isDryRun(bundle.inputData.dry_run),
+      call_id: null,
+      disposition: 'suppressed',
+      disposition_reason: suppressionCheck.reason,
+      is_actionable: false,
+      suppression_enforced: true,
+      matched_entry: suppressionCheck.matchedEntry,
+      correlation_id: payload.metadata.correlation_id,
+    };
+  }
 
   const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
 

@@ -99,6 +99,15 @@ the same as every other non-`confirmed` disposition above: escalate to the
 backup engineer, since a page that never dialed is exactly as unacknowledged
 as one that failed.
 
+This table also has no row for `suppressed`, for the same reason: leave
+`Do Not Call List` blank on both call steps here too. A suppression list
+exists to stop a person who has opted out of being contacted from being
+dialed again, which is the right guard for an outbound solicitation or
+qualification call. An on-call rotation is the opposite case - the on-call
+engineer and their backup are expected to be reachable while on rotation,
+and a paging recipe should not carry a do-not-call list that could silently
+suppress the very page the rotation exists to deliver.
+
 Escalating on ambiguity is deliberate. Only `confirmed` with
 `result_acknowledged = yes` stops the ladder; every other outcome, including
 an outcome that simply could not be classified, pages the backup engineer.

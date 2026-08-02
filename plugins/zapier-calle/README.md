@@ -32,10 +32,10 @@ credentials required.
 
 The integration places a phone call through the CALL-E Developer API, then
 either waits inside the Zap for the call to finish or returns immediately so
-a later step can look the result up. Every terminal outcome is classified
-into one of eight dispositions (see [Dispositions](#5-dispositions)) so a
-downstream step can branch on `is_actionable` instead of parsing free-text
-status strings.
+a later step can look the result up. Every terminal outcome, and every
+pre-flight refusal to dial, is classified into one of nine dispositions (see
+[Dispositions](#5-dispositions)) so a downstream step can branch on
+`is_actionable` instead of parsing free-text status strings.
 
 Two ways to wire it into a Zap:
 
@@ -86,7 +86,7 @@ rather than a set of visual-builder actions.
 
 | Name | Type | Key inputs |
 | --- | --- | --- |
-| `Place Call and Wait for Outcome` | Create | Call Task, Recipient Phone Number, Region (optional), Locale (optional), Recipient Timezone (optional, see [Calling windows](#calling-windows)), Result Schema (optional), Correlation ID (optional), Dry Run |
+| `Place Call and Wait for Outcome` | Create | Call Task, Recipient Phone Number, Region (optional), Locale (optional), Recipient Timezone (optional, see [Calling windows](#calling-windows)), Do Not Call List (optional, see [Suppression list](#suppression-list)), Result Schema (optional), Correlation ID (optional), Dry Run |
 | `Start Call (No Wait)` | Create | Same inputs as above |
 | `Find Call Result` | Search | Call ID |
 | `Call Completed` | Trigger (static webhook) | None - a URL you paste into CALL-E, see [Call Completed trigger](#call-completed-trigger) |
@@ -109,6 +109,7 @@ infers either from the phone number.
 | `calling_window_earliest_hour` (Earliest Local Hour) | No | Defaults to `8`. Only applies when Recipient Timezone is set. |
 | `calling_window_latest_hour` (Latest Local Hour) | No | Defaults to `21`. Only applies when Recipient Timezone is set. |
 | `calling_window_block_sunday` (Block Sunday Calls) | No | Defaults to `false`. Only applies when Recipient Timezone is set. |
+| `suppression_list` (Do Not Call List) | No | Numbers that must never be dialled, separated by commas or newlines. Matching is digits-only. See [Suppression list](#suppression-list). |
 | `result_schema` (Result Schema (JSON)) | No | JSON Schema for the structured result. See the allowlist in [Result schema support](#result-schema-support). |
 | `correlation_id` (Correlation ID) | No | Your own record id, echoed back on the result as `correlation_id`. |
 | `dry_run` (Dry Run) | No | Defaults to `false`. See [Dry run](#8-dry-run). |
@@ -210,6 +211,40 @@ does not know which state the recipient is actually in. The operator
 configuring this integration is responsible for determining which rules
 apply to their calls and configuring the fields accordingly.
 
+### Suppression list
+
+The CALL-E `CreateCallRequest` has no do-not-call support of its own, so
+setting `Do Not Call List` opts a call into a suppression guard: before
+either create action sends a request to CALL-E, it checks the recipient
+number against the list and refuses to dial a match. Like the calling
+window, this is **stateless** - the list is supplied fresh on every call,
+not stored anywhere by this integration, because a Zapier action has no
+durable storage available to it. Leaving the field blank disables the
+guard entirely and preserves the integration's prior behavior.
+
+Paste or map any mix of numbers separated by commas, semicolons, or
+newlines. Matching compares **digits only**, so `+1 (555) 012-3456`,
+`+15550123456`, and `15550123456` all match each other regardless of which
+form is on the list and which form was mapped into Recipient Phone Number.
+An entry also matches as a suffix of the target (or the target as a suffix
+of the entry) once both have at least 7 digits, so a national-format entry
+still catches an E.164 target and vice versa, without letting a very short
+entry suppress an unrelated number. A list that cannot be read as text (for
+example a mapped field carrying an object instead of a string) fails
+closed: the call is refused rather than risking a dial an unreadable list
+might have blocked.
+
+**Dry-run asymmetry, deliberate:** a dry run still previews outside the
+calling window, but a dry run does **not** preview for a suppressed number.
+The calling window is about timing, and a preview has no timing, so showing
+what the window would have decided is harmless at any hour. Suppression is
+about the number itself, not about when the call would happen - echoing
+back a preview for a number you have been told never to contact is not a
+harmless preview, it is the wrong behavior wearing a preview's clothes. Both
+create actions refuse a suppressed number the same way whether or not
+`Dry Run` is set, and `Place Call and Wait for Outcome` never generates a
+Zapier callback URL for a call it refused this way.
+
 ## 4. Outputs
 
 Every action, the search, and the `Call Completed` trigger return this
@@ -221,7 +256,7 @@ steps.
 
 | Field | Description |
 | --- | --- |
-| `disposition` | One of the eight values in [Dispositions](#5-dispositions). |
+| `disposition` | One of the nine values in [Dispositions](#5-dispositions). |
 | `disposition_reason` | Human-readable reason the disposition was chosen. |
 | `is_actionable` | `true` only when `disposition` is `confirmed`. |
 | `event_id` | The CALL-E webhook event id, when available. |
@@ -264,6 +299,7 @@ the integration.
 | `outcome_unknown` | `false` | The call is still `queued` or `in_progress`, or the webhook payload itself was unreadable. Deliberately distinct from `failed` - treating an ambiguous result as a failure is how a workflow ends up dialing someone twice. |
 | `needs_human` | `false` | Default, fail-closed branch: a malformed event, an unrecognized event type, a missing or unrecognized call status, or a callback that fails id verification (see [Callback verification](#callback-verification)). |
 | `outside_calling_window` | `false` | The call was refused before dialing because the current time in the recipient's configured timezone fell outside the calling window (see [Calling windows](#calling-windows)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
+| `suppressed` | `false` | The call was refused before dialing because the recipient number matched an entry on the supplied `Do Not Call List` (see [Suppression list](#suppression-list)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
 
 Only `confirmed` sets `is_actionable` to `true`. An unrecognized status or
 event type is never treated as a success - it always resolves to

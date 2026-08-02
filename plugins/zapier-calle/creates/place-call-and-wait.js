@@ -1,17 +1,28 @@
 import { createCall } from './start-call.js';
-import { isDryRun } from '../lib/build-payload.js';
+import { buildPayload, isDryRun } from '../lib/build-payload.js';
 import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { flattenResult } from '../lib/flatten-result.js';
 import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
+import { checkSuppression } from '../lib/suppression.js';
 
 const perform = async (z, bundle) => {
   const dryRun = isDryRun(bundle.inputData.dry_run);
   // A callback URL is only useful if createCall is actually going to dial,
-  // so both gates that stop it from dialing - dry run and calling-window
-  // enforcement - must also stop the URL from being minted here. Otherwise
-  // the Zap would strand itself waiting on a callback that never arrives.
+  // so every gate that stops it from dialing - suppression, dry run, and
+  // calling-window enforcement - must also stop the URL from being minted
+  // here. Otherwise the Zap would strand itself waiting on a callback that
+  // never arrives. Suppression is checked even on a dry run, unlike the
+  // calling window - see the comment in start-call.js's createCall.
+  const { payload, errors } = buildPayload(bundle.inputData, {});
+  const suppressed =
+    errors.length === 0 &&
+    checkSuppression({
+      phone: payload.recipients[0].phones[0],
+      suppressionList: bundle.inputData.suppression_list,
+    }).suppressed;
   const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
-  const webhookUrl = dryRun || !windowCheck.allowed ? undefined : z.generateCallbackUrl();
+  const webhookUrl =
+    suppressed || dryRun || !windowCheck.allowed ? undefined : z.generateCallbackUrl();
   return createCall(z, bundle, { webhookUrl });
 };
 

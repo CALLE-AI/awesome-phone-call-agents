@@ -3,7 +3,7 @@
 Four concrete, runnable Zap recipes built on the Zapier CALL-E integration.
 Each one names the exact apps, trigger, and actions to use; gives
 copy-pasteable Call Task text; a complete Result Schema; a routing table
-covering all eight dispositions; the Zapier plan you need; and what to
+covering all nine dispositions; the Zapier plan you need; and what to
 verify before you let it place real calls.
 
 | Recipe | Purpose | Zapier plan |
@@ -32,9 +32,10 @@ call with `HTTP 422` and error code `call_not_ready` until the missing
 information is supplied. See each recipe's "What to check" section for
 details.
 
-None of these recipes set `Recipient Timezone (IANA)`, so none of them
-enforce a calling window out of the box. If you add one, every routing
-table except `incident-escalation.md`'s has a row for the resulting
-`outside_calling_window` disposition - a call refused before dialing, not a
-result of one. `incident-escalation.md` explains why a paging recipe
-should generally leave the calling window disabled instead.
+None of these recipes set `Recipient Timezone (IANA)` or `Do Not Call
+List`, so none of them enforce a calling window or a suppression list out
+of the box. If you add either one, every routing table except
+`incident-escalation.md`'s has a row for the resulting
+`outside_calling_window` or `suppressed` disposition - a call refused
+before dialing, not a result of one. `incident-escalation.md` explains why
+a paging recipe should generally leave both guards disabled instead.

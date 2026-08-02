@@ -81,6 +81,34 @@ describe('place-call-and-wait perform', () => {
     }
   });
 
+  it('generates no callback url and makes no request for a suppressed number', async () => {
+    server = await startFakeCalle({});
+    const generated = [];
+    const output = await placeCallAndWait.operation.perform(zFor(generated), {
+      authData: { apiKey: 'k', baseUrl: server.url },
+      inputData: { ...input, suppression_list: '+15550123456' },
+    });
+
+    expect(generated).toEqual([]);
+    expect(output.disposition).toBe('suppressed');
+    expect(output.is_actionable).toBe(false);
+    expect(server.lastRequest()).toBe(null);
+  });
+
+  it('generates no callback url for a suppressed number even on a dry run', async () => {
+    server = await startFakeCalle({});
+    const generated = [];
+    const output = await placeCallAndWait.operation.perform(zFor(generated), {
+      authData: { apiKey: 'k', baseUrl: server.url },
+      inputData: { ...input, dry_run: true, suppression_list: '+15550123456' },
+    });
+
+    expect(generated).toEqual([]);
+    expect(output.dry_run).toBe(true);
+    expect(output.disposition).toBe('suppressed');
+    expect(server.lastRequest()).toBe(null);
+  });
+
   it('generates no callback url and makes no request outside the calling window', async () => {
     server = await startFakeCalle({});
     const generated = [];

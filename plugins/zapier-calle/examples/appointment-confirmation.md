@@ -79,6 +79,7 @@ must already be in E.164 format, for example `+15550123456`.
 | `outcome_unknown` | - | Log a "Still in progress - recheck" row. Do not treat this as a failed or missed call - see the note below. |
 | `needs_human` | - | Log a "Needs review" row with `disposition_reason`. A human calls back. |
 | `outside_calling_window` | - | Log a "Not called - outside calling window" row with `disposition_reason`. No call was placed; a human reschedules the confirmation call for the next allowed hour rather than treating a no-show as a decline. |
+| `suppressed` | - | Log a "Not called - on do-not-call list" row with `disposition_reason`. No call was placed; a human follows up by another channel rather than dialing a number that has been placed on the Do Not Call List. |
 
 Only `confirmed` with `result_confirmed = yes` needs no follow-up. Every
 other outcome, including an ambiguous `confirmed` result, gets logged for a

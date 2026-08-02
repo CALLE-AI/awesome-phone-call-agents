@@ -63,6 +63,14 @@ export const INPUT_FIELDS = [
       'When true, refuses to call on Sunday in the recipient local timezone. Florida prohibits Sunday solicitation calls. Only applies when Recipient Timezone is set.',
   },
   {
+    key: 'suppression_list',
+    label: 'Do Not Call List',
+    type: 'text',
+    required: false,
+    helpText:
+      'Paste or map a list of numbers that must never be dialled, separated by commas or newlines. Matching ignores formatting and compares digits only. Leave blank to disable. Used for this call only - not stored.',
+  },
+  {
     key: 'result_schema',
     label: 'Result Schema (JSON)',
     type: 'text',
