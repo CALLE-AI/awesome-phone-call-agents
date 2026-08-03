@@ -1,0 +1,227 @@
+body.call-in-progress {
+  overflow: hidden;
+}
+
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(7, 23, 56, .3);
+  backdrop-filter: blur(13px) saturate(.78);
+  -webkit-backdrop-filter: blur(13px) saturate(.78);
+  animation: overlay-in .22s ease-out;
+}
+
+.call-overlay-card {
+  position: relative;
+  width: min(430px, 100%);
+  overflow: hidden;
+  padding: 34px 34px 26px;
+  text-align: center;
+  color: #112b5c;
+  background: rgba(255, 255, 255, .97);
+  border: 1px solid #cfe1f6;
+  border-radius: 22px;
+  box-shadow: 0 30px 80px rgba(6, 27, 72, .35);
+  animation: card-in .3s cubic-bezier(.2, .8, .2, 1);
+}
+
+.call-overlay-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(90deg, #123f9a, #2f81e5, #71b7ff);
+}
+
+.call-status-dot {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #297be1;
+  box-shadow: 0 0 0 0 rgba(41, 123, 225, .6);
+  animation: status-pulse 1.5s infinite;
+}
+
+.call-animation {
+  display: block;
+  width: 132px;
+  height: 132px;
+  margin: -6px auto 14px;
+  object-fit: contain;
+}
+
+.call-overlay h2 {
+  margin: 0 0 9px;
+  color: #102c62;
+  font: 700 25px/1.15 'DM Sans', sans-serif;
+  letter-spacing: -.7px;
+}
+
+.call-overlay #call-overlay-detail {
+  min-height: 42px;
+  margin: 0;
+  color: #4b6287;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.call-overlay-note {
+  margin: 19px 0 15px;
+  padding-top: 16px;
+  border-top: 1px solid #e2ebf5;
+  color: #7788a3;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes status-pulse {
+  70% { box-shadow: 0 0 0 11px rgba(41, 123, 225, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(41, 123, 225, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-overlay,
+  .call-overlay-card,
+  .call-status-dot {
+    animation: none;
+  }
+
+  .call-animation {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .call-overlay-card {
+    padding: 31px 23px 23px;
+  }
+}
+ .icon-attribution {
+  color: #3976c7;
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.icon-attribution:hover,
+.icon-attribution:focus-visible {
+  text-decoration: underline;
+}
+
+.transcript-download {
+  grid-column: 2 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-self: start;
+  margin-top: 2px;
+  padding: 8px 11px;
+  border: 1px solid #a9c9ed;
+  border-radius: 7px;
+  color: #1559b7;
+  background: #f6faff;
+  font: 600 12px 'DM Sans', sans-serif;
+  text-decoration: none;
+}
+
+.transcript-download:hover,
+.transcript-download:focus-visible {
+  border-color: #397bd5;
+  background: #eaf4ff;
+}
+
+.transcript-download span {
+  font-size: 16px;
+  line-height: 11px;
+}
+
+.transcript-status {
+  grid-column: 2 / -1;
+  margin: 3px 0 0;
+  color: #7788a3;
+  font-size: 11px;
+}
+
+.activity-pdf,
+.activity-view-pdfs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border: 1px solid #b8d4f3;
+  border-radius: 6px;
+  padding: 5px 7px;
+  color: #175db9;
+  background: #f5faff;
+  font: 600 10px 'DM Sans', sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.activity-view-pdfs {
+  appearance: none;
+}
+
+.activity-pdf:hover,
+.activity-pdf:focus-visible,
+.activity-view-pdfs:hover,
+.activity-view-pdfs:focus-visible {
+  border-color: #3a80d9;
+  background: #eaf4ff;
+}
+
+.analytics-overflow {
+  margin-top: 14px;
+  border-top: 1px solid #e1eaf5;
+}
+
+.analytics-overflow summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 2px 2px;
+  color: #2266c3;
+  font: 600 12px 'DM Sans', sans-serif;
+  cursor: pointer;
+  list-style: none;
+}
+
+.analytics-overflow summary::-webkit-details-marker {
+  display: none;
+}
+
+.analytics-overflow summary span {
+  font-size: 16px;
+  transition: transform .18s ease;
+}
+
+.analytics-overflow[open] summary span {
+  transform: rotate(180deg);
+}
+
+.analytics-overflow-list {
+  padding-top: 4px;
+}
+
+@media (max-width: 520px) {
+  .transcript-download,
+  .transcript-status {
+    grid-column: 2;
+  }
+}
