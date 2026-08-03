@@ -185,17 +185,21 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
  *
  * The same two kinds as a fresh call. A read that fails, and a call CALL-E has
  * not finished with, leave it unresolved with its id kept, so it stays this
- * app's to settle rather than becoming an answer.
+ * app's to settle rather than becoming an answer. The key comes from the ledger
+ * and is carried through untouched, so the entry this produces still names the
+ * key the call was created under.
  */
 async function settleExisting(
   port: CallePort,
   callId: string,
+  key: string | null,
   timeoutMs: number,
   pollIntervalMs: number,
 ): Promise<CallOutcome> {
   const settle = (call: CallSnapshot, errorCode: string | null): CallOutcome => ({
     call,
     callId,
+    idempotencyKey: key,
     errorCode: errorCode ?? (TERMINAL_STATUSES.has(call.status) ? null : "not_finished"),
     unresolved: !TERMINAL_STATUSES.has(call.status),
   });
@@ -204,7 +208,7 @@ async function settleExisting(
       return settle(await port.getCall(callId), errorCode);
     } catch (error) {
       const code = error instanceof CalleCallError ? error.code : "sdk_error";
-      return { call: null, callId, errorCode: `${errorCode}, then ${code}`, unresolved: true };
+      return { call: null, callId, idempotencyKey: key, errorCode: `${errorCode}, then ${code}`, unresolved: true };
     }
   };
   try {
@@ -290,7 +294,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   }
   if (started.request_digest !== requestDigest(request)) {
     throw new ResumeError(
-      `${options.ledgerPath} was written from a different request. Resume needs the request the run started with, because that is what rebuilds the same idempotency keys.`,
+      `${options.ledgerPath} was written from a different request. Resume finishes the coordination this ledger recorded, so it needs the request that started it: who is called, on which slot, inside which calling hours and against which window.`,
     );
   }
   const state = inspectLedger(entries);
@@ -355,7 +359,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     let outcome: CallOutcome;
     let placedCall = false;
     if (previous.call_id !== null) {
-      outcome = await settleExisting(port, previous.call_id, timeoutMs, pollIntervalMs);
+      outcome = await settleExisting(port, previous.call_id, previous.idempotency_key ?? null, timeoutMs, pollIntervalMs);
     } else if (previous.phase === "confirm" && now() >= deadline) {
       // The key would place this call if CALL-E does not already have it, and
       // asking somebody to commit to a time this coordination can no longer act
@@ -379,9 +383,14 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       stuck.push(party.id);
       continue;
     } else {
-      // The same idempotency key. CALL-E answers with the call it already has, or
-      // places the one this run owed. Charged to the budget either way, because
-      // from here the two cannot be told apart.
+      // The key the ledger recorded, not a fresh one. CALL-E answers with the
+      // call it already has under that key, or places the one this run owed.
+      // Charged to the budget either way, because from here the two cannot be
+      // told apart. Deriving the key again would be a different key the moment
+      // any call script in this repo changed between the crash and the resume,
+      // and a different key rings a second phone. An entry written before keys
+      // were recorded has none, so that one is derived and the request digest is
+      // the only thing standing behind it.
       placedCall = true;
       calls += 1;
       outcome = await placeCall({
@@ -394,6 +403,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
         schema: previous.phase === "release" ? releaseSchema() : confirmSchema(),
         timeoutMs,
         pollIntervalMs,
+        ...(previous.idempotency_key == null ? {} : { key: previous.idempotency_key }),
       });
     }
     const result = evaluateCommit(request, party, slot, previous.phase, outcome, span());

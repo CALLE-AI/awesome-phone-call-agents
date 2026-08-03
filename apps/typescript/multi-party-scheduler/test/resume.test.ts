@@ -7,14 +7,15 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { CalleCallError, createSdkPort, type CallePort } from "../src/calle.js";
-import { runCoordination } from "../src/coordinate.js";
+import { placeCall, runCoordination } from "../src/coordinate.js";
 import { readEntries, replay } from "../src/ledger.js";
 import { inspectLedger, resumeCoordination, ResumeError } from "../src/resume.js";
+import { confirmSchema, confirmTask } from "../src/script.js";
 import type { CommitResult, LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
 import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
@@ -191,6 +192,133 @@ test("resume refuses a ledger another request wrote", async () => {
       },
     );
   });
+});
+
+/**
+ * Only the id is edited. Every word a call would say is identical, so nothing in
+ * the request changes who is rung or what they hear. The id still decides the
+ * call: it is the first thing every idempotency key is built from and it rides in
+ * the metadata, so a resume that accepted this ledger would reconcile an
+ * accepted-but-lost create under a key CALL-E has never seen and place a second
+ * call to somebody whose first one may still be live.
+ */
+test("resume refuses a ledger when only the request id was edited", async () => {
+  await withFake(async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const placed = fake.created.length;
+    const renamed = coordinationRequest({ request_id: "ash-lane-3b-leak-2" });
+    await assert.rejects(
+      () => resumeCoordination({ request: renamed, port, ledgerPath: path, pollIntervalMs: 5 }),
+      (error: unknown) => {
+        assert.ok(error instanceof ResumeError);
+        assert.match(error.message, /written from a different request/);
+        return true;
+      },
+    );
+    assert.equal(fake.created.length, placed, "and nothing was dialled");
+  });
+});
+
+/**
+ * The key is durable state, not something recomputed.
+ *
+ * Deriving it again reads the task text, which lives in this repo rather than in
+ * the request: a run that crashed, an upgrade that touched one line of a call
+ * script, then a resume, and the derived key is a different key. So the key the
+ * create went out under is recorded and re-issued verbatim. The ledger below is
+ * stamped with a key nothing could derive, which is the only way to prove where
+ * the string on the wire came from.
+ */
+test("resume re-issues the key the ledger recorded rather than deriving a new one", async () => {
+  await withFake(async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    const lossy: CallePort = {
+      ...port,
+      async createCall(input, key) {
+        const call = await port.createCall(input, key);
+        if (key.startsWith("mps-ash-lane-3b-leak-confirm-superintendent")) {
+          throw new CalleCallError("connection_error", "the create response never arrived");
+        }
+        return call;
+      },
+    };
+    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(first.outcome, "unresolved");
+    const lost = readEntries(path).find(
+      (entry) => entry.kind === "commit" && entry.result.party_id === "superintendent",
+    );
+    assert.ok(lost !== undefined && lost.kind === "commit");
+    assert.equal(lost.result.call_id, null, "the create response never came back");
+    assert.equal(
+      lost.result.idempotency_key,
+      fake.created.at(-1)?.idempotencyKey,
+      "so the recorded key is the only handle on that call",
+    );
+
+    const recorded = "mps-key-only-this-ledger-knows";
+    writeFileSync(
+      path,
+      `${readEntries(path)
+        .map((entry) =>
+          entry.kind === "commit" && entry.result.party_id === "superintendent"
+            ? JSON.stringify({ ...entry, result: { ...entry.result, idempotency_key: recorded } })
+            : JSON.stringify(entry),
+        )
+        .join("\n")}\n`,
+    );
+
+    await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(fake.created.at(-1)?.idempotencyKey, recorded, "resume sent the key it read");
+    const reconciled = readEntries(path).find((entry) => entry.kind === "reconcile");
+    assert.ok(reconciled !== undefined && reconciled.kind === "reconcile");
+    assert.equal(reconciled.result.idempotency_key, recorded, "and the entry names it");
+  });
+});
+
+/**
+ * What an upgrade between the crash and the resume looks like from CALL-E's side:
+ * the recorded key with different words behind it. The API answers 409 rather than
+ * placing anything, 409 leaves the call unknown, so it comes back unresolved and
+ * the round stops. Nobody is rung twice either way, which is the whole point of
+ * re-issuing the recorded key instead of deriving one that would have been new.
+ */
+test("a recorded key re-issued with a different body stops rather than ringing again", async () => {
+  const fake = await startFakeCalle([confirmYes(PLUMBER)]);
+  const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+  try {
+    const request = coordinationRequest();
+    const party = request.parties[0]!;
+    const slot = request.slots[1]!;
+    const key = "mps-ash-lane-3b-leak-confirm-plumber-thu-14-0123456789ab";
+    const place = (task: string) =>
+      placeCall({
+        request,
+        port,
+        party,
+        phase: "confirm",
+        slot,
+        task,
+        schema: confirmSchema(),
+        timeoutMs: 2_000,
+        pollIntervalMs: 5,
+        key,
+      });
+
+    const original = await place(confirmTask(request, party, slot));
+    assert.equal(original.unresolved, false, "the call was placed and read back");
+    assert.equal(original.idempotencyKey, key);
+
+    const upgraded = await place(`${confirmTask(request, party, slot)}\n- A rule that was not in the script before.`);
+    assert.equal(upgraded.unresolved, true, "a call that may exist is never written off");
+    assert.match(upgraded.errorCode ?? "", /idempotency_conflict/);
+    assert.equal(upgraded.idempotencyKey, key, "the entry names the key that was sent");
+    assert.equal(fake.created.length, 1, "and the new body never became a second call");
+  } finally {
+    await fake.close();
+  }
 });
 
 /**

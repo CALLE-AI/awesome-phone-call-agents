@@ -96,7 +96,7 @@ Node 20.6 or later, which is what `node --import` needs.
 cd apps/typescript/multi-party-scheduler
 npm install
 npm run check   # tsc --noEmit
-npm test        # 82 tests, no credentials, no outbound calls
+npm test        # 126 tests, no credentials, no outbound calls
 npm run demo    # four runs against the local fake CALL-E
 ```
 
@@ -141,11 +141,18 @@ Both leave somebody expecting an appointment that is not happening.
 `resume` reads the ledger, settles every call it cannot account for and places
 the release calls that are still owed. A call with an id is settled by asking for
 it. A call with no id, which is what a lost create response leaves behind, is
-settled by re-issuing the same idempotency key: CALL-E answers with the call it
-already has or places the one the run owed. It never gathers availability again
-and never picks a different slot and once any release call has gone out the
-appointment stays off, so a late yes cannot bring it back. Anything it still
-cannot settle is named in the note for a human to check.
+settled by re-issuing the idempotency key the ledger recorded for it: CALL-E
+answers with the call it already has or places the one the run owed. That key is
+read, never derived a second time, because deriving it reads the call script and
+the script lives in this repo: a crash, an upgrade, then a resume would otherwise
+send a key CALL-E has never seen and ring a second phone. It never gathers
+availability again and never picks a different slot and once any release call has
+gone out the appointment stays off, so a late yes cannot bring it back. Anything it
+still cannot settle is named in the note for a human to check.
+
+It also refuses to touch a ledger unless the request digest matches. That digest is
+taken over the request whole, so an edit to anything, the id included, is a refusal
+rather than a second call.
 
 ## The protocol
 
@@ -215,14 +222,16 @@ each answer, the slot that choice implies and whether the outcome follows. A
 ledger that says Thursday when the recorded answers do not intersect on Thursday
 fails, which a plain log cannot catch. A terminal outcome that is not a
 confirmation has to show every party who said yes either released or named in
-`unreleased`. One ledger is written by one process at a time: the run takes an
-`O_EXCL` lock on `<ledger>.lock` before it dials anybody.
+`unreleased`. Every line for a call also records the idempotency key it went out
+under, which is the only handle on a create whose response was lost. One ledger is
+written by one process at a time: the run takes an `O_EXCL` lock on
+`<ledger>.lock` before it dials anybody.
 
 ## The request file
 
 | Field | Notes |
 | --- | --- |
-| `request_id` | Stable per coordination. Part of every idempotency key, so a retried run reuses calls instead of ringing people again. |
+| `request_id` | Stable per coordination. Part of every idempotency key and bound into the resume digest, so a retried run reuses calls instead of ringing people again and an edited id is refused rather than dialled. |
 | `meeting.purpose` | Read out loud. 120 characters, because a call is not a document. |
 | `meeting.timezone` | IANA name, required. Times are spoken in this zone and never inferred from a number or a locale. |
 | `slots[]` | Two to four options, each a full ISO 8601 instant with an offset. The offset must agree with the timezone at that instant or the request is refused. |
@@ -260,7 +269,9 @@ confirmation has to show every party who said yes either released or named in
   https on its own is not trust: it says the wire is encrypted, not who answers.
   Anything else is refused rather than warned about.
 - Every idempotency key carries a short sha256 of the call payload, so a call is
-  reused only when it would say the same words.
+  reused only when it would say the same words. The key goes into the ledger with
+  the call and `resume` sends that exact string back, so recovery cannot invent a
+  new key after the scripts have moved on.
 - Ledgers are appended with mode `0600`, re-applied on every append rather than
   only when the file is created. A target that is not a regular file is refused.
   Numbers are masked to the country code

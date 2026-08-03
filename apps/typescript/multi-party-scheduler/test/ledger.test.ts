@@ -24,7 +24,7 @@ import {
   replay,
   requestDigest,
 } from "../src/ledger.js";
-import type { LedgerEntry } from "../src/types.js";
+import type { CoordinationRequest, LedgerEntry } from "../src/types.js";
 import { startFakeCalle, type FakeScript } from "../fake/calle-server.js";
 import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
 
@@ -76,7 +76,9 @@ test("canonical json ignores key order and digests are stable", () => {
 // anything that changes who gets dialled or what they hear has to move the
 // digest. Otherwise resume passes its check, builds a different payload, gets a
 // different idempotency key and places a second call to somebody else while the
-// first one may still be live.
+// first one may still be live. The two computed slot fields are in here as well:
+// `spoken` is rendered by the runtime's locale data rather than by this app, so a
+// resume that would read a different line out loud is refused rather than run.
 test("every call-affecting party field moves the request digest", () => {
   const base = requestDigest(coordinationRequest());
   const edits: [string, (request: ReturnType<typeof coordinationRequest>) => void][] = [
@@ -91,11 +93,41 @@ test("every call-affecting party field moves the request digest", () => {
     ["party order", (request) => void request.parties.reverse()],
     ["slot start", (request) => void (request.slots[0]!.start = "2026-08-09T10:00:00-07:00")],
     ["slot option", (request) => void (request.slots[0]!.option = 9)],
+    ["slot spoken", (request) => void (request.slots[0]!.spoken = "option 1, Thursday, August 6 at 10:00 a.m.")],
+    ["slot startMs", (request) => void (request.slots[0]!.startMs += 60_000)],
   ];
   for (const [what, edit] of edits) {
     const request = coordinationRequest();
     edit(request);
     assert.notEqual(requestDigest(request), base, `editing ${what} must not pass a resume check`);
+  }
+});
+
+// Every version of this digest that named the fields it bound left one out: the
+// party fields first, then `requestId`, which is what every idempotency key
+// starts with and what sits in the metadata of every call. So the digest binds the
+// request whole and this pins that. The map is typed over every key of
+// `CoordinationRequest`, so a new field fails the typecheck here until somebody
+// says how it moves the digest, and the key comparison catches a field that
+// reaches the object without reaching the type.
+test("every field of the request is bound into the digest", () => {
+  const base = requestDigest(coordinationRequest());
+  const edits: Record<keyof CoordinationRequest, (request: CoordinationRequest) => void> = {
+    requestId: (request) => void (request.requestId = "ash-lane-3b-leak-2"),
+    meeting: (request) => void (request.meeting.organizer = "a different organizer"),
+    slots: (request) => void (request.slots[0]!.start = "2026-08-09T10:00:00-07:00"),
+    parties: (request) => void (request.parties[0]!.phone = "+15550001111"),
+    policy: (request) => void (request.policy.maxCalls += 1),
+  };
+  assert.deepEqual(
+    Object.keys(edits).sort(),
+    Object.keys(coordinationRequest()).sort(),
+    "a request field with no edit here is a field nothing proves is bound",
+  );
+  for (const [field, edit] of Object.entries(edits)) {
+    const request = coordinationRequest();
+    edit(request);
+    assert.notEqual(requestDigest(request), base, `editing ${field} must not pass a resume check`);
   }
 });
 

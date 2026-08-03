@@ -150,21 +150,24 @@ to prevent.
 
 `resume --request <file> --ledger <file> --live` reads the ledger and:
 
-- refuses to touch it unless the request digest matches, because the same request
-  is what rebuilds the same idempotency keys. The digest binds the meeting, the
-  policy, every slot id, option and start, and every party in full: name, phone,
-  role, region, locale, recorded consent and calling hours. Parties go in whole
-  rather than field by field so that a new call-affecting field is bound by
-  default. That matters because a create with no call id is rebuilt from the
-  request in hand, so a digest that ignored the phone number would let an edited
-  party pass the check, build a different payload, take a different idempotency
-  key, and place a fresh call to somebody else while the original ambiguous call
-  might still be live
+- refuses to touch it unless the request digest matches. The digest is taken over
+  the request whole, so the id, the meeting, the policy, every slot field and every
+  party field are bound, and a field added to the request later is bound the day it
+  is added. Earlier versions of it named the fields to bind and every list left one
+  out: the party fields first, then `request_id`, which is what every idempotency
+  key starts with. That matters because a create with no call id is rebuilt from
+  the request in hand, so an edit the digest waved through would build a different
+  payload, take a different key with it, and place a fresh call to somebody while
+  the original ambiguous call might still be live
 - settles every call the ledger cannot account for. A call with an id is settled by
   asking for it, which places nothing. A call with no id, which is what a lost
-  create response leaves, is settled by re-issuing the same idempotency key: CALL-E
-  answers with the call it already has or places the one the run owed. That is
-  charged to the call budget, because from the outside the two cannot be told apart
+  create response leaves, is settled by re-issuing the key the ledger recorded for
+  that call: CALL-E answers with the call it already has or places the one the run
+  owed. That is charged to the call budget, because from the outside the two cannot
+  be told apart. The key is read rather than derived a second time. Deriving it
+  reads the task text and the task text lives in this repo, not in the request, so
+  a crash, an upgrade that touched one line of a call script, then a resume, and the
+  derived key would be a new key ringing a second phone
 - places the release calls that are owed, most recent yes first
 - writes a fresh outcome entry, so the ledger still replays as one history
 
@@ -238,9 +241,17 @@ uses the same canonical JSON the ledger uses for its request digest.
 Identifiers alone were not enough. Two runs with an edited script would share a
 key, so CALL-E would either replay the old call or reject the new body with
 `idempotency_conflict`. With the digest in the key, the same words reuse the same
-call and different words get their own key. That is also what makes recovery
-possible: `resume` rebuilds the same payload and therefore the same key, so
-settling a call cannot create a second one.
+call and different words get their own key.
+
+That last property is also why recovery does not derive the key a second time.
+Every call entry in the ledger records the key its call went out under, and
+`resume` sends that string back verbatim. A key derived again would read the task
+text out of this repo, so a run that crashed, an upgrade that touched one line of a
+script, then a resume would produce a key CALL-E has never seen and place a second
+call. Re-issuing the recorded key cannot do that: the same body hands back the same
+call, and a body that no longer matches is refused with `idempotency_conflict`,
+which is ambiguous, so the round stops with the call unresolved rather than dialling
+anybody.
 
 The keys are the reservation that stops a person being dialled twice and that
 reservation lives at CALL-E. The ledger is not a substitute for it. What the ledger
@@ -252,9 +263,11 @@ lines into one history.
 
 One JSON line per event: `run_started`, `gather`, `slot_chosen`, `commit`,
 `release`, `resume_started`, `reconcile`, `outcome`. Each `gather` entry stores the
-feasible set before and after it, plus the recorded answer. A `reconcile` entry
-records a call `resume` settled and says whether settling it had to place a call,
-which is what keeps the budget honest.
+feasible set before and after it, plus the recorded answer. Every entry for a call
+records the idempotency key that call went out under, which is what lets recovery
+settle a create whose response was lost without deriving a new key. A `reconcile`
+entry records a call `resume` settled and says whether settling it had to place a
+call, which is what keeps the budget honest.
 
 `replay` recomputes the whole run from those answers and reports the first thing
 that does not follow: a feasible set that grew, a chosen slot the answers do not
@@ -275,7 +288,7 @@ That last set of checks is the reason the ledger is worth keeping. A log that sa
 ## Data handling
 
 Stored: party id, the phone number masked to country code plus the last two
-digits, the CALL-E call id and provider call id, the option numbers, the decisive
-turns and the outcome.
+digits, the CALL-E call id and provider call id, the idempotency key the call was
+placed under, the option numbers, the decisive turns and the outcome.
 
 Not stored: the full phone number, the full transcript, the API key.

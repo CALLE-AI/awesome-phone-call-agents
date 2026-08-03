@@ -53,29 +53,24 @@ export function digestOf(value: unknown): string {
 /**
  * What a resume is allowed to assume has not changed.
  *
- * This has to bind every field that can change who gets dialled or what they
- * hear, because an unresolved create with no call id is later rebuilt from the
- * request in hand. Binding only party ids let somebody edit a phone number under
- * the same request id: the digest still matched, the payload differed, the
- * idempotency key differed with it, and resume would place a fresh call to a
- * different number while the original ambiguous call might still be live.
+ * The whole request goes in, because an unresolved create with no call id is
+ * later rebuilt from the request in hand and anything that moves the payload
+ * moves the idempotency key with it. This function used to name the fields to
+ * bind and every version of that list left something out: first the party
+ * fields, then `requestId`, which is the first thing every key is built from and
+ * is in the metadata of every call. A list has to be right forever, so there is
+ * no list. A field added to `CoordinationRequest` is bound the day it is added,
+ * and the cost of forgetting one is a refused resume rather than a second call
+ * to somebody who may already have one live.
  *
- * So parties go in whole rather than field by field. A new call-affecting field
- * on Party is then bound by default, and the failure mode of forgetting one is a
- * refused resume instead of a call to the wrong person.
- *
- * Slots drop `startMs` and `spoken`, which are pure functions of `start`,
- * `option` and the meeting timezone, all of which are bound. `option` is kept
- * because it is the number the callee hears, so slot order is part of the
- * contract.
+ * `startMs` and `spoken` are bound too, though both are computed from `start`,
+ * `option` and the meeting timezone. `spoken` is rendered by the runtime's own
+ * locale data rather than by this app, so it is not a function of the request
+ * alone: a resume under a runtime that renders it differently would build a
+ * different task text and a different key. Binding it makes that a refusal.
  */
 export function requestDigest(request: CoordinationRequest): string {
-  return digestOf({
-    meeting: request.meeting,
-    slots: request.slots.map((slot) => ({ id: slot.id, option: slot.option, start: slot.start })),
-    parties: request.parties,
-    policy: request.policy,
-  });
+  return digestOf(request);
 }
 
 export class LedgerError extends Error {}

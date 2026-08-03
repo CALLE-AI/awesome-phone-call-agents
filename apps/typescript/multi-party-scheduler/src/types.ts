@@ -185,6 +185,13 @@ export interface GatherResult {
   phone_masked: string;
   call_id: string | null;
   provider_call_id: string | null;
+  /**
+   * The `Idempotency-Key` this call was created under. Recorded because it is the
+   * only handle on a create whose response was lost, and because recovery
+   * re-issues this exact string rather than rebuilding one. Null when no call was
+   * attempted at all.
+   */
+  idempotency_key: string | null;
   call_status: string;
   reached_person: boolean;
   machine_answered: boolean;
@@ -226,6 +233,13 @@ export interface CommitResult {
   slot_id: string;
   call_id: string | null;
   provider_call_id: string | null;
+  /**
+   * The `Idempotency-Key` this call was created under. `resume` re-issues this
+   * exact string to settle a call, so the key is durable state rather than
+   * something recomputed from the request and the code in hand. Null when no
+   * call was attempted at all.
+   */
+  idempotency_key: string | null;
   call_status: string;
   confirmed: boolean;
   declined: boolean;

@@ -91,6 +91,11 @@ export interface CallOutcome {
   unresolved: boolean;
   /** The call id whenever one is known, even when nothing could be read from it. */
   callId: string | null;
+  /**
+   * The key this call was created under, so it reaches the ledger. It is the only
+   * handle on a create whose response was lost. Null when no call was attempted.
+   */
+  idempotencyKey: string | null;
 }
 
 /**
@@ -158,6 +163,13 @@ export interface PlaceOptions {
   timeoutMs: number;
   pollIntervalMs: number;
   signal?: AbortSignal;
+  /**
+   * The key to send, when one is already known. `resume` passes the key the
+   * ledger recorded for the call it is settling, so recovery re-issues the exact
+   * string the lost create used instead of rebuilding one. Omitted on a fresh
+   * call, which is where the key is derived.
+   */
+  key?: string;
 }
 
 async function waitOrAbort(
@@ -201,18 +213,25 @@ function asCallError(error: unknown): CalleCallError {
  * failure of any class, definite ones included, stays `unresolved`, because a
  * refusal can be decided before the idempotency lookup and says nothing about
  * the request that went unanswered.
+ *
+ * The key is derived here only on a fresh call. `resume` passes the one the
+ * ledger recorded, because the derived key depends on the task text, and the task
+ * text lives in this repo rather than in the request: a run that crashed, an
+ * upgrade, then a resume would derive a different key and place a second call to
+ * somebody whose first call may still be live. Whichever way it arrives, the key
+ * goes onto the outcome so the ledger records what went on the wire.
  */
 export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
   const { request, port, party, phase, slot } = options;
   const input = callInput(request, party, phase, slot, options.task, options.schema);
-  const key = idempotencyKey(request, phase, party, slot, input);
+  const key = options.key ?? idempotencyKey(request, phase, party, slot, input);
   let callId: string | null = null;
   try {
     callId = (await port.createCall(input, key)).id;
   } catch (error) {
     const problem = asCallError(error);
     if (!problem.ambiguous) {
-      return { call: null, callId: null, errorCode: problem.code, unresolved: false };
+      return { call: null, callId: null, idempotencyKey: key, errorCode: problem.code, unresolved: false };
     }
     try {
       callId = (await port.createCall(input, key)).id;
@@ -224,6 +243,7 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
       return {
         call: null,
         callId: null,
+        idempotencyKey: key,
         errorCode: `${problem.code}, then ${asCallError(secondError).code}`,
         unresolved: true,
       };
@@ -233,6 +253,7 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
   const settle = (call: CallSnapshot, errorCode: string | null): CallOutcome => ({
     call,
     callId: call.id,
+    idempotencyKey: key,
     // A call CALL-E has not finished with is not an answer. Its transcript is
     // still being written, so reading one as a result is how a call that is still
     // ringing gets scored as somebody agreeing to a time.
@@ -247,6 +268,7 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
       return {
         call: null,
         callId,
+        idempotencyKey: key,
         errorCode: `${errorCode}, then ${asCallError(error).code}`,
         unresolved: true,
       };
@@ -320,6 +342,7 @@ function evaluateGather(
     phone_masked: maskPhone(party.phone),
     call_id: outcome.callId ?? outcome.call?.id ?? null,
     provider_call_id: lastAttempt(outcome.call)?.providerCallId ?? null,
+    idempotency_key: outcome.idempotencyKey,
   };
   if (outcome.call === null) {
     return {
@@ -427,6 +450,7 @@ export function evaluateCommit(
     slot_id: slot.id,
     call_id: outcome.callId ?? outcome.call?.id ?? null,
     provider_call_id: lastAttempt(outcome.call)?.providerCallId ?? null,
+    idempotency_key: outcome.idempotencyKey,
   };
   const verdict = (completedAt: unknown): WindowVerdict =>
     phase === "release"
@@ -673,11 +697,12 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
     const at = now();
     if (!withinCallingHours(party.callingHours, at)) {
       // No call is placed, so this costs nothing from the budget. It is not a
-      // failure either: the person simply may not be rung at this hour.
+      // failure either: the person simply may not be rung at this hour. No key
+      // was used, so the entry records none: there is nothing to reconcile.
       progress(
         `  ${party.id}: not called, ${clockOf(at, party.callingHours.timezone)} is outside ${party.callingHours.start} to ${party.callingHours.end} ${party.callingHours.timezone}.`,
       );
-      return { call: null, callId: null, errorCode: "outside_calling_hours", unresolved: false };
+      return { call: null, callId: null, idempotencyKey: null, errorCode: "outside_calling_hours", unresolved: false };
     }
     const remaining = ignoreWindow ? request.policy.perCallTimeoutSeconds * 1000 : deadline - at;
     const timeoutMs = Math.max(
