@@ -225,6 +225,34 @@ test("item evidence is rejected unless the recipient explicitly agreed after dis
   assert.equal(refusal.findings[0]?.provider_output_valid, true);
   assert.equal(refusal.findings[0]?.recipient_agreed_to_continue, false);
   assert.equal(refusal.findings[0]?.match_confidence, "unknown");
+
+  for (const consentLeak of [
+    { reference_code: "LF-77", retrieval_mode: "unknown" },
+    { reference_code: "", retrieval_mode: "official-channel" },
+  ]) {
+    const leaked = createReport(request, {
+      providerCalls: [{
+        id: "call_refused_with_item_evidence",
+        status: "completed",
+        taskCompleted: true,
+        recipients: [{ phones: ["+12025550142"], status: "completed", structuredResult: structured({
+          recipient_agreed_to_continue: false,
+          desk_status: "refused",
+          item_logged: "unknown",
+          matched_feature_ids: [],
+          contradicted_feature_ids: [],
+          ...consentLeak,
+        }) }],
+      }],
+      attemptedLocationIds: ["station-desk"],
+      stopReason: "invalid-provider-output",
+    });
+    assert.equal(leaked.findings[0]?.provider_output_valid, false);
+    assert.equal(leaked.findings[0]?.reference_code, "");
+    assert.equal(leaked.findings[0]?.match_confidence, "unknown");
+    assert.match(leaked.findings[0]?.retrieval_instructions ?? "", /Do not act/);
+    assert.doesNotMatch(JSON.stringify(leaked), /LF-77/);
+  }
 });
 
 test("malformed or unsafe provider output fails closed", () => {
