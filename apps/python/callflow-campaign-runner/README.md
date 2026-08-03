@@ -178,8 +178,10 @@ unknown, never permission.
 | `frustration_signals` | **needs_human** |
 | Negative sentiment, no callback agreed | **needs_human** — a person decides |
 | Negative sentiment, `callback_agreed: true` | **retry** — they said yes |
-| `busy` / `no_answer` / `voicemail` | **retry** — nobody answered, nothing consented to |
-| `failed` / `canceled` | **unreachable** |
+| `busy` / `no_answer` / `voicemail`, **no** extraction | **retry** — nobody answered, nothing consented to |
+| Any non-completed status **with** extraction | **needs_human** — someone engaged; status alone is not evidence |
+| `failed` / `canceled`, no extraction | **unreachable** |
+| Unrecognised provider status | **needs_human** — never actioned on a guess |
 | Everything above satisfied | **auto_closed** |
 
 **Trusted fields.** `outcome`, `sentiment`, `summary`, `frustration_signals`,
@@ -207,9 +209,13 @@ consent to.
 | E.164 validation | Malformed numbers, and numbers with no country code, rejected before reaching CALL-E |
 | Masking | Numbers are masked in all console output and results |
 | Idempotency | Key binds campaign, number, batch, rendered task, and schema |
-| Dispatch ledger | Every requested call is recorded before the API call, so a crash cannot cause a re-dial |
-| Suppression | `do_not_call` is written to disk immediately and checked before every future call |
-| Redaction | Numbers, emails, and long digit runs are stripped from stored summaries |
+| Reservation ledger | One locked, per-recipient claim before any API call; a crash cannot cause a re-dial |
+| One call per person per run | A duplicate number in the input is called once, whatever the name or note says |
+| Suppression | `do_not_call` is written to disk *and* held in memory for the rest of the run |
+| Redaction | Numbers, emails, digit runs, and credentials stripped from stored results **and errors** |
+| No guessing | Region and locale are never inferred; state them with `--region` / `--locale` or omit them |
+| Prompt boundaries | Every goal is prefixed with AI disclosure, secret refusal, and sensitive-domain limits |
+| File modes | The results file is written `0600` |
 
 Masking always hides at least half the characters, so a malformed number
 cannot leak most of a real one through an error message.
@@ -222,18 +228,71 @@ a call placed under the old wording would return a result for a conversation
 that never happened. Pass a different `--batch-id` to deliberately call the
 same people again.
 
-**A crash cannot cause a double call.** Every call is written to
-`--dispatch-file` *before* the request is sent and flushed to disk. If the
-process dies after CALL-E accepts a call but before the result is read, that
-call still happened — the phone rang. The next run sees the key, counts it
-against `--max-calls`, and flags it for reconciliation rather than dialing
-again.
+**A crash cannot cause a double call.** Before any API request, the runner
+takes an exclusive lock and claims the **recipient** in `--dispatch-file`.
+Reservations are keyed on the person, not the request: a second CSV row for the
+same number with a different name or note produces a different content key, and
+must still not reach them twice.
+
+The ledger records three states per recipient:
+
+| State | Meaning |
+|---|---|
+| `reserved` | The runner intends to call. Written before the request. |
+| `accepted` | CALL-E accepted and returned a call ID, now bound to the reservation. |
+| `resolved:<status>` | The provider reached a terminal status. |
+
+Anything not `resolved` blocks a re-dial, counts against `--max-calls`, and is
+reported with its state and call ID so it can be reconciled in the CALL-E
+dashboard. A failed create also leaves the reservation open — the request may
+have reached the provider before the error, so a person confirms it did not
+connect before that number is dialed again.
+
+The lock is an atomic `O_CREAT | O_EXCL` file, so two runners sharing a ledger
+cannot both claim the same recipient. A stale lock names the process that holds
+it and can be deleted if no run is active.
+
+**One call per person per run.** Separately from the ledger, the runner tracks
+numbers already handled in the current run. A resolved reservation frees a
+recipient for a *future* batch, so without this a duplicate row inside one CSV
+would be dialled twice — the rows differ in name or note, so they hash to
+different content keys, but the same phone rings. Duplicates are reported as
+`DUPLICATE_IN_RUN` and skipped.
 
 **Stored text is redacted.** Summaries are model-generated prose and can quote
 whatever the contact said aloud — a phone number, an email, card digits.
 Masking the `phone` column while writing the summary verbatim would leak the
 same data one column over, so free-text values are redacted before they are
-written.
+written. The results file is created mode `0600`.
+
+**Errors are redacted too.** Provider exceptions echo the request back: the
+destination number, the rendered task, sometimes an `Authorization` header.
+Error text is stripped of numbers, emails, credential-shaped tokens, and long
+opaque strings before it is printed or stored. The exception type is kept, so
+failures stay diagnosable.
+
+**Opt-outs apply immediately.** `do_not_call` is written to disk *and* added to
+the in-memory suppression set, so a later CSV row for the same number is
+blocked within the same run — not just on the next one.
+
+**Nothing critical is guessed.** Region and locale are never inferred from the
+number, the CSV, or the host environment, per
+[`docs/design-principles.md`](../../../docs/design-principles.md) Principle 3.
+Pass `--region` and `--locale` explicitly, or omit them and let the provider
+decide.
+
+### Prompt boundaries
+
+Every campaign goal is prefixed with a fixed preamble, so a new campaign cannot
+forget it. It requires the agent to disclose that it is an AI, refuse OTPs,
+PINs, card and bank details, give no medical, legal, financial, or emergency
+advice, honour an opt-out without arguing, and promise no prices or outcomes.
+
+The `note` column is operator-supplied and interpolated into the prompt, so it
+is treated as untrusted: newlines are collapsed (a note cannot fake a new
+instruction block), redirection phrases such as "ignore the previous
+instructions" are stripped, the value is length-capped, and the boundaries are
+stated *above* it so later text cannot widen them.
 
 **Opt-outs are durable.** When CALL-E reports `do_not_call`, the number is
 appended to `--suppression-file` (default `results/do_not_call.txt`) before
@@ -252,10 +311,32 @@ There are **no recurring schedules, no daemons, and no queued jobs** to cancel.
 Each run is a foreground process:
 
 - **Stop a run** — `Ctrl+C`. Calls not yet started never begin. A call already
-  in progress continues on CALL-E's side; end it by hanging up.
-- **Undo** — nothing is written outside the results file, so deleting that file
-  removes all local state.
-- **Stop everything immediately** — unset `CALLE_API_KEY`, or omit `--live`.
+  in progress continues on CALL-E's side; end it by hanging up. Once the
+  provider has accepted a call this app cannot cancel it; use the CALL-E
+  dashboard if it exposes a cancel action.
+- **Stop everything immediately** — omit `--live`, or unset `CALLE_API_KEY`.
+
+### Local state, and what not to delete
+
+| File | Safe to delete? |
+|---|---|
+| `--out` results | Yes. Output only. |
+| `--dispatch-file` reservations | **No.** Deleting it permits re-dialing recipients whose calls were never reconciled. |
+| `--suppression-file` opt-outs | **Never.** Deleting it re-enables calling people who asked you to stop. |
+
+### Reconciling an unresolved reservation
+
+A recipient stuck in `reserved` or `accepted` blocks further calls by design.
+To clear one:
+
+1. Find the entry — `grep <phone-hash> results/reservations.txt`. The line
+   holds the campaign, idempotency key, call ID, and state.
+2. Look the call ID up in the CALL-E dashboard to see whether it connected.
+3. Append a resolving line yourself, or start a new `--batch-id` once you are
+   satisfied the prior attempt is accounted for.
+
+The ledger is append-only and the last line for a recipient wins, so history is
+preserved.
 
 ---
 
@@ -264,12 +345,26 @@ Each run is a foreground process:
 Verify without spending credits or dialing anyone:
 
 ```bash
-python test_runner.py
+python test_runner.py      # guards in isolation
+python test_live_path.py   # the whole live loop, with an injected fake client
 ```
 
-101 checks covering E.164 validation, masking, the dial gate, trusted-field
-validation, triage precedence, idempotency, dispatch durability, suppression,
-redaction, CSV parsing, and goal rendering. Exits non-zero on failure.
+`test_runner.py` runs 148 checks over E.164 validation, masking, the dial gate,
+trusted-field validation, triage precedence, non-completed-status handling,
+idempotency, per-recipient reservations (including a 12-thread contention race),
+ledger corruption, in-run suppression, result and error redaction, prompt
+boundaries, note sanitisation, CSV parsing, and goal rendering.
+
+`test_live_path.py` drives the full live loop against an injected fake client:
+a completed call, a duplicate number in one file, an opt-out mid-run, a provider
+error, and region/locale handling. Isolated tests missed a real duplicate-call
+bug that this caught — the first call had already resolved by the time the
+second row was read, freeing the reservation.
+
+Both exit non-zero on failure and place no calls.
+
+Also worth reading: `--dry-run` output is the same pipeline minus the dial, so a
+preview shows exactly which rows a live run would skip and why.
 
 To verify the live path end to end, run with `--live --allow <your-own-number>`
 and answer the phone. One call costs one credit.
@@ -287,8 +382,10 @@ and answer the phone. One call costs one credit.
 | `--max-calls` | `5` | Per-run call ceiling |
 | `--country-code` | *(off)* | Opt in to prefixing numbers with no country code |
 | `--batch-id` | `default` | Groups calls for idempotency; change it to re-dial |
+| `--region` | *(off)* | Provider region hint. Never inferred |
+| `--locale` | *(off)* | Conversation locale. Never inferred |
 | `--suppression-file` | `results/do_not_call.txt` | Durable opt-out list |
-| `--dispatch-file` | `results/dispatched.txt` | Ledger of requested calls |
+| `--dispatch-file` | `results/reservations.txt` | Per-recipient reservation ledger |
 | `--poll-interval` | `5.0` | Seconds between status checks |
 | `--timeout` | `600` | Seconds to wait for a call to finish |
 | `--out` | `results/campaign_results.jsonl` | Results path |
