@@ -203,3 +203,15 @@ Out of scope:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
+## Viewing results
+
+Open results_dashboard.html in a browser and use the "Load results.csv"
+button to load your output file. It renders each contact as a row in a
+pit-wall style timing tower, color-coded by outcome (interested,
+callback requested, not interested, no answer), with per-contact detail
+on click.
+
+Do not commit a real results.csv containing real contact phone numbers
+to a public repository. Use a redacted copy (mask the phone number) if
+you want to show real results in the repo.
