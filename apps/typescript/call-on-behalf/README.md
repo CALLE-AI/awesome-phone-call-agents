@@ -60,7 +60,9 @@ The extraction proposes. The transcript decides.
   `declined_by_callee` needs a turn that refuses the arrangement, which means a turn
   answering the arrangement rather than one of the questions: "no, we do not take
   that plan" turns down a question and says nothing about a booking the same call
-  may have held. A refusal aimed elsewhere is quoted as what was actually turned
+  may have held. It also has to be about the time the extraction reported, when it
+  reported one, so a no to the second slot proposed on a call is not read as a no to
+  the first. A refusal aimed elsewhere is quoted as what was actually turned
   down. When one turn agrees and another refuses the same arrangement, the report
   stands behind neither and says a person has to read the transcript and call.
 - A time no callee turn named is not read back as an offer. CALL-E's own note
@@ -156,7 +158,7 @@ Node 20 or later.
 cd apps/typescript/call-on-behalf
 npm install
 npm run check   # tsc --noEmit
-npm test        # 123 tests, no credentials, no outbound calls
+npm test        # 126 tests, no credentials, no outbound calls
 npm run demo    # the six cases against the local fake CALL-E
 ```
 

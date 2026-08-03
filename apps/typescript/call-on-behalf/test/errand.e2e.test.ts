@@ -664,3 +664,83 @@ test("an agreement and a refusal in the same call settle nothing", async () => {
     },
   );
 });
+
+test("a refusal of another proposed time is not a refusal of the one reported", async () => {
+  // Two times go across this call. The caller asks for Thursday at nine forty and the
+  // callee goes away to check it, then the caller offers Wednesday instead and that is
+  // the one the callee turns down. The extraction files declined_by_callee with
+  // Thursday in offered_datetime. Reading the Wednesday refusal as evidence for
+  // Thursday tells somebody the slot they asked for was turned down when nobody said
+  // that about it.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: [
+          BOT_LINES[0]!,
+          BOT_LINES[1]!,
+          "Could you hold Thursday the thirteenth at nine forty?",
+          "If that one is hard to hold, could you do Wednesday the twelfth at two in the afternoon?",
+          BOT_LINES[3]!,
+          BOT_LINES[4]!,
+        ],
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Earliest is Thursday the thirteenth at nine forty in the morning.",
+          "Let me look at Thursday and come back to you.",
+          "No, we are fully booked on Wednesday. I cannot fit that in.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: { ...goodResult(), commitment_made: "declined_by_callee", confirmation_code: "" },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.equal(report.committed_datetime, null);
+      assert.match(report.next_step, /nothing is settled either way/);
+      assert.equal(report.next_step.includes("would not arrange it on this call"), false);
+      assert.match(report.callee_notes, /no turn refuses the arrangement/);
+      assert.match(report.callee_notes, /fully booked on Wednesday/);
+      // What the callee did answer is still answered, out of the same call.
+      assert.equal(report.answers.every((answer) => answer.answered), true);
+      assert.equal(report.outcome, "partially_met");
+    },
+  );
+});
+
+test("a refusal of the time the extraction reported is still a refusal", async () => {
+  // The other side of the time binding. This turn refuses the slot the extraction
+  // named, so the report stands behind the refusal and quotes it.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: [
+          BOT_LINES[0]!,
+          BOT_LINES[1]!,
+          "Could you hold Thursday the thirteenth at nine forty?",
+          BOT_LINES[3]!,
+          BOT_LINES[4]!,
+        ],
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Earliest is Thursday the thirteenth at nine forty in the morning.",
+          "I am afraid we cannot book Thursday at nine forty, that slot has just gone.",
+          "Yes, we take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: { ...goodResult(), commitment_made: "declined_by_callee", confirmation_code: "" },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "declined_by_callee");
+      assert.match(report.next_step, /would not arrange it on this call/);
+      assert.match(report.callee_notes, /a turn in the transcript refuses it/);
+      assert.match(report.callee_notes, /cannot book Thursday at nine forty/);
+      assert.equal(report.outcome, "partially_met");
+    },
+  );
+});

@@ -512,8 +512,9 @@ export interface RefusalEvidence {
   index: number;
   /**
    * A refusal the callee voiced about something else, most often an answer to one of
-   * the questions. It is not evidence about the arrangement and it goes in the report
-   * so a person is not told nothing was said when something was.
+   * the questions or a no to another time. It is not evidence about the arrangement
+   * the extraction reported and it goes in the report so a person is not told nothing
+   * was said when something was.
    */
   otherQuote: string;
 }
@@ -522,15 +523,23 @@ export interface RefusalEvidence {
  * What the transcript shows about a refusal of the arrangement. An extraction saying
  * `declined_by_callee` is not a refusal on its own.
  *
- * Anchored the same way an agreement is, because it is the same size of claim about
- * the errand. Refusal words prove nothing by themselves: "no, we do not take that
- * plan" is a refusal of a question and it says nothing about the booking, which may
- * have been accepted in the same call. So the turn has to be answering the
+ * Two bindings, the same two an agreement is held to, because it is the same size of
+ * claim about the errand. Refusal words prove nothing by themselves: "no, we do not
+ * take that plan" is a refusal of a question and it says nothing about the booking,
+ * which may have been accepted in the same call. So the turn has to be answering the
  * arrangement rather than a question. The caller also has to have raised an
- * arrangement at all.
+ * arrangement at all. Then, when the extraction reports a datetime, that datetime has
+ * to be named around the refusing turn: in it, in the caller's proposal before it or
+ * in the turn after. Two times proposed on one call is otherwise a way for a no to the
+ * second to be reported as a no to the first.
  *
- * A refusal aimed at something else still comes back as `otherQuote`, so the report
- * can quote what was actually turned down.
+ * With no datetime reported there is nothing to bind to, so the prompt anchor stands
+ * alone. That is the same asymmetry the agreement side has.
+ *
+ * A refusal aimed at something else, another time included, still comes back as
+ * `otherQuote`, so the report can quote what was actually turned down. A refused
+ * arrangement that cannot be matched to the reported one fails closed: no evidence,
+ * so the commitment reads `unconfirmed` rather than turned down.
  */
 export function refusalEvidence(
   turns: TranscriptTurn[],
@@ -550,6 +559,15 @@ export function refusalEvidence(
       continue;
     }
     if (lastAskBefore(turns, index, offered, questions) !== "commitment") {
+      if (otherQuote.length === 0) {
+        otherQuote = turn.text;
+      }
+      continue;
+    }
+    if (offered.length > 0 && !namedAround(turns, index, offered)) {
+      // A no to another time is not a no to this one. The same binding the agreement
+      // side uses, so a call where two slots were discussed cannot report the refusal
+      // of one as the refusal of the other.
       if (otherQuote.length === 0) {
         otherQuote = turn.text;
       }

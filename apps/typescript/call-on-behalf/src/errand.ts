@@ -346,8 +346,9 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   let unconfirmedReason: "agreement" | "refusal" | "conflict" = "agreement";
   if (request.goal.commitment !== "none") {
     const agreement = agreementEvidence(turns, request.goal.commitment, offered);
-    // Held to the same standard and anchored the same way: a turn that refuses one
-    // of the questions is not a turn that refuses the arrangement.
+    // Held to the same standard and bound the same way. A turn that refuses one of
+    // the questions does not refuse the arrangement. A turn that refuses another
+    // time does not refuse this one.
     const refusal = refusalEvidence(turns, offered, request.questions);
     if (madeRaw.length > 0 && agreement.quote.length > 0 && refusal.quote.length > 0) {
       // Both claims have a turn behind them, so the transcript does not decide this

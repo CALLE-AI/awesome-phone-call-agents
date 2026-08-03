@@ -186,6 +186,24 @@ test("a refusal after the caller raised the arrangement is a refusal of it", () 
   assert.match(refusalEvidence(call, "", [EARLIEST, PLAN]).quote, /^I am afraid we cannot book/);
 });
 
+test("a refusal has to be about the time the extraction claims", () => {
+  const call = turns([
+    ["bot", "Could you hold Thursday the thirteenth at nine forty?"],
+    ["user", "Let me look at Thursday and come back to you."],
+    ["bot", "If that one is hard to hold, could you do Wednesday the twelfth at two in the afternoon?"],
+    ["user", "No, we are fully booked on Wednesday. I cannot fit that in."],
+  ]);
+  // The refusal answers the second option the caller put. Reading it as evidence for
+  // the first tells somebody a slot was turned down that nobody turned down.
+  const claimed = refusalEvidence(call, "2026-08-13T09:40:00-07:00", [EARLIEST, PLAN]);
+  assert.equal(claimed.quote, "");
+  assert.match(claimed.otherQuote, /^No, we are fully booked/);
+  // The same turn is evidence about the option it does answer.
+  assert.match(refusalEvidence(call, "2026-08-12T14:00:00-07:00", [EARLIEST, PLAN]).quote, /^No, we are fully booked/);
+  // No time reported, so there is nothing to bind to and the prompt anchor stands alone.
+  assert.match(refusalEvidence(call, "", [EARLIEST, PLAN]).quote, /^No, we are fully booked/);
+});
+
 test("a refusal in a call that never raised an arrangement refuses no arrangement", () => {
   const call = turns([
     ["bot", "Do you take Blue Shield PPO?"],

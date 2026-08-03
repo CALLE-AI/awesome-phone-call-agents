@@ -101,15 +101,30 @@ formatting choice. With one, the note quotes the turn. Either way a refusal does
 settle the errand: a booking that was refused is not a goal met, so the outcome is
 `partially_met` at best.
 
-A refusal is anchored the same way an agreement is, because refusal words prove
+A refusal is bound the same two ways an agreement is, because refusal words prove
 nothing on their own. "No, we do not take that plan" refuses a question and says
 nothing about the booking, which may have been held in the same call. So the turn has
 to be answering the arrangement: what the caller last put to the callee before it has
 to be the arrangement rather than one of the questions. Statements do not change the
 subject, so a caller reading out a date of birth between the two leaves the refusal
-answering the appointment it followed. A refusal aimed somewhere else is quoted in the
+answering the appointment it followed. Then the time is bound too. When the extraction
+reports a datetime, that datetime has to be named around the refusing turn, in it or in
+the turn either side, which is what the agreement side already requires. Two times
+proposed on one call is otherwise a way for a no to the second to be reported as a no
+to the first or as a no to the errand. A refusal aimed somewhere else is quoted in the
 report as what was actually turned down, so `unconfirmed` never reads as nothing
 having been said.
+
+When the extraction reports no time there is nothing to bind to, so the prompt anchor
+stands alone. That is the same asymmetry on the agreement side, where an agreement with
+no time cannot be held against the authorized windows either and reads `unconfirmed`.
+The time binding fails closed. `offered_datetime` is contracted as the time that was
+agreed or offered, so on a refused errand it can name a time that was discussed rather
+than the one that was turned down. Where it does, the refusal reads as being about
+something else, the commitment comes back `unconfirmed` and the note quotes the refusal.
+That says less than the call held, which is the direction to be wrong in: a real refusal
+reported as unsettled costs a phone call to check, a refusal of one option reported as a
+refusal of another costs somebody a slot that still stands.
 
 When both claims have a turn behind them, one agreeing and one refusing the same
 arrangement, the report stands behind neither. The commitment reads `unconfirmed`,
