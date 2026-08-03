@@ -72,7 +72,7 @@ Outcome      not_confirmed
   the process is killed here
 
   replay of the crashed ledger: ok=false
-   entry 7: no outcome entry, the run did not finish
+   entry 17: no outcome entry, the run did not finish
 
   Resuming ash-lane-3b-leak: 0 unsettled, 2 owed a release call.
     released tenant.
@@ -81,7 +81,7 @@ Outcome      not_confirmed
 Outcome      not_confirmed
 Note         resumed an unfinished run, nothing is going ahead
 
-  replay after resume: ok=true, 11 entries, outcome not_confirmed
+  replay after resume: ok=true, 25 entries, outcome not_confirmed
 ```
 
 The dashes in that grid are calls nobody made. Every answer narrows the set, so
@@ -96,7 +96,7 @@ Node 20.6 or later, which is what `node --import` needs.
 cd apps/typescript/multi-party-scheduler
 npm install
 npm run check   # tsc --noEmit
-npm test        # 126 tests, no credentials, no outbound calls
+npm test        # 131 tests, no credentials, no outbound calls
 npm run demo    # four runs against the local fake CALL-E
 ```
 
@@ -138,6 +138,14 @@ A process can die between the call that got a yes and the call that owes the
 apology and a create response can be lost while the call itself goes ahead.
 Both leave somebody expecting an appointment that is not happening.
 
+There is a narrower window than either. A call is accepted by CALL-E and the
+process dies before the entry that says what the call did. So the two lines that
+make a call recoverable are written by the code that places it, not by its caller:
+a `call_attempt` line with the exact idempotency key and a digest of the payload
+that key was taken over, before the create, then a `call_accepted` line with the
+id CALL-E returned, before anything waits on the call. A crash in between leaves
+the key on disk, usually the call id with it, so the call is still findable.
+
 `resume` reads the ledger, settles every call it cannot account for and places
 the release calls that are still owed. A call with an id is settled by asking for
 it. A call with no id, which is what a lost create response leaves behind, is
@@ -145,10 +153,14 @@ settled by re-issuing the idempotency key the ledger recorded for it: CALL-E
 answers with the call it already has or places the one the run owed. That key is
 read, never derived a second time, because deriving it reads the call script and
 the script lives in this repo: a crash, an upgrade, then a resume would otherwise
-send a key CALL-E has never seen and ring a second phone. It never gathers
-availability again and never picks a different slot and once any release call has
-gone out the appointment stays off, so a late yes cannot bring it back. Anything it
-still cannot settle is named in the note for a human to check.
+send a key CALL-E has never seen and ring a second phone. A call with neither an
+id nor a recorded key, which only a ledger written by an older version of this app
+can hold, is refused rather than dialled and named in the note for a person to
+check. Guessing the key there is the one mistake that rings somebody who may be on
+the line already. A gather call nothing settled is named for a person too:
+`resume` never gathers again, so there is no call it could place that would finish
+one. It never picks a different slot. Once any release call has gone out the
+appointment stays off, so a late yes cannot bring it back.
 
 It also refuses to touch a ledger unless the request digest matches. That digest is
 taken over the request whole, so an edit to anything, the id included, is a refusal
@@ -223,9 +235,12 @@ ledger that says Thursday when the recorded answers do not intersect on Thursday
 fails, which a plain log cannot catch. A terminal outcome that is not a
 confirmation has to show every party who said yes either released or named in
 `unreleased`. Every line for a call also records the idempotency key it went out
-under, which is the only handle on a create whose response was lost. One ledger is
-written by one process at a time: the run takes an `O_EXCL` lock on
-`<ledger>.lock` before it dials anybody.
+under, which is the only handle on a create whose response was lost. Two of those
+lines are written before the call is placed rather than after it comes back, so
+replay can also catch the call nobody recorded an answer for: an attempt with no
+result behind it means a call may have gone ahead that this history cannot account
+for. It is reported by party and phase. One ledger is written by one process at
+a time: the run takes an `O_EXCL` lock on `<ledger>.lock` before it dials anybody.
 
 ## The request file
 

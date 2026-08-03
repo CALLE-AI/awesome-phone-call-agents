@@ -23,7 +23,7 @@
 import { CalleCallError, CalleWaitTimeout, type CallePort, type CreateCallInput } from "./calle.js";
 import { ConfigError, worstCaseCalls } from "./config.js";
 import { clockOf, withinCallingHours } from "./hours.js";
-import { acquireLedgerLock, appendEntry, requestDigest } from "./ledger.js";
+import { acquireLedgerLock, appendEntry, digestOf, requestDigest } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
 import { TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
@@ -170,6 +170,21 @@ export interface PlaceOptions {
    * call, which is where the key is derived.
    */
   key?: string;
+  /**
+   * Appends to the ledger. This function writes the attempt record before the
+   * create and the accepted call id before anything waits on the call, so the
+   * window between CALL-E accepting a call and the caller recording what it did
+   * is no longer a window with nothing on disk. A caller with no ledger leaves it
+   * out and those two lines are simply not written.
+   */
+  record?: (entry: LedgerEntry) => void;
+  /**
+   * The run's clock, so those two entries are stamped from the same clock as the
+   * phase entry beside them. The demo pins a clock and commits the ledger it
+   * produced, so reading the wall clock here would move a committed file on every
+   * run.
+   */
+  now?: () => number;
 }
 
 async function waitOrAbort(
@@ -220,11 +235,34 @@ function asCallError(error: unknown): CalleCallError {
  * upgrade, then a resume would derive a different key and place a second call to
  * somebody whose first call may still be live. Whichever way it arrives, the key
  * goes onto the outcome so the ledger records what went on the wire.
+ *
+ * Two ledger lines are written from in here, before the caller can write anything.
+ * The attempt record carries the exact key and a digest of the payload it was
+ * taken over. It lands before the create. The accepted record carries the id
+ * CALL-E returned and it lands before anything waits on the call. Between those
+ * two moments a process death used to leave no trace of a call that had already
+ * been accepted, so nothing named it and nothing could settle it.
  */
 export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
   const { request, port, party, phase, slot } = options;
   const input = callInput(request, party, phase, slot, options.task, options.schema);
   const key = options.key ?? idempotencyKey(request, phase, party, slot, input);
+  const record = options.record ?? ((): void => {});
+  const now = options.now ?? ((): number => Date.now());
+  const stamp = (): string => new Date(now()).toISOString();
+  // Before the create, so the key exists on disk before it can have been used. One
+  // record per call: an ambiguous create re-issues the same key with the same
+  // payload, which is the same attempt.
+  record({
+    kind: "call_attempt",
+    at: stamp(),
+    phase,
+    party_id: party.id,
+    phone_masked: maskPhone(party.phone),
+    slot_id: slot?.id ?? null,
+    idempotency_key: key,
+    payload_digest: digestOf(input),
+  });
   let callId: string | null = null;
   try {
     callId = (await port.createCall(input, key)).id;
@@ -249,6 +287,9 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
       };
     }
   }
+  // Before the wait, so a crash while the call is running leaves an id recovery
+  // can read rather than a key it has to re-issue.
+  record({ kind: "call_accepted", at: stamp(), idempotency_key: key, call_id: callId });
 
   const settle = (call: CallSnapshot, errorCode: string | null): CallOutcome => ({
     call,
@@ -634,6 +675,8 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
       schema: releaseSchema(),
       timeoutMs: Math.max(request.policy.perCallTimeoutSeconds * 1000, 1_000),
       pollIntervalMs: options.pollIntervalMs,
+      record: options.record,
+      now: options.now,
     });
     const result = evaluateCommit(request, party, slot, "release", outcome, null);
     options.record({ kind: "release", at: new Date(at).toISOString(), result });
@@ -720,6 +763,8 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
       schema,
       timeoutMs,
       pollIntervalMs,
+      record,
+      now,
       // A release call is a duty. Cancelling the coordination does not cancel it.
       signal: phase === "release" ? undefined : options.signal,
     });

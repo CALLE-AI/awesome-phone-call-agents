@@ -148,6 +148,26 @@ lost while the call itself goes ahead. Both leave somebody expecting an
 appointment that is not happening, which is the one failure this protocol exists
 to prevent.
 
+There is a narrower window inside `placeCall` itself. It sends the create and
+waits. The caller only appends the gather or commit entry once that wait comes
+back, so a process death after CALL-E accepted the call and before that append used
+to leave nothing at all: no key to re-issue and no id to read. Two lines close it,
+both written by `placeCall` rather than by its caller:
+
+- `call_attempt`, before the create. It carries the phase, the party, the masked
+  number, the slot, the exact `Idempotency-Key` and a sha256 of the canonical JSON
+  of the payload that key was taken over. That last field is what makes the record
+  content bound: given the request and this code the payload can be recomputed, so
+  the record can be shown to belong to that call rather than merely to a party and a
+  phase. One record per call, because an ambiguous create re-issues the same key
+  with the same payload, which is the same attempt.
+- `call_accepted`, as soon as a create returns an id and before anything waits on
+  the call. A crash during the wait then leaves an id that can be read rather than
+  a key that has to be re-issued.
+
+Neither line records an answer and neither counts as a call placed. The phase entry
+that follows is still the only thing that says what a call did.
+
 `resume --request <file> --ledger <file> --live` reads the ledger and:
 
 - refuses to touch it unless the request digest matches. The digest is taken over
@@ -168,6 +188,13 @@ to prevent.
   reads the task text and the task text lives in this repo, not in the request, so a
   crash, an upgrade that touched one line of a call script, then a resume would
   derive a new key and ring a second phone
+- refuses a call with neither an id nor a recorded key. Only a ledger written before
+  the key was recorded can hold one. The key could be derived. Nothing on disk says
+  the derived string is the one the lost create used, so the choice is between a call
+  that may be a duplicate and a line in the note asking a person to check. It takes
+  the note. A duplicate confirm call rings somebody who may be on the line already.
+  The run still tells everybody who said yes that it is off, so refusing costs a
+  manual check rather than a duty
 - places the release calls that are owed, most recent yes first
 - writes a fresh outcome entry, so the ledger still replays as one history
 
@@ -178,12 +205,14 @@ placed at all. Anything it cannot settle is named in the outcome note for a pers
 to check by hand.
 
 Recovery owns exactly the confirm and release calls the ledger cannot account for,
-which includes every call recorded as `unresolved`. While one of those is a confirm
-call, `resume` decides nothing and places no release call either: it reports the
-outcome as `unresolved` again, with the debt still recorded, so a later run can
-settle it. An unresolved gather call is not recovery's to finish, because nothing is
-owed to anybody from a gather call and `resume` never gathers again, so the run
-names that call for a person to check instead.
+which includes every call recorded as `unresolved` and every attempt with no result
+behind it. While one of those is a confirm call, `resume` decides nothing and places
+no release call either: it reports the outcome as `unresolved` again, with the debt
+still recorded, so a later run can settle it. A gather call is not recovery's to
+finish, because nothing is owed to anybody from a gather call and `resume` never
+gathers again, so the run names that call for a person to check instead. That holds
+whether the gather call was recorded as unresolved or left as an attempt nothing
+answered.
 
 ## Consent and calling hours
 
@@ -244,14 +273,16 @@ key, so CALL-E would either replay the old call or reject the new body with
 call and different words get their own key.
 
 That last property is also why recovery does not derive the key a second time.
-Every call entry in the ledger records the key its call went out under, and
-`resume` sends that string back verbatim. A key derived again would read the task
-text out of this repo, so a run that crashed, an upgrade that touched one line of a
-script, then a resume would produce a key CALL-E has never seen and place a second
-call. Re-issuing the recorded key cannot do that: the same body hands back the same
-call and a body that no longer matches is refused with `idempotency_conflict`,
+Every call entry in the ledger records the key its call went out under. The key
+reaches the ledger before the create does, so it is on disk before it can have been
+used. `resume` sends that string back verbatim. A key derived again would read the
+task text out of this repo, so a run that crashed, an upgrade that touched one line
+of a script, then a resume would produce a key CALL-E has never seen and place a
+second call. Re-issuing the recorded key cannot do that: the same body hands back the
+same call and a body that no longer matches is refused with `idempotency_conflict`,
 which is ambiguous, so the round stops with the call unresolved rather than dialling
-anybody.
+anybody. An unsettled call with no recorded key at all is refused for the same
+reason, rather than dialled under a key nothing stands behind.
 
 The keys are the reservation that stops a person being dialled twice and that
 reservation lives at CALL-E. The ledger is not a substitute for it. What the ledger
@@ -261,11 +292,14 @@ lines into one history.
 
 ## The ledger
 
-One JSON line per event: `run_started`, `gather`, `slot_chosen`, `commit`,
-`release`, `resume_started`, `reconcile`, `outcome`. Each `gather` entry stores the
-feasible set before and after it, plus the recorded answer. Every entry for a call
-records the idempotency key that call went out under, which is what lets recovery
-settle a create whose response was lost without deriving a new key. A `reconcile`
+One JSON line per event: `run_started`, `call_attempt`, `call_accepted`, `gather`,
+`slot_chosen`, `commit`, `release`, `resume_started`, `reconcile`, `outcome`. Each
+`gather` entry stores the feasible set before and after it, plus the recorded
+answer. Every entry for a call records the idempotency key that call went out under,
+which is what lets recovery settle a create whose response was lost without deriving
+a new key. `call_attempt` and `call_accepted` are the two written before the answer
+is known, which is what keeps a call that was accepted from vanishing with the
+process. Neither is a call placed for accounting: the phase entry is. A `reconcile`
 entry records a call `resume` settled and says whether settling it had to place a
 call, which is what keeps the budget honest.
 
@@ -273,7 +307,11 @@ call, which is what keeps the budget honest.
 that does not follow: a feasible set that grew, a chosen slot the answers do not
 support, a confirmation that is missing from a confirmed outcome, a run that ended
 in anything other than a confirmation without releasing everybody who said yes or
-naming them in `unreleased` or a call count that does not match the entries.
+naming them in `unreleased`, a call count that does not match the entries or an
+attempt with no result behind it. That last one is the crash window: the call may
+have gone ahead, so the history cannot say what happened on the phone whatever its
+outcome line claims. It is reported by party and phase, with the accepted call id
+when there is one.
 
 A ledger can hold more than one round. A crashed or canceled run leaves no outcome
 entry, `resume` opens a `resume_started` entry and closes with a fresh outcome, and
@@ -289,6 +327,9 @@ That last set of checks is the reason the ledger is worth keeping. A log that sa
 
 Stored: party id, the phone number masked to country code plus the last two
 digits, the CALL-E call id and provider call id, the idempotency key the call was
-placed under, the option numbers, the decisive turns and the outcome.
+placed under, a sha256 of the call payload, the option numbers, the decisive turns
+and the outcome.
 
-Not stored: the full phone number, the full transcript, the API key.
+Not stored: the full phone number, the full transcript, the API key. The payload
+digest is a hash, not the payload, so the task text and the recipient are not in the
+file either.

@@ -25,7 +25,15 @@ import {
   UNRESOLVED_STATUS,
 } from "./coordinate.js";
 import { withinCallingHours } from "./hours.js";
-import { acquireLedgerLock, appendEntry, readEntries, repairTornTail, requestDigest } from "./ledger.js";
+import {
+  acquireLedgerLock,
+  appendEntry,
+  type OpenAttempt,
+  openAttempts,
+  readEntries,
+  repairTornTail,
+  requestDigest,
+} from "./ledger.js";
 import { confirmSchema, confirmTask, releaseSchema, releaseTask } from "./script.js";
 import { slotById } from "./slots.js";
 import { saidYes, type WindowSpan } from "./window.js";
@@ -68,7 +76,54 @@ export interface RecoveryState {
   releasesRecorded: number;
   /** Calls whose fate the ledger does not settle. */
   unsettled: CommitResult[];
+  /**
+   * Gather calls the ledger cannot account for, by party.
+   *
+   * These are not recovery's to finish. `resume` never gathers availability
+   * again, so there is no call it could place that would settle one. Nothing is
+   * owed to anybody from a gather call either. They are reported for a person to
+   * check instead, which is the same answer the coordinator gives when a gather
+   * call goes unresolved mid run.
+   */
+  unsettledGathers: string[];
   owedReleases: string[];
+}
+
+/**
+ * What the ledger knows about a call it never recorded a result for.
+ *
+ * Every field here is read off the attempt record or stated as unknown. The status
+ * is this app's own `unresolved`, so recovery owns it and nothing is decided off
+ * it. The failure code says no result was ever written rather than naming a
+ * failure nobody observed. Nothing is inferred about what the call did: not
+ * knowing is why it is in this list.
+ */
+function openResult(open: OpenAttempt): CommitResult {
+  return {
+    party_id: open.party_id,
+    phone_masked: open.phone_masked,
+    phase: open.phase,
+    slot_id: open.slot_id ?? "",
+    call_id: open.call_id,
+    provider_call_id: null,
+    idempotency_key: open.idempotency_key,
+    call_status: UNRESOLVED_STATUS,
+    confirmed: false,
+    declined: false,
+    acknowledged: false,
+    within_window: false,
+    window_reason: null,
+    completion_time_usable: false,
+    question_asked: false,
+    reached_person: false,
+    machine_answered: false,
+    structured_answer: null,
+    heard_answer: null,
+    disagreement: false,
+    confidence: null,
+    transcript_excerpt: [],
+    failure_code: "no_result_recorded",
+  };
 }
 
 /**
@@ -157,6 +212,26 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
     }
   }
 
+  // Calls this ledger records as attempted with no result behind them. That is the
+  // crash window: CALL-E accepted the call and the process died before the entry
+  // that would have said what it did. There is nothing to read, so the record is
+  // built from the attempt and says so.
+  const gatherOrphans: string[] = [];
+  for (const open of openAttempts(entries)) {
+    if (open.phase === "gather") {
+      if (!gatherOrphans.includes(open.party_id)) {
+        gatherOrphans.push(open.party_id);
+      }
+      continue;
+    }
+    const key = `${open.phase}:${open.party_id}`;
+    // The earliest attempt for that call is the one most likely to be live, so it
+    // is the one recovery goes after.
+    if (!unsettled.has(key)) {
+      unsettled.set(key, openResult(open));
+    }
+  }
+
   const confirmed = confirmOrder.filter((party) => credited.get(party) === true);
   return {
     entries: entries.length,
@@ -168,6 +243,7 @@ export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
     released: [...released],
     releasesRecorded,
     unsettled: [...unsettled.values()],
+    unsettledGathers: gatherOrphans,
     // A release is owed only when the appointment is off. A run that ended in a
     // verbal confirmation owes nobody a call saying it is not happening, and
     // `resume` only reaches that outcome when no release call has gone out.
@@ -330,7 +406,13 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     kind: "resume_started",
     at: stamp(),
     entries_before: entries.length,
-    ambiguous: state.unsettled.map((result) => `${result.phase}:${result.party_id}`),
+    // Every call the ledger cannot account for, including the gather calls this
+    // run will not place again. A record of what was open is worth more than a
+    // record of only what this run intended to touch.
+    ambiguous: [
+      ...state.unsettled.map((result) => `${result.phase}:${result.party_id}`),
+      ...state.unsettledGathers.map((party) => `gather:${party}`),
+    ],
     owed_releases: state.owedReleases,
   });
   progress(
@@ -349,9 +431,20 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   const handledReleases = new Set<string>();
   const timeoutMs = Math.max(request.policy.perCallTimeoutSeconds * 1000, 1_000);
 
+  // A gather call the ledger cannot account for is named and left alone. `resume`
+  // never gathers availability again, so there is no call it could place that would
+  // settle one. A call it cannot settle must not be allowed to look settled.
+  for (const party of state.unsettledGathers) {
+    progress(
+      `  ${party}: a gather call was accepted and no answer was ever recorded. Resume settles confirm and release calls only, so check that call by hand.`,
+    );
+    stuck.push(party);
+  }
+
   for (const previous of state.unsettled) {
     const party = partyById(request, previous.party_id);
     const slot = chosen ?? slotById(request.slots, previous.slot_id);
+    const recordedKey = previous.idempotency_key;
     if (party === undefined || slot === undefined) {
       stuck.push(previous.party_id);
       continue;
@@ -359,7 +452,21 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
     let outcome: CallOutcome;
     let placedCall = false;
     if (previous.call_id !== null) {
-      outcome = await settleExisting(port, previous.call_id, previous.idempotency_key ?? null, timeoutMs, pollIntervalMs);
+      outcome = await settleExisting(port, previous.call_id, recordedKey, timeoutMs, pollIntervalMs);
+    } else if (recordedKey === null) {
+      // No call id and no key. The key could be derived again and a derived key is
+      // built from the task text, which lives in this repo rather than in the
+      // ledger, so it may not be the string the lost create used. A key CALL-E has
+      // never seen places a second call to somebody whose first one may still be
+      // live, which is the one thing recovery must never do. So this call is not
+      // settled at all: it is named for a person, who can find it at CALL-E by the
+      // request id and the party in the call metadata. Entries written before keys
+      // were recorded are the only ones that look like this.
+      progress(
+        `  ${party.id}: the ${previous.phase} call cannot be settled, the ledger recorded no idempotency key for it and a derived key could ring them a second time. Check that call by hand.`,
+      );
+      stuck.push(party.id);
+      continue;
     } else if (previous.phase === "confirm" && now() >= deadline) {
       // The key would place this call if CALL-E does not already have it, and
       // asking somebody to commit to a time this coordination can no longer act
@@ -388,9 +495,8 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       // Charged to the budget either way, because from here the two cannot be
       // told apart. Deriving the key again would be a different key the moment
       // any call script in this repo changed between the crash and the resume,
-      // and a different key rings a second phone. An entry written before keys
-      // were recorded has none, so that one is derived and the request digest is
-      // the only thing standing behind it.
+      // and a different key rings a second phone. An entry with no recorded key
+      // never reaches this line: it was refused above.
       placedCall = true;
       calls += 1;
       outcome = await placeCall({
@@ -403,7 +509,9 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
         schema: previous.phase === "release" ? releaseSchema() : confirmSchema(),
         timeoutMs,
         pollIntervalMs,
-        ...(previous.idempotency_key == null ? {} : { key: previous.idempotency_key }),
+        record,
+        now,
+        key: recordedKey,
       });
     }
     const result = evaluateCommit(request, party, slot, previous.phase, outcome, span());
@@ -492,6 +600,11 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   ];
   if (stuck.length > 0) {
     notes.push(`still unsettled, check by hand: ${[...new Set(stuck)].join(", ")}`);
+  }
+  if (state.unsettledGathers.length > 0) {
+    notes.push(
+      `${state.unsettledGathers.length === 1 ? "a gather call" : "gather calls"} nobody can account for, which resume does not settle: ${state.unsettledGathers.join(", ")}`,
+    );
   }
   if (torn) {
     notes.push("the last line was half written and was dropped, so a call it may have recorded is not settled here");

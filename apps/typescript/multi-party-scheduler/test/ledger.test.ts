@@ -373,6 +373,40 @@ test("a ledger with no outcome entry is an unfinished run", async () => {
   assert.ok(verification.issues.some((issue) => issue.problem.includes("did not finish")));
 });
 
+/**
+ * The crash a plain reading of the phase entries cannot see. `placeCall` records an
+ * attempt before it creates a call, so a history that stops in that window still
+ * names the call. Replay has to say so: the ledger holds no answer for a call CALL-E
+ * may well have placed.
+ */
+test("a call attempt nothing settles is reported", async () => {
+  const { path, entries } = await confirmedLedger();
+  const cut = entries.findIndex(
+    (entry) => entry.kind === "call_attempt" && entry.phase === "confirm" && entry.party_id === "superintendent",
+  );
+  assert.notEqual(cut, -1, "placeCall records the attempt before the create");
+  rewrite(path, entries.slice(0, cut + 1));
+  const verification = replay(readEntries(path));
+  assert.equal(verification.ok, false);
+  assert.ok(
+    verification.issues.some((issue) =>
+      issue.problem.includes("superintendent's confirm call was attempted and nothing in this ledger settles it"),
+    ),
+    JSON.stringify(verification.issues),
+  );
+  assert.ok(verification.issues.some((issue) => issue.problem.includes("did not finish")));
+
+  // One line further on the accepted id is there too, so the report names the call
+  // to look up rather than only the person to ask.
+  const accepted = entries[cut + 1];
+  assert.ok(accepted !== undefined && accepted.kind === "call_accepted");
+  const named = replay(entries.slice(0, cut + 2));
+  assert.ok(
+    named.issues.some((issue) => issue.problem.includes(`accepted as ${accepted.call_id}`)),
+    JSON.stringify(named.issues),
+  );
+});
+
 test("a call count that does not match the entries is caught", async () => {
   const { path, entries } = await confirmedLedger();
   const tampered = entries.map((entry) =>

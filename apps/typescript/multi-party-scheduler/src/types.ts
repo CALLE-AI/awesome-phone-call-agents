@@ -274,8 +274,21 @@ export interface CommitResult {
   failure_code: string | null;
 }
 
+/**
+ * One line per event.
+ *
+ * `call_attempt` and `call_accepted` are written by `placeCall` itself rather than
+ * by its caller: the first before the create, the second as soon as CALL-E hands
+ * back an id and before anything waits on the call. A process that dies in that
+ * window used to leave nothing at all, so the call was at CALL-E and no record of
+ * it was on disk. Neither entry holds an answer and neither counts as a call
+ * placed: the phase entry that follows is still the only thing that says what a
+ * call did.
+ */
 export type LedgerEntry =
   | { kind: "run_started"; at: string; request_id: string; request_digest: string; slots: Slot[]; parties: string[]; policy: Policy }
+  | { kind: "call_attempt"; at: string; phase: Phase; party_id: string; phone_masked: string; slot_id: string | null; idempotency_key: string; payload_digest: string }
+  | { kind: "call_accepted"; at: string; idempotency_key: string; call_id: string }
   | { kind: "gather"; at: string; feasible_before: string[]; result: GatherResult; feasible_after: string[] }
   | { kind: "slot_chosen"; at: string; slot_id: string; feasible: string[] }
   | { kind: "commit"; at: string; result: CommitResult }

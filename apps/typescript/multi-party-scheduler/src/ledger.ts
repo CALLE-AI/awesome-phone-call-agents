@@ -28,6 +28,7 @@ import type {
   CoordinationRequest,
   LedgerEntry,
   Outcome,
+  Phase,
   ReplayIssue,
   ReplayVerification,
   Slot,
@@ -229,6 +230,75 @@ function ids(slots: Slot[]): string[] {
   return slots.map((slot) => slot.id);
 }
 
+/** A call the ledger records as attempted and never accounts for. */
+export interface OpenAttempt {
+  /** Line number of the attempt record, 1 based, so a replay issue can name it. */
+  entry: number;
+  phase: Phase;
+  party_id: string;
+  phone_masked: string;
+  slot_id: string | null;
+  idempotency_key: string;
+  /** The accepted call id when the create got that far. Null when it did not. */
+  call_id: string | null;
+}
+
+/**
+ * Every attempt with no result behind it.
+ *
+ * `placeCall` writes a `call_attempt` before the create and a `call_accepted` the
+ * moment CALL-E returns an id, so a process death between provider acceptance and
+ * the phase entry leaves the key on disk, usually with the call id. This finds the
+ * attempts that were left that way: no entry carries the key and no entry records
+ * that party and phase at all.
+ *
+ * A phase entry naming a different key still counts as the result of that call. A
+ * key that does not match is a ledger somebody rewrote, not a call nobody can
+ * account for. Treating it as open would send recovery after a call whose fate the
+ * history already states.
+ *
+ * Replay and recovery both read this, so the two cannot drift apart on which calls
+ * are unaccounted for.
+ */
+export function openAttempts(entries: LedgerEntry[]): OpenAttempt[] {
+  const attempts = new Map<string, OpenAttempt>();
+  const accepted = new Map<string, string>();
+  const settled = new Set<string>();
+  const answered = new Set<string>();
+  let index = 0;
+  for (const entry of entries) {
+    index += 1;
+    // An ambiguous create re-issues the same key inside one `placeCall`, so the
+    // key is the call: a second record under it is the same attempt, not another.
+    if (entry.kind === "call_attempt" && !attempts.has(entry.idempotency_key)) {
+      attempts.set(entry.idempotency_key, {
+        entry: index,
+        phase: entry.phase,
+        party_id: entry.party_id,
+        phone_masked: entry.phone_masked,
+        slot_id: entry.slot_id,
+        idempotency_key: entry.idempotency_key,
+        call_id: null,
+      });
+    }
+    if (entry.kind === "call_accepted") {
+      accepted.set(entry.idempotency_key, entry.call_id);
+    }
+    if (entry.kind === "gather" || entry.kind === "commit" || entry.kind === "release" || entry.kind === "reconcile") {
+      if (entry.result.idempotency_key !== null) {
+        settled.add(entry.result.idempotency_key);
+      }
+      answered.add(`${entry.kind === "gather" ? "gather" : entry.result.phase}:${entry.result.party_id}`);
+    }
+  }
+  return [...attempts.values()]
+    .filter(
+      (attempt) =>
+        !settled.has(attempt.idempotency_key) && !answered.has(`${attempt.phase}:${attempt.party_id}`),
+    )
+    .map((attempt) => ({ ...attempt, call_id: accepted.get(attempt.idempotency_key) ?? null }));
+}
+
 /**
  * Recompute the whole run from the recorded answers.
  *
@@ -240,6 +310,10 @@ function ids(slots: Slot[]): string[] {
  * by `resume`, which opens a `resume_started` entry and closes with a fresh
  * outcome, so replay folds every round in order and reports the last outcome.
  * Entries after an outcome that no `resume_started` opened are a problem.
+ *
+ * A call attempt with no result behind it is a problem too. It is the one a plain
+ * reading of the phase entries cannot see: the call was accepted and the process
+ * died before anything recorded what it did.
  */
 export function replay(entries: LedgerEntry[]): ReplayVerification {
   const issues: ReplayIssue[] = [];
@@ -383,6 +457,18 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       outcome = entry.outcome;
       closed = true;
     }
+  }
+
+  // A call CALL-E was asked to place and no entry ever settled. The call may have
+  // gone ahead, so a history holding one of these cannot say what happened on the
+  // phone, whatever its outcome line claims.
+  for (const open of openAttempts(entries)) {
+    issues.push({
+      entry: open.entry,
+      problem: `${open.party_id}'s ${open.phase} call was attempted${
+        open.call_id === null ? "" : ` and accepted as ${open.call_id}`
+      } and nothing in this ledger settles it`,
+    });
   }
 
   if (outcome === null) {

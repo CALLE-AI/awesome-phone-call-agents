@@ -12,8 +12,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { CalleCallError, createSdkPort, type CallePort } from "../src/calle.js";
-import { placeCall, runCoordination } from "../src/coordinate.js";
-import { readEntries, replay } from "../src/ledger.js";
+import { callInput, placeCall, runCoordination } from "../src/coordinate.js";
+import { digestOf, readEntries, replay } from "../src/ledger.js";
 import { inspectLedger, resumeCoordination, ResumeError } from "../src/resume.js";
 import { confirmSchema, confirmTask } from "../src/script.js";
 import type { CommitResult, LedgerEntry } from "../src/types.js";
@@ -319,6 +319,240 @@ test("a recorded key re-issued with a different body stops rather than ringing a
   } finally {
     await fake.close();
   }
+});
+
+/**
+ * The window inside `placeCall`.
+ *
+ * CALL-E accepts a call and the process dies before anything records what it did.
+ * Two states can be on disk: the attempt record on its own or the attempt with the
+ * accepted call id after it. Both ledgers below are built by running a real
+ * coordination against the fake server and cutting the file where the process
+ * would have stopped, so the call really is at the provider under the key the
+ * attempt names, which is the whole difficulty.
+ */
+function cutAt(path: string, at: (entry: LedgerEntry) => boolean): LedgerEntry[] {
+  const entries = readEntries(path);
+  const index = entries.findIndex(at);
+  assert.notEqual(index, -1, "the ledger holds no entry to cut this crash at");
+  const kept = entries.slice(0, index + 1);
+  writeFileSync(path, `${kept.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+  return kept;
+}
+
+function watch(port: CallePort, keys: string[]): CallePort {
+  return {
+    ...port,
+    async createCall(input, key) {
+      keys.push(key);
+      return port.createCall(input, key);
+    },
+  };
+}
+
+function confirmAttempt(entries: LedgerEntry[], partyId: string): LedgerEntry & { kind: "call_attempt" } {
+  const attempt = entries.find(
+    (entry) => entry.kind === "call_attempt" && entry.phase === "confirm" && entry.party_id === partyId,
+  );
+  assert.ok(attempt !== undefined && attempt.kind === "call_attempt", `no confirm attempt for ${partyId}`);
+  return attempt;
+}
+
+test("a crash between the create and the ledger append leaves the key resume settles that call with", async () => {
+  await withFake(async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    const keys: string[] = [];
+    const watched = watch(port, keys);
+    const first = await runCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(first.outcome, "verbally_confirmed");
+    const placed = fake.created.length;
+    const sent = keys.length;
+
+    // The superintendent's confirm call is at CALL-E. Nothing about it reached the
+    // ledger except the line `placeCall` wrote before the create.
+    const kept = cutAt(
+      path,
+      (entry) => entry.kind === "call_attempt" && entry.phase === "confirm" && entry.party_id === "superintendent",
+    );
+    const attempt = confirmAttempt(kept, "superintendent");
+    assert.equal(attempt.idempotency_key, keys.at(-1), "the recorded key is the string that went on the wire");
+    const party = request.parties[2]!;
+    const slot = request.slots.find((candidate) => candidate.id === attempt.slot_id)!;
+    assert.equal(
+      attempt.payload_digest,
+      digestOf(callInput(request, party, "confirm", slot, confirmTask(request, party, slot), confirmSchema())),
+      "and the record is bound to the payload that key was taken over",
+    );
+
+    const state = inspectLedger(kept);
+    assert.deepEqual(
+      state.unsettled.map((held) => `${held.phase}:${held.party_id}`),
+      ["confirm:superintendent"],
+      "which is what makes the call recoverable at all",
+    );
+    assert.equal(state.unsettled[0]?.call_id, null, "no accepted id ever reached the ledger");
+    assert.equal(state.unsettled[0]?.idempotency_key, attempt.idempotency_key);
+    const crashed = replay(kept);
+    assert.equal(crashed.ok, false);
+    assert.ok(
+      crashed.issues.some((issue) => issue.problem.includes("superintendent's confirm call was attempted")),
+      JSON.stringify(crashed.issues),
+    );
+
+    const resumed = await resumeCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(resumed.outcome, "verbally_confirmed", "the call CALL-E already held had said yes");
+    assert.equal(keys.length, sent + 1, "one create, under the key the ledger recorded");
+    assert.equal(keys.at(-1), attempt.idempotency_key);
+    assert.equal(fake.created.length, placed, "so CALL-E answered with the call it had and nothing rang twice");
+    assert.deepEqual(phones(fake, "release"), [], "and nobody was told it was off");
+    const after = readEntries(path);
+    const reconciled = after.find((entry) => entry.kind === "reconcile");
+    assert.ok(reconciled !== undefined && reconciled.kind === "reconcile");
+    assert.equal(reconciled.result.confirmed, true);
+    assert.equal(reconciled.result.idempotency_key, attempt.idempotency_key);
+    assert.equal(replay(after).ok, true, JSON.stringify(replay(after).issues));
+  });
+});
+
+test("a crash after the accepted id was recorded settles that call without placing one", async () => {
+  await withFake(async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    const keys: string[] = [];
+    const watched = watch(port, keys);
+    await runCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    const placed = fake.created.length;
+    const sent = keys.length;
+    const key = confirmAttempt(readEntries(path), "superintendent").idempotency_key;
+
+    // One line later than the crash above: the id CALL-E returned is on disk, so
+    // this call can be settled by reading it rather than by re-issuing anything.
+    const kept = cutAt(path, (entry) => entry.kind === "call_accepted" && entry.idempotency_key === key);
+    const accepted = kept.at(-1);
+    assert.ok(accepted !== undefined && accepted.kind === "call_accepted");
+    const state = inspectLedger(kept);
+    assert.equal(state.unsettled[0]?.call_id, accepted.call_id, "the accepted id is what resume settles against");
+    assert.equal(state.unsettled[0]?.idempotency_key, key);
+
+    const resumed = await resumeCoordination({ request, port: watched, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(resumed.outcome, "verbally_confirmed");
+    assert.equal(keys.length, sent, "reading a call places none, so no create went out at all");
+    assert.equal(fake.created.length, placed);
+    assert.equal(resumed.calls_placed, 5, "and looking one up is not charged to the budget");
+    const after = readEntries(path);
+    const reconciled = after.find((entry) => entry.kind === "reconcile");
+    assert.ok(reconciled !== undefined && reconciled.kind === "reconcile");
+    assert.equal(reconciled.placed_call, false);
+    assert.equal(reconciled.result.call_id, accepted.call_id);
+    assert.equal(reconciled.result.confirmed, true);
+    assert.equal(replay(after).ok, true, JSON.stringify(replay(after).issues));
+  });
+});
+
+test("a gather call nothing settled is reported for a person, never dialled again", async () => {
+  await withFake(async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const kept = cutAt(
+      path,
+      (entry) => entry.kind === "call_attempt" && entry.phase === "gather" && entry.party_id === "tenant",
+    );
+    const placed = fake.created.length;
+    const state = inspectLedger(kept);
+    assert.deepEqual(state.unsettledGathers, ["tenant"]);
+    assert.deepEqual(state.unsettled, [], "nothing here is recovery's to settle");
+
+    const lines: string[] = [];
+    const resumed = await resumeCoordination({
+      request,
+      port,
+      ledgerPath: path,
+      pollIntervalMs: 5,
+      onProgress: (line) => lines.push(line),
+    });
+    assert.equal(resumed.outcome, "not_confirmed");
+    assert.equal(fake.created.length, placed, "resume never gathers again, so it dialled nobody");
+    assert.match(resumed.note, /a gather call nobody can account for, which resume does not settle: tenant/);
+    assert.ok(
+      lines.some((line) => line.includes("tenant") && line.includes("check that call by hand")),
+      lines.join(" | "),
+    );
+    const after = readEntries(path);
+    const opened = after.find((entry) => entry.kind === "resume_started");
+    assert.ok(opened !== undefined && opened.kind === "resume_started");
+    assert.deepEqual(opened.ambiguous, ["gather:tenant"], "the open call is named even though resume leaves it");
+    const verification = replay(after);
+    assert.equal(verification.ok, false, "that call is still unaccounted for and the ledger says so");
+    assert.ok(
+      verification.issues.some((issue) => issue.problem.includes("tenant's gather call was attempted")),
+      JSON.stringify(verification.issues),
+    );
+  });
+});
+
+/**
+ * The one ledger shape recovery must refuse.
+ *
+ * A call with no id and no recorded key. The key could be derived again. A derived
+ * key is built from the task text in this repo, so it may not be the string the lost
+ * create used: a key CALL-E has never seen places a second call to somebody whose
+ * first one may still be live. Only a ledger written before the key was recorded
+ * looks like this. The answer is to name it for a person rather than to guess. The
+ * two who did say yes are still told it is off.
+ */
+test("an unsettled call with no key and no call id is refused rather than dialled", async () => {
+  await withFake(async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    const lossy: CallePort = {
+      ...port,
+      async createCall(input, key) {
+        const call = await port.createCall(input, key);
+        if (key.startsWith("mps-ash-lane-3b-leak-confirm-superintendent")) {
+          throw new CalleCallError("connection_error", "the create response never arrived");
+        }
+        return call;
+      },
+    };
+    const first = await runCoordination({ request, port: lossy, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(first.outcome, "unresolved");
+    const lost = readEntries(path).find(
+      (entry) => entry.kind === "commit" && entry.result.party_id === "superintendent",
+    );
+    assert.ok(lost !== undefined && lost.kind === "commit");
+    assert.equal(lost.result.call_id, null, "the create response never came back");
+    const key = lost.result.idempotency_key;
+
+    // Back to what that ledger looked like before this round: no attempt records
+    // and no key on the entry, so nothing on disk knows what went on the wire.
+    const legacy = readEntries(path)
+      .filter(
+        (entry) =>
+          !((entry.kind === "call_attempt" || entry.kind === "call_accepted") && entry.idempotency_key === key),
+      )
+      .map((entry) =>
+        entry.kind === "commit" && entry.result.party_id === "superintendent"
+          ? { ...entry, result: { ...entry.result, idempotency_key: null } }
+          : entry,
+      );
+    writeFileSync(path, `${legacy.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+    const state = inspectLedger(legacy);
+    assert.deepEqual(state.unsettled.map((held) => `${held.phase}:${held.party_id}`), ["confirm:superintendent"]);
+    assert.equal(state.unsettled[0]?.idempotency_key, null, "nothing to re-issue");
+
+    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(
+      phones(fake, "confirm").length,
+      3,
+      "no fourth confirm call: a derived key could ring the superintendent a second time",
+    );
+    assert.match(resumed.note, /still unsettled, check by hand: superintendent/);
+    assert.equal(resumed.outcome, "not_confirmed");
+    assert.deepEqual(phones(fake, "release"), [TENANT, PLUMBER], "and the two who said yes were still told");
+    assert.deepEqual(resumed.unreleased, []);
+  });
 });
 
 /**
