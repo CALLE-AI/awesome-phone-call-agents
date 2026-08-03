@@ -97,10 +97,16 @@ Rahul Verma,+15555550101,honeymoon package enquiry
 | `phone` | The number to dial. Normalised to E.164, then validated |
 | `note` | `{note}` in the goal template — context the agent mentions |
 
-Loose input is normalised where the intent is unambiguous (`+1 555-555-0100`,
-`0015555550100`, and a bare 10-digit number with `--country-code`). Anything
-still not E.164 is **rejected, not guessed** — dialing a wrong number is worse
-than skipping a row.
+Formatting is stripped and an explicit `00` prefix is converted
+(`0015555550100` → `+15555550100`). A number with **no country code is
+rejected, not guessed** — the same digits are a valid subscriber number in
+several countries, and picking one reaches a stranger.
+
+If a list is known to be single-country, opt in explicitly:
+
+```bash
+python runner.py --campaign travel --contacts contacts.csv --country-code 91
+```
 
 ---
 
@@ -159,17 +165,25 @@ Results are written as JSONL to `results/campaign_results.jsonl`
 
 ### Triage rules
 
-Applied in order — hard opt-outs beat everything else:
+Applied in order. A result that cannot be trusted goes to a human before any
+other rule is considered — an absent field is not a "no".
 
 | Signal | Disposition |
 |---|---|
-| `do_not_call` | **needs_human** — suppress and log |
+| Required field missing from the result | **needs_human** — schema incomplete |
+| `task_completed: false` from CALL-E | **needs_human** — the goal was not met |
+| Confidence below 0.6 | **needs_human** — result not reliable |
+| `do_not_call` | **needs_human** — and written to the suppression list |
 | `wants_human_callback` | **needs_human** |
 | `frustration_signals` | **needs_human** |
 | Negative sentiment, no frustration | **retry** — a bad time is not a bad mood |
 | `busy` / `no_answer` / `voicemail` | **retry** |
 | `failed` / `canceled` | **unreachable** |
-| `completed`, no escalation signals | **auto_closed** |
+| `completed`, goal met, no escalation signals | **auto_closed** |
+
+A call only auto-closes when CALL-E confirms the goal was met, reports enough
+confidence, and returns every required field. Anything less is a person's
+decision, not the runner's.
 
 ---
 
@@ -181,12 +195,24 @@ Applied in order — hard opt-outs beat everything else:
 | Explicit intent | `--live` refuses to run without `--allow` |
 | Allowlist | Only listed E.164 numbers can be dialed |
 | Per-run ceiling | `--max-calls` (default 5) caps one run |
-| E.164 validation | Malformed numbers rejected before reaching CALL-E |
+| E.164 validation | Malformed numbers, and numbers with no country code, rejected before reaching CALL-E |
 | Masking | Numbers are masked in all console output and results |
-| Idempotency | Each call carries a unique key, so a retry cannot double-dial |
+| Idempotency | Key derived from campaign + number + batch, so rerunning a batch never re-dials |
+| Suppression | `do_not_call` is written to disk immediately and checked before every future call |
 
 Masking always hides at least half the characters, so a malformed number
 cannot leak most of a real one through an error message.
+
+**Reruns are safe.** The idempotency key is `campaign + number + batch-id`,
+never random, so re-running the same batch returns the original calls instead
+of placing new ones. Pass a different `--batch-id` to deliberately call the
+same people again.
+
+**Opt-outs are durable.** When CALL-E reports `do_not_call`, the number is
+appended to `--suppression-file` (default `results/do_not_call.txt`) before
+anything else can fail, and checked ahead of the allowlist on every later run.
+Numbers are stored as SHA-256 hashes, so the file holds no personal data.
+Deleting that file re-enables calling people who asked you to stop.
 
 **Content boundaries.** The built-in campaigns instruct the agent to give no
 medical, legal, or financial advice and to defer to a human colleague. Keep
@@ -231,7 +257,9 @@ and answer the phone. One call costs one credit.
 | `--live` | off | Place real calls |
 | `--allow` | — | Comma-separated E.164 numbers that may be dialed |
 | `--max-calls` | `5` | Per-run call ceiling |
-| `--country-code` | `1` | Assumed code for bare 10-digit numbers |
+| `--country-code` | *(off)* | Opt in to prefixing numbers with no country code |
+| `--batch-id` | `default` | Groups calls for idempotency; change it to re-dial |
+| `--suppression-file` | `results/do_not_call.txt` | Durable opt-out list |
 | `--poll-interval` | `5.0` | Seconds between status checks |
 | `--timeout` | `600` | Seconds to wait for a call to finish |
 | `--out` | `results/campaign_results.jsonl` | Results path |

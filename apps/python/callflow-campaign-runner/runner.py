@@ -15,14 +15,13 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
 import sys
 import time
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -58,18 +57,77 @@ def mask(phone: str) -> str:
     return f"{phone[:reveal]}{'*' * (len(phone) - 2 * reveal)}{phone[-reveal:]}"
 
 
-def normalise(raw: str, default_cc: str = "1") -> str:
-    """Best-effort E.164 normalisation. Ambiguous input stays unchanged so the
-    caller rejects it rather than dialing a guess."""
+def normalise(raw: str, default_cc: str = "") -> str:
+    """Normalise only where the country is unambiguous.
+
+    Strips formatting and converts an explicit `00` international prefix. A
+    number with no country code is left alone so `check_dial` rejects it —
+    guessing a country is how you dial a stranger. `--country-code` opts into
+    the guess explicitly for a list you know is single-country.
+    """
     p = re.sub(r"[\s\-()./]", "", raw)
+
     if p.startswith("00"):
-        p = "+" + p[2:]
-    if not p.startswith("+"):
-        if len(p) == 10:
-            p = f"+{default_cc}{p}"
-        elif 11 <= len(p) <= 15:
-            p = f"+{p}"
+        return "+" + p[2:]
+    if p.startswith("+"):
+        return p
+
+    # Only prefix when the operator has stated the country for this batch.
+    if default_cc and p.isdigit():
+        return f"+{default_cc}{p}"
+
+    # Ambiguous: return unchanged and let the gate reject it.
     return p
+
+
+def _hash_phone(phone: str) -> str:
+    """Hash used for suppression records, so the file holds no real numbers."""
+    return hashlib.sha256(phone.encode()).hexdigest()
+
+
+def load_suppressions(path: str) -> set[str]:
+    """Hashed numbers that must never be dialed again."""
+    p = Path(path)
+    if not p.exists():
+        return set()
+    out: set[str] = set()
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            out.add(line.split(",")[0].strip())
+    return out
+
+
+def record_suppression(path: str, phone: str, campaign_id: str) -> None:
+    """Append an opt-out immediately.
+
+    Written the moment CALL-E reports `do_not_call`, before any later step can
+    fail — an opt-out that only lives in memory is not an opt-out. Stored as a
+    hash so the file itself carries no personal data.
+    """
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if not p.exists():
+        p.write_text(
+            "# Hashed numbers that opted out. Do not delete. One per line.\n",
+            encoding="utf-8",
+        )
+    with p.open("a", encoding="utf-8") as fh:
+        fh.write(f"{_hash_phone(phone)},{campaign_id}\n")
+
+
+def idempotency_key(campaign_id: str, phone: str, batch_id: str) -> str:
+    """Stable key for one contact in one batch.
+
+    Two runs of the same batch produce the same key, so CALL-E returns the
+    existing call rather than placing a second one. Change `--batch-id` to
+    deliberately call the same people again.
+
+    The number is hashed, not embedded, so it never appears in logs or in an
+    error echoed back by the API.
+    """
+    digest = hashlib.sha256(f"{campaign_id}|{phone}|{batch_id}".encode()).hexdigest()
+    return f"{campaign_id}-{digest[:24]}"
 
 
 @dataclass(frozen=True)
@@ -78,8 +136,18 @@ class Gate:
     reason: str = ""
 
 
-def check_dial(phone: str, made: int, *, allowlist: list[str], ceiling: int) -> Gate:
+def check_dial(
+    phone: str,
+    made: int,
+    *,
+    allowlist: list[str],
+    ceiling: int,
+    suppressed: set[str] | None = None,
+) -> Gate:
     """Final check before dialing. Fails closed."""
+    # Opt-outs are checked first: nothing else can override one.
+    if suppressed and _hash_phone(phone) in suppressed:
+        return Gate(False, f"{mask(phone)} previously opted out — suppressed")
     if not is_e164(phone):
         return Gate(False, f"not a valid E.164 number ({mask(phone)})")
     if made >= ceiling:
@@ -199,13 +267,46 @@ CAMPAIGNS: dict[str, Campaign] = {
 # --------------------------------------------------------------- triage --
 
 
-def triage(status: str, extracted: dict[str, Any]) -> tuple[str, str]:
+REQUIRED_FIELDS = ("outcome", "sentiment", "frustration_signals", "summary")
+
+# Below this, CALL-E's own judgement of the call is not worth acting on.
+MIN_CONFIDENCE = 0.6
+
+
+def triage(
+    status: str,
+    extracted: dict[str, Any],
+    *,
+    task_completed: bool | None = None,
+    confidence: float | None = None,
+) -> tuple[str, str]:
     """Decide what happens to a resolved call.
 
-    Order matters: hard opt-outs beat everything, then explicit human
-    requests, then frustration, then reachability.
+    Order matters: unusable results first, then hard opt-outs, then explicit
+    human requests, then frustration, then reachability. Anything that cannot
+    be trusted goes to a human rather than being closed.
     """
     status = (status or "").lower()
+
+    # A missing opt-out field is not a "no" — the schema simply did not come
+    # back. Closing on incomplete data would silently drop a do-not-call.
+    missing = [f for f in REQUIRED_FIELDS if f not in extracted]
+    if status == "completed" and missing:
+        return (
+            "needs_human",
+            f"Result incomplete (missing {', '.join(missing)}) — review manually.",
+        )
+
+    # CALL-E reports whether it actually achieved the goal. Ignoring that and
+    # auto-closing would mark a failed conversation as done.
+    if status == "completed" and task_completed is False:
+        return "needs_human", "CALL-E reports the call goal was not completed."
+
+    if status == "completed" and confidence is not None and confidence < MIN_CONFIDENCE:
+        return (
+            "needs_human",
+            f"Low confidence in the result ({confidence:.2f}) — review manually.",
+        )
 
     if extracted.get("do_not_call"):
         return "needs_human", "Contact requested do-not-call — suppress and log."
@@ -302,6 +403,12 @@ def run(args: argparse.Namespace) -> int:
     live = args.live
     allowlist = [a.strip() for a in (args.allow or "").split(",") if a.strip()]
 
+    # Opt-outs from previous runs. Checked in dry run too, so a preview shows
+    # exactly which contacts a live run would skip.
+    suppressed = load_suppressions(args.suppression_file)
+    if suppressed:
+        print(f"\n  {len(suppressed)} number(s) suppressed from earlier opt-outs")
+
     if live and not allowlist and not args.i_know_what_im_doing:
         print(
             "Refusing to run live without --allow. Pass a comma-separated list of\n"
@@ -329,7 +436,11 @@ def run(args: argparse.Namespace) -> int:
         goal = render_goal(campaign, contact)
 
         gate = check_dial(
-            contact["phone"], made, allowlist=allowlist, ceiling=args.max_calls
+            contact["phone"],
+            made,
+            allowlist=allowlist,
+            ceiling=args.max_calls,
+            suppressed=suppressed,
         )
         if not gate.allowed:
             print(f"  BLOCKED   {label} {gate.reason}")
@@ -362,7 +473,11 @@ def run(args: argparse.Namespace) -> int:
                 },
                 result_schema=campaign.schema,
                 metadata={"call-e/customerMetadata": {"campaign": campaign.id}},
-                idempotency_key=f"{campaign.id}-{uuid.uuid4().hex[:12]}",
+                # Derived from campaign + number + batch, never random: rerun
+                # the same batch and CALL-E returns the original call instead
+                # of dialing again. A random key would make every retry a
+                # fresh call to a real person.
+                idempotency_key=idempotency_key(campaign.id, contact["phone"], args.batch_id),
             )
             made += 1
             call_id = str(created["id"])
@@ -377,12 +492,34 @@ def run(args: argparse.Namespace) -> int:
 
             extracted = extract_result(final)
             status = str(final.get("status", "unknown"))
-            disposition, reason = triage(status, extracted)
+
+            # CALL-E's own verdict on whether the goal was met, and how sure
+            # it is. Auto-closing without checking these marks failed calls
+            # as done.
+            task_completed = final.get("task_completed")
+            raw_conf = final.get("completion_confidence")
+            confidence = (
+                raw_conf.get("score") if isinstance(raw_conf, dict) else raw_conf
+            )
+
+            disposition, reason = triage(
+                status,
+                extracted,
+                task_completed=task_completed,
+                confidence=confidence if isinstance(confidence, (int, float)) else None,
+            )
             print(f"            → {status} · {disposition} · {reason}")
+
+            # An opt-out must outlive this process, or the next run calls them
+            # again. Recorded before anything else can fail.
+            if extracted.get("do_not_call"):
+                record_suppression(args.suppression_file, contact["phone"], campaign.id)
+                print(f"            → added to {args.suppression_file}")
 
             results.append(
                 {"contact": contact["name"], "phone": mask(contact["phone"]),
                  "status": status, "disposition": disposition, "reason": reason,
+                 "task_completed": task_completed, "confidence": confidence,
                  "extracted": extracted, "call_id": call_id}
             )
 
@@ -428,10 +565,26 @@ def main() -> int:
     p.add_argument("--i-know-what-im-doing", action="store_true",
                    help="permit --live with no allowlist")
     p.add_argument("--max-calls", type=int, default=5, help="per-run call ceiling")
-    p.add_argument("--country-code", default="1", help="assumed code for 10-digit numbers")
+    p.add_argument(
+        "--country-code",
+        default="",
+        help="opt in to prefixing numbers that have no country code, e.g. --country-code 91. "
+        "Off by default: without it, such numbers are rejected rather than guessed",
+    )
     p.add_argument("--poll-interval", type=float, default=5.0)
     p.add_argument("--timeout", type=float, default=600.0)
     p.add_argument("--out", default="results/campaign_results.jsonl")
+    p.add_argument(
+        "--batch-id",
+        default="default",
+        help="groups calls for idempotency. Rerunning the same batch id will not "
+        "re-dial; change it to deliberately call the same people again",
+    )
+    p.add_argument(
+        "--suppression-file",
+        default="results/do_not_call.txt",
+        help="durable opt-out list. Numbers here are never dialed again",
+    )
     p.add_argument("--list-campaigns", action="store_true")
 
     args = p.parse_args()
