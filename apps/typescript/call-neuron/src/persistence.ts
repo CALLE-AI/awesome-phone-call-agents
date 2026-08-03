@@ -5,6 +5,7 @@ const DATABASE = "call-neuron-local";
 const STORE = "drafts";
 const DRAFT_KEY = "current";
 const DISPATCH_PREFIX = "dispatch:";
+const SUPPRESSION_PREFIX = "suppression:";
 const CHANNEL = "call-neuron-local-updates";
 
 export type LocalDraft = {
@@ -37,6 +38,13 @@ export type DispatchAttempt = {
 };
 
 export type DispatchFingerprint = Pick<DispatchAttempt, "recipientKey" | "contentBinding">;
+
+type PhoneSuppression = {
+  version: 1;
+  kind: "phone_suppression";
+  phoneKey: string;
+  suppressedAt: string;
+};
 
 export class DispatchBlockedError extends Error {
   attempt: DispatchAttempt | null;
@@ -81,6 +89,16 @@ function validAttempt(value: unknown): value is DispatchAttempt {
   return ["planId", "planExpiresAt", "runId", "providerStatus", "attemptedAt"].every((key) => value[key] === undefined || typeof value[key] === "string");
 }
 
+function validSuppression(value: unknown): value is PhoneSuppression {
+  return isObject(value)
+    && value.version === 1
+    && value.kind === "phone_suppression"
+    && typeof value.phoneKey === "string"
+    && Boolean(value.phoneKey)
+    && typeof value.suppressedAt === "string"
+    && Boolean(value.suppressedAt);
+}
+
 function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
@@ -109,11 +127,7 @@ async function digest(value: unknown) {
 }
 
 export function fingerprintRecipient(recipient: Recipient) {
-  return digest({
-    phone: recipient.phone,
-    studentCode: recipient.studentCode.trim().toLowerCase(),
-    employeeCode: recipient.employeeCode.trim().toLowerCase(),
-  });
+  return digest({ phone: recipient.phone });
 }
 
 export async function fingerprintDispatch(recipient: Recipient, offer: OfferBrief, voicemail: boolean): Promise<DispatchFingerprint> {
@@ -136,6 +150,10 @@ function attemptKey(recipientKey: string) {
   return `${DISPATCH_PREFIX}${recipientKey}`;
 }
 
+function suppressionKey(phoneKey: string) {
+  return `${SUPPRESSION_PREFIX}${phoneKey}`;
+}
+
 function blockedMessage(attempt: DispatchAttempt | null) {
   if (!attempt) return "A local dispatch record exists but could not be verified. CallNeuron is blocking this recipient to avoid a duplicate call.";
   if (attempt.phase === "accepted") return "CALL-E already accepted a call for this recipient. Refresh that same run instead of creating another plan.";
@@ -152,13 +170,19 @@ export async function reserveDispatch(recipient: Recipient, offer: OfferBrief, v
       const store = transaction.objectStore(STORE);
       const attemptRequest = store.get(attemptKey(fingerprint.recipientKey));
       const draftRequest = store.get(DRAFT_KEY);
+      const suppressionRequest = store.get(suppressionKey(fingerprint.recipientKey));
       let attemptLoaded = false;
       let draftLoaded = false;
+      let suppressionLoaded = false;
       let result: { created: boolean; attempt: DispatchAttempt | null; optedOut?: boolean; invalidCampaign?: boolean } | null = null;
       const decide = () => {
-        if (!attemptLoaded || !draftLoaded || result) return;
+        if (!attemptLoaded || !draftLoaded || !suppressionLoaded || result) return;
         if (attemptRequest.result !== undefined) {
           result = { created: false, attempt: validAttempt(attemptRequest.result) ? attemptRequest.result : null };
+          return;
+        }
+        if (suppressionRequest.result !== undefined) {
+          result = { created: false, attempt: null, optedOut: true };
           return;
         }
         const draft = validDraft(draftRequest.result) ? draftRequest.result : null;
@@ -187,6 +211,7 @@ export async function reserveDispatch(recipient: Recipient, offer: OfferBrief, v
       };
       attemptRequest.onsuccess = () => { attemptLoaded = true; decide(); };
       draftRequest.onsuccess = () => { draftLoaded = true; decide(); };
+      suppressionRequest.onsuccess = () => { suppressionLoaded = true; decide(); };
       transaction.oncomplete = () => resolve(result || { created: false, attempt: null });
       transaction.onerror = () => reject(new Error("The durable dispatch reservation could not be saved. No CALL-E plan was created."));
       transaction.onabort = () => reject(new Error("The durable dispatch reservation was interrupted. No CALL-E plan was created."));
@@ -215,12 +240,14 @@ async function transitionAttempt(
       const store = transaction.objectStore(STORE);
       const request = store.get(attemptKey(attempt.recipientKey));
       const draftRequest = failIfOptedOut ? store.get(DRAFT_KEY) : null;
+      const suppressionRequest = failIfOptedOut ? store.get(suppressionKey(attempt.recipientKey)) : null;
       let next: DispatchAttempt | null = null;
       let blocked: DispatchBlockedError | null = null;
       let attemptLoaded = false;
       let draftLoaded = !draftRequest;
+      let suppressionLoaded = !suppressionRequest;
       const decide = () => {
-        if (!attemptLoaded || !draftLoaded || next || blocked) return;
+        if (!attemptLoaded || !draftLoaded || !suppressionLoaded || next || blocked) return;
         const current = validAttempt(request.result) ? request.result : null;
         if (!current || current.reservationId !== attempt.reservationId || current.contentBinding !== attempt.contentBinding || !allowedPhases.includes(current.phase)) {
           blocked = new DispatchBlockedError(blockedMessage(current), current);
@@ -236,11 +263,16 @@ async function transitionAttempt(
           blocked = new DispatchBlockedError("This recipient was opted out before dispatch. The reviewed plan remains unstarted and cannot be run.", current);
           return;
         }
+        if (suppressionRequest?.result !== undefined) {
+          blocked = new DispatchBlockedError("This phone identity was durably opted out before dispatch. The reviewed plan remains unstarted and cannot be run.", current);
+          return;
+        }
         next = update(current);
         store.put(next, attemptKey(current.recipientKey));
       };
       request.onsuccess = () => { attemptLoaded = true; decide(); };
       if (draftRequest) draftRequest.onsuccess = () => { draftLoaded = true; decide(); };
+      if (suppressionRequest) suppressionRequest.onsuccess = () => { suppressionLoaded = true; decide(); };
       transaction.oncomplete = () => blocked ? reject(blocked) : next ? resolve(next) : reject(new Error(errorMessage));
       transaction.onerror = () => reject(new Error(errorMessage));
       transaction.onabort = () => reject(new Error(errorMessage));
@@ -346,6 +378,25 @@ export async function matchDispatchAttempts(recipients: Recipient[], attempts: D
   return Object.fromEntries(matches.filter((match): match is readonly [string, DispatchAttempt] => Boolean(match[1])));
 }
 
+export async function loadPhoneSuppressions() {
+  const database = await openDatabase();
+  try {
+    return await new Promise<string[]>((resolve, reject) => {
+      const request = database.transaction(STORE, "readonly").objectStore(STORE).getAll();
+      request.onsuccess = () => resolve(request.result.filter(validSuppression).map((item) => item.phoneKey));
+      request.onerror = () => reject(new Error("Durable phone suppressions could not be read. Live planning is disabled."));
+    });
+  } finally {
+    database.close();
+  }
+}
+
+export async function matchPhoneSuppressions(recipients: Recipient[], phoneKeys: string[]) {
+  const suppressed = new Set(phoneKeys);
+  const matches = await Promise.all(recipients.map(async (recipient) => [recipient.id, suppressed.has(await fingerprintRecipient(recipient))] as const));
+  return Object.fromEntries(matches);
+}
+
 export function runFromAcceptedAttempt(attempt: DispatchAttempt): CallRun | null {
   if (attempt.phase !== "accepted" || !attempt.runId || !attempt.providerStatus || !attempt.attemptedAt) return null;
   return {
@@ -358,11 +409,18 @@ export function runFromAcceptedAttempt(attempt: DispatchAttempt): CallRun | null
 }
 
 export async function saveLocalDraft(draft: LocalDraft) {
+  const suppressions = await Promise.all(draft.recipients.flatMap((recipient) =>
+    recipient.status === "blocked" || draft.dispositions[recipient.id] === "opted_out"
+      ? [fingerprintRecipient(recipient).then((phoneKey): PhoneSuppression => ({ version: 1, kind: "phone_suppression", phoneKey, suppressedAt: draft.savedAt }))]
+      : []
+  ));
   const database = await openDatabase();
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(STORE, "readwrite");
-      transaction.objectStore(STORE).put({ ...draft, version: 2 } satisfies PersistedDraft, DRAFT_KEY);
+      const store = transaction.objectStore(STORE);
+      store.put({ ...draft, version: 2 } satisfies PersistedDraft, DRAFT_KEY);
+      for (const suppression of suppressions) store.put(suppression, suppressionKey(suppression.phoneKey));
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(new Error("The local campaign draft could not be saved."));
     });

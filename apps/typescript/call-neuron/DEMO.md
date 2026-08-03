@@ -13,7 +13,7 @@ Show the operator guide and **Real calls placed: 0**.
 1. Edit one offer sentence and point out the escalation boundary.
 2. Download the CSV template or import a prepared XLSX/DOCX/PDF.
 3. Show the required student code, employee code, masked phone, eligible record, and withdrawn-consent record.
-4. Say: “The file never uploads. Derived rows remain on this device until Reset. Grades, finances, ID, and application evidence are excluded.”
+4. Say: “The file never uploads. Reset removes the campaign rows but retains hashed phone opt-outs and call locks so re-import cannot bypass them. Grades, finances, ID, and application evidence are excluded.”
 
 ## 1:10–1:50 — Consent and voicemail
 

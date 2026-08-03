@@ -85,7 +85,7 @@ After CALL-E reaches a terminal state, assign the human disposition, review any 
 | Data | Location and lifetime |
 |---|---|
 | Imported/manual recipient rows, approved brief, dispositions | Browser IndexedDB until **Reset local campaign** |
-| Content hash, recipient identity hash, dispatch phase, plan ID, accepted run ID/status | Browser IndexedDB safety ledger; retained when the campaign draft is reset |
+| Content hash, stable phone identity hash, durable opt-out, dispatch phase, plan ID, accepted run ID/status | Browser IndexedDB safety ledger; retained when the campaign draft is reset |
 | Original CSV/XLSX/DOCX/PDF | Parsed locally and never uploaded or retained |
 | Selected recipient and approved call instruction | Sent to CALL-E only after the operator creates a plan |
 | CALL-E token, MCP session, confirmation secret and transcript view | Browser memory; lost when the tab closes or refreshes |
@@ -126,12 +126,12 @@ python3 ../../../scripts/validate_repository.py
 
 `npm run verify` runs TypeScript, seventeen focused Node tests, the shared fake broker/MCP sequence and a Vite production build. Tests use reserved fictional numbers and cannot place a call.
 
-The test suite covers stateless and session-based MCP initialization, the plan/run/status sequence, rejection of expanded `run_call` contracts, refresh/second-tab dispatch persistence, ambiguous acceptance, accepted-run recovery, opt-out checks, manual and file intake validation, withdrawn consent, privacy-minimal export, disposition metrics, voicemail policy and the disabled-server gate.
+The test suite covers stateless and session-based MCP initialization, the plan/run/status sequence, rejection of expanded `run_call` contracts, refresh/second-tab dispatch persistence, ambiguous acceptance, accepted-run recovery, phone-keyed opt-outs across reset and changed-code re-imports, manual and file intake validation, withdrawn consent, privacy-minimal export, disposition metrics, voicemail policy and the disabled-server gate.
 
 ## Current limits
 
 - English calls and Malaysia region are fixed in this prototype.
-- One live call is monitored at a time; a durable browser safety ledger prevents replanning the same recipient after dispatch, including after draft reset or re-import.
+- One live call is monitored at a time; a durable browser safety ledger prevents replanning or calling the same phone after dispatch or opt-out, including after draft reset or changed-code re-import.
 - A CALL-E call already accepted by the provider cannot be cancelled from CallNeuron because no active cancellation tool is exposed.
 - Accepted run IDs and latest provider status are recoverable after refresh; live tokens, confirmation secrets and transcripts are intentionally not stored.
 - There is no shared team database, role management, audit log, call-credit counter or server-side campaign history.

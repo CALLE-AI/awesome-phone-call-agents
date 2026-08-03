@@ -10,7 +10,9 @@ import {
   clearLocalDraft,
   fingerprintDispatch,
   loadDispatchAttempts,
+  loadPhoneSuppressions,
   markAcceptanceUnknown,
+  matchPhoneSuppressions,
   recordAcceptedRun,
   recordReviewedPlan,
   reserveDispatch,
@@ -69,11 +71,13 @@ test("dispatch fingerprints bind the recipient and exact approved content", asyn
   const voicemail = await fingerprintDispatch(recipient, offer, true);
   const changedOffer = await fingerprintDispatch(recipient, { ...offer, details: "Changed approved details." }, false);
   const reimported = await fingerprintDispatch({ ...recipient, id: "new-row-id" }, offer, false);
+  const reassigned = await fingerprintDispatch({ ...recipient, id: "new-row-id", studentCode: "STU-999", employeeCode: "EMP-999" }, offer, false);
 
   assert.notEqual(base.contentBinding, voicemail.contentBinding);
   assert.notEqual(base.contentBinding, changedOffer.contentBinding);
   assert.equal(base.recipientKey, reimported.recipientKey);
   assert.equal(base.contentBinding, reimported.contentBinding);
+  assert.equal(base.recipientKey, reassigned.recipientKey);
 });
 
 test("refresh, second-tab and lost-response states remain durably blocked", async () => {
@@ -98,7 +102,7 @@ test("refresh, second-tab and lost-response states remain durably blocked", asyn
 
   await clearLocalDraft();
   assert.equal((await loadDispatchAttempts())[0].phase, "acceptance_unknown");
-  await assert.rejects(() => reserveDispatch({ ...recipient, id: "reimported-id" }, offer, false), /may have been accepted|duplicate call/iu);
+  await assert.rejects(() => reserveDispatch({ ...recipient, id: "reimported-id", studentCode: "STU-NEW", employeeCode: "EMP-NEW" }, offer, false), /may have been accepted|duplicate call/iu);
 });
 
 test("accepted run IDs survive refresh and provide same-run reconciliation", async () => {
@@ -130,10 +134,38 @@ test("opt-out is checked both before planning and again before dispatch", async 
   await saveDraft("opted_out");
   await assert.rejects(() => reserveDispatch(recipient, offer, false), /opted out/iu);
 
+  await resetDatabase();
   await saveDraft();
   const reservation = await reserveDispatch(recipient, offer, false);
   const planned = await recordReviewedPlan(reservation, plan);
   await saveDraft("opted_out");
   await assert.rejects(() => beginDispatch(planned), /opted out/iu);
   assert.equal((await loadDispatchAttempts())[0].phase, "planned");
+});
+
+test("phone opt-outs survive reset and block re-imports with changed codes", async () => {
+  await resetDatabase();
+  await saveLocalDraft({
+    sourceName: "opted-out.csv",
+    recipients: [{ ...recipient, status: "blocked", blocker: "Consent withdrawn — Do Not Call" }],
+    offer,
+    dispositions: {},
+    savedAt: "2026-08-03T09:00:00Z",
+  });
+  const phoneKeys = await loadPhoneSuppressions();
+  assert.equal(phoneKeys.length, 1);
+
+  await clearLocalDraft();
+  const reimported = { ...recipient, id: "different-row", studentCode: "STU-999", employeeCode: "EMP-999" };
+  const matches = await matchPhoneSuppressions([reimported], await loadPhoneSuppressions());
+  assert.equal(matches[reimported.id], true);
+
+  await saveLocalDraft({
+    sourceName: "replacement.csv",
+    recipients: [reimported],
+    offer,
+    dispositions: {},
+    savedAt: "2026-08-03T10:00:00Z",
+  });
+  await assert.rejects(() => reserveDispatch(reimported, offer, false), /opted out/iu);
 });

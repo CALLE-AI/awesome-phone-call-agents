@@ -17,7 +17,9 @@ import {
   clearLocalDraft,
   loadDispatchAttempts,
   loadLocalDraft,
+  loadPhoneSuppressions,
   matchDispatchAttempts,
+  matchPhoneSuppressions,
   runFromAcceptedAttempt,
   saveLocalDraft,
   subscribeLocalPersistence,
@@ -77,6 +79,8 @@ export function App() {
   const [runs, setRuns] = useState<Record<string, CallRun>>({});
   const [dispatchAttempts, setDispatchAttempts] = useState<DispatchAttempt[]>([]);
   const [attemptsByRecipientId, setAttemptsByRecipientId] = useState<Record<string, DispatchAttempt>>({});
+  const [phoneSuppressions, setPhoneSuppressions] = useState<string[]>([]);
+  const [suppressedRecipients, setSuppressedRecipients] = useState<Record<string, boolean>>({});
   const [dispositions, setDispositions] = useState<Record<string, Disposition>>({});
   const [resetArmed, setResetArmed] = useState(false);
   const [message, setMessage] = useState("Operator workspace ready. Complete the approved offer brief; no call is planned.");
@@ -84,8 +88,8 @@ export function App() {
   const previousStage = useRef(stage);
 
   const eligibleRecipients = useMemo(() => recipients.filter((recipient) => recipient.status === "eligible"), [recipients]);
-  const availableRecipients = useMemo(() => eligibleRecipients.filter((recipient) => canPlanRecipient(recipient, dispositions[recipient.id], Boolean(attemptsByRecipientId[recipient.id] || runs[recipient.id]))), [eligibleRecipients, dispositions, attemptsByRecipientId, runs]);
-  const selectedRecipient = eligibleRecipients.find((recipient) => recipient.id === selectedRecipientId) || availableRecipients[0];
+  const availableRecipients = useMemo(() => eligibleRecipients.filter((recipient) => canPlanRecipient(recipient, dispositions[recipient.id], Boolean(suppressedRecipients[recipient.id] || attemptsByRecipientId[recipient.id] || runs[recipient.id]))), [eligibleRecipients, dispositions, suppressedRecipients, attemptsByRecipientId, runs]);
+  const selectedRecipient = availableRecipients.find((recipient) => recipient.id === selectedRecipientId) || availableRecipients[0];
   const results = useMemo<CampaignResult[]>(() => Object.entries(runs).map(([recipientId, run]) => ({
     recipientId,
     providerSignal: run.status.toLowerCase(),
@@ -99,22 +103,24 @@ export function App() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([loadLocalDraft(), loadDispatchAttempts()]).then(([draft, attempts]) => {
+    Promise.all([loadLocalDraft(), loadDispatchAttempts(), loadPhoneSuppressions()]).then(([draft, attempts, suppressions]) => {
       if (!active) return;
       setDispatchAttempts(attempts);
+      setPhoneSuppressions(suppressions);
       if (!draft?.recipients.length) return;
       setRecipients(draft.recipients);
       setOffer(draft.offer || defaultOffer);
       setSourceName(draft.sourceName);
       setDispositions(draft.dispositions || {});
       setSelectedRecipientId(draft.recipients.find((item) => item.status === "eligible" && draft.dispositions[item.id] !== "opted_out")?.id || "");
-      setMessage(`Local campaign restored from ${draft.sourceName}. Durable dispatch locks and accepted run IDs were restored; CALL-E access and transcripts were not stored.`);
+      setMessage(`Local campaign restored from ${draft.sourceName}. Durable phone suppressions, dispatch locks and accepted run IDs were restored; CALL-E access and transcripts were not stored.`);
     }).catch(() => setMessage("Durable local storage is unavailable. CallNeuron will fail closed before creating a CALL-E plan."));
 
     const unsubscribe = subscribeLocalPersistence(() => {
-      Promise.all([loadLocalDraft(), loadDispatchAttempts()]).then(([draft, attempts]) => {
+      Promise.all([loadLocalDraft(), loadDispatchAttempts(), loadPhoneSuppressions()]).then(([draft, attempts, suppressions]) => {
         if (!active) return;
         setDispatchAttempts(attempts);
+        setPhoneSuppressions(suppressions);
         if (draft) setDispositions(draft.dispositions || {});
       }).catch(() => setMessage("A cross-tab safety update could not be read. New planning will fail closed at the durable gate."));
     });
@@ -126,13 +132,16 @@ export function App() {
 
   useEffect(() => {
     let active = true;
-    matchDispatchAttempts(recipients, dispatchAttempts).then((matches) => {
-      if (active) setAttemptsByRecipientId(matches);
+    Promise.all([matchDispatchAttempts(recipients, dispatchAttempts), matchPhoneSuppressions(recipients, phoneSuppressions)]).then(([attempts, suppressions]) => {
+      if (active) {
+        setAttemptsByRecipientId(attempts);
+        setSuppressedRecipients(suppressions);
+      }
     }).catch(() => {
       if (active) setMessage("Dispatch records could not be matched to recipients. New planning remains protected by the durable gate.");
     });
     return () => { active = false; };
-  }, [recipients, dispatchAttempts]);
+  }, [recipients, dispatchAttempts, phoneSuppressions]);
 
   useEffect(() => {
     setRuns((current) => {
@@ -218,7 +227,7 @@ export function App() {
     setDispositions({});
     setResetArmed(false);
     await clearLocalDraft().catch(() => undefined);
-    setMessage("Local campaign draft deleted. Durable dispatch locks and provider-side CALL-E records were preserved so reset cannot enable a duplicate call.");
+    setMessage("Local campaign draft deleted. Durable phone suppressions, dispatch locks and provider-side CALL-E records were preserved so reset cannot enable a duplicate call.");
   }
 
   async function changeDisposition(recipientId: string, disposition: Disposition) {
@@ -275,7 +284,7 @@ export function App() {
           <section className="operator-guide" aria-labelledby="guide-title">
             <div><p className="eyebrow">Before the first call</p><h2 id="guide-title">Use CallNeuron in this order.</h2><p>This prototype places real calls. Only contact an adult who gave valid permission for automated, processed and transcribed outreach.</p></div>
             <ol><li><strong>Approve</strong><span>Enter only words the caller may say.</span></li><li><strong>Load</strong><span>Add a recipient manually or import a local file.</span></li><li><strong>Verify</strong><span>Review evidence for the selected adult.</span></li><li><strong>Connect</strong><span>Authorize CALL-E and create a no-call plan.</span></li><li><strong>Confirm</strong><span>Place one call, then record human follow-up.</span></li></ol>
-            <details><summary>Privacy and operating limits</summary><ul><li>Shortlist data is stored in this browser only; the original file is never uploaded.</li><li>CALL-E credentials, confirmation secrets and transcripts stay in memory. Content hashes, dispatch phase and accepted run IDs persist locally to prevent duplicate calls.</li><li>CallNeuron does not rank students, award scholarships, schedule retries or make eligibility decisions.</li><li>Deleting the campaign draft preserves durable dispatch locks and does not delete provider-side CALL-E records.</li></ul></details>
+            <details><summary>Privacy and operating limits</summary><ul><li>Shortlist data is stored in this browser only; the original file is never uploaded.</li><li>CALL-E credentials, confirmation secrets and transcripts stay in memory. Phone suppression hashes, content hashes, dispatch phase and accepted run IDs persist locally to prevent duplicate calls.</li><li>CallNeuron does not rank students, award scholarships, schedule retries or make eligibility decisions.</li><li>Deleting the campaign draft preserves durable phone suppressions and dispatch locks; it does not delete provider-side CALL-E records.</li></ul></details>
           </section>
 
           <figure className="hero-signal" aria-labelledby="signal-title">
@@ -310,8 +319,9 @@ export function App() {
                   {recipients.length ? recipients.slice(0, 12).map((recipient) => {
                     const attempt = attemptsByRecipientId[recipient.id];
                     const optedOut = dispositions[recipient.id] === "opted_out";
-                    const blocked = !canPlanRecipient(recipient, dispositions[recipient.id], Boolean(attempt || runs[recipient.id]));
-                    const stateLabel = optedOut
+                    const suppressed = suppressedRecipients[recipient.id];
+                    const blocked = !canPlanRecipient(recipient, dispositions[recipient.id], Boolean(suppressed || attempt || runs[recipient.id]));
+                    const stateLabel = suppressed || optedOut
                       ? "Opted out — do not call"
                       : attempt?.phase === "accepted"
                         ? "Accepted run stored"
@@ -323,8 +333,8 @@ export function App() {
                     return <label className={`recipient-row recipient-row--${blocked ? "blocked" : recipient.status}`} key={recipient.id}><input type="radio" name="selected-recipient" disabled={blocked} checked={selectedRecipientId === recipient.id && !blocked} onChange={() => selectRecipient(recipient.id)} /><div><strong>{recipient.studentName}</strong><small>{recipient.studentCode} · owner {recipient.employeeCode}</small></div><div><span>{stateLabel}</span><small>{maskPhone(recipient.phone)}</small></div></label>;
                   }) : <div className="empty-state"><h3>No recipients yet.</h3><p>Add one manually or import a supported file. Nothing has been sent to CALL-E.</p></div>}
                   {recipients.length > 12 && <p className="inline-note">Showing 12 of {recipients.length} locally validated records.</p>}
-                  <p className="inline-note">Blocked consent, opt-outs and any durable dispatch record prevent a new plan across refreshes and tabs.</p>
-                  <button className="button button--primary" type="button" disabled={!selectedRecipient || !canPlanRecipient(selectedRecipient, dispositions[selectedRecipient.id], Boolean(attemptsByRecipientId[selectedRecipient.id] || runs[selectedRecipient.id]))} onClick={() => advance(2, `${selectedRecipient?.studentCode || "No record"} selected for one-person consent review.`)}>Review selected consent</button>
+                  <p className="inline-note">Blocked consent, durable phone opt-outs and any dispatch record prevent a new plan across resets, re-imports and tabs.</p>
+                  <button className="button button--primary" type="button" disabled={!selectedRecipient || !canPlanRecipient(selectedRecipient, dispositions[selectedRecipient.id], Boolean(suppressedRecipients[selectedRecipient.id] || attemptsByRecipientId[selectedRecipient.id] || runs[selectedRecipient.id]))} onClick={() => advance(2, `${selectedRecipient?.studentCode || "No record"} selected for one-person consent review.`)}>Review selected consent</button>
                 </div>
               </div>
             )}
@@ -350,7 +360,7 @@ export function App() {
               </div>
             )}
 
-            {stage === 4 && <div><div className="monitor-heading"><div className="stage-intro"><p className="eyebrow">05 / Follow-up</p><h2 id="stage-4-title">The call ends. Your responsibility does not.</h2><p>Read CALL-E’s provider result as untrusted call data, assign the human disposition, and follow up using the preference or question captured in the transcript.</p></div><div className="metrics" aria-label="Campaign metrics"><div><span>Attempted</span><strong>{metrics.attempted}</strong></div><div><span>Resolved</span><strong>{metrics.resolved}</strong></div><div className="metric--amber"><span>Follow-up</span><strong>{metrics.followUp}</strong></div><div><span>Resolution</span><strong>{metrics.resolutionRate}%</strong></div></div></div>{results.length ? <div className="results-list">{results.map((result) => { const recipient = recipients.find((item) => item.id === result.recipientId); return <article className="result-card result-card--completed" key={result.recipientId}><div className="result-card__summary"><div className="card-meta"><span>{recipient?.studentCode}</span><span>{result.providerSignal.replaceAll("_", " ")}</span></div><h3>{recipient?.recipientName} · {maskPhone(recipient?.phone || "")}</h3><p>{result.summary}</p><small>{result.attemptedAt}</small></div><div className="review-control"><label htmlFor={`disposition-${result.recipientId}`}>Human follow-up disposition</label><select id={`disposition-${result.recipientId}`} value={dispositions[result.recipientId] || "unreviewed"} onChange={(event) => changeDisposition(result.recipientId, event.target.value as Disposition)}>{Object.entries(dispositionLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div>{result.transcript && <details><summary>Review CALL-E transcript</summary><pre>{result.transcript}</pre></details>}</article>; })}</div> : <div className="empty-state"><h3>No call result yet.</h3><p>Return to Call. A plan and final confirmation are required before a phone can ring.</p></div>}<div className="monitor-actions"><button className="button button--primary" type="button" disabled={!availableRecipients.length} onClick={callAnotherRecipient}>Prepare another recipient</button><button className="button button--secondary" type="button" disabled={!results.length} onClick={() => downloadCsv(buildCampaignCsv(results, dispositions, recipients))}>Export privacy-minimal CSV</button><button className="text-button text-button--danger" type="button" onClick={() => setResetArmed(true)}>Reset local campaign</button></div>{resetArmed && <div className="reset-confirm" role="alert"><div><strong>Delete the local campaign draft?</strong><span>This removes the brief, recipient rows and dispositions. Durable dispatch locks remain so reset cannot enable a duplicate call; provider records are unchanged.</span></div><div className="live-actions"><button className="button button--danger" type="button" onClick={resetCampaign}>Delete campaign draft</button><button className="button button--secondary" type="button" onClick={() => setResetArmed(false)}>Cancel</button></div></div>}</div>}
+            {stage === 4 && <div><div className="monitor-heading"><div className="stage-intro"><p className="eyebrow">05 / Follow-up</p><h2 id="stage-4-title">The call ends. Your responsibility does not.</h2><p>Read CALL-E’s provider result as untrusted call data, assign the human disposition, and follow up using the preference or question captured in the transcript.</p></div><div className="metrics" aria-label="Campaign metrics"><div><span>Attempted</span><strong>{metrics.attempted}</strong></div><div><span>Resolved</span><strong>{metrics.resolved}</strong></div><div className="metric--amber"><span>Follow-up</span><strong>{metrics.followUp}</strong></div><div><span>Resolution</span><strong>{metrics.resolutionRate}%</strong></div></div></div>{results.length ? <div className="results-list">{results.map((result) => { const recipient = recipients.find((item) => item.id === result.recipientId); return <article className="result-card result-card--completed" key={result.recipientId}><div className="result-card__summary"><div className="card-meta"><span>{recipient?.studentCode}</span><span>{result.providerSignal.replaceAll("_", " ")}</span></div><h3>{recipient?.recipientName} · {maskPhone(recipient?.phone || "")}</h3><p>{result.summary}</p><small>{result.attemptedAt}</small></div><div className="review-control"><label htmlFor={`disposition-${result.recipientId}`}>Human follow-up disposition</label><select id={`disposition-${result.recipientId}`} value={dispositions[result.recipientId] || "unreviewed"} onChange={(event) => changeDisposition(result.recipientId, event.target.value as Disposition)}>{Object.entries(dispositionLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div>{result.transcript && <details><summary>Review CALL-E transcript</summary><pre>{result.transcript}</pre></details>}</article>; })}</div> : <div className="empty-state"><h3>No call result yet.</h3><p>Return to Call. A plan and final confirmation are required before a phone can ring.</p></div>}<div className="monitor-actions"><button className="button button--primary" type="button" disabled={!availableRecipients.length} onClick={callAnotherRecipient}>Prepare another recipient</button><button className="button button--secondary" type="button" disabled={!results.length} onClick={() => downloadCsv(buildCampaignCsv(results, dispositions, recipients))}>Export privacy-minimal CSV</button><button className="text-button text-button--danger" type="button" onClick={() => setResetArmed(true)}>Reset local campaign</button></div>{resetArmed && <div className="reset-confirm" role="alert"><div><strong>Delete the local campaign draft?</strong><span>This removes the brief, recipient rows and dispositions. Durable phone suppressions and dispatch locks remain; provider records are unchanged.</span></div><div className="live-actions"><button className="button button--danger" type="button" onClick={resetCampaign}>Delete campaign draft</button><button className="button button--secondary" type="button" onClick={() => setResetArmed(false)}>Cancel</button></div></div>}</div>}
           </section>
           <p className="global-status" role="status" aria-live="polite">{message}</p>
         </main>

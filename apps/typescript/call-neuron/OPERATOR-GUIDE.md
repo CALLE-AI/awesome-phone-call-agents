@@ -39,4 +39,4 @@ Use this checklist for every real call.
 - Contact interested recipients through a human using the captured preferred time and question.
 - Treat **Opted out** as do-not-call.
 - Export the privacy-minimal CSV before refreshing if transcript-derived details are needed; the accepted run ID/status will survive but transcript text will not.
-- Remember that resetting CallNeuron preserves durable dispatch locks and does not delete CALL-E's provider-side record.
+- Remember that resetting CallNeuron preserves durable phone opt-outs and dispatch locks and does not delete CALL-E's provider-side record.
