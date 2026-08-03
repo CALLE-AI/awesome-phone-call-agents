@@ -1,0 +1,37 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Local submission drafts may contain account or unpublished project details
+submission/
+
+# JavaScript and TypeScript
+node_modules/
+.next/
+.next-e2e/
+.next-verify/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# IDE and operating system
+.claude/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and local databases
+*.log
+*.sqlite
+*.sqlite3

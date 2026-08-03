@@ -1,0 +1,12 @@
+allowBuilds:
+  cpu-features: false
+  esbuild: true
+  protobufjs: false
+  sharp: true
+  ssh2: false
+minimumReleaseAgeExclude:
+  - '@call-e/calle@0.6.0'
+overrides:
+  '@esbuild-kit/core-utils>esbuild': 0.25.4
+  'next>postcss': 8.5.25
+  'next>sharp': 0.35.3
