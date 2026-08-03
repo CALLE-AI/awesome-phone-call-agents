@@ -1,0 +1,127 @@
+{
+  "_comment": [
+    "Fictional sample data. Every number is in the +1 555 01xx reserved range and belongs to",
+    "nobody. The waitlist is ordered so that each guardrail fires once, in view, before the slot",
+    "is filled: unknown timezone, revoked consent, frequency cap, then two real calls and one",
+    "suppression."
+  ],
+
+  "demoNow": "2026-09-02T17:00:00Z",
+
+  "slot": {
+    "id": "slot_2026_09_02_1430",
+    "businessName": "Brookmere Dental",
+    "service": "45-minute hygienist appointment",
+    "startsAtLocal": "Wednesday 2 September, 14:30",
+    "timeZone": "America/New_York",
+    "valueGbp": 68
+  },
+
+  "message": "A 45-minute hygienist appointment has come free this Wednesday at 2:30pm at Brookmere Dental. You are on our waiting list, so we are offering it to you first.",
+
+  "policy": {
+    "consentScope": "appointment_offers",
+    "quietHours": {
+      "startMinute": 540,
+      "endMinute": 1200,
+      "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "frequency": {
+      "maxCalls": 2,
+      "windowHours": 168
+    }
+  },
+
+  "waitlist": [
+    {
+      "id": "c_lindqvist",
+      "name": "Tomas Lindqvist",
+      "phone": "+15550100113",
+      "timeZone": null,
+      "region": "US",
+      "consent": {
+        "grantedAt": "2026-06-11T09:12:00Z",
+        "method": "signed_intake_form",
+        "scopes": ["appointment_offers"]
+      },
+      "_why": "Timezone was never captured at intake. The app refuses rather than inferring one from the +1 prefix."
+    },
+    {
+      "id": "c_abara",
+      "name": "Grace Abara",
+      "phone": "+15550100147",
+      "timeZone": "America/Chicago",
+      "region": "US",
+      "consent": {
+        "grantedAt": "2026-05-02T14:40:00Z",
+        "revokedAt": "2026-07-19T11:05:00Z",
+        "method": "signed_intake_form",
+        "scopes": ["appointment_offers"]
+      },
+      "_why": "Asked to stop being contacted. Consent revocation is checked before anything else costly."
+    },
+    {
+      "id": "c_watanabe",
+      "name": "Ken Watanabe",
+      "phone": "+15550100164",
+      "timeZone": "America/New_York",
+      "region": "US",
+      "consent": {
+        "grantedAt": "2026-04-28T16:20:00Z",
+        "method": "verbal_at_reception",
+        "scopes": ["appointment_offers", "reminders"]
+      },
+      "_why": "Already rung twice this week about other cancellations. The frequency cap stops a third."
+    },
+    {
+      "id": "c_whitfield",
+      "name": "Dana Whitfield",
+      "phone": "+15550100178",
+      "timeZone": "America/New_York",
+      "region": "US",
+      "consent": {
+        "grantedAt": "2026-07-01T10:00:00Z",
+        "method": "signed_intake_form",
+        "scopes": ["appointment_offers"]
+      },
+      "_why": "Called first. Says no in the sample script."
+    },
+    {
+      "id": "c_oyelaran",
+      "name": "Marcus Oyelaran",
+      "phone": "+15550100192",
+      "timeZone": "America/Denver",
+      "region": "US",
+      "consent": {
+        "grantedAt": "2026-07-14T08:30:00Z",
+        "method": "signed_intake_form",
+        "scopes": ["appointment_offers"]
+      },
+      "_why": "Says yes. The slot is filled here and the run stops calling."
+    },
+    {
+      "id": "c_raman",
+      "name": "Priya Raman",
+      "phone": "+15550100205",
+      "timeZone": "America/Los_Angeles",
+      "region": "US",
+      "consent": {
+        "grantedAt": "2026-07-20T12:15:00Z",
+        "method": "signed_intake_form",
+        "scopes": ["appointment_offers"]
+      },
+      "_why": "Passes every check and is still never called, because the slot is already gone."
+    }
+  ],
+
+  "history": [
+    { "contactId": "c_watanabe", "at": "2026-08-30T15:02:00Z", "slotId": "slot_2026_08_30_1500" },
+    { "contactId": "c_watanabe", "at": "2026-09-01T13:20:00Z", "slotId": "slot_2026_09_01_1315" }
+  ],
+
+  "scriptedAnswers": {
+    "c_whitfield": "no",
+    "c_oyelaran": "yes",
+    "c_raman": "yes"
+  }
+}

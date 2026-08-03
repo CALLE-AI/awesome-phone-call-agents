@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waitlist Backfill</title>
+<style>
+  /* Matched to the CALL-E dashboard: ice-blue page, white surfaces, hairline rules, 8px radii,
+     Inter, and flat elevation - a 1px border rather than a shadow. Light because the use scene
+     is a practice reception desk in daylight. */
+  :root {
+    --page:    #f4f9ff;
+    --surface: #ffffff;
+    --rule:    #dde5ef;
+    --rule-soft: #e5ebf2;
+
+    --ink:      #2e2f33;
+    --ink-2:    #5b6472;
+    --ink-muted:#6b7689;
+
+    --accent:   #004ead;
+    --accent-bg:#e8f0fb;
+
+    --good:     #0f6b45;
+    --good-bg:  #e6f3ec;
+    --hold:     #7a5310;
+    --hold-bg:  #fbf1de;
+    --bad:      #a32b1f;
+    --bad-bg:   #fbeae8;
+
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 44px 24px 80px;
+    background: var(--page);
+    color: var(--ink);
+    font: 400 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; }
+
+  /* ---- masthead ------------------------------------------------------- */
+
+  h1 {
+    font-size: 28px; font-weight: 400; letter-spacing: -.01em; line-height: 1.25;
+    margin: 0 0 10px; max-width: 40ch;
+  }
+  .standfirst { margin: 0 0 28px; max-width: 68ch; color: var(--ink-2); font-size: 15px; }
+
+  /* ---- panels --------------------------------------------------------- */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 22px;
+  }
+  .panel + .panel { margin-top: 12px; }
+
+  .slot { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 30px; }
+  .field .label {
+    display: block; font-size: 12px; color: var(--ink-muted); margin-bottom: 5px;
+  }
+  .field .value { font-size: 16px; line-height: 1.35; }
+  .field .value.id { font-family: var(--mono); font-size: 13px; word-break: break-all; }
+  .field .sub { display: block; color: var(--ink-muted); font-size: 12px; margin-top: 3px; }
+
+  /* ---- controls ------------------------------------------------------- */
+
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button {
+    font: 600 14px/1 var(--sans);
+    padding: 11px 16px; border-radius: 8px; border: 1px solid transparent; cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
+  }
+  button.primary { background: var(--ink); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #1c1d20; }
+  button.go { background: var(--accent); color: #fff; }
+  button.go:hover:not(:disabled) { background: #003d8a; }
+  button.ghost { background: var(--surface); color: var(--ink-2); border-color: var(--rule); }
+  button.ghost:hover:not(:disabled) { border-color: var(--ink-muted); color: var(--ink); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  #confirm, #token {
+    flex: 1; min-width: 240px;
+    font: 400 13px/1 var(--mono);
+    padding: 11px 13px; border-radius: 8px; border: 1px solid var(--rule);
+    background: var(--surface); color: var(--ink);
+  }
+  #token { min-width: 180px; }
+  #confirm::placeholder, #token::placeholder {
+    color: var(--ink-muted); font-family: var(--sans); font-size: 13px;
+  }
+  #confirm:disabled { background: #f7f9fc; color: var(--ink-muted); }
+
+  .mode-note { font-size: 13px; color: var(--ink-2); margin: 14px 0 0; max-width: 76ch; }
+  .mode-note strong { color: var(--ink); font-weight: 600; }
+  .mode-note .danger { color: var(--bad); font-weight: 600; }
+
+  /* ---- list ----------------------------------------------------------- */
+
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    margin: 36px 0 10px;
+  }
+  .section-head h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .section-head .hint { font-size: 12px; color: var(--ink-muted); }
+
+  .panel.flush { padding: 4px 22px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left; font-size: 12px; font-weight: 500; color: var(--ink-muted);
+    padding: 14px 10px; border-bottom: 1px solid var(--rule-soft);
+  }
+  tbody td { padding: 14px 10px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr { transition: background-color .45s ease; }
+  tbody tr.pending .name, tbody tr.pending .num { color: var(--ink-muted); }
+  tbody tr.filled { background: var(--good-bg); }
+
+  .num  { font-family: var(--mono); font-size: 12.5px; color: var(--ink-muted); width: 32px; }
+  .name { font-size: 15px; }
+  .tel, .tz { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+  .tz.absent { color: var(--bad); }
+
+  .pill {
+    display: inline-block; font-size: 12px; font-weight: 600; line-height: 1;
+    padding: 6px 10px; border-radius: 999px;
+    background: #eef2f7; color: var(--ink-2); white-space: nowrap;
+  }
+  .p-ok   { background: var(--good-bg);   color: var(--good); }
+  .p-skip { background: var(--hold-bg);   color: var(--hold); }
+  .p-stop { background: var(--bad-bg);    color: var(--bad); }
+  .p-live { background: var(--accent-bg); color: var(--accent); }
+  .p-mute { background: transparent; color: var(--ink-muted); box-shadow: inset 0 0 0 1px var(--rule); }
+
+  .reason { margin-top: 7px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 56ch; }
+  .reason code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: #eef2f7; padding: 1px 5px; border-radius: 4px; color: var(--ink-2);
+  }
+
+  /* ---- record --------------------------------------------------------- */
+
+  .record { max-height: 320px; overflow-y: auto; padding: 8px 22px; }
+  #log p { margin: 0; padding: 9px 0; font: 400 13px/1.6 var(--mono); color: var(--ink-2); }
+  #log p + p { border-top: 1px solid var(--rule-soft); }
+  #log p b { color: var(--ink); font-weight: 600; }
+  #log p.empty { color: var(--ink-muted); font-family: var(--sans); }
+  /* A halt is not a normal outcome: a call may be live and unaccounted for. */
+  #log p.halted b { color: var(--bad); }
+
+  /* ---- outcome -------------------------------------------------------- */
+
+  .outcome { display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 22px; margin-top: 12px; }
+  .stat b { display: block; font-size: 28px; font-weight: 400; letter-spacing: -.01em; line-height: 1.2; }
+  .stat span { display: block; margin-top: 4px; font-size: 12px; color: var(--ink-muted); }
+
+  /* One authored moment: a decision arriving. Defaults are already visible for anyone who has
+     asked the system to stop moving things. */
+  @media (prefers-reduced-motion: no-preference) {
+    .settle { animation: settle .4s cubic-bezier(.16, 1, .3, 1) both; }
+    @keyframes settle {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 30px 16px 60px; }
+    thead th:nth-child(4), tbody td:nth-child(4) { display: none; }
+    .panel, .panel.flush, .record { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>A slot just opened. Someone on the list can still take it.</h1>
+  <p class="standfirst">
+    The waiting list is called one person at a time. The first person to say yes gets the
+    appointment, and nobody behind them is called at all.
+  </p>
+
+  <div class="panel slot" id="slot"></div>
+
+  <div class="panel">
+    <div class="controls">
+      <button class="primary" id="preview">Preview the run</button>
+      <input id="confirm" placeholder="type the slot id to unlock calling" aria-label="Slot id confirmation">
+      <input id="token" placeholder="operator token" aria-label="Operator token" type="password" hidden>
+      <button class="go" id="live" disabled>Start calling</button>
+      <button class="ghost" id="cancel" disabled>Stop</button>
+    </div>
+    <p class="mode-note" id="modeNote"></p>
+  </div>
+
+  <div class="section-head">
+    <h2>The waiting list</h2>
+    <span class="hint">in priority order</span>
+  </div>
+  <div class="panel flush">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Contact</th>
+          <th scope="col">Number</th>
+          <th scope="col">Timezone</th>
+          <th scope="col">Decision</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="section-head">
+    <h2>What happened, and why</h2>
+    <span class="hint">every decision, in order</span>
+  </div>
+  <div class="panel record" id="log">
+    <p class="empty">Nothing yet. Preview the run to see who would be called.</p>
+  </div>
+
+  <div class="panel outcome" id="summary" hidden></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let scenario = null, abort = null;
+
+/* ---------------------------------------------------------------------------
+   DOM construction, not string concatenation.
+
+   Every value below - contact names, reason text, provider call summaries,
+   transport error messages - originates outside this page, in a scenario file
+   or in a response from the calling provider. Interpolating those into
+   innerHTML makes any one of them able to run script in the operator's
+   browser. Nothing untrusted is ever parsed as HTML here; it is assigned as
+   text, which cannot become markup no matter what it contains.
+   --------------------------------------------------------------------------- */
+
+function el(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text !== undefined && text !== null) n.textContent = String(text);
+  return n;
+}
+
+const bold = (t) => el("b", null, t);
+const code = (t) => el("code", null, t);
+
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+  return node;
+}
+
+function append(parent, parts) {
+  for (const part of parts) {
+    if (part === null || part === undefined) continue;
+    parent.appendChild(typeof part === "string" ? document.createTextNode(part) : part);
+  }
+  return parent;
+}
+
+async function init() {
+  scenario = await (await fetch("/api/scenario")).json();
+  const s = scenario.slot;
+  const slot = clear($("slot"));
+  slot.appendChild(field("Practice", s.businessName, s.service));
+  slot.appendChild(field("Appointment", s.startsAtLocal, s.timeZone));
+  slot.appendChild(field("Worth", `£${s.valueGbp}`, "if it is filled"));
+  const idField = el("div", "field");
+  idField.appendChild(el("span", "label", "Slot"));
+  // In live mode the server withholds the id, because echoing it is half the intent gate and it
+  // would otherwise be readable by anything that can reach the port.
+  idField.appendChild(el("span", "value id", scenario.slotIdWithheld ? "not shown in live mode" : s.id));
+  slot.appendChild(idField);
+
+  $("token").hidden = !scenario.operatorTokenRequired;
+
+  const simulated = scenario.liveConfigured && scenario.transport === "fake";
+  $("live").textContent = simulated ? "Start the simulated run" : "Start calling";
+
+  const note = clear($("modeNote"));
+  if (!scenario.liveConfigured) {
+    note.textContent = "This server has no CALL-E credentials, so it cannot place a call. "
+      + "Preview shows who would be rung, and why the others would not.";
+  } else if (simulated) {
+    append(note, [
+      el("strong", null, "Simulated."),
+      " The whole run — the calls, the acceptance, the people who are never rung — against a "
+        + "fake transport. ",
+      el("strong", null, "No real calls are placed."),
+    ]);
+  } else {
+    append(note, [
+      el("span", "danger", "This places real phone calls."),
+      " Type the slot id to unlock it.",
+    ]);
+  }
+
+  $("confirm").disabled = !scenario.liveConfigured;
+  refreshLiveButton();
+  resetRows();
+}
+
+function field(label, value, sub) {
+  const wrap = el("div", "field");
+  wrap.appendChild(el("span", "label", label));
+  wrap.appendChild(el("span", "value", value));
+  wrap.appendChild(el("span", "sub", sub));
+  return wrap;
+}
+
+function resetRows() {
+  const body = clear($("rows"));
+  scenario.waitlist.forEach((c, i) => {
+    const tr = el("tr", "pending");
+    tr.id = "row_" + c.id;
+    tr.appendChild(el("td", "num", String(i + 1).padStart(2, "0")));
+    tr.appendChild(el("td", "name", c.name));
+    // The server sends only the masked form; there is no raw number in this page to leak.
+    tr.appendChild(el("td", "tel", c.phoneMasked ?? "***"));
+    tr.appendChild(el("td", "tz" + (c.timeZone ? "" : " absent"), c.timeZone ?? "not recorded"));
+    const decision = el("td", "decision");
+    decision.appendChild(el("span", "pill p-mute", "waiting"));
+    tr.appendChild(decision);
+    body.appendChild(tr);
+  });
+}
+
+function setDecision(contactId, label, cls, reason, reasonCode) {
+  const row = $("row_" + contactId);
+  if (!row) return;
+  row.classList.remove("pending");
+  const cell = clear(row.querySelector(".decision"));
+  cell.appendChild(el("span", "pill " + (cls || ""), label));
+  if (reason || reasonCode) {
+    const r = el("div", "reason");
+    if (reasonCode) { r.appendChild(code(reasonCode)); r.appendChild(document.createTextNode(" ")); }
+    if (reason) r.appendChild(document.createTextNode(reason));
+    cell.appendChild(r);
+  }
+  cell.classList.remove("settle");
+  void cell.offsetWidth;
+  cell.classList.add("settle");
+}
+
+function logLine(parts, cls) {
+  const log = $("log");
+  const first = log.firstElementChild;
+  if (first && first.classList.contains("empty")) clear(log);
+  const p = el("p", cls || null);
+  append(p, Array.isArray(parts) ? parts : [parts]);
+  log.appendChild(p);
+  log.scrollTop = log.scrollHeight;
+}
+
+function onEvent(e) {
+  switch (e.type) {
+    case "run_started": {
+      const label = e.mode !== "live" ? "Preview" : e.transport === "live" ? "Live" : "Simulated";
+      logLine([bold(`${label} run.`), " ", e.detail]);
+      break;
+    }
+    case "contact_skipped":
+      setDecision(e.contactId, "not called", "p-skip", e.detail, e.code);
+      logLine(["Skipped ", bold(e.name), ` (${e.phone}). `, e.detail]);
+      break;
+    case "contact_would_call":
+      setDecision(e.contactId, "would call", "p-live", e.detail);
+      logLine(["Would call ", bold(e.name), ` (${e.phone}). Passed every check.`]);
+      break;
+    case "call_started":
+      setDecision(e.contactId, "calling", "p-live", null, e.idempotencyKey);
+      logLine(["Calling ", bold(e.name), ` (${e.phone})…`]);
+      break;
+    case "call_completed":
+      // A declined call is neutral, not amber. Amber means a guardrail stopped us; this person
+      // was reached and said no, which is a normal outcome rather than something we prevented.
+      setDecision(e.contactId, e.answer ?? e.status, e.answer === "yes" ? "p-ok" : "",
+        e.summary ?? "");
+      logLine([bold(e.name), " answered ", bold(e.answer ?? e.status), "."]);
+      break;
+    case "call_failed":
+      setDecision(e.contactId, "failed", "p-stop", e.detail, e.code);
+      logLine(["Call to ", bold(e.name), " failed. ", e.detail]);
+      break;
+    case "run_halted":
+      setDecision(e.contactId, "unresolved", "p-stop", e.detail, e.code);
+      logLine([bold("Run stopped."), " ", e.detail], "halted");
+      break;
+    case "slot_filled":
+      setDecision(e.contactId, "slot filled", "p-ok", e.detail);
+      $("row_" + e.contactId)?.classList.add("filled");
+      logLine([bold(`${e.name} took the slot.`), " Nobody else will be called."]);
+      break;
+    case "contact_suppressed":
+      setDecision(e.contactId, "never called", "p-mute", e.detail);
+      logLine(["Did not call ", bold(e.name), ". The slot was already gone."]);
+      break;
+    case "run_cancelled":
+      logLine([bold("Stopped."), " ", e.detail]);
+      break;
+    case "run_error":
+      logLine([bold("Error."), " ", e.detail]);
+      break;
+    case "run_finished":
+      showSummary(e.summary);
+      finish();
+      break;
+  }
+}
+
+function showSummary(s) {
+  const panel = clear($("summary"));
+  panel.hidden = false;
+  const stats = [
+    [s.filled ? s.filledBy.name : "Still open", s.filled ? "took the slot" : "nobody accepted"],
+    [s.callsPlaced, "calls placed"],
+    [s.callsAvoided, "calls avoided"],
+    [s.skipped, "stopped by a check"],
+    [s.suppressed, "never called"],
+  ];
+  for (const [value, label] of stats) {
+    const box = el("div", "stat");
+    box.appendChild(bold(value));
+    box.appendChild(el("span", null, label));
+    panel.appendChild(box);
+  }
+  if (s.reconcileKey) {
+    const warn = el("div", "stat");
+    warn.appendChild(bold("Check"));
+    warn.appendChild(el("span", null, `reconcile ${s.reconcileKey} before re-running`));
+    panel.appendChild(warn);
+  }
+}
+
+// Calling only unlocks once the operator has named the slot, and supplied the token when the
+// server requires one. Intent has to name the thing being authorised, not just be a general yes.
+//
+// When the id is withheld the button cannot check it, only that something was typed. That is fine:
+// this was always a UI affordance, and the server is what actually enforces the match.
+function refreshLiveButton() {
+  const typed = $("confirm").value.trim();
+  const named = scenario?.slotIdWithheld ? typed !== "" : typed === scenario?.slot?.id;
+  const authed = !scenario?.operatorTokenRequired || $("token").value.trim() !== "";
+  $("live").disabled = !scenario?.liveConfigured || !named || !authed;
+}
+
+/**
+ * Starting a run is a POST carrying JSON, not a GET.
+ *
+ * EventSource can only issue GET, and a GET that dials people can be triggered by anything that
+ * can make the browser fetch a URL - a prefetch, an <img>, a link from another tab. The stream is
+ * read straight off the POST response instead, which keeps the live view and makes the request
+ * one no cross-site context can forge.
+ */
+async function start(mode) {
+  if (abort) abort.abort();
+  resetRows();
+  clear($("log"));
+  $("summary").hidden = true;
+
+  const headers = { "content-type": "application/json" };
+  const body = { mode };
+  if (mode === "live") {
+    const typed = $("confirm").value.trim();
+    // Only pre-check when we hold the id to check against. Otherwise the server decides, and a
+    // mismatch comes back as a refused run rather than a silent no-op here.
+    if (!scenario.slotIdWithheld && typed !== scenario.slot.id) {
+      logLine([bold("Not confirmed."), " The slot id did not match, so nothing was called."]);
+      return;
+    }
+    body.confirmSlotId = typed;
+    if (scenario.operatorTokenRequired) headers.authorization = `Bearer ${$("token").value.trim()}`;
+  }
+
+  $("preview").disabled = $("live").disabled = true;
+  $("cancel").disabled = false;
+  abort = new AbortController();
+
+  try {
+    const res = await fetch("/api/run", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: abort.signal,
+    });
+    if (!res.ok || !res.body) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      logLine([bold("Refused."), " ", err.error ?? "The server would not start the run."]);
+      return finish();
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let split;
+      while ((split = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("data: ")) onEvent(JSON.parse(line.slice(6)));
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") logLine([bold("Connection lost."), " ", String(err.message ?? err)]);
+  }
+  finish();
+}
+
+function finish() {
+  abort = null;
+  $("preview").disabled = false;
+  $("cancel").disabled = true;
+  refreshLiveButton();
+}
+
+$("confirm").oninput = refreshLiveButton;
+$("token").oninput = refreshLiveButton;
+$("preview").onclick = () => start("preview");
+$("live").onclick = () => start("live");
+$("cancel").onclick = async () => {
+  $("cancel").disabled = true;
+  const headers = { "content-type": "application/json" };
+  if (scenario?.operatorTokenRequired) headers.authorization = `Bearer ${$("token").value.trim()}`;
+  await fetch("/api/cancel", { method: "POST", headers, body: "{}" });
+};
+init();
+</script>
+</body>
+</html>

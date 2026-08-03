@@ -20,6 +20,7 @@ Current apps:
 | [`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
 | [`python/oauth-login-client`](python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
+| [`web/waitlist-backfill`](web/waitlist-backfill/) | Web (Node, no build step) | Fills a cancelled appointment slot by phoning a waiting list one person at a time, stopping at the first acceptance. |
 
 Suggested grouping:
 
