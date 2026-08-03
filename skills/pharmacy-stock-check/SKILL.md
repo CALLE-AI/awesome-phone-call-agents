@@ -146,10 +146,24 @@ Offer the transcript. Every claim should be checkable against what was said.
   through.
 - **Persist `plan_id` and `run_id` to disk as soon as you receive them.**
   `plan_id` is CALL-E's idempotency key, but it only protects you if it survives
-  a crash. An interrupted poll with no persisted run means the next invocation
-  plans afresh and calls the same pharmacist a second time — spending a call and
-  bothering a real person. On restart, resume the stored run instead of
-  re-planning; only clear the entry once the run reaches a terminal state.
+  a crash. On restart, resume the stored run instead of re-planning.
+
+  The ledger is the thing standing between a crash and a second call to a real
+  person, so it has to be written like one:
+
+  - **Lock it.** Read-modify-write under an exclusive file lock. Without it,
+    two processes both see "no entry" and both dial.
+  - **Write atomically.** Temp file, fsync, then rename. A partial write must
+    never replace a good ledger.
+  - **Fail loudly on corruption.** An unreadable ledger means quarantine it and
+    stop. Substituting an empty one presents every in-flight run as new and
+    redials the lot.
+  - **Record the terminal result before retiring the entry.** Clearing first
+    opens a window where a crash loses both the result and the claim.
+  - **Treat an ambiguous create as un-retryable.** If `run_call` was sent and
+    the response was lost, whether the phone rang is unknown. Mark that state
+    before the call, and require a human decision to clear it — never retry
+    automatically.
 - **Never re-dial to recover data you already paid for.**
 - **No recurring schedules.** This is a one-shot workflow. If a user wants
   repeat checks, create them explicitly and tell the user how to cancel.
@@ -164,10 +178,47 @@ That matters here. A dry run that still transmits the recipient's phone number
 and the medication being sought — by calling the planning endpoint — is not a
 dry run. In a medical-adjacent workflow it leaks who is looking for what.
 
+Numbers are masked in the printed payload too. Masking covers anything printed
+or logged, not just what reaches the user: terminal output ends up in
+scrollback, CI logs and screen recordings.
+
 ```bash
 python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv        # offline
 python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live # calls
 ```
+
+## Verifying end to end without a real pharmacy
+
+CALL-E publishes an inbound testing hotline — **+1 276-322-9632** — that answers
+with a general-purpose conversational prompt. It's the recommended target for
+exercising this skill live without calling a business.
+
+```bash
+printf 'name,phone,address\nCALL-E Hotline,+12763229632,Inbound testing hotline\n' \
+  > pharmacies.hotline.csv
+
+python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv           # offline
+python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live    # 1 call
+```
+
+The hotline isn't role-playing a pharmacist, so the extracted fields will be
+sparse or `unknown`. That's the expected result and it's still a useful check —
+it exercises plan, run, poll, the completion gate and the ledger, and confirms
+an incomplete stock check reports as one rather than inventing fields.
+
+**To verify the durable-run behaviour**, interrupt a live call mid-poll
+(`Ctrl+C`) and run the same command again:
+
+```
+  …9632: resuming run 4BJPgjIFv3gZ
+```
+
+It polls the existing run instead of planning a new one. Inspect
+`.pharmacy_runs.json` between the two invocations to see the entry sitting in
+`running` with its `run_id` recorded.
+
+This number is published by CALL-E for testing, so it is not masked here — the
+masking rule protects private numbers, not a public test endpoint.
 
 ## Example
 

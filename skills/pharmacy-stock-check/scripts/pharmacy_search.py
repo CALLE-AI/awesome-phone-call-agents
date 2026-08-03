@@ -24,11 +24,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import fcntl
 import hashlib
 import json
 import logging
+import os
 import re
+import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -141,44 +145,192 @@ class CallBudget:
 # --------------------------------------------------------------------------
 
 
+class StateCorrupted(RuntimeError):
+    """The run ledger could not be read. Refuse to proceed rather than
+    starting from a blank slate, which would redial everything."""
+
+
+class RunLocked(RuntimeError):
+    """Another live process holds this recipient."""
+
+
+class AmbiguousRun(RuntimeError):
+    """run_call was sent but no run_id was recorded. Whether a call was
+    placed is unknown, so it must not be retried automatically."""
+
+
 @dataclass
 class RunStore:
-    """Persisted plan and run IDs, so an interruption resumes instead of redials.
+    """Crash-safe, concurrency-safe ledger of in-flight calls.
 
-    Without this, a lost response or a killed process means the next invocation
-    plans afresh and calls the pharmacist a second time — spending a call and
-    bothering a real person. `plan_id` is CALL-E's idempotency key, so it only
-    protects you if it survives the crash.
+    Losing this state means redialling a real person, so the failure modes
+    matter more than the happy path:
+
+    * **Locked.** Every read-modify-write runs under an exclusive `flock`, so
+      two processes can't both see "no entry" and both dial.
+    * **Atomic.** Writes go to a temp file, get fsynced, then `os.replace` —
+      a crash mid-write leaves the previous good file, never a truncated one.
+    * **Loud on corruption.** An unreadable ledger is quarantined and raises.
+      Silently substituting `{}` would present every in-flight run as new.
+    * **Terminal-first.** The entry is only marked `done` once the result is
+      recorded, and pruned separately. Clearing before the result is durable
+      opens a window where a crash loses both.
+    * **Ambiguity is not retryable.** If `run_call` was sent and the response
+      was lost, whether the phone rang is unknown. That state requires a human
+      decision, not an automatic retry.
+
+    States: planned -> dialing -> running -> done
     """
 
     path: Path = field(default=Path(".pharmacy_runs.json"))
 
-    def _load(self) -> dict[str, Any]:
+    # -- locking ------------------------------------------------------------
+
+    @contextmanager
+    def _locked(self):
+        lock_path = self.path.with_name(self.path.name + ".lock")
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
+    def _read(self) -> dict[str, Any]:
         if not self.path.exists():
             return {}
-        try:
-            return json.loads(self.path.read_text())
-        except json.JSONDecodeError:
+        text = self.path.read_text()
+        if not text.strip():
             return {}
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            quarantine = self.path.with_name(
+                f"{self.path.name}.corrupt.{int(time.time())}"
+            )
+            self.path.rename(quarantine)
+            raise StateCorrupted(
+                f"Run ledger {self.path} is unreadable and has been moved to "
+                f"{quarantine}. Refusing to continue: treating a corrupt ledger "
+                f"as empty would redial every in-flight recipient. Inspect the "
+                f"quarantined file, then remove it to start clean."
+            ) from exc
+
+    def _write(self, data: dict[str, Any]) -> None:
+        fd, tmp = tempfile.mkstemp(dir=str(self.path.parent or "."), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as handle:
+                json.dump(data, handle, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, self.path)   # atomic
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+
+    # -- api ----------------------------------------------------------------
 
     @staticmethod
     def key(phone: str, goal: str) -> str:
         return hashlib.sha256(f"{phone}|{goal}".encode()).hexdigest()[:32]
 
+    @staticmethod
+    def _alive(pid: int | None) -> bool:
+        if not pid or pid == os.getpid():
+            return pid == os.getpid()
+        try:
+            os.kill(pid, 0)
+        except (ProcessLookupError, PermissionError, OSError):
+            return False
+        return True
+
+    def claim(self, key: str, phone_masked: str) -> dict[str, Any]:
+        """Atomically take ownership of a recipient, or return the live entry.
+
+        The read and the write happen under one lock, so there is no window in
+        which two processes both conclude the recipient is unclaimed.
+        """
+        with self._locked():
+            data = self._read()
+            entry = data.get(key)
+
+            if entry is None:
+                entry = {
+                    "state": "planned",
+                    "pid": os.getpid(),
+                    "phone_masked": phone_masked,
+                    "claimed_at": datetime.now(timezone.utc).isoformat(),
+                }
+                data[key] = entry
+                self._write(data)
+                return entry
+
+            if entry.get("state") == "dialing":
+                raise AmbiguousRun(
+                    f"{phone_masked}: a call was submitted but no run id was "
+                    f"recorded, so whether the phone rang is unknown. Not "
+                    f"retrying automatically. Check the CALL-E dashboard for "
+                    f"plan {entry.get('plan_id')}, then either record the "
+                    f"run id or remove this entry to allow a redial."
+                )
+
+            owner = entry.get("pid")
+            if (
+                entry.get("state") in {"planned", "running"}
+                and owner != os.getpid()
+                and self._alive(owner)
+            ):
+                raise RunLocked(
+                    f"{phone_masked}: held by live process {owner}. "
+                    f"Not dialling concurrently."
+                )
+
+            entry["pid"] = os.getpid()
+            data[key] = entry
+            self._write(data)
+            return entry
+
+    def update(self, key: str, **fields: Any) -> None:
+        with self._locked():
+            data = self._read()
+            entry = data.setdefault(key, {})
+            entry.update(fields)
+            entry["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._write(data)
+
+    def mark_done(self, key: str, result_path: str | None = None) -> None:
+        """Record completion. Called only AFTER the terminal result is durable.
+
+        Deliberately not a delete: pruning is a separate step, so a crash
+        between recording the result and tidying the ledger can never lose
+        both.
+        """
+        self.update(key, state="done", result_path=result_path,
+                    completed_at=datetime.now(timezone.utc).isoformat())
+
+    def prune_done(self) -> int:
+        with self._locked():
+            data = self._read()
+            stale = [k for k, v in data.items() if v.get("state") == "done"]
+            for k in stale:
+                data.pop(k)
+            if stale:
+                self._write(data)
+            return len(stale)
+
     def get(self, key: str) -> dict[str, Any]:
-        return self._load().get(key, {})
+        with self._locked():
+            return self._read().get(key, {})
 
-    def put(self, key: str, **fields: Any) -> None:
-        data = self._load()
-        entry = data.setdefault(key, {})
-        entry.update(fields)
-        entry["updated_at"] = datetime.now(timezone.utc).isoformat()
-        self.path.write_text(json.dumps(data, indent=2))
-
-    def clear(self, key: str) -> None:
-        data = self._load()
-        data.pop(key, None)
-        self.path.write_text(json.dumps(data, indent=2))
+    def release(self, key: str) -> None:
+        """Drop a claim that never reached `dialing`. Safe: no call was sent."""
+        with self._locked():
+            data = self._read()
+            entry = data.get(key)
+            if entry and entry.get("state") == "planned" and not entry.get("run_id"):
+                data.pop(key)
+                self._write(data)
 
 
 # --------------------------------------------------------------------------
@@ -403,21 +555,36 @@ class Caller:
             await asyncio.sleep(min(delay, 15.0))
         return None
 
+    def _record_terminal(self, key: str, phone: str, final: dict[str, Any]) -> str:
+        """Write the terminal response to disk BEFORE the ledger is retired.
+
+        If the ledger entry were cleared first, a crash in between would lose
+        the result and the claim together — and the next invocation would
+        redial.
+        """
+        path = Path(f"run_{key[:12]}_{int(time.time())}.json")
+        path.write_text(json.dumps(final, indent=2, default=str))
+        return str(path)
+
     async def call(self, pharmacy: dict[str, str], goal: str, region: str
                    ) -> dict[str, Any] | None:
         phone = validate_e164(pharmacy["phone"])
         key = self.store.key(phone, goal)
-        saved = self.store.get(key)
+
+        # Atomic claim. Raises if another live process holds this recipient, or
+        # if a previous attempt left an ambiguous create.
+        saved = self.store.claim(key, mask(phone))
 
         async with self._client() as client:
-            # Resume an in-flight run rather than planning again. Without this,
-            # an interrupted poll causes a second call to the same pharmacist.
+            # Resume an in-flight run rather than planning again.
             if saved.get("run_id"):
                 log.info("  %s: resuming run %s", mask(phone), saved["run_id"][:12])
                 final = await self._poll(client, saved["run_id"], phone)
                 if final is None:
                     return None
-                self.store.clear(key)
+                self.store.mark_done(
+                    key, self._record_terminal(key, phone, final)
+                )
                 return to_record(final, pharmacy)
 
             # Reuse a stored plan if its confirm_token is still valid.
@@ -438,30 +605,38 @@ class Caller:
                 if not plan.get("ready_to_run"):
                     log.warning("  %s: planner needs more detail — %s",
                                 mask(phone), plan.get("clarifying_questions"))
+                    self.store.release(key)   # nothing was dialled
                     return None
-                self.store.put(
+                self.store.update(
                     key,
                     plan_id=plan["plan_id"],
                     confirm_token=plan["confirm_token"],
                     confirm_expires_at=plan.get("confirm_expires_at"),
-                    phone_masked=mask(phone),
                 )
 
+            # Mark "dialing" BEFORE run_call. If the response is lost, the
+            # ledger already says a call may have been placed — and claim()
+            # will refuse to retry it rather than risk a second ring.
+            self.store.update(key, state="dialing")
             self.budget.charge(1)
+
             run = self._unwrap(await client.call_tool("run_call", {
                 "plan_id": plan["plan_id"], "confirm_token": plan["confirm_token"],
             }))
             run_id = run.get("run_id")
             if not run_id:
+                log.error("  %s: no run id returned — left as ambiguous, "
+                          "will not auto-retry", mask(phone))
                 return None
-            self.store.put(key, run_id=run_id)
+            self.store.update(key, state="running", run_id=run_id)
 
             final = await self._poll(client, run_id, phone)
             if final is None:
                 log.error("  %s: poll timed out — rerun to resume, not redial",
                           mask(phone))
                 return None
-            self.store.clear(key)
+
+            self.store.mark_done(key, self._record_terminal(key, phone, final))
             return to_record(final, pharmacy)
 
 
@@ -481,10 +656,13 @@ def dry_run(pharmacies: list[dict[str, str]], goal: str, region: str) -> None:
     print(f"\nDRY RUN — offline. No credentials read, nothing sent.\n")
     for pharmacy in pharmacies:
         phone = validate_e164(pharmacy["phone"])
+        # Numbers are masked here too. The masking rule covers anything
+        # printed or logged — a dry run that echoes full E.164 numbers to the
+        # terminal puts them in scrollback, CI logs and screen recordings.
         payload = {
             "tool": "plan_call",
             "goal": goal,
-            "to_phones": [phone],
+            "to_phones": [mask(phone)],
             "region": region,
             "language": "English",
             "ttl_seconds": 0,
@@ -492,7 +670,9 @@ def dry_run(pharmacies: list[dict[str, str]], goal: str, region: str) -> None:
         print(f"  {pharmacy.get('name', '?')} ({mask(phone)}) — would send:")
         print("  " + json.dumps(payload, indent=2)[:400].replace("\n", "\n  "))
         print()
-    print(f"  {len(pharmacies)} call(s) would be placed. Add --live to dial.\n")
+    print(f"  {len(pharmacies)} call(s) would be placed. Add --live to dial.")
+    print(f"  Numbers shown masked; the real E.164 values are sent only "
+          f"under --live.\n")
 
 
 # --------------------------------------------------------------------------
@@ -567,6 +747,10 @@ async def main() -> None:
         async with semaphore:
             try:
                 return await caller.call(pharmacy, goal, args.region)
+            except (AmbiguousRun, RunLocked) as exc:
+                # Not failures to retry past — these exist to stop a redial.
+                log.error("  %s", exc)
+                return None
             except Exception as exc:
                 log.error("  %s failed: %s", pharmacy.get("name"), exc)
                 return None
@@ -577,4 +761,16 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        # A stack trace here is worse than unhelpful: the operator has just
+        # interrupted a live call and needs to know that rerunning resumes it
+        # rather than dialling the recipient a second time.
+        print(
+            "\nInterrupted. Any call already placed is still running on "
+            "CALL-E's side.\nRerun the same command to resume polling — the "
+            "ledger holds the run id, so it will not redial.\n"
+            "  cat .pharmacy_runs.json    # inspect what's in flight"
+        )
+        raise SystemExit(130)

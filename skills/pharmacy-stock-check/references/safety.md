@@ -93,7 +93,9 @@ instead.
 - Do not state the patient's name, condition, or any identifying detail to the
   pharmacy. The medication and quantity are all that's needed.
 - Mask phone numbers in summaries and logs — pharmacy name plus last four
-  digits.
+  digits. This includes dry-run and debug output. Terminal text ends up in
+  shell scrollback, CI logs and screen recordings, none of which the person
+  whose number it is agreed to.
 - Transcripts contain a third party's voice. Store them under a retention policy
   and do not publish them.
 
@@ -122,6 +124,25 @@ This is a one-shot workflow. If a user wants a repeated check:
 - never create a schedule as a side effect of a one-off request
 
 ---
+
+## An uncertain call must never be retried automatically
+
+If a request to place a call was sent and the response was lost — a timeout, a
+crash, a dropped connection — you do not know whether the phone rang.
+
+Retrying is not the safe default. The safe default is to stop and say so. A
+duplicate call to a pharmacist costs money, wastes their time, and in a
+health-adjacent context looks like a malfunctioning system contacting a
+business repeatedly about a patient.
+
+Record the "about to dial" state *before* sending the request, so a lost
+response is distinguishable from a request that was never sent. Clearing that
+state requires a human deciding what happened — check the provider's dashboard,
+then either record the run or release the entry deliberately.
+
+The same reasoning applies to concurrency. Two processes that both read "no
+call in progress" will both dial. Claims must be atomic and locked, not
+best-effort.
 
 ## Cost is a safety property
 

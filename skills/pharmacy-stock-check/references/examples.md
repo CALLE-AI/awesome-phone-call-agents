@@ -171,7 +171,79 @@ sought to a third party, from a mode the user was told places no calls.
 
 ---
 
-## Example 9 — budget refuses before dialling
+## Example 9 — an interrupted call is not redialled
+
+The process was killed while a call was in progress. Rerunning:
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live
+  …0100: resuming run 4BJPgjIFv3gZ
+```
+
+It polls the existing run rather than planning a new one. The pharmacist is not
+called twice.
+
+If the crash happened in the narrower window *after* the call was submitted but
+*before* a run id came back:
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live
+  …0100: a call was submitted but no run id was recorded, so whether the
+  phone rang is unknown. Not retrying automatically. Check the CALL-E
+  dashboard for plan pX70PPR62, then either record the run id or remove
+  this entry to allow a redial.
+```
+
+Ambiguity is not resolved by guessing. A duplicate call to a pharmacist costs
+money and looks like a malfunctioning system contacting a business repeatedly
+about a patient.
+
+---
+
+## Example 10 — two processes, one recipient
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live &
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live
+  …0100: held by live process 48213. Not dialling concurrently.
+```
+
+Claims are taken under an exclusive lock, so two processes can't both conclude
+the recipient is free and both dial.
+
+---
+
+## Example 11 — verifying against CALL-E's testing hotline
+
+CALL-E publishes an inbound hotline at **+1 276-322-9632** for testing. It
+answers with a general-purpose prompt rather than role-playing a pharmacist, so
+this is a pipeline check, not a source of stock data.
+
+```bash
+$ printf 'name,phone,address\nCALL-E Hotline,+12763229632,Testing hotline\n' \
+    > pharmacies.hotline.csv
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live
+
+Pharmacy          Stock     Qty  Price  Rx       Hold  Conf
+CALL-E Hotline    unknown     —      —  unknown     —  0.34  ⚠ unverified
+    The recipient did not provide stock information.
+```
+
+The right outcome. The hotline can't answer a stock question, confidence is
+low, and the row is marked unverified rather than filled with plausible
+guesses. It exercises plan, run, poll, the completion gate and the ledger
+without calling a business.
+
+Interrupt it mid-poll and run it again to check the durable path:
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live
+  …9632: resuming run 4BJPgjIFv3gZ
+```
+
+---
+
+## Example 12 — budget refuses before dialling
 
 ```bash
 $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live --max-calls 2
