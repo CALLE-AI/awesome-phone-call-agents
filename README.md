@@ -130,6 +130,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/quotechaser`](apps/typescript/quotechaser/) | TypeScript | Supplier quote caller that previews an approved buying brief, calls each vendor with CALL-E, and returns comparable structured quote records. |
 | [`apps/typescript/verify-contact-claim`](apps/typescript/verify-contact-claim/) | TypeScript | Contact-claim verifier for a suspicious voicemail, text or missed call: dials only the number printed on the customer's own card, asks whether that contact was genuine and returns the words that came back with a hash-chained record. |
 | [`apps/typescript/phone-approval-gate`](apps/typescript/phone-approval-gate/) | TypeScript | Phone-verified approval gate for irreversible automation, with a one-time spoken code, an escalation ladder, dual control and a verifiable approval record. |
 | [`apps/typescript/call-on-behalf`](apps/typescript/call-on-behalf/) | TypeScript | Delegated errand caller with a disclosure budget: says only the details the person authorized, commits only inside authorized windows, and returns the answers plus the transcript. |
