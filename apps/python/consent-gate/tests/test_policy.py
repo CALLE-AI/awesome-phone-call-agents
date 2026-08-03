@@ -156,12 +156,32 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("phone", event)
         self.assertNotIn(valid_plan()["phone"], str(event))
 
-    def test_completed_provider_status_with_recipient_refusal_is_rejected(self):
+    def test_explicit_stop_request_is_rejected_even_when_completed(self):
         result = {
             "status": "completed",
-            "structured_result": {"can_hear_clearly": "no"},
+            "structured_result": {
+                "can_hear_clearly": "yes",
+                "stop_requested": "yes",
+            },
         }
         self.assertEqual(_verified_outcome(result), "rejected")
+
+    def test_inability_to_hear_is_not_recipient_refusal(self):
+        result = {
+            "status": "completed",
+            "structured_result": {
+                "can_hear_clearly": "no",
+                "stop_requested": "no",
+            },
+        }
+        self.assertEqual(_verified_outcome(result), "unknown")
+
+    def test_provider_rejection_is_not_recipient_refusal(self):
+        result = {
+            "status": "rejected",
+            "structured_result": {"stop_requested": "no"},
+        }
+        self.assertEqual(_verified_outcome(result), "unknown")
 
     def test_completed_provider_status_without_reachability_is_unknown(self):
         self.assertEqual(_verified_outcome({"status": "completed"}), "unknown")
@@ -169,9 +189,19 @@ class PolicyTests(unittest.TestCase):
     def test_completed_provider_status_requires_verified_reachability(self):
         result = {
             "status": "completed",
-            "structured_result": {"can_hear_clearly": "yes"},
+            "structured_result": {
+                "can_hear_clearly": "yes",
+                "stop_requested": "no",
+            },
         }
         self.assertEqual(_verified_outcome(result), "completed")
+
+    def test_completed_provider_status_without_stop_evidence_is_unknown(self):
+        result = {
+            "status": "completed",
+            "structured_result": {"can_hear_clearly": "yes"},
+        }
+        self.assertEqual(_verified_outcome(result), "unknown")
 
 
 if __name__ == "__main__":

@@ -32,11 +32,23 @@ def _verified_outcome(result: dict) -> str:
         if isinstance(structured, dict)
         else "unknown"
     )
-    if reachability == "no" or provider_status == "rejected":
+    stop_requested = (
+        str(structured.get("stop_requested", "unknown")).lower()
+        if isinstance(structured, dict)
+        else "unknown"
+    )
+    # A provider rejection or an inaudible call is not evidence that the
+    # recipient withdrew consent. Suppress future calls only on an explicit
+    # stop request captured in the structured result.
+    if stop_requested == "yes":
         return "rejected"
     if provider_status in {"no_answer", "failed"}:
         return provider_status
-    if provider_status == "completed" and reachability == "yes":
+    if (
+        provider_status == "completed"
+        and reachability == "yes"
+        and stop_requested == "no"
+    ):
         return "completed"
     return "unknown"
 
@@ -98,6 +110,8 @@ def _execute(
     task = (
         f"Begin by saying exactly: {plan['ai_disclosure']} "
         f"Then: {plan['purpose']} "
+        "If the recipient asks to stop or not be called again, acknowledge the "
+        "request, end the call, and set stop_requested to yes. "
         "Do not request passwords, passcodes, payment data, or other secrets."
     )
     with ledger.locked_events() as history:
@@ -124,12 +138,20 @@ def _execute(
             ],
             result_schema={
                 "type": "object",
-                "required": ["can_hear_clearly"],
+                "required": ["can_hear_clearly", "stop_requested"],
                 "properties": {
                     "can_hear_clearly": {
                         "type": "string",
                         "enum": ["yes", "no", "unknown"],
-                    }
+                    },
+                    "stop_requested": {
+                        "type": "string",
+                        "enum": ["yes", "no", "unknown"],
+                        "description": (
+                            "Whether the recipient explicitly asked to stop "
+                            "the call or not be called again"
+                        ),
+                    },
                 },
             },
         )
@@ -190,6 +212,7 @@ def _simulate(plan: dict, history: list[dict]) -> dict:
             "status": "completed",
             "task_completed": True,
             "can_hear_clearly": "yes",
+            "stop_requested": "no",
         },
     }
 
