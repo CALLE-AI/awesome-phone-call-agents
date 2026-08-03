@@ -20,6 +20,7 @@ Current apps:
 | [`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
 | [`python/oauth-login-client`](python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
+| [`typescript/wellness-checkin-call`](typescript/wellness-checkin-call/) | TypeScript | Consent-gated wellness check-in call for an elderly or at-risk person, with ok/mild_concern/escalate classification and a masked, no-call preview by default. |
 
 Suggested grouping:
 
