@@ -1,7 +1,12 @@
 import json
+import os
+import sys
+import tempfile
+import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from consent_gate.policy import (
     PolicyError,
@@ -12,7 +17,13 @@ from consent_gate.policy import (
     validate_plan,
     validate_rejection_cooldown,
 )
-from consent_gate.__main__ import _execute, _simulate, _verified_outcome
+from consent_gate.__main__ import (
+    _execute,
+    _request_for_plan,
+    _request_identity,
+    _simulate,
+    _verified_outcome,
+)
 
 
 def valid_plan():
@@ -76,6 +87,21 @@ class PolicyTests(unittest.TestCase):
             {
                 "event": "dispatch_reserved",
                 "state": "reconciliation_required",
+                "phone_fingerprint": record_outcome(plan["phone"], "failed")[
+                    "phone_fingerprint"
+                ],
+            }
+        ]
+        self.assertIn("reconcile", " ".join(validate_attempt_limit(plan, history)))
+
+    def test_accepted_call_still_waiting_blocks_concurrent_dispatch(self):
+        plan = valid_plan()
+        plan["max_attempts"] = 2
+        history = [
+            {
+                "event": "dispatch_reserved",
+                "state": "accepted_waiting",
+                "provider_call_id": "call_123",
                 "phone_fingerprint": record_outcome(plan["phone"], "failed")[
                     "phone_fingerprint"
                 ],
@@ -160,6 +186,7 @@ class PolicyTests(unittest.TestCase):
         result = {
             "status": "completed",
             "structured_result": {
+                "contact_made": "yes",
                 "can_hear_clearly": "yes",
                 "stop_requested": "yes",
             },
@@ -170,6 +197,7 @@ class PolicyTests(unittest.TestCase):
         result = {
             "status": "completed",
             "structured_result": {
+                "contact_made": "yes",
                 "can_hear_clearly": "no",
                 "stop_requested": "no",
             },
@@ -179,7 +207,10 @@ class PolicyTests(unittest.TestCase):
     def test_provider_rejection_is_not_recipient_refusal(self):
         result = {
             "status": "rejected",
-            "structured_result": {"stop_requested": "no"},
+            "structured_result": {
+                "contact_made": "unknown",
+                "stop_requested": "no",
+            },
         }
         self.assertEqual(_verified_outcome(result), "unknown")
 
@@ -190,6 +221,7 @@ class PolicyTests(unittest.TestCase):
         result = {
             "status": "completed",
             "structured_result": {
+                "contact_made": "yes",
                 "can_hear_clearly": "yes",
                 "stop_requested": "no",
             },
@@ -199,9 +231,111 @@ class PolicyTests(unittest.TestCase):
     def test_completed_provider_status_without_stop_evidence_is_unknown(self):
         result = {
             "status": "completed",
-            "structured_result": {"can_hear_clearly": "yes"},
+            "structured_result": {
+                "contact_made": "yes",
+                "can_hear_clearly": "yes",
+            },
         }
         self.assertEqual(_verified_outcome(result), "unknown")
+
+    def test_no_answer_requires_positive_no_contact_evidence(self):
+        self.assertEqual(_verified_outcome({"status": "no_answer"}), "unknown")
+        result = {
+            "status": "no_answer",
+            "structured_result": {
+                "contact_made": "no",
+                "can_hear_clearly": "unknown",
+                "stop_requested": "unknown",
+            },
+        }
+        self.assertEqual(_verified_outcome(result), "no_answer")
+
+    def test_failed_after_possible_contact_requires_reconciliation(self):
+        result = {
+            "status": "failed",
+            "structured_result": {"contact_made": "unknown"},
+        }
+        self.assertEqual(_verified_outcome(result), "unknown")
+
+    def test_request_identity_is_content_bound_and_stable(self):
+        payload = _request_for_plan(valid_plan())
+        digest, key = _request_identity(payload)
+        self.assertEqual((digest, key), _request_identity(payload))
+        changed = json.loads(json.dumps(payload))
+        changed["task"] += " Changed."
+        self.assertNotEqual(digest, _request_identity(changed)[0])
+        self.assertEqual(key, "consent-gate-" + digest)
+
+    def test_request_schema_requires_contact_evidence(self):
+        schema = _request_for_plan(valid_plan())["result_schema"]
+        self.assertIn("contact_made", schema["required"])
+
+    def test_execute_checkpoints_call_id_before_waiting(self):
+        plan = valid_plan()
+        plan["execution_allowed"] = True
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "ledger.json"
+            observed = {}
+
+            class FakeCalls:
+                def create(self, **kwargs):
+                    observed["create"] = kwargs
+                    return {"id": "call_123"}
+
+                def wait_for_result(self, call_id):
+                    observed["during_wait"] = json.loads(
+                        state_path.read_text(encoding="utf-8")
+                    )[0]
+                    self.assert_call_id = call_id
+                    return {
+                        "status": "completed",
+                        "task_completed": True,
+                        "structured_result": {
+                            "contact_made": "yes",
+                            "can_hear_clearly": "yes",
+                            "stop_requested": "no",
+                        },
+                    }
+
+            fake_calls = FakeCalls()
+
+            class FakeClient:
+                def __init__(self, **_kwargs):
+                    self.calls = fake_calls
+
+            fake_module = types.SimpleNamespace(CalleClient=FakeClient)
+            with (
+                patch.dict(sys.modules, {"calle": fake_module}),
+                patch.dict(os.environ, {"CALLE_API_KEY": "test-only"}),
+                patch(
+                    "consent_gate.__main__.validate_dispatch_window",
+                    return_value=[],
+                ),
+            ):
+                result = _execute(
+                    plan,
+                    "I reviewed this call plan",
+                    str(state_path),
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(fake_calls.assert_call_id, "call_123")
+            self.assertEqual(observed["during_wait"]["state"], "accepted_waiting")
+            self.assertEqual(
+                observed["during_wait"]["provider_call_id"], "call_123"
+            )
+            self.assertEqual(
+                observed["create"]["idempotency_key"],
+                observed["during_wait"]["idempotency_key"],
+            )
+            self.assertEqual(
+                observed["during_wait"]["request_payload"],
+                {
+                    key: value
+                    for key, value in observed["create"].items()
+                    if key != "idempotency_key"
+                },
+            )
 
 
 if __name__ == "__main__":

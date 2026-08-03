@@ -159,7 +159,8 @@ def validate_attempt_limit(
     fingerprint = _phone_fingerprint(str(plan.get("phone", "")))
     if any(
         event.get("phone_fingerprint") == fingerprint
-        and event.get("state") in {"dispatching", "reconciliation_required"}
+        and event.get("state")
+        in {"dispatching", "accepted_waiting", "reconciliation_required"}
         for event in history
     ):
         return ["an earlier dispatch is unresolved; reconcile it before retrying"]

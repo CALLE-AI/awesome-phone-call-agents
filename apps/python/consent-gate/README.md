@@ -66,13 +66,30 @@ python3 -m consent_gate validate plan.json --history call-history.json
 ```
 
 Live execution requires a durable ledger and refuses to dispatch outside the
-recipient's local window. A reservation is atomically persisted before the
-provider request, counts against `max_attempts`, and remains blocked for manual
-reconciliation if the request is interrupted:
+recipient's local window. Before the provider request, ConsentGate atomically
+persists the exact request, its SHA-256 digest, and a content-bound idempotency
+key. After create returns, it checkpoints the accepted call ID before waiting.
+The reservation counts against `max_attempts` and remains blocked for manual
+reconciliation if either phase is interrupted:
 
 ```bash
 python3 -m consent_gate execute plan.json \
   --state private/call-ledger.json \
+  --confirm "I reviewed this call plan"
+```
+
+The live ledger contains the destination in the reserved provider request. Keep
+it in a private directory with owner-only permissions; do not commit it.
+
+To recover an interrupted dispatch, use the reservation ID from the ledger.
+ConsentGate looks up the accepted call ID when one was checkpointed. If create
+was ambiguous, it replays the exact request with the same idempotency key,
+never a new key:
+
+```bash
+python3 -m consent_gate reconcile plan.json \
+  --state private/call-ledger.json \
+  --reservation RESERVATION_ID \
   --confirm "I reviewed this call plan"
 ```
 
@@ -87,6 +104,9 @@ even when the provider reports a completed call. An inaudible call or provider
 `rejected` status is not treated as withdrawal of consent. A completed status
 without both verified reachability and explicit no-stop evidence remains
 blocked for manual reconciliation rather than permitting a retry.
+Likewise, `failed` and `no_answer` are retry-safe only with positive structured
+evidence that no recipient contact occurred; ambiguous or partial contact stays
+blocked for reconciliation.
 
 Only call a number you control or a recipient who has explicitly agreed to the
 call. Comply with applicable calling, recording, privacy, and consumer

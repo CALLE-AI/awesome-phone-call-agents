@@ -56,11 +56,20 @@ class DurableLedger:
                 os.unlink(temporary)
 
     @staticmethod
-    def reservation(phone: str) -> dict[str, Any]:
+    def reservation(
+        phone: str,
+        *,
+        request_payload: dict[str, Any],
+        request_sha256: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
         return {
             "event": "dispatch_reserved",
             "reservation_id": str(uuid4()),
             "phone_fingerprint": _phone_fingerprint(phone),
             "occurred_at": datetime.now(timezone.utc).isoformat(),
             "state": "dispatching",
+            "request_payload": request_payload,
+            "request_sha256": request_sha256,
+            "idempotency_key": idempotency_key,
         }
