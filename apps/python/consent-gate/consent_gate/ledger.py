@@ -62,6 +62,7 @@ class DurableLedger:
         request_payload: dict[str, Any],
         request_sha256: str,
         idempotency_key: str,
+        provider_namespace: str,
     ) -> dict[str, Any]:
         return {
             "event": "dispatch_reserved",
@@ -72,4 +73,5 @@ class DurableLedger:
             "request_payload": request_payload,
             "request_sha256": request_sha256,
             "idempotency_key": idempotency_key,
+            "provider_namespace": provider_namespace,
         }

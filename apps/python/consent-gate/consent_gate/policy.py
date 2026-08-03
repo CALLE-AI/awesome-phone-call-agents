@@ -52,8 +52,10 @@ SUPPORTED_REGION_LANGUAGES = {
 }
 E164 = re.compile(r"^\+[1-9]\d{7,14}$")
 SECRET_TERMS = re.compile(
-    r"\b(password|passcode|one[- ]?time code|otp|seed phrase|private key|"
-    r"credit card|cvv|social security|bank login)\b",
+    r"\b(password|passcode|pin|one[- ]?time code|otp|verification code|"
+    r"security code|api[ -]?key|api[ -]?token|access token|bearer token|"
+    r"authorization code|auth code|seed phrase|private key|credit card|cvv|"
+    r"social security|bank login)\b",
     re.IGNORECASE,
 )
 
@@ -185,13 +187,19 @@ def validate_rejection_cooldown(
     *,
     now: datetime | None = None,
 ) -> list[str]:
-    """Block dispatch for 24 hours after this recipient rejects a call."""
+    """Block temporary refusals and permanently honor explicit do-not-call."""
     current = now or datetime.now(timezone.utc)
     fingerprint = _phone_fingerprint(str(plan.get("phone", "")))
     errors: list[str] = []
 
     for event in history:
         if event.get("phone_fingerprint") != fingerprint:
+            continue
+        if event.get("outcome") == "do_not_call":
+            errors.append(
+                "recipient has an explicit do-not-call record; a new verified "
+                "opt-in must be recorded before any future dispatch"
+            )
             continue
         if event.get("outcome") != "rejected":
             continue
@@ -220,7 +228,13 @@ def record_outcome(
     *,
     occurred_at: datetime | None = None,
 ) -> dict[str, str]:
-    if outcome not in {"completed", "rejected", "no_answer", "failed"}:
+    if outcome not in {
+        "completed",
+        "rejected",
+        "do_not_call",
+        "no_answer",
+        "failed",
+    }:
         raise PolicyError("unsupported call outcome")
     timestamp = occurred_at or datetime.now(timezone.utc)
     if timestamp.tzinfo is None:

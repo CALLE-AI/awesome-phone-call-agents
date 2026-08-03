@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +23,84 @@ from .policy import (
 
 
 CONFIRMATION = "I reviewed this call plan"
+NAMESPACE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$")
+DO_NOT_CALL = re.compile(
+    r"\b(do not call|don't call|never call|stop calling|remove me from|"
+    r"do not contact|don't contact)\b",
+    re.IGNORECASE,
+)
+
+
+def _transcript_text(result: dict, *, recipient_only: bool = False) -> str:
+    turns: list[str] = []
+    recipients = result.get("recipients")
+    if not isinstance(recipients, list):
+        return ""
+    for recipient in recipients:
+        if not isinstance(recipient, dict):
+            continue
+        attempts = recipient.get("attempts")
+        if not isinstance(attempts, list):
+            continue
+        for attempt in attempts:
+            if not isinstance(attempt, dict):
+                continue
+            transcript = attempt.get("transcript_turns")
+            if not isinstance(transcript, list):
+                continue
+            for turn in transcript:
+                if not isinstance(turn, dict) or not isinstance(turn.get("text"), str):
+                    continue
+                if recipient_only and str(turn.get("speaker", "")).lower() not in {
+                    "recipient",
+                    "user",
+                    "callee",
+                }:
+                    continue
+                turns.append(turn["text"])
+    return "\n".join(turns)
+
+
+def _has_high_confidence_evidence(result: dict) -> bool:
+    confidence = result.get("completion_confidence")
+    if not isinstance(confidence, dict):
+        return False
+    try:
+        score = float(confidence.get("score", 0))
+    except (TypeError, ValueError):
+        return False
+    return (
+        result.get("task_completed") is True
+        and score >= 0.8
+        and str(confidence.get("label", "")).lower() == "high"
+        and bool(result.get("evidence"))
+        and bool(_transcript_text(result).strip())
+    )
+
+
+def _has_verified_no_contact(result: dict) -> bool:
+    recipients = result.get("recipients")
+    if not isinstance(recipients, list) or not recipients:
+        return False
+    attempts_found = False
+    no_contact_codes = {"no_answer", "not_connected", "unreachable"}
+    for recipient in recipients:
+        if not isinstance(recipient, dict):
+            return False
+        attempts = recipient.get("attempts")
+        if not isinstance(attempts, list) or not attempts:
+            return False
+        for attempt in attempts:
+            if not isinstance(attempt, dict):
+                return False
+            attempts_found = True
+            if str(attempt.get("status", "")).lower() not in {"failed", "canceled"}:
+                return False
+            if str(attempt.get("failure_code", "")).lower() not in no_contact_codes:
+                return False
+            if attempt.get("transcript_turns"):
+                return False
+    return attempts_found
 
 
 def _verified_outcome(result: dict) -> str:
@@ -33,8 +112,13 @@ def _verified_outcome(result: dict) -> str:
         if isinstance(structured, dict)
         else "unknown"
     )
-    stop_requested = (
-        str(structured.get("stop_requested", "unknown")).lower()
+    end_call_requested = (
+        str(structured.get("end_call_requested", "unknown")).lower()
+        if isinstance(structured, dict)
+        else "unknown"
+    )
+    do_not_call_requested = (
+        str(structured.get("do_not_call_requested", "unknown")).lower()
         if isinstance(structured, dict)
         else "unknown"
     )
@@ -43,29 +127,37 @@ def _verified_outcome(result: dict) -> str:
         if isinstance(structured, dict)
         else "unknown"
     )
-    # A provider rejection or an inaudible call is not evidence that the
-    # recipient withdrew consent. Suppress future calls only on an explicit
-    # stop request captured in the structured result.
-    if stop_requested == "yes":
-        return "rejected"
-    if provider_status in {"no_answer", "failed"} and contact_made == "no":
+    if do_not_call_requested == "yes":
+        if _has_high_confidence_evidence(result) and DO_NOT_CALL.search(
+            _transcript_text(result, recipient_only=True)
+        ):
+            return "do_not_call"
+        return "unknown"
+    if (
+        provider_status in {"no_answer", "failed"}
+        and contact_made == "no"
+        and _has_verified_no_contact(result)
+    ):
         return provider_status
     if (
         provider_status == "completed"
         and contact_made == "yes"
         and reachability == "yes"
-        and stop_requested == "no"
+        and end_call_requested in {"yes", "no"}
+        and do_not_call_requested == "no"
+        and _has_high_confidence_evidence(result)
     ):
         return "completed"
     return "unknown"
 
 
-def _request_for_plan(plan: dict) -> dict:
+def _request_for_plan(plan: dict, provider_namespace: str) -> dict:
     task = (
         f"Begin by saying exactly: {plan['ai_disclosure']} "
         f"Then: {plan['purpose']} "
-        "If the recipient asks to stop or not be called again, acknowledge the "
-        "request, end the call, and set stop_requested to yes. "
+        "Distinguish a request to end only this call from a request never to be "
+        "called again. Set end_call_requested or do_not_call_requested exactly "
+        "as spoken, acknowledge either request, and end the call. "
         "Do not request passwords, passcodes, payment data, or other secrets."
     )
     return {
@@ -79,7 +171,12 @@ def _request_for_plan(plan: dict) -> dict:
         ],
         "result_schema": {
             "type": "object",
-            "required": ["contact_made", "can_hear_clearly", "stop_requested"],
+            "required": [
+                "contact_made",
+                "can_hear_clearly",
+                "end_call_requested",
+                "do_not_call_requested",
+            ],
             "properties": {
                 "contact_made": {
                     "type": "string",
@@ -92,23 +189,44 @@ def _request_for_plan(plan: dict) -> dict:
                     "type": "string",
                     "enum": ["yes", "no", "unknown"],
                 },
-                "stop_requested": {
+                "end_call_requested": {
                     "type": "string",
                     "enum": ["yes", "no", "unknown"],
                     "description": (
-                        "Whether the recipient explicitly asked to stop the call "
-                        "or not be called again"
+                        "Whether the recipient explicitly asked to end this call"
+                    ),
+                },
+                "do_not_call_requested": {
+                    "type": "string",
+                    "enum": ["yes", "no", "unknown"],
+                    "description": (
+                        "Whether the recipient explicitly requested no future calls"
                     ),
                 },
             },
         },
+        "metadata": {"consent_gate_provider_namespace": provider_namespace},
     }
 
 
-def _request_identity(payload: dict) -> tuple[str, str]:
+def _request_identity(payload: dict, provider_namespace: str) -> tuple[str, str]:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return digest, f"consent-gate-{digest}"
+    basis = f"{provider_namespace}\n{canonical}"
+    digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()
+    namespace_digest = hashlib.sha256(
+        provider_namespace.encode("utf-8")
+    ).hexdigest()[:12]
+    return digest, f"consent-gate-{namespace_digest}-{digest}"
+
+
+def _load_provider_namespace() -> str:
+    namespace = os.environ.get("CALLE_IDEMPOTENCY_NAMESPACE", "").strip()
+    if not NAMESPACE.fullmatch(namespace):
+        raise PolicyError(
+            "CALLE_IDEMPOTENCY_NAMESPACE must be a stable 3-80 character "
+            "provider account or project namespace"
+        )
+    return namespace
 
 
 def _update_event(
@@ -191,14 +309,17 @@ def _execute(
     if errors:
         raise PolicyError("; ".join(errors))
     api_key = _load_api_key()
+    provider_namespace = _load_provider_namespace()
 
     try:
         from calle import CalleClient
     except ImportError as exc:
         raise PolicyError("install the live extra: pip install '.[live]'") from exc
 
-    request_payload = _request_for_plan(plan)
-    request_sha256, idempotency_key = _request_identity(request_payload)
+    request_payload = _request_for_plan(plan, provider_namespace)
+    request_sha256, idempotency_key = _request_identity(
+        request_payload, provider_namespace
+    )
     with ledger.locked_events() as history:
         live_errors = validate_rejection_cooldown(plan, history)
         live_errors.extend(validate_attempt_limit(plan, history))
@@ -212,6 +333,7 @@ def _execute(
             request_payload=request_payload,
             request_sha256=request_sha256,
             idempotency_key=idempotency_key,
+            provider_namespace=provider_namespace,
         )
         history.append(reservation)
 
@@ -257,8 +379,11 @@ def _reconcile(
         raise PolicyError(f"reconciliation requires --confirm {CONFIRMATION!r}")
     if not state_path or not reservation_id:
         raise PolicyError("reconciliation requires --state and --reservation")
-    payload = _request_for_plan(plan)
-    request_sha256, idempotency_key = _request_identity(payload)
+    provider_namespace = _load_provider_namespace()
+    payload = _request_for_plan(plan, provider_namespace)
+    request_sha256, idempotency_key = _request_identity(
+        payload, provider_namespace
+    )
     ledger = DurableLedger(state_path)
     with ledger.locked_events() as history:
         event = next(
@@ -267,15 +392,19 @@ def _reconcile(
         )
         if event is None:
             raise PolicyError("durable reservation was not found")
-        if event.get("state") != "reconciliation_required":
+        state = event.get("state")
+        if state not in {"accepted_waiting", "reconciliation_required"}:
             raise PolicyError("reservation does not require reconciliation")
         if (
             event.get("request_payload") != payload
             or event.get("request_sha256") != request_sha256
             or event.get("idempotency_key") != idempotency_key
+            or event.get("provider_namespace") != provider_namespace
         ):
             raise PolicyError("plan does not match the reserved request")
         call_id = str(event.get("provider_call_id", "")).strip()
+        if state == "accepted_waiting" and not call_id:
+            raise PolicyError("accepted_waiting reservation is missing its call ID")
 
     api_key = _load_api_key()
     try:
@@ -333,7 +462,8 @@ def _simulate(plan: dict, history: list[dict]) -> dict:
             "status": "completed",
             "task_completed": True,
             "can_hear_clearly": "yes",
-            "stop_requested": "no",
+            "end_call_requested": "no",
+            "do_not_call_requested": "no",
         },
     }
 

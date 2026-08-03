@@ -19,11 +19,15 @@ from consent_gate.policy import (
 )
 from consent_gate.__main__ import (
     _execute,
+    _reconcile,
     _request_for_plan,
     _request_identity,
     _simulate,
     _verified_outcome,
 )
+
+
+PROVIDER_NAMESPACE = "calle-project-test"
 
 
 def valid_plan():
@@ -40,6 +44,60 @@ def valid_plan():
         "retention_days": 0,
         "locale": "en-US",
         "region": "US",
+    }
+
+
+def high_confidence_result(**structured_overrides):
+    structured = {
+        "contact_made": "yes",
+        "can_hear_clearly": "yes",
+        "end_call_requested": "no",
+        "do_not_call_requested": "no",
+    }
+    structured.update(structured_overrides)
+    return {
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.95, "label": "high"},
+        "evidence": [{"kind": "transcript"}],
+        "structured_result": structured,
+        "recipients": [
+            {
+                "attempts": [
+                    {
+                        "status": "completed",
+                        "failure_code": None,
+                        "transcript_turns": [
+                            {"speaker": "recipient", "text": "I can hear you."}
+                        ],
+                    }
+                ]
+            }
+        ],
+    }
+
+
+def verified_no_contact_result(status="no_answer"):
+    return {
+        "status": status,
+        "task_completed": False,
+        "structured_result": {
+            "contact_made": "no",
+            "can_hear_clearly": "unknown",
+            "end_call_requested": "unknown",
+            "do_not_call_requested": "unknown",
+        },
+        "recipients": [
+            {
+                "attempts": [
+                    {
+                        "status": "failed",
+                        "failure_code": "no_answer",
+                        "transcript_turns": [],
+                    }
+                ]
+            }
+        ],
     }
 
 
@@ -128,6 +186,13 @@ class PolicyTests(unittest.TestCase):
         plan["purpose"] = "Ask the recipient for their one-time code to verify identity."
         self.assertIn("secrets", " ".join(validate_plan(plan)))
 
+    def test_blocks_api_tokens_and_pins(self):
+        for secret in ("API token", "PIN", "access token"):
+            with self.subTest(secret=secret):
+                plan = valid_plan()
+                plan["purpose"] = f"Ask the recipient to provide their {secret}."
+                self.assertIn("secrets", " ".join(validate_plan(plan)))
+
     def test_blocks_non_consent_source(self):
         plan = valid_plan()
         plan["recipient_source"] = "scraped_directory"
@@ -182,16 +247,28 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("phone", event)
         self.assertNotIn(valid_plan()["phone"], str(event))
 
-    def test_explicit_stop_request_is_rejected_even_when_completed(self):
-        result = {
-            "status": "completed",
-            "structured_result": {
-                "contact_made": "yes",
-                "can_hear_clearly": "yes",
-                "stop_requested": "yes",
-            },
-        }
-        self.assertEqual(_verified_outcome(result), "rejected")
+    def test_do_not_call_is_permanent(self):
+        history = [record_outcome(valid_plan()["phone"], "do_not_call")]
+        errors = validate_rejection_cooldown(valid_plan(), history)
+        self.assertIn("explicit do-not-call", " ".join(errors))
+
+    def test_explicit_do_not_call_requires_transcript_corroboration(self):
+        result = high_confidence_result(do_not_call_requested="yes")
+        result["recipients"][0]["attempts"][0]["transcript_turns"][0][
+            "text"
+        ] = "Please do not call me again."
+        self.assertEqual(_verified_outcome(result), "do_not_call")
+
+    def test_uncorroborated_do_not_call_fails_closed(self):
+        result = high_confidence_result(do_not_call_requested="yes")
+        self.assertEqual(_verified_outcome(result), "unknown")
+
+    def test_agent_acknowledgement_does_not_corroborate_do_not_call(self):
+        result = high_confidence_result(do_not_call_requested="yes")
+        result["recipients"][0]["attempts"][0]["transcript_turns"] = [
+            {"speaker": "agent", "text": "I will not call you again."}
+        ]
+        self.assertEqual(_verified_outcome(result), "unknown")
 
     def test_inability_to_hear_is_not_recipient_refusal(self):
         result = {
@@ -199,7 +276,8 @@ class PolicyTests(unittest.TestCase):
             "structured_result": {
                 "contact_made": "yes",
                 "can_hear_clearly": "no",
-                "stop_requested": "no",
+                "end_call_requested": "no",
+                "do_not_call_requested": "no",
             },
         }
         self.assertEqual(_verified_outcome(result), "unknown")
@@ -209,7 +287,8 @@ class PolicyTests(unittest.TestCase):
             "status": "rejected",
             "structured_result": {
                 "contact_made": "unknown",
-                "stop_requested": "no",
+                "end_call_requested": "no",
+                "do_not_call_requested": "no",
             },
         }
         self.assertEqual(_verified_outcome(result), "unknown")
@@ -218,15 +297,13 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(_verified_outcome({"status": "completed"}), "unknown")
 
     def test_completed_provider_status_requires_verified_reachability(self):
-        result = {
-            "status": "completed",
-            "structured_result": {
-                "contact_made": "yes",
-                "can_hear_clearly": "yes",
-                "stop_requested": "no",
-            },
-        }
+        result = high_confidence_result()
         self.assertEqual(_verified_outcome(result), "completed")
+
+    def test_low_confidence_completion_fails_closed(self):
+        result = high_confidence_result()
+        result["completion_confidence"] = {"score": 0.4, "label": "low"}
+        self.assertEqual(_verified_outcome(result), "unknown")
 
     def test_completed_provider_status_without_stop_evidence_is_unknown(self):
         result = {
@@ -240,15 +317,13 @@ class PolicyTests(unittest.TestCase):
 
     def test_no_answer_requires_positive_no_contact_evidence(self):
         self.assertEqual(_verified_outcome({"status": "no_answer"}), "unknown")
-        result = {
-            "status": "no_answer",
-            "structured_result": {
-                "contact_made": "no",
-                "can_hear_clearly": "unknown",
-                "stop_requested": "unknown",
-            },
-        }
+        result = verified_no_contact_result()
         self.assertEqual(_verified_outcome(result), "no_answer")
+
+    def test_no_contact_model_field_without_attempt_evidence_fails_closed(self):
+        result = verified_no_contact_result()
+        result.pop("recipients")
+        self.assertEqual(_verified_outcome(result), "unknown")
 
     def test_failed_after_possible_contact_requires_reconciliation(self):
         result = {
@@ -258,17 +333,29 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(_verified_outcome(result), "unknown")
 
     def test_request_identity_is_content_bound_and_stable(self):
-        payload = _request_for_plan(valid_plan())
-        digest, key = _request_identity(payload)
-        self.assertEqual((digest, key), _request_identity(payload))
+        payload = _request_for_plan(valid_plan(), PROVIDER_NAMESPACE)
+        digest, key = _request_identity(payload, PROVIDER_NAMESPACE)
+        self.assertEqual(
+            (digest, key), _request_identity(payload, PROVIDER_NAMESPACE)
+        )
         changed = json.loads(json.dumps(payload))
         changed["task"] += " Changed."
-        self.assertNotEqual(digest, _request_identity(changed)[0])
-        self.assertEqual(key, "consent-gate-" + digest)
+        self.assertNotEqual(
+            digest, _request_identity(changed, PROVIDER_NAMESPACE)[0]
+        )
+        self.assertTrue(key.endswith(digest))
+
+    def test_request_identity_is_bound_to_provider_namespace(self):
+        payload = _request_for_plan(valid_plan(), PROVIDER_NAMESPACE)
+        self.assertNotEqual(
+            _request_identity(payload, PROVIDER_NAMESPACE),
+            _request_identity(payload, "calle-project-other"),
+        )
 
     def test_request_schema_requires_contact_evidence(self):
-        schema = _request_for_plan(valid_plan())["result_schema"]
+        schema = _request_for_plan(valid_plan(), PROVIDER_NAMESPACE)["result_schema"]
         self.assertIn("contact_made", schema["required"])
+        self.assertIn("do_not_call_requested", schema["required"])
 
     def test_execute_checkpoints_call_id_before_waiting(self):
         plan = valid_plan()
@@ -287,15 +374,7 @@ class PolicyTests(unittest.TestCase):
                         state_path.read_text(encoding="utf-8")
                     )[0]
                     self.assert_call_id = call_id
-                    return {
-                        "status": "completed",
-                        "task_completed": True,
-                        "structured_result": {
-                            "contact_made": "yes",
-                            "can_hear_clearly": "yes",
-                            "stop_requested": "no",
-                        },
-                    }
+                    return high_confidence_result()
 
             fake_calls = FakeCalls()
 
@@ -306,7 +385,13 @@ class PolicyTests(unittest.TestCase):
             fake_module = types.SimpleNamespace(CalleClient=FakeClient)
             with (
                 patch.dict(sys.modules, {"calle": fake_module}),
-                patch.dict(os.environ, {"CALLE_API_KEY": "test-only"}),
+                patch.dict(
+                    os.environ,
+                    {
+                        "CALLE_API_KEY": "test-only",
+                        "CALLE_IDEMPOTENCY_NAMESPACE": PROVIDER_NAMESPACE,
+                    },
+                ),
                 patch(
                     "consent_gate.__main__.validate_dispatch_window",
                     return_value=[],
@@ -336,6 +421,74 @@ class PolicyTests(unittest.TestCase):
                     if key != "idempotency_key"
                 },
             )
+            self.assertEqual(
+                observed["during_wait"]["provider_namespace"],
+                PROVIDER_NAMESPACE,
+            )
+
+    def test_reconcile_resumes_accepted_waiting_by_call_id_without_create(self):
+        plan = valid_plan()
+        plan["execution_allowed"] = True
+        payload = _request_for_plan(plan, PROVIDER_NAMESPACE)
+        digest, key = _request_identity(payload, PROVIDER_NAMESPACE)
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "ledger.json"
+            state_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "event": "dispatch_reserved",
+                            "reservation_id": "reservation-1",
+                            "state": "accepted_waiting",
+                            "request_payload": payload,
+                            "request_sha256": digest,
+                            "idempotency_key": key,
+                            "provider_namespace": PROVIDER_NAMESPACE,
+                            "provider_call_id": "call_123",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            class FakeCalls:
+                def create(self, **_kwargs):
+                    raise AssertionError("accepted_waiting must not create a new call")
+
+                def wait_for_result(self, call_id):
+                    self.call_id = call_id
+                    return high_confidence_result()
+
+            fake_calls = FakeCalls()
+
+            class FakeClient:
+                def __init__(self, **_kwargs):
+                    self.calls = fake_calls
+
+            with (
+                patch.dict(
+                    sys.modules,
+                    {"calle": types.SimpleNamespace(CalleClient=FakeClient)},
+                ),
+                patch.dict(
+                    os.environ,
+                    {
+                        "CALLE_API_KEY": "test-only",
+                        "CALLE_IDEMPOTENCY_NAMESPACE": PROVIDER_NAMESPACE,
+                    },
+                ),
+            ):
+                result = _reconcile(
+                    plan,
+                    "I reviewed this call plan",
+                    str(state_path),
+                    "reservation-1",
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(fake_calls.call_id, "call_123")
+            event = json.loads(state_path.read_text(encoding="utf-8"))[0]
+            self.assertEqual(event["state"], "accepted")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ ConsentGate blocks a CALL-E request until the caller has supplied:
 - an opening disclosure that identifies the call as AI-generated;
 - a recipient timezone and permitted calling window;
 - a bounded retry policy;
-- a 24-hour suppression period after the recipient rejects a call;
+- temporary rejection cooldowns plus permanent do-not-call suppression;
 - explicit recording and retention choices; and
 - a human-readable purpose that does not request secrets.
 
@@ -46,6 +46,7 @@ Live use is intentionally guarded:
 
 ```bash
 export CALLE_API_KEY_FILE="/path/to/restricted/calle-api-key"
+export CALLE_IDEMPOTENCY_NAMESPACE="your-stable-calle-project-id"
 python3 -m consent_gate execute plan.json --confirm "I reviewed this call plan"
 ```
 
@@ -68,7 +69,8 @@ python3 -m consent_gate validate plan.json --history call-history.json
 Live execution requires a durable ledger and refuses to dispatch outside the
 recipient's local window. Before the provider request, ConsentGate atomically
 persists the exact request, its SHA-256 digest, and a content-bound idempotency
-key. After create returns, it checkpoints the accepted call ID before waiting.
+key bound to `CALLE_IDEMPOTENCY_NAMESPACE`. After create returns, it
+checkpoints the accepted call ID before waiting.
 The reservation counts against `max_attempts` and remains blocked for manual
 reconciliation if either phase is interrupted:
 
@@ -82,9 +84,10 @@ The live ledger contains the destination in the reserved provider request. Keep
 it in a private directory with owner-only permissions; do not commit it.
 
 To recover an interrupted dispatch, use the reservation ID from the ledger.
-ConsentGate looks up the accepted call ID when one was checkpointed. If create
-was ambiguous, it replays the exact request with the same idempotency key,
-never a new key:
+ConsentGate resumes both `accepted_waiting` and `reconciliation_required`
+records by the accepted call ID when one was checkpointed. If create was
+ambiguous, it replays the exact request with the same account-bound idempotency
+key, never a new key:
 
 ```bash
 python3 -m consent_gate reconcile plan.json \
@@ -97,16 +100,15 @@ Because the current provider SDK does not expose verifiable recording and
 retention controls, live execution also requires `recording: false` and
 `retention_days: 0`.
 
-If that phone fingerprint has a `rejected` event less than 24 hours old,
-ConsentGate blocks the call and reports the earliest permitted retry time.
-Recipient refusal is derived only from an explicit structured stop request,
-even when the provider reports a completed call. An inaudible call or provider
-`rejected` status is not treated as withdrawal of consent. A completed status
-without both verified reachability and explicit no-stop evidence remains
-blocked for manual reconciliation rather than permitting a retry.
-Likewise, `failed` and `no_answer` are retry-safe only with positive structured
-evidence that no recipient contact occurred; ambiguous or partial contact stays
-blocked for reconciliation.
+ConsentGate distinguishes a request to end only the current call from an
+explicit request for no future calls. A corroborated do-not-call request is
+stored permanently and blocks every later attempt until a new verified opt-in
+is recorded. A provider status or model-extracted field alone never changes
+consent state: permanent suppression requires high-confidence task evidence
+and a matching transcript statement. Completed outcomes similarly require
+usable evidence and high confidence. `failed` and `no_answer` are retry-safe
+only when terminal attempt records positively establish no contact and contain
+no transcript; ambiguous or partial contact stays blocked for reconciliation.
 
 Only call a number you control or a recipient who has explicitly agreed to the
 call. Comply with applicable calling, recording, privacy, and consumer

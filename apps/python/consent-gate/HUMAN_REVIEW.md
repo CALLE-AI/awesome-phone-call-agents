@@ -19,3 +19,10 @@ Implementation decision:
 The entrant also confirmed that this is a personal entry, uses no employer
 code, data, devices, or identity, and does not violate the entrant's employer
 policy.
+
+## 2026-08-03 clarification
+
+The 24-hour rule applies only to a temporary rejection. A corroborated request
+never to call again creates a permanent do-not-call record. It may be cleared
+only after a new, independently verified opt-in; merely waiting 24 hours is not
+sufficient.
