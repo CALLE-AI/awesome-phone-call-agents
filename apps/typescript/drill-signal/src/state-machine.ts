@@ -205,6 +205,13 @@ export function launchSideEffectsBlocked(drill: DrillRecord): boolean {
   if (drill.cancelRequested) {
     return true;
   }
+  // Never auto-retry after an accepted provider call or reconciliation-required stop.
+  if (drill.activeProviderCallId !== null) {
+    return true;
+  }
+  if (drill.reconciliationRequired) {
+    return true;
+  }
   return false;
 }
 

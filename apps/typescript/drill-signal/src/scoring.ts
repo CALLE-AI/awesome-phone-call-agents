@@ -120,15 +120,25 @@ export function buildRecommendations(drill: DrillRecord, attempts: CallAttemptRe
   if (attempts.some((attempt) => attempt.outcome === "malformed_result")) {
     recommendations.push("Investigate malformed provider results and tighten structured-result validation.");
   }
-  if (attempts.some((attempt) => attempt.ambiguous)) {
+  if (attempts.some((attempt) => attempt.ambiguous) || drill.reconciliationRequired) {
     recommendations.push("Reconcile ambiguous provider states before relying on this drill for compliance evidence.");
   }
-  const retainedCallIds = attempts
-    .filter((attempt) => attempt.ambiguous && attempt.callId !== null)
-    .map((attempt) => attempt.callId as string);
-  if (retainedCallIds.length > 0) {
+  const retainedCallIds = new Set<string>();
+  for (const attempt of attempts) {
+    if (attempt.ambiguous && attempt.callId !== null) {
+      retainedCallIds.add(attempt.callId);
+    }
+  }
+  if (drill.activeProviderCallId) {
+    retainedCallIds.add(drill.activeProviderCallId);
+  }
+  if (retainedCallIds.size > 0 || drill.reconciliationRequired) {
+    const ids = [...retainedCallIds];
+    const reason = drill.reconciliationReason ? ` (reason: ${drill.reconciliationReason})` : "";
     recommendations.push(
-      `Reconcile the retained provider call ID (${retainedCallIds.join(", ")}) with CALL-E before placing any new call.`,
+      ids.length > 0
+        ? `Reconcile the retained provider call ID (${ids.join(", ")}) with CALL-E before placing any new call.${reason}`
+        : `Reconciliation is required before placing any new call.${reason}`,
     );
   }
   if (recommendations.length === 0) {
@@ -145,10 +155,16 @@ export function buildSummary(drill: DrillRecord, attempts: CallAttemptRecord[]):
       attempt.structuredResult.can_take_ownership &&
       attempt.structuredResult.acknowledged_scenario,
   );
-  return [
+  const parts = [
     `Scenario ${drill.scenario} finished in ${drill.status}.`,
     `${attempts.length} call attempt(s), max allowed ${drill.maxCalls}.`,
     roleReady ? "At least one role demonstrated ownership readiness." : "No role demonstrated full ownership readiness.",
     `Scores — contactability ${scores.contactability}, acknowledgement ${scores.acknowledgement}, role coverage ${scores.roleCoverage}, escalation ${scores.escalationCorrectness}, follow-up needs ${scores.followUpNeeds}.`,
-  ].join(" ");
+  ];
+  if (drill.reconciliationRequired || drill.activeProviderCallId) {
+    const idPart = drill.activeProviderCallId ? ` provider call ${drill.activeProviderCallId}` : "";
+    const reasonPart = drill.reconciliationReason ? ` (${drill.reconciliationReason})` : "";
+    parts.push(`Reconciliation required for${idPart || " an unresolved provider call"}${reasonPart}.`);
+  }
+  return parts.join(" ");
 }

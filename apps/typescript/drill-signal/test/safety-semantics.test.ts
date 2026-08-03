@@ -96,6 +96,10 @@ function armedDrill(overrides: Partial<DrillRecord> = {}): DrillRecord {
     report: null,
     cancelRequested: false,
     cancelBoundary: null,
+    activeProviderCallId: null,
+    activeProviderCallRole: null,
+    reconciliationRequired: false,
+    reconciliationReason: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -305,6 +309,10 @@ test("timeout with configured backup creates one call, ends ambiguous, retains p
   assert.equal(finished.attempts.length, 1);
   assert.equal(finished.attempts[0]?.callId, "call_timeout_1");
   assert.equal(finished.attempts[0]?.ambiguous, true);
+  assert.equal(finished.activeProviderCallId, "call_timeout_1");
+  assert.equal(finished.activeProviderCallRole, "primary");
+  assert.equal(finished.reconciliationRequired, true);
+  assert.equal(finished.reconciliationReason, "timeout");
   assert.ok(
     finished.events.some(
       (evt) =>
@@ -561,4 +569,208 @@ test("simulation preset primary-unavailable-backup-success still completes via p
   );
   assert.equal(finished.attempts.length, 2);
   assert.equal(finished.status, "completed");
+  assert.equal(finished.reconciliationRequired, false);
+  assert.equal(finished.activeProviderCallId, null);
+});
+
+test("failed terminal with conflicting structured contact evidence does not escalate", async () => {
+  const conflicting: CallSnapshot = {
+    id: "call_conflict_1",
+    status: "failed",
+    recipients: [
+      {
+        id: "rcp_1",
+        phones: ["+15550100001"],
+        status: "failed",
+        structuredResult: {
+          reached_live_person: true,
+          acknowledged_scenario: true,
+          can_take_ownership: true,
+          first_action: "Opened bridge",
+          escalation_target: null,
+          needs_help: false,
+          follow_up_required: false,
+          opt_out: false,
+        },
+        summary: null,
+        attempts: [
+          {
+            id: "att_1",
+            phone: "+15550100001",
+            status: "failed",
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:01:00.000Z",
+            summary: null,
+            transcriptTurns: [{ offset_seconds: 1, speaker: "user", text: "I can take ownership." }],
+            providerCallId: "provider_conflict",
+            failureCode: "no_answer",
+            failureMessage: "reported no answer",
+          },
+        ],
+      },
+    ],
+    structuredResult: {
+      reached_live_person: true,
+      acknowledged_scenario: true,
+      can_take_ownership: true,
+      first_action: "Opened bridge",
+      escalation_target: null,
+      needs_help: false,
+      follow_up_required: false,
+      opt_out: false,
+    },
+    summary: null,
+    taskCompleted: false,
+    completionConfidence: null,
+    evidence: ["user: I can take ownership."],
+    failureCode: "no_answer",
+    failureMessage: "reported no answer",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    completedAt: "2026-01-01T00:01:00.000Z",
+  };
+  const port = new StaticSnapshotProvider([conflicting, successSnapshot({ id: "call_backup_should_not_run" })]);
+  const finished = await runDrill(armedDrill(), { port });
+  assert.equal(port.createdIds.length, 1);
+  assert.equal(finished.status, "ambiguous");
+  assert.equal(finished.attempts.length, 1);
+  assert.equal(finished.attempts[0]?.outcome, "unknown");
+  assert.equal(finished.attempts[0]?.ambiguous, true);
+  assert.equal(finished.reconciliationRequired, true);
+  assert.equal(finished.reconciliationReason, "conflicting_evidence");
+  assert.equal(finished.activeProviderCallId, "call_conflict_1");
+});
+
+test("failed terminal with incomplete evidence does not escalate", async () => {
+  const incomplete: CallSnapshot = {
+    id: "call_incomplete_1",
+    status: "failed",
+    recipients: [
+      {
+        id: "rcp_1",
+        phones: ["+15550100001"],
+        status: "failed",
+        structuredResult: null,
+        summary: null,
+        attempts: [
+          {
+            id: "att_1",
+            phone: "+15550100001",
+            status: "failed",
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:01:00.000Z",
+            summary: null,
+            transcriptTurns: [],
+            providerCallId: "provider_incomplete",
+            failureCode: null,
+            failureMessage: null,
+          },
+        ],
+      },
+    ],
+    structuredResult: null,
+    summary: null,
+    taskCompleted: null,
+    completionConfidence: null,
+    evidence: [],
+    failureCode: null,
+    failureMessage: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    completedAt: "2026-01-01T00:01:00.000Z",
+  };
+  const port = new StaticSnapshotProvider([incomplete, successSnapshot({ id: "call_backup_should_not_run" })]);
+  const finished = await runDrill(armedDrill(), { port });
+  assert.equal(port.createdIds.length, 1);
+  assert.equal(finished.status, "ambiguous");
+  assert.equal(finished.attempts[0]?.outcome, "unknown");
+  assert.equal(finished.reconciliationRequired, true);
+  assert.equal(finished.reconciliationReason, "incomplete_evidence");
+  assert.equal(finished.activeProviderCallId, "call_incomplete_1");
+});
+
+test("crash-like polling exception retains provider ID and reconciliation state without backup", async () => {
+  const provider = new AmbiguousAfterCreateProvider("call_crash_1");
+  const finished = await runDrill(armedDrill(), { port: provider, pollIntervalMs: 10 });
+  assert.equal(provider.createdIds.length, 1);
+  assert.equal(finished.status, "ambiguous");
+  assert.equal(finished.attempts.length, 1);
+  assert.equal(finished.activeProviderCallId, "call_crash_1");
+  assert.equal(finished.reconciliationRequired, true);
+  assert.ok(finished.reconciliationReason === "provider_error" || finished.reconciliationReason === "interrupted");
+});
+
+test("definitive busy failure escalates like unavailable", async () => {
+  const primaryBusy: CallSnapshot = {
+    id: "call_primary_busy",
+    status: "failed",
+    recipients: [
+      {
+        id: "rcp_primary",
+        phones: ["+15550100002"],
+        status: "failed",
+        structuredResult: null,
+        summary: null,
+        attempts: [
+          {
+            id: "att_primary",
+            phone: "+15550100002",
+            status: "failed",
+            startedAt: "2026-01-01T00:00:00.000Z",
+            completedAt: "2026-01-01T00:01:00.000Z",
+            summary: null,
+            transcriptTurns: [],
+            providerCallId: "provider_primary",
+            failureCode: "busy",
+            failureMessage: null,
+          },
+        ],
+      },
+    ],
+    structuredResult: null,
+    summary: null,
+    taskCompleted: false,
+    completionConfidence: null,
+    evidence: [],
+    failureCode: "busy",
+    failureMessage: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    completedAt: "2026-01-01T00:01:00.000Z",
+  };
+  const port = new StaticSnapshotProvider([primaryBusy, successSnapshot({ id: "call_backup_after_busy" })]);
+  const finished = await runDrill(
+    armedDrill({
+      primary: {
+        role: "primary",
+        label: "Primary",
+        phone: "+15550100002",
+        phoneMasked: "+*******0002",
+        consented: true,
+      },
+    }),
+    { port },
+  );
+  assert.equal(finished.attempts.length, 2);
+  assert.equal(finished.attempts[0]?.outcome, "no_answer");
+  assert.equal(finished.attempts[0]?.ambiguous, false);
+  assert.equal(finished.status, "completed");
+  assert.equal(finished.reconciliationRequired, false);
+});
+
+test("unknown failure codes containing busy remain ambiguous and do not escalate", async () => {
+  const failed = successSnapshot({
+    id: "call_primary_busy_substring",
+    status: "failed",
+    structuredResult: null,
+    taskCompleted: false,
+    completionConfidence: null,
+    failureCode: "busybox_internal_error",
+    recipients: [],
+  });
+  const provider = new StaticSnapshotProvider([failed, successSnapshot({ id: "call_backup_should_not_run" })]);
+
+  const result = await runDrill(armedDrill({ id: "busy-substring-is-not-definitive" }), { port: provider });
+
+  assert.equal(provider.createdIds.length, 1);
+  assert.equal(result.status, "ambiguous");
+  assert.equal(result.attempts[0]?.outcome, "unknown");
+  assert.equal(result.reconciliationRequired, true);
 });

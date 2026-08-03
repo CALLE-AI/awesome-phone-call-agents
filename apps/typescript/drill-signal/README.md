@@ -157,6 +157,15 @@ CALLE_API_KEY="<your-server-api-key>" CALLE_BASE_URL="https://api.heycall-e.com"
 - Per-drill single-flight ensures concurrent launch requests share one orchestration.
 - Process-safe launch claims use atomic file creation (`wx`) under `.data/claims/`. **Single-instance boundary:** one server process per data directory; multi-instance requires external coordination.
 
+## Provider call checkpoint and reconciliation
+
+- After CALL-E **accepts** a call (`createCall` returns an ID), DrillSignal **durably checkpoints** that provider call ID and role in the JSON store **before** the first `getCall` / poll.
+- Local result monitoring uses a **30-minute** default window per placed call (`DEFAULT_PER_CALL_RESULT_MONITORING_TIMEOUT_MS`). Tests override with short `perCallTimeoutMs` values.
+- **Timeout**, **unknown**, **malformed**, **conflicting**, or **incomplete** evidence ends the drill as `ambiguous` with **no backup escalation**. The accepted provider call ID is retained.
+- Structured results are trusted only when the call is `completed`, `taskCompleted` is true, and `completionConfidence.score` meets the configured minimum (0.8). Top-level structured output is examined before recipient-level fallback.
+- Failed terminal snapshots are classified only after inspecting failure codes, structured payloads, and transcript evidence. Only definitive unavailable / no-answer / busy / voicemail outcomes without conflicting contact evidence may escalate to backup.
+- Restart or reload **never auto-retries** an in-flight or reconciliation-required call. Public status and after-action reports surface reconciliation honestly (provider call IDs only; phones stay masked).
+
 ## Safety boundaries
 
 - One scoped scenario: `production_outage` business-continuity drill.
@@ -193,7 +202,7 @@ npm run demo
 python3 ../../../scripts/validate_repository.py
 ```
 
-Tests cover state transitions, consent/call caps, scoring, masking, idempotency, cancellation, launch guards, API security, malformed results, SDK contract against the fake server, and end-to-end simulated flows (54 source tests plus 2 post-build production static-serving tests).
+Tests cover state transitions, consent/call caps, scoring, masking, idempotency, cancellation, launch guards, durable provider-call checkpoints, reconciliation stops, API security, malformed results, SDK contract against the fake server, and end-to-end simulated flows (89 source tests plus 2 post-build production static-serving tests).
 
 ## Demo script
 

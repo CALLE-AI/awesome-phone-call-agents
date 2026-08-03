@@ -14,6 +14,7 @@ import {
   cancelBoundaryMessage,
   applyTerminalStatus,
   redactContacts,
+  isInFlightDrillStatus,
 } from "./state-machine.js";
 import type { DrillStore, LaunchClaimStore } from "./store.js";
 import type { CreateDrillBody, DrillContact, DrillRecord, LaunchBody, PreviewAckBody } from "./types.js";
@@ -106,6 +107,10 @@ export function createDrill(deps: DrillServiceDeps, body: CreateDrillBody): Dril
     report: null,
     cancelRequested: false,
     cancelBoundary: null,
+    activeProviderCallId: null,
+    activeProviderCallRole: null,
+    reconciliationRequired: false,
+    reconciliationReason: null,
   };
   const withMax = { ...draft, maxCalls: maxCallsForDrill({ backup, consent } as DrillRecord) };
   return deps.store.save(transitionToPreview(deps.store.create(withMax)));
@@ -130,8 +135,66 @@ export function acknowledgePreview(deps: DrillServiceDeps, id: string, body: Pre
   return deps.store.save(updated);
 }
 
+/**
+ * If a process dies mid-call, the durable checkpoint remains but no orchestration
+ * slot is live. Materialize an honest terminal reconciliation-required state and
+ * never auto-retry the provider call.
+ */
+function materializeOrphanedActiveCall(deps: DrillServiceDeps, drill: DrillRecord): DrillRecord {
+  if (orchestrationSlots.has(drill.id)) {
+    return drill;
+  }
+
+  if (drill.activeProviderCallId !== null && !isTerminalDrillStatus(drill.status)) {
+    const healed: DrillRecord = {
+      ...drill,
+      reconciliationRequired: true,
+      reconciliationReason: drill.reconciliationReason ?? "interrupted",
+      events: [
+        ...drill.events,
+        {
+          at: new Date().toISOString(),
+          level: "warn",
+          message: "Reconcile the retained provider call ID with CALL-E before placing any new call.",
+          detail: `providerCallId=${drill.activeProviderCallId}`,
+        },
+        {
+          at: new Date().toISOString(),
+          level: "warn",
+          message: "Process interruption left an accepted provider call without a finished evaluation.",
+          detail: `reason=interrupted`,
+        },
+      ],
+    };
+    return deps.store.save(applyTerminalStatus(healed, "ambiguous"));
+  }
+
+  // In-flight without a checkpointed provider ID: stop without inventing a call or retrying.
+  if (isInFlightDrillStatus(drill.status) && drill.activeProviderCallId === null && !orchestrationSlots.has(drill.id)) {
+    const healed: DrillRecord = {
+      ...drill,
+      reconciliationRequired: drill.reconciliationRequired,
+      events: [
+        ...drill.events,
+        {
+          at: new Date().toISOString(),
+          level: "warn",
+          message: "Drill left in-flight after process interruption with no accepted provider call ID.",
+        },
+      ],
+    };
+    return deps.store.save(applyTerminalStatus(healed, "failed"));
+  }
+
+  return drill;
+}
+
 export function getDrill(deps: DrillServiceDeps, id: string): DrillRecord | null {
-  return deps.store.get(id);
+  const drill = deps.store.get(id);
+  if (!drill) {
+    return null;
+  }
+  return materializeOrphanedActiveCall(deps, drill);
 }
 
 export function getPreview(deps: DrillServiceDeps, id: string): { drill: DrillRecord; plan: string[] } {
@@ -286,7 +349,7 @@ export function cancelDrill(deps: DrillServiceDeps, id: string): DrillRecord {
   }
 
   const slot = orchestrationSlots.get(id);
-  const activeCallId = slot?.activeCallId ?? null;
+  const activeCallId = slot?.activeCallId ?? drill.activeProviderCallId ?? null;
   const boundary = cancelBoundaryMessage(drill.callsPlaced, activeCallId);
 
   if (slot) {
@@ -296,14 +359,31 @@ export function cancelDrill(deps: DrillServiceDeps, id: string): DrillRecord {
     }
   }
 
+  const retainRecon = activeCallId !== null;
   const cancelled = applyTerminalStatus(
     {
       ...drill,
       cancelRequested: true,
       cancelBoundary: boundary,
+      activeProviderCallId: activeCallId ?? drill.activeProviderCallId,
+      activeProviderCallRole: drill.activeProviderCallRole,
+      reconciliationRequired: retainRecon ? true : drill.reconciliationRequired,
+      reconciliationReason: retainRecon
+        ? (drill.reconciliationReason ?? "cancelled_with_active_call")
+        : drill.reconciliationReason,
       events: [
         ...drill.events,
         { at: new Date().toISOString(), level: "warn", message: "Cancel requested.", detail: boundary },
+        ...(retainRecon
+          ? [
+              {
+                at: new Date().toISOString(),
+                level: "warn" as const,
+                message: "Reconcile the retained provider call ID with CALL-E before placing any new call.",
+                detail: `providerCallId=${activeCallId}`,
+              },
+            ]
+          : []),
       ],
     },
     slot ? drill.status : "cancelled",
@@ -316,13 +396,13 @@ export function cancelDrill(deps: DrillServiceDeps, id: string): DrillRecord {
 }
 
 export function publicDrillView(drill: DrillRecord): DrillRecord {
-  return isTerminalDrillStatus(drill.status)
-    ? drill
-    : {
-        ...drill,
-        primary: { ...drill.primary, phone: undefined },
-        backup: drill.backup ? { ...drill.backup, phone: undefined } : null,
-      };
+  // Always strip full phones from public/status responses; keep recon fields honest.
+  const masked: DrillRecord = {
+    ...drill,
+    primary: { ...drill.primary, phone: undefined },
+    backup: drill.backup ? { ...drill.backup, phone: undefined } : null,
+  };
+  return masked;
 }
 
 /** Test helper — reset module-level orchestration state. */

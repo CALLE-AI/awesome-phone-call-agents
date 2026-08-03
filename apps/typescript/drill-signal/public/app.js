@@ -75,11 +75,18 @@ function escapeHtml(value) {
 function renderStatus(drill) {
   document.getElementById("mode-pill").textContent = `Mode: ${drill.mode}`;
   syncLiveAckUI(drill.mode);
+  const recon = drill.reconciliationRequired
+    ? `<div class="metric"><span>Reconciliation</span><strong>required${drill.reconciliationReason ? ` (${escapeHtml(drill.reconciliationReason)})` : ""}</strong></div>
+       <div class="metric"><span>Provider call</span><strong>${escapeHtml(drill.activeProviderCallId ?? "—")}</strong></div>`
+    : drill.activeProviderCallId
+      ? `<div class="metric"><span>Active provider call</span><strong>${escapeHtml(drill.activeProviderCallId)}</strong></div>`
+      : "";
   document.getElementById("status-board").innerHTML = `
     <div class="metric"><span>Status</span><strong>${escapeHtml(drill.status)}</strong></div>
     <div class="metric"><span>Calls placed</span><strong>${drill.callsPlaced} / ${drill.maxCalls}</strong></div>
     <div class="metric"><span>Primary</span><strong>${escapeHtml(drill.primary.phoneMasked)}</strong></div>
     <div class="metric"><span>Backup</span><strong>${drill.backup ? escapeHtml(drill.backup.phoneMasked) : "—"}</strong></div>
+    ${recon}
   `;
   document.getElementById("event-log").innerHTML = drill.events
     .slice()
@@ -88,7 +95,8 @@ function renderStatus(drill) {
     .join("");
   document.getElementById("cancel-boundary").textContent = drill.cancelBoundary ?? "";
   const terminal = ["completed", "failed", "cancelled", "ambiguous"].includes(drill.status);
-  document.getElementById("launch-btn").disabled = terminal || drill.status !== "armed";
+  const blocked = terminal || drill.status !== "armed" || drill.reconciliationRequired || drill.activeProviderCallId;
+  document.getElementById("launch-btn").disabled = blocked;
   document.getElementById("cancel-btn").disabled = terminal;
   const fakeErr = document.getElementById("fake-server-error");
   if (drill.mode === "fake-server" && !state.fakeServerReady) {

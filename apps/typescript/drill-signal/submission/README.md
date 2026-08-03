@@ -18,7 +18,7 @@ Master checklist for hackathon / upstream contribution evidence. Status values: 
 | Item | Status | Notes |
 | --- | --- | --- |
 | TypeScript check (`npm run check`) | proven locally | |
-| Unit and integration tests (`npm test`) | proven locally | 53 tests, 0 failures (see `evidence-manifest.example.json`) |
+| Unit and integration tests (`npm test`) | proven locally | 89 tests, 0 failures (see `evidence-manifest.example.json`) |
 | Post-build dist static tests (`npm run test:dist`) | proven locally | Compiled `dist/server.js` serves `/`, favicon, assets |
 | Production smoke (`npm run smoke:production`) | proven locally | Spawns `node dist/server.js` on ephemeral loopback port |
 | Build (`npm run build`) | proven locally | Emits `dist/` and copies `public/` |
@@ -27,17 +27,17 @@ Master checklist for hackathon / upstream contribution evidence. Status values: 
 | Docker health check | proven locally | `GET /api/health` via Node fetch |
 | Docker static UI | proven locally | `GET /` returns DrillSignal HTML; favicon/assets served from `dist/public/` |
 
-## External / unperformed (placeholders)
+## External handoff and completed evidence
 
 | Item | Status | Placeholder |
 | --- | --- | --- |
-| Upstream pull request | pending external | `PR_URL` in evidence manifest |
-| Demo video (2:40-2:50) | pending external | `VIDEO_URL` in evidence manifest |
+| Upstream pull request | proven externally | https://github.com/CALLE-AI/awesome-phone-call-agents/pull/56 |
+| Local demo video (2:55.91) | proven locally | `drillsignal-demo-final-hd.mp4`; public `VIDEO_URL` pending user upload |
 | Devpost submission | pending external | Submit via Devpost UI; do not commit account email |
 | CALL-E account email | pending external | Supply only in Devpost form, never in git |
 | Hosted deployment URL | pending external | `HOSTED_URL` in evidence manifest (optional) |
-| Real cloud CALL-E call | pending external | Requires opt-in credentials and consent; see `judge-guide.md` |
-| Real call ID / recording evidence | pending external | Fill `evidence-manifest.example.json` after live verification |
+| Authorized live CALL-E runtime path | proven externally | Verified separately with user authorization; no credentials, phone numbers, call IDs, or transcript data committed |
+| Public live-call evidence | not applicable | Deliberately omitted to protect credentials and personal call data |
 | Desktop/mobile browser QA on hosted URL | pending external | After optional deploy |
 
 ## Packet contents

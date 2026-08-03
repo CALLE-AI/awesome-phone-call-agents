@@ -257,6 +257,10 @@ test("launch side effects blocked covers terminal and in-flight states", () => {
     report: null,
     cancelRequested: false,
     cancelBoundary: null,
+    activeProviderCallId: null,
+    activeProviderCallRole: null,
+    reconciliationRequired: false,
+    reconciliationReason: null,
     createdAt: "t",
     updatedAt: "t",
   } as DrillRecord;
@@ -265,6 +269,24 @@ test("launch side effects blocked covers terminal and in-flight states", () => {
   assert.equal(launchSideEffectsBlocked({ ...base, status: "calling_primary" }), true);
   assert.equal(launchSideEffectsBlocked({ ...base, status: "armed", launchClaim: { idempotencyKey: "k", claimedAt: "t", claimedBy: "op" } }), true);
   assert.equal(launchSideEffectsBlocked({ ...base, status: "armed" }), false);
+  assert.equal(
+    launchSideEffectsBlocked({
+      ...base,
+      status: "armed",
+      activeProviderCallId: "call_orphan_1",
+      activeProviderCallRole: "primary",
+    }),
+    true,
+  );
+  assert.equal(
+    launchSideEffectsBlocked({
+      ...base,
+      status: "armed",
+      reconciliationRequired: true,
+      reconciliationReason: "interrupted",
+    }),
+    true,
+  );
 });
 
 test("simulation report includes fictional evidence excerpts", async () => {

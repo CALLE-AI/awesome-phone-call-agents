@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test, { mock } from "node:test";
+import test from "node:test";
 import type { CallePort, CreateCallInput } from "../src/calle.js";
 import {
   DEFAULT_PER_CALL_RESULT_MONITORING_TIMEOUT_MS,
@@ -107,6 +107,10 @@ function armedDrill(): DrillRecord {
     report: null,
     cancelRequested: false,
     cancelBoundary: null,
+    activeProviderCallId: null,
+    activeProviderCallRole: null,
+    reconciliationRequired: false,
+    reconciliationReason: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };

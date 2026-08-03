@@ -26,15 +26,15 @@ Default mode is **simulation** (no network). Judges and contributors can verify 
 
 DrillSignal uses the `@call-e/calle` SDK (v0.2.2) for fake-server and live modes. Simulation exercises orchestration without the SDK. Fake-server mode runs against an embedded or external loopback fake that implements the CALL-E contract. Live mode places one or two outbound calls per drill, bounded by the configured max call cap.
 
-**Live verification is pending** until a real cloud call is performed with authorized numbers and documented in the evidence manifest. Repository tests and default demos do not place live calls.
+The authorized live CALL-E runtime path was verified separately with a consented destination. To protect credentials and personal call data, the repository and demo video contain no API key, full phone number, call ID, recording, or transcript. Repository tests and the default demo remain credentialless and do not place live calls.
 
 ## Technical implementation
 
 - TypeScript / Node.js 20+ HTTP API and static web UI
-- JSON file store with atomic launch claims and active-drill retention policy
-- State machine and orchestrator with idempotency keys and single-flight launch
+- JSON file store with atomic launch claims, durable accepted-call checkpoints, and active-drill retention policy
+- State machine and orchestrator with idempotency keys, single-flight launch, evidence-gated escalation, and reconciliation stops for ambiguous outcomes
 - Multi-stage Docker image: `npm ci` build, production runtime only, non-root user, `/data` volume, port 3847
-- 54 source tests plus 2 post-build production static-serving tests covering security, cancellation, scoring, SDK contract, and end-to-end simulation
+- 89 source tests plus 2 post-build production static-serving tests covering security, cancellation, durable provider-call checkpoints, reconciliation stops, scoring, SDK contract, and end-to-end simulation
 
 Built during the Jul 23-Sep 14, 2026 hackathon window as a reference app in Awesome Phone Call Agents.
 

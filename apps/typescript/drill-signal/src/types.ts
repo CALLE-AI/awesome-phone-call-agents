@@ -170,6 +170,18 @@ export interface DrillEvent {
   detail?: string;
 }
 
+/** Why an accepted provider call must be reconciled with CALL-E before any new call. */
+export type ReconciliationReason =
+  | "timeout"
+  | "unknown"
+  | "malformed_result"
+  | "provider_error"
+  | "interrupted"
+  | "untrusted_completed"
+  | "conflicting_evidence"
+  | "incomplete_evidence"
+  | "cancelled_with_active_call";
+
 export interface DrillRecord {
   id: string;
   scenario: DrillScenario;
@@ -187,6 +199,16 @@ export interface DrillRecord {
   report: AfterActionReport | null;
   cancelRequested: boolean;
   cancelBoundary: string | null;
+  /**
+   * Provider call ID accepted by createCall, checkpointed before the first poll.
+   * Retained through timeout/unknown/interrupted/reconciliation; cleared only after
+   * a terminal result is safely evaluated and recorded without recon need.
+   */
+  activeProviderCallId: string | null;
+  activeProviderCallRole: ContactRole | null;
+  /** Operator must reconcile with CALL-E; never auto-retry while true. */
+  reconciliationRequired: boolean;
+  reconciliationReason: ReconciliationReason | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -7,8 +7,8 @@
     "npmRunVerify": null,
     "typecheck": null,
     "tests": {
-      "total": 53,
-      "passed": 53,
+      "total": 89,
+      "passed": 89,
       "failed": 0,
       "skipped": 0,
       "notes": "npm test; verify also runs 2 post-build dist static-serving tests and smoke:production"
@@ -33,7 +33,7 @@
     "mobileBrowserQa": null
   },
   "pendingExternal": {
-    "pullRequestUrl": null,
+    "pullRequestUrl": "https://github.com/CALLE-AI/awesome-phone-call-agents/pull/56",
     "videoUrl": null,
     "hostedUrl": null,
     "devpostSubmitted": null,

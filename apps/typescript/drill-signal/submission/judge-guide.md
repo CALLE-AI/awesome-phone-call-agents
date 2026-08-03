@@ -19,7 +19,7 @@ npm run verify
 `npm run verify` runs, in order:
 
 1. `npm run check` - TypeScript typecheck
-2. `npm test` - 54 source tests plus 2 post-build production static-serving tests (simulation and fake-server; no live calls)
+2. `npm test` - 89 source tests (simulation and fake-server; no live calls)
 3. `npm run build` - compile to `dist/` and copy `public/` to `dist/public/`
 4. `npm run test:dist` - post-build static serving tests against compiled server
 5. `npm run smoke:production` - self-terminating `node dist/server.js` health and UI check
@@ -119,7 +119,7 @@ Select **Live CALL-E** in the UI and complete all consent steps including live s
 | Minute | Action |
 | --- | --- |
 | 0-1 | `npm ci && npm run verify` |
-| 1-2 | Scan passing test summary (53 pass in `npm test`) |
+| 1-2 | Scan passing test summary (89 pass in `npm test`, plus 2 in `npm run test:dist`) |
 | 2-4 | `npm run dev`, run simulation preset **primary-unavailable-backup-success** |
 | 4-5 | Read after-action report; optional `curl /api/health` on Docker |
 

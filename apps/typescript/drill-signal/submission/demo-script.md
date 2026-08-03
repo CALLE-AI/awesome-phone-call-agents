@@ -1,8 +1,9 @@
 # DrillSignal demo video script
 
-**Target length:** 1:42 (under 3 minutes)
+**Final length:** 2:55.91 (under 3 minutes)
 **Scenario:** Simulation preset `primary-unavailable-backup-success`
 **Disclosure:** This recording is simulation only; no live call occurs. UI timing may be compressed; simulation steps are real.
+**Narration:** Microsoft David Desktop male voice, rendered at 1.2x speed; burned-in English captions; no music.
 
 ## Pre-recording checklist
 
@@ -18,11 +19,13 @@
 
 | Time | Visual | Audio / caption |
 | --- | --- | --- |
-| 0:00-0:10 | Create Drill form and problem framing | "Teams need to know on-call roles can answer before the real incident." |
-| 0:10-0:35 | Safety Preview: masked numbers, consent checkboxes, max-call disclosure, attestations | "Explicit consent and safety preview before any side effect." |
-| 0:35-0:55 | Mission Control: Launch, event log showing primary no-answer then backup success | "Deterministic primary-to-backup escalation when primary is unavailable." |
-| 0:55-1:15 | After-Action Report: score overview | "Readiness scores summarize drill outcomes." |
-| 1:15-1:42 | Recommendations, redacted evidence excerpts, masked attempts, close | "Evidence-backed recommendations with redacted phones; no live call in this recording." |
+| 0:00-0:18 | Opening disclosure and problem framing | Introduce consented phone drills and state that the recording uses simulation only. |
+| 0:18-0:48 | Empty then completed Create Drill form | Show fictional reserved numbers, consent, simulation mode, and deterministic preset. |
+| 0:48-1:16 | Safety Preview | Show masked destinations, consent attestations, maximum-call disclosure, and side-effect boundary. |
+| 1:16-1:54 | Mission Control | Launch the simulation and show primary `no_answer`, then approved backup `success`. |
+| 1:54-2:24 | After-Action Report | Explain readiness scores, masked attempts, redacted evidence, and recommendations. |
+| 2:24-2:43 | Technical safety | Highlight idempotency, durable accepted-call checkpoints, and reconciliation stops for ambiguous live outcomes. |
+| 2:43-2:55.91 | Honest close | Reconfirm that the video is simulation while the authorized live runtime path was verified separately. |
 
 ## Optional live verification (separate evidence)
 
