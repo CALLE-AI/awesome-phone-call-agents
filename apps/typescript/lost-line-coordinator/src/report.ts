@@ -73,7 +73,16 @@ function parseProviderResult(value: unknown, allowedFeatures: Set<string>): Pars
   const matched = stringArray(raw.matched_feature_ids, allowedFeatures);
   const contradicted = stringArray(raw.contradicted_feature_ids, allowedFeatures);
   if (!matched || !contradicted || matched.some((id) => contradicted.includes(id))) return invalid;
-  if (!raw.recipient_agreed_to_continue && (raw.item_logged !== "unknown" || matched.length > 0 || contradicted.length > 0)) return invalid;
+  if (
+    !raw.recipient_agreed_to_continue
+    && (
+      raw.item_logged !== "unknown"
+      || matched.length > 0
+      || contradicted.length > 0
+      || raw.reference_code !== ""
+      || raw.retrieval_mode !== "unknown"
+    )
+  ) return invalid;
   if (
     typeof raw.reference_code !== "string"
     || (raw.reference_code !== "" && (
