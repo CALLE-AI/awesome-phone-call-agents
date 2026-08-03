@@ -267,7 +267,7 @@ export function App() {
       <div className="atmosphere" aria-hidden="true"><span className="atmosphere__glow atmosphere__glow--one" /><span className="atmosphere__glow atmosphere__glow--two" /><span className="atmosphere__arc atmosphere__arc--one" /><span className="atmosphere__arc atmosphere__arc--two" /></div>
       <div className="app-frame">
         <header className="site-header">
-          <a className="brand" href="/" aria-label="CallNeuron home"><img className="brand__mark" src="/callneuron-logo.png" alt="" width="31" height="31" /><span>CallNeuron</span></a>
+          <a className="brand" href="/" aria-label="CallNeuron home"><img className="brand__mark" src="/callneuron-mark.png" alt="" width="31" height="31" /><span>CallNeuron</span></a>
           <span className="mode-label mode-label--live"><span aria-hidden="true">●</span>Operator prototype · real calls</span>
         </header>
 
