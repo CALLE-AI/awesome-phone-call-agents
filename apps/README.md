@@ -20,6 +20,7 @@ Current apps:
 | [`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
 | [`python/oauth-login-client`](python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
+| [`web/voxra`](web/voxra/) | TypeScript / Next.js | Web dashboard for CALL-E brokered login, one-off outbound calls, transcripts, analytics summaries, and webhook settings. |
 
 Suggested grouping:
 
