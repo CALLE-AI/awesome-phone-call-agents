@@ -384,7 +384,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       continue;
     } else {
       // The key the ledger recorded, not a fresh one. CALL-E answers with the
-      // call it already has under that key, or places the one this run owed.
+      // call it already has under that key or places the one this run owed.
       // Charged to the budget either way, because from here the two cannot be
       // told apart. Deriving the key again would be a different key the moment
       // any call script in this repo changed between the crash and the resume,

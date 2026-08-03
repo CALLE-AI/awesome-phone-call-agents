@@ -152,12 +152,12 @@ to prevent.
 
 - refuses to touch it unless the request digest matches. The digest is taken over
   the request whole, so the id, the meeting, the policy, every slot field and every
-  party field are bound, and a field added to the request later is bound the day it
-  is added. Earlier versions of it named the fields to bind and every list left one
+  party field are bound. A field added to the request later is bound the day it is
+  added. Earlier versions of it named the fields to bind and every list left one
   out: the party fields first, then `request_id`, which is what every idempotency
   key starts with. That matters because a create with no call id is rebuilt from
   the request in hand, so an edit the digest waved through would build a different
-  payload, take a different key with it, and place a fresh call to somebody while
+  payload, take a different key with it and place a fresh call to somebody while
   the original ambiguous call might still be live
 - settles every call the ledger cannot account for. A call with an id is settled by
   asking for it, which places nothing. A call with no id, which is what a lost
@@ -165,9 +165,9 @@ to prevent.
   that call: CALL-E answers with the call it already has or places the one the run
   owed. That is charged to the call budget, because from the outside the two cannot
   be told apart. The key is read rather than derived a second time. Deriving it
-  reads the task text and the task text lives in this repo, not in the request, so
-  a crash, an upgrade that touched one line of a call script, then a resume, and the
-  derived key would be a new key ringing a second phone
+  reads the task text and the task text lives in this repo, not in the request, so a
+  crash, an upgrade that touched one line of a call script, then a resume would
+  derive a new key and ring a second phone
 - places the release calls that are owed, most recent yes first
 - writes a fresh outcome entry, so the ledger still replays as one history
 
@@ -249,7 +249,7 @@ Every call entry in the ledger records the key its call went out under, and
 text out of this repo, so a run that crashed, an upgrade that touched one line of a
 script, then a resume would produce a key CALL-E has never seen and place a second
 call. Re-issuing the recorded key cannot do that: the same body hands back the same
-call, and a body that no longer matches is refused with `idempotency_conflict`,
+call and a body that no longer matches is refused with `idempotency_conflict`,
 which is ambiguous, so the round stops with the call unresolved rather than dialling
 anybody.
 

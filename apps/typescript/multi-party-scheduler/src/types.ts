@@ -187,7 +187,7 @@ export interface GatherResult {
   provider_call_id: string | null;
   /**
    * The `Idempotency-Key` this call was created under. Recorded because it is the
-   * only handle on a create whose response was lost, and because recovery
+   * only handle on a create whose response was lost and because recovery
    * re-issues this exact string rather than rebuilding one. Null when no call was
    * attempted at all.
    */

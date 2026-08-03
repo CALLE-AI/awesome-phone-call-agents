@@ -108,8 +108,8 @@ test("every call-affecting party field moves the request digest", () => {
 // starts with and what sits in the metadata of every call. So the digest binds the
 // request whole and this pins that. The map is typed over every key of
 // `CoordinationRequest`, so a new field fails the typecheck here until somebody
-// says how it moves the digest, and the key comparison catches a field that
-// reaches the object without reaching the type.
+// says how it moves the digest. The key comparison catches a field that reaches
+// the object without reaching the type.
 test("every field of the request is bound into the digest", () => {
   const base = requestDigest(coordinationRequest());
   const edits: Record<keyof CoordinationRequest, (request: CoordinationRequest) => void> = {

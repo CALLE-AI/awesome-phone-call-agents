@@ -215,7 +215,7 @@ function asCallError(error: unknown): CalleCallError {
  * the request that went unanswered.
  *
  * The key is derived here only on a fresh call. `resume` passes the one the
- * ledger recorded, because the derived key depends on the task text, and the task
+ * ledger recorded, because the derived key depends on the task text and the task
  * text lives in this repo rather than in the request: a run that crashed, an
  * upgrade, then a resume would derive a different key and place a second call to
  * somebody whose first call may still be live. Whichever way it arrives, the key

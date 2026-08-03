@@ -225,10 +225,10 @@ test("resume refuses a ledger when only the request id was edited", async () => 
  * The key is durable state, not something recomputed.
  *
  * Deriving it again reads the task text, which lives in this repo rather than in
- * the request: a run that crashed, an upgrade that touched one line of a call
- * script, then a resume, and the derived key is a different key. So the key the
- * create went out under is recorded and re-issued verbatim. The ledger below is
- * stamped with a key nothing could derive, which is the only way to prove where
+ * the request. A run crashes, an upgrade touches one line of a call script, the
+ * resume derives a key CALL-E has never seen and a second phone rings. So the key
+ * the create went out under is recorded and re-issued verbatim. The ledger below
+ * is stamped with a key nothing could derive, which is the only way to prove where
  * the string on the wire came from.
  */
 test("resume re-issues the key the ledger recorded rather than deriving a new one", async () => {
