@@ -124,7 +124,7 @@ npm run verify
 python3 ../../../scripts/validate_repository.py
 ```
 
-`npm run verify` runs TypeScript, seventeen focused Node tests, the shared fake broker/MCP sequence and a Vite production build. Tests use reserved fictional numbers and cannot place a call.
+`npm run verify` runs TypeScript, eighteen focused Node tests, the shared fake broker/MCP sequence and a Vite production build. Tests use reserved fictional numbers and cannot place a call.
 
 The test suite covers stateless and session-based MCP initialization, the plan/run/status sequence, rejection of expanded `run_call` contracts, refresh/second-tab dispatch persistence, ambiguous acceptance, accepted-run recovery, phone-keyed opt-outs across reset and changed-code re-imports, manual and file intake validation, withdrawn consent, privacy-minimal export, disposition metrics, voicemail policy and the disabled-server gate.
 
