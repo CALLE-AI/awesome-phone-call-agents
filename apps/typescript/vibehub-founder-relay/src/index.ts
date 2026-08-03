@@ -1,7 +1,6 @@
 import {
   CalleAPIError,
   CalleClient,
-  CalleConnectionError,
   CalleTimeoutError,
   type CreateCallInput,
   type Call,
@@ -20,6 +19,10 @@ import {
   safeFailureCode,
   verifiedFounderRelayResult,
 } from "./workflow.js";
+import {
+  CreateOutcomeUnresolvedError,
+  reconcileCreateWithOriginalKey,
+} from "./create-reconciliation.js";
 
 dotenv.config();
 
@@ -33,18 +36,10 @@ const runId = (process.env.FOUNDER_RELAY_RUN_ID ?? "relay-example-001").trim();
 const consent = process.env.CALLE_RECIPIENT_CONSENT === "YES";
 const terminal = new Set(["completed", "failed", "canceled"]);
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function networkCode(error: unknown) {
   if (!(error instanceof Error)) return undefined;
   const cause = (error as Error & { cause?: { code?: unknown } }).cause;
   return typeof cause?.code === "string" ? cause.code : undefined;
-}
-
-function isAmbiguousCreateError(error: unknown) {
-  return error instanceof CalleConnectionError || error instanceof TypeError || Boolean(networkCode(error));
 }
 
 async function createWithReconciliation(
@@ -52,16 +47,19 @@ async function createWithReconciliation(
   input: CreateCallInput,
   idempotencyKey: string,
 ) {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      return await client.calls.create(input, { idempotencyKey });
-    } catch (error) {
-      if (!isAmbiguousCreateError(error) || attempt === 3) throw error;
-      console.warn("CALL-E create response was ambiguous; reconciling with the same idempotency key.");
-      await sleep(attempt * 400);
-    }
-  }
-  throw new CalleConnectionError("CALL-E create reconciliation failed.");
+  return reconcileCreateWithOriginalKey(
+    (originalIdempotencyKey) => client.calls.create(input, { idempotencyKey: originalIdempotencyKey }),
+    idempotencyKey,
+    {
+      onRetry: () => {
+        console.warn("CALL-E create response was ambiguous; reconciling with the same idempotency key.");
+      },
+    },
+  );
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function waitForResult(client: CalleClient, callId: string): Promise<Call> {
@@ -158,6 +156,8 @@ async function main() {
 main().catch((error) => {
   if (error instanceof CalleAPIError) {
     console.error(`CALL-E request failed (${safeFailureCode(error.code) ?? "API_ERROR"}, HTTP ${error.status}).`);
+  } else if (error instanceof CreateOutcomeUnresolvedError) {
+    console.error(`${error.code}: do not issue a new call with changed content; reconcile only with the original request.`);
   } else {
     console.error("Founder Relay stopped safely before producing a verified result.");
   }

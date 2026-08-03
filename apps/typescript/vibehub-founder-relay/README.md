@@ -11,7 +11,8 @@ The call confirms four fields: whether the recipient is available now, interest 
 - Use only a number you own or whose owner explicitly authorized the call.
 - Phone numbers are masked in console summaries and hashed for idempotency.
 - The API key can be sent only to the official CALL-E HTTPS origin or an exact IP loopback test origin.
-- Idempotency covers the run ID, recipient, region, candidate, goal, task, and result-schema version. Ambiguous create responses are retried only with that same key.
+- Idempotency covers the run ID, recipient, region, candidate, goal, task, and result-schema version. Network failures plus HTTP `408`, `409`, `429`, and every `5xx` create response are acceptance-ambiguous and are reconciled only with that original key.
+- If same-key reconciliation remains ambiguous after three attempts, the app emits `CREATE_OUTCOME_UNRESOLVED` instead of treating the request as an ordinary failure. Do not change the request or issue a new key while that outcome is unresolved.
 - Completed output requires task success, recipient success, confidence of at least `0.5`, and a schema-valid result. Provider summaries and failure messages are never printed.
 - The agent discloses that it is automated, asks whether now is convenient, ends on refusal, stays under one minute, and avoids sensitive topics.
 - This app creates no recurring job. To stop a queued or active call, use the CALL-E dashboard and the printed Call ID. Do not start a new run until the earlier call reaches a terminal state.
