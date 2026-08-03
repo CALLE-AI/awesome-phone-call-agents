@@ -26,10 +26,13 @@ ROUTE_LABELS = {
     "support_person": "permission for a support person to join or handle a future call",
     "slower_pace": "a slower-paced future phone conversation with time to process",
 }
+RECIPIENT_MODES = {"public_contact", "consenting_demo"}
 
 ALLOWED_TOP_LEVEL_KEYS = {
     "workflow_id",
     "owner_authorized",
+    "recipient_mode",
+    "recipient_consent_confirmed",
     "organization",
     "requested_routes",
     "locale",
@@ -42,13 +45,15 @@ ALLOWED_ORGANIZATION_KEYS = {"display_name", "phone", "published_source"}
 class Organization:
     display_name: str
     phone: str
-    published_source: str
+    published_source: str | None
 
 
 @dataclass(frozen=True)
 class AccessRouteRequest:
     workflow_id: str
     owner_authorized: bool
+    recipient_mode: str
+    recipient_consent_confirmed: bool
     organization: Organization
     requested_routes: tuple[str, ...]
     locale: str
@@ -128,6 +133,13 @@ def parse_request(raw: Any) -> AccessRouteRequest:
     if raw.get("owner_authorized") is not True:
         raise ValueError("owner_authorized must be true")
 
+    recipient_mode = raw.get("recipient_mode", "public_contact")
+    if recipient_mode not in RECIPIENT_MODES:
+        raise ValueError("recipient_mode must be public_contact or consenting_demo")
+    recipient_consent_confirmed = raw.get("recipient_consent_confirmed", False)
+    if not isinstance(recipient_consent_confirmed, bool):
+        raise ValueError("recipient_consent_confirmed must be true or false")
+
     organization_raw = raw.get("organization")
     if not isinstance(organization_raw, dict):
         raise ValueError("organization must be an object")
@@ -139,6 +151,24 @@ def parse_request(raw: Any) -> AccessRouteRequest:
     )
     if not E164_PATTERN.fullmatch(phone):
         raise ValueError("organization.phone must use E.164 format")
+    published_source_raw = organization_raw.get("published_source")
+    if recipient_mode == "public_contact":
+        published_source = _validate_published_source(published_source_raw)
+        if recipient_consent_confirmed:
+            raise ValueError(
+                "recipient_consent_confirmed must be false for public_contact mode"
+            )
+    else:
+        if recipient_consent_confirmed is not True:
+            raise ValueError(
+                "consenting_demo mode requires recipient_consent_confirmed true"
+            )
+        if published_source_raw is not None:
+            raise ValueError(
+                "consenting_demo mode must not include organization.published_source"
+            )
+        published_source = None
+
     organization = Organization(
         display_name=clean_text(
             organization_raw.get("display_name"),
@@ -147,9 +177,7 @@ def parse_request(raw: Any) -> AccessRouteRequest:
             maximum=100,
         ),
         phone=phone,
-        published_source=_validate_published_source(
-            organization_raw.get("published_source")
-        ),
+        published_source=published_source,
     )
 
     route_values = raw.get("requested_routes")
@@ -174,6 +202,8 @@ def parse_request(raw: Any) -> AccessRouteRequest:
     return AccessRouteRequest(
         workflow_id=workflow_id,
         owner_authorized=True,
+        recipient_mode=recipient_mode,
+        recipient_consent_confirmed=recipient_consent_confirmed,
         organization=organization,
         requested_routes=tuple(route_values),
         locale=locale,
@@ -187,14 +217,18 @@ def load_request(path: Path) -> AccessRouteRequest:
 
 
 def request_document(request: AccessRouteRequest) -> dict[str, Any]:
+    organization = {
+        "display_name": request.organization.display_name,
+        "phone": request.organization.phone,
+    }
+    if request.organization.published_source is not None:
+        organization["published_source"] = request.organization.published_source
     return {
         "workflow_id": request.workflow_id,
         "owner_authorized": request.owner_authorized,
-        "organization": {
-            "display_name": request.organization.display_name,
-            "phone": request.organization.phone,
-            "published_source": request.organization.published_source,
-        },
+        "recipient_mode": request.recipient_mode,
+        "recipient_consent_confirmed": request.recipient_consent_confirmed,
+        "organization": organization,
         "requested_routes": list(request.requested_routes),
         "locale": request.locale,
         "allow_neutral_voicemail": request.allow_neutral_voicemail,
@@ -224,14 +258,36 @@ def build_task(request: AccessRouteRequest) -> str:
         if request.allow_neutral_voicemail
         else "If a person does not answer, do not leave a voicemail."
     )
+    opening = (
+        f"Place one controlled accessibility-information demo call to {request.organization.display_name}. "
+        "The recipient explicitly agreed to receive this demo call and may role-play an organization. In the first sentence, disclose that you are an AI calling assistant making a demonstration call and confirm that they still agree to continue. If they do not confirm, end immediately. Treat every answer as demonstration data, not verified public instructions. "
+        if request.recipient_mode == "consenting_demo"
+        else f"Place one accessibility-information call to {request.organization.display_name}. "
+    )
+    disclosure = (
+        ""
+        if request.recipient_mode == "consenting_demo"
+        else "In the first sentence, disclose that you are an AI calling assistant. "
+    )
+    information_boundary = (
+        "This call may gather demonstration communication-access instructions only. "
+        if request.recipient_mode == "consenting_demo"
+        else "This call may gather public access instructions only. "
+    )
+    stop_boundary = (
+        "If the demo participant withdraws consent or stops role-playing, end politely. If asked for personal or service-specific information, explain that this is only a controlled demonstration and do not collect it. "
+        if request.recipient_mode == "consenting_demo"
+        else "If the organization will not speak with an automated caller, record that and end politely. If asked for personal or service-specific information, explain that you are only collecting public communication-access instructions, then end if the public instructions cannot be provided. "
+    )
     return (
-        f"Place one accessibility-information call to {request.organization.display_name}. "
-        "In the first sentence, disclose that you are an AI calling assistant. Say that a person asked you to find a communication route they can use instead of an unplanned live phone conversation. "
+        opening
+        + disclosure
+        + "Say that a person asked you to find a communication route they can use instead of an unplanned live phone conversation. "
         "Do not state or ask why they need another route. Ask whether the organization supports each requested option and what a person must do to use it. "
         f"The requested options are: {route_questions(request)}. "
-        "This call may gather public access instructions only. Do not access or change an account, verify identity, make or change an appointment, buy anything, accept terms or fees, transfer the call into a service interaction, or make any commitment. "
+        f"{information_boundary}Do not access or change an account, verify identity, make or change an appointment, buy anything, accept terms or fees, transfer the call into a service interaction, or make any commitment. "
         "Do not request or disclose a name, date of birth, address, account or case number, diagnosis, insurance information, payment information, legal facts, financial facts, password, code, or other personal information. "
-        "If the organization will not speak with an automated caller, record that and end politely. If asked for personal or service-specific information, explain that you are only collecting public communication-access instructions, then end if the public instructions cannot be provided. "
+        f"{stop_boundary}"
         f"{voicemail_instruction} Summarize the available routes, conditions, and the safest next step, then end the call."
     )
 
@@ -271,7 +327,11 @@ def build_result_schema(request: AccessRouteRequest) -> dict[str, Any]:
                         },
                         "instructions": {
                             "type": "string",
-                            "description": "Public instructions only; omit personal information.",
+                            "description": (
+                                "Demonstration instructions only; omit personal information."
+                                if request.recipient_mode == "consenting_demo"
+                                else "Public instructions only; omit personal information."
+                            ),
                         },
                     },
                     "additionalProperties": False,
@@ -288,7 +348,11 @@ def build_result_schema(request: AccessRouteRequest) -> dict[str, Any]:
             },
             "evidence_summary": {
                 "type": "string",
-                "description": "Short paraphrase of what the organization said, with no personal information.",
+                "description": (
+                    "Short paraphrase of the controlled demonstration, with no personal information."
+                    if request.recipient_mode == "consenting_demo"
+                    else "Short paraphrase of what the organization said, with no personal information."
+                ),
             },
         },
         "additionalProperties": False,
@@ -309,6 +373,7 @@ def build_call_arguments(request: AccessRouteRequest) -> dict[str, Any]:
         "metadata": {
             "workflow_id": request.workflow_id,
             "workflow_type": "accessible_communication_route_discovery",
+            "recipient_mode": request.recipient_mode,
         },
         "idempotency_key": idempotency_key(request),
     }
@@ -324,6 +389,8 @@ def preview(request: AccessRouteRequest) -> dict[str, Any]:
         "creates_phone_call": False,
         "workflow_id": request.workflow_id,
         "organization": request.organization.display_name,
+        "recipient_mode": request.recipient_mode,
+        "recipient_consent_confirmed": request.recipient_consent_confirmed,
         "published_source": request.organization.published_source,
         "requested_routes": list(request.requested_routes),
         "call_arguments": arguments,

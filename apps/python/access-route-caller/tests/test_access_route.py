@@ -77,6 +77,24 @@ class AccessRouteTests(unittest.TestCase):
             ("email", "text", "scheduled_callback", "relay_support"),
         )
 
+    def test_consenting_demo_requires_consent_and_no_source_claim(self) -> None:
+        raw = valid_raw()
+        raw["recipient_mode"] = "consenting_demo"
+        raw["recipient_consent_confirmed"] = True
+        del raw["organization"]["published_source"]
+        parsed = access_route.parse_request(raw)
+        self.assertEqual(parsed.recipient_mode, "consenting_demo")
+        self.assertIsNone(parsed.organization.published_source)
+
+        raw["recipient_consent_confirmed"] = False
+        with self.assertRaisesRegex(ValueError, "requires recipient_consent_confirmed"):
+            access_route.parse_request(raw)
+
+        raw["recipient_consent_confirmed"] = True
+        raw["organization"]["published_source"] = "https://example.org/contact"
+        with self.assertRaisesRegex(ValueError, "must not include"):
+            access_route.parse_request(raw)
+
     def test_invalid_request_fields_fail_closed(self) -> None:
         cases = [
             (("owner_authorized",), False, "owner_authorized must be true"),
@@ -137,6 +155,17 @@ class AccessRouteTests(unittest.TestCase):
         self.assertIn("Do not state or ask why", task)
         self.assertIn("Do not access or change an account", task)
         self.assertIn("make or change an appointment", task)
+
+    def test_demo_task_reconfirms_consent_and_labels_demo_data(self) -> None:
+        raw = valid_raw()
+        raw["recipient_mode"] = "consenting_demo"
+        raw["recipient_consent_confirmed"] = True
+        del raw["organization"]["published_source"]
+        task = access_route.build_task(access_route.parse_request(raw))
+        self.assertIn("still agree to continue", task)
+        self.assertIn("demonstration data", task)
+        self.assertIn("withdraws consent", task)
+        self.assertEqual(task.count("first sentence"), 1)
 
     def test_result_schema_is_closed_and_route_bounded(self) -> None:
         schema = access_route.build_result_schema(request())

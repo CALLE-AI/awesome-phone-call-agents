@@ -21,7 +21,7 @@ The useful outcome may be that no alternative exists or that the organization re
 
 The workflow has three separate gates:
 
-1. The request must state that the owner authorized the call and must point to the organization's published HTTPS contact page.
+1. The request must state that the owner authorized the call. Public-contact mode requires the organization's published HTTPS contact page; controlled-demo mode instead requires explicit recipient consent and forbids a source-page claim.
 2. Preview mode shows the exact CALL-E task, a masked destination, the requested routes, and a SHA-256 receipt. It places no call.
 3. Live mode requires the unchanged request, the matching preview receipt, `--execute`, and a separate `--confirm-owner-authorized` flag.
 
@@ -69,9 +69,11 @@ Live mode creates exactly one CALL-E call task and waits for its terminal result
 
 - `workflow_id`: stable non-secret identifier.
 - `owner_authorized`: must be literal `true`.
-- `organization.display_name`: public organization or business name.
+- `recipient_mode`: `public_contact` (default) or `consenting_demo`.
+- `recipient_consent_confirmed`: must be literal `true` only for a controlled demo; false otherwise.
+- `organization.display_name`: public organization or business name, or a non-personal scenario label for a controlled demo.
 - `organization.phone`: one E.164 number.
-- `organization.published_source`: public HTTPS page where the contact route is published.
+- `organization.published_source`: required in `public_contact` mode and must be the public HTTPS page where the contact route is published. It must be omitted in `consenting_demo` mode.
 - `requested_routes`: one to six supported route names.
 - `locale`: optional locale such as `en-US`.
 - `allow_neutral_voicemail`: optional boolean, false by default.
@@ -82,8 +84,8 @@ No free-text personal narrative belongs in this request. Unknown fields are reje
 
 - Live mode places one outbound call. There is no schedule and no background worker.
 - The caller identifies itself as AI in its first sentence.
-- The call gathers public communication-access instructions only.
-- It is not for emergencies, crisis response, medical advice, legal advice, financial activity, collections, political outreach, marketing, or calls to private individuals.
+- The call gathers public communication-access instructions, or clearly labeled demonstration instructions in controlled-demo mode, only.
+- It is not for emergencies, crisis response, medical advice, legal advice, financial activity, collections, political outreach, marketing, or unsolicited calls to private individuals. Controlled-demo mode may call a number the user owns or a recipient who explicitly agreed, and it reconfirms consent at the start of the call.
 - It cannot establish that an offered route is legally sufficient, accessible in practice, or available to a specific person or account.
 - A result is a report of what was said, not proof that the organization will honor the route later.
 - CALL-E and its telephony providers necessarily process the call and may retain audio, transcripts, or metadata under their policies. Review those policies before live use.
@@ -102,4 +104,4 @@ python3 -m unittest discover -s tests -v
 python3 ../../../scripts/validate_repository.py
 ```
 
-Live verification is opt-in. Use a number you own or a public organization you are authorized to contact, preserve only a redacted result, and never commit the live request, result, credential, transcript, or recording.
+Live verification is opt-in. Use a number you own, a consenting demo participant, or a public organization you are authorized to contact. Preserve only a redacted result, and never commit the live request, result, credential, transcript, or recording.
