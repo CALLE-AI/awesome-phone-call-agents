@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 260" role="img" aria-label="DrillSignal architecture">
+  <rect width="820" height="260" fill="#0f1419"/>
+  <text x="24" y="34" fill="#e8edf2" font-family="Segoe UI, sans-serif" font-size="18" font-weight="600">DrillSignal Architecture</text>
+  <rect x="24" y="56" width="120" height="48" rx="6" fill="#1f2730" stroke="#3d8f6e"/>
+  <text x="44" y="86" fill="#e8edf2" font-family="Consolas, monospace" font-size="13">Web UI</text>
+  <rect x="170" y="56" width="120" height="48" rx="6" fill="#1f2730" stroke="#2a3441"/>
+  <text x="186" y="86" fill="#e8edf2" font-family="Consolas, monospace" font-size="13">Express API</text>
+  <rect x="316" y="56" width="140" height="48" rx="6" fill="#1f2730" stroke="#2a3441"/>
+  <text x="332" y="86" fill="#e8edf2" font-family="Consolas, monospace" font-size="13">Orchestrator</text>
+  <rect x="482" y="40" width="150" height="40" rx="6" fill="#2a634d" stroke="#3d8f6e"/>
+  <text x="498" y="66" fill="#e8edf2" font-family="Consolas, monospace" font-size="12">Simulation (default)</text>
+  <rect x="482" y="92" width="150" height="40" rx="6" fill="#1f2730" stroke="#4a8fd4"/>
+  <text x="505" y="118" fill="#e8edf2" font-family="Consolas, monospace" font-size="12">@call-e/calle SDK</text>
+  <rect x="660" y="66" width="136" height="48" rx="6" fill="#1f2730" stroke="#2a3441"/>
+  <text x="680" y="96" fill="#e8edf2" font-family="Consolas, monospace" font-size="12">CALL-E / Fake</text>
+  <rect x="316" y="150" width="140" height="48" rx="6" fill="#1f2730" stroke="#2a3441"/>
+  <text x="336" y="180" fill="#e8edf2" font-family="Consolas, monospace" font-size="12">JSON Store</text>
+  <rect x="482" y="150" width="150" height="48" rx="6" fill="#1f2730" stroke="#c9a227"/>
+  <text x="500" y="180" fill="#e8edf2" font-family="Consolas, monospace" font-size="12">After-Action Report</text>
+  <line x1="144" y1="80" x2="170" y2="80" stroke="#9aa7b5" stroke-width="2"/>
+  <line x1="290" y1="80" x2="316" y2="80" stroke="#9aa7b5" stroke-width="2"/>
+  <line x1="456" y1="72" x2="482" y2="60" stroke="#9aa7b5" stroke-width="2"/>
+  <line x1="456" y1="88" x2="482" y2="112" stroke="#9aa7b5" stroke-width="2"/>
+  <line x1="632" y1="112" x2="660" y2="90" stroke="#9aa7b5" stroke-width="2"/>
+  <line x1="386" y1="104" x2="386" y2="150" stroke="#9aa7b5" stroke-width="2"/>
+  <line x1="456" y1="174" x2="482" y2="174" stroke="#9aa7b5" stroke-width="2"/>
+</svg>

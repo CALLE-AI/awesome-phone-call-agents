@@ -1,0 +1,26 @@
+{
+  "name": "drill-signal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consented business-continuity outage drills by phone with deterministic escalation and evidence-backed readiness reports.",
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-public.mjs",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "tsx demo/run-local.ts",
+    "test:dist": "node --import tsx --test postbuild-tests/static-serving.test.ts",
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "verify": "npm run check && npm test && npm run build && npm run test:dist && npm run smoke:production && npm run demo",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,37 @@
+# Dependencies and build output (rebuilt inside the image)
+node_modules/
+dist/
+
+# Runtime and local secrets
+.data/
+.env
+.env.*
+!.env.example
+
+# Logs, coverage, and caches
+*.log
+logs/
+coverage/
+.npm/
+.cache/
+
+# Version control and editor metadata
+.git/
+.gitignore
+.github/
+
+# Tests and demos (not required for production image)
+test/
+demo/
+submission/
+
+# Documentation and misc local artifacts
+README.md
+*.md
+!package.json
+
+# OS and temp files
+.DS_Store
+Thumbs.db
+.tmp/
+tmp/
