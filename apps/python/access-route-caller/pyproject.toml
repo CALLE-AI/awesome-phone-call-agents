@@ -1,0 +1,8 @@
+[project]
+name = "calle-access-route-caller"
+version = "0.1.0"
+description = "Consent-bound CALL-E workflow for discovering accessible communication routes."
+requires-python = ">=3.11"
+dependencies = [
+  "calle-ai==0.2.0",
+]
