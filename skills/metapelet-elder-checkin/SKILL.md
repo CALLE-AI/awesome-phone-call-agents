@@ -25,15 +25,15 @@ MetaPelet is an existing voice companion product; this skill packages its **conv
 ## Workflow
 
 1. Read `references/safety.md` and confirm **recipient consent**.
-2. Fill a request JSON (see `apps/python/metapelet-checkin/example_request.json`).
+2. Fill a request JSON with **E.164** `phone`, explicit CALL-E `region` and `locale` (see `apps/python/metapelet-checkin/example_request.json`).
 3. **Preview** (no call): run the Python app without `--execute`.
 4. **Live call**: set `CALLE_API_KEY`, pass `--execute --confirm-recipient-opt-in`.
 5. Share the redacted structured result with the authorized caregiver only.
 
 ## Persona and profile
 
-- Core persona: `references/persona.ru.txt` (snapshot from MetaPelet product prompts).
-- Optional demo profile shape: `references/profile-demo.ru.txt`.
+- Core persona: `references/persona.en.txt` (MetaPelet companion snapshot, English repository text).
+- Optional demo profile shape: `references/profile-demo.en.txt`.
 - Structured output schema: `references/result-schema.json`.
 
 ## Runnable app

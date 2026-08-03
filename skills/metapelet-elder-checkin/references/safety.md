@@ -16,10 +16,10 @@ MetaPelet is a **warm conversation companion**, not a clinician.
 
 ## Phone numbers and data
 
-- Use **E.164** format for live runs.
-- Mask phone numbers in logs, previews, and demo materials (`+972***`).
+- Use **E.164** format for live runs; the app rejects non-E.164 input.
+- Set explicit CALL-E **region** and **locale** in the request — do not infer routing from the number prefix.
+- Mask phone numbers in logs, previews, and demo materials.
 - Do not commit API keys, live request files, or call result JSON with transcripts to git.
-- Hackathon demo video: no full names or unmasked numbers unless the person consented on camera.
 
 ## Side effects
 
@@ -33,8 +33,8 @@ MetaPelet is a **warm conversation companion**, not a clinician.
 
 ## Platform coverage
 
-Outbound to **Israel (+972)** is **not** in CALL-E’s [published supported regions](https://github.com/CALLE-AI/call-e-integrations#-supported-regions-and-languages). Do not bypass with fake region/locale. See `docs/PLATFORM-LIMITATION-ISRAEL.en.md` (repo root).
+Confirm outbound regions and locales against CALL-E’s [supported regions and languages](https://github.com/CALLE-AI/call-e-integrations#-supported-regions-and-languages) before live runs.
 
 ## Source persona
 
-Conversation rules are copied from the MetaPelet product prompt (`persona.ru.txt`). Canonical product repo is unchanged; this folder is an isolated hackathon submission snapshot.
+Conversation rules are adapted from the MetaPelet product prompt (`persona.en.txt` in this skill). This folder is an isolated community contribution snapshot.

@@ -9,7 +9,14 @@ import os
 import sys
 from pathlib import Path
 
-from task_builder import build_recipients, build_task, load_result_schema, preview_plan
+from task_builder import (
+    build_recipients,
+    build_task,
+    idempotency_key,
+    load_result_schema,
+    preview_plan,
+    validate_request,
+)
 
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
 ENV_PATH = Path(__file__).resolve().parent / ".env"
@@ -29,14 +36,14 @@ def _load_dotenv() -> None:
 
 
 def _load_request(path: Path) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    required = ["workflow_id", "phone", "recipient_consented", "user_name", "language"]
-    missing = [k for k in required if k not in data]
-    if missing:
-        raise SystemExit(f"Missing required fields: {', '.join(missing)}")
-    if data.get("recipient_consented") is not True:
-        raise SystemExit("recipient_consented must be true for any run.")
-    return data
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Invalid JSON in {path}: {exc}") from exc
+    try:
+        return validate_request(data)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 def _run_live(request: dict, output: Path | None) -> int:
@@ -55,7 +62,7 @@ def _run_live(request: dict, output: Path | None) -> int:
     client = CalleClient(api_key=api_key)
     task = build_task(request)
     schema = load_result_schema()
-    idempotency = f"metapelet-{request['workflow_id']}"
+    idempotency = idempotency_key(request, task, schema)
 
     print("Placing one CALL-E call (live)...", flush=True)
     call = client.calls.create_and_wait(
@@ -68,6 +75,7 @@ def _run_live(request: dict, output: Path | None) -> int:
 
     redacted = {
         "workflow_id": request["workflow_id"],
+        "idempotency_key": idempotency,
         "status": call.get("status") if isinstance(call, dict) else getattr(call, "status", None),
         "task_completed": call.get("task_completed")
         if isinstance(call, dict)

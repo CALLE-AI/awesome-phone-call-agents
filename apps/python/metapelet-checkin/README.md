@@ -29,7 +29,7 @@ python client.py --request example_request.json
 ## Live call (one recipient, opt-in)
 
 1. Copy `example_request.json` to a **local** file (e.g. `my-live-request.json`), not committed.
-2. Set a real **E.164** number you are authorized to call and `recipient_consented: true`.
+2. Set a real **E.164** number you are authorized to call, explicit **region** and **locale**, and `recipient_consented: true`.
 3. Run:
 
 ```bash
@@ -39,7 +39,7 @@ python client.py --request my-live-request.json --execute --confirm-recipient-op
 ## Side effects
 
 - `--execute` places a **real call** and uses CALL-E credits.
-- Idempotency key: `metapelet-<workflow_id>` — reuse the same `workflow_id` to avoid duplicate calls on retry.
+- Idempotency key: `metapelet-<workflow_id>-<digest>` — derived from workflow id, E.164 phone, region, locale, task text, and result schema. Reuse the **same request file** on retry; changing phone or task-shaping fields creates a new key.
 
 ## Safety
 

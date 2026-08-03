@@ -1,9 +1,11 @@
 {
   "workflow_id": "demo-checkin-001",
   "phone": "+15550100000",
+  "region": "US",
+  "locale": "en-US",
   "recipient_consented": true,
   "user_name": "Demo",
-  "language": "ru",
+  "language": "en",
   "age": null,
   "max_minutes": 5,
   "include_demo_profile": true
