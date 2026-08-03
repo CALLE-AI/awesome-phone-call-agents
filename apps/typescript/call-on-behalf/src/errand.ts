@@ -24,7 +24,7 @@
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
 import { CalleCallError, CalleWaitTimeout, isTerminalCallStatus, type CallePort } from "./calle.js";
-import { agreementEvidence, codeNamedAround, mentionsDatetime, readTranscript, supportingTurn } from "./read.js";
+import { agreementEvidence, codeNamedAround, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "./read.js";
 import {
   buildCallInput,
   buildTask,
@@ -109,8 +109,8 @@ function nextStep(
   request: ErrandRequest,
   offered: string,
   stillOpen = false,
-  /** Which claim the transcript failed to support, when commitment is unconfirmed. */
-  unsupported: "agreement" | "refusal" = "agreement",
+  /** Why the commitment is unconfirmed, so the instruction says the right thing. */
+  reason: "agreement" | "refusal" | "conflict" = "agreement",
 ): string {
   if (outcome === "outcome_unknown") {
     return stillOpen ? UNFINISHED_NEXT_STEP : UNREAD_NEXT_STEP;
@@ -128,11 +128,17 @@ function nextStep(
     return "The call did not connect to a person. Nothing was said on your behalf and nothing was arranged.";
   }
   if (commitment === "unconfirmed") {
-    if (unsupported === "refusal") {
+    if (reason === "conflict") {
+      // Both claims have a turn behind them. Picking either one means telling
+      // somebody their errand went a way the same call contradicts, so this says
+      // what the call holds and hands it to a person.
+      return "This call holds both somebody agreeing to it and somebody refusing it, so nothing here can tell you which one stands. Read the transcript below and call to check before you rely on either.";
+    }
+    if (reason === "refusal") {
       // A claimed refusal nobody voiced. The report will not tell somebody their
       // errand was turned down on the extraction's word alone, so it says the
       // outcome is unknown rather than picking a side.
-      return "CALL-E reported that they would not arrange it and the transcript does not show anybody refusing, so nothing is settled either way. Read the transcript below, then call to check.";
+      return "CALL-E reported that they would not arrange it and no turn in the transcript refuses it, so nothing is settled either way. Read the transcript below, then call to check.";
     }
     return "Something was reported as agreed and the transcript does not show anybody agreeing to it, so treat nothing as booked. Read the transcript below, then call to check if you need it.";
   }
@@ -332,13 +338,25 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   let commitment: CommitmentState = "none_sought";
   let agreedQuote = "";
   let agreedIndex = -1;
+  /** The turn that refuses the arrangement, when one does, for the note. */
+  let refusedQuote = "";
   /** Why the report will not stand behind a claimed agreement, for the note. */
   let unconfirmedNote = "";
-  /** Which claim went unsupported, so the next step can say the right thing. */
-  let unsupportedClaim: "agreement" | "refusal" = "agreement";
+  /** Why the commitment is unconfirmed, so the next step can say the right thing. */
+  let unconfirmedReason: "agreement" | "refusal" | "conflict" = "agreement";
   if (request.goal.commitment !== "none") {
-    if (madeRaw === "accepted") {
-      const agreement = agreementEvidence(turns, request.goal.commitment, offered);
+    const agreement = agreementEvidence(turns, request.goal.commitment, offered);
+    // Held to the same standard and anchored the same way: a turn that refuses one
+    // of the questions is not a turn that refuses the arrangement.
+    const refusal = refusalEvidence(turns, offered, request.questions);
+    if (madeRaw.length > 0 && agreement.quote.length > 0 && refusal.quote.length > 0) {
+      // Both claims have a turn behind them, so the transcript does not decide this
+      // and neither does this app. Reporting either side means stating an outcome
+      // the same call contradicts.
+      commitment = "unconfirmed";
+      unconfirmedReason = "conflict";
+      unconfirmedNote = `This call holds an agreement and a refusal for the same arrangement, so this report stands behind neither. They said: "${agreement.quote}" and also: "${refusal.quote}"`;
+    } else if (madeRaw === "accepted") {
       if (agreement.quote.length === 0) {
         // An agreement about a time nobody said is not an agreement this app can
         // report, so it does not become committed and it does not become an
@@ -367,17 +385,21 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
       commitment = "proposal_only";
     } else if (madeRaw === "declined_by_callee") {
       // A refusal is a claim about the errand's outcome, so it is held to the
-      // same standard as an agreement: somebody has to have said it. Without a
-      // turn behind it the report will not state as fact that they would not
-      // arrange it, because the next step is an instruction and an instruction
-      // built on the extraction alone is the thing this app exists to avoid.
-      if (reading.refusalQuote.length > 0 || reading.declinedAutomated) {
+      // same standard as an agreement: somebody has to have said it, about the
+      // thing the errand asked for. Without such a turn the report will not state
+      // as fact that they would not arrange it, because the next step is an
+      // instruction and an instruction built on the extraction alone is the thing
+      // this app exists to avoid.
+      if (refusal.quote.length > 0 || reading.declinedAutomated) {
         commitment = "declined_by_callee";
+        refusedQuote = refusal.quote;
       } else {
         commitment = "unconfirmed";
-        unsupportedClaim = "refusal";
+        unconfirmedReason = "refusal";
         unconfirmedNote =
-          "CALL-E reported that they would not arrange it and no turn in the transcript refuses anything, so this report does not treat the errand as turned down.";
+          refusal.otherQuote.length > 0
+            ? `CALL-E reported that they would not arrange it and no turn refuses the arrangement the call asked for. What they did turn down was something else: "${refusal.otherQuote}"`
+            : "CALL-E reported that they would not arrange it and no turn in the transcript refuses anything, so this report does not treat the errand as turned down.";
       }
     }
   }
@@ -455,9 +477,9 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
         : "CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.",
     );
   }
-  if (commitment === "declined_by_callee" && !reading.declinedAutomated) {
+  if (commitment === "declined_by_callee" && refusedQuote.length > 0) {
     notes.push(
-      `CALL-E reported that they would not arrange it and the transcript agrees. They said: "${reading.refusalQuote}"`,
+      `CALL-E reported that they would not arrange it and a turn in the transcript refuses it. They said: "${refusedQuote}"`,
     );
   }
   if (reading.declineQuote.length > 0) {
@@ -486,7 +508,7 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
       request,
       commitment === "proposal_only" && !offeredSaid ? "" : offeredSpoken,
       false,
-      unsupportedClaim,
+      unconfirmedReason,
     ),
     call_id: call.id,
     provider_call_id: attempt?.providerCallId ?? null,

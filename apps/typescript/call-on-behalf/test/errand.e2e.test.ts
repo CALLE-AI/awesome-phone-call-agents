@@ -553,8 +553,8 @@ test("a refusal CALL-E reported does not make the errand done", async () => {
 });
 
 test("a refusal the callee actually voiced is reported as a refusal", async () => {
-  // The other side of the same coin. When a turn plainly refuses, the report
-  // stands behind it, names the quote and stops calling the errand done.
+  // The other side of the same coin. When a turn plainly refuses the arrangement,
+  // the report stands behind it, names the quote and stops calling the errand done.
   await withFake(
     [
       {
@@ -579,8 +579,88 @@ test("a refusal the callee actually voiced is reported as a refusal", async () =
       const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
       assert.equal(report.commitment, "declined_by_callee");
       assert.match(report.next_step, /would not arrange it/);
-      assert.match(report.callee_notes, /the transcript agrees/);
+      assert.match(report.callee_notes, /a turn in the transcript refuses it/);
       assert.match(report.callee_notes, /cannot book that over the phone/);
+    },
+  );
+});
+
+test("a refusal of one of the questions is not a refusal of the errand", async () => {
+  // The arrangement was accepted on this call and what the callee turned down was
+  // the insurance question. CALL-E still reported declined_by_callee, so the only
+  // thing that could stand behind that claim is a turn refusing the arrangement,
+  // and there is not one. Reading the insurance refusal as corroboration would tell
+  // somebody their appointment was turned down in a call where it was held.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: BOT_LINES,
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "Earliest is Thursday the thirteenth at nine forty in the morning. I can hold that slot, reference four four seven one.",
+          "No, we do not take Blue Shield PPO.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: {
+          ...goodResult(),
+          answer_accepts_plan: "no",
+          commitment_made: "declined_by_callee",
+        },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.equal(report.committed_datetime, null);
+      assert.match(report.next_step, /nothing is settled either way/);
+      assert.equal(report.next_step.includes("would not arrange it on this call"), false);
+      assert.match(report.callee_notes, /no turn refuses the arrangement/);
+      assert.match(report.callee_notes, /we do not take Blue Shield PPO/);
+      // The question they did turn down is still answered, out of that same turn.
+      assert.equal(report.answers[1]!.answered, true);
+      assert.equal(report.answers[1]!.answer, "no");
+    },
+  );
+});
+
+test("an agreement and a refusal in the same call settle nothing", async () => {
+  // Both claims have a turn behind them, so the transcript contradicts itself and
+  // this app does not pick a side. Reporting the agreement would book something the
+  // callee took back, reporting the refusal would drop a slot they may be holding.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: [
+          BOT_LINES[0]!,
+          BOT_LINES[1]!,
+          BOT_LINES[2]!,
+          "Can you hold that slot on Thursday at nine forty?",
+          BOT_LINES[4]!,
+        ],
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look. Can I take the date of birth?",
+          "Earliest is Thursday the thirteenth at nine forty in the morning. I can hold that slot, reference four four seven one.",
+          "Sorry, I am not able to hold that after all.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: goodResult(),
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.equal(report.committed_datetime, null);
+      // A reference number belongs to an agreement that stands. This one does not.
+      assert.equal(report.confirmation_code, "");
+      assert.match(report.next_step, /both somebody agreeing to it and somebody refusing it/);
+      assert.match(report.next_step, /call to check/);
+      assert.match(report.callee_notes, /an agreement and a refusal for the same arrangement/);
+      assert.match(report.callee_notes, /I can hold that slot/);
+      assert.match(report.callee_notes, /not able to hold that after all/);
     },
   );
 });

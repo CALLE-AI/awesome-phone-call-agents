@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agreementEvidence, mentionsCode, mentionsDatetime, readTranscript, supportingTurn } from "../src/read.js";
+import { agreementEvidence, mentionsCode, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "../src/read.js";
 import type { ErrandQuestion, TranscriptTurn } from "../src/types.js";
 
 const EARLIEST: ErrandQuestion = {
@@ -159,4 +159,39 @@ test("reading the transcript still finds the machine and the refusal", () => {
   const refused = readTranscript(turns([["user", "We do not deal with automated callers."]]));
   assert.equal(refused.declinedAutomated, true);
   assert.equal(refused.declineQuote, "We do not deal with automated callers.");
+});
+
+test("a refusal has to be answering the arrangement", () => {
+  const call = turns([
+    ["bot", "What is the earliest appointment you have for a routine check-up?"],
+    ["user", "Earliest is Thursday the thirteenth at nine forty. I can hold that slot."],
+    ["bot", "Do you take Blue Shield PPO?"],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // The only refusal in this call answers the insurance question, so it says nothing
+  // about the booking, which the turn before it held.
+  const evidence = refusalEvidence(call, "2026-08-13T09:40:00-07:00", [EARLIEST, PLAN]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+});
+
+test("a refusal after the caller raised the arrangement is a refusal of it", () => {
+  const call = turns([
+    ["bot", "What is the earliest appointment you have for a routine check-up?"],
+    ["bot", "Her date of birth is 12 April 1990."],
+    ["user", "I am afraid we cannot book that over the phone for somebody else."],
+  ]);
+  // The date of birth is a statement and not a new question, so the refusal is still
+  // answering the appointment the caller asked about.
+  assert.match(refusalEvidence(call, "", [EARLIEST, PLAN]).quote, /^I am afraid we cannot book/);
+});
+
+test("a refusal in a call that never raised an arrangement refuses no arrangement", () => {
+  const call = turns([
+    ["bot", "Do you take Blue Shield PPO?"],
+    ["user", "No, we do not take that plan."],
+  ]);
+  const evidence = refusalEvidence(call, "", [PLAN]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /do not take that plan/);
 });

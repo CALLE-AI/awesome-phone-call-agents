@@ -5,7 +5,12 @@
  * contract is for. This module reads the things a structured result must never be
  * the only source of: whether a person was actually there, whether that person
  * told the caller to go away, whether anything the callee said supports a claimed
- * answer and whether anybody agreed to anything.
+ * answer and whether anybody agreed to or refused the arrangement.
+ *
+ * Every one of those is anchored to what the caller had just put to the callee. A
+ * sentence is evidence for the thing it was answering and for nothing else, which is
+ * what stops a yes to one question standing in for an agreement and a no to another
+ * standing in for a refusal of the errand.
  *
  * A business declining to deal with an automated caller is a legitimate answer,
  * not an error to retry around. It is detected, reported and obeyed.
@@ -43,6 +48,10 @@ const DECLINE_AUTOMATED_PATTERNS: RegExp[] = [
  * thing, so an extraction that reports a refusal nobody voiced comes back
  * unsupported. Missing a real refusal costs a softer report, inventing one costs
  * the person a fact about their own errand.
+ *
+ * Matching one of these is not enough on its own. The same words refuse a question
+ * ("we do not take that plan") as easily as they refuse the arrangement, so
+ * `refusalEvidence` decides what a matching turn was actually answering.
  */
 const REFUSAL_PATTERNS: RegExp[] = [
   /\b(?:we|i)\s*(?:'?re| are| am)?\s*(?:not able|unable)\s+to\b/i,
@@ -64,11 +73,6 @@ export interface TranscriptReading {
   botText: string;
   /** The turn where the callee declined, for the report. */
   declineQuote: string;
-  /**
-   * The turn where the callee refused the errand itself, empty when no turn
-   * says so. A claimed refusal with nothing here is the extraction's alone.
-   */
-  refusalQuote: string;
 }
 
 export function readTranscript(turns: TranscriptTurn[]): TranscriptReading {
@@ -83,9 +87,6 @@ export function readTranscript(turns: TranscriptTurn[]): TranscriptReading {
   const declineTurn = userTurns.find((turn) =>
     DECLINE_AUTOMATED_PATTERNS.some((pattern) => pattern.test(turn.text)),
   );
-  const refusalTurn = userTurns.find((turn) =>
-    REFUSAL_PATTERNS.some((pattern) => pattern.test(turn.text)),
-  );
   return {
     userTurnCount: userTurns.length,
     machineAnswered,
@@ -93,7 +94,6 @@ export function readTranscript(turns: TranscriptTurn[]): TranscriptReading {
     reachedPerson: userTurns.length > 0 && !machineAnswered,
     botText,
     declineQuote: declineTurn?.text ?? "",
-    refusalQuote: refusalTurn?.text ?? "",
   };
 }
 
@@ -148,12 +148,15 @@ function polarity(text: string): "yes" | "no" | null {
   return yesAt < noAt ? "yes" : "no";
 }
 
+/** How much of a question a caller turn has to carry before it counts as asked. */
+const QUESTION_ASKED = 0.7;
+
 /** The last turn where the caller asked this question. -1 when it never did. */
 function askedAt(question: string, turns: TranscriptTurn[]): number {
   const wanted = tokens(question);
   let found = -1;
   for (const [index, turn] of turns.entries()) {
-    if (turn.speaker === "bot" && support(wanted, turn.text) >= 0.7) {
+    if (turn.speaker === "bot" && support(wanted, turn.text) >= QUESTION_ASKED) {
       found = index;
     }
   }
@@ -465,6 +468,96 @@ function commitmentPromptAt(turns: TranscriptTurn[], offered: string): number {
     }
   }
   return -1;
+}
+
+/** What the caller last put to the callee, which is what their next turn answers. */
+type LastAsk = "commitment" | "question" | null;
+
+/**
+ * What the caller had last put to the callee before this turn.
+ *
+ * A turn answers the most recent thing asked of it, so this is what decides which
+ * claim a callee turn is evidence for. Statements are skipped: the caller reading
+ * out a date of birth does not change the subject, so a callee who refuses after
+ * that is still refusing whatever was last asked.
+ *
+ * A turn that raises the arrangement counts as the arrangement even when it is also
+ * one of the errand's questions, which is the usual case: "what is the earliest
+ * appointment you have" is both.
+ */
+function lastAskBefore(
+  turns: TranscriptTurn[],
+  index: number,
+  offered: string,
+  questions: ErrandQuestion[],
+): LastAsk {
+  for (let at = index - 1; at >= 0; at -= 1) {
+    const turn = turns[at]!;
+    if (turn.speaker !== "bot") {
+      continue;
+    }
+    if (COMMITMENT_PROMPT.test(turn.text) || mentionsDatetime(turn.text, offered)) {
+      return "commitment";
+    }
+    if (questions.some((question) => support(tokens(question.text), turn.text) >= QUESTION_ASKED)) {
+      return "question";
+    }
+  }
+  return null;
+}
+
+export interface RefusalEvidence {
+  /** The callee turn that refuses the arrangement. Empty when no turn does. */
+  quote: string;
+  index: number;
+  /**
+   * A refusal the callee voiced about something else, most often an answer to one of
+   * the questions. It is not evidence about the arrangement and it goes in the report
+   * so a person is not told nothing was said when something was.
+   */
+  otherQuote: string;
+}
+
+/**
+ * What the transcript shows about a refusal of the arrangement. An extraction saying
+ * `declined_by_callee` is not a refusal on its own.
+ *
+ * Anchored the same way an agreement is, because it is the same size of claim about
+ * the errand. Refusal words prove nothing by themselves: "no, we do not take that
+ * plan" is a refusal of a question and it says nothing about the booking, which may
+ * have been accepted in the same call. So the turn has to be answering the
+ * arrangement rather than a question. The caller also has to have raised an
+ * arrangement at all.
+ *
+ * A refusal aimed at something else still comes back as `otherQuote`, so the report
+ * can quote what was actually turned down.
+ */
+export function refusalEvidence(
+  turns: TranscriptTurn[],
+  offered = "",
+  questions: ErrandQuestion[] = [],
+): RefusalEvidence {
+  let otherQuote = "";
+  if (commitmentPromptAt(turns, offered) === -1) {
+    // The caller never raised an arrangement, so nothing here can be a refusal of one.
+    const loose = turns.find(
+      (turn) => turn.speaker === "user" && REFUSAL_PATTERNS.some((pattern) => pattern.test(turn.text)),
+    );
+    return { quote: "", index: -1, otherQuote: loose?.text ?? "" };
+  }
+  for (const [index, turn] of turns.entries()) {
+    if (turn.speaker !== "user" || !REFUSAL_PATTERNS.some((pattern) => pattern.test(turn.text))) {
+      continue;
+    }
+    if (lastAskBefore(turns, index, offered, questions) !== "commitment") {
+      if (otherQuote.length === 0) {
+        otherQuote = turn.text;
+      }
+      continue;
+    }
+    return { quote: turn.text, index, otherQuote: "" };
+  }
+  return { quote: "", index: -1, otherQuote };
 }
 
 /** How far either side of the agreement the time may have been said. */

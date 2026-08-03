@@ -93,13 +93,30 @@ next step says "another time" rather than a time nobody said. An agreement with 
 time at all cannot be checked against the windows, so it reads `unconfirmed` too.
 CALL-E's own note is printed with its name on it, because nothing here checked that
 sentence. A reported refusal is held to the same standard as a reported agreement:
-`declined_by_callee` needs a turn that plainly refuses the errand, or the business
+`declined_by_callee` needs either a turn that refuses the arrangement or the business
 refusing to deal with an automated caller at all. Without one the commitment reads
 `unconfirmed` and the next step says nothing is settled either way, because telling
 somebody their errand was turned down is a claim about their errand and not a
 formatting choice. With one, the note quotes the turn. Either way a refusal does not
 settle the errand: a booking that was refused is not a goal met, so the outcome is
 `partially_met` at best.
+
+A refusal is anchored the same way an agreement is, because refusal words prove
+nothing on their own. "No, we do not take that plan" refuses a question and says
+nothing about the booking, which may have been held in the same call. So the turn has
+to be answering the arrangement: what the caller last put to the callee before it has
+to be the arrangement rather than one of the questions. Statements do not change the
+subject, so a caller reading out a date of birth between the two leaves the refusal
+answering the appointment it followed. A refusal aimed somewhere else is quoted in the
+report as what was actually turned down, so `unconfirmed` never reads as nothing
+having been said.
+
+When both claims have a turn behind them, one agreeing and one refusing the same
+arrangement, the report stands behind neither. The commitment reads `unconfirmed`,
+the note quotes both turns and the next step says a person has to read the transcript
+and call, because reporting the agreement would book something the callee took back
+and reporting the refusal would drop a slot they may be holding. A confirmation code
+belongs to an agreement that stands, so it is dropped there too.
 
 The refusal patterns are narrow on purpose. Missing a real refusal costs a softer
 report that says the outcome is unknown. Inventing one costs the person a fact about
