@@ -138,6 +138,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/freshchain-resolver`](apps/python/freshchain-resolver/) | Python | Resolve delayed cold-chain receiving exceptions by phone and return a safe dispatch decision. |
 | [`apps/python/callback-window-coordinator`](apps/python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/python/batch-runner`](apps/python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
+| [`apps/python/fs-sponsor-outreach`](apps/python/fs-sponsor-outreach/) | Python | Packages a CSV of sponsor leads into per-contact outbound calls via the CALL-E CLI, executing each call and returning structured interest-level and follow-up data, with dry-run preview and phone-number masking for safe operation. |
 | [`apps/python/broker-login-client`](apps/python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`apps/typescript/broker-login-client-standalone`](apps/typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
