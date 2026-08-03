@@ -85,6 +85,34 @@ def _hash_phone(phone: str) -> str:
     return hashlib.sha256(phone.encode()).hexdigest()
 
 
+# Contacts read numbers, emails and card digits aloud, and CALL-E returns them
+# inside free-text summaries. Those strings are written to disk, so they are
+# redacted first.
+_PHONE_IN_TEXT = re.compile(r"\+?\d[\d\s\-().]{7,}\d")
+_EMAIL_IN_TEXT = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+_LONG_DIGITS = re.compile(r"\b\d{6,}\b")
+
+
+def redact(text: Any) -> Any:
+    """Strip contact details from free text before it is stored.
+
+    A summary is model-generated prose, so it can contain anything the contact
+    said — "call me on 555 0100", an email, a card number. Masking the `phone`
+    column but writing the summary verbatim would leak the same data one column
+    over.
+    """
+    if not isinstance(text, str):
+        return text
+    out = _EMAIL_IN_TEXT.sub("[email redacted]", text)
+    out = _PHONE_IN_TEXT.sub("[number redacted]", out)
+    return _LONG_DIGITS.sub("[digits redacted]", out)
+
+
+def redact_result(extracted: dict[str, Any]) -> dict[str, Any]:
+    """Redact every free-text value in an extraction result."""
+    return {k: redact(v) for k, v in extracted.items()}
+
+
 def load_suppressions(path: str) -> set[str]:
     """Hashed numbers that must never be dialed again."""
     p = Path(path)
@@ -116,18 +144,68 @@ def record_suppression(path: str, phone: str, campaign_id: str) -> None:
         fh.write(f"{_hash_phone(phone)},{campaign_id}\n")
 
 
-def idempotency_key(campaign_id: str, phone: str, batch_id: str) -> str:
-    """Stable key for one contact in one batch.
+def record_dispatch(path: str, key: str, campaign_id: str, note: str) -> None:
+    """Write a dispatch record *before* the API call is made.
 
-    Two runs of the same batch produce the same key, so CALL-E returns the
-    existing call rather than placing a second one. Change `--batch-id` to
-    deliberately call the same people again.
+    If the process dies between CALL-E accepting a call and us reading the
+    result, that call still happened — the person's phone rang. Recording the
+    intent first means the next run can see it, count it, and not re-dial.
+
+    Only the idempotency key is stored, which is already a hash, so the ledger
+    holds no phone numbers.
+    """
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if not p.exists():
+        p.write_text(
+            "# Dispatch ledger: calls this runner has requested.\n"
+            "# key,campaign,note\n",
+            encoding="utf-8",
+        )
+    with p.open("a", encoding="utf-8") as fh:
+        fh.write(f"{key},{campaign_id},{note}\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def load_dispatches(path: str) -> set[str]:
+    """Idempotency keys already dispatched in an earlier run."""
+    p = Path(path)
+    if not p.exists():
+        return set()
+    out: set[str] = set()
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            out.add(line.split(",")[0].strip())
+    return out
+
+
+def idempotency_key(
+    campaign_id: str,
+    phone: str,
+    batch_id: str,
+    *,
+    task: str = "",
+    schema: dict[str, Any] | None = None,
+) -> str:
+    """Stable key bound to the exact call being requested.
+
+    Two identical requests produce the same key, so CALL-E returns the existing
+    call rather than placing a second one. Change `--batch-id` to deliberately
+    call the same people again.
+
+    The rendered task and result schema are part of the key: editing a goal
+    changes what the contact hears, so it must not silently reuse a call placed
+    under the old wording. Keying on the ID alone would return a stale result
+    for a conversation that never happened.
 
     The number is hashed, not embedded, so it never appears in logs or in an
     error echoed back by the API.
     """
-    digest = hashlib.sha256(f"{campaign_id}|{phone}|{batch_id}".encode()).hexdigest()
-    return f"{campaign_id}-{digest[:24]}"
+    canonical_schema = json.dumps(schema or {}, sort_keys=True, separators=(",", ":"))
+    payload = "|".join([campaign_id, phone, batch_id, task, canonical_schema])
+    return f"{campaign_id}-{hashlib.sha256(payload.encode()).hexdigest()[:24]}"
 
 
 @dataclass(frozen=True)
@@ -183,6 +261,13 @@ BASE_PROPERTIES: dict[str, Any] = {
     "do_not_call": {
         "type": "boolean",
         "description": "True if the contact asked never to be contacted again.",
+    },
+    "callback_agreed": {
+        "type": "boolean",
+        "description": (
+            "True only if the contact explicitly agreed to being called back. "
+            "False if they did not say, or said no."
+        ),
     },
     "summary": {
         "type": "string",
@@ -267,10 +352,44 @@ CAMPAIGNS: dict[str, Campaign] = {
 # --------------------------------------------------------------- triage --
 
 
-REQUIRED_FIELDS = ("outcome", "sentiment", "frustration_signals", "summary")
+# Every field that must be present AND correctly typed before a completed
+# call may auto-close. The consent booleans are here deliberately: an absent
+# `do_not_call` is unknown, not permission.
+REQUIRED_FIELDS: dict[str, type | tuple[type, ...]] = {
+    "outcome": str,
+    "sentiment": str,
+    "summary": str,
+    "frustration_signals": bool,
+    "wants_human_callback": bool,
+    "do_not_call": bool,
+}
+
+VALID_SENTIMENTS = {"positive", "neutral", "negative"}
 
 # Below this, CALL-E's own judgement of the call is not worth acting on.
 MIN_CONFIDENCE = 0.6
+
+
+def validate_result(extracted: dict[str, Any]) -> list[str]:
+    """Reasons this result cannot be trusted. Empty means it is safe to act on.
+
+    Checks presence *and* type. A malformed value is worse than a missing one:
+    `{"do_not_call": "no"}` is truthy in Python and would be read as an
+    opt-out, while `{"do_not_call": "yes"}` read loosely could be missed.
+    """
+    problems: list[str] = []
+
+    for name, expected in REQUIRED_FIELDS.items():
+        if name not in extracted:
+            problems.append(f"missing {name}")
+        elif not isinstance(extracted[name], expected):
+            problems.append(f"{name} is not {getattr(expected, '__name__', expected)}")
+
+    sentiment = extracted.get("sentiment")
+    if isinstance(sentiment, str) and sentiment.lower() not in VALID_SENTIMENTS:
+        problems.append(f"sentiment '{sentiment}' is not a recognised value")
+
+    return problems
 
 
 def triage(
@@ -282,31 +401,38 @@ def triage(
 ) -> tuple[str, str]:
     """Decide what happens to a resolved call.
 
-    Order matters: unusable results first, then hard opt-outs, then explicit
-    human requests, then frustration, then reachability. Anything that cannot
-    be trusted goes to a human rather than being closed.
+    Fails closed: anything absent, malformed, unconfirmed, or low-confidence
+    routes to a human. A call auto-closes only when every trust signal is
+    present and positive.
     """
     status = (status or "").lower()
 
-    # A missing opt-out field is not a "no" — the schema simply did not come
-    # back. Closing on incomplete data would silently drop a do-not-call.
-    missing = [f for f in REQUIRED_FIELDS if f not in extracted]
-    if status == "completed" and missing:
-        return (
-            "needs_human",
-            f"Result incomplete (missing {', '.join(missing)}) — review manually.",
-        )
+    if status == "completed":
+        # A result we cannot verify is a result we cannot act on.
+        problems = validate_result(extracted)
+        if problems:
+            return (
+                "needs_human",
+                f"Result not trustworthy ({'; '.join(problems)}) — review manually.",
+            )
 
-    # CALL-E reports whether it actually achieved the goal. Ignoring that and
-    # auto-closing would mark a failed conversation as done.
-    if status == "completed" and task_completed is False:
-        return "needs_human", "CALL-E reports the call goal was not completed."
+        # `None` means CALL-E did not say whether the goal was met. Absence is
+        # not success, so it is treated exactly like an explicit failure.
+        if task_completed is not True:
+            reason = (
+                "CALL-E reports the call goal was not completed."
+                if task_completed is False
+                else "CALL-E did not confirm the call goal was completed."
+            )
+            return "needs_human", reason
 
-    if status == "completed" and confidence is not None and confidence < MIN_CONFIDENCE:
-        return (
-            "needs_human",
-            f"Low confidence in the result ({confidence:.2f}) — review manually.",
-        )
+        if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+            return "needs_human", "No usable confidence score — review manually."
+        if confidence < MIN_CONFIDENCE:
+            return (
+                "needs_human",
+                f"Low confidence in the result ({confidence:.2f}) — review manually.",
+            )
 
     if extracted.get("do_not_call"):
         return "needs_human", "Contact requested do-not-call — suppress and log."
@@ -315,11 +441,19 @@ def triage(
     if extracted.get("frustration_signals"):
         return "needs_human", "Frustration detected during the call."
 
-    # A negative tone without frustration usually means "bad time", not "bad
-    # mood" — that deserves another attempt, not a human's attention.
+    # A negative tone usually means "bad time", not "bad mood" — but calling
+    # someone back is a decision only they can authorise. Without an explicit
+    # callback agreement, a person decides whether to try again.
     if str(extracted.get("sentiment", "")).lower() == "negative":
-        return "retry", "Call went poorly but no frustration — worth one polite retry."
+        if extracted.get("callback_agreed") is True:
+            return "retry", "Bad time, and the contact agreed to a callback."
+        return (
+            "needs_human",
+            "Call went poorly and no callback was agreed — a person should decide.",
+        )
 
+    # Nobody answered, so there was no conversation and nothing to consent to.
+    # Redialling an unanswered number is normal practice.
     if status in RETRYABLE:
         return "retry", f"Unreachable ({status}) — eligible for one retry."
     if status in {"failed", "canceled"}:
@@ -409,6 +543,12 @@ def run(args: argparse.Namespace) -> int:
     if suppressed:
         print(f"\n  {len(suppressed)} number(s) suppressed from earlier opt-outs")
 
+    # Calls a previous run asked CALL-E to place. They may have connected even
+    # if the result was never recorded, so they are not re-dialled.
+    dispatched = load_dispatches(args.dispatch_file)
+    if dispatched:
+        print(f"  {len(dispatched)} call(s) already dispatched in earlier runs")
+
     if live and not allowlist and not args.i_know_what_im_doing:
         print(
             "Refusing to run live without --allow. Pass a comma-separated list of\n"
@@ -459,7 +599,37 @@ def run(args: argparse.Namespace) -> int:
             )
             continue
 
+        # Bound to the exact task and schema, so editing a goal does not
+        # silently reuse a call placed under the old wording.
+        key = idempotency_key(
+            campaign.id,
+            contact["phone"],
+            args.batch_id,
+            task=goal,
+            schema=campaign.schema,
+        )
+
+        # A key in the ledger means an earlier run already asked CALL-E to
+        # place this call. It may have connected even if we never saw the
+        # result, so it counts against the ceiling and is not re-dialled.
+        if key in dispatched:
+            made += 1
+            print(f"  SKIPPED   {label} already dispatched in an earlier run")
+            results.append(
+                {"contact": contact["name"], "phone": mask(contact["phone"]),
+                 "status": "ALREADY_DISPATCHED", "disposition": "needs_human",
+                 "reason": "Dispatched previously with no recorded result — reconcile manually.",
+                 "idempotency_key": key}
+            )
+            continue
+
         print(f"  DIALING   {label}", flush=True)
+
+        # Written before the request. If the process dies mid-call the phone
+        # still rang, and the next run must know that.
+        record_dispatch(args.dispatch_file, key, campaign.id, "requested")
+        made += 1
+
         try:
             assert client is not None
             created = client.calls.create(
@@ -473,13 +643,8 @@ def run(args: argparse.Namespace) -> int:
                 },
                 result_schema=campaign.schema,
                 metadata={"call-e/customerMetadata": {"campaign": campaign.id}},
-                # Derived from campaign + number + batch, never random: rerun
-                # the same batch and CALL-E returns the original call instead
-                # of dialing again. A random key would make every retry a
-                # fresh call to a real person.
-                idempotency_key=idempotency_key(campaign.id, contact["phone"], args.batch_id),
+                idempotency_key=key,
             )
-            made += 1
             call_id = str(created["id"])
 
             deadline = time.monotonic() + args.timeout
@@ -512,15 +677,18 @@ def run(args: argparse.Namespace) -> int:
 
             # An opt-out must outlive this process, or the next run calls them
             # again. Recorded before anything else can fail.
-            if extracted.get("do_not_call"):
+            if extracted.get("do_not_call") is True:
                 record_suppression(args.suppression_file, contact["phone"], campaign.id)
                 print(f"            → added to {args.suppression_file}")
 
+            # Summaries are model-generated prose and can quote a number or
+            # email the contact read out. Redact before writing to disk.
             results.append(
                 {"contact": contact["name"], "phone": mask(contact["phone"]),
                  "status": status, "disposition": disposition, "reason": reason,
                  "task_completed": task_completed, "confidence": confidence,
-                 "extracted": extracted, "call_id": call_id}
+                 "extracted": redact_result(extracted), "call_id": call_id,
+                 "idempotency_key": key}
             )
 
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
@@ -584,6 +752,11 @@ def main() -> int:
         "--suppression-file",
         default="results/do_not_call.txt",
         help="durable opt-out list. Numbers here are never dialed again",
+    )
+    p.add_argument(
+        "--dispatch-file",
+        default="results/dispatched.txt",
+        help="ledger of calls already requested. Prevents re-dialing after a crash",
     )
     p.add_argument("--list-campaigns", action="store_true")
 

@@ -8,9 +8,10 @@ failure.
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
-from pathlib import Path  # noqa: F401  (used in the suppression checks)
+from pathlib import Path
 
 from runner import (
     CAMPAIGNS,
@@ -18,13 +19,18 @@ from runner import (
     check_dial,
     idempotency_key,
     is_e164,
+    load_dispatches,
     load_suppressions,
     mask,
     normalise,
     read_contacts,
+    record_dispatch,
     record_suppression,
+    redact,
+    redact_result,
     render_goal,
     triage,
+    validate_result,
 )
 
 FAILURES: list[str] = []
@@ -75,7 +81,7 @@ check(
 )
 check(
     "--country-code respects the value given",
-    normalise("9876543210", "91") == "+919876543210",
+    normalise("1632960100", "44") == "+441632960100",
 )
 
 # ---------------------------------------------------------- dial gate --
@@ -109,14 +115,26 @@ check(
 
 
 def complete(**overrides):
-    """A full extraction result. Partial results are refused by design."""
+    """A fully trusted extraction result.
+
+    Every consent field is present and correctly typed — anything less is
+    refused by design, so tests must be explicit about what CALL-E returned.
+    """
     return {
         "outcome": "interested",
         "sentiment": "neutral",
-        "frustration_signals": False,
         "summary": "Sample summary.",
+        "frustration_signals": False,
+        "wants_human_callback": False,
+        "do_not_call": False,
+        "callback_agreed": False,
         **overrides,
     }
+
+
+def trusted(**kw):
+    """Args for a call CALL-E confirmed it completed with high confidence."""
+    return {"task_completed": True, "confidence": 0.9, **kw}
 
 
 print("\nTriage precedence")
@@ -134,8 +152,21 @@ check(
     triage("completed", complete(frustration_signals=True))[0] == "needs_human",
 )
 check(
-    "negative without frustration retries",
-    triage("completed", complete(sentiment="negative", frustration_signals=False))[0]
+    "negative WITHOUT callback consent escalates",
+    triage(
+        "completed",
+        complete(sentiment="negative", callback_agreed=False),
+        **trusted(),
+    )[0]
+    == "needs_human",
+)
+check(
+    "negative WITH callback consent retries",
+    triage(
+        "completed",
+        complete(sentiment="negative", callback_agreed=True),
+        **trusted(),
+    )[0]
     == "retry",
 )
 check("no answer retries", triage("no_answer", {})[0] == "retry")
@@ -143,32 +174,133 @@ check("busy retries", triage("busy", {})[0] == "retry")
 check("failed is unreachable", triage("failed", {})[0] == "unreachable")
 check(
     "clean call auto-closes",
-    triage("completed", complete(sentiment="positive"))[0] == "auto_closed",
+    triage("completed", complete(sentiment="positive"), **trusted())[0]
+    == "auto_closed",
 )
 
-# --- result trust ------------------------------------------------------
-print("\nResult trust")
+# --- result trust: everything must fail closed -------------------------
+print("\nResult trust (fails closed)")
 check(
     "incomplete result is not auto-closed",
-    triage("completed", {"sentiment": "positive"})[0] == "needs_human",
+    triage("completed", {"sentiment": "positive"}, **trusted())[0] == "needs_human",
 )
 check(
-    "unmet goal escalates even when the call completed",
-    triage("completed", complete(sentiment="positive"), task_completed=False)[0]
+    "unmet goal escalates",
+    triage("completed", complete(), task_completed=False, confidence=0.9)[0]
+    == "needs_human",
+)
+check(
+    "ABSENT task_completed escalates (absence is not success)",
+    triage("completed", complete(), task_completed=None, confidence=0.9)[0]
     == "needs_human",
 )
 check(
     "low confidence escalates",
-    triage("completed", complete(sentiment="positive"), confidence=0.3)[0]
+    triage("completed", complete(), task_completed=True, confidence=0.3)[0]
     == "needs_human",
 )
 check(
-    "met goal with high confidence auto-closes",
-    triage(
-        "completed", complete(sentiment="positive"), task_completed=True, confidence=0.9
-    )[0]
+    "ABSENT confidence escalates",
+    triage("completed", complete(), task_completed=True, confidence=None)[0]
+    == "needs_human",
+)
+check(
+    "malformed confidence escalates",
+    triage("completed", complete(), task_completed=True, confidence="high")[0]  # type: ignore[arg-type]
+    == "needs_human",
+)
+
+# A missing consent field is unknown, never permission.
+for field in ("do_not_call", "wants_human_callback", "frustration_signals"):
+    payload = complete()
+    del payload[field]
+    check(
+        f"missing {field} escalates",
+        triage("completed", payload, **trusted())[0] == "needs_human",
+    )
+
+# A string where a bool belongs is truthy in Python, so "no" would read as yes.
+check(
+    "string in place of a boolean escalates",
+    triage("completed", complete(do_not_call="no"), **trusted())[0] == "needs_human",
+)
+check(
+    "unrecognised sentiment escalates",
+    triage("completed", complete(sentiment="furious"), **trusted())[0] == "needs_human",
+)
+check(
+    "fully trusted result auto-closes",
+    triage("completed", complete(sentiment="positive"), **trusted())[0]
     == "auto_closed",
 )
+
+# Truthy look-alikes must never read as a boolean answer. `"false"` is a
+# non-empty string and therefore truthy in Python — the type check is what
+# stops it being treated as an opt-out.
+for bad in (1, 0, "true", "false", "", None, [], {}):
+    check(
+        f"do_not_call={bad!r} never auto-closes",
+        triage("completed", complete(do_not_call=bad), **trusted())[0] != "auto_closed",
+    )
+
+check(
+    "confidence exactly at the threshold passes",
+    triage("completed", complete(), task_completed=True, confidence=0.6)[0]
+    == "auto_closed",
+)
+check(
+    "confidence just below the threshold escalates",
+    triage("completed", complete(), task_completed=True, confidence=0.59)[0]
+    == "needs_human",
+)
+check(
+    "boolean confidence escalates (True is not a score)",
+    triage("completed", complete(), task_completed=True, confidence=True)[0]
+    == "needs_human",
+)
+check(
+    "an uppercase status is still validated",
+    triage("COMPLETED", {"sentiment": "positive"}, **trusted())[0] == "needs_human",
+)
+check(
+    "an in-flight status never auto-closes on an empty result",
+    all(
+        triage(s, {})[0] != "auto_closed"
+        for s in ("queued", "ringing", "in_progress", "")
+    ),
+)
+check(
+    "every problem is reported, not just the first",
+    len(validate_result({"sentiment": 5})) >= 3,
+)
+
+# --- redaction ---------------------------------------------------------
+print("\nRedaction of stored text")
+for spoken, secret in [
+    ("+1 555-555-0100", "5555550100"),
+    ("555.555.0100", "5550100"),
+    ("(555) 555-0100", "5550100"),
+    ("+44 1632 960100", "1632960100"),
+]:
+    check(
+        f"phone written as {spoken} is redacted",
+        secret not in redact(f"Contact said {spoken}").replace(" ", ""),
+    )
+check(
+    "email in a summary is redacted",
+    "@example.com" not in redact("Email me at someone@example.com"),
+)
+check(
+    "long digit runs are redacted",
+    "4111111111111111" not in redact("My card is 4111111111111111"),
+)
+check("ordinary prose survives", "wants a quote" in redact("The contact wants a quote"))
+check(
+    "result summaries are redacted before storage",
+    "5555550100"
+    not in json.dumps(redact_result(complete(summary="reach me on 5555550100"))),
+)
+check("non-string values pass through", redact_result(complete())["do_not_call"] is False)
 
 # --- idempotency & suppression ----------------------------------------
 print("\nIdempotency and suppression")
@@ -191,6 +323,45 @@ check(
     "the key never contains the raw number",
     "5555550100" not in idempotency_key("travel", "+15555550100", "b1"),
 )
+
+# The key must bind what will actually be said and extracted. Otherwise
+# editing a goal reuses a call placed under the old wording.
+check(
+    "a changed task changes the key",
+    idempotency_key("travel", "+15555550100", "b1", task="Ask about Bali")
+    != idempotency_key("travel", "+15555550100", "b1", task="Ask about Dubai"),
+)
+check(
+    "a changed schema changes the key",
+    idempotency_key("travel", "+15555550100", "b1", schema={"a": 1})
+    != idempotency_key("travel", "+15555550100", "b1", schema={"a": 2}),
+)
+check(
+    "identical task and schema give the same key",
+    idempotency_key("travel", "+15555550100", "b1", task="x", schema={"a": 1})
+    == idempotency_key("travel", "+15555550100", "b1", task="x", schema={"a": 1}),
+)
+check(
+    "schema key order does not matter",
+    idempotency_key("travel", "+15555550100", "b1", schema={"a": 1, "b": 2})
+    == idempotency_key("travel", "+15555550100", "b1", schema={"b": 2, "a": 1}),
+)
+
+with tempfile.TemporaryDirectory() as tmp:
+    ledger = str(Path(tmp) / "dispatched.txt")
+    k = idempotency_key("travel", "+15555550100", "b1", task="x")
+    record_dispatch(ledger, k, "travel", "requested")
+
+    check("dispatch survives a restart", k in load_dispatches(ledger))
+    check(
+        "the ledger stores no raw numbers",
+        "5555550100" not in Path(ledger).read_text(encoding="utf-8"),
+    )
+    check(
+        "an unrelated key is not treated as dispatched",
+        idempotency_key("travel", "+15555550199", "b1", task="x")
+        not in load_dispatches(ledger),
+    )
 
 with tempfile.TemporaryDirectory() as tmp:
     supp = str(Path(tmp) / "dnc.txt")

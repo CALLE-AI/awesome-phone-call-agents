@@ -165,25 +165,34 @@ Results are written as JSONL to `results/campaign_results.jsonl`
 
 ### Triage rules
 
-Applied in order. A result that cannot be trusted goes to a human before any
-other rule is considered — an absent field is not a "no".
+Applied in order, and **fails closed** — an absent or malformed field is
+unknown, never permission.
 
 | Signal | Disposition |
 |---|---|
-| Required field missing from the result | **needs_human** — schema incomplete |
-| `task_completed: false` from CALL-E | **needs_human** — the goal was not met |
-| Confidence below 0.6 | **needs_human** — result not reliable |
+| Required field missing or wrongly typed | **needs_human** — result not trustworthy |
+| `task_completed` not `true` (including absent) | **needs_human** — goal unconfirmed |
+| Confidence absent, malformed, or below 0.6 | **needs_human** — result unreliable |
 | `do_not_call` | **needs_human** — and written to the suppression list |
 | `wants_human_callback` | **needs_human** |
 | `frustration_signals` | **needs_human** |
-| Negative sentiment, no frustration | **retry** — a bad time is not a bad mood |
-| `busy` / `no_answer` / `voicemail` | **retry** |
+| Negative sentiment, no callback agreed | **needs_human** — a person decides |
+| Negative sentiment, `callback_agreed: true` | **retry** — they said yes |
+| `busy` / `no_answer` / `voicemail` | **retry** — nobody answered, nothing consented to |
 | `failed` / `canceled` | **unreachable** |
-| `completed`, goal met, no escalation signals | **auto_closed** |
+| Everything above satisfied | **auto_closed** |
 
-A call only auto-closes when CALL-E confirms the goal was met, reports enough
-confidence, and returns every required field. Anything less is a person's
-decision, not the runner's.
+**Trusted fields.** `outcome`, `sentiment`, `summary`, `frustration_signals`,
+`wants_human_callback`, and `do_not_call` must all be present *and* the right
+type before a call can auto-close. Type matters as much as presence:
+`{"do_not_call": "no"}` is truthy in Python and would otherwise read as an
+opt-out.
+
+**Retry needs consent.** A negative call is not re-dialled on the runner's
+judgement. Unless the contact explicitly agreed to a callback
+(`callback_agreed: true`), a person decides whether to try again. Unanswered
+calls are different — there was no conversation, so there was nothing to
+consent to.
 
 ---
 
@@ -197,16 +206,34 @@ decision, not the runner's.
 | Per-run ceiling | `--max-calls` (default 5) caps one run |
 | E.164 validation | Malformed numbers, and numbers with no country code, rejected before reaching CALL-E |
 | Masking | Numbers are masked in all console output and results |
-| Idempotency | Key derived from campaign + number + batch, so rerunning a batch never re-dials |
+| Idempotency | Key binds campaign, number, batch, rendered task, and schema |
+| Dispatch ledger | Every requested call is recorded before the API call, so a crash cannot cause a re-dial |
 | Suppression | `do_not_call` is written to disk immediately and checked before every future call |
+| Redaction | Numbers, emails, and long digit runs are stripped from stored summaries |
 
 Masking always hides at least half the characters, so a malformed number
 cannot leak most of a real one through an error message.
 
-**Reruns are safe.** The idempotency key is `campaign + number + batch-id`,
-never random, so re-running the same batch returns the original calls instead
-of placing new ones. Pass a different `--batch-id` to deliberately call the
+**Reruns are safe.** The idempotency key hashes `campaign + number + batch-id
++ rendered task + result schema`, never a random value. Re-running the same
+batch returns the original calls instead of placing new ones. Editing a goal
+changes the key, because the contact would hear something different — reusing
+a call placed under the old wording would return a result for a conversation
+that never happened. Pass a different `--batch-id` to deliberately call the
 same people again.
+
+**A crash cannot cause a double call.** Every call is written to
+`--dispatch-file` *before* the request is sent and flushed to disk. If the
+process dies after CALL-E accepts a call but before the result is read, that
+call still happened — the phone rang. The next run sees the key, counts it
+against `--max-calls`, and flags it for reconciliation rather than dialing
+again.
+
+**Stored text is redacted.** Summaries are model-generated prose and can quote
+whatever the contact said aloud — a phone number, an email, card digits.
+Masking the `phone` column while writing the summary verbatim would leak the
+same data one column over, so free-text values are redacted before they are
+written.
 
 **Opt-outs are durable.** When CALL-E reports `do_not_call`, the number is
 appended to `--suppression-file` (default `results/do_not_call.txt`) before
@@ -240,8 +267,9 @@ Verify without spending credits or dialing anyone:
 python test_runner.py
 ```
 
-Covers E.164 validation, masking, the dial gate, triage precedence, CSV
-parsing, and goal rendering. Exits non-zero on failure.
+101 checks covering E.164 validation, masking, the dial gate, trusted-field
+validation, triage precedence, idempotency, dispatch durability, suppression,
+redaction, CSV parsing, and goal rendering. Exits non-zero on failure.
 
 To verify the live path end to end, run with `--live --allow <your-own-number>`
 and answer the phone. One call costs one credit.
@@ -260,6 +288,7 @@ and answer the phone. One call costs one credit.
 | `--country-code` | *(off)* | Opt in to prefixing numbers with no country code |
 | `--batch-id` | `default` | Groups calls for idempotency; change it to re-dial |
 | `--suppression-file` | `results/do_not_call.txt` | Durable opt-out list |
+| `--dispatch-file` | `results/dispatched.txt` | Ledger of requested calls |
 | `--poll-interval` | `5.0` | Seconds between status checks |
 | `--timeout` | `600` | Seconds to wait for a call to finish |
 | `--out` | `results/campaign_results.jsonl` | Results path |
