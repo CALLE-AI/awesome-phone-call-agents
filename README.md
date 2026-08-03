@@ -1,3 +1,4 @@
+
 # Awesome Phone Call Agents
 
 <div align="center">
@@ -104,7 +105,7 @@ Every plugin should document supported triggers or actions, required inputs, sid
 ### README list entry template
 
 ```markdown
-- [Project Name](https://example.com) - One sentence explaining why this is useful for AI-agent phone-call workflows.
+# Awesome Phone Call AgentsModular AI-agent phone-call workflows built on CALL-E.## 📞 Plugins- [call-reminder](skills/call-reminder)    Automates recurring phone‑call reminders for AI‑agent workflows.- [call-logger](skills/call-logger)    Logs and timestamps AI‑agent phone‑call events for audit and analytics.- [call-cancel](skills/call-cancel)    Safely cancels or rolls back scheduled calls to prevent duplicates or unintended actions.- [fs-sponsor-outreach](skills/fs-sponsor-outreach)    Batch outbound caller for Formula Student racing teams, built on CALL‑E CLI.
 ```
 
 Keep descriptions short, specific, factual, and directly tied to packaging, scheduling, executing, or safely operating AI-agent phone-call tasks.
