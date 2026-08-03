@@ -11,8 +11,7 @@
  * dependency-free also means it can run even in an environment where
  * format-to-vpat.js's npm packages haven't been installed.
  *
- * The recap format this parses (one label per line, transcript timestamp/
- * speaker prefixes optional and stripped if present):
+ * The recap format this parses (one label per line):
  *
  *   Assistive technology: <value>
  *   Task attempted: <value>
@@ -22,9 +21,22 @@
  *   Follow-up contact: <value, or 'none'>
  *   Follow-up contact confirmed: <yes|no>
  *
+ * SECURITY: recap lines are only ever read from the BOT's final, uninterrupted
+ * speaking turn -- i.e. lines explicitly tagged "[HH:MM:SS] BOT:" (or an
+ * untagged continuation of that same tagged turn) that occur strictly after
+ * the last "[HH:MM:SS] USER:"-tagged line in the transcript. The transcript
+ * MUST use these speaker tags; an untagged transcript cannot be attributed
+ * and is treated as having no recap. This exists specifically so a caller
+ * cannot speak the label format themselves (e.g. "Assistive technology:
+ * screen_reader") and have it accepted as if the bot had validated and
+ * recapped it -- that would let a callee forge compliance data. If the bot's
+ * recap cannot be cleanly isolated to that final segment, this fails rather
+ * than accepting a partial or scattered match.
+ *
  * Per SKILL.md: if the recap is missing, incomplete, or fails schema
  * validation, this never guesses field values -- it reports exactly what's
- * wrong so the raw transcript can be surfaced to the user instead.
+ * wrong so a *redacted* excerpt of the transcript can be surfaced to the user
+ * instead (see scripts/redact-transcript.js; never surface the raw transcript).
  *
  * Usage:
  *   node parse-recap.js --transcript-file <path-to-transcript.txt>
@@ -71,10 +83,46 @@ function loadSchema() {
   return JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf8"));
 }
 
-function stripLinePrefix(line) {
-  // Strips an optional "[00:01:23] BOT:" / "[00:01:23] USER:" style prefix
-  // that call transcripts in this skill use, leaving just "Label: value".
-  return line.replace(/^\s*\[[^\]]*\]\s*(?:BOT|USER)\s*:\s*/i, "").trim();
+/**
+ * Tags every transcript line with its speaker. A line with an explicit
+ * "[HH:MM:SS] BOT:" / "[HH:MM:SS] USER:" prefix sets the current speaker and
+ * strips the prefix; an untagged line (a wrapped continuation of the same
+ * quote) inherits whatever speaker was last explicitly tagged. Lines before
+ * any speaker tag has appeared are speaker: null (untrusted, attributable to
+ * no one).
+ */
+function tagLines(transcript) {
+  const rawLines = String(transcript || "").split(/\r?\n/);
+  let currentSpeaker = null;
+  return rawLines.map((rawLine) => {
+    const match = rawLine.match(/^\s*\[[^\]]*\]\s*(BOT|USER)\s*:\s*(.*)$/i);
+    if (match) {
+      currentSpeaker = match[1].toUpperCase();
+      return { speaker: currentSpeaker, text: match[2].trim() };
+    }
+    return { speaker: currentSpeaker, text: rawLine.trim() };
+  });
+}
+
+/**
+ * Isolates the bot's final, uninterrupted speaking turn: every line strictly
+ * after the last USER-tagged line, filtered to BOT-tagged lines only. A real
+ * recap is the last thing the bot says before the call ends, with no caller
+ * turn in between it and the end of the transcript -- so anything the caller
+ * said, anywhere, at any point, is never eligible to be read as the recap,
+ * regardless of its content. If there are no USER-tagged lines at all (e.g. a
+ * voicemail-only transcript), the whole transcript is treated as the final
+ * segment. If there are no BOT-tagged lines in that segment either (e.g. an
+ * untagged transcript, or the caller's line really was the last thing said),
+ * the segment is empty and no recap can be attributed -- callers must treat
+ * that as "no recap found," never guess.
+ */
+function getFinalBotSegment(taggedLines) {
+  let lastUserIdx = -1;
+  for (let i = 0; i < taggedLines.length; i++) {
+    if (taggedLines[i].speaker === "USER") lastUserIdx = i;
+  }
+  return taggedLines.slice(lastUserIdx + 1).filter((line) => line.speaker === "BOT");
 }
 
 function normalizeYesNo(rawValue) {
@@ -85,20 +133,19 @@ function normalizeYesNo(rawValue) {
 }
 
 /**
- * Extracts labeled recap lines from a raw transcript string. Scans every
- * line independently (recap lines can span multiple transcript lines within
- * the same speaker turn), so it does not require the recap to be contiguous
- * or on its own dedicated transcript entry.
+ * Extracts labeled recap lines from a raw transcript string. Only considers
+ * lines within the bot's final, uninterrupted speaking turn (see
+ * getFinalBotSegment) -- content spoken by the caller, anywhere in the
+ * transcript, is never eligible, no matter what it says.
  */
 function extractRecapFields(transcript) {
   const found = {};
-  const lines = String(transcript || "").split(/\r?\n/);
+  const finalBotSegment = getFinalBotSegment(tagLines(transcript));
 
-  for (const rawLine of lines) {
-    const line = stripLinePrefix(rawLine);
+  for (const { text } of finalBotSegment) {
     for (const { label, field } of FIELD_PATTERNS) {
       const re = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:\\s*(.+?)\\s*$`, "i");
-      const match = line.match(re);
+      const match = text.match(re);
       if (match && found[field] === undefined) {
         found[field] = match[1].trim().replace(/\.$/, "");
       }
@@ -227,9 +274,11 @@ function parseRecap(transcript, { schema } = {}) {
 
   if (Object.keys(rawFields).length === 0) {
     throw new Error(
-      "No labeled recap lines found in transcript. The call may have ended before the recap " +
-        "(e.g. a crisis-safety override, a dropped call, or a caller who hung up early) -- " +
-        "surface the raw transcript instead of guessing a result.",
+      "No labeled recap lines attributable to the bot's final speaking turn were found in the " +
+        "transcript. Either the call ended before the recap (e.g. a crisis-safety override, a " +
+        "dropped call, or a caller who hung up early), or the transcript lacks the speaker tags " +
+        "needed to attribute the recap to the bot. Do not guess a result -- surface a redacted " +
+        "excerpt of the transcript instead (see scripts/redact-transcript.js).",
     );
   }
 
@@ -245,6 +294,8 @@ function parseRecap(transcript, { schema } = {}) {
 }
 
 module.exports = {
+  tagLines,
+  getFinalBotSegment,
   extractRecapFields,
   coerceRecapFields,
   validateAgainstSchema,

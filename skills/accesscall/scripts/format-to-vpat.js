@@ -1,7 +1,7 @@
 /**
  * format-to-vpat.js
  *
- * Takes a validated intake-result JSON object (see ../schemas/intake-result.schema.json)
+ * Takes a validated intake-result JSON object (see ../references/intake-result.schema.json)
  * and inserts it as a row into a copy of the existing Design Lady VPAT 2.4 docx template.
  *
  * KNOWN CONSTRAINT (do not violate):
@@ -32,9 +32,12 @@
  * 3. Insert a new row using explicit per-cell construction (see constraint above).
  * 4. Save output as vpat-intake-{{call_id}}.docx
  *
- * Usage (once implemented):
- *   node format-to-vpat.js --input ../examples/example-output.json --call-id demo001 \
- *     --template ../../path/to/vpat-2.4-template.docx --out ./vpat-intake-demo001.docx
+ * Usage:
+ *   node format-to-vpat.js --input ../references/example-output.json --call-id demo001 \
+ *     --template ../assets/vpat-2.4-template-generic.docx --out ./vpat-intake-demo001.docx
+ *
+ * --template defaults to ../assets/vpat-2.4-template-generic.docx (relative to this
+ * script) if omitted.
  */
 
 const fs = require("fs");
@@ -317,6 +320,12 @@ function appendFlaggedRow(table, intake) {
 }
 
 async function buildVpatDocx({ templatePath, intake, tableIndex }) {
+  if (!fs.existsSync(templatePath)) {
+    throw new Error(
+      `Template file not found: ${templatePath}\n` +
+        "Pass --template with a valid path, e.g. skills/accesscall/assets/vpat-2.4-template-generic.docx",
+    );
+  }
   const templateBuffer = fs.readFileSync(templatePath);
   const zip = await JSZip.loadAsync(templateBuffer);
 
@@ -389,13 +398,16 @@ async function main() {
 
   if (!args.input || !args["call-id"]) {
     console.error("Usage: node format-to-vpat.js --input <intake-result.json> --call-id <id> " +
-      "[--template vpat/vpat-2.4-template.docx] [--out vpat/vpat-intake-<call-id>.docx] [--table-index 3]");
+      "[--template skills/accesscall/assets/vpat-2.4-template-generic.docx] " +
+      "[--out vpat-intake-<call-id>.docx] [--table-index 3]");
     process.exitCode = 1;
     return;
   }
 
   const callId = args["call-id"];
-  const templatePath = path.resolve(args.template || path.join(__dirname, "vpat-2.4-template.docx"));
+  const templatePath = path.resolve(
+    args.template || path.join(__dirname, "..", "assets", "vpat-2.4-template-generic.docx"),
+  );
   const outPath = path.resolve(args.out || path.join(__dirname, `vpat-intake-${callId}.docx`));
   const tableIndex = args["table-index"] !== undefined ? parseInt(args["table-index"], 10) : 3;
 
