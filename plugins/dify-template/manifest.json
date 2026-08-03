@@ -23,7 +23,7 @@
     "Blocks live-call creation when the documented API preflight returns a non-2xx status code.",
     "Prepends non-overridable phone-call safety boundaries before custom task text reaches CALL-E.",
     "Uses a stable idempotency key derived from request_id and call inputs for replay safety.",
-    "Reports a 2xx create response without a recognized call ID as unknown and possibly created, and requires replay or reconciliation with the same idempotency key.",
+    "Reports a 2xx create or poll response without a documented CallTask as unknown and possibly created, and requires replay or reconciliation with the same idempotency key.",
     "Reports indeterminate create transport and force-failed HTTP outcomes as unknown and possibly created, and preserves the original idempotency key for reconciliation.",
     "Masks E.164, common US-style, and grouped international phone numbers, including display formats with parentheses, in summaries and raw result output.",
     "Does not create recurring schedules."

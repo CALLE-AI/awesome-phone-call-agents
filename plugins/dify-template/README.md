@@ -76,7 +76,7 @@ The polling sleep is capped below Dify's default 5-second code-node timeout. Eac
 
 The live create request uses a stable idempotency key derived from `request_id`, the call item, destination phone number, and task. This protects replay after an ambiguous `POST /v1/calls` result from creating a duplicate outbound call.
 
-If `POST /v1/calls` returns 2xx without a recognized call ID, or Dify cannot determine the POST outcome because of a transport or force-failed HTTP response, the workflow does not claim that no call was created. It reports the creation outcome as unknown and possibly created, skips automatic lookup, and shows the same idempotency key to use for replay or provider-side reconciliation. Do not retry that request with a new key.
+If `POST /v1/calls` returns 2xx without a documented `CallTask` (`object: "call_task"`, a `call_` ID, and a documented lifecycle status), or Dify cannot determine the POST outcome because of a transport or force-failed HTTP response, the workflow does not claim that no call was created. It reports the creation outcome as unknown and possibly created, skips automatic lookup, and shows the same idempotency key to use for replay or provider-side reconciliation. Do not retry that request with a new key. A successful poll response must meet the same `CallTask` contract; otherwise the workflow requires reconciliation rather than reporting a confirmed call.
 
 To prevent future live calls:
 

@@ -724,9 +724,10 @@ def validate_dify_template() -> None:
             "f\"Call creation outcomes unknown (possibly created): {creation_unknown}\"",
             "\"liveCallsCreated\": 0 if dry_run_enabled else (None if creation_unknown else created_count)",
             "\"creationOutcomeUnknownCount\": 0 if dry_run_enabled else creation_unknown",
-            "nested_get(call, [\"data\", \"status\"])",
-            "nested_get(call, [\"call\", \"status\"])",
-            "nested_get(call, [\"result\", \"status\"])",
+            "def documented_call_task(value):",
+            "value.get(\"object\") != \"call_task\"",
+            "CALL_ID_RE.fullmatch(call_id)",
+            "status not in DOCUMENTED_CALL_STATUSES",
             "poll_error = str(poll_error_message or call.get(\"_dify_poll_error\") or \"\").strip()",
             "failed = bool(poll_error) or bool(poll_timed_out)",
         ],
@@ -903,8 +904,8 @@ def validate_dify_template() -> None:
         (
             "Extract call lookup id",
             extract_section,
-            "metadata_round_trip = compare_metadata_round_trip(body, metadata_sent_json)",
-            "redacted_body = redact_phone_values(body)",
+            "metadata_round_trip = compare_metadata_round_trip(call, metadata_sent_json)",
+            "redacted_body = redact_phone_values(call)",
         ),
     ]:
         if compare_call not in section or redact_call not in section or section.find(compare_call) > section.rfind(redact_call):
@@ -1010,7 +1011,9 @@ def validate_dify_template() -> None:
         fail("Prepare poll context must receive the preflight-gated validation_error.")
     for snippet in [
         "def main(latest_response, poll_status_code, poll_count, started_at_ms, wait_timeout_minutes, max_poll_count, metadata_sent_json, has_live_call) -> dict:",
-        "status = normalize_status(first_value(\n                  nested_get(call, [\"data\", \"status\"])",
+        "call = documented_call_task(response_body)",
+        "if 200 <= poll_status < 300 and not call:",
+        "without a documented CallTask",
         "poll_status = int(as_number(poll_status_code, 0))",
         "if not (200 <= poll_status < 300):",
         "CALL-E poll request returned HTTP",
@@ -1074,6 +1077,8 @@ def validate_dify_template() -> None:
             fail(f"Summarize iteration results must preserve unknown create outcomes: {snippet}")
     if "raise ValueError(\"CALL-E create response did not include a recognized call id." in extract_section:
         fail("Extract call lookup id must return a masked unknown context instead of raising on missing call id.")
+    if "call_payload_from_response" in dsl_text:
+        fail("Dify CallTask handling must not accept legacy wrapper or call-id response shapes.")
     for snippet in ["from urllib.parse import urlparse", "TRUSTED_BASE_URLS", "normalize_trusted_base_url"]:
         if snippet in extract_section:
             fail(f"Extract call lookup id must not duplicate base URL allowlist checks after POST /v1/calls: {snippet}")
@@ -1160,6 +1165,19 @@ def validate_dify_template() -> None:
     ):
         fail("Dify indeterminate create failures must preserve the original idempotency key.")
 
+    legacy_create = extract_main(
+        '{"call_id":"legacy_123","status":"completed"}',
+        201,
+        "https://api.heycall-e.com",
+        "{}",
+        "+15****24",
+        idempotency_key,
+        "call_001",
+    )
+    legacy_context = legacy_create.get("call_context", {})
+    if not legacy_context.get("createOutcomeUnknown") or legacy_context.get("callId"):
+        fail("Dify must treat a successful create response without a documented CallTask as unknown.")
+
     poll_main = embedded_python_main(dsl_path, poll_section)
     poll_failure = poll_main(
         {"data": {"status": "running"}},
@@ -1173,6 +1191,22 @@ def validate_dify_template() -> None:
     )
     if not poll_failure.get("done") or not poll_failure.get("error_message"):
         fail("Dify poll transport failures must terminate polling with an error result.")
+
+    invalid_poll_response = poll_main(
+        {"callId": "legacy_123", "status": "completed"},
+        200,
+        0,
+        int(time.time() * 1000),
+        15,
+        45,
+        "{}",
+        True,
+    )
+    if (
+        not invalid_poll_response.get("done")
+        or "documented CallTask" not in str(invalid_poll_response.get("error_message") or "")
+    ):
+        fail("Dify successful poll responses must require a documented CallTask before completion.")
 
     parse_main = embedded_python_main(dsl_path, parse_result_section)
     parsed_poll_failure = parse_main(
@@ -1193,6 +1227,29 @@ def validate_dify_template() -> None:
     parsed_status = parsed_poll_failure.get("result", {}).get("callStatus", {})
     if parsed_status.get("ok") is not False or parsed_status.get("failed") is not True:
         fail("Dify nested poll payloads with poll errors must be counted as failed results.")
+
+    documented_create = extract_main(
+        '{"object":"call_task","id":"call_test","status":"in_progress"}',
+        201,
+        "https://api.heycall-e.com",
+        "{}",
+        "+15****24",
+        idempotency_key,
+        "call_001",
+    )
+    invalid_poll = parse_main(
+        documented_create.get("call_context", {}),
+        '{"callId":"legacy_123","status":"completed"}',
+        1,
+        False,
+        "",
+    )
+    invalid_poll_status = invalid_poll.get("result", {}).get("callStatus", {})
+    if (
+        invalid_poll_status.get("created") is not None
+        or invalid_poll_status.get("creation_state") != "unknown_possibly_created"
+    ):
+        fail("Dify must not report an invalid 2xx poll response as a confirmed CallTask.")
 
 
 def require_text_content(path: Path, text: str, snippets: list[str]) -> None:
