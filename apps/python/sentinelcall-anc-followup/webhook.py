@@ -35,16 +35,18 @@ async def escalate_danger_signs(
     patient_id: str,
     danger_signs: list[str],
     call_id: str,
-    fhir_base_url: str = DEMO_FHIR_BASE_URL,
+    fhir_base_url: str,
     status: str = "preliminary",
 ) -> list[dict]:
     """
     Writes one Observation per human-confirmed danger sign, via
-    CliniqBridge's create_observation tool. Defaults to status
-    "preliminary" rather than "final" -- the SNOMED codes used here have
-    not been independently verified against an authoritative terminology
-    source, and this data has not undergone clinical validation. Do not
-    pass status="final" without that verification in place.
+    CliniqBridge's create_observation tool. fhir_base_url is now REQUIRED
+    with no default -- FIX (review round 4, point 1): a real escalation
+    must never silently fall back to the public hapi.fhir.org test
+    server, since that server is world-readable and unauthenticated.
+    Callers must pass an explicitly approved destination (see
+    ALLOWED_FHIR_BASE_URLS in main.py). DEMO_FHIR_BASE_URL still exists
+    below for connectivity-testing scripts (create_test_patient.py) only.
     """
     results = []
     async with httpx.AsyncClient(timeout=30.0) as client:

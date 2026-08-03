@@ -4,10 +4,12 @@ load_dotenv()
 import os
 import re
 import time
+import json
+import sqlite3
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, field_validator
 from calle_client import plan_call, run_call, wait_for_call_result, CalleError
-from webhook import escalate_danger_signs
+from webhook import escalate_danger_signs, DEMO_FHIR_BASE_URL
 
 app = FastAPI()
 
@@ -17,28 +19,73 @@ API_KEY = os.environ.get("SENTINELCALL_API_KEY", "")
 E164_PATTERN = re.compile(r"^\+[1-9]\d{6,14}$")
 
 # --------------------------------------------------------------------------
-# KNOWN, STATED LIMITATION (not silently hidden): this is a single-process,
-# in-memory store. It does not solve cross-worker races or survive a
-# restart. A production deployment needs a real datastore (Redis/DB) with
-# atomic reserve-then-confirm semantics. This demo fixes the *ordering*
-# bug (reserving before the external call, not after) but does not claim
-# to be safe under multi-worker concurrency.
+# FIX (review round 4, point 1): no more silent default to the public
+# hapi.fhir.org for real escalations. A real escalation must target an
+# EXPLICITLY approved FHIR destination -- the public playground is fine
+# for connectivity testing (create_test_patient.py) but must not be where
+# clinical Observations land by default, since that server is world-
+# readable and unauthenticated.
 # --------------------------------------------------------------------------
-_call_requests: dict[str, dict] = {}  # idempotency_key -> {"status": "pending"|"done", "ts": float, "response": dict|None}
-_escalated_runs: dict[str, dict] = {}  # run_id -> escalation record
-IDEMPOTENCY_WINDOW_SECONDS = 3600
+_allowed_raw = os.environ.get("ALLOWED_FHIR_BASE_URLS", "")
+ALLOWED_FHIR_BASE_URLS = {u.strip() for u in _allowed_raw.split(",") if u.strip()}
+
+
+def require_approved_fhir_destination(fhir_base_url: str):
+    if not ALLOWED_FHIR_BASE_URLS:
+        raise HTTPException(
+            500,
+            "ALLOWED_FHIR_BASE_URLS is not configured. No FHIR destination is "
+            "approved for real escalation writes -- set this explicitly before "
+            "any clinical mutation can occur.",
+        )
+    if fhir_base_url not in ALLOWED_FHIR_BASE_URLS:
+        raise HTTPException(
+            403,
+            f"'{fhir_base_url}' is not in the explicitly approved FHIR destination "
+            f"list. Approved destinations: {sorted(ALLOWED_FHIR_BASE_URLS)}",
+        )
+
+
+# --------------------------------------------------------------------------
+# FIX (review round 4, point 3): SQLite-backed durable state, replacing
+# the prior in-memory dicts. This survives process restarts -- the
+# specific failure mode named in review ("restarts... can lose binding or
+# duplicate records"). Stated honestly: a single SQLite file is not a
+# distributed-transaction system. For real multi-worker concurrency at
+# production scale, a dedicated DB server (Postgres/Redis) is still the
+# right next step -- this fixes restart-durability, not horizontal scale.
+# --------------------------------------------------------------------------
+DB_PATH = os.environ.get("SENTINELCALL_DB_PATH", "sentinelcall_state.sqlite3")
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS call_requests (
+            idempotency_key TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            ts REAL NOT NULL,
+            response TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS run_to_patient (
+            run_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS escalations (
+            run_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            record TEXT
+        )
+    """)
+    conn.commit()
+    return conn
 
 
 def require_api_key(x_api_key: str | None, allow_if_dry_run: bool = False):
-    """
-    allow_if_dry_run: only relevant to endpoints that themselves check
-    DRY_RUN before doing anything real. The /escalate endpoint MUST NOT
-    pass allow_if_dry_run=True, because escalation performs a real FHIR
-    write regardless of the app's DRY_RUN setting -- that was the bug
-    flagged in review: DRY_RUN gated call-placing but never gated
-    escalation, so escalation was reachable unauthenticated whenever no
-    key was configured.
-    """
     if not API_KEY:
         if allow_if_dry_run and DRY_RUN:
             return
@@ -57,13 +104,6 @@ def mask_phone(phone: str) -> str:
     return phone[:2] + "*" * (len(phone) - 4) + phone[-2:]
 
 
-# --------------------------------------------------------------------------
-# Speaker- and negation-aware extraction, round 2: broader negation
-# coverage. "Yes, I do not have bleeding" previously slipped through
-# because only whole-word "no/nope/none/never/negative/not really" were
-# checked. Now also catches "not", "n't", "don't", "doesn't", "didn't",
-# "isn't", "haven't", "without".
-# --------------------------------------------------------------------------
 QUESTION_TO_SIGN = [
     (re.compile(r"vaginal bleeding", re.I), "vaginal_bleeding"),
     (re.compile(r"headache|vision", re.I), "severe_headache_or_vision_change"),
@@ -76,21 +116,13 @@ NEGATIVE_PATTERN = re.compile(
     re.I,
 )
 AFFIRMATIVE_PATTERN = re.compile(r"\b(yes|yeah|yep|correct|i do|i have|i am)\b", re.I)
-
-# A blunt, deliberately conservative emergency keyword set. If matched
-# alongside an affirmative bleeding/headache answer, this is flagged
-# separately as urgent -- distinct from the routine "call back today"
-# framing, because that framing is not safe for a genuinely acute symptom.
 EMERGENCY_PATTERN = re.compile(r"\b(heavy|severe|a lot|soaking|can'?t see|passed out|fainted)\b", re.I)
 
 
 def extract_danger_signs_from_transcript(transcript: str) -> tuple[list[str], list[str]]:
-    """Returns (danger_signs, urgent_signs). urgent_signs is a subset."""
     if not transcript:
         return [], []
-
     lines = [re.sub(r"^\[\d{2}:\d{2}:\d{2}\]\s*", "", l.strip()) for l in transcript.splitlines() if l.strip()]
-
     found, urgent = [], []
     for i, line in enumerate(lines):
         if not line.upper().startswith("BOT:"):
@@ -111,21 +143,13 @@ def extract_danger_signs_from_transcript(transcript: str) -> tuple[list[str], li
     return found, urgent
 
 
-# FIX (review round 3): each follow-up call is now bound to an explicit
-# patient_id at creation time -- no more silently defaulting every
-# escalation to one fixed demo patient regardless of which call it came
-# from. run_id -> patient_id is recorded the moment the call is planned,
-# and /escalate looks up the REAL bound patient for that run, not a
-# global constant.
-_run_to_patient: dict[str, str] = {}
-
-
 class FollowUpRequest(BaseModel):
     phone: str
     region: str
     patient_first_name: str
+    patient_date_of_birth: str  # REQUIRED: e.g. "1998-04-12" -- second identifier
     missed_visit_date: str
-    patient_id: str  # REQUIRED: the real FHIR Patient ID this call is for
+    patient_id: str
     language: str = "English"
     consent_confirmed: bool = False
 
@@ -137,24 +161,27 @@ class FollowUpRequest(BaseModel):
         return v
 
 
-def build_goal(patient_first_name: str, missed_visit_date: str) -> str:
-    # FIX (review round 2, point 4): identity is now verified BEFORE any
-    # clinic-specific or clinical context is revealed. Also adds an
-    # explicit emergency branch: severe/heavy symptoms get told to seek
-    # care immediately, not "call back today."
+def build_goal(patient_first_name: str, patient_date_of_birth: str, missed_visit_date: str) -> str:
+    # FIX (review round 4, point 2): identity confirmation now requires
+    # TWO identifiers -- first name AND date of birth -- before any
+    # clinical or clinic-specific content is disclosed. First-name-only
+    # confirmation was correctly flagged as insufficient for maternal
+    # health disclosure.
     return (
         f"You are an AI voice assistant. Start by saying you are an AI "
-        f"assistant, not a human, and ask to confirm you are speaking with "
-        f"{patient_first_name} -- do not say anything about a clinic, a "
-        f"missed visit, or health topics until identity is confirmed. If "
-        f"the person says they are not {patient_first_name}, do not reveal "
-        f"any further details; politely end the call and report that "
-        f"{patient_first_name} was not reached. "
-        f"If identity is confirmed, say you're calling on behalf of a "
-        f"maternal health clinic following up on a missed antenatal visit "
-        f"on {missed_visit_date}. Ask one at a time: any vaginal bleeding, "
-        f"severe headache or vision changes, reduced baby movement, "
-        f"swelling in the face or hands, or high fever. "
+        f"assistant, not a human. Confirm you are speaking with "
+        f"{patient_first_name} by asking for their name, AND separately "
+        f"confirm their date of birth matches {patient_date_of_birth} -- "
+        f"ask for their date of birth as a second identifier, do not state "
+        f"it yourself. Do not say anything about a clinic, a missed visit, "
+        f"or health topics until BOTH identifiers are confirmed. If either "
+        f"does not match, do not reveal any further details; politely end "
+        f"the call and report that identity could not be confirmed. "
+        f"If both identifiers are confirmed, say you're calling on behalf "
+        f"of a maternal health clinic following up on a missed antenatal "
+        f"visit on {missed_visit_date}. Ask one at a time: any vaginal "
+        f"bleeding, severe headache or vision changes, reduced baby "
+        f"movement, swelling in the face or hands, or high fever. "
         f"If the person describes a symptom as heavy, severe, soaking, "
         f"loss of vision, or fainting, do NOT say a health worker will "
         f"call back today -- instead say this sounds urgent and they "
@@ -174,6 +201,8 @@ async def trigger_followup(
 ):
     require_api_key(x_api_key, allow_if_dry_run=True)
 
+    db = get_db()
+
     if not DRY_RUN:
         if not req.consent_confirmed:
             raise HTTPException(400, "consent_confirmed must be true to place a real call.")
@@ -181,24 +210,26 @@ async def trigger_followup(
             raise HTTPException(400, "Idempotency-Key header is required for live calls.")
 
         now = time.time()
-        expired = [k for k, v in _call_requests.items() if now - v["ts"] > IDEMPOTENCY_WINDOW_SECONDS]
-        for k in expired:
-            del _call_requests[k]
+        db.execute("DELETE FROM call_requests WHERE ts < ?", (now - 3600,))
+        db.commit()
 
-        existing = _call_requests.get(idempotency_key)
-        if existing:
-            if existing["status"] == "pending":
+        row = db.execute(
+            "SELECT status, response FROM call_requests WHERE idempotency_key = ?",
+            (idempotency_key,),
+        ).fetchone()
+        if row:
+            status, response_json = row
+            if status == "pending":
                 raise HTTPException(409, "A request with this Idempotency-Key is already in flight.")
-            return existing["response"]
+            return json.loads(response_json)
 
-        # FIX (review round 2, point 2): reserve the key as "pending"
-        # BEFORE calling run_call, not after. Previously a lost/ambiguous
-        # response from run_call could result in a retry placing a second
-        # real call, because nothing was recorded until after a response
-        # was received.
-        _call_requests[idempotency_key] = {"status": "pending", "ts": now, "response": None}
+        db.execute(
+            "INSERT INTO call_requests (idempotency_key, status, ts, response) VALUES (?, 'pending', ?, NULL)",
+            (idempotency_key, now),
+        )
+        db.commit()
 
-    goal = build_goal(req.patient_first_name, req.missed_visit_date)
+    goal = build_goal(req.patient_first_name, req.patient_date_of_birth, req.missed_visit_date)
 
     if DRY_RUN:
         return {
@@ -216,23 +247,29 @@ async def trigger_followup(
             run = run_call(plan_id=plan["plan_id"], confirm_token=plan["confirm_token"])
             run_id = run.get("run_id")
             if run_id:
-                # Bind this run to the real patient BEFORE returning --
-                # this is the record /escalate will trust later, not a
-                # hardcoded constant.
-                _run_to_patient[run_id] = req.patient_id
+                db.execute(
+                    "INSERT OR REPLACE INTO run_to_patient (run_id, patient_id) VALUES (?, ?)",
+                    (run_id, req.patient_id),
+                )
+                db.commit()
             response = {
                 "status": "call_started",
                 "run_id": run_id,
                 "plan_id": plan["plan_id"],
                 "called": mask_phone(req.phone),
             }
-        _call_requests[idempotency_key] = {"status": "done", "ts": time.time(), "response": response}
+        db.execute(
+            "UPDATE call_requests SET status = 'done', response = ? WHERE idempotency_key = ?",
+            (json.dumps(response), idempotency_key),
+        )
+        db.commit()
         return response
     except Exception:
-        # Do not leave the key stuck as "pending" forever on failure --
-        # mark it failed explicitly so a human can check before any
-        # automatic retry, rather than silently clearing it.
-        _call_requests[idempotency_key] = {"status": "done", "ts": time.time(), "response": {"status": "error_uncertain_outcome"}}
+        db.execute(
+            "UPDATE call_requests SET status = 'done', response = ? WHERE idempotency_key = ?",
+            (json.dumps({"status": "error_uncertain_outcome"}), idempotency_key),
+        )
+        db.commit()
         raise
 
 
@@ -251,11 +288,15 @@ async def check_followup(run_id: str, x_api_key: str | None = Header(None)):
     transcript = result.get("result", {}).get("transcript", "")
     danger_signs, urgent_signs = extract_danger_signs_from_transcript(transcript)
 
+    db = get_db()
+    row = db.execute("SELECT status FROM escalations WHERE run_id = ?", (run_id,)).fetchone()
+    already_escalated = bool(row)
+
     return {
         "call_status": result.get("status"),
         "danger_signs_detected_preview": danger_signs,
         "urgent_signs_preview": urgent_signs,
-        "already_escalated": run_id in _escalated_runs,
+        "already_escalated": already_escalated,
         "note": "Read-only. Use POST /followups/{run_id}/escalate to commit, after human review.",
     }
 
@@ -263,6 +304,7 @@ async def check_followup(run_id: str, x_api_key: str | None = Header(None)):
 class EscalationConfirmRequest(BaseModel):
     reviewed_by: str
     confirmed_signs: list[str]
+    fhir_base_url: str  # REQUIRED: must be in ALLOWED_FHIR_BASE_URLS
 
 
 @app.post("/followups/{run_id}/escalate")
@@ -271,25 +313,24 @@ async def confirm_escalation(
     req: EscalationConfirmRequest,
     x_api_key: str | None = Header(None),
 ):
-    # FIX (review round 2, point 1 -- the critical one): escalation is a
-    # real, unconditional FHIR write. It must ALWAYS require a real key,
-    # regardless of the app's DRY_RUN setting. allow_if_dry_run is
-    # deliberately NOT passed here.
     require_api_key(x_api_key)
+    require_approved_fhir_destination(req.fhir_base_url)
 
-    if run_id in _escalated_runs:
-        return {"status": "already_escalated", "run_id": run_id, "record": _escalated_runs[run_id]}
+    db = get_db()
 
-    # FIX (review round 3): resolve the REAL patient this run was bound to
-    # at call-creation time. No more falling back to a fixed demo constant
-    # -- if a run has no recorded binding, refuse rather than guess.
-    bound_patient_id = _run_to_patient.get(run_id)
-    if not bound_patient_id:
+    existing = db.execute("SELECT status, record FROM escalations WHERE run_id = ?", (run_id,)).fetchone()
+    if existing:
+        status, record_json = existing
+        return {"status": status, "run_id": run_id, "record": json.loads(record_json) if record_json else None}
+
+    patient_row = db.execute("SELECT patient_id FROM run_to_patient WHERE run_id = ?", (run_id,)).fetchone()
+    if not patient_row:
         raise HTTPException(
             409,
             f"No patient binding found for run {run_id}. Escalation requires a "
             f"call that was created through this app's /followups endpoint.",
         )
+    bound_patient_id = patient_row[0]
 
     try:
         result = wait_for_call_result(run_id, poll_interval_seconds=3, max_wait_seconds=30)
@@ -315,28 +356,34 @@ async def confirm_escalation(
 
     deduped_signs = sorted(set(req.confirmed_signs))
 
-    # FIX (review round 3): reserve BEFORE the external write, not after --
-    # same ordering fix already applied to call idempotency. A crash
-    # between the FHIR write and this line previously could not be
-    # distinguished from "never attempted," allowing a duplicate write on
-    # retry.
-    _escalated_runs[run_id] = {"status": "pending", "reviewed_by": req.reviewed_by, "confirmed_signs": deduped_signs}
+    # Reserve BEFORE the external write, durable this time -- a SQLite row,
+    # not a dict that vanishes on restart.
+    db.execute(
+        "INSERT INTO escalations (run_id, status, record) VALUES (?, 'pending', ?)",
+        (run_id, json.dumps({"reviewed_by": req.reviewed_by, "confirmed_signs": deduped_signs})),
+    )
+    db.commit()
 
     results = await escalate_danger_signs(
         patient_id=bound_patient_id,
         danger_signs=deduped_signs,
         call_id=result.get("result", {}).get("call_id", run_id),
         status="preliminary",
+        fhir_base_url=req.fhir_base_url,
     )
 
     record = {
-        "status": "done",
         "reviewed_by": req.reviewed_by,
         "confirmed_signs": deduped_signs,
         "patient_id": bound_patient_id,
+        "fhir_base_url": req.fhir_base_url,
         "urgent_at_call_time": actual_urgent,
         "escalation_results": results,
     }
-    _escalated_runs[run_id] = record
+    db.execute(
+        "UPDATE escalations SET status = 'done', record = ? WHERE run_id = ?",
+        (json.dumps(record), run_id),
+    )
+    db.commit()
 
     return {"status": "escalated", "run_id": run_id, **record}
