@@ -27,10 +27,12 @@ including exact phrasing if desired:
    endpoint URLs, hostnames, ports, PIDs, systemd
    units, real account info, or recipient file content.
 8. The test suite is **offline-only** and hermetic.
-9. The originating prototype exercised the **official
-   client code path** against a local synthetic
-   interceptor; this reference app demonstrates the
-   data shape, not the SDK glue.
+9. The reference app exercises the **official
+   `@call-e/core` runtime** (`@call-e/core/mcp-client`'s
+   `callMcpTool`) **against an injected offline
+   synthetic transport**. The runtime is imported and
+   invoked; the live CALL-E endpoint is **not**
+   contacted.
 10. The reference app is **not production-ready**; it
     is a developer-facing reference app.
 
@@ -57,6 +59,12 @@ following, including exact phrasing if desired:
 14. ~~"ParcelBridge is a service."~~
 15. ~~"This README contains a phone number,
     token, or URL."~~
+16. ~~"Live CALL-E endpoint execution is verified by
+    this bundle."~~
+17. ~~"The official SDK returned a real `plan_call`
+    response from the live service."~~
+18. ~~"`npm run demo:official-runtime-offline` dials a
+    real phone number."~~
 
 ## 3. Disambiguation rules
 
@@ -73,6 +81,7 @@ disambiguation applies to every claim-rewriting:
 | "offline-fake default mode" | "no-call mode" | "offline-fake" names the response origin; "no-call" could be misread as "we never tested anything." |
 | "not implemented at all" | "feature-flagged off" | "not implemented" is structural; "feature-flagged off" is procedural and could be flipped. |
 | "refusal-first pattern" | "safety-first pattern" | "refusal-first" names the engineering contribution; "safety-first" is a vibe. |
+| "official `@call-e/core` runtime executed against an injected offline synthetic transport" | "official `@call-e/core` runtime executed against the live CALL-E endpoint" | The runtime is invoked in-process; the transport is synthetic. A live-claim rewrite is forbidden. |
 
 ## 4. Sanitization rules for PR text
 

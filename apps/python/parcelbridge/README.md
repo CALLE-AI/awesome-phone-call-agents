@@ -18,8 +18,17 @@ integrations:
 4. Reduce capability-shaped values to length-only fingerprints.
 5. Omit the dial path entirely: no `run_call` function is shipped.
 
-The public bundle contains only an offline demo and a validation command.
-The live integration remains a documentation stub.
+The public bundle ships **two** runnable proof surfaces:
+
+1. **Python offline reference demo** (`python -m parcelbridge.cli demo --offline`) —
+   the synthetic, in-process fake MCP response shape. The default surface.
+2. **Official CALL-E runtime offline proof** (`npm run demo:official-runtime-offline`
+   inside `bridge/`) — imports the **official** `@call-e/core` SDK, injects a
+   synthetic `fetchImpl`, and exercises the official `callMcpTool` code path
+   **without ever contacting a live endpoint or dialing a real number**.
+
+A live CALL-E endpoint execution is **not** claimed. See
+`docs/DISCLOSURE.md` for the complete claim contract.
 
 ## Why Delivery Exceptions
 
@@ -30,17 +39,25 @@ planning payload while keeping call execution outside the reference app.
 
 ## Demo Status
 
-The submitted demo is offline and synthetic.
+The submitted demos are offline and synthetic.
 
 - `python -m parcelbridge.cli demo --offline` exits successfully.
 - `python -m parcelbridge.cli validate` exits successfully.
 - `pytest tests/` passes **48 tests**.
+- `cd bridge && npm ci && npm test` passes **12 Node tests** that
+  prove the official `@call-e/core` runtime is invoked end-to-end.
+- `cd bridge && npm run demo:official-runtime-offline` exits
+  successfully and prints a JSON summary showing
+  `official_call_mcp_tool_executed=true`, `live_endpoint_accessed=false`,
+  `run_call_invocations=0`, `real_calls=0`.
 - Network access is zero.
 - OAuth cache reads are zero.
 - Real calls placed are zero.
 - `run_call` is absent.
 
-A synthetic `READY` result is not presented as a live provider result.
+A synthetic `READY` result is not presented as a live provider result. The
+official `@call-e/core` runtime is exercised against an injected offline
+synthetic transport; live CALL-E endpoint execution is **not** claimed.
 
 ## Architecture
 
@@ -59,8 +76,10 @@ The package includes:
 - `parcelbridge/sanitization.py` for fail-closed response reduction.
 - `parcelbridge/workflow.py` for offline orchestration.
 - `parcelbridge/live_stub.py` for explicit live-mode refusal.
-- `bridge/calle_inprocess_bridge.mjs` as integration-pattern documentation,
-  not vendored runtime code.
+- `bridge/calle_inprocess_bridge.mjs`, `bridge/synthetic_mcp_fetch.mjs`,
+  and `bridge/synthetic_auth_cache.mjs` for the **official CALL-E
+  runtime offline proof**. The Node bridge imports `@call-e/core` and
+  injects a synthetic `fetchImpl`; no live endpoint is contacted.
 
 The dial path is absent by design.
 
@@ -173,18 +192,49 @@ fails.
 The fake MCP server is in-process and deterministic. It exists only to test
 the offline request, sanitization, and refusal surfaces.
 
+## Official CALL-E Runtime Offline Proof
+
+The Node bridge inside `bridge/` proves that the **official**
+`@call-e/core` runtime can be exercised against an injected offline
+synthetic transport. A reviewer can reproduce the proof locally with:
+
+```bash
+cd bridge
+npm ci                # installs the exact-pinned @call-e/core@0.2.3
+npm run validate      # confirms the SDK shape is present
+npm test              # 12 hermetic tests covering all 25 protocol assertions
+npm run demo:official-runtime-offline
+```
+
+What the proof shows:
+
+| Claim | Evidence |
+|---|---|
+| Official `@call-e/core` runtime imported | `import { callMcpTool } from "@call-e/core/mcp-client"` |
+| Official `callMcpTool` executed | `npm run demo` JSON includes `official_call_mcp_tool_executed=true` |
+| Transport | Injected offline synthetic fetch (no live URL) |
+| Authentication | Temporary public synthetic canary (`PUBLIC_OFFLINE_CANARY_*`), never a real OAuth token |
+| Live CALL-E endpoint | **Not contacted** (`live_endpoint_accessed=false`) |
+| `run_call` / `get_call_run` / `track_ui_events` | **Not invoked / absent** |
+| Real calls placed | **0** |
+
+The bridge is **not** a live client. The official SDK code path is exercised
+inside the local Node process against a fully-synthetic transport, and the
+temporary synthetic auth cache is removed on exit.
+
 ## Live Verification
 
-Live mode is opt-in and **not validated in this submission**.
+Live CALL-E endpoint execution is **not** claimed by this reference bundle.
+The official `@call-e/core` runtime is exercised against an injected offline
+synthetic transport; this proves the SDK glue is wired correctly, but it does
+**not** prove the upstream CALL-E service returns a usable `plan_call`
+result. A future live validation would require a new explicit authorization
+cycle, real credential handling, endpoint-provenance evidence, and a separate
+review. Call execution would remain outside this reference app.
 
-The reference bundle does not execute the official live client, read real
-credentials, contact a provider endpoint, or place calls. The Node bridge file
-is a documentation stub showing where a separately authorized integration
-could be connected.
-
-A future live validation would require a new explicit authorization cycle,
-real credential handling, endpoint-provenance evidence, and a separate review.
-Call execution would remain outside this reference app.
+The bundle remains a **documentation stub** for live integration; only the
+offline synthetic demo and the offline official-runtime proof are
+reproducible by an outside reviewer today.
 
 ## Cancellation and Rollback
 
@@ -207,23 +257,45 @@ capability.
 pytest tests/
 python -m parcelbridge.cli validate
 python -m parcelbridge.cli demo --offline
+
+cd bridge
+npm ci
+npm run validate
+npm test
+npm run demo:official-runtime-offline
 ```
 
-The suite contains **48 tests**:
+The Python suite contains **48 tests**:
 
 - 30 functional offline tests;
 - 18 defensive and self-audit tests.
 
-The tests use sandboxed home, configuration, cache, and temporary directories.
-They verify zero network access, zero OAuth reads, absence of phone data in
-arguments, environment, and disk, no raw-response persistence, no capability
-persistence, no dial path, fictional examples, bundle privacy, disclosure
-completeness, and successful validation.
+The Node suite contains **12 tests** covering the official
+`@call-e/core` runtime proof.
+
+The Python tests use sandboxed home, configuration, cache, and temporary
+directories. They verify zero network access, zero OAuth reads, absence of
+phone data in arguments, environment, and disk, no raw-response persistence,
+no capability persistence, no dial path, fictional examples, bundle privacy,
+disclosure completeness, and successful validation.
+
+The Node tests verify the official `@call-e/core` package is installed,
+`callMcpTool` is exported, the synthetic fetch handles
+`initialize` / `notifications/initialized` / `tools/call`, the synthetic
+auth cache is created and removed, the Authorization header uses a
+synthetic canary without ever being echoed, the official client receives
+the tool arguments and request metadata, forbidden tools
+(`run_call`, `get_call_run`, `track_ui_events`) refuse, unknown tools
+fail closed, non-sentinel URLs are blocked, unsupported JSON-RPC methods
+fail closed, and the bridge never opens a TCP listener.
 
 ## Known Limitations
 
-- Only the offline synthetic demo is implemented.
-- The package does not vendor or execute the live CALL-E SDK.
+- Only the offline synthetic demo and the offline official-runtime proof
+  are implemented.
+- The package **does** import the official `@call-e/core` runtime, but
+  **only** with an injected synthetic `fetchImpl`; no live CALL-E endpoint
+  is contacted in this bundle.
 - Provider-generated plan text is not available or verified.
 - Business requirements are not provider-verified.
 - Capability fingerprints are length-only and are not identifiers.
