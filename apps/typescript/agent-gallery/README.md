@@ -28,6 +28,10 @@ The code is split so that the CALL-E integration can be lifted into a different
 workflow without carrying appointment concepts with it.
 
 ```text
+api/                                deployment surface
+├── _lib/calls.ts                   handlers on web-standard Request/Response
+└── calls/                          thin Vercel Edge route files
+
 src/calle/                          reusable, workflow-agnostic
 ├── client.ts                       MCP transport: plan_call, run_call, get_call_run
 ├── status.ts                       run-status semantics and delivery classification
@@ -79,14 +83,25 @@ npm run dev        # local UI at the Vite dev URL
 npm run verify     # typecheck + tests + build
 ```
 
-Deploy with `npm run deploy` (Cloudflare Pages via Wrangler).
+Deploy with `npm run deploy` (Vercel). The API routes under `api/` run on
+Vercel's Edge runtime, but the handlers themselves take and return web-standard
+`Request` and `Response`, so moving to another host means replacing two thin
+route files rather than rewriting the integration.
 
 ## Credentials and their boundary
 
-CALL-E credentials are supplied only as Cloudflare Pages environment variables
-(`CALLE_ACCESS_TOKEN`, `CALLE_SERVER_URL`) read by the server function in
-`functions/api/`. No credential is ever bundled into browser code, committed, or
-pasted into chat. Local live testing will use an untracked `.dev.vars` file.
+CALL-E credentials are supplied only as Vercel environment variables
+(`CALLE_ACCESS_TOKEN`, `CALLE_SERVER_URL`) read by the handlers in `api/_lib/`.
+No credential is ever bundled into browser code, committed, or pasted into chat.
+Set the token so its value never appears in a shell argument or history:
+
+```bash
+npx vercel env add CALLE_ACCESS_TOKEN production
+```
+
+The `confirm_token` that authorizes one call is also server-only: it is created,
+spent, and discarded inside a single request and never sent to the browser.
+Local live testing uses an untracked `.env.local`.
 
 ## Dry-run and preview behavior
 
@@ -139,7 +154,7 @@ human review before anything else happens.
 No database. CALL-E is the system of record for call state; the browser polls a
 server endpoint that relays CALL-E's own status. Results exist only in CALL-E
 and the operator's browser session. The server function logs nothing beyond
-Cloudflare's standard request handling and never logs phone numbers.
+Vercel's standard request handling and never logs phone numbers.
 
 ## Tests and verification
 

@@ -1,14 +1,17 @@
 // Server-side integration layer for CALL-E.
 //
-// Credentials live only here, supplied through Cloudflare Pages environment
-// variables. They must never reach browser code, and neither must the
-// confirm_token: it authorizes one real phone call, so it is created, spent,
-// and discarded inside a single request.
+// Credentials live only here, supplied through Vercel environment variables.
+// They must never reach browser code, and neither must the confirm_token: it
+// authorizes one real phone call, so it is created, spent, and discarded inside
+// a single request.
 //
 // CALL-E is MCP. plan_call issues a plan_id and a confirm_token, run_call
 // requires both, and get_call_run polls the result. The operator's explicit
 // authorization happens in the browser before this endpoint is reached; the
 // server then performs plan, confirm, and run as one atomic step.
+//
+// These handlers take and return web-standard Request and Response, so they run
+// unchanged on any runtime with fetch and are not tied to Vercel.
 //
 // See docs/agent-gallery/calle-api-observations.md.
 
@@ -18,16 +21,10 @@ import { validateRequest } from "../../src/workflows/appointment-recovery/valida
 import { buildCallGoal } from "../../src/workflows/appointment-recovery/workflow";
 import type { RecoveryRequest } from "../../src/workflows/appointment-recovery/types";
 
-type Env = {
+export interface CalleEnv {
   CALLE_ACCESS_TOKEN?: string;
   CALLE_SERVER_URL?: string;
-};
-
-type Context = {
-  request: Request;
-  env: Env;
-  params: { path?: string[] };
-};
+}
 
 const REQUEST_LIMIT = 64 * 1024;
 
@@ -41,17 +38,17 @@ function json(payload: unknown, status = 200): Response {
 }
 
 /**
- * Duplicate guard for retries and double-clicks within one isolate.
+ * Duplicate guard for retries and double-clicks within one server instance.
  *
  * plan_call and run_call happen in the same request, so a repeated submission
  * would mint a fresh confirm_token and dial again; the token being single-use
- * does not help here. A new isolate starts with an empty map, so this covers the
- * realistic double-click and not a determined retry across cold starts. Durable
+ * does not help here. A cold start begins with an empty map, so this covers the
+ * realistic double-click and not a determined retry across instances. Durable
  * storage is the only complete answer and is out of scope for one call.
  */
 const startedCalls = new Map<string, string>();
 
-function clientFor(env: Env) {
+function clientFor(env: CalleEnv) {
   if (!env.CALLE_ACCESS_TOKEN || !env.CALLE_SERVER_URL) return null;
   return createCalleClient({
     accessToken: env.CALLE_ACCESS_TOKEN,
@@ -61,27 +58,14 @@ function clientFor(env: Env) {
 
 function calleFailure(error: unknown): Response {
   if (error instanceof CalleError) {
-    const status = error.code === "auth" ? 502 : error.code === "timeout" ? 504 : 502;
+    const status = error.code === "timeout" ? 504 : 502;
     return json({ error: error.code, message: error.message }, status);
   }
   return json({ error: "unexpected", message: "The call could not be started." }, 500);
 }
 
-export async function onRequest(context: Context): Promise<Response> {
-  const { request, params } = context;
-  const path = params.path ?? [];
-
-  if (request.method === "POST" && path.length === 1 && path[0] === "calls") {
-    return createCall(context);
-  }
-  if (request.method === "GET" && path.length === 2 && path[0] === "calls") {
-    return getCallStatus(context, path[1]);
-  }
-  return json({ error: "not_found" }, 404);
-}
-
-async function createCall(context: Context): Promise<Response> {
-  const body = await context.request.text();
+export async function handleCreateCall(request: Request, env: CalleEnv): Promise<Response> {
+  const body = await request.text();
   if (body.length > REQUEST_LIMIT) return json({ error: "request_too_large" }, 413);
 
   let payload: RecoveryRequest;
@@ -101,10 +85,13 @@ async function createCall(context: Context): Promise<Response> {
   const errors = validateRequest(payload);
   if (errors.length > 0) return json({ error: "invalid_request", details: errors }, 400);
 
-  const client = clientFor(context.env);
+  const client = clientFor(env);
   if (!client) {
     return json(
-      { error: "not_configured", message: "This deployment has no CALL-E credentials, so it cannot place calls." },
+      {
+        error: "not_configured",
+        message: "This deployment has no CALL-E credentials, so it cannot place calls.",
+      },
       503,
     );
   }
@@ -114,7 +101,6 @@ async function createCall(context: Context): Promise<Response> {
       to_phones: [payload.customer.phone_e164],
       goal: buildCallGoal(payload),
       language: "English",
-      region: payload.business.timezone.split("/")[0] === "Asia" ? "SG" : undefined,
     });
 
     if (!plan.ready_to_run || !plan.confirm_token) {
@@ -132,8 +118,10 @@ async function createCall(context: Context): Promise<Response> {
   }
 }
 
-async function getCallStatus(context: Context, runId: string): Promise<Response> {
-  const client = clientFor(context.env);
+export async function handleGetCallStatus(runId: string, env: CalleEnv): Promise<Response> {
+  if (!runId) return json({ error: "missing_run_id" }, 400);
+
+  const client = clientFor(env);
   if (!client) return json({ error: "not_configured" }, 503);
 
   let run: CalleRun;
@@ -158,4 +146,13 @@ async function getCallStatus(context: Context, runId: string): Promise<Response>
   // the browser; classifying here without them would downgrade every successful
   // reschedule to `uncertain`.
   return json({ status: run.status, activity, calle_result: run.result ?? null });
+}
+
+/** Read credentials from the process environment without exposing their values. */
+export function envFromProcess(): CalleEnv {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+  return {
+    CALLE_ACCESS_TOKEN: env.CALLE_ACCESS_TOKEN,
+    CALLE_SERVER_URL: env.CALLE_SERVER_URL,
+  };
 }

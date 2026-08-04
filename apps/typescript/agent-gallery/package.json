@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && npx wrangler pages deploy",
+    "deploy": "npx vercel deploy --prod",
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "verify": "npm run check && npm test && npm run build"
