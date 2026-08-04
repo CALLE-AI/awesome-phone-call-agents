@@ -5,6 +5,7 @@ import { Preview } from "./screens/Preview";
 import { Authorize } from "./screens/Authorize";
 import { LiveCall } from "./screens/LiveCall";
 import { ResultScreen } from "./screens/Result";
+import { Steps } from "./screens/Steps";
 import type { RecoveryRequest, RecoveryResult } from "./workflows/appointment-recovery/types";
 
 export type Screen = "landing" | "configure" | "preview" | "authorize" | "live" | "result";
@@ -30,10 +31,17 @@ export function App() {
 
   return (
     <main className="app">
-      <header>
-        <h1>Agent Gallery</h1>
-        <p className="mode-badge">Dry run is the default. No call is placed without explicit authorization.</p>
+      <header className="masthead">
+        <h1 className="wordmark">
+          Agent Gallery <span>· Appointment Recovery</span>
+        </h1>
+        {/* The badge states the current mode rather than a slogan, so it stays
+            true once the call is live instead of quietly contradicting it. */}
+        <p className="mode-badge" data-state={screen === "live" ? "live" : "dry-run"}>
+          {screen === "live" ? "Live call in progress" : "Dry run · no call placed"}
+        </p>
       </header>
+      <Steps current={screen} />
       {screen === "landing" && <Landing onStart={() => setScreen("configure")} />}
       {screen === "configure" && (
         <Configure

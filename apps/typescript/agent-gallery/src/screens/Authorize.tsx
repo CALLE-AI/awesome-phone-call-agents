@@ -49,41 +49,69 @@ export function Authorize({
   }
 
   return (
-    <section>
-      <h2>Authorize one live call</h2>
-      <p>
-        You are about to place one real phone call to {maskE164(request.customer.phone_e164)}.
-        This is the only step that leaves dry-run mode.
-      </p>
-      <label className="consent">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-          disabled={submitting}
-        />
-        I authorize exactly one call to this number, now.
-      </label>
-      <label className="field">
-        Operator access code
-        <input
-          type="password"
-          value={accessCode}
-          onChange={(e) => onAccessCodeChange(e.target.value)}
-          disabled={submitting}
-          autoComplete="off"
-        />
-      </label>
-      <p className="muted">
-        The checkbox above records your consent. This code is what the server actually
-        checks, so that only an authorized operator can spend a real call.
-      </p>
-      {error && <p className="errors">{error}</p>}
+    <section className="screen">
+      <div className="screen-head">
+        <h2>Authorize one live call</h2>
+        <p className="lede">
+          This is the only step that leaves dry-run mode. Pressing the button places one real
+          phone call to a real person, and it cannot be recalled.
+        </p>
+      </div>
+
+      <div className="card">
+        <dl className="spec">
+          <dt>Calling</dt>
+          <dd>
+            {request.customer.given_name} at{" "}
+            <span className="tabular">{maskE164(request.customer.phone_e164)}</span>
+          </dd>
+          <dt>Calls placed</dt>
+          <dd>Exactly one</dd>
+        </dl>
+      </div>
+
+      <div className="card">
+        <label className="consent">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            disabled={submitting}
+          />
+          I authorize exactly one call to this number, now.
+        </label>
+        <label className="field">
+          Operator access code
+          <input
+            type="password"
+            value={accessCode}
+            onChange={(e) => onAccessCodeChange(e.target.value)}
+            disabled={submitting}
+            autoComplete="off"
+          />
+          <span className="field-hint">
+            The checkbox records your consent; this code is what the server actually checks, so
+            that only an authorized operator can spend a real call.
+          </span>
+        </label>
+      </div>
+
+      {error && (
+        <div className="alert" role="alert">
+          <h3>The call was not placed</h3>
+          <p>{error}</p>
+        </div>
+      )}
+
       <div className="actions">
         <button onClick={onBack} disabled={submitting}>
           Back
         </button>
-        <button onClick={placeCall} disabled={!confirmed || !accessCode || submitting}>
+        <button
+          className="destructive"
+          onClick={placeCall}
+          disabled={!confirmed || !accessCode || submitting}
+        >
           {submitting ? "Placing call…" : "Place the call"}
         </button>
       </div>
