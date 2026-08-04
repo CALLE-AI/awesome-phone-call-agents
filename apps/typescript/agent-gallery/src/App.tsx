@@ -5,7 +5,7 @@ import { Preview } from "./screens/Preview";
 import { Authorize } from "./screens/Authorize";
 import { LiveCall } from "./screens/LiveCall";
 import { ResultScreen } from "./screens/Result";
-import type { RecoveryRequest, RecoveryResult } from "./types";
+import type { RecoveryRequest, RecoveryResult } from "./workflows/appointment-recovery/types";
 
 export type Screen = "landing" | "configure" | "preview" | "authorize" | "live" | "result";
 

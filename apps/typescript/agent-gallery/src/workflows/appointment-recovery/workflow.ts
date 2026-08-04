@@ -1,4 +1,4 @@
-import type { RecoveryRequest } from "../types";
+import type { RecoveryRequest } from "./types";
 
 export const MAX_REPLACEMENT_WINDOWS = 3;
 

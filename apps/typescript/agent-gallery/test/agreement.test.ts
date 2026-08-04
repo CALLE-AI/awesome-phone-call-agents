@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseTranscript, readAgreement } from "../src/lib/agreement";
-import { classifyOutcome } from "../src/lib/outcome";
-import type { ReplacementWindow } from "../src/types";
+import { parseTranscript, readAgreement } from "../src/workflows/appointment-recovery/agreement";
+import { classifyOutcome } from "../src/workflows/appointment-recovery/outcome";
+import type { ReplacementWindow } from "../src/workflows/appointment-recovery/types";
 
 const TIMEZONE = "Asia/Singapore";
 const WINDOWS: ReplacementWindow[] = [

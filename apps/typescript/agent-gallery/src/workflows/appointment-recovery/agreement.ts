@@ -1,5 +1,5 @@
 import type { Agreement } from "./outcome";
-import type { ReplacementWindow } from "../types";
+import type { ReplacementWindow } from "./types";
 
 /**
  * Reads what a completed call actually agreed to.

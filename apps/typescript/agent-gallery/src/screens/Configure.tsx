@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { MAX_REPLACEMENT_WINDOWS } from "../workflows/appointment-recovery";
-import { validateRequest } from "../lib/validate";
-import type { RecoveryRequest } from "../types";
+import { MAX_REPLACEMENT_WINDOWS } from "../workflows/appointment-recovery/workflow";
+import { validateRequest } from "../workflows/appointment-recovery/validate";
+import type { RecoveryRequest } from "../workflows/appointment-recovery/types";
 
 interface Props {
   request: RecoveryRequest;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isE164, isIanaTimezone, validateRequest } from "../src/lib/validate";
-import type { RecoveryRequest } from "../src/types";
+import { isE164, isIanaTimezone, validateRequest } from "../src/workflows/appointment-recovery/validate";
+import type { RecoveryRequest } from "../src/workflows/appointment-recovery/types";
 
 const NOW = new Date("2026-08-04T12:00:00+08:00");
 

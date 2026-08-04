@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { maskE164 } from "../src/lib/mask";
+import { maskE164 } from "../src/calle";
 
 test("masks the middle of an E.164 number", () => {
   assert.equal(maskE164("+6580000000"), "+65•••••000");

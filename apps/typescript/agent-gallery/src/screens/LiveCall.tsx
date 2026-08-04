@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { maskE164 } from "../lib/mask";
-import type { RecoveryRequest, RecoveryResult } from "../types";
+import { maskE164 } from "../calle";
+import type { CalleRunResult } from "../calle";
+import { buildRecoveryResult } from "../workflows/appointment-recovery/result";
+import type { RecoveryRequest, RecoveryResult } from "../workflows/appointment-recovery/types";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -12,7 +14,9 @@ interface Props {
 
 interface StatusPayload {
   status: string;
-  result?: RecoveryResult;
+  activity?: { ts: string; level: string; message: string }[];
+  /** Present once the run is terminal. Untrusted call output. */
+  calle_result?: CalleRunResult | null;
   error?: string;
 }
 
@@ -35,8 +39,15 @@ export function LiveCall({ request, callId, onResult }: Props) {
           return;
         }
         setStatus(payload.status);
-        if (payload.result) {
-          onResult(payload.result);
+        if (payload.calle_result !== undefined) {
+          onResult(
+            buildRecoveryResult({
+              request,
+              status: payload.status,
+              calle: payload.calle_result,
+              runId: callId,
+            }),
+          );
           return;
         }
       } catch {
