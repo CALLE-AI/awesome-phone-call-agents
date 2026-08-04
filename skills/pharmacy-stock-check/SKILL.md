@@ -151,11 +151,12 @@ Offer the transcript. Every claim should be checkable against what was said.
   dispatched concurrently, so nothing downstream spaces them out. A file lock
   won't catch this: both rows run in one process and share a pid, so the
   in-flight set has to be tracked in-process as well.
-- **Store credentials and transcripts owner-only (0600).** The ledger holds
-  `confirm_token`s that authorise placing a call; run dumps hold a third
-  party's recorded voice. Default umask leaves both readable by every account
-  on the machine. Write them to a dedicated directory, not beside the script
-  where they get committed by accident.
+- **Store credentials and transcripts owner-only (0600), and ignore them.** The
+  ledger holds `confirm_token`s that authorise placing a call; run dumps hold a
+  third party's recorded voice. Default umask leaves both readable by every
+  account on the machine, and file permissions are no protection at all against
+  being committed. Write them to a dedicated directory and add that directory to
+  `.gitignore` — this skill ships one covering its own runtime state.
 - **Bind the auth token to the endpoint you are calling.** Credential caches
   are keyed by hash and more than one can exist — a second account, a different
   environment, a stale login. Selecting whichever sorts last silently

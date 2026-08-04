@@ -160,9 +160,13 @@ Two kinds of file here are more sensitive than they look:
   stored where anyone on the machine can read them.
 
 Write both with mode 0600, into a dedicated directory rather than the working
-directory. Files scattered beside the script get committed by accident — and a
-token in a public repository is a token in a public repository, however
-short-lived.
+directory, and add that directory to `.gitignore`.
+
+The two protections do different jobs and neither substitutes for the other.
+0600 stops other accounts on the machine reading a transcript. Ignoring stops
+the file reaching a public repository, which is the failure that actually
+happens — a token in a public repo is a token in a public repo, however
+short-lived, and permissions are irrelevant once it's pushed.
 
 ## Authenticate as the account you meant to
 
