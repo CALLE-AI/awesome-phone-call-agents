@@ -1,39 +1,21 @@
-License placeholder — to be negotiated at PR review time.
+MIT License
 
-This file currently ships with the literal token:
+Copyright (c) 2026 conanxin
 
-    LICENSE_PLACEHOLDER_PENDING_HUMAN_DECISION
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The maintainers of awesome-phone-call-agents and the
-ParcelBridge submitter are expected to replace this
-file's contents with the agreed license text before
-the PR is marked ready for review. The ParcelBridge
-submitter has not chosen a license yet because the
-license decision belongs to the human submitter, not
-to the agent that produced the bundle.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-Allowed replacement licenses include (but are not
-limited to):
-
-- MIT License (with year and copyright holder filled
-  in by the human submitter)
-- Apache License, Version 2.0
-- BSD 2-Clause / 3-Clause License
-- ISC License
-- Mozilla Public License 2.0
-- Any OSI-approved permissive license
-
-Forbidden replacements:
-
-- Any license that adds restrictions not present in
-  the original placeholder (the placeholder is
-  permissive-by-default).
-- Any license that requires attribution of the
-  ParcelBridge agent.
-- Any license that is not OSI-approved.
-
-When the replacement is performed, the file's first
-non-comment line must no longer contain the literal
-token `LICENSE_PLACEHOLDER_PENDING_HUMAN_DECISION`. The
-PR reviewer should reject any PR that still contains
-this token.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
