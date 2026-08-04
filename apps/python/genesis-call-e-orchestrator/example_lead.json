@@ -1,0 +1,12 @@
+{
+  "scenario": "lead_qualification",
+  "phone_number": "+14155550100",
+  "authorized_recipient": true,
+  "region": "US",
+  "locale": "en-US",
+  "context": {
+    "company_name": "Example Software",
+    "product_name": "Genesis",
+    "qualification_criteria": ["need", "authority", "budget", "timeline"]
+  }
+}
