@@ -1,0 +1,7 @@
+[
+    {
+        "incident": "Database server is down",
+        "severity": "Critical",
+        "priority": "P1"
+    }
+]
