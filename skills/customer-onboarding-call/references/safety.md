@@ -105,11 +105,13 @@ acknowledge it and route to a human. Never advise.
 
 ## Honest reporting
 
-- Report `not-reached` only with positive evidence that nobody took part — voicemail, a carrier
-  message, no answer, silence. Do not let an unanswered call appear as an onboarding, and do not
-  let a missing structured result stand in for evidence of no answer: a reached call whose result
-  is absent or unusable is `needs-review`, because `not-reached` retries and could redial someone
-  who refused.
+- Report `not-reached` only with positive evidence from the closed no-human set — voicemail, a
+  carrier message, ring-out, no answer, silence, or the provider's own answered-by-machine signal.
+  An unreachable provider, an unknown attempt, an expired lease, an extractor-claimed `NotReached`,
+  and a billing charge are all *unknown*, not evidence of no answer, and must go to review.
+- Never let an unanswered call appear as an onboarding, and never let a missing structured result
+  stand in for evidence of no answer. A reached call whose result is absent or unusable is
+  `needs-review`, because `not-reached` retries and could redial someone who refused.
 - Do not report a customer as onboarded, interested, or requesting follow-up without a structured
   result to support it.
 - Surface extraction the agent inferred rather than heard, so a human can check it.

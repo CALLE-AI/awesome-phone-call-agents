@@ -131,11 +131,17 @@ says what it permits.
         |                                                       |
         +-- refusal evidence present? --> ( declined )          |
         |                                                       |
-   no-human (positive evidence:                                 |
-   voicemail / carrier msg / no answer / silence)               |
-        +--> ( not-reached ) ( failed ) --- retry allowed -------+
+   no-human — CLOSED evidence set only: voicemail / carrier msg /
+   ring-out / no-answer / silence / provider machine signal      |
+        +--> ( not-reached ) ------------------ retry allowed ---+
+        |                                                        |
+        +--> ( failed ) provider positively says NO CALL PLACED --+
         |
-   human  OR  indeterminate
+        +--> ( needs-review )  indeterminate: provider unreachable,
+        |     unknown attempt, expired lease, extractor-only NotReached,
+        |     billing charge with no obtainable outcome.  NO RETRY.
+        |
+   human
         v
   == STAGE B: consent governs ==
         |
@@ -149,8 +155,11 @@ says what it permits.
 
 Invariants the diagram encodes:
 
-- **Nothing reaches Stage B without a human, and nothing lands in Stage A without positive evidence
-  there was none.** A missing structured result proves neither.
+- **A redial requires positive no-human evidence from a closed set.** A missing result, an
+  extractor-claimed `NotReached`, an unreachable provider, an expired lease, and a billing charge
+  are all *unknown* — they route to `needs-review`, never to a retry.
+- **Releasing a stuck attempt and authorising a redial are separate decisions.** Unblocking the
+  slot is bookkeeping; dialling again needs evidence.
 - **Refusal evidence dominates.** It routes to `declined` from anywhere, with or without a result.
 - **Only Stage B can suppress a number**, and only via `declined`.
 - **Only Stage A outcomes retry automatically.** Every Stage B redial needs consent or a human, and
@@ -184,25 +193,57 @@ conversation can return no result at all: extraction failed, the result failed v
 customer refused and rang off before the model emitted anything. Inferring "nobody answered" from a
 missing result would auto-retry those calls and redial a person who may have just refused.
 
-First establish reachability independently of the result:
+#### The no-human evidence set
+
+Exactly one thing authorises an automatic redial: **observed evidence from the call itself that no
+person took part.** This is a closed list.
+
+| Counts as no-human evidence | |
+| --- | --- |
+| voicemail or answering-machine greeting | carrier or network announcement |
+| ring-out with no answer | the provider's own answered-by-machine / no-answer signal |
+| silence throughout after the agent spoke | |
+
+**Nothing else qualifies.** In particular these are *not* no-human evidence, however tempting:
+
+- a missing or empty structured result
+- the extractor's own `disposition: NotReached` — that is a model claim about the call, not an
+  observation of it, and the same extractor mislabels refusals
+- a provider that is unreachable, times out, or has no record of the attempt
+- an expired lease
+- a billing charge or usage record — that shows a call *was placed*, which if anything makes a
+  conversation more likely, not less
+
+Every one of those means **we do not know**. Unknown is `needs-review`, never a retry. The
+asymmetry is deliberate: a needless manual check costs a minute, and a wrong redial reaches someone
+who may have already refused.
+
+#### Establishing reachability
 
 | Reachability | Evidence |
 | --- | --- |
 | `human` | the provider reports a human answered, **or** the transcript contains customer speech that is not carrier or IVR audio |
-| `no-human` | positive evidence nobody took part: voicemail greeting, carrier or network message, ring-out, no answer, silence throughout |
-| `indeterminate` | none of the above can be established |
+| `no-human` | at least one item from the no-human evidence set above, and no contradicting customer speech |
+| `indeterminate` | anything else, including every "not evidence" item listed above |
 
-Then classify:
+#### Then classify
 
 | # | Outcome | Condition | Action |
 | --- | --- | --- | --- |
-| A1 | `not-reached` | reachability is `no-human` — positive evidence — **or** `disposition` is `NotReached` and nothing contradicts it | write no insight; queue a retry; **never** suppress the number |
+| A1 | `not-reached` | reachability is `no-human` | write no insight; queue a retry; **never** suppress the number |
 | A2 | `ambiguous` | provider reported failure and reconciliation has not completed | write nothing; schedule reconciliation, not a retry |
-| A3 | `failed` | provider reported failure **and** reconciliation confirms no call occurred | write no insight; queue a retry; **never** suppress the number |
+| A3 | `failed` | provider reported failure **and** reconciliation positively establishes that **no call was placed** | write no insight; queue a retry; **never** suppress the number |
+| A4 | `needs-review` | reachability is `indeterminate` — provider unreachable, unknown attempt, expired lease, extractor-only `NotReached` | write nothing beyond the raw record; **no automatic retry**; route to a human |
 
-**`not-reached` requires positive evidence that nobody took part. Absence of a result is not that
-evidence.** Where reachability is `human` or `indeterminate`, continue to Stage B — a missing or
-unusable result there resolves to `needs-review` (B2), which never retries automatically.
+`disposition: NotReached` may **corroborate** no-human evidence, and it may never substitute for it.
+On its own it yields `needs-review`, not `not-reached`.
+
+Note the strictness of A3: reconciliation must show the call *did not happen*. "The provider does
+not know" is not that; it is A4. Only a definite negative — no such call, never dialled — releases a
+retry.
+
+Where reachability is `human`, continue to Stage B; a missing or unusable result there resolves to
+`needs-review` (B2), which never retries automatically.
 
 **Refusal evidence outranks everything in this stage.** If the transcript or provider summary shows
 the customer refusing or asking not to be called — even with no structured result, and even where
@@ -286,12 +327,27 @@ Retries are only safe if each attempt is durably recorded **before** the call is
    constraint on `signup_id` restricted to non-terminal states. Uniqueness on
    `(signup_id, attempt_no)` alone does not provide this: two workers can allocate attempt 2 and
    attempt 3 concurrently and both dial.
-3. Derive the provider idempotency key deterministically from that record, for example
-   `onboarding:<signup_id>:<attempt_no>`.
+3. **Bind the idempotency key to the canonical call payload**, not just to the attempt slot. Derive
+   it deterministically from the attempt identity *and* a digest of exactly what will be dialled:
+
+   ```text
+   attempt_key = onboarding:<signup_id>:<attempt_no>:<digest>
+   digest      = hash( E.164 destination + task/script version + result-schema version + locale )
+   ```
+
+   `onboarding:<signup_id>:<attempt_no>` alone identifies a slot, not a call. If the destination
+   number is corrected, the script revised, or the schema changed between attempts, that key would
+   silently cover a materially different call — and reconciliation would match a provider record
+   that is not the one you placed, which is how a "no record found" turns into a wrong redial.
+   Include the destination in the digest so a changed number can never inherit a prior attempt's
+   identity.
 4. Never derive an idempotency key from a timestamp, a random value, or a retry counter held only
    in memory. A key that changes on redelivery is not an idempotency key.
-5. Key webhook ingestion on the provider event id so redelivery cannot advance state twice.
-6. **If placing the call fails after the attempt record exists — provider rejection, timeout,
+5. **Reconcile on the key, and verify the payload matches** before believing the answer. A provider
+   record whose destination or script digest differs from the attempt you are reconciling is not
+   evidence about that attempt — treat the attempt as `needs-review`.
+6. Key webhook ingestion on the provider event id so redelivery cannot advance state twice.
+7. **If placing the call fails after the attempt record exists — provider rejection, timeout,
    crash — close that attempt out before returning.** An attempt left live because the call was
    never actually placed blocks the signup forever.
 
@@ -306,13 +362,19 @@ nothing failed.
   minutes beyond the provider's maximum call duration is enough.
 - When the lease expires, **reconcile before concluding anything.** Ask the provider for that
   attempt's state by its idempotency key.
-  - Terminal at the provider: ingest that result through the normal path. The webhook was lost,
+  - **Terminal at the provider:** ingest that result through the normal path. The webhook was lost,
     not the call.
-  - Still live at the provider: extend the lease once, then treat it as `ambiguous`.
-  - Unknown to the provider, or the provider is unreachable past a hard cap: close the attempt as
-    `failed` and release the signup so a retry can proceed.
-- Expiry must never invent an outcome. A lapsed lease means *we do not know*, which is
-  `ambiguous` or `failed` — never `declined`, and never `onboarded`.
+  - **Still live at the provider:** extend the lease once, then treat it as `ambiguous`.
+  - **The provider positively reports the call was never placed:** close the attempt as `failed`.
+    This is the only lease-expiry path that releases a retry, and it requires a definite negative.
+  - **Unknown to the provider, or the provider is unreachable:** close the attempt as
+    `needs-review`. Release the signup so it is no longer blocked, but **do not queue a retry.**
+- **An expired lease is not evidence about the customer.** It says our bookkeeping failed, not that
+  nobody answered. The call may well have connected and been refused. Expiry therefore resolves to
+  `ambiguous`, `needs-review`, or a reconciled terminal result — never `not-reached`, never
+  `declined`, never `onboarded`, and never a retry on its own.
+- Releasing the signup and authorising a redial are **separate decisions.** Unblocking the attempt
+  slot is bookkeeping; dialling again needs evidence. Do not let one imply the other.
 - Surface stranded attempts to operators. A signup silently stuck is the failure mode this whole
   section exists to prevent.
 
@@ -325,10 +387,13 @@ report failure and dial minutes later.
   reconciliation check instead of a retry.
 - Wait a reconciliation window, default 15 minutes, then check the provider's billing records,
   call logs, or platform logs for that idempotency key.
-- If any evidence shows a call was placed, do not retry. Wait for the late terminal result, or
-  classify as `not-reached` once the window closes.
-- Only promote `ambiguous` to `failed`, and only then schedule a retry, once reconciliation shows
-  no call occurred.
+- **A billing charge or usage record proves the call happened, not that it went unanswered.** It is
+  evidence *against* a retry, not for one. If the call was placed but you cannot obtain its outcome,
+  the attempt is `needs-review` — a human reads the record. It is never `not-reached`, because a
+  placed call may have reached someone who refused.
+- Only promote `ambiguous` to `failed`, and only then schedule a retry, when reconciliation
+  **positively establishes that no call was placed.** "The provider has no record" is not that;
+  absence in a log you cannot fully trust is `needs-review`.
 
 **`ambiguous` is provisional, not a verdict.** If a late result arrives — from the delayed webhook
 or from reconciliation — re-run the full classification on it, Stage A then Stage B. A call that

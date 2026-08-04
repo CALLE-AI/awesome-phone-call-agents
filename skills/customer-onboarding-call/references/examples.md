@@ -177,6 +177,40 @@ Automatically redialling someone who already gave a full interview — because a
 step failed — wastes their time and risks contacting a customer who declined in words the classifier
 never saw.
 
+## Extractor says NotReached, but nothing observed agrees
+
+The result claims nobody was there. The call evidence does not corroborate it: there is no
+voicemail greeting, no carrier message, and no ring-out — just a short exchange the extractor
+apparently discounted.
+
+```json
+{
+  "consent_granted": false,
+  "disposition": "NotReached",
+  "disposition_evidence": "No response detected."
+}
+```
+
+```text
+0s  agent     Hi Ada, this is Example Supply. Is now a good time?
+2s  customer  (inaudible)
+4s  customer  ...no.
+```
+
+Expected report:
+
+```text
+outcome: needs-review
+phone: +1******1234
+reachability: indeterminate — extractor claimed NotReached, no corroborating no-human evidence
+retry: none, manual review required
+```
+
+**`disposition: NotReached` is a model claim about the call, not an observation of it** — and it
+comes from the same extractor that mislabels refusals. It may corroborate voicemail or carrier
+evidence; it can never substitute for it. Here the transcript contains what may be a refusal, so
+retrying on the extractor's word alone could redial someone who said no.
+
 ## Malformed result — review, never redial
 
 A human clearly took part, but the consent fields are unusable: `disposition` is `Completed` while
@@ -328,11 +362,27 @@ retry: not scheduled yet
 action: reconciliation check in 15 minutes against provider billing and platform call logs
 ```
 
-After reconciliation finds a matching charge for idempotency key `onboarding:<signup_id>:1`:
+After reconciliation finds a matching charge for attempt key
+`onboarding:<signup_id>:1:<digest>`, and the payload digest matches the number and script actually
+dialled:
 
 ```text
-outcome: not-reached
-evidence: provider billed a call for this idempotency key despite reporting failure
+outcome: needs-review
+evidence: provider billed a call for this attempt key despite reporting failure
+meaning: the call WAS placed; its outcome is unknown
+retry: none — a human reads the provider record first
+```
+
+**A billing charge is evidence against a retry, not for one.** It shows the call happened, which
+makes a conversation *more* likely, not less — the person may have answered and refused. Reading it
+as "no result, so nobody answered" and redialling is exactly the mistake this workflow must not
+make.
+
+Only a definite negative releases a retry:
+
+```text
+reconcile: provider positively reports no call was ever placed for this attempt key
+outcome: failed
 retry: attempt 2 of 3 scheduled after 30 minutes
 ```
 
@@ -361,16 +411,20 @@ retry: none, a conversation took place
 note: the webhook was lost, not the call
 ```
 
-If instead the provider had no record of the attempt:
+If instead the provider is unreachable, or simply does not recognise the attempt key:
 
 ```text
-outcome: failed
-attempt: closed, signup released
-retry: attempt 2 of 3 scheduled after 30 minutes
+outcome: needs-review
+attempt: closed, signup released so it is no longer blocked
+retry: none — releasing the slot is not authorisation to dial
 ```
 
-An expired lease means the outcome is **unknown**. It is resolved by asking the provider, never by
-assuming — and never by inferring a refusal.
+An expired lease is a fact about **our bookkeeping**, not about the customer. The call may have
+connected and been refused. So expiry resolves to a reconciled result, `ambiguous`, or
+`needs-review` — never `not-reached`, and never a redial on its own.
+
+Only a provider that positively confirms the call was never placed yields `failed`, which is the
+one lease-expiry path that releases a retry.
 
 ## Attempt cap reached with a callback request
 
