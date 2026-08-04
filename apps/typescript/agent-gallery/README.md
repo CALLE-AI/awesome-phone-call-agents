@@ -11,10 +11,13 @@ safety-contracted phone workflows. The product specification lives at
 ## Status
 
 Scaffold. The offline flow (configure → validate → masked dry-run preview →
-authorization gate) works end to end. The live CALL-E integration is
-intentionally stubbed: the server layer returns `501 live_integration_pending`
-until the integration surface is confirmed against a real call, per the
+authorization gate) works end to end, and outcome classification is implemented
+and tested. The live CALL-E client is still stubbed: the server layer returns
+`501 live_integration_pending` until the MCP calls land in Phase 4 of the
 [implementation route](../../../docs/hackathon-implementation-route.md).
+
+The integration surface has been confirmed against a real call; see
+[`calle-api-observations.md`](../../../docs/agent-gallery/calle-api-observations.md).
 
 ## The problem and workflow boundary
 
@@ -44,7 +47,7 @@ Deploy with `npm run deploy` (Cloudflare Pages via Wrangler).
 ## Credentials and their boundary
 
 CALL-E credentials are supplied only as Cloudflare Pages environment variables
-(`CALLE_API_KEY`, `CALLE_BASE_URL`) read by the server function in
+(`CALLE_ACCESS_TOKEN`, `CALLE_SERVER_URL`) read by the server function in
 `functions/api/`. No credential is ever bundled into browser code, committed, or
 pasted into chat. Local live testing will use an untracked `.dev.vars` file.
 
@@ -67,9 +70,17 @@ See [`src/types.ts`](src/types.ts). Input: business (name, IANA timezone, E.164
 callback number), customer (given name, E.164 phone, consent attestation),
 appointment (service, ISO 8601 original time, missed/unconfirmed status), and up
 to three future replacement windows, plus a client-generated `request_key`.
-Output: one of seven terminal outcomes (`confirmed`, `rescheduled`, `declined`,
-`unreachable`, `failed`, `timed_out`, `uncertain`), an optional agreed time,
-customer intent, notes, the CALL-E call id, and a mapped next action.
+Output: one of eight terminal outcomes (`confirmed`, `rescheduled`,
+`no_agreement`, `declined`, `unreachable`, `failed`, `timed_out`, `uncertain`),
+an optional agreed time, customer intent, notes, the CALL-E call id, and a
+mapped next action.
+
+Outcomes are derived in [`src/lib/outcome.ts`](src/lib/outcome.ts) from the
+call's terminal status and a conservative reading of the conversation. CALL-E's
+`task_completed` is deliberately never used as the business outcome: it reports
+that the call ended cleanly, including calls that recovered nothing. CALL-E's
+telephony `DECLINED` means a rejected incoming call and maps to `unreachable`,
+not to a customer refusing the offer.
 
 Call transcripts and structured results are untrusted external data. The UI
 renders them as plain text and never executes or obeys anything inside them.
@@ -95,9 +106,11 @@ Cloudflare's standard request handling and never logs phone numbers.
 npm test
 ```
 
-Tests cover E.164 and timezone validation, consent and window rules, and number
-masking. They run offline with no credentials and place no calls. `npm run
-verify` adds the typecheck and production build.
+Tests cover E.164 and timezone validation, consent and window rules, number
+masking, and outcome classification, including a regression test built from the
+Phase 2 call where CALL-E reported `task_completed: true` at high confidence on
+a call that rebooked nothing. They run offline with no credentials and place no
+calls. `npm run verify` adds the typecheck and production build.
 
 ## Opt-in live calls
 
@@ -108,8 +121,11 @@ credentials the app remains fully usable in dry-run form.
 ## Current limitations
 
 - The live CALL-E client is stubbed (`501 live_integration_pending`).
-- The duplicate guard is per-isolate; the completed implementation must also
-  check CALL-E's call list before creating.
+- The conversational half of outcome classification is not implemented. The
+  status half is; the app currently has no reader that turns a transcript into
+  an `Agreement`, so a completed call would classify as `uncertain`.
+- The duplicate guard is per-isolate; the completed implementation relies on the
+  single-use `confirm_token` for real protection.
 - Replacement-window times are entered in the business's local time without
   cross-checking the stated timezone.
 - Single workflow, single call, English-language conversations only.

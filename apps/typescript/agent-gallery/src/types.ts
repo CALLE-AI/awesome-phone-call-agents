@@ -3,6 +3,7 @@ export type AppointmentStatus = "missed" | "unconfirmed";
 export type Outcome =
   | "confirmed"
   | "rescheduled"
+  | "no_agreement"
   | "declined"
   | "unreachable"
   | "failed"
@@ -47,6 +48,9 @@ export interface RecoveryResult {
 export const NEXT_ACTIONS: Record<Outcome, string> = {
   confirmed: "Mark the appointment confirmed and send an SMS confirmation.",
   rescheduled: "Book the agreed slot and send an SMS confirmation.",
+  no_agreement:
+    "The customer wants to rebook but no approved window worked. Decide whether to " +
+    "open a new window, then have the front desk call back.",
   declined: "Free the slot. Do not call again without fresh consent.",
   unreachable: "You may retry manually later. Nothing happens automatically.",
   failed: "The call did not complete. Have the front desk call manually.",

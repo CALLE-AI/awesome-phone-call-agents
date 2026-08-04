@@ -3,14 +3,17 @@
 // Credentials live only here, supplied through Cloudflare Pages environment
 // variables. They must never reach browser code.
 //
-// The live CALL-E client is intentionally not implemented yet. Phase 2 of the
-// implementation route places one throwaway real call to observe the actual
-// surface (sibling apps in this repository use MCP Streamable HTTP), and this
-// layer is then completed against the observed behavior.
+// CALL-E is MCP, not REST: plan_call issues a plan_id and a confirm_token,
+// run_call requires both and returns a run_id, and get_call_run polls it.
+// Because run_call cannot execute without a token that plan_call issued, the
+// preview-then-authorize flow is enforced by the protocol rather than only by
+// this app, and one token yielding one run is what makes retries safe.
+//
+// See docs/agent-gallery/calle-api-observations.md.
 
 type Env = {
-  CALLE_API_KEY?: string;
-  CALLE_BASE_URL?: string;
+  CALLE_ACCESS_TOKEN?: string;
+  CALLE_SERVER_URL?: string;
 };
 
 type Context = {
@@ -72,9 +75,8 @@ async function createCall(context: Context): Promise<Response> {
   return json(
     {
       error:
-        "live_integration_pending: the CALL-E client is completed in Phase 4 " +
-        "of the implementation route, after the Phase 2 throwaway call fixes " +
-        "the integration surface.",
+        "live_integration_pending: the MCP client calling plan_call and " +
+        "run_call is completed in Phase 4 of the implementation route.",
     },
     501,
   );

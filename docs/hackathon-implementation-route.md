@@ -348,7 +348,14 @@ Before implementation, define:
 - Follow-up actions.
 - A measurable before-and-after claim that can be defended without invented data.
 
-### Phase 2: De-Risk the Live Integration First
+### Phase 2: De-Risk the Live Integration First — Done
+
+Completed 2026-08-04. The findings are recorded in
+[`agent-gallery/calle-api-observations.md`](agent-gallery/calle-api-observations.md), and
+they corrected the integration surface from REST to MCP, exposed that
+`task_completed` does not mean the business goal succeeded, and added the
+`no_agreement` outcome. Doing this before the UI was the right call: the
+`task_completed` trap would otherwise have shipped as a demo-day bug.
 
 Telephony integration is the highest-risk component and must not wait until late in the schedule. Before building any app UI:
 
