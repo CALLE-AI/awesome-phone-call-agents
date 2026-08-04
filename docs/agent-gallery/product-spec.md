@@ -88,11 +88,24 @@ Phone numbers are masked (`+65•••••000`) everywhere except the operato
 | --- | --- | --- |
 | `confirmed` | Customer keeps the original/near slot | Mark confirmed; send SMS confirmation |
 | `rescheduled` | Customer accepted one offered window | Book that slot; send confirmation |
+| `no_agreement` | Customer engaged and wants to rebook, but no approved window worked | Decide whether to open a new window; front desk calls back |
 | `declined` | Customer clearly declined | Free the slot; no re-call without new consent |
-| `unreachable` | No answer / voicemail | Operator may retry manually later; nothing automatic |
+| `unreachable` | No answer, voicemail, busy, or a rejected call | Operator may retry manually later; nothing automatic |
 | `failed` | Call errored before or during dial | Front desk calls manually |
 | `timed_out` | Call exceeded time budget without resolution | Review transcript; front desk follows up |
 | `uncertain` | Intent unclear or result unparseable | Human reviews transcript before any action |
+
+`no_agreement` was added after the Phase 2 call, which produced exactly this
+case: a reachable, willing customer for whom every proposed time fell outside
+policy. It is operationally different from `declined` (does not want it) and
+from `uncertain` (we cannot tell), and collapsing the three would hide the one
+case where opening a new window recovers the booking.
+
+Outcomes are derived in [`outcome.ts`](../../apps/typescript/agent-gallery/src/lib/outcome.ts).
+CALL-E's `task_completed` is never consulted: it reports that the call ended
+cleanly, not that the appointment was recovered. CALL-E's telephony `DECLINED`
+means a rejected incoming call and maps to `unreachable`, not to a customer
+refusing the offer.
 
 Transcripts and structured results are untrusted external data: rendered as text,
 never executed or treated as instructions.
@@ -113,19 +126,31 @@ never executed or treated as instructions.
 
 ## Key Technical Decisions (frozen)
 
-- **Integration surface:** CALL-E REST API/SDK from the server-side layer. The `calle`
-  CLI is used on Day 1 for the throwaway call to observe real creation semantics, status
-  transitions, and result payloads. The offline fake must match this same surface.
+Confirmed against a real call on 2026-08-04. Full record:
+[`calle-api-observations.md`](calle-api-observations.md).
+
+- **Integration surface: MCP**, not REST. The Phase 2 call corrected the earlier
+  provisional decision. The server layer calls `plan_call` (returns `plan_id` and
+  `confirm_token`), then `run_call` (requires both, returns `run_id`), then polls
+  `get_call_run`. Because `run_call` cannot execute without a token `plan_call` issued,
+  the preview-then-authorize flow is enforced by the protocol, and one token yielding one
+  run provides idempotency without app-side storage. The offline fake must match this
+  surface.
+- **Result parsing:** CALL-E has no custom extraction schema, so the goal instructs the
+  agent to state the accepted window and SMS preference plainly, and the app reads those
+  back conservatively, defaulting to `uncertain`. `completion_confidence` below 0.6 routes
+  to human review regardless of what was read.
+- **Voicemail:** stated explicitly in the goal. The planner otherwise invents its own
+  voicemail behavior, and leaving a voicemail is a real-world side effect.
 - **Deployment and call state:** Cloudflare Pages + Pages Functions (copying
   `apps/typescript/call-neuron`'s working pipeline). No database: CALL-E is the system
   of record; the browser polls a server endpoint that relays CALL-E status. Idempotency:
   client `request_key` + immediate submit-disable + server-side duplicate check before
   creation. No call data is stored server-side.
-- **Unknown-creation reconciliation:** provisionally in scope pending Day 1 findings.
-  `apps/typescript/phone-approval-gate` already reconciles unknown creation outcomes
-  against the fake CALL-E, which suggests the API can lose the creation reply. If the
-  Day 1 throwaway call confirms this, promote reconciliation from nice-to-have to
-  required; otherwise ship stable idempotency plus a clear `failed` state.
+- **Unknown-creation reconciliation:** stays a nice-to-have. The plan-then-confirm
+  handshake means a lost `run_call` reply can be resolved by reusing the same
+  `confirm_token`, which is single-use, so a duplicate call cannot be created by
+  retrying. Revisit only if a live run actually produces an ambiguous creation.
 
 ## Out of Scope (MVP)
 
