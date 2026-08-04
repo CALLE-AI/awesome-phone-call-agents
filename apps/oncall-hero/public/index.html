@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnCall Hero — AI Phone Booking Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6 font-sans">
+    <div class="max-w-4xl mx-auto space-y-8">
+
+        <!-- Header -->
+        <div class="border-b border-slate-800 pb-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-indigo-400">☎️ OnCall Hero</h1>
+                <p class="text-slate-400 text-sm mt-1">Autonomous AI Agent powered by CALL-E</p>
+            </div>
+            <span
+                class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-3 py-1 rounded-full font-medium">System
+                Online</span>
+        </div>
+
+        <!-- Booking Form & Recent Calls Grid -->
+        <div class="grid md:grid-cols-2 gap-8">
+
+            <!-- Trigger Form -->
+            <div class="bg-slate-800/60 border border-slate-700/60 p-6 rounded-xl space-y-4">
+                <h2 class="text-xl font-semibold text-slate-200">Dispatch Booking Agent</h2>
+                <form id="bookingForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Service Provider Name</label>
+                        <input type="text" id="providerName" required placeholder="e.g., Dental Care Clinic"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Target Phone Number (E.164
+                            format)</label>
+                        <input type="text" id="phoneNumber" required placeholder="+916374400557"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Customer Name</label>
+                            <input type="text" id="customerName" required placeholder="Anton"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Desired Time</label>
+                            <input type="text" id="desiredTime" required placeholder="Tomorrow at 3:00 PM"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Appointment Type</label>
+                            <input type="text" id="serviceName" required placeholder="clinic service, car service, haircut"
+                                placeholder="e.g. Dental Cleaning, Oil Change, Haircut" required
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Special Instructions
+                            (Optional)</label>
+                        <input type="text" id="notes" placeholder="Prefer afternoon slots if 3 PM is busy"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <button type="submit" id="submitBtn"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 transition-colors text-white font-medium py-2.5 rounded-lg text-sm flex justify-center items-center gap-2">
+                        <span>Call & Book Appointment</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Live Call Status / Log -->
+            <div
+                class="bg-slate-800/60 border border-slate-700/60 p-6 rounded-xl space-y-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-200 mb-3">Call Activity Log</h2>
+                    <div id="statusContainer"
+                        class="bg-slate-900 border border-slate-800 rounded-lg p-4 text-xs font-mono text-slate-400 min-h-[220px] whitespace-pre-wrap overflow-y-auto">
+                        Ready to dispatch. Fill out the form and click 'Call & Book Appointment'.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('bookingForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusContainer = document.getElementById('statusContainer');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                providerName: document.getElementById('providerName').value,
+                phoneNumber: document.getElementById('phoneNumber').value,
+                customerName: document.getElementById('customerName').value,
+                desiredTime: document.getElementById('desiredTime').value,
+                notes: document.getElementById('notes').value,
+                serviceName: document.getElementById('serviceName').value
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = "📞 Call in progress (30-60s)...";
+            statusContainer.innerText = `[${new Date().toLocaleTimeString()}] Dispatching CALL-E agent to ${payload.phoneNumber}...\nPlease wait for the phone conversation to finish.`;
+
+            try {
+                const res = await fetch('/api/calls/book', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    statusContainer.innerText = `✅ CALL COMPLETED SUCCESSFULLY!\n\n` +
+                        `Provider: ${data.data.providerName}\n` +
+                        `Status: ${data.data.status}\n` +
+                        `Task Completed: ${data.data.taskCompleted}\n\n` +
+                        `Summary:\n${data.data.summary}`;
+                } else {
+                    statusContainer.innerText = `❌ Call Failed:\n${data.error}`;
+                }
+            } catch (err) {
+                statusContainer.innerText = `❌ Network/Server Error:\n${err.message}`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Call & Book Appointment";
+            }
+        });
+    </script>
+</body>
+
+</html>
