@@ -433,7 +433,11 @@ def _reconcile(
         if event is None:
             raise PolicyError("durable reservation was not found")
         state = event.get("state")
-        if state not in {"accepted_waiting", "reconciliation_required"}:
+        if state not in {
+            "dispatching",
+            "accepted_waiting",
+            "reconciliation_required",
+        }:
             raise PolicyError("reservation does not require reconciliation")
         attempt_number = event.get("attempt_number")
         if not isinstance(attempt_number, int) or attempt_number < 1:

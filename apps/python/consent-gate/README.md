@@ -89,8 +89,9 @@ The live ledger contains the destination in the reserved provider request. Keep
 it in a private directory with owner-only permissions; do not commit it.
 
 To recover an interrupted dispatch, use the reservation ID from the ledger.
-ConsentGate resumes both `accepted_waiting` and `reconciliation_required`
-records by the accepted call ID when one was checkpointed. If create was
+ConsentGate can reconcile `dispatching`, `accepted_waiting`, and
+`reconciliation_required` records. It resumes by the accepted call ID when one
+was checkpointed. If the process stopped before that checkpoint or create was
 ambiguous, it replays the exact request with the same account-bound idempotency
 key, never a new key:
 
@@ -134,6 +135,17 @@ no transcript; ambiguous or partial contact stays blocked for reconciliation.
 A corroborated request to end only the current call is stored as a temporary
 rejection and starts the 24-hour cooldown; an uncorroborated or low-confidence
 extraction remains blocked for reconciliation.
+
+A verified completed call is final and cannot consume a second attempt. A new
+attempt is permitted only after the previous reservation has a retry-safe
+terminal outcome (`no_answer`, `failed`, or a temporary `rejected` outcome
+after its cooldown). `max_attempts` is an upper bound, not permission to repeat
+an already successful or ambiguous call.
+
+The audit manifest is constructed from a fixed schema of validated operational
+fields. Unknown top-level fields and unknown nested fields are omitted rather
+than copied, so plan extensions cannot leak tokens, alternate phone numbers, or
+private operator context into supposedly redacted output.
 
 Caller-controlled purpose prose is never inserted into a live task. A plan must
 select an allowlisted `purpose_kind`, and its human-readable `purpose` must

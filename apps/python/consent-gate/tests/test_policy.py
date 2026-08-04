@@ -170,6 +170,35 @@ class PolicyTests(unittest.TestCase):
         ]
         self.assertIn("reconcile", " ".join(validate_attempt_limit(plan, history)))
 
+    def test_verified_completion_cannot_use_remaining_attempt(self):
+        plan = valid_plan()
+        plan["max_attempts"] = 2
+        history = [
+            {
+                "event": "dispatch_reserved",
+                "state": "accepted",
+                "outcome": "completed",
+                "phone_fingerprint": record_outcome(plan["phone"], "completed")[
+                    "phone_fingerprint"
+                ],
+            }
+        ]
+        self.assertIn("completed", " ".join(validate_attempt_limit(plan, history)))
+
+    def test_retry_requires_a_retry_safe_terminal_outcome(self):
+        plan = valid_plan()
+        plan["max_attempts"] = 2
+        history = [
+            {
+                "event": "dispatch_reserved",
+                "state": "accepted",
+                "phone_fingerprint": record_outcome(plan["phone"], "failed")[
+                    "phone_fingerprint"
+                ],
+            }
+        ]
+        self.assertIn("not retry-safe", " ".join(validate_attempt_limit(plan, history)))
+
     def test_live_execution_requires_durable_state(self):
         plan = valid_plan()
         plan["execution_allowed"] = True
@@ -217,6 +246,11 @@ class PolicyTests(unittest.TestCase):
         plan["purpose"] += " Also discuss an unrelated topic."
         self.assertIn("exactly match", " ".join(validate_plan(plan)))
 
+    def test_nested_purpose_kind_is_rejected_without_crashing(self):
+        plan = valid_plan()
+        plan["purpose_kind"] = {"name": "accessibility_test", "token": "private"}
+        self.assertIn("purpose_kind", " ".join(validate_plan(plan)))
+
     def test_safe_accessibility_purpose_remains_allowed(self):
         self.assertEqual(validate_plan(valid_plan()), [])
 
@@ -243,6 +277,35 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("phone", manifest)
         self.assertNotIn(plan["phone"], str(manifest))
         self.assertEqual(len(manifest["phone_fingerprint"]), 12)
+
+    def test_manifest_omits_unknown_and_nested_private_fields(self):
+        plan = valid_plan()
+        plan["api_token"] = "token-must-not-leak"
+        plan["operator_context"] = {
+            "backup_phone": "+15555550999",
+            "nested": {"private_key": "private-key-must-not-leak"},
+        }
+        plan["allowed_window"]["approval_context"] = {
+            "password": "password-must-not-leak"
+        }
+        manifest = build_manifest(plan)
+        serialized = json.dumps(manifest, sort_keys=True)
+        for secret in (
+            "token-must-not-leak",
+            "+15555550999",
+            "private-key-must-not-leak",
+            "password-must-not-leak",
+        ):
+            self.assertNotIn(secret, serialized)
+        self.assertEqual(
+            manifest["allowed_window"], {"start_hour": 9, "end_hour": 18}
+        )
+
+    def test_manifest_rejects_nested_locale_value(self):
+        plan = valid_plan()
+        plan["locale"] = {"language": "en-US", "api_token": "must-not-leak"}
+        with self.assertRaisesRegex(PolicyError, "locale"):
+            build_manifest(plan)
 
     def test_invalid_manifest_raises(self):
         plan = valid_plan()
@@ -611,6 +674,130 @@ class PolicyTests(unittest.TestCase):
                 events[1]["idempotency_key"],
             )
             self.assertNotEqual(first_key, events[1]["idempotency_key"])
+
+    def test_completed_call_blocks_second_live_dispatch(self):
+        plan = valid_plan()
+        plan["execution_allowed"] = True
+        plan["max_attempts"] = 2
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "ledger.json"
+            state_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "event": "dispatch_reserved",
+                            "reservation_id": "reservation-1",
+                            "state": "accepted",
+                            "outcome": "completed",
+                            "phone_fingerprint": record_outcome(
+                                plan["phone"], "completed"
+                            )["phone_fingerprint"],
+                            "attempt_number": 1,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            class FakeCalls:
+                def create(self, **_kwargs):
+                    raise AssertionError("completed call must not be dispatched again")
+
+            class FakeClient:
+                def __init__(self, **_kwargs):
+                    self.calls = FakeCalls()
+
+            with (
+                patch.dict(
+                    sys.modules,
+                    {"calle": types.SimpleNamespace(CalleClient=FakeClient)},
+                ),
+                patch.dict(
+                    os.environ,
+                    {
+                        "CALLE_API_KEY": "test-only",
+                        "CALLE_IDEMPOTENCY_NAMESPACE": PROVIDER_NAMESPACE,
+                    },
+                ),
+                patch(
+                    "consent_gate.__main__.validate_dispatch_window",
+                    return_value=[],
+                ),
+            ):
+                with self.assertRaisesRegex(PolicyError, "completed"):
+                    _execute(plan, "I reviewed this call plan", str(state_path))
+
+            self.assertEqual(len(json.loads(state_path.read_text())), 1)
+
+    def test_reconcile_dispatching_replays_same_key_before_call_id_checkpoint(self):
+        plan = valid_plan()
+        plan["execution_allowed"] = True
+        payload = _request_for_plan(plan, PROVIDER_NAMESPACE)
+        digest, key = _request_identity(payload, PROVIDER_NAMESPACE, 1)
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "ledger.json"
+            state_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "event": "dispatch_reserved",
+                            "reservation_id": "reservation-1",
+                            "state": "dispatching",
+                            "request_payload": payload,
+                            "request_sha256": digest,
+                            "idempotency_key": key,
+                            "provider_namespace": PROVIDER_NAMESPACE,
+                            "attempt_number": 1,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            observed = {}
+
+            class FakeCalls:
+                def create(self, **kwargs):
+                    observed["create"] = kwargs
+                    return {"id": "call_recovered"}
+
+                def wait_for_result(self, call_id):
+                    observed["call_id"] = call_id
+                    return high_confidence_result()
+
+            class FakeClient:
+                def __init__(self, **_kwargs):
+                    self.calls = FakeCalls()
+
+            with (
+                patch.dict(
+                    sys.modules,
+                    {"calle": types.SimpleNamespace(CalleClient=FakeClient)},
+                ),
+                patch.dict(
+                    os.environ,
+                    {
+                        "CALLE_API_KEY": "test-only",
+                        "CALLE_IDEMPOTENCY_NAMESPACE": PROVIDER_NAMESPACE,
+                    },
+                ),
+                patch(
+                    "consent_gate.__main__.validate_dispatch_window",
+                    return_value=[],
+                ),
+            ):
+                result = _reconcile(
+                    plan,
+                    "I reviewed this call plan",
+                    str(state_path),
+                    "reservation-1",
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(observed["create"]["idempotency_key"], key)
+            self.assertEqual(observed["call_id"], "call_recovered")
+            event = json.loads(state_path.read_text(encoding="utf-8"))[0]
+            self.assertEqual(event["state"], "accepted")
+            self.assertEqual(event["provider_call_id"], "call_recovered")
 
     def test_reconcile_resumes_accepted_waiting_by_call_id_without_create(self):
         plan = valid_plan()

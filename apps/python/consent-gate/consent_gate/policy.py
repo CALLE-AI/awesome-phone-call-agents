@@ -60,6 +60,7 @@ SUPPORTED_REGION_LANGUAGES = {
     "KE": {"en"},
 }
 E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
 SECRET_TERMS = re.compile(
     r"\b(password|passcode|pin|one[- ]?time code|otp|verification code|"
     r"security code|api[ -]?key|api[ -]?token|access token|bearer token|"
@@ -93,7 +94,7 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
         return errors
 
     purpose_kind = plan["purpose_kind"]
-    if purpose_kind not in ALLOWED_PURPOSES:
+    if not isinstance(purpose_kind, str) or purpose_kind not in ALLOWED_PURPOSES:
         errors.append("purpose_kind is not an approved low-risk administrative use")
     if not isinstance(plan["purpose"], str) or len(plan["purpose"].strip()) < 15:
         errors.append("purpose must clearly describe the call in at least 15 characters")
@@ -103,23 +104,33 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
         errors.append(
             "purpose must not contain medical, legal, financial, or emergency content"
         )
-    elif purpose_kind in ALLOWED_PURPOSES and plan["purpose"].strip() != ALLOWED_PURPOSES[
-        purpose_kind
-    ]:
+    elif (
+        isinstance(purpose_kind, str)
+        and purpose_kind in ALLOWED_PURPOSES
+        and plan["purpose"].strip() != ALLOWED_PURPOSES[purpose_kind]
+    ):
         errors.append("purpose must exactly match its approved purpose_kind template")
 
     if not isinstance(plan["phone"], str) or not E164.fullmatch(plan["phone"]):
         errors.append("phone must be a valid E.164 number")
 
-    if plan["recipient_source"] not in ALLOWED_RECIPIENT_SOURCES:
+    if (
+        not isinstance(plan["recipient_source"], str)
+        or plan["recipient_source"] not in ALLOWED_RECIPIENT_SOURCES
+    ):
         errors.append("recipient_source is not consent-based")
-    if plan["consent_basis"] not in ALLOWED_CONSENT_BASES:
+    if (
+        not isinstance(plan["consent_basis"], str)
+        or plan["consent_basis"] not in ALLOWED_CONSENT_BASES
+    ):
         errors.append("consent_basis is not accepted")
 
     if not isinstance(plan["ai_disclosure"], str):
         errors.append("ai_disclosure must be a string")
-    elif purpose_kind in ALLOWED_DISCLOSURES and plan["ai_disclosure"].strip() != (
-        ALLOWED_DISCLOSURES[purpose_kind]
+    elif (
+        isinstance(purpose_kind, str)
+        and purpose_kind in ALLOWED_DISCLOSURES
+        and plan["ai_disclosure"].strip() != ALLOWED_DISCLOSURES[purpose_kind]
     ):
         errors.append(
             "ai_disclosure must exactly match its approved purpose_kind template"
@@ -143,9 +154,12 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
             errors.append("timezone must be a valid IANA timezone such as Asia/Seoul")
 
     region = plan["region"]
-    locale = str(plan.get("locale", "en-US"))
+    locale = plan.get("locale", "en-US")
+    if not isinstance(locale, str) or not LOCALE.fullmatch(locale):
+        errors.append("locale must be a simple BCP 47 language tag")
+        locale = ""
     language = locale.split("-", 1)[0].lower()
-    if region not in SUPPORTED_REGION_LANGUAGES:
+    if not isinstance(region, str) or region not in SUPPORTED_REGION_LANGUAGES:
         errors.append("recipient region is not currently supported by CALL-E")
     elif language not in SUPPORTED_REGION_LANGUAGES[region]:
         errors.append("recipient language is not supported for this CALL-E region")
@@ -200,14 +214,25 @@ def validate_attempt_limit(
         for event in history
     ):
         return ["an earlier dispatch is unresolved; reconcile it before retrying"]
-    attempts = sum(
-        1
+    reservations = [
+        event
         for event in history
         if event.get("phone_fingerprint") == fingerprint
         and event.get("event") == "dispatch_reserved"
-    )
+    ]
+    attempts = len(reservations)
     if attempts >= int(plan.get("max_attempts", 0)):
         return [f"max_attempts reached ({attempts})"]
+    retry_safe_outcomes = {"no_answer", "failed", "rejected"}
+    for event in reservations:
+        outcome = event.get("outcome")
+        if outcome == "completed":
+            return ["a verified completed call cannot be retried"]
+        if outcome not in retry_safe_outcomes:
+            return [
+                "an earlier terminal outcome is not retry-safe; "
+                "do not create another call"
+            ]
     return []
 
 
@@ -295,10 +320,25 @@ def build_manifest(plan: dict[str, Any]) -> dict[str, Any]:
     errors = validate_plan(plan)
     if errors:
         raise PolicyError("; ".join(errors))
+    # Build from an explicit, scalar-safe schema. Never copy arbitrary plan
+    # fields: extensions can contain credentials, alternate phone numbers, or
+    # nested private context that a shallow denylist cannot redact safely.
     canonical = {
-        key: value
-        for key, value in plan.items()
-        if key not in {"phone", "notes", "recording_consent"}
+        "purpose": plan["purpose"],
+        "purpose_kind": plan["purpose_kind"],
+        "recipient_source": plan["recipient_source"],
+        "consent_basis": plan["consent_basis"],
+        "ai_disclosure": plan["ai_disclosure"],
+        "timezone": plan["timezone"],
+        "allowed_window": {
+            "start_hour": plan["allowed_window"]["start_hour"],
+            "end_hour": plan["allowed_window"]["end_hour"],
+        },
+        "max_attempts": plan["max_attempts"],
+        "recording": plan["recording"],
+        "retention_days": plan["retention_days"],
+        "region": plan["region"],
+        "locale": plan.get("locale", "en-US"),
     }
     canonical["phone_fingerprint"] = _phone_fingerprint(plan["phone"])
     canonical["generated_at"] = datetime.now(timezone.utc).isoformat()
