@@ -1,0 +1,18 @@
+{
+  "workflow_id": "cedar-library-access-001",
+  "owner_authorized": true,
+  "organization": {
+    "display_name": "Cedar Public Library",
+    "phone": "+12025550123",
+    "published_source": "https://example.org/contact"
+  },
+  "requested_routes": [
+    "email",
+    "text",
+    "scheduled_callback",
+    "relay_support",
+    "support_person"
+  ],
+  "locale": "en-US",
+  "allow_neutral_voicemail": false
+}
