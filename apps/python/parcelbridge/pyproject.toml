@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "conanxin" },
+    { name = "ParcelBridge Contributors" },
 ]
 keywords = [
     "ai-phone-agent",
