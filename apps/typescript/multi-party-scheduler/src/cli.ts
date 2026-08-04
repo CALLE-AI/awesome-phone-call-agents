@@ -8,7 +8,8 @@
  *   20 not confirmed for another reason (a party did not confirm, was not
  *      reached, the window closed, the call budget ran out, the run was canceled
  *      or CALL-E returned an error)
- *   30 usage or request file error
+ *   30 usage or request file error, a ledger that already records this
+ *      coordination included
  *   40 replay found a problem in a ledger
  *
  * Progress goes to stderr, results to stdout.
@@ -37,11 +38,18 @@ const USAGE = `Multi-party scheduler
       Gather availability, confirm one slot with everybody, release everyone who
       confirmed if the commit fails. Needs CALLE_API_KEY. The ledger is required:
       it is the durable state resume reads if this run does not finish. Ctrl-C
-      stops the run and still places the release calls that are owed.
+      stops the run and still places the release calls that are owed. A ledger
+      that already records this coordination is never run again: a finished one is
+      printed as it stands with no call placed, anything left open belongs to
+      resume.
 
-  resume --request <file> --ledger <file> --live [--json] [--base-url <url>] [--allow-host <host>]
+  resume --request <file> --ledger <file> --live [--json] [--base-url <url>] [--allow-host <host>] [--retry-release]
       Finish an interrupted run: settle every call the ledger cannot account for
-      and place the release calls that are still owed. Needs CALLE_API_KEY.
+      and place the release calls that are still owed. Needs CALLE_API_KEY. Every
+      call it settles goes out under the key the ledger recorded for it.
+      --retry-release authorizes one exception, calling somebody again whose
+      release call reached nobody, which is a new key and so a phone ringing
+      again. Without it that debt is reported and nothing is dialled.
 
   replay --ledger <file> [--json]
       Recompute the feasible set, the chosen slot and the outcome from the
@@ -55,7 +63,7 @@ pick the host and only api.heycall-e.com, localhost, 127.0.0.1 and ::1 are
 trusted with the key. Name another with --allow-host <host>, which can be
 repeated or with CALLE_ALLOWED_HOSTS. Hostnames are matched exactly.
 
-Exit codes: 0 confirmed by every party, 10 no common slot, 20 not confirmed, 30 usage error, 40 replay failed.`;
+Exit codes: 0 confirmed by every party, 10 no common slot, 20 not confirmed, 30 usage or ledger error, 40 replay failed.`;
 
 interface Parsed {
   command: string;
@@ -79,7 +87,7 @@ function parseArgs(argv: string[]): Parsed {
       throw new ConfigError(`Unexpected argument: ${token}`);
     }
     const name = token.slice(2);
-    if (name === "live" || name === "json" || name === "help") {
+    if (name === "live" || name === "json" || name === "help" || name === "retry-release") {
       flags.add(name);
       continue;
     }
@@ -173,6 +181,14 @@ async function main(argv: string[]): Promise<number> {
         `${parsed.command} places real phone calls. Look at plan first, then add --live when the options and the order are right.`,
       );
     }
+    if (parsed.command === "run" && parsed.flags.has("retry-release")) {
+      // Nothing here would honour it, and a flag that looks like it authorizes a
+      // call and does not is worse than no flag. A run places one release call per
+      // party, so it has no earlier attempt to retry.
+      throw new ConfigError(
+        "--retry-release is a resume option. run places one release call per party, so there is no earlier attempt for it to retry.",
+      );
+    }
     const ledgerPath = requireLedger(parsed);
     const apiKey = process.env.CALLE_API_KEY;
     if (apiKey === undefined || apiKey.length === 0) {
@@ -194,6 +210,7 @@ async function main(argv: string[]): Promise<number> {
         port,
         ledgerPath,
         onProgress: progress,
+        retryRelease: parsed.flags.has("retry-release"),
       });
     } else {
       // Ctrl-C cancels the coordination. It does not cancel the release calls

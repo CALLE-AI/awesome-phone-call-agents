@@ -6,6 +6,11 @@
  * The point is `replay`, which walks the recorded answers and recomputes the
  * feasible set, the chosen slot and the outcome. If the ledger says Thursday but
  * the recorded answers do not intersect on Thursday, replay says so.
+ *
+ * It also answers what a history leaves open: which attempts nothing accounts for,
+ * whether a call may go out under a key the provider has never seen and what a
+ * round still owes. Those answers live here rather than beside one caller because a
+ * fresh run, a recovery and replay all have to give the same one.
  */
 
 import {
@@ -318,15 +323,15 @@ export function openAttempts(entries: LedgerEntry[]): OpenAttempt[] {
 }
 
 /**
- * Which attempt the next call to this party in this phase is.
+ * The highest attempt at this exact call the ledger already holds, 0 when it holds
+ * none.
  *
- * One more than the highest the ledger already holds. The number goes into the
- * idempotency key, so this is what makes a retry a call the provider has never seen
- * rather than a replay of the one it already holds. It is read off the ledger rather
- * than counted in memory, because the run that placed the earlier attempts is
- * usually a process that is no longer running.
+ * The number goes into the idempotency key, so it is what makes a retry a call the
+ * provider has never seen rather than a replay of the one it already holds. It is
+ * read off the ledger rather than counted in memory, because the run that placed
+ * the earlier attempts is usually a process that is no longer running.
  */
-export function nextAttempt(
+function highestAttempt(
   entries: LedgerEntry[],
   phase: Phase,
   partyId: string,
@@ -343,7 +348,7 @@ export function nextAttempt(
       highest = Math.max(highest, entry.attempt ?? 1);
     }
   }
-  return highest + 1;
+  return highest;
 }
 
 /**
@@ -372,6 +377,68 @@ export function unaccountedAttempt(entries: LedgerEntry[], phase: Phase, partyId
     (attempt) => attempt.phase === phase && attempt.party_id === partyId,
   );
   return orphan?.idempotency_key ?? null;
+}
+
+/**
+ * Whether a call may go out under a new key.
+ *
+ * Either the attempt number to mint or the reason nothing may be minted, in a sentence
+ * a caller can print. Never both and never neither, so a caller that finds no number
+ * has the refusal in hand.
+ */
+export type AttemptVerdict = { attempt: number; refusal: null } | { attempt: null; refusal: string };
+
+/**
+ * Whether this call may be placed under a key the provider has never seen.
+ *
+ * The attempt number is part of the key, so minting one is not bookkeeping: it is a
+ * decision to ring somebody. One rule, and both places that derive a key ask it, the
+ * coordinator for a gather or a confirm call and the release round for a release
+ * call, so a fresh coordination and a recovery cannot answer it differently.
+ * Recovery derives no key at all, it re-issues the one the ledger recorded.
+ *
+ * A new key is minted for a call this ledger holds no attempt for. The single
+ * exception is a release retry that was asked for and whose last attempt is settled.
+ *
+ * Nothing else may mint one and that is the rule rather than a special case. A
+ * gather or a confirm call is placed once per coordination, so a second attempt at
+ * one is a second phone call about an answer already on disk: an outcome the ledger
+ * has settled is read, never coordinated again. A release call is the one call this
+ * app places twice, because a release nobody acknowledged leaves the person owed,
+ * and even then the last attempt has to be accounted for first. While one may be on
+ * the phone to somebody, the key it went out under is re-issued instead.
+ */
+export function attemptToMint(
+  entries: LedgerEntry[],
+  phase: Phase,
+  partyId: string,
+  slotId: string | null,
+  authorizedRetry = false,
+): AttemptVerdict {
+  const highest = highestAttempt(entries, phase, partyId, slotId);
+  if (highest === 0) {
+    return { attempt: 1, refusal: null };
+  }
+  if (phase !== "release") {
+    return {
+      attempt: null,
+      refusal: `this ledger already records a ${phase} call to that party (attempt ${highest}) and a coordination places one, so a new key would ring them again about an answer already on disk`,
+    };
+  }
+  const pending = unaccountedAttempt(entries, phase, partyId);
+  if (pending !== null) {
+    return {
+      attempt: null,
+      refusal: `an earlier attempt is unaccounted for (${pending}) and has to be settled under its own key before another one is placed`,
+    };
+  }
+  if (!authorizedRetry) {
+    return {
+      attempt: null,
+      refusal: `attempt ${highest} is settled and nobody asked for another one, which resume --retry-release does`,
+    };
+  }
+  return { attempt: highest + 1, refusal: null };
 }
 
 /**
@@ -405,6 +472,196 @@ export function attemptRecords(entries: LedgerEntry[]): Map<string, AttemptRecor
     });
   }
   return records;
+}
+
+/**
+ * What a ledger says about the round it holds and about what is left to do.
+ *
+ * Recovery reads this to decide what to settle. A fresh `run` reads it too, before
+ * it places anything: a coordination this file already records is returned or handed
+ * to `resume`, never coordinated a second time, because every key a second run
+ * derived would carry the next attempt number and ring everybody again. One reader,
+ * so the two cannot disagree about what is finished and what is owed.
+ */
+export interface RecoveryState {
+  entries: number;
+  finished: boolean;
+  outcome: Outcome | null;
+  chosenSlotId: string | null;
+  callsPlaced: number;
+  /** Parties with a recorded confirmation, in the order they first gave it. */
+  confirmed: string[];
+  /**
+   * Parties a person acknowledged a release call for. Nothing else clears the
+   * debt: a release call can end and still have told nobody.
+   */
+  released: string[];
+  /** How many release calls this ledger holds. One is enough to make it off. */
+  releasesRecorded: number;
+  /** Calls whose fate the ledger does not settle. */
+  unsettled: CommitResult[];
+  /**
+   * Gather calls the ledger cannot account for, by party.
+   *
+   * These are not recovery's to finish. `resume` never gathers availability
+   * again, so there is no call it could place that would settle one. Nothing is
+   * owed to anybody from a gather call either. They are reported for a person to
+   * check instead, which is the same answer the coordinator gives when a gather
+   * call goes unresolved mid run.
+   */
+  unsettledGathers: string[];
+  owedReleases: string[];
+}
+
+/**
+ * What the ledger knows about a call it never recorded a result for.
+ *
+ * Every field here is read off the attempt record or stated as unknown. The status
+ * is this app's own `unresolved`, so recovery owns it and nothing is decided off
+ * it. The failure code says no result was ever written rather than naming a
+ * failure nobody observed. Nothing is inferred about what the call did: not
+ * knowing is why it is in this list.
+ */
+function openResult(open: OpenAttempt): CommitResult {
+  return {
+    party_id: open.party_id,
+    phone_masked: open.phone_masked,
+    phase: open.phase,
+    slot_id: open.slot_id ?? "",
+    call_id: open.call_id,
+    provider_call_id: null,
+    idempotency_key: open.idempotency_key,
+    call_status: UNRESOLVED_STATUS,
+    confirmed: false,
+    declined: false,
+    acknowledged: false,
+    within_window: false,
+    window_reason: null,
+    completion_time_usable: false,
+    question_asked: false,
+    reached_person: false,
+    machine_answered: false,
+    structured_answer: null,
+    heard_answer: null,
+    disagreement: false,
+    confidence: null,
+    transcript_excerpt: [],
+    failure_code: "no_result_recorded",
+  };
+}
+
+export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
+  let callsPlaced = 0;
+  let chosenSlotId: string | null = null;
+  let outcome: Outcome | null = null;
+  const confirmOrder: string[] = [];
+  const credited = new Map<string, boolean>();
+  const spokenYes: string[] = [];
+  const released = new Set<string>();
+  const owed = new Set<string>();
+  const unsettled = new Map<string, CommitResult>();
+  let releasesRecorded = 0;
+
+  for (const entry of entries) {
+    if (entry.kind === "gather") {
+      callsPlaced += 1;
+    }
+    if (entry.kind === "slot_chosen") {
+      chosenSlotId = entry.slot_id;
+    }
+    if (entry.kind === "commit" || entry.kind === "release" || entry.kind === "reconcile") {
+      const result = entry.result;
+      if (entry.kind !== "reconcile" || entry.placed_call) {
+        callsPlaced += 1;
+      }
+      const key = `${result.phase}:${result.party_id}`;
+      if (unsettledCall(result)) {
+        unsettled.set(key, result);
+      } else {
+        unsettled.delete(key);
+      }
+      if (result.phase === "confirm") {
+        if (!confirmOrder.includes(result.party_id)) {
+          confirmOrder.push(result.party_id);
+        }
+        // Credit is the ledger's last word on that call, so a later entry
+        // settling the same call replaces it rather than adding to it. A yes
+        // recorded outside the window is not credit at all.
+        credited.set(result.party_id, result.confirmed && result.within_window !== false);
+        // A debt only grows. Somebody who said yes has to be told. No later
+        // entry talks this app out of placing that call.
+        if (saidYes(result) && !spokenYes.includes(result.party_id)) {
+          spokenYes.push(result.party_id);
+        }
+      }
+      if (result.phase === "release") {
+        releasesRecorded += 1;
+        // Only acknowledged delivery settles the debt. A release call that
+        // failed, was canceled or left a message on a machine is over and the
+        // person still has not been told, so they are owed the call.
+        if (result.acknowledged) {
+          released.add(result.party_id);
+          owed.delete(result.party_id);
+        } else {
+          owed.add(result.party_id);
+        }
+      }
+    }
+    if (entry.kind === "outcome") {
+      outcome = entry.outcome;
+      // A debt this run wrote down stays a debt. Only an acknowledged delivery
+      // after it can clear it, which is why this reads the released set rather
+      // than trusting a later terminal entry.
+      for (const party of entry.unreleased) {
+        if (!released.has(party)) {
+          owed.add(party);
+        }
+      }
+    }
+  }
+
+  // Calls this ledger records as attempted with no result behind them. That is the
+  // crash window: CALL-E accepted the call and the process died before the entry
+  // that would have said what it did. There is nothing to read, so the record is
+  // built from the attempt and says so.
+  const gatherOrphans: string[] = [];
+  for (const open of openAttempts(entries)) {
+    if (open.phase === "gather") {
+      if (!gatherOrphans.includes(open.party_id)) {
+        gatherOrphans.push(open.party_id);
+      }
+      continue;
+    }
+    const key = `${open.phase}:${open.party_id}`;
+    // The earliest attempt for that call is the one most likely to be live, so it
+    // is the one recovery goes after.
+    if (!unsettled.has(key)) {
+      unsettled.set(key, openResult(open));
+    }
+  }
+
+  const confirmed = confirmOrder.filter((party) => credited.get(party) === true);
+  return {
+    entries: entries.length,
+    finished: outcome !== null,
+    outcome,
+    chosenSlotId,
+    callsPlaced,
+    confirmed,
+    released: [...released],
+    releasesRecorded,
+    unsettled: [...unsettled.values()],
+    unsettledGathers: gatherOrphans,
+    // A release is owed only when the appointment is off. A run that ended in a
+    // verbal confirmation owes nobody a call saying it is not happening, and
+    // `resume` only reaches that outcome when no release call has gone out.
+    owedReleases:
+      outcome === "verbally_confirmed"
+        ? []
+        : [...new Set([...spokenYes, ...confirmed, ...owed])].filter(
+            (party) => !released.has(party),
+          ),
+  };
 }
 
 /**

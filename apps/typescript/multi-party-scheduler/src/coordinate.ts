@@ -18,14 +18,29 @@
  * What happens when this process dies mid-commit lives in `resume.ts`, which
  * reuses `placeCall` and `releaseRound` from here so a recovered call is the same
  * call under the same idempotency key.
+ *
+ * A coordination lives in one ledger and runs once. A `run` pointed at a ledger that
+ * already records this coordination hands back what the file holds or sends it to
+ * `resume` rather than opening a second round: the attempt number in every key is
+ * counted from that file, so a second round derives a key the provider has never seen
+ * for every call in it and rings everybody again.
  */
 
 import { CalleCallError, CalleWaitTimeout, type CallePort, type CreateCallInput } from "./calle.js";
 import { ConfigError, worstCaseCalls } from "./config.js";
 import { clockOf, withinCallingHours } from "./hours.js";
-import { acquireLedgerLock, appendEntry, digestOf, nextAttempt, readLedger, requestDigest, unaccountedAttempt } from "./ledger.js";
+import {
+  acquireLedgerLock,
+  appendEntry,
+  attemptToMint,
+  digestOf,
+  inspectLedger,
+  LedgerError,
+  readLedger,
+  requestDigest,
+} from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
-import { chooseSlot, intersect } from "./slots.js";
+import { chooseSlot, intersect, slotById } from "./slots.js";
 import { NOT_PLACED_STATUS, TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
 import { completionInstant, judgeWindow, saidYes, type WindowSpan, type WindowVerdict } from "./window.js";
 import {
@@ -130,6 +145,101 @@ export function assertDurableState(port: CallePort, ledgerPath: string | null): 
 
 class Aborted extends Error {}
 
+/**
+ * A ledger that already records a coordination is not one `run` may add to.
+ *
+ * Its own class, so a caller can tell "this belongs to resume" from a file that is
+ * broken, and a `LedgerError`, so the CLI already reports it as the usage error it
+ * is.
+ */
+export class AlreadyCoordinatedError extends LedgerError {}
+
+/**
+ * What `run` may do with a ledger that already holds this coordination.
+ *
+ * The ledger is the coordination's durable state and the attempt number in every key
+ * is counted from it, so a second run is not a fresh start: each gather and confirm
+ * call derives a key one attempt higher, CALL-E has never seen that key, and every
+ * party is rung again about an answer already on disk. On an interrupted ledger it is
+ * worse than a duplicate call, because the second round closes the file with a clean
+ * outcome of its own and a release call the first round owed somebody is written out
+ * of the history.
+ *
+ * Three answers and no fourth. A round that finished with nothing left open is handed
+ * back as it stands and no call is placed, so running twice is reading twice. A round
+ * that did not finish, or that finished owing a call, is `resume`'s: that is the one
+ * path that settles a call under the key it went out under instead of minting a new
+ * one. Anything else about the file, a coordination that is not this one or lines no
+ * run opened, is refused outright.
+ *
+ * Returns the result to hand back, or null when the ledger is fresh and this run may
+ * go ahead. Refuses by throwing, before anything is dialled.
+ */
+function recordedRound(
+  request: CoordinationRequest,
+  ledgerPath: string,
+  entries: LedgerEntry[],
+  torn: boolean,
+  progress: (line: string) => void,
+): RunResult | null {
+  const recover = `Run resume --request <file> --ledger ${ledgerPath} --live. Nothing was dialled.`;
+  if (torn) {
+    // Half an entry is what a crash during an append leaves, so a run stopped here
+    // whatever the rest of the file says. `resume` drops that line under the lock.
+    throw new AlreadyCoordinatedError(
+      `${ledgerPath} ends in half an entry, which is what a crash during an append leaves, so a run was interrupted here. resume drops that line under the lock and settles the call it may describe. ${recover}`,
+    );
+  }
+  const started = entries.find((entry) => entry.kind === "run_started");
+  if (started === undefined || started.kind !== "run_started") {
+    if (entries.length === 0) {
+      return null;
+    }
+    throw new AlreadyCoordinatedError(
+      `${ledgerPath} holds ${plural(entries.length, "line")} and none of them opens a run, so nothing in it says which coordination those lines belong to. Point run at a new file. Nothing was dialled.`,
+    );
+  }
+  if (started.request_digest !== requestDigest(request)) {
+    throw new AlreadyCoordinatedError(
+      `${ledgerPath} was written from a different request, so it is another coordination's durable state and every call it records belongs to that one. A ledger holds one coordination: point this run at a new file. Nothing was dialled.`,
+    );
+  }
+  const closing = [...entries].reverse().find((entry) => entry.kind === "outcome");
+  if (closing === undefined || closing.kind !== "outcome") {
+    throw new AlreadyCoordinatedError(
+      `${ledgerPath} records this coordination and no entry closes it, so the run did not finish and this is a recovery rather than a new run. resume settles every call under the key the ledger recorded for it and places the release calls that are owed, where a second run derives a new key for each one and rings everybody again. ${recover}`,
+    );
+  }
+  const state = inspectLedger(entries);
+  const outstanding = [
+    ...state.unsettled.map((result) => `${result.party_id}'s ${result.phase} call is not settled`),
+    ...state.owedReleases.map((party) => `${party} is still owed a release call`),
+  ];
+  if (outstanding.length > 0) {
+    throw new AlreadyCoordinatedError(
+      `${ledgerPath} records this coordination as ${closing.outcome} with work still outstanding: ${outstanding.join(", ")}. That work is resume's, because a call is settled under the key it went out under and a release call that is owed is the one call this app may place a second time. ${recover}`,
+    );
+  }
+  progress(
+    `${ledgerPath} already records this coordination as ${closing.outcome} and every call in it is settled, so nothing was dialled and the recorded outcome is what this run returns.`,
+  );
+  const slot = closing.slot_id === null ? undefined : slotById(request.slots, closing.slot_id);
+  return {
+    request_id: request.requestId,
+    outcome: closing.outcome,
+    slot_id: closing.slot_id,
+    slot_spoken: slot?.spoken ?? null,
+    confirmed_with: closing.confirmed_with,
+    unreleased: closing.unreleased,
+    // The recorded count, not a fresh one. This run placed nothing, so claiming a
+    // call of its own would be a second call in the accounting and none on a phone.
+    calls_placed: closing.calls_placed,
+    calls_saved: Math.max(worstCaseCalls(request) - closing.calls_placed, 0),
+    note: `${closing.note}; read from the ledger, which already records this coordination, so this run placed no call`,
+    ledger_path: ledgerPath,
+  };
+}
+
 /** The exact body one call sends. The idempotency key is a digest of this. */
 export function callInput(
   request: CoordinationRequest,
@@ -172,10 +282,11 @@ export interface PlaceOptions {
    */
   key?: string;
   /**
-   * Which attempt at this call it is, when the key is being derived here. One more
-   * than the ledger already holds, so a retry is a call the provider has never seen
-   * rather than a replay of the one it has. Ignored when `key` is given: that string
-   * already belongs to an attempt.
+   * Which attempt at this call it is, when the key is being derived here. The number
+   * the ledger licenses, which `attemptToMint` decides, so a retry is a call the
+   * provider has never seen rather than a replay of the one it has and a call the
+   * ledger has already answered gets no new key at all. Ignored when `key` is given:
+   * that string already belongs to an attempt.
    */
   attempt?: number;
   /**
@@ -691,6 +802,16 @@ export interface ReleaseRoundOptions {
    * without durable state can honestly claim.
    */
   history: LedgerEntry[];
+  /**
+   * Whether a retry was asked for. Off unless something says otherwise.
+   *
+   * A first release call to somebody is this round finishing what the coordination
+   * owed. A second one is a retry: the key is new, so it is a phone ringing again
+   * rather than a lookup, and it goes out only when somebody asked for it and the
+   * last attempt is settled. A fresh coordination never sets this, because it has no
+   * earlier attempt to retry. `resume --retry-release` sets it.
+   */
+  retryAuthorized?: boolean;
 }
 
 export interface ReleaseRoundResult {
@@ -711,10 +832,14 @@ export interface ReleaseRoundResult {
  * number that moves. A release call that ended without reaching a person leaves the
  * debt owed and the retry has to be a call the provider has never seen: the key is
  * otherwise identical, so CALL-E would answer with the call that reached the machine
- * and nothing would ring. A retry is only minted once the last attempt's outcome is
- * known. While one is unaccounted for, the person stays owed and recovery reconciles
- * that attempt under its own key, because a second call to somebody who may be on
- * the first one is the mistake this whole protocol is built to avoid.
+ * and nothing would ring. That is also why a retry is not automatic. A new key rings
+ * a phone, so it goes out only once somebody asked for it and the last attempt's
+ * outcome is known. While one is unaccounted for, the person stays owed and recovery
+ * reconciles that attempt under its own key, because a second call to somebody who
+ * may be on the first one is the mistake this whole protocol exists to avoid. Both
+ * conditions are one rule in `attemptToMint`, asked here rather than in the callers,
+ * because a fresh coordination and a resume both place release calls and only one of
+ * them reads the ledger first.
  */
 export async function releaseRound(options: ReleaseRoundOptions): Promise<ReleaseRoundResult> {
   const { request, port, slot } = options;
@@ -726,11 +851,15 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
       unreleased.push(party.id);
       continue;
     }
-    const pending = unaccountedAttempt(options.history, "release", party.id);
-    if (pending !== null) {
-      options.progress(
-        `  ${party.id} is still owed a release call, an earlier attempt is unaccounted for (${pending}) and has to be settled before another one is placed.`,
-      );
+    const minted = attemptToMint(
+      options.history,
+      "release",
+      party.id,
+      slot.id,
+      options.retryAuthorized === true,
+    );
+    if (minted.attempt === null) {
+      options.progress(`  ${party.id} is still owed a release call, ${minted.refusal}.`);
       unreleased.push(party.id);
       continue;
     }
@@ -755,7 +884,7 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
       pollIntervalMs: options.pollIntervalMs,
       record: options.record,
       now: options.now,
-      attempt: nextAttempt(options.history, "release", party.id, slot.id),
+      attempt: minted.attempt,
     });
     const result = evaluateCommit(request, party, slot, "release", outcome, null);
     options.record({ kind: "release", at: new Date(at).toISOString(), result });
@@ -769,7 +898,9 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
 
 /**
  * Run the protocol. One writer per ledger: the lock is held for the whole run, so
- * a second process cannot interleave its lines into the same history.
+ * a second process cannot interleave its lines into the same history. The lock is
+ * taken before the file is read, so the check that this coordination is not already
+ * recorded in it happens where nothing else can be appending.
  */
 export async function runCoordination(options: RunOptions): Promise<RunResult> {
   assertDurableState(options.port, options.ledgerPath ?? null);
@@ -791,14 +922,33 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
   const deadline = windowStart + request.policy.windowMinutes * 60_000;
 
   /**
-   * Everything this ledger holds, the lines from before this run included.
+   * A coordination this ledger already records is not started again.
    *
-   * A ledger is usually empty here and this is usually just what the run writes.
-   * It is read rather than assumed because the attempt number for a call comes from
-   * the history and not from this process: a run appending to a ledger that already
-   * records a release call to somebody must not derive the key that call used.
+   * Read before anything is dialled and under the run's lock. Either this run may
+   * append to the file or it may not, and when it may not the answer is on disk
+   * already or it belongs to `resume`.
    */
-  const history: LedgerEntry[] = ledgerPath === null ? [] : readLedger(ledgerPath).entries;
+  if (ledgerPath !== null) {
+    const stored = readLedger(ledgerPath);
+    const recorded = recordedRound(request, ledgerPath, stored.entries, stored.truncatedTail, progress);
+    if (recorded !== null) {
+      return recorded;
+    }
+  }
+
+  /**
+   * Everything this run appends, which for a fresh coordination is everything the
+   * ledger holds.
+   *
+   * It used to start from the file, because the attempt number for a call is counted
+   * from the history and a run appending to a ledger that already records a release
+   * call must not derive the key that call used. The file is empty by the time this
+   * line runs now: a run that finds a coordination in it returns or refuses above
+   * rather than opening a second round, which is what stopped it deriving a fresh key
+   * for every call the round already held. What is left is what this run writes,
+   * which is what the release round reads to number its own attempts.
+   */
+  const history: LedgerEntry[] = [];
   const record = (entry: LedgerEntry): void => {
     history.push(entry);
     if (ledgerPath !== null) {
@@ -827,6 +977,18 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
     ignoreWindow = false,
   ): Promise<CallOutcome> => {
     const at = now();
+    const minted = attemptToMint(history, phase, party.id, slot?.id ?? null);
+    if (minted.attempt === null) {
+      // Asked before the hours check and before the budget, because this decides
+      // whether the call may exist at all rather than when it may go out. A run only
+      // ever appends to a fresh ledger, so the answer here is attempt 1 every time.
+      // It is asked rather than assumed because the rule is one function and this is
+      // one of the two places in the app that derive a key: the coordinator cannot
+      // mint a second attempt at a call even if it is one day reached with a history
+      // the check above did not see. No key was used, so the entry records none.
+      progress(`  ${party.id}: not called, ${minted.refusal}.`);
+      return { call: null, callId: null, idempotencyKey: null, errorCode: "already_attempted", unresolved: false };
+    }
     if (!withinCallingHours(party.callingHours, at)) {
       // No call is placed, so this costs nothing from the budget. It is not a
       // failure either: the person simply may not be rung at this hour. No key
@@ -854,7 +1016,7 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
       pollIntervalMs,
       record,
       now,
-      attempt: nextAttempt(history, phase, party.id, slot?.id ?? null),
+      attempt: minted.attempt,
       // A release call is a duty. Cancelling the coordination does not cancel it.
       signal: phase === "release" ? undefined : options.signal,
     });

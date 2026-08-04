@@ -645,10 +645,20 @@ test("a terminal release call that reached nobody leaves the debt owed", async (
  * A second ledger line and a second charge against the budget looked like a retry
  * from the inside while the person was never called again. This test counts calls the
  * provider created, because that is the only thing that means somebody's phone rang.
+ *
+ * A new key is a phone ringing rather than a lookup, so the retry is asked for:
+ * `retryRelease` is `--retry-release`. What the same ledger does without it is in
+ * `settled.test.ts`, beside the rest of the rule.
  */
 test("resume finishes a release nobody acknowledged instead of writing it off", async () => {
   await withOwedRelease(async ({ port, path, request, fake }) => {
-    const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    const resumed = await resumeCoordination({
+      request,
+      port,
+      ledgerPath: path,
+      pollIntervalMs: 5,
+      retryRelease: true,
+    });
     assert.notEqual(resumed.note, "nothing to resume");
     assert.deepEqual(resumed.unreleased, ["plumber"], "the machine answered again");
     assert.match(resumed.note, /still owed a release call: plumber/);

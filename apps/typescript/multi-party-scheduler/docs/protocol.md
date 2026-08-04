@@ -150,6 +150,57 @@ The Developer API has no cancel endpoint, so a call that is already connected
 cannot be hung up. It is recorded with the status it had, which makes it unsettled,
 and `resume` settles it.
 
+## One coordination, one ledger, one round
+
+A ledger is the coordination's durable state, not a log beside it. The attempt number
+in every idempotency key is counted from that file, so a `run` pointed at a ledger
+which already records a round is not a fresh start: each gather and confirm call
+derives a key one attempt higher, CALL-E has never seen that key, and every party is
+rung again about an answer already on disk.
+
+On an interrupted ledger it is worse than a duplicate call. The second round closes
+the file with a clean outcome of its own, so a release call the first round owed
+somebody is written out of the history and nobody is left to place it.
+
+So a run reads the ledger under its own lock before it dials anybody, and there are
+three answers and no fourth.
+
+- A round that finished with every call settled is handed back as it stands. No call
+  is placed and nothing is appended, so running twice is reading twice and the file
+  still replays as one round. The outcome, the slot, who confirmed and the call count
+  are the recorded ones: this run placed nothing, and claiming a call of its own would
+  be a call in the accounting and none on a phone.
+- A round that did not finish, or that finished still owing somebody a release call,
+  belongs to `resume`. That is the one path that settles a call by sending the key it
+  went out under, so the refusal names it.
+- A file that is not this coordination's is refused outright. Another request's
+  digest, lines no `run_started` opens, or a torn last line, which is what a crash
+  during an append leaves and is itself evidence that a run stopped there. `resume`
+  repairs that line under the lock.
+
+A new coordination goes in a new file, which is what makes a ledger the coordination
+rather than a scratch pad.
+
+## What may mint a new attempt key
+
+One rule, and both places in the app that derive a key ask it, so a fresh coordination
+and a recovery cannot answer it differently. Recovery derives no key at all: it
+re-issues the string the ledger recorded.
+
+A key is minted for a call this ledger holds no attempt for. The single exception is a
+release retry that was asked for and whose last attempt is settled.
+
+Nothing else, and that is the rule rather than a carve-out. A gather or a confirm call
+is placed once per coordination, so a second attempt at one is a second phone call
+about an answer the ledger already holds: an outcome settled on disk is read, never
+coordinated again. A release call is the one call this app places twice, because a
+release nobody acknowledged leaves the person owed, and even then two things have to
+hold. The last attempt has to be accounted for, since one that may still be on the
+phone to somebody is reconciled under its own key instead. And the retry has to be
+asked for, with `resume --retry-release`, because a new key is a handset ringing rather
+than a lookup and nothing else recovery does can reach anybody who is not already
+being called. Without it the debt is reported and stays owed.
+
 ## Recovery
 
 The ledger is not only there to be read back. A process can die between the call
@@ -220,10 +271,12 @@ that follows is still the only thing that says what a call did.
   there while the original stays ambiguous where it was placed, which is two calls to
   one person wearing the look of a reconciliation. A different `--base-url` or a
   different `CALLE_API_KEY` on the resume is all it takes
-- never mints a new attempt at a call while an earlier one is unaccounted for. The
-  attempt number is part of the key, so a new one is a call the provider has never
-  seen. That is only correct once the last outcome is known: while it is not, the key
-  that attempt went out under is re-issued instead
+- mints a new attempt at a call in one case only, a release retry that
+  `--retry-release` asked for and whose last attempt is settled. The attempt number is
+  part of the key, so a new one is a call the provider has never seen. That is only
+  correct once the last outcome is known: while it is not, the key that attempt went
+  out under is re-issued instead. Everything else recovery sends is a key the ledger
+  recorded
 - places the release calls that are owed, most recent yes first
 - writes a fresh outcome entry, so the ledger still replays as one history
 
@@ -313,6 +366,13 @@ outcome is known. While an attempt is unaccounted for, the person stays owed and
 attempt is reconciled under its own key, because a second call to somebody who may be
 on the first one is what the whole protocol is built to avoid.
 
+Counted from the ledger is not the same as one more than the ledger holds. A run
+pointed at a coordination the file already records would step the number on every key
+in it, which is every party rung again, so such a ledger is returned or handed to
+`resume` rather than run, and the only number that ever moves is a release retry's,
+once somebody asks for it. Both rules are above, in **One coordination, one ledger, one
+round** and **What may mint a new attempt key**.
+
 That last property is also why recovery does not derive the key a second time.
 Every call entry in the ledger records the key its call went out under. The key
 reaches the ledger before the create does, so it is on disk before it can have been
@@ -367,8 +427,9 @@ A ledger can hold more than one round. A crashed or canceled run leaves no outco
 entry, `resume` opens a `resume_started` entry and closes with a fresh outcome, and
 replay folds the rounds in order and reports the last outcome. Entries that follow
 an outcome without a `resume_started` opening a new round are reported as a
-problem. The call count comes from the entries, so a call whose entry never reached
-the disk is invisible to it.
+problem, which is the check a second `run` against a finished ledger used to trip.
+The call count comes from the entries, so a call whose entry never reached the disk
+is invisible to it.
 
 That last set of checks is the reason the ledger is worth keeping. A log that says
 `verbally_confirmed` proves nothing on its own.

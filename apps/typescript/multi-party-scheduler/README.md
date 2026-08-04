@@ -96,7 +96,7 @@ Node 20.6 or later, which is what `node --import` needs.
 cd apps/typescript/multi-party-scheduler
 npm install
 npm run check   # tsc --noEmit
-npm test        # 131 tests, no credentials, no outbound calls
+npm test        # 151 tests, no credentials, no outbound calls
 npm run demo    # four runs against the local fake CALL-E
 ```
 
@@ -132,11 +132,28 @@ like a lookup and is a create, so if the first request never landed it would sta
 the very call the cancellation was meant to stop. It is left unresolved under the key
 already on disk instead, for `resume` to settle.
 
+A ledger belongs to one coordination and that coordination runs once. Pointed at a
+ledger that already records it, `run` places nothing: a round that finished with
+every call settled is printed as it stands, and anything left open is refused with
+`resume` named. The attempt number in every idempotency key is counted from the
+ledger, so a second run would derive a key CALL-E has never seen for every call in
+that round and ring everybody again about an answer already on disk. On an
+interrupted ledger it is worse than a duplicate call, because the second round would
+close the file with a clean outcome of its own and write a release call the first
+round owed somebody out of the history. A new coordination goes in a new file.
+
 ## When a run does not finish
 
 ```bash
 npm run schedule -- resume --request your-request.json --ledger booking.jsonl --live
+npm run schedule -- resume --request your-request.json --ledger booking.jsonl --live --retry-release
 ```
+
+The second form authorizes one thing the first will not do, calling somebody again
+whose release call reached nobody. Every other call recovery makes goes out under the
+key the ledger recorded for it, so it can only find a call that already exists. A
+retry is a key CALL-E has never seen, which is a phone ringing, so it is asked for
+rather than assumed and the earlier attempt still has to be settled first.
 
 A process can die between the call that got a yes and the call that owes the
 apology and a create response can be lost while the call itself goes ahead.
@@ -167,8 +184,9 @@ would send under it, because when the first request never reached CALL-E the key
 unknown there and the create places a call with whatever body goes out now. The
 provider origin and account digest have to match the port in hand, because a key is a
 reservation inside one namespace and the same string sent elsewhere creates the call
-there while the original stays open. And no new attempt at a call is minted while an
-earlier one is unaccounted for.
+there while the original stays open. And a new attempt at a call is minted in one case
+only: a release retry that was asked for and whose last attempt is settled. While an
+attempt is unaccounted for, the key it went out under is re-issued instead.
 
 A call with neither an id nor a recorded key, which only a ledger written by an older
 version of this app
@@ -281,13 +299,15 @@ a time: the run takes an `O_EXCL` lock on `<ledger>.lock` before it dials anybod
 | 0 | every party confirmed the time by voice |
 | 10 | no time works for everyone, which is a real answer |
 | 20 | not confirmed: a party did not confirm, was not reached, the window closed, the budget ran out, the run was canceled, a call could not be accounted for or CALL-E refused the call |
-| 30 | usage, request file, ledger lock or resume error |
+| 30 | usage, request file, ledger lock or resume error, a ledger that already records the coordination included |
 | 40 | replay found a problem in a ledger |
 
 ## Side effects, cancellation, credentials
 
-- At most one call per party per phase. Nothing recurring is created, so there is
-  no schedule to clean up.
+- At most one call per party per phase, decided against the ledger before a key is
+  minted rather than left to the shape of the code. The one call that goes out twice
+  is a release call nobody acknowledged, and only when `--retry-release` asks for it.
+  Nothing recurring is created, so there is no schedule to clean up.
 - Ctrl-C cancels a run in flight: no new gather or confirm call, the release calls
   still go out and a call already connected is recorded as unsettled because the
   API has no cancel. `resume` settles it.
@@ -306,7 +326,9 @@ a time: the run takes an `O_EXCL` lock on `<ledger>.lock` before it dials anybod
   the call, beside the payload digest and the provider it was sent to and `resume`
   sends that exact string back only while all three still hold, so recovery cannot
   invent a new key after the scripts have moved on or replay an old one somewhere
-  else.
+  else. A new attempt number is minted only for a call the ledger holds no attempt
+  for, plus that one authorized release retry, so no command can mint its way to a
+  second call to the same person.
 - Ledgers are appended with mode `0600`, re-applied on every append rather than
   only when the file is created. A target that is not a regular file is refused.
   Numbers are masked to the country code

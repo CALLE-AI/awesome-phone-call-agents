@@ -65,3 +65,31 @@ test("the help text says --ledger is required for a live run", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /run --request <file> --live --ledger <file>/);
 });
+
+/**
+ * A flag that looks like it authorizes a call and does nothing is worse than no flag.
+ * A run places one release call per party, so it has no earlier attempt to retry and
+ * it says so rather than accepting the option and ignoring it.
+ */
+test("--retry-release is a resume option and run says so", () => {
+  const result = runCli([
+    "run",
+    "--request",
+    requestFile,
+    "--live",
+    "--ledger",
+    tempLedger(),
+    "--retry-release",
+  ]);
+  assert.equal(result.status, 30);
+  assert.match(result.stderr, /--retry-release is a resume option/);
+  assert.equal(/CALLE_API_KEY/.test(result.stderr), false, "refused before the key is read");
+  assert.equal(result.stdout, "", "nothing ran");
+});
+
+test("the help text names --retry-release on resume and what a second run does", () => {
+  const result = runCli(["help"]);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /resume --request <file> --ledger <file> --live .*\[--retry-release\]/);
+  assert.match(result.stdout, /already records this coordination is never run again/);
+});
