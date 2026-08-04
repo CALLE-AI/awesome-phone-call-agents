@@ -23,6 +23,7 @@ Current apps:
 | [`python/oauth-login-client`](python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/vibehub-founder-relay`](typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
+| [`typescript/agent-gallery`](typescript/agent-gallery/) | TypeScript | Appointment Recovery workflow: one consent-gated CALL-E call that confirms or reschedules a missed appointment inside business-approved windows and returns a structured disposition with a next action. |
 
 Suggested grouping:
 
