@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+  line-height: 1.5;
+}
+
+.mode-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, currentcolor 12%, transparent);
+  font-size: 0.85rem;
+}
+
+.muted {
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+fieldset {
+  margin: 1rem 0;
+  border: 1px solid color-mix(in srgb, currentcolor 25%, transparent);
+  border-radius: 0.5rem;
+}
+
+label {
+  display: block;
+  margin: 0.5rem 0;
+}
+
+label.consent {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+input:not([type="checkbox"]),
+select {
+  display: block;
+  width: 100%;
+  max-width: 24rem;
+  padding: 0.4rem;
+  margin-top: 0.2rem;
+  box-sizing: border-box;
+}
+
+.window-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.errors {
+  color: #c0392b;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

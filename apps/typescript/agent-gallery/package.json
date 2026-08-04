@@ -1,0 +1,27 @@
+{
+  "name": "agent-gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "deploy": "npm run build && npx wrangler pages deploy",
+    "check": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "verify": "npm run check && npm test && npm run build"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vite": "^7.0.0"
+  }
+}
