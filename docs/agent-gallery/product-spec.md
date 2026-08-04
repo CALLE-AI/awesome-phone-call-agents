@@ -101,7 +101,7 @@ policy. It is operationally different from `declined` (does not want it) and
 from `uncertain` (we cannot tell), and collapsing the three would hide the one
 case where opening a new window recovers the booking.
 
-Outcomes are derived in [`outcome.ts`](../../apps/typescript/agent-gallery/src/lib/outcome.ts).
+Outcomes are derived in [`outcome.ts`](../../apps/typescript/agent-gallery/src/workflows/appointment-recovery/outcome.ts).
 CALL-E's `task_completed` is never consulted: it reports that the call ended
 cleanly, not that the appointment was recovered. CALL-E's telephony `DECLINED`
 means a rejected incoming call and maps to `unreachable`, not to a customer
@@ -133,9 +133,10 @@ Confirmed against a real call on 2026-08-04. Full record:
   provisional decision. The server layer calls `plan_call` (returns `plan_id` and
   `confirm_token`), then `run_call` (requires both, returns `run_id`), then polls
   `get_call_run`. Because `run_call` cannot execute without a token `plan_call` issued,
-  the preview-then-authorize flow is enforced by the protocol, and one token yielding one
-  run provides idempotency without app-side storage. The offline fake must match this
-  surface.
+  the preview-then-authorize flow is enforced by the protocol rather than by UI
+  convention. It does **not** supply idempotency: planning and running happen inside one
+  request, so a resubmission mints a fresh token and dials again. Duplicate protection
+  has to come from the app. The offline fake must match this surface.
 - **Result parsing:** CALL-E has no custom extraction schema, so the goal instructs the
   agent to state the accepted window and SMS preference plainly, and the app reads those
   back conservatively, defaulting to `uncertain`. `completion_confidence` below 0.6 routes
@@ -152,10 +153,12 @@ Confirmed against a real call on 2026-08-04. Full record:
   server endpoint that relays CALL-E status. Idempotency: client `request_key` +
   immediate submit-disable + an in-instance duplicate check. No call data is stored
   server-side.
-- **Unknown-creation reconciliation:** stays a nice-to-have. The plan-then-confirm
-  handshake means a lost `run_call` reply can be resolved by reusing the same
-  `confirm_token`, which is single-use, so a duplicate call cannot be created by
-  retrying. Revisit only if a live run actually produces an ambiguous creation.
+- **Unknown-creation reconciliation:** still open. A lost `run_call` reply leaves the app
+  unable to tell whether a call was created, and the `confirm_token` does not resolve it:
+  the token is single-use, but the app mints a new one on every submission, so retrying
+  can dial twice. An atomic durable claim recorded before dialing, with `pending`,
+  `started`, and `failed` states, is the real answer. Revisit before any use beyond a
+  single demonstrated call.
 
 ## Out of Scope (MVP)
 

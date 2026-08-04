@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { handleCreateCall, handleGetCallStatus } from "../api/_lib/calls";
+import { ACCESS_CODE_HEADER } from "../src/access";
 import { FAKE_SERVER_URL, FAKE_TOKEN, createFakeCalle } from "./fake-calle-server";
 import type { RecoveryRequest } from "../src/workflows/appointment-recovery/types";
 
-const CONFIGURED = { CALLE_ACCESS_TOKEN: FAKE_TOKEN, CALLE_SERVER_URL: FAKE_SERVER_URL };
+const ACCESS_CODE = "test-operator-code";
+
+const CONFIGURED = {
+  CALLE_ACCESS_TOKEN: FAKE_TOKEN,
+  CALLE_SERVER_URL: FAKE_SERVER_URL,
+  OPERATOR_ACCESS_CODE: ACCESS_CODE,
+};
 
 function validRequest(key: string): RecoveryRequest {
   return {
@@ -24,10 +31,18 @@ function validRequest(key: string): RecoveryRequest {
   };
 }
 
-function post(body: unknown): Request {
+function post(body: unknown, accessCode: string | null = ACCESS_CODE): Request {
   return new Request("https://app.invalid/api/calls", {
     method: "POST",
+    headers: accessCode === null ? {} : { [ACCESS_CODE_HEADER]: accessCode },
     body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+/** A status request carrying an access code, as the polling browser sends it. */
+function get(accessCode: string | null = ACCESS_CODE): Request {
+  return new Request("https://app.invalid/api/calls/run-1", {
+    headers: accessCode === null ? {} : { [ACCESS_CODE_HEADER]: accessCode },
   });
 }
 
@@ -108,7 +123,7 @@ test("resubmitting the same request key does not dial twice", async () => {
 
 test("an in-progress run reports status and activity but no result", async () => {
   const fake = createFakeCalle({ statusSequence: ["PREPARING"] });
-  const response = await withFakeCalle(fake, () => handleGetCallStatus("run-1", CONFIGURED));
+  const response = await withFakeCalle(fake, () => handleGetCallStatus(get(), "run-1", CONFIGURED));
 
   const payload = await response.json();
   assert.equal(payload.status, "PREPARING");
@@ -121,7 +136,7 @@ test("a terminal run returns the raw CALL-E result for the workflow to read", as
     statusSequence: ["COMPLETED"],
     terminalResult: { summary: "Rebooked.", call_id: "call-1" },
   });
-  const response = await withFakeCalle(fake, () => handleGetCallStatus("run-1", CONFIGURED));
+  const response = await withFakeCalle(fake, () => handleGetCallStatus(get(), "run-1", CONFIGURED));
 
   const payload = await response.json();
   assert.equal(payload.status, "COMPLETED");
@@ -129,13 +144,71 @@ test("a terminal run returns the raw CALL-E result for the workflow to read", as
 });
 
 test("a status request without a run id is refused", async () => {
-  const response = await handleGetCallStatus("", CONFIGURED);
+  const response = await handleGetCallStatus(get(), "", CONFIGURED);
   assert.equal(response.status, 400);
+});
+
+// The browser's authorization checkbox is a value in a request body, so anyone
+// can send it. These tests cover the boundary that actually protects the
+// credentials and the call budget.
+
+test("a caller without an access code cannot place a call", async () => {
+  const fake = createFakeCalle();
+  const response = await withFakeCalle(fake, () =>
+    handleCreateCall(post(validRequest("no-code"), null), CONFIGURED),
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "invalid_access_code");
+  assert.deepEqual(fake.toolCalls, [], "CALL-E was contacted by an unauthorized caller");
+});
+
+test("a caller with the wrong access code cannot place a call", async () => {
+  const fake = createFakeCalle();
+  const response = await withFakeCalle(fake, () =>
+    handleCreateCall(post(validRequest("wrong-code"), "not-the-code"), CONFIGURED),
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal(fake.runCallAttempts, 0);
+});
+
+// Ordering matters: a caller who cannot place a call should not be able to use
+// the endpoint as a free validator, or make the server parse their input.
+test("the access gate runs before the request body is read", async () => {
+  const response = await handleCreateCall(post("{not json", null), CONFIGURED);
+  assert.equal(response.status, 401, "malformed input was parsed before authorization");
+});
+
+test("a deployment with no access code configured refuses to place calls", async () => {
+  const response = await handleCreateCall(post(validRequest("unset-code")), {
+    CALLE_ACCESS_TOKEN: FAKE_TOKEN,
+    CALLE_SERVER_URL: FAKE_SERVER_URL,
+  });
+
+  assert.equal(response.status, 503);
+  assert.equal(
+    (await response.json()).error,
+    "not_configured",
+    "an unset access code must fail closed, and must not say which part is unset",
+  );
+});
+
+test("reading what a real call said also requires an access code", async () => {
+  const fake = createFakeCalle({ statusSequence: ["COMPLETED"] });
+  const response = await withFakeCalle(fake, () =>
+    handleGetCallStatus(get(null), "run-1", CONFIGURED),
+  );
+
+  assert.equal(response.status, 401);
+  const payload = await response.json();
+  assert.equal(payload.activity, undefined, "activity leaked to an unauthorized caller");
+  assert.equal(payload.calle_result, undefined, "a transcript leaked to an unauthorized caller");
 });
 
 test("an upstream failure is reported without inventing a call outcome", async () => {
   const fake = createFakeCalle({ rejectWithStatus: 500 });
-  const response = await withFakeCalle(fake, () => handleGetCallStatus("run-1", CONFIGURED));
+  const response = await withFakeCalle(fake, () => handleGetCallStatus(get(), "run-1", CONFIGURED));
 
   assert.equal(response.status, 502);
   const payload = await response.json();

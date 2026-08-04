@@ -12,5 +12,9 @@ export default async function handler(request: Request): Promise<Response> {
   // The run id is the last path segment; reading it from the URL keeps this
   // handler on web-standard types rather than a platform-specific params object.
   const segments = new URL(request.url).pathname.split("/").filter(Boolean);
-  return handleGetCallStatus(decodeURIComponent(segments[segments.length - 1] ?? ""), envFromProcess());
+  return handleGetCallStatus(
+    request,
+    decodeURIComponent(segments[segments.length - 1] ?? ""),
+    envFromProcess(),
+  );
 }

@@ -1,82 +1,775 @@
+/*
+ * Agent Gallery visual system.
+ *
+ * This is a utility surface, not a marketing page: the operator is here to get
+ * a call placed correctly, so the design defers to the content. Hierarchy comes
+ * from type scale and whitespace rather than from boxes, glow, or gradients,
+ * there is exactly one accent color, and motion stays under 300ms and never
+ * comments on itself.
+ *
+ * Color follows a semantic model rather than literal hex: every token below is
+ * a role (label, background, separator, fill) so light, dark, and increased
+ * contrast all resolve correctly from one set of declarations. Dark mode dims
+ * rather than inverts, stepping up a luminance staircase.
+ */
+
+/* ==========================================================================
+   Tokens
+   ========================================================================== */
+
 :root {
   color-scheme: light dark;
-  font-family: system-ui, sans-serif;
+
+  /* Labels: one base color at descending alpha, so text blends on any surface
+     instead of leaving the halo that discrete grays leave. */
+  --label: #000000;
+  --label-secondary: rgba(60, 60, 67, 0.6);
+  --label-tertiary: rgba(60, 60, 67, 0.3);
+
+  /* Grouped-table surface model: tinted canvas, white cards lifting off it. */
+  --bg: #f2f2f7;
+  --bg-elevated: #ffffff;
+
+  --fill-quaternary: rgba(116, 116, 128, 0.08);
+  --separator: rgba(60, 60, 67, 0.18);
+
+  /* The single accent. Everything else is neutral. */
+  --accent: #007aff;
+  --accent-pressed: #0062cc;
+  --on-accent: #ffffff;
+
+  /* Status hues are semantic, never decorative, and are always paired with a
+     glyph or a word so color is not the only signal. */
+  --positive: #34c759;
+  --caution: #ff9500;
+  --critical: #ff3b30;
+
+  /* Type scale mirroring the system text styles at the default content size. */
+  --text-hero: clamp(2.125rem, 1.4vw + 1.75rem, 3rem);
+  --text-title-1: 1.75rem;
+  --text-title-2: 1.375rem;
+  --text-body: 1.0625rem;
+  --text-callout: 1rem;
+  --text-subhead: 0.9375rem;
+  --text-footnote: 0.8125rem;
+  --text-caption: 0.75rem;
+
+  /* Tracking tightens as size grows, and never goes negative at body or below. */
+  --track-hero: -0.022em;
+  --track-title-1: -0.014em;
+  --track-title-2: -0.01em;
+  --track-body: 0em;
+  --track-caption: 0.05em;
+
+  /* 8pt grid, with 4pt half-steps for tight pairings. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 4rem;
+
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  /* Under 300ms, decelerating: fast enough to feel instant, slow enough to
+     show where a thing came from. */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration: 240ms;
+}
+
+/* P3 where available. The sRGB values above stay as the fallback, because these
+   are different physical colors rather than equivalents. */
+@supports (color: color(display-p3 1 1 1)) {
+  :root {
+    --accent: color(display-p3 0 0.478 1);
+    --positive: color(display-p3 0.204 0.78 0.349);
+    --critical: color(display-p3 1 0.231 0.188);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --label: #ffffff;
+    --label-secondary: rgba(235, 235, 245, 0.6);
+    --label-tertiary: rgba(235, 235, 245, 0.3);
+
+    /* Dimming, not inverting: each step climbs, never falls. */
+    --bg: #000000;
+    --bg-elevated: #1c1c1e;
+
+    --fill-quaternary: rgba(118, 118, 128, 0.18);
+    --separator: rgba(84, 84, 88, 0.55);
+
+    --accent: #0a84ff;
+    --accent-pressed: #3d9bff;
+
+    --positive: #30d158;
+    --caution: #ff9f0a;
+    --critical: #ff453a;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Translucent tokens firm up when the reader has asked for more contrast. */
+@media (prefers-contrast: more) {
+  :root {
+    --label-secondary: rgba(60, 60, 67, 0.82);
+    --separator: rgba(60, 60, 67, 0.5);
+  }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--label);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--text-body);
+  line-height: 1.47;
+  letter-spacing: var(--track-body);
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
 }
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ==========================================================================
+   Shell
+   ========================================================================== */
 
 .app {
-  max-width: 44rem;
+  max-width: 46rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
-  line-height: 1.5;
+  /* Respects the notch and home indicator when opened on a phone. */
+  padding: var(--space-6) max(var(--space-4), env(safe-area-inset-left)) var(--space-8);
 }
 
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.wordmark {
+  font-size: var(--text-callout);
+  font-weight: 600;
+}
+
+.wordmark span {
+  color: var(--label-secondary);
+  font-weight: 400;
+}
+
+/* The standing promise that nothing dials without an explicit act. Quiet by
+   default; it earns attention by never moving, not by shouting. */
 .mode-badge {
-  display: inline-block;
-  padding: 0.25rem 0.6rem;
-  border-radius: 0.4rem;
-  background: color-mix(in srgb, currentcolor 12%, transparent);
-  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 100px;
+  background: var(--fill-quaternary);
+  color: var(--label-secondary);
+  font-size: var(--text-footnote);
 }
 
-.muted {
-  opacity: 0.75;
-  font-size: 0.9rem;
+.mode-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--positive);
+  flex: none;
 }
+
+.mode-badge[data-state="live"] {
+  color: var(--critical);
+}
+
+.mode-badge[data-state="live"]::before {
+  background: var(--critical);
+  animation: pulse 2s var(--ease) infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ==========================================================================
+   Progress
+   ========================================================================== */
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-caption);
+  letter-spacing: var(--track-caption);
+  text-transform: uppercase;
+  color: var(--label-secondary);
+  flex-wrap: wrap;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.steps li::after {
+  content: "";
+  width: var(--space-4);
+  height: 1px;
+  background: var(--separator);
+}
+
+.steps li:last-child::after {
+  display: none;
+}
+
+/* Completed steps read as solid, upcoming ones stay secondary, so the sequence
+   still has three distinct levels now that no text sits at tertiary. */
+.steps li[data-state="done"] {
+  color: var(--label);
+}
+
+.steps li[data-state="current"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Sections and cards
+   ========================================================================== */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  animation: rise var(--duration) var(--ease);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.screen-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.screen-head h2 {
+  font-size: var(--text-title-1);
+  letter-spacing: var(--track-title-1);
+}
+
+.lede {
+  color: var(--label-secondary);
+  max-width: 34rem;
+}
+
+.hero h2 {
+  font-size: var(--text-hero);
+  line-height: 1.08;
+  letter-spacing: var(--track-hero);
+  max-width: 18ch;
+}
+
+.card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
 
 fieldset {
-  margin: 1rem 0;
-  border: 1px solid color-mix(in srgb, currentcolor 25%, transparent);
-  border-radius: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-label {
-  display: block;
-  margin: 0.5rem 0;
+legend,
+.card-title {
+  font-size: var(--text-subhead);
+  letter-spacing: var(--track-caption);
+  text-transform: uppercase;
+  color: var(--label-secondary);
+  padding: 0;
+  margin-bottom: var(--space-4);
+  font-weight: 600;
 }
 
-label.consent {
+.field {
   display: flex;
-  gap: 0.5rem;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-subhead);
+  color: var(--label-secondary);
+}
+
+.field + .field,
+.field + .consent,
+.consent + .field {
+  margin-top: var(--space-4);
+}
+
+.field-hint {
+  font-size: var(--text-footnote);
+  color: var(--label-secondary);
 }
 
 input:not([type="checkbox"]),
 select {
-  display: block;
   width: 100%;
-  max-width: 24rem;
-  padding: 0.4rem;
-  margin-top: 0.2rem;
-  box-sizing: border-box;
+  /* 44px minimum target, met with padding and line-height rather than a fixed
+     height, so the control still grows with the reader's text size. */
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--bg-elevated);
+  color: var(--label);
+  font: inherit;
+  font-size: var(--text-body);
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+
+input:not([type="checkbox"]):focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--fill-quaternary);
+  font-size: var(--text-subhead);
+  color: var(--label);
+  cursor: pointer;
 }
 
 .window-row {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-3);
+  align-items: end;
 }
 
-.errors {
-  color: #c0392b;
+.window-row + .window-row {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--separator);
+}
+
+@media (max-width: 34rem) {
+  .window-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Controls
+   ========================================================================== */
+
+button {
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--fill-quaternary);
+  color: var(--label);
+  font: inherit;
+  font-size: var(--text-callout);
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform var(--duration) var(--ease), background var(--duration) var(--ease),
+    opacity var(--duration) var(--ease);
+}
+
+button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--label) 10%, transparent);
+}
+
+/* The press is the whole animation. It confirms the tap landed, nothing more. */
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-pressed);
+}
+
+button.destructive {
+  background: var(--critical);
+  color: var(--on-accent);
+}
+
+button.quiet {
+  background: transparent;
+  color: var(--accent);
+  padding-inline: var(--space-3);
+}
+
+button.quiet:hover:not(:disabled) {
+  background: var(--fill-quaternary);
 }
 
 .actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-button {
-  padding: 0.5rem 1rem;
-  cursor: pointer;
+.actions .spacer {
+  margin-left: auto;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+/* ==========================================================================
+   Description lists
+   ========================================================================== */
+
+.spec {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+  font-size: var(--text-subhead);
+}
+
+.spec dt {
+  color: var(--label-secondary);
+}
+
+.spec dd {
+  margin: 0;
+  color: var(--label);
+  font-size: var(--text-body);
+}
+
+@media (max-width: 34rem) {
+  .spec {
+    grid-template-columns: 1fr;
+    gap: var(--space-1) 0;
+  }
+
+  .spec dd + dt {
+    margin-top: var(--space-3);
+  }
+}
+
+/* Times and counters use tabular figures so they stop shifting as they update. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: var(--text-footnote);
+  color: var(--label-secondary);
+}
+
+/* ==========================================================================
+   Policy lists — the safety contract
+   ========================================================================== */
+
+.policy {
+  display: grid;
+  gap: var(--space-5);
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 40rem) {
+  .policy {
+    grid-template-columns: 1fr;
+  }
+}
+
+.policy-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: var(--text-subhead);
+}
+
+.policy-list li + li {
+  border-top: 1px solid var(--separator);
+}
+
+/* The glyph carries the meaning alongside the color, never instead of it. */
+.policy-list li::before {
+  flex: none;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.policy-list[data-kind="may"] li::before {
+  content: "✓";
+  color: var(--positive);
+}
+
+.policy-list[data-kind="may-not"] li::before {
+  content: "✕";
+  color: var(--critical);
+}
+
+/* ==========================================================================
+   Alerts
+   ========================================================================== */
+
+.alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--critical) 10%, var(--bg-elevated));
+  font-size: var(--text-subhead);
+}
+
+.alert h3 {
+  font-size: var(--text-subhead);
+  color: var(--critical);
+}
+
+.alert li {
+  display: flex;
+  gap: var(--space-2);
+  color: var(--label);
+}
+
+.alert li::before {
+  content: "•";
+  color: var(--critical);
+  flex: none;
+}
+
+.errors {
+  color: var(--critical);
+  font-size: var(--text-subhead);
+}
+
+/* ==========================================================================
+   Live call
+   ========================================================================== */
+
+.call-status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.call-state {
+  font-size: var(--text-title-2);
+  letter-spacing: var(--track-title-2);
+  font-weight: 600;
+}
+
+.call-timer {
+  font-size: var(--text-title-2);
+  color: var(--label-secondary);
+}
+
+/* The transcript is the content this screen exists to show, so it gets the
+   room. It scrolls internally rather than growing the page under the reader. */
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 22rem;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.transcript li {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: var(--space-3);
+  font-size: var(--text-subhead);
+  animation: rise var(--duration) var(--ease);
+}
+
+.transcript time {
+  color: var(--label-secondary);
+  font-size: var(--text-footnote);
+  font-variant-numeric: tabular-nums;
+  padding-top: 0.15em;
+}
+
+.transcript li[data-level="error"] p {
+  color: var(--critical);
+}
+
+.transcript-empty {
+  color: var(--label-secondary);
+  font-size: var(--text-subhead);
+  padding: var(--space-5) 0;
+  text-align: center;
+}
+
+/* ==========================================================================
+   Outcome
+   ========================================================================== */
+
+.outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.outcome-label {
+  font-size: var(--text-caption);
+  letter-spacing: var(--track-caption);
+  text-transform: uppercase;
+  color: var(--label-secondary);
+}
+
+.outcome-value {
+  font-size: var(--text-title-1);
+  letter-spacing: var(--track-title-1);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.outcome-value::before {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex: none;
+  background: var(--label-tertiary);
+}
+
+.outcome[data-tone="positive"] .outcome-value::before {
+  background: var(--positive);
+}
+
+.outcome[data-tone="caution"] .outcome-value::before {
+  background: var(--caution);
+}
+
+.outcome[data-tone="critical"] .outcome-value::before {
+  background: var(--critical);
+}
+
+/* The next action is the reason the operator opened this screen. */
+.next-action {
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+  font-size: var(--text-body);
+}
+
+.next-action strong {
+  display: block;
+  font-size: var(--text-caption);
+  letter-spacing: var(--track-caption);
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+/* Untrusted call output. Rendered as quoted text so it never reads as UI. */
+.quote {
+  border-left: 2px solid var(--separator);
+  padding-left: var(--space-4);
+  color: var(--label-secondary);
+  font-size: var(--text-subhead);
+}
+
+.muted {
+  color: var(--label-secondary);
+  font-size: var(--text-subhead);
+}
+
+/* ==========================================================================
+   Motion preference
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
