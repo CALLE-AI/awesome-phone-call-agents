@@ -371,13 +371,51 @@ A recipient stuck in `reserved` or `accepted` blocks further calls by design.
 To clear one:
 
 1. Find the entry — `grep <phone-hash> results/reservations.txt`. The line
-   holds the campaign, idempotency key, call ID, and state.
+   holds the campaign, idempotency key, call ID, state, and batch.
 2. Look the call ID up in the CALL-E dashboard to see whether it connected.
 3. Append a resolving line yourself, or start a new `--batch-id` once you are
    satisfied the prior attempt is accounted for.
 
 The ledger is append-only and the last line for a recipient wins, so history is
 preserved.
+
+#### Ledger line format
+
+If you hand-edit, match this exactly — the runner refuses to read a line it
+would not itself have written, and stops rather than risk a duplicate call:
+
+```text
+phone_hash,campaign,idempotency_key,call_id,state,batch
+```
+
+| Column | Must be |
+|---|---|
+| `phone_hash` | 64 lowercase hex characters (SHA-256 of the E.164 number) |
+| `campaign` | non-empty; no comma, line break, or NUL |
+| `idempotency_key` | non-empty; no comma, line break, or NUL |
+| `call_id` | the provider's call ID, or `-` if none yet |
+| `state` | exactly `reserved`, `accepted`, or `resolved:<status>` |
+| `batch` | the `--batch-id` it belongs to, or `-` |
+
+`<status>` must be one CALL-E reports: `completed`, `failed`, `canceled`,
+`busy`, `no_answer`, `voicemail`, `timeout`, or `unknown`. A bare `resolved` is
+rejected — it would read as terminal and free a claim on a call that may still
+be live.
+
+States only move forward: `reserved` → `accepted` → `resolved:<status>`. A line
+walking a recipient backwards is refused, and a new `--batch-id` may only begin
+from a resolved state and only at `reserved`.
+
+Fields are refused rather than escaped if they contain a comma, any line
+terminator, or NUL. Both records are one row per line with no quoting, so a
+smuggled delimiter could forge an entire extra row — including a `resolved` row
+for a *different* recipient, which is exactly the duplicate call the ledger
+exists to prevent. Silently rewriting the value would be worse: the reservation
+would no longer match the batch the operator passed.
+
+The opt-out file is `phone_hash,campaign`. Lines whose first field is not a
+SHA-256 digest are reported and ignored — they cannot match any number, and
+keeping them would give the appearance of an opt-out list without the effect.
 
 ---
 
@@ -390,17 +428,22 @@ python test_runner.py      # guards in isolation
 python test_live_path.py   # the whole live loop, with an injected fake client
 ```
 
-`test_runner.py` runs 192 checks over E.164 validation, masking, the dial gate,
-trusted-field validation, triage precedence, non-completed-status handling,
-idempotency, per-recipient reservations (including a 12-thread contention race),
-ledger corruption, in-run suppression, result and error redaction, prompt
-boundaries, note sanitisation, CSV parsing, and goal rendering.
+`test_runner.py` runs 245 checks over E.164 validation, masking, the dial gate,
+trusted-field validation, triage precedence (including non-finite and
+out-of-range confidence scores), provider-status normalisation,
+non-completed-status handling, idempotency, per-recipient reservations
+(including a 12-thread contention race), ledger corruption and exact state
+validation, forward-only state transitions, the batch completion guard,
+suppression re-checked at claim time, delimiter injection into both on-disk
+records, result and error redaction, prompt boundaries, note sanitisation, CSV
+parsing, and goal rendering.
 
-`test_live_path.py` drives the full live loop against an injected fake client:
-a completed call, a duplicate number in one file, an opt-out mid-run, a provider
-error, and region/locale handling. Isolated tests missed a real duplicate-call
-bug that this caught — the first call had already resolved by the time the
-second row was read, freeing the reservation.
+`test_live_path.py` drives the full live loop against an injected fake client
+across 31 checks: a completed call, a duplicate number in one file, an opt-out
+mid-run, a provider error, a poll timeout, an empty allowlist, region/locale
+handling, and a batch-id reuse that must not re-dial. Isolated tests missed a
+real duplicate-call bug that this caught — the first call had already resolved
+by the time the second row was read, freeing the reservation.
 
 Both exit non-zero on failure and place no calls.
 

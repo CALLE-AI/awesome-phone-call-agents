@@ -17,7 +17,10 @@ from pathlib import Path
 from runner import (
     CAMPAIGNS,
     LedgerCorruptError,
+    _UNSAFE_FIELD,
     _hash_phone,
+    _is_resolved,
+    _valid_state,
     build_schema,
     MAX_NAME,
     check_dial,
@@ -374,6 +377,105 @@ check(
     len(redact_error(_FakeAPIError("x" * 5000))) <= 400,
 )
 
+# --- ledger states are validated exactly ---------------------------------
+# A syntactically plausible but unrecognised state would otherwise be treated
+# as terminal and free a claim that may still be in flight.
+print("\nLedger states are validated exactly")
+for state, ok, why in [
+    ("reserved", True, "reserved"),
+    ("accepted", True, "accepted"),
+    ("resolved:completed", True, "resolved:completed"),
+    ("resolved:no_answer", True, "resolved:no_answer"),
+    ("resolved", False, "bare 'resolved'"),
+    ("resolvedX", False, "'resolvedX'"),
+    ("resolved:", False, "empty status"),
+    ("resolved:anything", False, "unknown status"),
+    ("resolved:COMPLETED", False, "wrong case"),
+    ("done", False, "invented state"),
+    ("", False, "empty"),
+]:
+    check(f"{why} is {'valid' if ok else 'refused'}", _valid_state(state) == ok)
+
+check("only resolved:<known status> counts as terminal", _is_resolved("resolved:completed"))
+check("a bare 'resolved' is NOT terminal", not _is_resolved("resolved"))
+check("'resolvedX' is NOT terminal", not _is_resolved("resolvedX"))
+
+# An unrecognised state in the file must stop the run, not free the claim.
+with tempfile.TemporaryDirectory() as tmp:
+    for bad in ("resolved", "resolvedX", "resolved:anything", "done"):
+        led = str(Path(tmp) / f"s_{bad.replace(':', '_')}.txt")
+        Path(led).write_text(
+            f"# h\n0cbf019479241f66c9c60d39e69e06989f108bc47da5b938a87045a615cad4a4,c,k,call_1,accepted,b1\n0cbf019479241f66c9c60d39e69e06989f108bc47da5b938a87045a615cad4a4,c,k,call_1,{bad},b1\n",
+            encoding="utf-8",
+        )
+        try:
+            load_reservations(led)
+            check(f"state {bad!r} in the file is refused", False)
+        except LedgerCorruptError:
+            check(f"state {bad!r} in the file is refused", True)
+
+    # A backwards transition would reopen a closed claim.
+    led = str(Path(tmp) / "backwards.txt")
+    Path(led).write_text(
+        f"# h\n0cbf019479241f66c9c60d39e69e06989f108bc47da5b938a87045a615cad4a4,c,k,call_1,resolved:completed,b1\n0cbf019479241f66c9c60d39e69e06989f108bc47da5b938a87045a615cad4a4,c,k,-,reserved,b1\n",
+        encoding="utf-8",
+    )
+    try:
+        load_reservations(led)
+        check("resolved -> reserved is refused", False)
+    except LedgerCorruptError:
+        check("resolved -> reserved is refused", True)
+
+    # The phone column must be a real digest.
+    led = str(Path(tmp) / "badhash.txt")
+    Path(led).write_text("# h\nnotahash,c,k,call_1,reserved,b1\n", encoding="utf-8")
+    try:
+        load_reservations(led)
+        check("a non-digest phone column is refused", False)
+    except LedgerCorruptError:
+        check("a non-digest phone column is refused", True)
+
+# --- batch completion guard ----------------------------------------------
+# Editing the task or schema yields a new content key. Without a batch guard
+# that new key looks like a fresh, permissible call.
+print("\nA completed recipient stays claimed for that batch")
+with tempfile.TemporaryDirectory() as tmp:
+    led = str(Path(tmp) / "batch.txt")
+    phone = "+15555550100"
+    k_a = idempotency_key("c", phone, "b1", task="Ask about Bali")
+    k_b = idempotency_key("c", phone, "b1", task="Ask about Dubai")
+
+    reserve_recipient(led, phone, "c", k_a, batch_id="b1")
+    record_resolved(led, phone, "c", k_a, "call_1", "completed", batch_id="b1")
+
+    check(
+        "an edited task cannot re-call inside the same batch",
+        not reserve_recipient(led, phone, "c", k_b, batch_id="b1")[0],
+    )
+    check(
+        "a new --batch-id permits a deliberate re-call",
+        reserve_recipient(led, phone, "c", k_b, batch_id="b2")[0],
+    )
+
+# --- suppression is re-read when claiming --------------------------------
+# A runner that started before an opt-out has a stale snapshot; the only thing
+# that can stop it is re-reading the opt-out file inside the lock.
+print("\nSuppression is re-checked at claim time")
+with tempfile.TemporaryDirectory() as tmp:
+    led = str(Path(tmp) / "l.txt")
+    supp = str(Path(tmp) / "s.txt")
+    phone = "+15555550100"
+
+    reserve_recipient(led, phone, "c", "kA", batch_id="b1", suppression_file=supp)
+    record_suppression(supp, phone, "c")
+    record_resolved(led, phone, "c", "kA", "call_A", "completed", batch_id="b1")
+
+    ok, prior = reserve_recipient(
+        led, phone, "c", "kB", batch_id="b2", suppression_file=supp
+    )
+    check("a concurrent runner with a stale snapshot is refused", not ok)
+    check("the refusal reports a suppression", (prior or {}).get("state") == "suppressed")
+
 # --- hostile provider payloads --------------------------------------------
 # Every finding below came from assuming the provider is actively hostile
 # rather than merely imperfect.
@@ -599,7 +701,7 @@ with tempfile.TemporaryDirectory() as tmp:
         check("a corrupt ledger raises rather than degrading", False)
     except LedgerCorruptError as exc:
         check("a corrupt ledger raises rather than degrading", True)
-        check("the error names the bad lines", "1, 2, 3" in str(exc))
+        check("the error names each bad line and why", "expected 6 fields" in str(exc))
         check("the error explains the risk", "dialing someone twice" in str(exc))
 
     try:
@@ -611,7 +713,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # A well-formed ledger with a header and blank lines still parses.
     good = str(Path(tmp) / "good.txt")
     Path(good).write_text(
-        "# header\n\n   \nabc123,travel,k1,call_1,reserved\n", encoding="utf-8"
+        "# header\n\n   \n0cbf019479241f66c9c60d39e69e06989f108bc47da5b938a87045a615cad4a4,travel,k1,call_1,reserved,b1\n", encoding="utf-8"
     )
     check("comments and blank lines are tolerated", len(load_reservations(good)) == 1)
 
@@ -782,6 +884,143 @@ with tempfile.TemporaryDirectory() as tmp:
         f"all 12 concurrent opt-outs persisted (got {len(load_suppressions(supp))})",
         len(load_suppressions(supp)) == 13,
     )
+
+# --- delimiter injection into the on-disk records -------------------------
+# Both records are comma-separated, one row per line, with no quoting. A field
+# carrying a comma splits into two; a field carrying a newline forges an entire
+# extra row — including a `resolved` row for a *different* recipient, which
+# frees a claim on a call that is still in flight.
+print("\nDelimiters cannot be smuggled into the ledger")
+with tempfile.TemporaryDirectory() as tmp:
+    phone = "+15555550100"
+    victim = "+15555550999"
+
+    # The exact forgery: a newline in --batch-id appending a resolved row for
+    # someone else.
+    forge = f"b1\n{_hash_phone(victim)},c,k,call_x,resolved:completed,b1"
+    led = str(Path(tmp) / "forge.txt")
+    try:
+        reserve_recipient(led, phone, "c", "k", batch_id=forge)
+        check("a newline in batch id cannot forge a ledger row", False)
+    except ValueError:
+        check("a newline in batch id is refused at write time", True)
+    check(
+        "the forged recipient was never written",
+        not Path(led).exists() or _hash_phone(victim) not in Path(led).read_text(
+            encoding="utf-8"
+        ),
+    )
+
+    # A comma would previously write a row the app then refused to read back,
+    # bricking the ledger for every later run.
+    for field, value, why in [
+        ("campaign", "camp,with,comma", "a comma in the campaign id"),
+        ("campaign", "camp\nnewline", "a newline in the campaign id"),
+        ("key", "key,with,comma", "a comma in the idempotency key"),
+        ("batch", "b\x00null", "a NUL in the batch id"),
+    ]:
+        led = str(Path(tmp) / f"d_{field}_{len(value)}_{why[2:6]}.txt")
+        kwargs = {"campaign_id": "c", "key": "k", "batch_id": "b1"}
+        kwargs[{"campaign": "campaign_id", "key": "key", "batch": "batch_id"}[field]] = value
+        try:
+            reserve_recipient(led, phone, kwargs["campaign_id"], kwargs["key"],
+                              batch_id=kwargs["batch_id"])
+            check(f"{why} is refused", False)
+        except ValueError:
+            check(f"{why} is refused", True)
+
+    # `str.splitlines()` breaks on far more than \r\n. Blocking only the obvious
+    # line breaks would leave a forgery path open through any of these, so the
+    # guard is checked against every character splitlines() honours.
+    unblocked = [
+        hex(cp)
+        for cp in range(0x110000)
+        if len(f"a{chr(cp)}b".splitlines()) > 1
+        and not _UNSAFE_FIELD.search(chr(cp))
+    ]
+    check(
+        f"every line terminator splitlines() honours is blocked "
+        f"({len(unblocked)} unblocked)",
+        not unblocked,
+    )
+
+    for ch, why in [
+        ("\x0b", "vertical tab"), ("\x0c", "form feed"),
+        ("\x1c", "file separator"), ("\x1d", "group separator"),
+        ("\x1e", "record separator"), ("\x85", "NEL"),
+        ("\u2028", "line separator"), ("\u2029", "paragraph separator"),
+    ]:
+        led = str(Path(tmp) / f"t_{ord(ch)}.txt")
+        forged = f"b1{ch}{_hash_phone(victim)},c,k,call_x,resolved:completed,b1"
+        try:
+            reserve_recipient(led, phone, "c", "k", batch_id=forged)
+            check(f"a {why} in the batch id is refused", False)
+        except ValueError:
+            check(f"a {why} in the batch id is refused", True)
+
+    # A legitimate value must still be accepted — the guard must not be so
+    # strict that ordinary batch ids stop working.
+    led = str(Path(tmp) / "ok.txt")
+    ok, _ = reserve_recipient(led, phone, "travel-q3", "k-1_2.3", batch_id="2026-08-04")
+    check("ordinary campaign, key, and batch values still work", ok)
+    check("and the ledger reads back cleanly", len(load_reservations(led)) == 1)
+
+    for value, why in [
+        ("2026-08-04", "an ISO date"), ("q3 followup", "a space"),
+        # Non-ASCII letters must work (an operator may name a batch in their own
+        # language) while the repository's English-only rule keeps the sample
+        # itself in Latin script.
+        ("café", "accented letters"), ("Übersicht", "an umlaut"),
+    ]:
+        led = str(Path(tmp) / f"g_{abs(hash(value))}.txt")
+        ok, _ = reserve_recipient(led, phone, "c", "k", batch_id=value)
+        check(f"{why} is still a usable batch id", ok)
+
+print("\nDelimiters cannot be smuggled into the opt-out list")
+with tempfile.TemporaryDirectory() as tmp:
+    supp = str(Path(tmp) / "s.txt")
+    try:
+        record_suppression(supp, "+15555550100", "c\nDEADBEEF")
+        check("a newline in the campaign id cannot inject an opt-out line", False)
+    except ValueError:
+        check("a newline in the campaign id is refused at write time", True)
+
+    # A hand-edited junk line must not become a phantom entry: an opt-out list
+    # full of values that can never match is the appearance of protection
+    # without the effect.
+    record_suppression(supp, "+15555550100", "travel")
+    with open(supp, "a", encoding="utf-8") as fh:
+        fh.write("not-a-digest,travel\nDEADBEEF\n")
+    loaded = load_suppressions(supp)
+    check("junk lines are not loaded as opt-outs", loaded == {_hash_phone("+15555550100")})
+    check("the genuine opt-out still loads", _hash_phone("+15555550100") in loaded)
+
+# --- provider status normalisation ----------------------------------------
+# The status is compared against fixed sets in three places (the poll loop,
+# triage, and the ledger). A padded value would escalate a good call to a human
+# and file it as `resolved:unknown`, losing the real outcome.
+print("\nA padded or mixed-case provider status is normalised")
+_trusted = {
+    "outcome": "interested", "sentiment": "positive", "summary": "ok",
+    "frustration_signals": False, "wants_human_callback": False,
+    "do_not_call": False,
+}
+for raw in ("completed", " completed ", "COMPLETED", "Completed", "\tcompleted\n"):
+    disposition, _ = triage(raw, _trusted, task_completed=True, confidence=0.9)
+    check(f"status {raw!r} auto-closes", disposition == "auto_closed")
+
+for raw in (" no_answer ", "NO_ANSWER"):
+    disposition, _ = triage(raw, {}, task_completed=None, confidence=None)
+    check(f"status {raw!r} is treated as retryable", disposition == "retry")
+
+with tempfile.TemporaryDirectory() as tmp:
+    led = str(Path(tmp) / "l.txt")
+    phone = "+15555550100"
+    reserve_recipient(led, phone, "c", "k", batch_id="b1")
+    record_resolved(led, phone, "c", "k", "call_1", " COMPLETED ", batch_id="b1")
+    stored = load_reservations(led)[_hash_phone(phone)]["state"]
+    check("a padded status is stored as resolved:completed, not unknown",
+          stored == "resolved:completed")
 
 # -------------------------------------------------------------- report --
 print()

@@ -148,15 +148,35 @@ def redact_error(exc: BaseException) -> str:
 
 
 def load_suppressions(path: str) -> set[str]:
-    """Hashed numbers that must never be dialed again."""
+    """Hashed numbers that must never be dialed again.
+
+    Only well-formed digests are collected. A line that is not a SHA-256 hex
+    digest cannot correspond to any number this app would dial, so keeping it
+    would add an entry that silently never matches — the appearance of an
+    opt-out list without the effect. Malformed lines are reported on stderr and
+    skipped rather than raising: refusing to load the opt-out list would be a
+    far worse failure than ignoring a line that could never match anyway.
+    """
     p = Path(path)
     if not p.exists():
         return set()
     out: set[str] = set()
+    skipped = 0
     for line in p.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line and not line.startswith("#"):
-            out.add(line.split(",")[0].strip())
+        if not line or line.startswith("#"):
+            continue
+        digest = line.split(",")[0].strip().lower()
+        if _HASH_RE.match(digest):
+            out.add(digest)
+        else:
+            skipped += 1
+    if skipped:
+        print(
+            f"  warning: {path} has {skipped} line(s) that are not SHA-256 "
+            f"digests; they cannot match any number and were ignored",
+            file=sys.stderr,
+        )
     return out
 
 
@@ -168,6 +188,10 @@ def record_suppression(path: str, phone: str, campaign_id: str) -> None:
     record survives a crash — an opt-out that is only in a buffer is not an
     opt-out. Stored as a hash, so the file carries no personal data.
     """
+    # Validated before the lock is taken: a comma would split the record and a
+    # newline would append an arbitrary extra line to the opt-out list.
+    campaign_field = _safe_field("campaign id", campaign_id)
+
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with _ledger_lock(path):
@@ -177,7 +201,7 @@ def record_suppression(path: str, phone: str, campaign_id: str) -> None:
                 encoding="utf-8",
             )
         with p.open("a", encoding="utf-8") as fh:
-            fh.write(f"{_hash_phone(phone)},{campaign_id}\n")
+            fh.write(f"{_hash_phone(phone)},{campaign_field}\n")
             fh.flush()
             os.fsync(fh.fileno())
 
@@ -225,43 +249,173 @@ class LedgerCorruptError(RuntimeError):
     """
 
 
+# The complete set of non-terminal states. Anything else in the state column is
+# corruption, not a state we have not thought of — accepting an unknown string
+# is how a typo'd or tampered line frees an active claim.
+OPEN_STATES = frozenset({"reserved", "accepted"})
+
+# A terminal state is exactly `resolved:<provider status>`, and the status must
+# be one CALL-E actually reports. A bare `resolved`, or `resolvedX`, is corrupt.
+RESOLVED_PREFIX = "resolved:"
+RESOLVABLE_STATUSES = frozenset(TERMINAL | RETRYABLE | {"timeout", "unknown"})
+
+# 64 hex characters: the SHA-256 of a phone number.
+_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+# Both on-disk records are comma-separated with one row per line and no quoting.
+# A field containing a comma silently splits into two, and a field containing a
+# line break forges an entire extra row — including a `resolved` row for a
+# *different* recipient, which frees a claim on a call that is still in flight.
+#
+# The set below is deliberately wider than `\r\n`, because these files are read
+# back with `str.splitlines()`, which also breaks on vertical tab, form feed,
+# the C1 separators, NEL, and U+2028/U+2029. Blocking only `\r\n` would leave a
+# forgery path open through any of them.
+#
+# Nothing legitimate needs these characters, so they are refused at the single
+# point where a field is written rather than trusted from each caller.
+_UNSAFE_FIELD = re.compile(
+    "[,"
+    "\x00"                      # NUL - truncates the record for some readers
+    "\n\r"                      # the obvious line breaks
+    "\x0b\x0c"                  # vertical tab, form feed
+    "\x1c\x1d\x1e"              # file, group, and record separators
+    "\x85"                      # NEL
+    "\u2028\u2029"              # line and paragraph separators
+    "]"
+)
+
+
+def _safe_field(name: str, value: str) -> str:
+    """Validate one field before it is written to a delimited record.
+
+    Raises rather than escaping or stripping. A silently-rewritten campaign or
+    batch id would no longer match the one the operator passed, so a reservation
+    written under it could never be found again — which is its own duplicate
+    call. Refusing loudly is the only safe option.
+    """
+    text = str(value)
+    if _UNSAFE_FIELD.search(text):
+        raise ValueError(
+            f"{name} may not contain a comma, newline, or NUL "
+            f"(these delimit the on-disk record): {text!r}"
+        )
+    return text
+
+
+def _valid_state(state: str) -> bool:
+    """Is this exactly one of the states this app writes?"""
+    if state in OPEN_STATES:
+        return True
+    if state.startswith(RESOLVED_PREFIX):
+        return state[len(RESOLVED_PREFIX):] in RESOLVABLE_STATUSES
+    return False
+
+
 def _read_ledger(path: str) -> dict[str, dict[str, str]]:
     """Reservations keyed by hashed phone, newest state per recipient.
 
-    Raises `LedgerCorruptError` on any unparseable line. This file is the only
-    thing standing between a crash and a duplicate call, so it fails loudly
-    rather than degrading quietly.
+    Raises `LedgerCorruptError` on any line this app would not itself have
+    written. This file is the only thing standing between a crash and a
+    duplicate call, so every field is validated against an exact expected
+    shape rather than merely being present:
+
+    * the phone column must be a 64-char SHA-256 hex digest
+    * the state must be exactly `reserved`, `accepted`, or
+      `resolved:<known provider status>`
+    * a recipient's states must only move forward — `reserved -> accepted ->
+      resolved`, never backwards
+
+    A syntactically plausible but unknown state would otherwise be treated as
+    terminal and free an active claim.
     """
     p = Path(path)
     if not p.exists():
         return {}
 
     out: dict[str, dict[str, str]] = {}
+    order = {"reserved": 0, "accepted": 1}
     bad: list[str] = []
 
     for lineno, raw in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
+
         parts = [c.strip() for c in line.split(",")]
-        if len(parts) != 5 or not all(parts[:3]) or not parts[4]:
-            bad.append(str(lineno))
+        if len(parts) != 6:
+            bad.append(f"{lineno} (expected 6 fields, got {len(parts)})")
             continue
-        phone_hash, campaign_id, key, call_id, state = parts
+
+        phone_hash, campaign_id, key, call_id, state, batch = parts
+
+        if not _HASH_RE.match(phone_hash):
+            bad.append(f"{lineno} (phone column is not a SHA-256 digest)")
+            continue
+        if not campaign_id or not key or not call_id:
+            bad.append(f"{lineno} (empty campaign, key, or call_id)")
+            continue
+        if not _valid_state(state):
+            bad.append(f"{lineno} (unrecognised state {state!r})")
+            continue
+
+        # States must only move forward, and forward-only is a property of the
+        # RECIPIENT, not of a batch. Scoping this check to matching batch values
+        # would let a line carrying a different batch skip it entirely — which
+        # is the dangerous direction: forging `accepted -> resolved` frees a
+        # claim on a call that is still in flight.
+        #
+        # A new batch legitimately starts a fresh attempt, but only from a
+        # resolved state, and only by appending `reserved`. Anything else is a
+        # line this app would not have written.
+        prior = out.get(phone_hash)
+        if prior:
+            prior_state = prior["state"]
+            prior_batch = prior.get("batch", "")
+            new_attempt = prior_batch != batch
+
+            if new_attempt:
+                # Starting a new batch is only valid from a closed attempt, and
+                # only as a fresh reservation.
+                if not _is_resolved(prior_state):
+                    bad.append(
+                        f"{lineno} (batch {batch!r} starts while batch "
+                        f"{prior_batch!r} is still {prior_state!r})"
+                    )
+                    continue
+                if state != "reserved":
+                    bad.append(
+                        f"{lineno} (a new batch must begin at 'reserved', "
+                        f"not {state!r})"
+                    )
+                    continue
+            else:
+                if _is_resolved(prior_state) and not _is_resolved(state):
+                    bad.append(f"{lineno} (state moves backwards from {prior_state!r})")
+                    continue
+                if (
+                    prior_state in order
+                    and state in order
+                    and order[state] < order[prior_state]
+                ):
+                    bad.append(f"{lineno} (state moves backwards from {prior_state!r})")
+                    continue
+
         # Later lines supersede earlier ones for the same recipient.
         out[phone_hash] = {
             "campaign": campaign_id,
             "key": key,
             "call_id": call_id,
             "state": state,
+            "batch": batch,
         }
 
     if bad:
         raise LedgerCorruptError(
-            f"{path} has malformed line(s) at {', '.join(bad)}. A corrupt entry "
-            f"may be the only record of an in-flight call, so this run stops "
-            f"rather than risk dialing someone twice. Inspect the file, repair "
-            f"or remove the bad lines deliberately, then retry."
+            f"{path} has invalid line(s): {'; '.join(bad)}. A corrupt entry may "
+            f"be the only record of an in-flight call, so this run stops rather "
+            f"than risk dialing someone twice. Inspect the file, repair or "
+            f"remove the bad lines deliberately, then retry."
         )
 
     return out
@@ -273,17 +427,36 @@ def load_reservations(path: str) -> dict[str, dict[str, str]]:
 
 
 def _append_ledger(path: str, phone: str, campaign_id: str, key: str,
-                   call_id: str, state: str) -> None:
+                   call_id: str, state: str, batch_id: str = "") -> None:
+    """Append one reservation row, fsynced.
+
+    `batch_id` is stored so a completed recipient stays claimed for that batch:
+    editing the task or schema yields a new content key, and without the batch
+    column that new key would look like a fresh, permissible call.
+    """
+    if not _valid_state(state):  # guards against a caller inventing a state
+        raise ValueError(f"refusing to write unrecognised ledger state {state!r}")
+
+    # Validated BEFORE the file is touched, so a rejected write leaves no
+    # partial row behind.
+    campaign_field = _safe_field("campaign id", campaign_id)
+    key_field = _safe_field("idempotency key", key)
+    call_field = _safe_field("call id", call_id or "-")
+    batch_field = _safe_field("batch id", batch_id or "-")
+
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     if not p.exists():
         p.write_text(
             "# Per-recipient call reservations. Append-only; last line wins.\n"
-            "# phone_hash,campaign,idempotency_key,call_id,state\n",
+            "# phone_hash,campaign,idempotency_key,call_id,state,batch\n",
             encoding="utf-8",
         )
     with p.open("a", encoding="utf-8") as fh:
-        fh.write(f"{_hash_phone(phone)},{campaign_id},{key},{call_id or '-'},{state}\n")
+        fh.write(
+            f"{_hash_phone(phone)},{campaign_field},{key_field},"
+            f"{call_field},{state},{batch_field}\n"
+        )
         fh.flush()
         os.fsync(fh.fileno())
 
@@ -294,11 +467,23 @@ def _is_resolved(state: str) -> bool:
     An exact `state == "resolved"` check never matches and would block every
     recipient forever after their first completed call.
     """
-    return (state or "").startswith("resolved")
+    # Requires the exact `resolved:<status>` form. A bare "resolved" or a
+    # tampered "resolvedX" is not terminal — treating it as such would free a
+    # claim that may still be in flight.
+    state = state or ""
+    return state.startswith(RESOLVED_PREFIX) and (
+        state[len(RESOLVED_PREFIX):] in RESOLVABLE_STATUSES
+    )
 
 
 def reserve_recipient(
-    path: str, phone: str, campaign_id: str, key: str
+    path: str,
+    phone: str,
+    campaign_id: str,
+    key: str,
+    *,
+    batch_id: str = "",
+    suppression_file: str | None = None,
 ) -> tuple[bool, dict[str, str] | None]:
     """Claim the right to call this number, atomically.
 
@@ -307,32 +492,76 @@ def reserve_recipient(
     note, so a different key — dial them again. The person is what must not be
     called twice.
 
+    Three checks happen inside the lock, so a concurrent runner cannot slip
+    between them:
+
+    1. **Durable suppression.** The opt-out file is re-read here, not trusted
+       from a set loaded at start-up. Another runner may have recorded an
+       opt-out and resolved its reservation while this process was already
+       running, and an in-memory snapshot would miss it.
+    2. **Unresolved prior attempt.** Anything mid-flight blocks a re-dial.
+    3. **Batch completion.** A recipient already completed in this batch stays
+       claimed, so editing the task or schema — which yields a new content key
+       — cannot buy a second call. A deliberate re-call needs a new
+       `--batch-id`, exactly as documented.
+
     Returns `(reserved, existing)`. When `reserved` is False, `existing` holds
-    the prior reservation so the caller can reconcile rather than re-dial.
+    the blocking record so the caller can reconcile rather than re-dial.
     """
     with _ledger_lock(path):
+        # (1) Durable opt-out check, inside the lock and off disk.
+        if suppression_file is not None:
+            if _hash_phone(phone) in load_suppressions(suppression_file):
+                return False, {
+                    "campaign": campaign_id,
+                    "key": "-",
+                    "call_id": "-",
+                    "state": "suppressed",
+                }
+
         ledger = _read_ledger(path)
         prior = ledger.get(_hash_phone(phone))
-        # A finished attempt does not block a deliberate new batch, but any
-        # unresolved one does — it may have connected.
-        if prior and not _is_resolved(prior.get("state", "")):
-            return False, prior
-        _append_ledger(path, phone, campaign_id, key, "", "reserved")
+
+        if prior:
+            state = prior.get("state", "")
+            # (2) A mid-flight attempt may have connected.
+            if not _is_resolved(state):
+                return False, prior
+            # (3) Already completed for this batch: a new content key must not
+            # reopen it.
+            if batch_id and prior.get("batch") == batch_id:
+                return False, prior
+
+        _append_ledger(path, phone, campaign_id, key, "", "reserved", batch_id)
         return True, None
 
 
-def record_accepted(path: str, phone: str, campaign_id: str, key: str, call_id: str) -> None:
+def record_accepted(
+    path: str, phone: str, campaign_id: str, key: str, call_id: str,
+    *, batch_id: str = "",
+) -> None:
     """Bind the provider's call ID to the reservation once CALL-E accepts."""
     with _ledger_lock(path):
-        _append_ledger(path, phone, campaign_id, key, call_id, "accepted")
+        _append_ledger(path, phone, campaign_id, key, call_id, "accepted", batch_id)
 
 
 def record_resolved(
-    path: str, phone: str, campaign_id: str, key: str, call_id: str, status: str
+    path: str, phone: str, campaign_id: str, key: str, call_id: str, status: str,
+    *, batch_id: str = "",
 ) -> None:
-    """Close the reservation with the provider's terminal status."""
+    """Close the reservation with the provider's terminal status.
+
+    An unrecognised provider status is stored as `resolved:unknown` rather than
+    written verbatim, so the state column can be validated exactly on read.
+    """
+    # Normalised here too: this is public API, so it must not depend on the
+    # caller having lowered and stripped the provider's value.
+    normalised = str(status or "").strip().lower()
+    safe = normalised if normalised in RESOLVABLE_STATUSES else "unknown"
     with _ledger_lock(path):
-        _append_ledger(path, phone, campaign_id, key, call_id, f"resolved:{status}")
+        _append_ledger(
+            path, phone, campaign_id, key, call_id, f"resolved:{safe}", batch_id
+        )
 
 
 def idempotency_key(
@@ -583,7 +812,10 @@ def triage(
     routes to a human. A call auto-closes only when every trust signal is
     present and positive.
     """
-    status = (status or "").lower()
+    # Stripped as well as lowered. A provider that returns " completed " would
+    # otherwise fall through to the unrecognised-status branch, escalating a
+    # perfectly good call to a human for a whitespace difference.
+    status = (status or "").strip().lower()
 
     if status == "completed":
         # A result we cannot verify is a result we cannot act on.
@@ -963,21 +1195,45 @@ def run(args: argparse.Namespace) -> int:
         # person, not the request: a second CSV row for the same number with a
         # different name or note produces a different content key, and must
         # still not reach them twice.
+        # batch_id keeps a completed recipient claimed for this batch, and
+        # suppression_file is re-read inside the lock so a concurrent runner's
+        # opt-out cannot be missed by our start-up snapshot.
         reserved, prior = reserve_recipient(
-            args.dispatch_file, contact["phone"], campaign.id, key
+            args.dispatch_file,
+            contact["phone"],
+            campaign.id,
+            key,
+            batch_id=args.batch_id,
+            suppression_file=args.suppression_file,
         )
         if not reserved:
             made += 1  # an unresolved attempt may have connected
             seen_this_run.add(phone_hash)
             state = (prior or {}).get("state", "unknown")
             prior_call = (prior or {}).get("call_id", "-")
-            print(f"  SKIPPED   {label} reserved already (state={state})")
+            if state == "suppressed":
+                # Recorded by another runner after our snapshot was taken.
+                print(f"  BLOCKED   {label} opted out (found on re-check)")
+            elif _is_resolved(state):
+                print(f"  SKIPPED   {label} already completed in batch {args.batch_id}")
+            else:
+                print(f"  SKIPPED   {label} reserved already (state={state})")
             results.append(
                 {"contact": contact["name"], "phone": mask(contact["phone"]),
                  "status": "ALREADY_RESERVED", "disposition": "needs_human",
                  "reason": (
-                     f"An earlier attempt is unresolved (state={state}, "
-                     f"call_id={prior_call}). Reconcile that call before dialing again."
+                     "Blocked by a durable opt-out found when claiming the "
+                     "recipient."
+                     if state == "suppressed"
+                     else (
+                         f"Already completed in batch {args.batch_id}. Use a new "
+                         f"--batch-id for a deliberate re-call."
+                     )
+                     if _is_resolved(state)
+                     else (
+                         f"An earlier attempt is unresolved (state={state}, "
+                         f"call_id={prior_call}). Reconcile it before dialing again."
+                     )
                  ),
                  "idempotency_key": key, "prior_call_id": prior_call}
             )
@@ -1025,20 +1281,26 @@ def run(args: argparse.Namespace) -> int:
             # Bind the provider's ID to the reservation the moment CALL-E
             # accepts. Until this line the reservation says "reserved" with no
             # call_id; after it, a crashed run leaves a reconcilable record.
-            record_accepted(args.dispatch_file, contact["phone"], campaign.id, key, call_id)
+            record_accepted(
+                args.dispatch_file, contact["phone"], campaign.id, key, call_id,
+                batch_id=args.batch_id,
+            )
 
             deadline = time.monotonic() + args.timeout
             final = created
             reached_terminal = False
             while time.monotonic() < deadline:
                 final = client.calls.get(call_id)
-                if str(final.get("status", "")).lower() in TERMINAL:
+                if str(final.get("status", "")).strip().lower() in TERMINAL:
                     reached_terminal = True
                     break
                 time.sleep(args.poll_interval)
 
             extracted = extract_result(final)
-            status = str(final.get("status", "unknown"))
+            # Normalised once, here, so triage, the ledger, and the results file
+            # all record the same value. Storing a padded status would file a
+            # completed call as `resolved:unknown` and lose the real outcome.
+            status = str(final.get("status", "unknown")).strip().lower() or "unknown"
 
             # A timeout is not an outcome. The call may still be ringing, in
             # progress, or already finished — we simply stopped looking. Marking
@@ -1091,7 +1353,8 @@ def run(args: argparse.Namespace) -> int:
             # Only now, with any opt-out durable, close the reservation with the
             # provider's terminal status.
             record_resolved(
-                args.dispatch_file, contact["phone"], campaign.id, key, call_id, status
+                args.dispatch_file, contact["phone"], campaign.id, key, call_id, status,
+                batch_id=args.batch_id,
             )
 
             # Summaries are model-generated prose and can quote a number or
@@ -1132,14 +1395,41 @@ def run(args: argparse.Namespace) -> int:
     # Never overwrite: a results file is the only local record of who was
     # called and what they said. A second run with the same --out would destroy
     # the first run's evidence, including any opt-out it captured.
+    #
+    # By this point the calls have already been placed, so failing to write is
+    # not an option either — losing this file loses the only record of them.
+    # A one-second timestamp collides when two runs finish in the same second,
+    # so the suffix is retried with a counter until `open("x")` wins. Neither
+    # the old file nor this run's record can be lost.
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    if out.exists():
+    fh = None
+    try:
+        fh = out.open("x", encoding="utf-8")
+    except FileExistsError:
         stamp = time.strftime("%Y%m%dT%H%M%S")
-        out = out.with_name(f"{out.stem}-{stamp}{out.suffix}")
-        print(f"  {args.out} exists; writing {out.name} instead")
+        for n in range(1, 1000):
+            suffix = f"-{stamp}" if n == 1 else f"-{stamp}-{n}"
+            candidate = out.with_name(f"{out.stem}{suffix}{out.suffix}")
+            try:
+                fh = candidate.open("x", encoding="utf-8")
+            except FileExistsError:
+                continue
+            out = candidate
+            print(f"  {args.out} exists; writing {out.name} instead")
+            break
+        if fh is None:
+            # Print the record rather than lose it — these calls really happened.
+            print(
+                f"Could not create a results file next to {args.out}. Dumping "
+                f"the run record to stdout so it is not lost:",
+                file=sys.stderr,
+            )
+            for r in results:
+                print(json.dumps(r), file=sys.stderr)
+            return 1
 
-    with out.open("x", encoding="utf-8") as fh:
+    with fh:
         for r in results:
             fh.write(json.dumps(r) + "\n")
     # Results hold call outcomes about identifiable people. Owner-only.
@@ -1221,6 +1511,14 @@ def main() -> int:
     missing = [f"--{n}" for n in ("campaign", "contacts") if not getattr(args, n)]
     if missing:
         p.error(f"the following arguments are required: {', '.join(missing)}")
+
+    # The batch id is written into the comma-delimited ledger, so reject a
+    # delimiter here — at parse time, with a clear message — rather than raising
+    # from inside the first reservation after a run has already begun.
+    try:
+        _safe_field("--batch-id", args.batch_id)
+    except ValueError as exc:
+        p.error(str(exc))
 
     return run(args)
 

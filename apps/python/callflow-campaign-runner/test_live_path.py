@@ -242,16 +242,33 @@ with tempfile.TemporaryDirectory() as tmp:
     check("no override flag exists", not hasattr(args, "i_know_what_im_doing"))
 
 print("\nRegion and locale are never invented")
+# Each case needs its OWN directory. Sharing one means sharing the reservation
+# ledger, and the second run is then correctly refused as "already completed in
+# this batch" — so no call is created and there is no recipient to inspect.
 with tempfile.TemporaryDirectory() as tmp:
     _, _, fake = run_case("noloc", "clean", ONE_ROW, tmp)
+    check("a call was created to inspect", len(fake.calls.created) == 1)
     recipient = fake.calls.created[0]["recipient"]
     check("region omitted when not stated", "region" not in recipient)
     check("locale omitted when not stated", "locale" not in recipient)
 
+with tempfile.TemporaryDirectory() as tmp:
     _, _, fake = run_case("withloc", "clean", ONE_ROW, tmp, region="US", locale="en")
+    check("a call was created to inspect", len(fake.calls.created) == 1)
     recipient = fake.calls.created[0]["recipient"]
     check("region sent when stated", recipient.get("region") == "US")
     check("locale sent when stated", recipient.get("locale") == "en")
+
+print("\nA completed recipient is not re-dialled by reusing the batch id")
+# The same ledger and the same --batch-id must refuse the second attempt, even
+# though changing region/locale changes the request. This is the guard the
+# shared-directory bug above tripped over.
+with tempfile.TemporaryDirectory() as tmp:
+    _, _, first = run_case("reuse1", "clean", ONE_ROW, tmp)
+    check("the first attempt dials", len(first.calls.created) == 1)
+
+    _, _, second = run_case("reuse2", "clean", ONE_ROW, tmp, region="US", locale="en")
+    check("reusing the batch id places no second call", len(second.calls.created) == 0)
 
 print()
 if FAILURES:
