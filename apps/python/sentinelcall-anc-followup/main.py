@@ -6,6 +6,7 @@ import re
 import time
 import json
 import sqlite3
+import hashlib
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, field_validator
 from calle_client import plan_call, run_call, wait_for_call_result, CalleError
@@ -63,6 +64,7 @@ def get_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS call_requests (
             idempotency_key TEXT PRIMARY KEY,
+            request_hash TEXT NOT NULL,
             status TEXT NOT NULL,
             ts REAL NOT NULL,
             response TEXT
@@ -143,6 +145,14 @@ def extract_danger_signs_from_transcript(transcript: str) -> tuple[list[str], li
     return found, urgent
 
 
+def _request_hash(req: "FollowUpRequest") -> str:
+    payload = (
+        f"{req.phone}|{req.region}|{req.patient_first_name}|"
+        f"{req.patient_date_of_birth}|{req.missed_visit_date}|{req.patient_id}"
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 class FollowUpRequest(BaseModel):
     phone: str
     region: str
@@ -161,6 +171,20 @@ class FollowUpRequest(BaseModel):
         return v
 
 
+# FIX (review round 5, point 2): escalation must be able to VERIFY, from
+# the actual transcript, that the two-identifier check succeeded before
+# any clinical content was discussed -- not just trust that the script
+# was followed. The goal now instructs the agent to say an exact,
+# machine-checkable phrase only after both identifiers are confirmed, and
+# escalation refuses to proceed if that phrase is absent from the
+# transcript.
+IDENTITY_CONFIRMED_PHRASE = "identity confirmed, thank you"
+
+
+def transcript_shows_identity_confirmed(transcript: str) -> bool:
+    return IDENTITY_CONFIRMED_PHRASE in transcript.lower()
+
+
 def build_goal(patient_first_name: str, patient_date_of_birth: str, missed_visit_date: str) -> str:
     # FIX (review round 4, point 2): identity confirmation now requires
     # TWO identifiers -- first name AND date of birth -- before any
@@ -177,7 +201,9 @@ def build_goal(patient_first_name: str, patient_date_of_birth: str, missed_visit
         f"or health topics until BOTH identifiers are confirmed. If either "
         f"does not match, do not reveal any further details; politely end "
         f"the call and report that identity could not be confirmed. "
-        f"If both identifiers are confirmed, say you're calling on behalf "
+        f"If both identifiers are confirmed, say the exact phrase "
+        f"'Identity confirmed, thank you.' -- use this exact wording, then "
+        f"continue: say you're calling on behalf "
         f"of a maternal health clinic following up on a missed antenatal "
         f"visit on {missed_visit_date}. Ask one at a time: any vaginal "
         f"bleeding, severe headache or vision changes, reduced baby "
@@ -209,23 +235,40 @@ async def trigger_followup(
         if not idempotency_key:
             raise HTTPException(400, "Idempotency-Key header is required for live calls.")
 
+        req_hash = _request_hash(req)
         now = time.time()
-        db.execute("DELETE FROM call_requests WHERE ts < ?", (now - 3600,))
+
+        # FIX (review round 5, point 1a): only clean up RESOLVED rows past
+        # the window. Previously this also deleted 'pending' rows after an
+        # hour -- meaning a call genuinely still in flight past an hour lost
+        # its dedup protection entirely and could be dispatched again.
+        db.execute("DELETE FROM call_requests WHERE ts < ? AND status = 'done'", (now - 3600,))
         db.commit()
 
         row = db.execute(
-            "SELECT status, response FROM call_requests WHERE idempotency_key = ?",
+            "SELECT status, request_hash, response FROM call_requests WHERE idempotency_key = ?",
             (idempotency_key,),
         ).fetchone()
         if row:
-            status, response_json = row
+            status, stored_hash, response_json = row
+            # FIX (review round 5, point 1b): idempotency key is now bound
+            # to the actual request content. Reusing a key with a DIFFERENT
+            # patient/phone/etc. is rejected outright, rather than silently
+            # returning the old cached response for a different patient.
+            if stored_hash != req_hash:
+                raise HTTPException(
+                    409,
+                    "This Idempotency-Key was already used with different request "
+                    "content. Use a new key for a genuinely different request.",
+                )
             if status == "pending":
                 raise HTTPException(409, "A request with this Idempotency-Key is already in flight.")
             return json.loads(response_json)
 
         db.execute(
-            "INSERT INTO call_requests (idempotency_key, status, ts, response) VALUES (?, 'pending', ?, NULL)",
-            (idempotency_key, now),
+            "INSERT INTO call_requests (idempotency_key, request_hash, status, ts, response) "
+            "VALUES (?, ?, 'pending', ?, NULL)",
+            (idempotency_key, req_hash, now),
         )
         db.commit()
 
@@ -341,6 +384,19 @@ async def confirm_escalation(
         raise HTTPException(409, f"Run {run_id} is not in a COMPLETED state; cannot escalate.")
 
     transcript = result.get("result", {}).get("transcript", "")
+
+    # FIX (review round 5, point 2): refuse to escalate unless the
+    # transcript itself proves the two-identifier check actually
+    # succeeded. Previously escalation trusted that the call script was
+    # followed; now it verifies real evidence from the real transcript.
+    if not transcript_shows_identity_confirmed(transcript):
+        raise HTTPException(
+            409,
+            f"Run {run_id}'s transcript does not show a confirmed two-identifier "
+            f"check. Escalation refused -- cannot write clinical data without "
+            f"verified proof identity was confirmed during the call.",
+        )
+
     actual_signs, actual_urgent = extract_danger_signs_from_transcript(transcript)
     actual_signs_set = set(actual_signs)
 

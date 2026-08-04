@@ -138,8 +138,22 @@ an in-progress call; that can only be done at the CALL-E platform level.
   codes used for each danger sign were selected for plausibility and have
   not been independently verified against an authoritative terminology
   browser -- do not treat records from this app as clinically validated.
-- The idempotency and escalation-tracking stores are in-memory and reset
-  on restart. A production deployment would need persistent storage.
+- The idempotency, run-to-patient, and escalation-tracking stores are
+  SQLite-backed (survives process restarts), but are not a distributed-
+  transaction system. A production deployment with multiple concurrent
+  worker processes would need a real database server (Postgres/Redis)
+  with proper distributed locking.
+- Authorization is currently a single shared API key, not per-patient or
+  per-user access control. `reviewed_by` on an escalation is self-
+  asserted by the caller, not cryptographically verified. A production
+  deployment needs a real auth/RBAC layer that ties specific reviewers to
+  specific patient records.
+- When an escalation writes multiple Observations (one per confirmed
+  danger sign), there is no durable per-write reconciliation across that
+  batch -- if an external write partially succeeds or returns an
+  ambiguous result, this app does not yet track which specific
+  Observations landed. A production deployment needs a saga/outbox-style
+  pattern to reconcile multi-write batches reliably.
 - As of this writing, CALL-E has added support for Nigeria (NG) as a
   recipient region, which is this project's real intended market --
   earlier versions of this README noted NG was unsupported; that has
