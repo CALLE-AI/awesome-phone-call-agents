@@ -457,14 +457,77 @@ export function agreementEvidence(
 const COMMITMENT_PROMPT =
   /\b(?:book|books|booked|booking|hold|holding|reserve|reserving|reserved|schedule|scheduled|scheduling|reschedule|pencil|slot|slots|appointment|appointments|availability|confirm|confirming)\b/i;
 
+/**
+ * Caller turns that put something to the callee rather than tell them something.
+ * A question or a request, in the forms a call script uses. The question mark is
+ * not required on its own, because a transcript of speech does not always carry
+ * one and an asked question is still an asked question without it.
+ */
+const ASK_FORMS: RegExp[] = [
+  /\?/,
+  /\b(?:can|could|would|will|shall|may)\s+(?:you|we|i|she|he|they)\b/i,
+  /\b(?:do|does|is|are|have|has)\s+(?:you|she|he|they|there)\b/i,
+  /\b(?:please|any chance)\b/i,
+  /\bi(?:'?m| am) calling to\b/i,
+  /\b(?:would|'?d) like to\b/i,
+];
+
+const MINUTE_WORDS = [...TEEN_WORDS, ...TEN_WORDS.slice(2), "oh", "zero"].join("|");
+const HOUR_WORD_GROUP = HOUR_WORDS.join("|");
+
+/** A clock time as a transcript writes one, whichever day it belongs to. */
+const CLOCK_TIME: RegExp[] = [
+  /\b\d{1,2}[:.]\d{2}\b/,
+  /\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?|o'? ?clock)\b/i,
+  /\b(?:half|quarter)\s+(?:past|to)\b/i,
+  new RegExp(
+    `\\b(?:${HOUR_WORD_GROUP})\\b[^a-z0-9]{1,4}(?:o'? ?clock|a\\.?m\\.?|p\\.?m\\.?|in the (?:morning|afternoon|evening))`,
+    "i",
+  ),
+  new RegExp(`\\b(?:${HOUR_WORD_GROUP})[^a-z0-9]{1,3}(?:${MINUTE_WORDS})\\b`, "i"),
+];
+
+/**
+ * Whether the turn names a time a slot could be: a weekday, a day of the month or
+ * a clock time. "Next week" and "soon" are not times anybody can hold, so a turn
+ * carrying only those has proposed nothing to answer.
+ */
+function namesATime(text: string): boolean {
+  return (
+    weekdaysNamed(text).size > 0 || daysNamed(text).size > 0 || CLOCK_TIME.some((pattern) => pattern.test(text))
+  );
+}
+
+/**
+ * Whether a caller turn puts the arrangement to the callee.
+ *
+ * Two halves, because the words alone are not enough. The turn has to be about the
+ * arrangement, which is booking language or the time the extraction reported. It
+ * also has to be putting it to them, which is an ask or an actual proposal, a time
+ * they could say yes to. A statement that merely carries one of those words is
+ * neither. "This appointment is for next week", told between a question and its
+ * answer, would otherwise make that answer a reply to the arrangement, so a no to
+ * the question would be reported as a no to the booking.
+ *
+ * All three bindings run through here, the agreement, the refusal and the
+ * confirmation code that belongs to the agreement, so the rule cannot hold on one
+ * side and not another.
+ *
+ * It is deliberately lexical and it fails closed. A real ask this misses leaves the
+ * evidence unbound, so the commitment reads unconfirmed and the report says less
+ * than the extraction claimed.
+ */
+function raisesArrangement(text: string, offered: string): boolean {
+  if (!COMMITMENT_PROMPT.test(text) && !mentionsDatetime(text, offered)) {
+    return false;
+  }
+  return ASK_FORMS.some((form) => form.test(text)) || namesATime(text);
+}
+
 /** Where the caller raised the arrangement. -1 when it never did. */
 function commitmentPromptAt(turns: TranscriptTurn[], offered: string): number {
   for (const [index, turn] of turns.entries()) {
-    if (turn.speaker !== "bot") {
-      continue;
-    }
-    // Proposing the time is raising the arrangement as much as the word book is.
-    if (COMMITMENT_PROMPT.test(turn.text) || mentionsDatetime(turn.text, offered)) {
+    if (turn.speaker === "bot" && raisesArrangement(turn.text, offered)) {
       return index;
     }
   }
@@ -480,7 +543,9 @@ type LastAsk = "commitment" | "question" | null;
  * A turn answers the most recent thing asked of it, so this is what decides which
  * claim a callee turn is evidence for. Statements are skipped: the caller reading
  * out a date of birth does not change the subject, so a callee who refuses after
- * that is still refusing whatever was last asked.
+ * that is still refusing whatever was last asked. A statement that names the
+ * arrangement is skipped for the same reason, because mentioning an appointment is
+ * not asking for one and the last real ask still stands.
  *
  * A turn that raises the arrangement counts as the arrangement even when it is also
  * one of the errand's questions, which is the usual case: "what is the earliest
@@ -497,7 +562,7 @@ function lastAskBefore(
     if (turn.speaker !== "bot") {
       continue;
     }
-    if (COMMITMENT_PROMPT.test(turn.text) || mentionsDatetime(turn.text, offered)) {
+    if (raisesArrangement(turn.text, offered)) {
       return "commitment";
     }
     if (questions.some((question) => support(tokens(question.text), turn.text) >= QUESTION_ASKED)) {

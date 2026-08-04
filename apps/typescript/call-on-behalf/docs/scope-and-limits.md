@@ -90,6 +90,20 @@ this one. The cost is a call where the only precise form of the time or the refe
 in a later turn: that reads as not named, so the report gives less than the extraction
 claimed rather than more.
 
+Raising the arrangement takes two things at once and not one word. The turn has to be
+about the arrangement, which is booking language or the time the extraction reported. It
+also has to put that to the callee, which means an ask or an actual proposal: a question,
+a request or a time they could say yes to. A statement that only carries the word
+appointment, confirm or availability raises nothing. "This appointment is for next week",
+said between a question and its answer, would otherwise make that answer a reply to the
+arrangement, so a no to the insurance question would come back as a refused appointment.
+One rule, used by all three bindings, so it cannot hold on the agreement and not on the
+refusal or the confirmation code. A caller who proposes a time without asking a question
+is still proposing, so "Thursday the thirteenth at nine forty would suit her" is an anchor
+and the tightening does not cost real agreements. It fails closed the other way: an ask
+this does not catch leaves the evidence unbound, so the commitment reads
+`unconfirmed`.
+
 The time is matched as a wall clock, in the forms a transcript carries. When a turn
 names a day or a weekday it has to be the claimed one, so the same time on another
 authorized day is not reported as this one. A turn that names no day is taken as the
@@ -116,8 +130,9 @@ nothing on their own. "No, we do not take that plan" refuses a question and says
 nothing about the booking, which may have been held in the same call. So the turn has
 to be answering the arrangement: what the caller last put to the callee before it has
 to be the arrangement rather than one of the questions. Statements do not change the
-subject, so a caller reading out a date of birth between the two leaves the refusal
-answering the appointment it followed. Then the time is bound too. When the extraction
+subject. A caller reading out a date of birth between the two leaves the refusal
+answering the appointment it followed. So does a statement that only mentions the
+appointment. Then the time is bound too. When the extraction
 reports a datetime, that datetime has to have been named by the moment the callee spoke,
 in the refusing turn or in the caller's proposal before it, which is what the agreement
 side already requires. Two times

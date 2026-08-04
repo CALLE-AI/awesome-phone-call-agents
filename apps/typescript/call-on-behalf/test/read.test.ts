@@ -14,6 +14,7 @@ const BRING: ErrandQuestion = {
   text: "What should she bring to a first appointment?",
   answer: "text",
 };
+const AETNA: ErrandQuestion = { id: "aetna", text: "Do you accept Aetna?", answer: "yes_no" };
 
 function turns(lines: [TranscriptTurn["speaker"], string][]): TranscriptTurn[] {
   return lines.map(([speaker, text], index) => ({ offset_seconds: index * 6, speaker, text }));
@@ -265,4 +266,93 @@ test("a refusal in a call that never raised an arrangement refuses no arrangemen
   const evidence = refusalEvidence(call, "", [PLAN]);
   assert.equal(evidence.quote, "");
   assert.match(evidence.otherQuote, /do not take that plan/);
+});
+
+test("a statement that mentions the arrangement is not the caller raising it", () => {
+  const call = turns([
+    ["bot", "Do you accept Aetna?"],
+    ["bot", "This appointment is for next week."],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // The middle turn tells them something. It asks for nothing and it names no time
+  // anybody could hold, so the refusal after it still answers the insurance
+  // question. Reading it as the arrangement reports a refused appointment in a call
+  // where no appointment was ever put to them.
+  const evidence = refusalEvidence(call, "", [AETNA]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+});
+
+test("a statement about the arrangement does not displace the last real ask", () => {
+  const answered = turns([
+    ["bot", "What is the earliest appointment you have for a routine check-up?"],
+    ["user", "Earliest is Thursday the thirteenth at nine forty. I can hold that slot."],
+    ["bot", "Do you accept Aetna?"],
+    ["bot", "This appointment is for next week."],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // The arrangement was raised and answered four turns back. The statement in
+  // between is not a second ask, so the insurance question is still the last thing
+  // put to them and the refusal is an answer to that.
+  const insurance = refusalEvidence(answered, "", [EARLIEST, AETNA]);
+  assert.equal(insurance.quote, "");
+  assert.match(insurance.otherQuote, /^No, we do not take that plan/);
+  // The other direction, with the same sentence. The arrangement is the last thing
+  // asked, so a statement after it does not take that away either.
+  const arrangement = turns([
+    ["bot", "Could you hold Thursday the thirteenth at nine forty?"],
+    ["bot", "This appointment is for next week."],
+    ["user", "I am afraid we cannot book that over the phone for somebody else."],
+  ]);
+  assert.match(refusalEvidence(arrangement, "", [EARLIEST, AETNA]).quote, /^I am afraid we cannot book/);
+});
+
+test("a time the caller states rather than asks is still an arrangement proposal", () => {
+  const refused = turns([
+    ["bot", "Thursday the thirteenth at nine forty would suit her for the appointment."],
+    ["user", "I am afraid we cannot book that, we are full on Thursday."],
+  ]);
+  // No question mark and no request. It puts a time on the table, which is what a
+  // proposal is, so the turn that answers it is evidence about it. Tightening what
+  // counts as raising the arrangement must not cost the calls where the caller
+  // proposes instead of asking.
+  assert.match(
+    refusalEvidence(refused, "2026-08-13T09:40:00-07:00", [EARLIEST, AETNA]).quote,
+    /^I am afraid we cannot book/,
+  );
+  const agreed = turns([
+    ["bot", "Thursday the thirteenth at nine forty would suit her for the appointment."],
+    ["user", "I have booked her in for then."],
+  ]);
+  assert.match(
+    agreementEvidence(agreed, "slot_within_windows", "2026-08-13T09:40:00-07:00").quote,
+    /^I have booked/,
+  );
+});
+
+test("booking language after a statement about the arrangement is not an agreement", () => {
+  const call = turns([
+    ["bot", "Do you accept Aetna?"],
+    ["bot", "This appointment is for next week."],
+    [
+      "user",
+      "No, we do not take that plan. I have put her in for Thursday the thirteenth at nine forty, reference four four seven one.",
+    ],
+  ]);
+  // The same statement, the other two bindings. The caller asked for nothing to be
+  // held, so a booking the callee volunteered is not an agreement with the caller
+  // and the reference number that came with it has no agreement to belong to.
+  const evidence = agreementEvidence(call, "slot_within_windows", "2026-08-13T09:40:00-07:00");
+  assert.equal(evidence.quote, "");
+  assert.equal(evidence.index, -1);
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+  assert.equal(codeNamedBefore(call, evidence.index, "4471"), false);
+  // The same turn after an actual ask is evidence for both.
+  const asked = turns([
+    ["bot", "Could you hold Thursday the thirteenth at nine forty?"],
+    ["user", "I have put her in for Thursday the thirteenth at nine forty, reference four four seven one."],
+  ]);
+  const supported = agreementEvidence(asked, "slot_within_windows", "2026-08-13T09:40:00-07:00");
+  assert.match(supported.quote, /^I have put her in/);
+  assert.equal(codeNamedBefore(asked, supported.index, "4471"), true);
 });

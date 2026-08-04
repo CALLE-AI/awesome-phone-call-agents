@@ -65,6 +65,12 @@ The extraction proposes. The transcript decides.
   the first. A refusal aimed elsewhere is quoted as what was actually turned
   down. When one turn agrees and another refuses the same arrangement, the report
   stands behind neither and says a person has to read the transcript and call.
+- Raising the arrangement means asking for it or proposing it. A statement that only
+  carries the word appointment or confirm raises nothing, so an answer to the
+  question before it stays an answer to that question. A time the caller proposes
+  without a question mark does count, because that is a time the callee can say yes
+  to. It is one rule and all three bindings use it: the agreement, the refusal and
+  the confirmation code that belongs to the agreement.
 - A time no callee turn named is not read back as an offer. CALL-E's own note
   is printed with its name on it. Nothing in the report is both unchecked and
   unlabelled.
@@ -158,7 +164,7 @@ Node 20 or later.
 cd apps/typescript/call-on-behalf
 npm install
 npm run check   # tsc --noEmit
-npm test        # 126 tests, no credentials, no outbound calls
+npm test        # 135 tests, no credentials, no outbound calls
 npm run demo    # the six cases against the local fake CALL-E
 ```
 

@@ -744,3 +744,76 @@ test("a refusal of the time the extraction reported is still a refusal", async (
     },
   );
 });
+
+test("a statement about the appointment does not turn a refused question into a refused errand", async () => {
+  // The caller asks about the plan, tells them what the appointment is for and the
+  // callee turns down the plan. Nothing was ever put to them about holding a slot,
+  // so a statement carrying the word appointment is not the thing that refusal
+  // answered. Reading it that way tells somebody an appointment was refused in a
+  // call where nobody was asked for one.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: [BOT_LINES[0]!, "Do you take Blue Shield PPO?", "This appointment is for next week.", BOT_LINES[4]!],
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look that up for you.",
+          "No, we do not take that plan.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: {
+          ...goodResult(),
+          answer_earliest: "",
+          answer_accepts_plan: "no",
+          commitment_made: "declined_by_callee",
+          offered_datetime: "",
+          confirmation_code: "",
+        },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.equal(report.outcome, "partially_met");
+      assert.match(report.next_step, /nothing is settled either way/);
+      assert.equal(report.next_step.includes("would not arrange it on this call"), false);
+      assert.match(report.callee_notes, /no turn refuses the arrangement/);
+      assert.match(report.callee_notes, /we do not take that plan/);
+      // The question they did turn down is still answered, out of that same turn.
+      assert.equal(report.answers[1]!.answered, true);
+      assert.equal(report.answers[1]!.answer, "no");
+    },
+  );
+});
+
+test("a booking nobody asked for is not agreed and its reference number is dropped", async () => {
+  // The same statement on the other two bindings. The callee volunteers a slot and a
+  // reference in a call where the caller only asked about the plan. Reporting that as
+  // agreed books something on the callee's word alone. The reference number goes with
+  // the agreement it belongs to, so it goes nowhere here.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: [BOT_LINES[0]!, "Do you take Blue Shield PPO?", "This appointment is for next week.", BOT_LINES[4]!],
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "Let me look that up for you.",
+          "Yes, we take Blue Shield PPO. I have put her in for Thursday the thirteenth at nine forty, reference four four seven one.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: { ...goodResult(), answer_earliest: "" },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.equal(report.committed_datetime, null);
+      assert.equal(report.confirmation_code, "");
+      assert.match(report.callee_notes, /no turn in the transcript agrees to that/);
+      assert.match(report.callee_notes, /I have put her in for Thursday/);
+      assert.match(report.next_step, /treat nothing as booked/);
+    },
+  );
+});
