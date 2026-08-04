@@ -144,6 +144,37 @@ The same reasoning applies to concurrency. Two processes that both read "no
 call in progress" will both dial. Claims must be atomic and locked, not
 best-effort.
 
+A file lock is necessary but not sufficient. Two coroutines inside one process
+share a pid, so a pid-based ownership check passes for both — and a batch that
+dispatches rows concurrently will dial a duplicated recipient twice. Track
+in-flight recipients in-process as well, and collapse duplicate rows before
+dispatch.
+
+## Credentials and recordings are owner-only
+
+Two kinds of file here are more sensitive than they look:
+
+- **The run ledger** holds confirmation tokens that authorise placing a call.
+- **Terminal run dumps** hold the full transcript of a conversation with a
+  third party who agreed to talk to an assistant, not to have their words
+  stored where anyone on the machine can read them.
+
+Write both with mode 0600, into a dedicated directory rather than the working
+directory. Files scattered beside the script get committed by accident — and a
+token in a public repository is a token in a public repository, however
+short-lived.
+
+## Authenticate as the account you meant to
+
+Credential caches accumulate: a second account, a different environment, a
+stale login. Picking one by sort order works right up until it doesn't, and the
+failure is silent — calls placed from the wrong number, billed to the wrong
+balance, attributed to the wrong party.
+
+Bind the token to the endpoint being called. If the correct one cannot be
+determined, stop and ask. Guessing which identity to act as is not a recoverable
+error once the phone has rung.
+
 ## Cost is a safety property
 
 Calls cost money and free allowances are small. A workflow that silently spends

@@ -141,9 +141,27 @@ Offer the transcript. Every claim should be checkable against what was said.
 
 - **Count phones, not calls.** `to_phones` is an array, so one plan can spend N
   calls. Charge `len(to_phones)` against any budget before dialling.
-- **Check the budget for the whole search up front**, so five pharmacies against
-  three remaining calls fails before anything is dialled rather than halfway
-  through.
+- **Reserve atomically, under the same lock as the ledger read.** A
+  check-then-write budget is not a ceiling: two processes read the same
+  `spent`, both pass the check, and both dial. The up-front whole-batch check
+  is a convenience so a batch fails before the first call rather than halfway;
+  the per-call atomic reserve is what actually enforces the limit.
+- **Deduplicate recipients before dispatch.** The same number listed twice is a
+  data-entry mistake, not a request to ring someone twice — and rows are
+  dispatched concurrently, so nothing downstream spaces them out. A file lock
+  won't catch this: both rows run in one process and share a pid, so the
+  in-flight set has to be tracked in-process as well.
+- **Store credentials and transcripts owner-only (0600).** The ledger holds
+  `confirm_token`s that authorise placing a call; run dumps hold a third
+  party's recorded voice. Default umask leaves both readable by every account
+  on the machine. Write them to a dedicated directory, not beside the script
+  where they get committed by accident.
+- **Bind the auth token to the endpoint you are calling.** Credential caches
+  are keyed by hash and more than one can exist — a second account, a different
+  environment, a stale login. Selecting whichever sorts last silently
+  authenticates as the wrong account, which here means calling from the wrong
+  number and billing the wrong balance. If the correct cache can't be
+  determined, refuse and make the caller choose.
 - **Persist `plan_id` and `run_id` to disk as soon as you receive them.**
   `plan_id` is CALL-E's idempotency key, but it only protects you if it survives
   a crash. On restart, resume the stored run instead of re-planning.

@@ -243,7 +243,50 @@ $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live
 
 ---
 
-## Example 12 — budget refuses before dialling
+## Example 12 — a duplicated row is not dialled twice
+
+`pharmacies.csv` lists the same number under two names — easily done when a
+chain has branches:
+
+```csv
+name,phone,address
+Oakhill Chemist,+15550101,High Street
+Oakhill (High St),+15550101,duplicate of the above
+```
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live
+Skipping 1 duplicate row(s) for recipients already in this batch:
+  Oakhill (High St) (…0101)
+```
+
+Rows are dispatched concurrently, so without this both would ring the same
+pharmacist within a second of each other. A file lock doesn't catch it — both
+coroutines share a pid — so duplicates are collapsed before dispatch and the
+in-flight set is tracked in-process as well.
+
+---
+
+## Example 13 — ambiguous credentials, no guessing
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live
+2 cached CALL-E tokens found and none records the endpoint
+https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth, so the correct
+account cannot be determined. Refusing to guess — calls would be placed
+and billed from whichever cache happens to sort last. Set
+CALLE_TOKEN_CACHE to one of:
+  /Users/you/.calle-mcp/cli/4811f3e.../token.json
+  /Users/you/.calle-mcp/cli/9c22ab1.../token.json
+or run `calle auth login` to refresh the intended account.
+```
+
+Placing a call from the wrong account isn't recoverable once the phone has
+rung, so an ambiguous credential is a stop, not a default.
+
+---
+
+## Example 14 — budget refuses before dialling
 
 ```bash
 $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live --max-calls 2

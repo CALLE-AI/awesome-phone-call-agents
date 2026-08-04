@@ -43,6 +43,10 @@ log = logging.getLogger("pharmacy-stock-check")
 SERVER_URL = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 TOKEN_CACHE = Path.home() / ".calle-mcp" / "cli"
 
+# Terminal responses include call transcripts. Keep them out of the working
+# directory so they are neither committed by accident nor world-readable.
+RUN_DIR = Path(os.environ.get("PHARMACY_RUN_DIR", "call_runs"))
+
 TERMINAL_STATUSES = {"COMPLETED", "NO ANSWER", "DECLINED", "FAILED", "CANCELLED"}
 TERMINAL_ACTIONS = {"report_result", "report_blocked", "none"}
 BLOCKED_ACTIONS = {"ask_user_for_missing_info", "ask_user_for_retry_confirmation"}
@@ -107,37 +111,98 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+@contextmanager
+def _file_lock(path: Path):
+    """Exclusive lock keyed on a sidecar file next to `path`."""
+    lock_path = path.with_name(path.name + ".lock")
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def _write_private(path: Path, payload: str) -> None:
+    """Atomic write, owner-readable only.
+
+    These files hold confirm_tokens and call transcripts. Default umask would
+    leave them world-readable on a shared machine.
+    """
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent or "."), suffix=".tmp")
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 @dataclass
 class CallBudget:
-    """Hard ceiling on outbound calls.
+    """Hard ceiling on outbound calls, enforced across processes.
 
-    `to_phones` is an array, so ONE plan can spend N calls. Always charge the
-    number of phones, and check the whole batch before dialling anything.
+    `to_phones` is an array, so ONE plan can spend N calls. The ledger is read,
+    checked and incremented inside a single lock — an unlocked
+    read/modify/write lets two processes both observe the same `spent`, both
+    pass the ceiling check, and both dial.
+
+    `check()` is only a fast pre-flight so a batch fails before the first call
+    rather than halfway. `reserve()` is what actually enforces the ceiling.
     """
 
     max_calls: int
-    spent: int = 0
     ledger: Path = field(default=Path(".pharmacy_budget.json"))
 
-    def __post_init__(self) -> None:
-        if self.ledger.exists():
-            self.spent = json.loads(self.ledger.read_text()).get("spent", 0)
+    def _read(self) -> int:
+        if not self.ledger.exists():
+            return 0
+        text = self.ledger.read_text()
+        if not text.strip():
+            return 0
+        try:
+            return int(json.loads(text).get("spent", 0))
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise BudgetExceeded(
+                f"Budget ledger {self.ledger} is unreadable. Refusing to dial: "
+                f"assuming zero spent would ignore the ceiling entirely."
+            ) from exc
+
+    @property
+    def spent(self) -> int:
+        with _file_lock(self.ledger):
+            return self._read()
 
     @property
     def remaining(self) -> int:
         return max(0, self.max_calls - self.spent)
 
     def check(self, n: int) -> None:
-        if n > self.remaining:
+        """Advisory pre-flight. Not a guarantee — see reserve()."""
+        remaining = self.remaining
+        if n > remaining:
             raise BudgetExceeded(
-                f"{n} call(s) needed, {self.remaining} left of {self.max_calls}."
+                f"{n} call(s) needed, {remaining} left of {self.max_calls}."
             )
 
-    def charge(self, n: int) -> None:
-        self.check(n)
-        self.spent += n
-        self.ledger.write_text(json.dumps({"spent": self.spent}))
-        log.warning("Placed %s call(s) — %s/%s used", n, self.spent, self.max_calls)
+    def reserve(self, n: int = 1) -> int:
+        """Atomically claim n calls. This is the ceiling's real enforcement."""
+        with _file_lock(self.ledger):
+            spent = self._read()
+            if spent + n > self.max_calls:
+                raise BudgetExceeded(
+                    f"{n} call(s) needed, {max(0, self.max_calls - spent)} left "
+                    f"of {self.max_calls}."
+                )
+            spent += n
+            _write_private(self.ledger, json.dumps({"spent": spent}))
+            log.warning("Placed %s call(s) — %s/%s used", n, spent, self.max_calls)
+            return spent
 
 
 # --------------------------------------------------------------------------
@@ -184,18 +249,18 @@ class RunStore:
 
     path: Path = field(default=Path(".pharmacy_runs.json"))
 
+    # Keys currently in flight in THIS process. The file lock stops two
+    # processes racing; it does nothing about two coroutines in one process,
+    # because they share a pid. Duplicate rows dispatched by asyncio.gather
+    # would otherwise both claim and both dial.
+    _active: set[str] = field(default_factory=set, repr=False)
+
     # -- locking ------------------------------------------------------------
 
     @contextmanager
     def _locked(self):
-        lock_path = self.path.with_name(self.path.name + ".lock")
-        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
+        with _file_lock(self.path):
             yield
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            os.close(fd)
 
     def _read(self) -> dict[str, Any]:
         if not self.path.exists():
@@ -218,16 +283,8 @@ class RunStore:
             ) from exc
 
     def _write(self, data: dict[str, Any]) -> None:
-        fd, tmp = tempfile.mkstemp(dir=str(self.path.parent or "."), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as handle:
-                json.dump(data, handle, indent=2)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(tmp, self.path)   # atomic
-        except BaseException:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+        # 0600: this file holds confirm_tokens, which authorise placing a call.
+        _write_private(self.path, json.dumps(data, indent=2))
 
     # -- api ----------------------------------------------------------------
 
@@ -249,8 +306,16 @@ class RunStore:
         """Atomically take ownership of a recipient, or return the live entry.
 
         The read and the write happen under one lock, so there is no window in
-        which two processes both conclude the recipient is unclaimed.
+        which two processes both conclude the recipient is unclaimed. The
+        in-process set covers the case the file lock cannot: two coroutines in
+        the same process sharing a pid.
         """
+        if key in self._active:
+            raise RunLocked(
+                f"{phone_masked}: already in flight in this process. Duplicate "
+                f"entries for the same recipient and goal are not dialled twice."
+            )
+
         with self._locked():
             data = self._read()
             entry = data.get(key)
@@ -264,6 +329,7 @@ class RunStore:
                 }
                 data[key] = entry
                 self._write(data)
+                self._active.add(key)
                 return entry
 
             if entry.get("state") == "dialing":
@@ -289,6 +355,7 @@ class RunStore:
             entry["pid"] = os.getpid()
             data[key] = entry
             self._write(data)
+            self._active.add(key)
             return entry
 
     def update(self, key: str, **fields: Any) -> None:
@@ -308,6 +375,7 @@ class RunStore:
         """
         self.update(key, state="done", result_path=result_path,
                     completed_at=datetime.now(timezone.utc).isoformat())
+        self._active.discard(key)
 
     def prune_done(self) -> int:
         with self._locked():
@@ -331,6 +399,7 @@ class RunStore:
             if entry and entry.get("state") == "planned" and not entry.get("run_id"):
                 data.pop(key)
                 self._write(data)
+        self._active.discard(key)
 
 
 # --------------------------------------------------------------------------
@@ -469,12 +538,7 @@ def rank(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------
 
 
-def load_token() -> str:
-    """Reuse the CALL-E CLI's cached token. Live mode only."""
-    candidates = sorted(TOKEN_CACHE.glob("*/token.json"))
-    if not candidates:
-        raise SystemExit(f"No CALL-E token under {TOKEN_CACHE}. Run: calle auth login")
-    data = json.loads(candidates[-1].read_text())
+def _extract_token(data: dict[str, Any]) -> str | None:
     for key in ("access_token", "accessToken", "token", "bearer"):
         value = data.get(key)
         if isinstance(value, str):
@@ -483,7 +547,75 @@ def load_token() -> str:
             for inner in ("access_token", "accessToken", "token"):
                 if isinstance(value.get(inner), str):
                     return value[inner]
-    raise SystemExit(f"No access token found in {candidates[-1]}")
+    return None
+
+
+def _endpoint_of(data: dict[str, Any]) -> str | None:
+    for key in ("server_url", "serverUrl", "endpoint", "audience", "mcp_url"):
+        value = data.get(key)
+        if isinstance(value, str):
+            return value
+    return None
+
+
+def load_token(server_url: str = SERVER_URL) -> str:
+    """Select the CLI token bound to the endpoint we are about to call.
+
+    The cache is keyed by a hash directory, and more than one can exist — a
+    second account, a different environment, a stale login. Taking the
+    lexicographically last one silently authenticates as whoever happens to
+    sort last, which in a workflow that dials real people means calling from
+    the wrong account and billing the wrong balance.
+
+    Prefer a cache that records this endpoint. If several exist and none can
+    be bound, refuse and make the caller choose, rather than guessing.
+
+    Override with CALLE_TOKEN_CACHE=/path/to/token.json
+    """
+    override = os.environ.get("CALLE_TOKEN_CACHE")
+    if override:
+        path = Path(override).expanduser()
+        token = _extract_token(json.loads(path.read_text()))
+        if not token:
+            raise SystemExit(f"No access token found in {path}")
+        return token
+
+    candidates = sorted(TOKEN_CACHE.glob("*/token.json"))
+    if not candidates:
+        raise SystemExit(f"No CALL-E token under {TOKEN_CACHE}. Run: calle auth login")
+
+    parsed: list[tuple[Path, dict[str, Any]]] = []
+    for path in candidates:
+        try:
+            parsed.append((path, json.loads(path.read_text())))
+        except json.JSONDecodeError:
+            log.warning("Skipping unreadable token cache %s", path)
+
+    bound = [(p, d) for p, d in parsed if _endpoint_of(d) == server_url]
+    if len(bound) == 1:
+        return _extract_token(bound[0][1]) or _fail_no_token(bound[0][0])
+    if len(bound) > 1:
+        raise SystemExit(
+            f"{len(bound)} cached tokens claim endpoint {server_url}. Set "
+            f"CALLE_TOKEN_CACHE to the one you intend to use:\n  " +
+            "\n  ".join(str(p) for p, _ in bound)
+        )
+
+    if len(parsed) == 1:
+        return _extract_token(parsed[0][1]) or _fail_no_token(parsed[0][0])
+
+    raise SystemExit(
+        f"{len(parsed)} cached CALL-E tokens found and none records the "
+        f"endpoint {server_url}, so the correct account cannot be determined. "
+        f"Refusing to guess — calls would be placed and billed from whichever "
+        f"cache happens to sort last. Set CALLE_TOKEN_CACHE to one of:\n  " +
+        "\n  ".join(str(p) for p, _ in parsed) +
+        f"\nor run `calle auth login` to refresh the intended account."
+    )
+
+
+def _fail_no_token(path: Path) -> str:
+    raise SystemExit(f"No access token found in {path}")
 
 
 class Caller:
@@ -561,9 +693,15 @@ class Caller:
         If the ledger entry were cleared first, a crash in between would lose
         the result and the claim together — and the next invocation would
         redial.
+
+        These files contain a third party's voice: the full transcript of a
+        call with a pharmacist. They go in a dedicated directory, owner-only,
+        never scattered next to the script where they get committed by
+        accident. Override the location with PHARMACY_RUN_DIR.
         """
-        path = Path(f"run_{key[:12]}_{int(time.time())}.json")
-        path.write_text(json.dumps(final, indent=2, default=str))
+        RUN_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path = RUN_DIR / f"run_{key[:12]}_{int(time.time())}.json"
+        _write_private(path, json.dumps(final, indent=2, default=str))
         return str(path)
 
     async def call(self, pharmacy: dict[str, str], goal: str, region: str
@@ -618,7 +756,7 @@ class Caller:
             # ledger already says a call may have been placed — and claim()
             # will refuse to retry it rather than risk a second ring.
             self.store.update(key, state="dialing")
-            self.budget.charge(1)
+            self.budget.reserve(1)   # atomic; the ceiling's real enforcement
 
             run = self._unwrap(await client.call_tool("run_call", {
                 "plan_id": plan["plan_id"], "confirm_token": plan["confirm_token"],
@@ -728,6 +866,25 @@ async def main() -> None:
         raise SystemExit(f"Invalid phone number: {exc}")
 
     goal = build_goal(args.drug, args.dosage, args.quantity)
+
+    # Collapse duplicate rows before dispatch. The same recipient listed twice
+    # is a data-entry mistake, not a request to ring someone twice — and the
+    # rows are launched concurrently, so nothing downstream would space them
+    # out.
+    seen: dict[str, dict[str, str]] = {}
+    duplicates: list[str] = []
+    for pharmacy in pharmacies:
+        dedupe_key = RunStore.key(pharmacy["phone"], goal)
+        if dedupe_key in seen:
+            duplicates.append(f"{pharmacy.get('name', '?')} ({mask(pharmacy['phone'])})")
+            continue
+        seen[dedupe_key] = pharmacy
+    if duplicates:
+        log.warning(
+            "Skipping %s duplicate row(s) for recipients already in this batch: %s",
+            len(duplicates), ", ".join(duplicates),
+        )
+    pharmacies = list(seen.values())
 
     if not args.live:
         dry_run(pharmacies, goal, args.region)
