@@ -1,14 +1,23 @@
 import { useState } from "react";
+import { ACCESS_CODE_HEADER } from "../access";
 import { maskE164 } from "../calle";
 import type { RecoveryRequest } from "../workflows/appointment-recovery/types";
 
 interface Props {
   request: RecoveryRequest;
+  accessCode: string;
+  onAccessCodeChange: (code: string) => void;
   onStarted: (callId: string) => void;
   onBack: () => void;
 }
 
-export function Authorize({ request, onStarted, onBack }: Props) {
+export function Authorize({
+  request,
+  accessCode,
+  onAccessCodeChange,
+  onStarted,
+  onBack,
+}: Props) {
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,12 +28,16 @@ export function Authorize({ request, onStarted, onBack }: Props) {
     try {
       const response = await fetch("/api/calls", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", [ACCESS_CODE_HEADER]: accessCode },
         body: JSON.stringify(request),
       });
       const payload = (await response.json()) as { call_id?: string; error?: string };
       if (!response.ok || !payload.call_id) {
-        setError(payload.error ?? `Call creation failed with status ${response.status}.`);
+        setError(
+          payload.error === "invalid_access_code"
+            ? "That access code was not accepted. No call was placed."
+            : (payload.error ?? `Call creation failed with status ${response.status}.`),
+        );
         setSubmitting(false);
         return;
       }
@@ -51,12 +64,26 @@ export function Authorize({ request, onStarted, onBack }: Props) {
         />
         I authorize exactly one call to this number, now.
       </label>
+      <label className="field">
+        Operator access code
+        <input
+          type="password"
+          value={accessCode}
+          onChange={(e) => onAccessCodeChange(e.target.value)}
+          disabled={submitting}
+          autoComplete="off"
+        />
+      </label>
+      <p className="muted">
+        The checkbox above records your consent. This code is what the server actually
+        checks, so that only an authorized operator can spend a real call.
+      </p>
       {error && <p className="errors">{error}</p>}
       <div className="actions">
         <button onClick={onBack} disabled={submitting}>
           Back
         </button>
-        <button onClick={placeCall} disabled={!confirmed || submitting}>
+        <button onClick={placeCall} disabled={!confirmed || !accessCode || submitting}>
           {submitting ? "Placing call…" : "Place the call"}
         </button>
       </div>

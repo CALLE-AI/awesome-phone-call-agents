@@ -15,6 +15,7 @@
 //
 // See docs/agent-gallery/calle-api-observations.md.
 
+import { ACCESS_CODE_HEADER } from "../../src/access";
 import { CalleError, createCalleClient, isTerminalStatus } from "../../src/calle";
 import type { CalleActivity, CalleRun } from "../../src/calle";
 import { validateRequest } from "../../src/workflows/appointment-recovery/validate";
@@ -24,6 +25,7 @@ import type { RecoveryRequest } from "../../src/workflows/appointment-recovery/t
 export interface CalleEnv {
   CALLE_ACCESS_TOKEN?: string;
   CALLE_SERVER_URL?: string;
+  OPERATOR_ACCESS_CODE?: string;
 }
 
 const REQUEST_LIMIT = 64 * 1024;
@@ -48,6 +50,68 @@ function json(payload: unknown, status = 200): Response {
  */
 const startedCalls = new Map<string, string>();
 
+/**
+ * Compare two secrets without returning early on the first differing byte.
+ *
+ * The loop still runs for as long as the supplied value, which reveals only the
+ * length the caller already chose. It never reveals the length of the real code.
+ */
+function secretsMatch(supplied: string, expected: string): boolean {
+  const encoder = new TextEncoder();
+  const left = encoder.encode(supplied);
+  const right = encoder.encode(expected);
+  let mismatch = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  }
+  return mismatch === 0;
+}
+
+/**
+ * The server-side authorization boundary for anything that spends CALL-E
+ * credits or reveals what a real call said.
+ *
+ * The browser's authorization checkbox is consent, not security: a checkbox is
+ * a value in a request body and anyone can send it. Both call endpoints are
+ * therefore gated on a shared access code held only in deployment environment
+ * variables.
+ *
+ * This fails closed. A deployment with no `OPERATOR_ACCESS_CODE` cannot place
+ * calls at all, and reports `not_configured` exactly as a deployment with no
+ * CALL-E credentials does, so an unauthenticated caller cannot tell which part
+ * of the configuration is absent.
+ *
+ * The dry-run flow reaches no endpoint, so a reviewer can still explore the
+ * entire workflow — configure, validate, masked preview, safety contract —
+ * without a code. Only leaving dry-run mode needs one.
+ *
+ * Returns null when the request may proceed, or the response to send back.
+ */
+function accessFailure(request: Request, env: CalleEnv): Response | null {
+  const expected = env.OPERATOR_ACCESS_CODE;
+  if (!expected) {
+    return json(
+      {
+        error: "not_configured",
+        message: "This deployment is not configured to place calls.",
+      },
+      503,
+    );
+  }
+  const supplied = request.headers.get(ACCESS_CODE_HEADER) ?? "";
+  if (!supplied || !secretsMatch(supplied, expected)) {
+    return json(
+      {
+        error: "invalid_access_code",
+        message: "A valid operator access code is required to place or inspect a call.",
+      },
+      401,
+    );
+  }
+  return null;
+}
+
 function clientFor(env: CalleEnv) {
   if (!env.CALLE_ACCESS_TOKEN || !env.CALLE_SERVER_URL) return null;
   return createCalleClient({
@@ -65,6 +129,11 @@ function calleFailure(error: unknown): Response {
 }
 
 export async function handleCreateCall(request: Request, env: CalleEnv): Promise<Response> {
+  // Checked before the body is read, so an unauthorized caller learns nothing
+  // about validation behavior and cannot make the server do work.
+  const denied = accessFailure(request, env);
+  if (denied) return denied;
+
   const body = await request.text();
   if (body.length > REQUEST_LIMIT) return json({ error: "request_too_large" }, 413);
 
@@ -118,7 +187,16 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
   }
 }
 
-export async function handleGetCallStatus(runId: string, env: CalleEnv): Promise<Response> {
+export async function handleGetCallStatus(
+  request: Request,
+  runId: string,
+  env: CalleEnv,
+): Promise<Response> {
+  // A run's activity and transcript are the contents of a real conversation
+  // with a real person, so reading one is gated exactly as placing one is.
+  const denied = accessFailure(request, env);
+  if (denied) return denied;
+
   if (!runId) return json({ error: "missing_run_id" }, 400);
 
   const client = clientFor(env);
@@ -154,5 +232,6 @@ export function envFromProcess(): CalleEnv {
   return {
     CALLE_ACCESS_TOKEN: env.CALLE_ACCESS_TOKEN,
     CALLE_SERVER_URL: env.CALLE_SERVER_URL,
+    OPERATOR_ACCESS_CODE: env.OPERATOR_ACCESS_CODE,
   };
 }

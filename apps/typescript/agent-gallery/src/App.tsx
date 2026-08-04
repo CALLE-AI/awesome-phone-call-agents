@@ -24,6 +24,9 @@ export function App() {
   const [request, setRequest] = useState<RecoveryRequest>(emptyRequest);
   const [callId, setCallId] = useState<string | null>(null);
   const [result, setResult] = useState<RecoveryResult | null>(null);
+  // Held for this session only, never persisted, and needed from the
+  // authorization gate onward because the polling endpoint is gated too.
+  const [accessCode, setAccessCode] = useState("");
 
   return (
     <main className="app">
@@ -50,6 +53,8 @@ export function App() {
       {screen === "authorize" && (
         <Authorize
           request={request}
+          accessCode={accessCode}
+          onAccessCodeChange={setAccessCode}
           onStarted={(id) => {
             setCallId(id);
             setScreen("live");
@@ -61,6 +66,7 @@ export function App() {
         <LiveCall
           request={request}
           callId={callId}
+          accessCode={accessCode}
           onResult={(r) => {
             setResult(r);
             setScreen("result");

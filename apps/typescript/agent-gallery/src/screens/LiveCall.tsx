@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ACCESS_CODE_HEADER } from "../access";
 import { maskE164 } from "../calle";
 import type { CalleRunResult } from "../calle";
 import { buildRecoveryResult } from "../workflows/appointment-recovery/result";
@@ -9,6 +10,7 @@ const POLL_INTERVAL_MS = 3000;
 interface Props {
   request: RecoveryRequest;
   callId: string;
+  accessCode: string;
   onResult: (result: RecoveryResult) => void;
 }
 
@@ -20,7 +22,7 @@ interface StatusPayload {
   error?: string;
 }
 
-export function LiveCall({ request, callId, onResult }: Props) {
+export function LiveCall({ request, callId, accessCode, onResult }: Props) {
   const [status, setStatus] = useState("starting");
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,9 @@ export function LiveCall({ request, callId, onResult }: Props) {
 
     async function poll() {
       try {
-        const response = await fetch(`/api/calls/${encodeURIComponent(callId)}`);
+        const response = await fetch(`/api/calls/${encodeURIComponent(callId)}`, {
+          headers: { [ACCESS_CODE_HEADER]: accessCode },
+        });
         const payload = (await response.json()) as StatusPayload;
         if (cancelled) return;
         if (!response.ok) {
@@ -66,7 +70,7 @@ export function LiveCall({ request, callId, onResult }: Props) {
       clearInterval(pollTimer);
       clearInterval(clockTimer);
     };
-  }, [callId, onResult]);
+  }, [callId, accessCode, onResult]);
 
   return (
     <section>
