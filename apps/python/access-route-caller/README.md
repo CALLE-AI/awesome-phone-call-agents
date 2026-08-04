@@ -89,7 +89,7 @@ No free-text personal narrative belongs in this request. Unknown fields are reje
 - It cannot establish that an offered route is legally sufficient, accessible in practice, or available to a specific person or account.
 - A result is a report of what was said, not proof that the organization will honor the route later.
 - CALL-E and its telephony providers necessarily process the call and may retain audio, transcripts, or metadata under their policies. Review those policies before live use.
-- Numbers are masked in previews and phone-like text is removed from returned structured results. A private result can still contain public contact instructions and should not be committed.
+- Numbers are masked in previews and phone-like text is removed from returned structured results. Live output also includes `consistency_warnings` for missing or duplicate route results and possible cross-route contradictions. These warnings require human review; they do not silently rewrite what the organization said. A private result can still contain public contact instructions and should not be committed.
 
 ## Cancellation and rollback
 

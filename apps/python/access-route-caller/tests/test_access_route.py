@@ -55,7 +55,22 @@ class FakeCalls:
                         "route": "email",
                         "availability": "yes",
                         "instructions": "Use access@example.org or call +12025550177.",
-                    }
+                    },
+                    {
+                        "route": "text",
+                        "availability": "no",
+                        "instructions": "Text messaging is unavailable.",
+                    },
+                    {
+                        "route": "scheduled_callback",
+                        "availability": "no",
+                        "instructions": "Scheduled callbacks are unavailable.",
+                    },
+                    {
+                        "route": "relay_support",
+                        "availability": "no",
+                        "instructions": "Relay support is unavailable.",
+                    },
                 ],
                 "next_step": "use_available_route",
                 "evidence_summary": "Staff confirmed the public access route.",
@@ -201,6 +216,43 @@ class AccessRouteTests(unittest.TestCase):
         rendered = json.dumps(result)
         self.assertNotIn("+12025550177", rendered)
         self.assertIn("[phone-redacted]", rendered)
+        self.assertEqual(result["consistency_warnings"], [])
+
+    def test_result_consistency_warnings_flag_provider_conflicts(self) -> None:
+        structured_result = {
+            "route_results": [
+                {
+                    "route": "email",
+                    "availability": "no",
+                    "instructions": "Email is unavailable.",
+                },
+                {
+                    "route": "text",
+                    "availability": "yes",
+                    "instructions": "Send a text to the published number.",
+                },
+                {
+                    "route": "text",
+                    "availability": "yes",
+                    "instructions": "SMS is also supported.",
+                },
+                {
+                    "route": "scheduled_callback",
+                    "availability": "yes",
+                    "instructions": "Request the callback by email.",
+                },
+            ]
+        }
+        warnings = access_route.result_consistency_warnings(
+            request(), structured_result
+        )
+        self.assertIn("Missing requested route result: relay_support.", warnings)
+        self.assertIn("Duplicate route result: text.", warnings)
+        self.assertIn(
+            "Possible contradiction: scheduled_callback instructions reference "
+            "email, but email is marked unavailable.",
+            warnings,
+        )
 
     def test_write_output_does_not_overwrite(self) -> None:
         destination = Path(__file__).parent / ".write-output-test.json"

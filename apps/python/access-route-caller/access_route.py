@@ -26,6 +26,16 @@ ROUTE_LABELS = {
     "support_person": "permission for a support person to join or handle a future call",
     "slower_pace": "a slower-paced future phone conversation with time to process",
 }
+ROUTE_MENTION_PATTERNS = {
+    "email": re.compile(r"\be-?mail\b", re.IGNORECASE),
+    "text": re.compile(r"\b(?:text|sms)\b", re.IGNORECASE),
+    "scheduled_callback": re.compile(
+        r"\b(?:scheduled[ -])?call[ -]?back\b", re.IGNORECASE
+    ),
+    "relay_support": re.compile(r"\brelay\b", re.IGNORECASE),
+    "support_person": re.compile(r"\bsupport person\b", re.IGNORECASE),
+    "slower_pace": re.compile(r"\bslower[ -]paced?\b", re.IGNORECASE),
+}
 RECIPIENT_MODES = {"public_contact", "consenting_demo"}
 
 ALLOWED_TOP_LEVEL_KEYS = {
@@ -412,6 +422,62 @@ def redact_phone_like_text(value: Any) -> Any:
     return value
 
 
+def result_consistency_warnings(
+    request: AccessRouteRequest, structured_result: Any
+) -> list[str]:
+    if not isinstance(structured_result, dict):
+        return ["Structured result is unavailable or malformed; review provider output."]
+    route_results = structured_result.get("route_results")
+    if not isinstance(route_results, list):
+        return ["route_results is missing or malformed; review provider output."]
+
+    counts: dict[str, int] = {}
+    valid_results: list[dict[str, Any]] = []
+    for item in route_results:
+        if not isinstance(item, dict):
+            continue
+        route = item.get("route")
+        if not isinstance(route, str):
+            continue
+        counts[route] = counts.get(route, 0) + 1
+        valid_results.append(item)
+
+    warnings = [
+        f"Missing requested route result: {route}."
+        for route in request.requested_routes
+        if counts.get(route, 0) == 0
+    ]
+    warnings.extend(
+        f"Duplicate route result: {route}."
+        for route in request.requested_routes
+        if counts.get(route, 0) > 1
+    )
+
+    unavailable = {
+        item.get("route")
+        for item in valid_results
+        if item.get("availability") == "no"
+    }
+    for item in valid_results:
+        source_route = item.get("route")
+        instructions = item.get("instructions")
+        if item.get("availability") not in {"yes", "conditional"}:
+            continue
+        if not isinstance(source_route, str) or not isinstance(instructions, str):
+            continue
+        for unavailable_route in request.requested_routes:
+            if unavailable_route == source_route or unavailable_route not in unavailable:
+                continue
+            pattern = ROUTE_MENTION_PATTERNS[unavailable_route]
+            if pattern.search(instructions):
+                warnings.append(
+                    "Possible contradiction: "
+                    f"{source_route} instructions reference {unavailable_route}, "
+                    f"but {unavailable_route} is marked unavailable."
+                )
+    return warnings
+
+
 def execute(
     request: AccessRouteRequest,
     client: Any,
@@ -431,6 +497,7 @@ def execute(
     completed = client.calls.wait_for_result(
         call_id, timeout_seconds=timeout_seconds, interval_seconds=2
     )
+    structured_result = redact_phone_like_text(completed.get("structured_result"))
     return {
         "mode": "execute",
         "creates_phone_call": True,
@@ -442,8 +509,9 @@ def execute(
         "status": completed.get("status"),
         "task_completed": completed.get("task_completed"),
         "completion_confidence": completed.get("completion_confidence"),
-        "structured_result": redact_phone_like_text(
-            completed.get("structured_result")
+        "structured_result": structured_result,
+        "consistency_warnings": result_consistency_warnings(
+            request, structured_result
         ),
     }
 
