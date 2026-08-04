@@ -42,7 +42,10 @@ export interface RecoveryResult {
   follow_up_required: boolean;
   next_action: string;
   notes: string;
+  /** CALL-E's identifier for the call itself. */
   call_id: string;
+  /** The run identifier, which is what `get_call_run` accepts afterwards. */
+  run_id: string;
 }
 
 export const NEXT_ACTIONS: Record<Outcome, string> = {
