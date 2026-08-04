@@ -73,13 +73,22 @@ discussing something else is not an answer to a question nobody asked.
 
 An agreement is reported when the transcript shows somebody agreeing to the thing
 the report would print. It is anchored twice: to the turn where the caller raised
-the arrangement, plus to the time itself, which has to be named in the agreeing turn
-or in the turn either side of it. Booking language on its own proves nothing. An
+the arrangement, plus to the time itself, which has to have been named by the moment
+the callee spoke, either in the agreeing turn or in the caller's proposal before it.
+Booking language on its own proves nothing. An
 agreement about some other time reads `unconfirmed`, not `committed` and not
 `outside_authorized_window`, because both of those would print or act on a time off
 the extraction alone. The note quotes what they did say, so nobody reads
 `unconfirmed` as nothing having happened. Any confirmation code goes with the
 agreement.
+
+Both bindings look backwards only. A turn is evidence for what it was answering.
+Nothing said after it can be that. A caller who proposes Wednesday, hears no, then
+proposes Thursday has not been refused Thursday. A callee who reads out a second
+reference number after agreeing to the first appointment has not given that number for
+this one. The cost is a call where the only precise form of the time or the reference is
+in a later turn: that reads as not named, so the report gives less than the extraction
+claimed rather than more.
 
 The time is matched as a wall clock, in the forms a transcript carries. When a turn
 names a day or a weekday it has to be the claimed one, so the same time on another
@@ -87,8 +96,9 @@ authorized day is not reported as this one. A turn that names no day is taken as
 day the caller had already established.
 
 Everything else the report prints off the extraction is held to the same standard. A
-confirmation code has to have been read out around the agreement or the report drops
-it and says it did. A time no callee turn named is not read back as an offer, so the
+confirmation code has to have been read out by the time the agreement was made or the
+report drops it and says it did. A time no callee turn named is not read back as an
+offer, so the
 next step says "another time" rather than a time nobody said. An agreement with no
 time at all cannot be checked against the windows, so it reads `unconfirmed` too.
 CALL-E's own note is printed with its name on it, because nothing here checked that
@@ -108,10 +118,13 @@ to be answering the arrangement: what the caller last put to the callee before i
 to be the arrangement rather than one of the questions. Statements do not change the
 subject, so a caller reading out a date of birth between the two leaves the refusal
 answering the appointment it followed. Then the time is bound too. When the extraction
-reports a datetime, that datetime has to be named around the refusing turn, in it or in
-the turn either side, which is what the agreement side already requires. Two times
-proposed on one call is otherwise a way for a no to the second to be reported as a no
-to the first or as a no to the errand. A refusal aimed somewhere else is quoted in the
+reports a datetime, that datetime has to have been named by the moment the callee spoke,
+in the refusing turn or in the caller's proposal before it, which is what the agreement
+side already requires. Two times
+proposed on one call is otherwise a way for a no to one of them to be read as a no
+to the other in either order. It is also a way for either to be read as a no to the
+errand. A refusal aimed
+somewhere else is quoted in the
 report as what was actually turned down, so `unconfirmed` never reads as nothing
 having been said.
 

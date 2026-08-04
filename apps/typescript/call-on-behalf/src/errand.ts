@@ -24,7 +24,7 @@
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
 import { CalleCallError, CalleWaitTimeout, isTerminalCallStatus, type CallePort } from "./calle.js";
-import { agreementEvidence, codeNamedAround, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "./read.js";
+import { agreementEvidence, codeNamedBefore, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "./read.js";
 import {
   buildCallInput,
   buildTask,
@@ -406,9 +406,9 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   }
 
   // A reference number belongs to an agreement, so it is held to the same standard:
-  // somebody has to have read it out where the agreement was made.
+  // somebody has to have read it out by the time the agreement was made.
   const claimedCode = readString(structured, "confirmation_code");
-  const confirmationCode = codeNamedAround(turns, agreedIndex, claimedCode) ? claimedCode : "";
+  const confirmationCode = codeNamedBefore(turns, agreedIndex, claimedCode) ? claimedCode : "";
 
   const answered = answers.filter((answer) => answer.answered).length;
   // Terminal and not completed, so CALL-E ended the call before the conversation

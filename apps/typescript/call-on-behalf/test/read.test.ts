@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agreementEvidence, mentionsCode, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "../src/read.js";
+import { agreementEvidence, codeNamedBefore, mentionsCode, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "../src/read.js";
 import type { ErrandQuestion, TranscriptTurn } from "../src/types.js";
 
 const EARLIEST: ErrandQuestion = {
@@ -114,6 +114,24 @@ test("an agreement has to be about the time the extraction claims", () => {
   assert.match(agreementEvidence(elsewhere, "slot_within_windows", "2026-08-18T14:00:00-07:00").quote, /^I have booked/);
 });
 
+test("an agreement is not evidence about a time the caller raised after it", () => {
+  const call = turns([
+    ["bot", "Could you hold Wednesday the twelfth at two in the afternoon?"],
+    ["user", "Yes, I have booked her in."],
+    ["bot", "And could you do Thursday the thirteenth at nine forty as well?"],
+  ]);
+  // They agreed to the time that had been put to them. Thursday came after, so the
+  // turn before it cannot be an agreement to Thursday, whatever the extraction says.
+  const claimed = agreementEvidence(call, "slot_within_windows", "2026-08-13T09:40:00-07:00");
+  assert.equal(claimed.quote, "");
+  assert.match(claimed.otherQuote, /^Yes, I have booked/);
+  // The same turn is evidence for the time it was answering.
+  assert.match(
+    agreementEvidence(call, "slot_within_windows", "2026-08-12T14:00:00-07:00").quote,
+    /^Yes, I have booked/,
+  );
+});
+
 test("an agreement the caller never asked for is not an agreement with the caller", () => {
   const volunteered = turns([
     ["bot", "Do you take Blue Shield PPO?"],
@@ -202,6 +220,41 @@ test("a refusal has to be about the time the extraction claims", () => {
   assert.match(refusalEvidence(call, "2026-08-12T14:00:00-07:00", [EARLIEST, PLAN]).quote, /^No, we are fully booked/);
   // No time reported, so there is nothing to bind to and the prompt anchor stands alone.
   assert.match(refusalEvidence(call, "", [EARLIEST, PLAN]).quote, /^No, we are fully booked/);
+});
+
+test("a refusal is not evidence about a time the caller raised after it", () => {
+  const call = turns([
+    ["bot", "Could you hold Wednesday the twelfth at two in the afternoon?"],
+    ["user", "No, we are fully booked. I cannot fit that in."],
+    ["bot", "Then could you do Thursday the thirteenth at nine forty?"],
+    ["user", "Let me look and call you back."],
+  ]);
+  // The refusal answered Wednesday. Thursday was put to them in the next turn, so the
+  // refusal cannot be about it: the report would say Thursday was turned down before
+  // anybody had been asked about Thursday.
+  const claimed = refusalEvidence(call, "2026-08-13T09:40:00-07:00", [EARLIEST, PLAN]);
+  assert.equal(claimed.quote, "");
+  assert.match(claimed.otherQuote, /^No, we are fully booked/);
+  // The option it does answer is the one the caller had put to them.
+  assert.match(
+    refusalEvidence(call, "2026-08-12T14:00:00-07:00", [EARLIEST, PLAN]).quote,
+    /^No, we are fully booked/,
+  );
+});
+
+test("a confirmation code counts where it was read out, not in a later booking", () => {
+  const call = turns([
+    ["bot", "Could you hold Thursday the thirteenth at nine forty?"],
+    ["user", "Held, reference four four seven one."],
+    ["user", "And the follow up we spoke about is reference nine nine one two."],
+  ]);
+  assert.equal(codeNamedBefore(call, 1, "4471"), true);
+  // The second reference belongs to the second booking. Reading it back onto the
+  // first agreement prints a number that is not that appointment's. A code the
+  // callee only reads out after the agreement is dropped, which is the report
+  // saying less than the extraction claimed rather than more.
+  assert.equal(codeNamedBefore(call, 1, "9912"), false);
+  assert.equal(codeNamedBefore(call, -1, "4471"), false, "no agreement, so no code");
 });
 
 test("a refusal in a call that never raised an arrangement refuses no arrangement", () => {

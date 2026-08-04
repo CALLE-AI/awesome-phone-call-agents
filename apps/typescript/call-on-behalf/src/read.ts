@@ -413,10 +413,11 @@ export interface AgreementEvidence {
  * not an agreement on its own.
  *
  * Two bindings, because booking language on its own proves nothing. The agreement
- * has to come after the caller raised the arrangement. When the extraction
- * claims a datetime that datetime has to be named around the agreement itself: in
- * the turn, in the caller's proposal before it or in the read back after it. An
- * unrelated yes plus a plausible time is not a booking.
+ * has to come after the caller raised the arrangement. When the extraction claims a
+ * datetime that datetime has to have been named by the time the callee spoke: in
+ * their own turn or in the caller's proposal before it. An unrelated yes plus a
+ * plausible time is not a booking. A time the caller only put to them afterwards
+ * is a proposal they have not answered.
  *
  * Booking language that fails either binding is still worth saying out loud, so it
  * comes back as `otherQuote` and the report quotes it as what was said instead.
@@ -443,7 +444,7 @@ export function agreementEvidence(
     if (!patterns.some((pattern) => pattern.test(turn.text))) {
       continue;
     }
-    if (offered.length > 0 && !namedAround(turns, index, offered)) {
+    if (offered.length > 0 && !namedBefore(turns, index, offered)) {
       otherQuote = turn.text;
       continue;
     }
@@ -529,9 +530,9 @@ export interface RefusalEvidence {
  * which may have been accepted in the same call. So the turn has to be answering the
  * arrangement rather than a question. The caller also has to have raised an
  * arrangement at all. Then, when the extraction reports a datetime, that datetime has
- * to be named around the refusing turn: in it, in the caller's proposal before it or
- * in the turn after. Two times proposed on one call is otherwise a way for a no to the
- * second to be reported as a no to the first.
+ * to have been named by the time the callee spoke: in their own turn or in the
+ * caller's proposal before it. Two times proposed on one call is otherwise a way for a
+ * no to one of them to be reported as a no to the other, in either order.
  *
  * With no datetime reported there is nothing to bind to, so the prompt anchor stands
  * alone. That is the same asymmetry the agreement side has.
@@ -564,10 +565,11 @@ export function refusalEvidence(
       }
       continue;
     }
-    if (offered.length > 0 && !namedAround(turns, index, offered)) {
-      // A no to another time is not a no to this one. The same binding the agreement
-      // side uses, so a call where two slots were discussed cannot report the refusal
-      // of one as the refusal of the other.
+    if (offered.length > 0 && !namedBefore(turns, index, offered)) {
+      // A no to another time is not a no to this one. A no given before the caller
+      // had put this time to them is not about it either. The same binding the
+      // agreement side uses, so a call where two slots were discussed cannot report
+      // the refusal of one as the refusal of the other in either order.
       if (otherQuote.length === 0) {
         otherQuote = turn.text;
       }
@@ -578,26 +580,48 @@ export function refusalEvidence(
   return { quote: "", index: -1, otherQuote };
 }
 
-/** How far either side of the agreement the time may have been said. */
-const NEIGHBOURING_TURNS = 1;
+/** How far back from a turn the caller's proposal may be. */
+const PRECEDING_TURNS = 1;
 
-function nearby(turns: TranscriptTurn[], index: number): TranscriptTurn[] {
-  return turns.slice(Math.max(index - NEIGHBOURING_TURNS, 0), index + NEIGHBOURING_TURNS + 1);
+/**
+ * The turn itself and the caller's turn before it.
+ *
+ * Those are the only two places the thing a turn was answering can have been said,
+ * which is the rule the rest of this module already runs on. Nothing after the turn
+ * is in here: a turn cannot be an answer to something nobody had said yet.
+ *
+ * This used to reach one turn forward as well, on the grounds that the caller reads
+ * the time back once it is settled and that read back is sometimes the first precise
+ * form of it in the call. A read back and a fresh proposal are the same shape from one
+ * turn away, so that reach let a later turn decide what an earlier one had meant. The
+ * caller offers Wednesday, the callee refuses, the caller then offers Thursday. The
+ * refusal of Wednesday passed as evidence about Thursday, which the callee had not
+ * answered yet. Two arrangements in one call did the same thing to a reference number.
+ *
+ * The cost is a call where the only precise form of the time is in the caller's read
+ * back. That now reads as not named, so the commitment comes back unconfirmed and the
+ * report says less than the extraction claimed, which is the direction to be wrong in.
+ */
+function upTo(turns: TranscriptTurn[], index: number): TranscriptTurn[] {
+  return turns.slice(Math.max(index - PRECEDING_TURNS, 0), index + 1);
 }
 
-function namedAround(turns: TranscriptTurn[], index: number, offered: string): boolean {
-  return nearby(turns, index).some((turn) => mentionsDatetime(turn.text, offered));
+function namedBefore(turns: TranscriptTurn[], index: number, offered: string): boolean {
+  return upTo(turns, index).some((turn) => mentionsDatetime(turn.text, offered));
 }
 
 /**
- * Whether the confirmation code was said around the agreement.
+ * Whether the confirmation code was said at the agreement or in the turn it answered.
  *
  * A reference number is part of the same claim as the booking, so it is held to the
- * same standard. A code the extraction produced and nobody read out is dropped.
+ * same standard and bound the same way. Two bookings in one call is otherwise a way
+ * for the second reference to be printed against the first appointment. A code the
+ * callee only reads out in a later turn is dropped, so the report gives no number
+ * rather than the wrong one.
  */
-export function codeNamedAround(turns: TranscriptTurn[], index: number, code: string): boolean {
+export function codeNamedBefore(turns: TranscriptTurn[], index: number, code: string): boolean {
   if (index < 0 || code.trim().length === 0) {
     return false;
   }
-  return nearby(turns, index).some((turn) => mentionsCode(turn.text, code));
+  return upTo(turns, index).some((turn) => mentionsCode(turn.text, code));
 }
