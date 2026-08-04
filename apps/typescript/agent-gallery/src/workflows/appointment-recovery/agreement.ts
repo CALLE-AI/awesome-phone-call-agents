@@ -34,6 +34,15 @@ const REFUSAL = /\b(?:not interested|no thank|don'?t want|do not want|rather not
 const UNAVAILABLE = /\b(?:isn'?t one of the (?:available|approved)|not one of the (?:available|approved)|outside (?:the|those|our) (?:available |approved )?windows?|(?:that time|it) (?:is|'s) not available)\b/;
 const SMS = /\b(?:sms|text (?:message|confirmation)|text you)\b/;
 
+/**
+ * An acceptance that keeps the slot the customer already had.
+ *
+ * Naming the original time is the stronger signal and is checked separately;
+ * this catches the agent that agrees without repeating the time back.
+ */
+const ORIGINAL =
+  /\b(?:original|existing|already (?:booked|scheduled|have)|keep (?:it|that|the|your)|as (?:planned|scheduled)|same (?:time|slot|appointment))\b/;
+
 /** Split "[00:00:12] BOT: text" lines into utterances, joining runs by one speaker. */
 export function parseTranscript(transcript: string): Utterance[] {
   const utterances: Utterance[] = [];
@@ -80,27 +89,168 @@ function matchesAnywhere(text: string, pattern: RegExp): string | null {
   return null;
 }
 
-/** Identifying tokens for a window, rendered in the business timezone. */
-function windowTokens(window: ReplacementWindow, timeZone: string): string[] {
-  const start = new Date(window.start);
-  if (Number.isNaN(start.getTime())) return [];
-  const part = (options: Intl.DateTimeFormatOptions) => {
+/**
+ * When a time is stated, in the terms the operator meant.
+ *
+ * A `datetime-local` value carries no offset: it is already the business's own
+ * wall clock, so its digits are read directly. Re-rendering it through a
+ * timezone would move the appointment by the gap between the operator's browser
+ * and the business, which is how a 10 AM window became a 10 PM one to match
+ * against. A value that does carry an offset is a real instant, so that one is
+ * rendered into the business timezone.
+ */
+interface Clock {
+  weekday: string;
+  month: string;
+  day: number;
+  hour24: number;
+  minute: number;
+}
+
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/;
+
+function clockOf(value: string, timeZone: string): Clock | null {
+  let year: number;
+  let monthNumber: number;
+  let day: number;
+  let hour24: number;
+  let minute: number;
+
+  const wall = WALL_CLOCK.exec(value ?? "");
+  if (wall) {
+    [year, monthNumber, day, hour24, minute] = wall.slice(1, 6).map(Number);
+  } else {
+    const instant = new Date(value);
+    if (Number.isNaN(instant.getTime())) return null;
     try {
-      return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(start).toLowerCase();
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(instant);
+      const value_ = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+      year = value_("year");
+      monthNumber = value_("month");
+      day = value_("day");
+      hour24 = value_("hour") % 24;
+      minute = value_("minute");
+    } catch {
+      return null;
+    }
+    if ([year, monthNumber, day, hour24, minute].some(Number.isNaN)) return null;
+  }
+
+  // Named from a UTC date built out of those same digits, so the weekday cannot
+  // drift by a day the way a zone conversion can.
+  const date = new Date(Date.UTC(year, monthNumber - 1, day));
+  if (Number.isNaN(date.getTime())) return null;
+  const name = (options: Intl.DateTimeFormatOptions) => {
+    try {
+      return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" })
+        .format(date)
+        .toLowerCase();
     } catch {
       return "";
     }
   };
-  return [part({ weekday: "long" }), part({ month: "long" }), part({ day: "numeric" }), part({ hour: "numeric", hour12: true })].filter(Boolean);
+  const weekday = name({ weekday: "long" });
+  const month = name({ month: "long" });
+  if (!weekday || !month) return null;
+  return { weekday, month, day, hour24, minute };
+}
+
+const WORD_HOURS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+};
+
+const MONTH_NAMES =
+  "january|february|march|april|may|june|july|august|september|october|november|december";
+
+/**
+ * A time as a person actually says it.
+ *
+ * Agents say "10:00 AM" far more often than "10 AM", and also "10am", "10.00",
+ * "ten in the morning", "10 o'clock" and "14:00". Matching on one rendered
+ * spelling missed all but one of those and sent correctly handled calls to
+ * human review.
+ */
+interface SpokenTime {
+  hour: number;
+  minute: number | null;
+  meridiem: "am" | "pm" | null;
+}
+
+const SPOKEN_TIME = new RegExp(
+  String.raw`(\bat\s+)?\b(\d{1,2}|${Object.keys(WORD_HOURS).join("|")})` +
+    String.raw`(?:[:.](\d{2}))?\s*(a\.?m\.?|p\.?m\.?|o'?clock)?` +
+    String.raw`(?:\s+in\s+the\s+(morning|afternoon|evening))?` +
+    String.raw`(\s+(?:${MONTH_NAMES}))?`,
+  "gi",
+);
+
+function spokenTimesIn(sentence: string): SpokenTime[] {
+  const found: SpokenTime[] = [];
+  for (const match of sentence.toLowerCase().matchAll(SPOKEN_TIME)) {
+    const [, at, rawHour, rawMinute, suffix, partOfDay, followedByMonth] = match;
+    // "Friday 7 August" is a date. Only a number that announces itself as a
+    // time — by minutes, a meridiem, "o'clock", or a leading "at" — is one.
+    if (followedByMonth) continue;
+    if (!rawMinute && !suffix && !partOfDay && !at) continue;
+
+    const hour = WORD_HOURS[rawHour] ?? Number(rawHour);
+    if (!Number.isFinite(hour) || hour > 24) continue;
+
+    const marker = suffix?.replace(/\./g, "");
+    let meridiem: "am" | "pm" | null = null;
+    if (marker === "am" || marker === "pm") meridiem = marker;
+    else if (partOfDay === "morning") meridiem = "am";
+    else if (partOfDay === "afternoon" || partOfDay === "evening") meridiem = "pm";
+
+    found.push({ hour, minute: rawMinute === undefined ? null : Number(rawMinute), meridiem });
+  }
+  return found;
+}
+
+function spokenMatches(spoken: SpokenTime, clock: Clock): boolean {
+  // A stated minute must agree: "10:30" is not the 10:00 window.
+  if (spoken.minute !== null && spoken.minute !== clock.minute) return false;
+  if (spoken.meridiem) {
+    const hour24 = spoken.meridiem === "pm" ? (spoken.hour % 12) + 12 : spoken.hour % 12;
+    return hour24 === clock.hour24;
+  }
+  if (spoken.hour > 12) return spoken.hour === clock.hour24;
+  // With no meridiem stated, the hour hand alone has to agree.
+  return spoken.hour % 12 === clock.hour24 % 12;
+}
+
+/** True when a sentence names both the day and the time of a given clock. */
+function mentionsClock(sentence: string, clock: Clock): boolean {
+  const text = sentence.toLowerCase();
+  const dayNamed =
+    text.includes(clock.weekday) ||
+    (text.includes(clock.month) && new RegExp(`\\b${clock.day}\\b`).test(text));
+  if (!dayNamed) return false;
+  return spokenTimesIn(sentence).some((spoken) => spokenMatches(spoken, clock));
 }
 
 function windowMatches(sentence: string, window: ReplacementWindow, timeZone: string): boolean {
-  const [weekday, month, day, hour] = windowTokens(window, timeZone);
-  if (!weekday || !hour) return false;
-  const text = sentence.toLowerCase();
-  const dayNamed = text.includes(weekday) || (text.includes(month) && new RegExp(`\\b${day}\\b`).test(text));
-  const hourNamed = text.includes(hour) || text.includes(hour.replace(" ", ""));
-  return dayNamed && hourNamed;
+  const clock = clockOf(window.start, timeZone);
+  return clock ? mentionsClock(sentence, clock) : false;
 }
 
 export function readAgreement(input: {
@@ -108,6 +258,8 @@ export function readAgreement(input: {
   transcript: string | null;
   windows: ReplacementWindow[];
   timezone: string;
+  /** The slot the customer already had, so keeping it can be recognized. */
+  originalTime?: string | null;
 }): AgreementReading {
   const evidence: string[] = [];
   const utterances = input.transcript ? parseTranscript(input.transcript) : [];
@@ -169,8 +321,22 @@ export function readAgreement(input: {
     return { agreement: "accepted_window", matchedWindowIndex, smsRequested, evidence };
   }
 
-  // An acceptance that names no offered window may be the original slot, but it
-  // may equally be an unparsed reschedule, so it is not read as either.
+  // An acceptance that keeps the existing slot, either by naming the original
+  // time back or by saying plainly that nothing moved. Without this the
+  // `confirmed` outcome was unreachable from a real call, so a customer who
+  // simply kept their appointment was reported as `uncertain`.
+  if (acceptance) {
+    const originalClock = input.originalTime ? clockOf(input.originalTime, input.timezone) : null;
+    const keepsOriginal =
+      ORIGINAL.test(acceptance) || (originalClock !== null && mentionsClock(acceptance, originalClock));
+    if (keepsOriginal) {
+      evidence.push(acceptance);
+      return { agreement: "confirmed_original", matchedWindowIndex: null, smsRequested, evidence };
+    }
+  }
+
+  // Any other acceptance names no time this workflow offered or already held,
+  // so it stays inconclusive rather than being guessed at.
   if (acceptance) {
     evidence.push(acceptance);
     return { agreement: null, matchedWindowIndex: null, smsRequested, evidence };

@@ -23,6 +23,7 @@ export function buildRecoveryResult(input: {
     transcript: calle.transcript ?? null,
     windows: input.request.replacement_windows,
     timezone: input.request.business.timezone,
+    originalTime: input.request.appointment.original_time,
   });
 
   const outcome = classifyOutcome({
@@ -36,13 +37,24 @@ export function buildRecoveryResult(input: {
       ? input.request.replacement_windows[reading.matchedWindowIndex]
       : null;
 
+  // A confirmed call agreed to the slot the customer already had.
+  const confirmedTime = agreedWindow
+    ? agreedWindow.start
+    : outcome === "confirmed"
+      ? input.request.appointment.original_time
+      : null;
+
   return {
     outcome,
-    confirmed_time: agreedWindow ? agreedWindow.start : null,
+    confirmed_time: confirmedTime,
     customer_intent: reading.agreement ?? "unclear",
     follow_up_required: outcome !== "confirmed" && outcome !== "rescheduled",
     next_action: NEXT_ACTIONS[outcome],
     notes: calle.post_summary ?? calle.summary ?? "",
     call_id: calle.call_id ?? input.runId,
+    // Kept separate from call_id, which is CALL-E's identifier for the call
+    // itself. The run id is the one that can be polled afterwards, and losing
+    // it left a finished call impossible to look up.
+    run_id: input.runId,
   };
 }

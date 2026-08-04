@@ -126,6 +126,115 @@ test("an acceptance naming no offered window is not guessed at", () => {
   assert.equal(reading.agreement, null);
 });
 
+// Regression tests for a live call in which the customer confirmed and the app
+// still reported `uncertain`. The reader matched a single rendered spelling of
+// the hour ("3 PM"), so the phrasings an agent actually uses all missed.
+const PHRASINGS: [string, string][] = [
+  ["with minutes", "I've confirmed you for Saturday 8 August at 3:00 PM."],
+  ["with minutes, no space", "I've confirmed you for Saturday 8 August at 3:00PM."],
+  ["a period instead of a colon", "I've confirmed you for Saturday 8 August at 3.00pm."],
+  ["punctuated meridiem", "I've confirmed you for Saturday 8 August at 3:00 p.m."],
+  ["o'clock", "I've confirmed you for Saturday 8 August at 3 o'clock."],
+  ["a part of day", "I've confirmed you for Saturday 8 August at three in the afternoon."],
+  ["a 24-hour clock", "I've confirmed you for Saturday 8 August at 15:00."],
+  ["a bare hour after 'at'", "I've confirmed you for Saturday 8 August at 3."],
+];
+
+for (const [label, sentence] of PHRASINGS) {
+  test(`an acceptance stating the time ${label} identifies the window`, () => {
+    const reading = readAgreement({
+      summary: null,
+      transcript: `[00:01] BOT: ${sentence}`,
+      windows: WINDOWS,
+      timezone: TIMEZONE,
+    });
+    assert.equal(reading.agreement, "accepted_window", sentence);
+    assert.equal(reading.matchedWindowIndex, 1, sentence);
+  });
+}
+
+test("a stated time that is not the offered one is never read as acceptance", () => {
+  for (const sentence of [
+    "I've confirmed you for Saturday 8 August at 3:30 PM.", // wrong minute
+    "I've confirmed you for Saturday 8 August at 3:00 AM.", // wrong meridiem
+    "I've confirmed you for Saturday 8 August at 16:00.", // wrong hour
+  ]) {
+    const reading = readAgreement({
+      summary: null,
+      transcript: `[00:01] BOT: ${sentence}`,
+      windows: WINDOWS,
+      timezone: TIMEZONE,
+    });
+    assert.notEqual(reading.agreement, "accepted_window", sentence);
+  }
+});
+
+// "Friday 7 August" must not read as seven o'clock, or a date would book the
+// 7 AM window that nobody agreed to.
+test("a day number inside a date is not read as an hour", () => {
+  const sevenAm: ReplacementWindow[] = [
+    { start: "2026-08-09T07:00:00+08:00", end: "2026-08-09T09:00:00+08:00" },
+  ];
+  const reading = readAgreement({
+    summary: null,
+    transcript: "[00:01] BOT: I've confirmed you for Sunday 7 August.",
+    windows: sevenAm,
+    timezone: TIMEZONE,
+  });
+  assert.notEqual(reading.agreement, "accepted_window");
+});
+
+test("keeping the original appointment reads as confirmed, not as uncertain", () => {
+  for (const sentence of [
+    "Great, I've confirmed your original appointment. See you then.",
+    "You're all set - we'll keep it as scheduled.",
+    "I've confirmed you for Monday 3 August at 2:00 PM, the same time as before.",
+  ]) {
+    const reading = readAgreement({
+      summary: null,
+      transcript: `[00:01] BOT: ${sentence}`,
+      windows: WINDOWS,
+      timezone: TIMEZONE,
+      originalTime: "2026-08-03T14:00:00+08:00",
+    });
+    assert.equal(reading.agreement, "confirmed_original", sentence);
+    assert.equal(
+      classifyOutcome({ status: "COMPLETED", agreement: reading.agreement }),
+      "confirmed",
+      sentence,
+    );
+  }
+});
+
+// An offered window still wins: a reschedule is not a confirmation.
+test("an offered window takes precedence over the original slot", () => {
+  const reading = readAgreement({
+    summary: null,
+    transcript: "[00:01] BOT: I've confirmed you for Saturday 8 August at 3:00 PM instead.",
+    windows: WINDOWS,
+    timezone: TIMEZONE,
+    originalTime: "2026-08-03T14:00:00+08:00",
+  });
+  assert.equal(reading.agreement, "accepted_window");
+  assert.equal(reading.matchedWindowIndex, 1);
+});
+
+test("a wall-clock window is matched in the operator's own terms, not shifted", () => {
+  // No offset, so these digits are the business's own clock. Reading them
+  // through the runner's timezone would look for a different hour entirely.
+  const wallClock: ReplacementWindow[] = [
+    { start: "2026-08-07T10:00", end: "2026-08-07T12:00" },
+  ];
+  const reading = readAgreement({
+    summary: null,
+    transcript: "[00:01] BOT: I've confirmed you for Friday 7 August at 10:00 AM.",
+    windows: wallClock,
+    timezone: TIMEZONE,
+  });
+  assert.equal(reading.agreement, "accepted_window");
+  assert.equal(reading.matchedWindowIndex, 0);
+});
+
 test("a missing transcript is inconclusive rather than an error", () => {
   const reading = readAgreement({
     summary: null,

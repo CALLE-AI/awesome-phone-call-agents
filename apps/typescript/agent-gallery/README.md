@@ -239,19 +239,22 @@ Tests never place calls and never need credentials.
   an authorized operator can place, so a leaked code is a spending risk until it
   is rotated. A per-isolate limiter would not meaningfully limit anything, for
   the same reason the duplicate guard does not.
-- The `confirmed` outcome is currently unreachable from a real call. The
-  agreement reader returns only `accepted_window`, `refused`, `no_valid_window`,
-  or inconclusive, so an agent confirming the original slot classifies as
-  `uncertain` and routes to human review. That fails safe, but it is not the
-  documented behavior.
 - The agreement reader matches phrasing rather than understanding language. It
-  handles negation and split sentences, but wording it does not recognize reads
-  as inconclusive, which sends a correctly handled call to human review as
-  `uncertain`. It errs toward review rather than toward a wrong booking.
+  handles negation, split sentences, and the common ways a time is spoken, but
+  wording it does not recognize reads as inconclusive, which sends a correctly
+  handled call to human review as `uncertain`. It errs toward review rather than
+  toward a wrong booking.
+- An acceptance is only tied to a window when the sentence names both the day
+  and the time. An agent that says only "confirmed for 3 PM" with two windows
+  offered stays inconclusive, because guessing between them could book the
+  wrong one.
 - The call goal asks the agent to offer to confirm the original appointment for
   both `missed` and `unconfirmed` statuses, though confirming an appointment
   already in the past is not meaningful. The two statuses want different call
   policies.
 - Replacement-window times are entered in the business's local time without
-  cross-checking the stated timezone.
+  cross-checking the stated timezone. The agreement reader now reads those
+  digits as the business's own clock rather than converting them, so matching no
+  longer depends on where the operator's browser is, but nothing yet verifies
+  that the entered times are valid in the timezone the operator named.
 - Single workflow, single call, English-language conversations only.

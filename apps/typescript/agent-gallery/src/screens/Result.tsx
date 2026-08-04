@@ -61,6 +61,10 @@ export function ResultScreen({ result, onRestart }: Props) {
 
           <dt>Call id</dt>
           <dd className="mono">{result.call_id}</dd>
+
+          {/* The run id is the one that can be looked up after the fact. */}
+          <dt>Run id</dt>
+          <dd className="mono">{result.run_id}</dd>
         </dl>
       </div>
 
