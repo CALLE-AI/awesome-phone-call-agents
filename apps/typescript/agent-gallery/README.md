@@ -76,7 +76,11 @@ an optional agreed time, customer intent, notes, the CALL-E call id, and a
 mapped next action.
 
 Outcomes are derived in [`src/lib/outcome.ts`](src/lib/outcome.ts) from the
-call's terminal status and a conservative reading of the conversation. CALL-E's
+call's terminal status and a conservative reading of the conversation produced
+by [`src/lib/agreement.ts`](src/lib/agreement.ts). That reader treats the
+summary and transcript as untrusted text, requires positive evidence for every
+conclusion, and returns "inconclusive" when signals conflict or when an
+acceptance names no offered window, so ambiguity reaches a human. CALL-E's
 `task_completed` is deliberately never used as the business outcome: it reports
 that the call ended cleanly, including calls that recovered nothing. CALL-E's
 telephony `DECLINED` means a rejected incoming call and maps to `unreachable`,
@@ -121,9 +125,10 @@ credentials the app remains fully usable in dry-run form.
 ## Current limitations
 
 - The live CALL-E client is stubbed (`501 live_integration_pending`).
-- The conversational half of outcome classification is not implemented. The
-  status half is; the app currently has no reader that turns a transcript into
-  an `Agreement`, so a completed call would classify as `uncertain`.
+- The agreement reader matches phrasing rather than understanding language. It
+  handles negation and split sentences, but wording it does not recognize reads
+  as inconclusive, which sends a correctly handled call to human review as
+  `uncertain`. It errs toward review rather than toward a wrong booking.
 - The duplicate guard is per-isolate; the completed implementation relies on the
   single-use `confirm_token` for real protection.
 - Replacement-window times are entered in the business's local time without
