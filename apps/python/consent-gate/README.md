@@ -5,7 +5,8 @@ A consent-first preflight and audit layer for AI phone agents.
 ConsentGate blocks a CALL-E request until the caller has supplied:
 
 - a legitimate recipient source and consent basis;
-- an opening disclosure that identifies the call as AI-generated;
+- a purpose-bound, fixed opening disclosure that identifies the call as
+  AI-generated without accepting caller-controlled instructions;
 - a recipient timezone and permitted calling window;
 - a bounded retry policy;
 - temporary rejection cooldowns plus permanent do-not-call suppression;
@@ -70,7 +71,10 @@ python3 -m consent_gate validate plan.json --history call-history.json
 Live execution requires a durable ledger and refuses to dispatch outside the
 recipient's local window. Before the provider request, ConsentGate atomically
 persists the exact request, its SHA-256 digest, and a content-bound idempotency
-key bound to `CALLE_IDEMPOTENCY_NAMESPACE`. After create returns, it
+key bound to `CALLE_IDEMPOTENCY_NAMESPACE` and the persisted attempt number.
+An ambiguous create is reconciled with the same key; only a separately
+authorized attempt after a known terminal outcome receives the next attempt
+number and a distinct key. After create returns, ConsentGate
 checkpoints the accepted call ID before waiting.
 The reservation counts against `max_attempts` and remains blocked for manual
 reconciliation if either phase is interrupted:
@@ -138,6 +142,11 @@ financial, or emergency content are rejected rather than delegated to the
 model. This version intentionally allowlists only the bundled, consented
 `accessibility_test`; adding another purpose requires a reviewed code change,
 template, and tests.
+
+Caller-controlled disclosure prose is also never inserted into a live task.
+Each approved `purpose_kind` owns one exact disclosure template; both the plan
+validator and the live request builder enforce that binding. Adding or changing
+a disclosure requires the same reviewed code and regression-test process.
 
 Only call a number you control or a recipient who has explicitly agreed to the
 call. Comply with applicable calling, recording, privacy, and consumer

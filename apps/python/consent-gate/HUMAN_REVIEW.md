@@ -41,3 +41,9 @@ inappropriate when such a kill switch is required.
 Live tasks do not interpolate freeform purpose text. Version 0.1 allowlists
 only the fixed `accessibility_test` template; any new purpose kind requires a
 reviewed code change and regression coverage.
+
+The same rule applies to the opening disclosure: version 0.1 uses one fixed
+disclosure for `accessibility_test`, and live task construction reads the
+allowlist rather than caller-supplied prose. Durable attempt numbers are bound
+into provider idempotency keys so reconciliation remains same-key while an
+authorized second attempt after a terminal first result has a distinct key.

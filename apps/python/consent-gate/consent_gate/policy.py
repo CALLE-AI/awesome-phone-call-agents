@@ -37,6 +37,9 @@ ALLOWED_PURPOSES = {
         "Confirm that the consenting tester can hear an accessibility message."
     ),
 }
+ALLOWED_DISCLOSURES = {
+    "accessibility_test": "Hello, this is an automated AI test call.",
+}
 SUPPORTED_REGION_LANGUAGES = {
     "US": {"en"},
     "SG": {"en"},
@@ -113,9 +116,14 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
     if plan["consent_basis"] not in ALLOWED_CONSENT_BASES:
         errors.append("consent_basis is not accepted")
 
-    disclosure = str(plan["ai_disclosure"]).lower()
-    if "ai" not in disclosure and "automated" not in disclosure:
-        errors.append("ai_disclosure must identify the caller as AI or automated")
+    if not isinstance(plan["ai_disclosure"], str):
+        errors.append("ai_disclosure must be a string")
+    elif purpose_kind in ALLOWED_DISCLOSURES and plan["ai_disclosure"].strip() != (
+        ALLOWED_DISCLOSURES[purpose_kind]
+    ):
+        errors.append(
+            "ai_disclosure must exactly match its approved purpose_kind template"
+        )
 
     window = plan["allowed_window"]
     if not (
@@ -201,6 +209,17 @@ def validate_attempt_limit(
     if attempts >= int(plan.get("max_attempts", 0)):
         return [f"max_attempts reached ({attempts})"]
     return []
+
+
+def next_attempt_number(plan: dict[str, Any], history: list[dict[str, Any]]) -> int:
+    """Return the next durable provider attempt number for this recipient."""
+    fingerprint = _phone_fingerprint(str(plan.get("phone", "")))
+    return 1 + sum(
+        1
+        for event in history
+        if event.get("phone_fingerprint") == fingerprint
+        and event.get("event") == "dispatch_reserved"
+    )
 
 
 def _phone_fingerprint(phone: str) -> str:

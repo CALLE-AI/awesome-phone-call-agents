@@ -12,10 +12,12 @@ from pathlib import Path
 from .ledger import DurableLedger
 
 from .policy import (
+    ALLOWED_DISCLOSURES,
     ALLOWED_PURPOSES,
     PolicyError,
     build_manifest,
     load_plan,
+    next_attempt_number,
     validate_attempt_limit,
     validate_dispatch_window,
     validate_plan,
@@ -168,13 +170,16 @@ def _verified_outcome(result: dict) -> str:
     return "unknown"
 
 
-def _request_for_plan(plan: dict, provider_namespace: str) -> dict:
+def _request_for_plan(
+    plan: dict, provider_namespace: str, attempt_number: int = 1
+) -> dict:
     # Never inject caller-controlled prose into a live task. validate_plan()
     # binds purpose_kind to this exact allowlisted text before this function is
     # reached; looking it up again provides defense in depth.
     approved_purpose = ALLOWED_PURPOSES[plan["purpose_kind"]]
+    approved_disclosure = ALLOWED_DISCLOSURES[plan["purpose_kind"]]
     task = (
-        f"Begin by saying exactly: {plan['ai_disclosure']} "
+        f"Begin by saying exactly: {approved_disclosure} "
         f"Then: {approved_purpose} "
         "Distinguish a request to end only this call from a request never to be "
         "called again. Set end_call_requested or do_not_call_requested exactly "
@@ -228,13 +233,24 @@ def _request_for_plan(plan: dict, provider_namespace: str) -> dict:
                 },
             },
         },
-        "metadata": {"consent_gate_provider_namespace": provider_namespace},
+        "metadata": {
+            "consent_gate_provider_namespace": provider_namespace,
+            "consent_gate_attempt_number": attempt_number,
+        },
     }
 
 
-def _request_identity(payload: dict, provider_namespace: str) -> tuple[str, str]:
+def _request_identity(
+    payload: dict, provider_namespace: str, attempt_number: int = 1
+) -> tuple[str, str]:
+    if not isinstance(attempt_number, int) or attempt_number < 1:
+        raise PolicyError("attempt_number must be a positive integer")
+    if payload.get("metadata", {}).get("consent_gate_attempt_number") != (
+        attempt_number
+    ):
+        raise PolicyError("payload attempt number does not match attempt identity")
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    basis = f"{provider_namespace}\n{canonical}"
+    basis = f"{provider_namespace}\nattempt={attempt_number}\n{canonical}"
     digest = hashlib.sha256(basis.encode("utf-8")).hexdigest()
     namespace_digest = hashlib.sha256(
         provider_namespace.encode("utf-8")
@@ -340,10 +356,6 @@ def _execute(
     except ImportError as exc:
         raise PolicyError("install the live extra: pip install '.[live]'") from exc
 
-    request_payload = _request_for_plan(plan, provider_namespace)
-    request_sha256, idempotency_key = _request_identity(
-        request_payload, provider_namespace
-    )
     with ledger.locked_events() as history:
         live_errors = validate_rejection_cooldown(plan, history)
         live_errors.extend(validate_attempt_limit(plan, history))
@@ -352,12 +364,20 @@ def _execute(
         live_errors.extend(validate_dispatch_window(plan))
         if live_errors:
             raise PolicyError("; ".join(live_errors))
+        attempt_number = next_attempt_number(plan, history)
+        request_payload = _request_for_plan(
+            plan, provider_namespace, attempt_number
+        )
+        request_sha256, idempotency_key = _request_identity(
+            request_payload, provider_namespace, attempt_number
+        )
         reservation = ledger.reservation(
             plan["phone"],
             request_payload=request_payload,
             request_sha256=request_sha256,
             idempotency_key=idempotency_key,
             provider_namespace=provider_namespace,
+            attempt_number=attempt_number,
         )
         history.append(reservation)
 
@@ -404,10 +424,6 @@ def _reconcile(
     if not state_path or not reservation_id:
         raise PolicyError("reconciliation requires --state and --reservation")
     provider_namespace = _load_provider_namespace()
-    payload = _request_for_plan(plan, provider_namespace)
-    request_sha256, idempotency_key = _request_identity(
-        payload, provider_namespace
-    )
     ledger = DurableLedger(state_path)
     with ledger.locked_events() as history:
         event = next(
@@ -419,6 +435,13 @@ def _reconcile(
         state = event.get("state")
         if state not in {"accepted_waiting", "reconciliation_required"}:
             raise PolicyError("reservation does not require reconciliation")
+        attempt_number = event.get("attempt_number")
+        if not isinstance(attempt_number, int) or attempt_number < 1:
+            raise PolicyError("reservation is missing a valid attempt_number")
+        payload = _request_for_plan(plan, provider_namespace, attempt_number)
+        request_sha256, idempotency_key = _request_identity(
+            payload, provider_namespace, attempt_number
+        )
         if (
             event.get("request_payload") != payload
             or event.get("request_sha256") != request_sha256
@@ -465,7 +488,7 @@ def _simulate(plan: dict, history: list[dict]) -> dict:
     if errors:
         raise PolicyError("; ".join(errors))
 
-    disclosure = plan["ai_disclosure"].strip()
+    disclosure = ALLOWED_DISCLOSURES[plan["purpose_kind"]]
     purpose = plan["purpose"].strip()
     return {
         "mode": "offline_simulation",
