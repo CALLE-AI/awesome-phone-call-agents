@@ -105,7 +105,7 @@ several countries, and picking one reaches a stranger.
 If a list is known to be single-country, opt in explicitly:
 
 ```bash
-python runner.py --campaign travel --contacts contacts.csv --country-code 91
+python runner.py --campaign travel --contacts example_contacts.csv --country-code 91
 ```
 
 ---
@@ -462,8 +462,9 @@ read, freeing the reservation.
 
 Both exit non-zero on failure and place no calls.
 
-Also worth reading: `--dry-run` output is the same pipeline minus the dial, so a
-preview shows exactly which rows a live run would skip and why.
+Also worth reading: the default dry run (any invocation without `--live`) is the
+same pipeline minus the dial, so a preview shows exactly which rows a live run
+would skip and why.
 
 To verify the live path end to end, run with `--live --allow <your-own-number>`
 and answer the phone. One call costs one credit.
@@ -486,7 +487,7 @@ and answer the phone. One call costs one credit.
 | `--suppression-file` | `results/do_not_call.txt` | Durable opt-out list |
 | `--dispatch-file` | `results/reservations.txt` | Per-recipient reservation ledger |
 | `--poll-interval` | `5.0` | Seconds between status checks |
-| `--timeout` | `600` | Seconds to wait for a call to finish |
+| `--timeout` | `600.0` | Seconds to wait for a call to finish |
 | `--out` | `results/campaign_results.jsonl` | Results path |
 
 ---
