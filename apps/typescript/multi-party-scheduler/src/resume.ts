@@ -14,9 +14,11 @@
  */
 
 import { CalleCallError, CalleWaitTimeout, type CallePort } from "./calle.js";
+import { unsettledCall } from "./call-state.js";
 import { worstCaseCalls } from "./config.js";
 import {
   assertDurableState,
+  callInput,
   type CallOutcome,
   evaluateCommit,
   placeCall,
@@ -28,6 +30,9 @@ import { withinCallingHours } from "./hours.js";
 import {
   acquireLedgerLock,
   appendEntry,
+  type AttemptRecord,
+  attemptRecords,
+  digestOf,
   type OpenAttempt,
   openAttempts,
   readEntries,
@@ -41,6 +46,7 @@ import type {
   CallSnapshot,
   CommitResult,
   CoordinationRequest,
+  JsonSchema,
   LedgerEntry,
   Outcome,
   Party,
@@ -127,20 +133,13 @@ function openResult(open: OpenAttempt): CommitResult {
 }
 
 /**
- * A call is unsettled when the ledger cannot say what it did. No call id means
- * the create response was lost and the call may still have gone out. A call id
- * with a status that is not terminal means it was still running when this process
- * stopped. A call the coordinator declined to place is settled: it never happened.
+ * A call is unsettled when the ledger cannot say what it did.
+ *
+ * The rule itself lives in `call-state.ts`, beside the terminal statuses it is built
+ * from, because recovery, the release round and replay all have to give the same
+ * answer. It is re-exported here because this is where it is read from.
  */
-export function unsettledCall(result: CommitResult): boolean {
-  if (result.call_status === "not_placed") {
-    return false;
-  }
-  if (result.call_id === null) {
-    return true;
-  }
-  return !TERMINAL_STATUSES.has(result.call_status);
-}
+export { unsettledCall };
 
 export function inspectLedger(entries: LedgerEntry[]): RecoveryState {
   let callsPlaced = 0;
@@ -384,10 +383,40 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
   const windowStart = Date.parse(started.at);
   const deadline = windowStart + started.policy.windowMinutes * 60_000;
   const span = (): WindowSpan => ({ windowStart, deadline, now: now() });
+  /** Everything on disk plus everything this round appends, for the release round. */
+  const history: LedgerEntry[] = [...entries];
   const record = (entry: LedgerEntry): void => {
+    history.push(entry);
     appendEntry(options.ledgerPath, entry);
   };
   const stamp = (): string => new Date(now()).toISOString();
+  /**
+   * What each recorded key went out against, so re-issuing one can be checked.
+   *
+   * Recovery sends the key the ledger recorded rather than deriving one, which is
+   * what stops a second phone ringing. It also means nothing about that key is
+   * recomputed, so nothing about it is verified either unless this is read. Two
+   * things have to still hold before the string may go back on the wire: the payload
+   * behind it, because a key CALL-E never received will place whatever body is sent
+   * under it and the provider and account, because a key only means anything inside
+   * one namespace.
+   */
+  const recorded = attemptRecords(entries);
+  const providerMismatch = (attempt: AttemptRecord): string | null => {
+    const origin = port.origin ?? null;
+    const account = port.account ?? null;
+    if (attempt.provider_origin !== origin) {
+      return `the ledger recorded that key against ${
+        attempt.provider_origin ?? "a port that named no origin"
+      } and this run is talking to ${origin ?? "a port that names none"}`;
+    }
+    if (attempt.provider_account !== account) {
+      return `the ledger recorded that key against another account (${
+        attempt.provider_account ?? "none named"
+      }, this run is ${account ?? "a port that names none"})`;
+    }
+    return null;
+  };
 
   if (state.finished && state.unsettled.length === 0 && state.owedReleases.length === 0) {
     progress("Nothing to resume: every call is settled and nobody is owed a release call.");
@@ -449,6 +478,25 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       stuck.push(previous.party_id);
       continue;
     }
+    // The call this build would send under that key, so the two can be compared
+    // before anything goes out. Rebuilt from the request and this repo's own
+    // scripts, which is exactly the pair that can have moved since the crash.
+    const task =
+      previous.phase === "release" ? releaseTask(request, party, slot) : confirmTask(request, party, slot);
+    const schema: JsonSchema = previous.phase === "release" ? releaseSchema() : confirmSchema();
+    const rebuilt = digestOf(callInput(request, party, previous.phase, slot, task, schema));
+    const attempt = recordedKey === null ? undefined : recorded.get(recordedKey);
+    const elsewhere = attempt === undefined ? null : providerMismatch(attempt);
+    if (elsewhere !== null) {
+      // A key is only that call inside one provider and one account. Sending it to
+      // another namespace creates the call there and leaves the original ambiguous,
+      // which is two calls to one person wearing the look of a reconciliation.
+      progress(
+        `  ${party.id}: the ${previous.phase} call cannot be settled, ${elsewhere}. Resume it against the provider it was placed with or check that call by hand.`,
+      );
+      stuck.push(party.id);
+      continue;
+    }
     let outcome: CallOutcome;
     let placedCall = false;
     if (previous.call_id !== null) {
@@ -464,6 +512,25 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       // were recorded are the only ones that look like this.
       progress(
         `  ${party.id}: the ${previous.phase} call cannot be settled, the ledger recorded no idempotency key for it and a derived key could ring them a second time. Check that call by hand.`,
+      );
+      stuck.push(party.id);
+      continue;
+    } else if (attempt === undefined) {
+      // The key is on disk and nothing behind it is. Re-issuing it would send this
+      // build's words to a provider nothing names, under a key nothing vouches for.
+      progress(
+        `  ${party.id}: the ${previous.phase} call cannot be settled, the ledger names the key ${recordedKey} with no attempt record behind it, so nothing says which payload or which provider it went out against. Check that call by hand.`,
+      );
+      stuck.push(party.id);
+      continue;
+    } else if (attempt.payload_digest !== rebuilt) {
+      // The key is a reservation for one exact request. If the first one never
+      // reached CALL-E, this key is unknown there and re-issuing it does not replay
+      // anything: it places a call with whatever body goes out now. An upgrade to a
+      // call script between the crash and the resume is enough to make that a call
+      // nobody approved, so it fails closed rather than dialling.
+      progress(
+        `  ${party.id}: the ${previous.phase} call cannot be settled, the call this build would send under that key is not the one the key was taken over (recorded ${attempt.payload_digest}, rebuilt ${rebuilt}). If the first request never reached CALL-E, re-issuing it would place a call with words nobody approved. Check that call by hand.`,
       );
       stuck.push(party.id);
       continue;
@@ -505,8 +572,8 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
         party,
         phase: previous.phase,
         slot,
-        task: previous.phase === "release" ? releaseTask(request, party, slot) : confirmTask(request, party, slot),
-        schema: previous.phase === "release" ? releaseSchema() : confirmSchema(),
+        task,
+        schema,
         timeoutMs,
         pollIntervalMs,
         record,
@@ -588,6 +655,7 @@ async function recover(options: ResumeOptions): Promise<RunResult> {
       now,
       progress,
       record,
+      history,
     });
     calls = round.callsPlaced;
     unreleased.push(...round.unreleased, ...debt.filter((party) => handledReleases.has(party)));

@@ -112,7 +112,7 @@ test("everyone answers, one time survives and it is confirmed with all three", a
       );
       assert.ok(tenantGather !== undefined);
       assert.equal(tenantGather.task.includes("option 3,"), false);
-      assert.match(tenantGather.idempotencyKey ?? "", /^mps-ash-lane-3b-leak-gather-tenant-[0-9a-f]{12}$/);
+      assert.match(tenantGather.idempotencyKey ?? "", /^mps-ash-lane-3b-leak-gather-tenant-[0-9a-f]{12}-a1$/);
       const confirm = fake.created.find((call) => call.phase === "confirm");
       assert.equal(confirm?.slotId, "thu-14");
       assert.equal(confirm?.resultSchema?.additionalProperties, false);

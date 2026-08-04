@@ -259,14 +259,22 @@ test("resume re-issues the key the ledger recorded rather than deriving a new on
     );
 
     const recorded = "mps-key-only-this-ledger-knows";
+    const original = lost.result.idempotency_key;
+    // The attempt record moves with the key. A key with no attempt record behind it
+    // is refused and rightly: nothing would say which payload or which provider that
+    // string went out against, so nothing could check either before sending it again.
     writeFileSync(
       path,
       `${readEntries(path)
-        .map((entry) =>
-          entry.kind === "commit" && entry.result.party_id === "superintendent"
-            ? JSON.stringify({ ...entry, result: { ...entry.result, idempotency_key: recorded } })
-            : JSON.stringify(entry),
-        )
+        .map((entry) => {
+          if (entry.kind === "commit" && entry.result.party_id === "superintendent") {
+            return JSON.stringify({ ...entry, result: { ...entry.result, idempotency_key: recorded } });
+          }
+          if (entry.kind === "call_attempt" && entry.idempotency_key === original) {
+            return JSON.stringify({ ...entry, idempotency_key: recorded });
+          }
+          return JSON.stringify(entry);
+        })
         .join("\n")}\n`,
     );
 
@@ -579,6 +587,7 @@ async function withOwedRelease(
     port: CallePort;
     path: string;
     request: ReturnType<typeof coordinationRequest>;
+    fake: Awaited<ReturnType<typeof startFakeCalle>>;
   }) => Promise<void>,
 ): Promise<void> {
   const fake = await startFakeCalle(MACHINE_RELEASE);
@@ -589,7 +598,7 @@ async function withOwedRelease(
     const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
     assert.equal(first.outcome, "not_confirmed");
     assert.deepEqual(first.unreleased, ["plumber"], "the release call reached a machine");
-    await body({ port, path, request });
+    await body({ port, path, request, fake });
   } finally {
     await fake.close();
   }
@@ -627,20 +636,46 @@ test("a terminal release call that reached nobody leaves the debt owed", async (
   });
 });
 
+/**
+ * The retry has to be a call the provider has never seen.
+ *
+ * Everything else in an idempotency key is stable across attempts, which is what
+ * makes the key a reservation. So a release call derived the key its first attempt
+ * had used, CALL-E answered with the call that reached the machine and nothing rang.
+ * A second ledger line and a second charge against the budget looked like a retry
+ * from the inside while the person was never called again. This test counts calls the
+ * provider created, because that is the only thing that means somebody's phone rang.
+ */
 test("resume finishes a release nobody acknowledged instead of writing it off", async () => {
-  await withOwedRelease(async ({ port, path, request }) => {
+  await withOwedRelease(async ({ port, path, request, fake }) => {
     const resumed = await resumeCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
     assert.notEqual(resumed.note, "nothing to resume");
     assert.deepEqual(resumed.unreleased, ["plumber"], "the machine answered again");
     assert.match(resumed.note, /still owed a release call: plumber/);
     assert.equal(resumed.calls_placed, 7, "6 recorded calls plus the release call it tried again");
 
+    const releases = fake.created.filter((call) => call.phase === "release");
+    assert.deepEqual(releases.map((call) => call.phones[0]), [PLUMBER, PLUMBER], "the phone rang twice");
+    assert.notEqual(releases[0]?.id, releases[1]?.id, "two calls at CALL-E, not one answered twice");
+    assert.notEqual(releases[0]?.idempotencyKey, releases[1]?.idempotencyKey);
+    assert.match(releases[0]?.idempotencyKey ?? "", /-a1$/);
+    assert.match(releases[1]?.idempotencyKey ?? "", /-a2$/, "the attempt number is what made it a new call");
+
     const entries = readEntries(path);
-    assert.equal(
-      entries.filter((entry) => entry.kind === "release").length,
-      2,
-      "resume called again rather than reading the first attempt as delivery",
+    const recorded = entries
+      .filter((entry) => entry.kind === "release")
+      .map((entry) => (entry.kind === "release" ? entry.result : null));
+    assert.equal(recorded.length, 2, "resume called again rather than reading the first attempt as delivery");
+    assert.deepEqual(
+      recorded.map((result) => result?.call_id),
+      releases.map((call) => call.id),
+      "and each entry names the call it was",
     );
+    const attempts = entries
+      .filter((entry) => entry.kind === "call_attempt" && entry.phase === "release")
+      .map((entry) => (entry.kind === "call_attempt" ? entry.attempt : 0));
+    assert.deepEqual(attempts, [1, 2], "the ledger holds the identity each attempt went out under");
+
     const opened = entries.find((entry) => entry.kind === "resume_started");
     assert.ok(opened !== undefined && opened.kind === "resume_started");
     assert.deepEqual(opened.owed_releases, ["plumber"]);

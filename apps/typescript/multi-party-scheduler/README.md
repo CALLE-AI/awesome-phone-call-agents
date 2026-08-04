@@ -126,7 +126,11 @@ sooner the set narrows, the shorter every later call.
 Ctrl-C cancels a run in flight. No new gather or confirm call is placed, everybody
 who already said yes is still called and told it is off and a call that was
 already connected is recorded as unsettled because the API has no way to hang it
-up. A second Ctrl-C gives up on the release calls too.
+up. A second Ctrl-C gives up on the release calls too. Nothing is created after the
+signal fires, including the reconciliation of an ambiguous create: that one looks
+like a lookup and is a create, so if the first request never landed it would start
+the very call the cancellation was meant to stop. It is left unresolved under the key
+already on disk instead, for `resume` to settle.
 
 ## When a run does not finish
 
@@ -141,8 +145,9 @@ Both leave somebody expecting an appointment that is not happening.
 There is a narrower window than either. A call is accepted by CALL-E and the
 process dies before the entry that says what the call did. So the two lines that
 make a call recoverable are written by the code that places it, not by its caller:
-a `call_attempt` line with the exact idempotency key and a digest of the payload
-that key was taken over, before the create, then a `call_accepted` line with the
+a `call_attempt` line with the exact idempotency key, the attempt number it belongs
+to, a digest of the payload that key was taken over and the provider origin and
+account it went to, before the create, then a `call_accepted` line with the
 id CALL-E returned, before anything waits on the call. A crash in between leaves
 the key on disk, usually the call id with it, so the call is still findable.
 
@@ -153,8 +158,20 @@ settled by re-issuing the idempotency key the ledger recorded for it: CALL-E
 answers with the call it already has or places the one the run owed. That key is
 read, never derived a second time, because deriving it reads the call script and
 the script lives in this repo: a crash, an upgrade, then a resume would otherwise
-send a key CALL-E has never seen and ring a second phone. A call with neither an
-id nor a recorded key, which only a ledger written by an older version of this app
+send a key CALL-E has never seen and ring a second phone.
+
+Re-issuing a recorded key is only safe while it still stands for the same request to
+the same provider, so three things are checked first and any one of them fails the
+call closed. The payload digest recorded with the key has to match what this build
+would send under it, because when the first request never reached CALL-E the key is
+unknown there and the create places a call with whatever body goes out now. The
+provider origin and account digest have to match the port in hand, because a key is a
+reservation inside one namespace and the same string sent elsewhere creates the call
+there while the original stays open. And no new attempt at a call is minted while an
+earlier one is unaccounted for.
+
+A call with neither an id nor a recorded key, which only a ledger written by an older
+version of this app
 can hold, is refused rather than dialled and named in the note for a person to
 check. Guessing the key there is the one mistake that rings somebody who may be on
 the line already. A gather call nothing settled is named for a person too:
@@ -283,10 +300,13 @@ a time: the run takes an `O_EXCL` lock on `<ledger>.lock` before it dials anybod
   suffix match and no wildcard. An opted in host still has to be https, because
   https on its own is not trust: it says the wire is encrypted, not who answers.
   Anything else is refused rather than warned about.
-- Every idempotency key carries a short sha256 of the call payload, so a call is
-  reused only when it would say the same words. The key goes into the ledger with
-  the call and `resume` sends that exact string back, so recovery cannot invent a
-  new key after the scripts have moved on.
+- Every idempotency key carries a short sha256 of the call payload and the attempt
+  number it belongs to, so a call is reused only when it would say the same words and
+  a retry is a call the provider has never seen. The key goes into the ledger with
+  the call, beside the payload digest and the provider it was sent to and `resume`
+  sends that exact string back only while all three still hold, so recovery cannot
+  invent a new key after the scripts have moved on or replay an old one somewhere
+  else.
 - Ledgers are appended with mode `0600`, re-applied on every append rather than
   only when the file is created. A target that is not a regular file is refused.
   Numbers are masked to the country code

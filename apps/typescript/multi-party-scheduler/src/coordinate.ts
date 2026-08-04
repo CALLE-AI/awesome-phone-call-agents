@@ -23,10 +23,10 @@
 import { CalleCallError, CalleWaitTimeout, type CallePort, type CreateCallInput } from "./calle.js";
 import { ConfigError, worstCaseCalls } from "./config.js";
 import { clockOf, withinCallingHours } from "./hours.js";
-import { acquireLedgerLock, appendEntry, digestOf, requestDigest } from "./ledger.js";
+import { acquireLedgerLock, appendEntry, digestOf, nextAttempt, readLedger, requestDigest, unaccountedAttempt } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
 import { chooseSlot, intersect } from "./slots.js";
-import { TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
+import { NOT_PLACED_STATUS, TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
 import { completionInstant, judgeWindow, saidYes, type WindowSpan, type WindowVerdict } from "./window.js";
 import {
   confirmSchema,
@@ -99,11 +99,12 @@ export interface CallOutcome {
 }
 
 /**
- * Statuses a call can no longer move out of, and the status this app records for
- * a call it cannot account for. Both live in `call-state.ts` so the coordinator,
- * recovery and replay cannot drift apart on what finished means.
+ * Statuses a call can no longer move out of, the status this app records for a call
+ * it cannot account for and the status for a call that never went out. All three
+ * live in `call-state.ts` so the coordinator, recovery and replay cannot drift apart
+ * on what finished means.
  */
-export { TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
+export { NOT_PLACED_STATUS, TERMINAL_STATUSES, UNRESOLVED_STATUS } from "./call-state.js";
 
 /**
  * A port that dials real phones may not place its first call with no durable
@@ -171,6 +172,13 @@ export interface PlaceOptions {
    */
   key?: string;
   /**
+   * Which attempt at this call it is, when the key is being derived here. One more
+   * than the ledger already holds, so a retry is a call the provider has never seen
+   * rather than a replay of the one it has. Ignored when `key` is given: that string
+   * already belongs to an attempt.
+   */
+  attempt?: number;
+  /**
    * Appends to the ledger. This function writes the attempt record before the
    * create and the accepted call id before anything waits on the call, so the
    * window between CALL-E accepting a call and the caller recording what it did
@@ -237,19 +245,34 @@ function asCallError(error: unknown): CalleCallError {
  * goes onto the outcome so the ledger records what went on the wire.
  *
  * Two ledger lines are written from in here, before the caller can write anything.
- * The attempt record carries the exact key and a digest of the payload it was
- * taken over. It lands before the create. The accepted record carries the id
+ * The attempt record carries the exact key, the attempt number it belongs to, a
+ * digest of the payload it was taken over and the provider origin and account it is
+ * being sent to. It lands before the create. The accepted record carries the id
  * CALL-E returned and it lands before anything waits on the call. Between those
  * two moments a process death used to leave no trace of a call that had already
  * been accepted, so nothing named it and nothing could settle it.
+ *
+ * No create is issued once the signal has fired, the reconciliation included. The
+ * two cases are not the same, so they are not recorded the same. Before the first
+ * create nothing has been sent, so no key is claimed and the call reads as never
+ * placed. Before the reconciliation the first request may already have been
+ * accepted, so the call comes back unresolved under its key rather than written off.
+ * Creating it there would be a call placed after the run was canceled.
  */
 export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
   const { request, port, party, phase, slot } = options;
   const input = callInput(request, party, phase, slot, options.task, options.schema);
-  const key = options.key ?? idempotencyKey(request, phase, party, slot, input);
+  const key = options.key ?? idempotencyKey(request, phase, party, slot, input, options.attempt ?? 1);
   const record = options.record ?? ((): void => {});
   const now = options.now ?? ((): number => Date.now());
   const stamp = (): string => new Date(now()).toISOString();
+  /** Read fresh every time. The signal can fire between any two lines below. */
+  const canceled = (): boolean => options.signal?.aborted === true;
+  if (canceled()) {
+    // Nothing has gone out, so nothing is claimed under this key and there is
+    // nothing for recovery to settle.
+    return { call: null, callId: null, idempotencyKey: null, errorCode: "canceled", unresolved: false };
+  }
   // Before the create, so the key exists on disk before it can have been used. One
   // record per call: an ambiguous create re-issues the same key with the same
   // payload, which is the same attempt.
@@ -260,8 +283,11 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
     party_id: party.id,
     phone_masked: maskPhone(party.phone),
     slot_id: slot?.id ?? null,
+    attempt: options.attempt ?? 1,
     idempotency_key: key,
     payload_digest: digestOf(input),
+    provider_origin: port.origin ?? null,
+    provider_account: port.account ?? null,
   });
   let callId: string | null = null;
   try {
@@ -270,6 +296,18 @@ export async function placeCall(options: PlaceOptions): Promise<CallOutcome> {
     const problem = asCallError(error);
     if (!problem.ambiguous) {
       return { call: null, callId: null, idempotencyKey: key, errorCode: problem.code, unresolved: false };
+    }
+    if (canceled()) {
+      // The reconciliation would be a create and the first request may never have
+      // landed, so it could start the call this cancellation was meant to stop. The
+      // call stays this app's to account for, under the key on disk.
+      return {
+        call: null,
+        callId: null,
+        idempotencyKey: key,
+        errorCode: `${problem.code}, then canceled`,
+        unresolved: true,
+      };
     }
     try {
       callId = (await port.createCall(input, key)).id;
@@ -365,11 +403,23 @@ function sameOptions(left: number[], right: number[]): boolean {
   return left.length === right.length && left.every((option, index) => option === right[index]);
 }
 
+/**
+ * The status to record for a call.
+ *
+ * A call nobody can account for gets this app's own `unresolved`, whatever else is
+ * known about it. A create that never went out gets `not_placed`: no key reached
+ * the provider and no id came back, so there is no call at CALL-E to settle. That
+ * is the party's calling hours refusing the call and the run being canceled before
+ * the create, which are the same thing from here.
+ */
 function statusOf(outcome: CallOutcome, known: string): string {
   if (outcome.unresolved) {
     return UNRESOLVED_STATUS;
   }
-  return outcome.errorCode === "outside_calling_hours" ? "not_placed" : known;
+  if (outcome.callId === null && outcome.idempotencyKey === null) {
+    return NOT_PLACED_STATUS;
+  }
+  return known;
 }
 
 function evaluateGather(
@@ -630,6 +680,17 @@ export interface ReleaseRoundOptions {
   now: () => number;
   progress: (line: string) => void;
   record: (entry: LedgerEntry) => void;
+  /**
+   * Every entry the ledger holds, including the ones this round appends.
+   *
+   * A release call is the one call this app places more than once, so it is the one
+   * that needs to know what came before. The history decides two things: which
+   * attempt this is, which goes into the key and makes the retry a call the provider
+   * has never seen and whether the last attempt is accounted for at all. A caller
+   * with no ledger passes an empty list and gets attempt 1, which is all a run
+   * without durable state can honestly claim.
+   */
+  history: LedgerEntry[];
 }
 
 export interface ReleaseRoundResult {
@@ -645,6 +706,15 @@ export interface ReleaseRoundResult {
  * budget and the party's calling hours do apply and a party who cannot be called
  * inside either is reported as still owed the call rather than rung at 3am. The
  * same round runs from a fresh coordination and from `resume`.
+ *
+ * This is the only call the app places twice, so it is the only one with an attempt
+ * number that moves. A release call that ended without reaching a person leaves the
+ * debt owed and the retry has to be a call the provider has never seen: the key is
+ * otherwise identical, so CALL-E would answer with the call that reached the machine
+ * and nothing would ring. A retry is only minted once the last attempt's outcome is
+ * known. While one is unaccounted for, the person stays owed and recovery reconciles
+ * that attempt under its own key, because a second call to somebody who may be on
+ * the first one is the mistake this whole protocol is built to avoid.
  */
 export async function releaseRound(options: ReleaseRoundOptions): Promise<ReleaseRoundResult> {
   const { request, port, slot } = options;
@@ -653,6 +723,14 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
   for (const party of options.parties) {
     if (calls >= request.policy.maxCalls) {
       options.progress(`  ${party.id} is still owed a release call, the call budget is spent.`);
+      unreleased.push(party.id);
+      continue;
+    }
+    const pending = unaccountedAttempt(options.history, "release", party.id);
+    if (pending !== null) {
+      options.progress(
+        `  ${party.id} is still owed a release call, an earlier attempt is unaccounted for (${pending}) and has to be settled before another one is placed.`,
+      );
       unreleased.push(party.id);
       continue;
     }
@@ -677,6 +755,7 @@ export async function releaseRound(options: ReleaseRoundOptions): Promise<Releas
       pollIntervalMs: options.pollIntervalMs,
       record: options.record,
       now: options.now,
+      attempt: nextAttempt(options.history, "release", party.id, slot.id),
     });
     const result = evaluateCommit(request, party, slot, "release", outcome, null);
     options.record({ kind: "release", at: new Date(at).toISOString(), result });
@@ -711,7 +790,17 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
   const windowStart = now();
   const deadline = windowStart + request.policy.windowMinutes * 60_000;
 
+  /**
+   * Everything this ledger holds, the lines from before this run included.
+   *
+   * A ledger is usually empty here and this is usually just what the run writes.
+   * It is read rather than assumed because the attempt number for a call comes from
+   * the history and not from this process: a run appending to a ledger that already
+   * records a release call to somebody must not derive the key that call used.
+   */
+  const history: LedgerEntry[] = ledgerPath === null ? [] : readLedger(ledgerPath).entries;
   const record = (entry: LedgerEntry): void => {
+    history.push(entry);
     if (ledgerPath !== null) {
       appendEntry(ledgerPath, entry);
     }
@@ -765,6 +854,7 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
       pollIntervalMs,
       record,
       now,
+      attempt: nextAttempt(history, phase, party.id, slot?.id ?? null),
       // A release call is a duty. Cancelling the coordination does not cancel it.
       signal: phase === "release" ? undefined : options.signal,
     });
@@ -978,6 +1068,7 @@ async function coordinate(options: RunOptions): Promise<RunResult> {
       now,
       progress,
       record,
+      history,
     });
     calls = round.callsPlaced;
     unreleased.push(...round.unreleased);

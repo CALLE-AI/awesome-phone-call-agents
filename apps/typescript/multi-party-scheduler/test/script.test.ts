@@ -80,7 +80,7 @@ test("every call script refuses advice, emergencies and payment details", () => 
 test("idempotency keys are stable, specific to phase and slot and bound to the content", () => {
   const gather = { task: gatherTask(request, plumber, request.slots), schema: gatherSchema(3) };
   const key = idempotencyKey(request, "gather", plumber, undefined, gather);
-  assert.match(key, /^mps-ash-lane-3b-leak-gather-plumber-[0-9a-f]{12}$/);
+  assert.match(key, /^mps-ash-lane-3b-leak-gather-plumber-[0-9a-f]{12}-a1$/);
   assert.equal(idempotencyKey(request, "gather", plumber, undefined, gather), key);
 
   // A shorter option list is a different call, so it must not reuse the key.
@@ -89,7 +89,7 @@ test("idempotency keys are stable, specific to phase and slot and bound to the c
 
   const confirm = { task: confirmTask(request, plumber, request.slots[1]!), schema: confirmSchema() };
   const confirmKey = idempotencyKey(request, "confirm", plumber, request.slots[1]!, confirm);
-  assert.match(confirmKey, /^mps-ash-lane-3b-leak-confirm-plumber-thu-14-[0-9a-f]{12}$/);
+  assert.match(confirmKey, /^mps-ash-lane-3b-leak-confirm-plumber-thu-14-[0-9a-f]{12}-a1$/);
   assert.notEqual(
     confirmKey,
     idempotencyKey(request, "release", plumber, request.slots[1]!, {
@@ -97,6 +97,25 @@ test("idempotency keys are stable, specific to phase and slot and bound to the c
       schema: releaseSchema(),
     }),
   );
+});
+
+/**
+ * Everything else in a key is stable across attempts by design, which is what makes
+ * it a reservation. So a retry of the one call this app places twice needs the
+ * attempt number to be part of it. Without that the provider answers the retry with
+ * the call it already holds and no second call is placed.
+ */
+test("a retry gets a key of its own and the number is the only thing that moved", () => {
+  const release = {
+    task: releaseTask(request, plumber, request.slots[1]!),
+    schema: releaseSchema(),
+  };
+  const first = idempotencyKey(request, "release", plumber, request.slots[1]!, release, 1);
+  const second = idempotencyKey(request, "release", plumber, request.slots[1]!, release, 2);
+  assert.notEqual(first, second);
+  assert.equal(first, idempotencyKey(request, "release", plumber, request.slots[1]!, release));
+  assert.equal(`${first.slice(0, -1)}2`, second, "the same call, the next attempt at it");
+  assert.match(second, /-a2$/);
 });
 
 test("metadata carries what a workflow needs to reconcile a call", () => {

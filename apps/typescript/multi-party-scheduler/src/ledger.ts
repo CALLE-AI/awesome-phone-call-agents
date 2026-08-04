@@ -20,7 +20,7 @@ import {
   writeSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { UNRESOLVED_STATUS } from "./call-state.js";
+import { UNRESOLVED_STATUS, unsettledCall } from "./call-state.js";
 import { chooseSlot, intersect } from "./slots.js";
 import { saidYes } from "./window.js";
 import type {
@@ -238,9 +238,22 @@ export interface OpenAttempt {
   party_id: string;
   phone_masked: string;
   slot_id: string | null;
+  /** Which attempt at that call this was. 1 on a ledger written before they were numbered. */
+  attempt: number;
   idempotency_key: string;
   /** The accepted call id when the create got that far. Null when it did not. */
   call_id: string | null;
+}
+
+/** Every entry that records what one call did. */
+function isPhaseEntry(
+  entry: LedgerEntry,
+): entry is LedgerEntry & { kind: "gather" | "commit" | "release" | "reconcile" } {
+  return entry.kind === "gather" || entry.kind === "commit" || entry.kind === "release" || entry.kind === "reconcile";
+}
+
+function phaseOf(entry: LedgerEntry & { kind: "gather" | "commit" | "release" | "reconcile" }): Phase {
+  return entry.kind === "gather" ? "gather" : entry.result.phase;
 }
 
 /**
@@ -249,13 +262,15 @@ export interface OpenAttempt {
  * `placeCall` writes a `call_attempt` before the create and a `call_accepted` the
  * moment CALL-E returns an id, so a process death between provider acceptance and
  * the phase entry leaves the key on disk, usually with the call id. This finds the
- * attempts that were left that way: no entry carries the key and no entry records
- * that party and phase at all.
+ * attempts that were left that way: no entry names the key they went out under.
  *
- * A phase entry naming a different key still counts as the result of that call. A
- * key that does not match is a ledger somebody rewrote, not a call nobody can
- * account for. Treating it as open would send recovery after a call whose fate the
- * history already states.
+ * The match is by key and not by party and phase, because one call can now have
+ * more than one attempt. A release call that reached a machine is retried under a
+ * key of its own, so the entry settling the first attempt says nothing about the
+ * second and reading it as an answer for both would hide exactly the call nobody
+ * can account for. A result carrying no key at all is the one thing still matched
+ * by party and phase: those are ledgers written before keys were recorded and
+ * there is nothing else about them to match on.
  *
  * Replay and recovery both read this, so the two cannot drift apart on which calls
  * are unaccounted for.
@@ -264,7 +279,7 @@ export function openAttempts(entries: LedgerEntry[]): OpenAttempt[] {
   const attempts = new Map<string, OpenAttempt>();
   const accepted = new Map<string, string>();
   const settled = new Set<string>();
-  const answered = new Set<string>();
+  const answeredWithoutKey = new Set<string>();
   let index = 0;
   for (const entry of entries) {
     index += 1;
@@ -277,6 +292,7 @@ export function openAttempts(entries: LedgerEntry[]): OpenAttempt[] {
         party_id: entry.party_id,
         phone_masked: entry.phone_masked,
         slot_id: entry.slot_id,
+        attempt: entry.attempt ?? 1,
         idempotency_key: entry.idempotency_key,
         call_id: null,
       });
@@ -284,19 +300,111 @@ export function openAttempts(entries: LedgerEntry[]): OpenAttempt[] {
     if (entry.kind === "call_accepted") {
       accepted.set(entry.idempotency_key, entry.call_id);
     }
-    if (entry.kind === "gather" || entry.kind === "commit" || entry.kind === "release" || entry.kind === "reconcile") {
+    if (isPhaseEntry(entry)) {
       if (entry.result.idempotency_key !== null) {
         settled.add(entry.result.idempotency_key);
+      } else {
+        answeredWithoutKey.add(`${phaseOf(entry)}:${entry.result.party_id}`);
       }
-      answered.add(`${entry.kind === "gather" ? "gather" : entry.result.phase}:${entry.result.party_id}`);
     }
   }
   return [...attempts.values()]
     .filter(
       (attempt) =>
-        !settled.has(attempt.idempotency_key) && !answered.has(`${attempt.phase}:${attempt.party_id}`),
+        !settled.has(attempt.idempotency_key) &&
+        !answeredWithoutKey.has(`${attempt.phase}:${attempt.party_id}`),
     )
     .map((attempt) => ({ ...attempt, call_id: accepted.get(attempt.idempotency_key) ?? null }));
+}
+
+/**
+ * Which attempt the next call to this party in this phase is.
+ *
+ * One more than the highest the ledger already holds. The number goes into the
+ * idempotency key, so this is what makes a retry a call the provider has never seen
+ * rather than a replay of the one it already holds. It is read off the ledger rather
+ * than counted in memory, because the run that placed the earlier attempts is
+ * usually a process that is no longer running.
+ */
+export function nextAttempt(
+  entries: LedgerEntry[],
+  phase: Phase,
+  partyId: string,
+  slotId: string | null,
+): number {
+  let highest = 0;
+  for (const entry of entries) {
+    if (
+      entry.kind === "call_attempt" &&
+      entry.phase === phase &&
+      entry.party_id === partyId &&
+      entry.slot_id === slotId
+    ) {
+      highest = Math.max(highest, entry.attempt ?? 1);
+    }
+  }
+  return highest + 1;
+}
+
+/**
+ * The attempt at this call that the ledger cannot account for, if there is one.
+ *
+ * Two shapes count. An attempt record with nothing naming its key, which is the
+ * crash window. And a recorded result this app cannot read as finished, which is a
+ * call that was still running or that nobody could read. Either one may be on the
+ * phone to somebody right now, so a new attempt must not be minted while one
+ * stands: the key it went out under has to be re-issued instead. Returns that key,
+ * or null when every attempt at the call is accounted for.
+ *
+ * The last word wins, so an entry that later settles an unresolved call clears it.
+ */
+export function unaccountedAttempt(entries: LedgerEntry[], phase: Phase, partyId: string): string | null {
+  let open: string | null = null;
+  for (const entry of entries) {
+    if (isPhaseEntry(entry) && phaseOf(entry) === phase && entry.result.party_id === partyId) {
+      open = unsettledCall(entry.result) ? entry.result.idempotency_key : null;
+    }
+  }
+  if (open !== null) {
+    return open;
+  }
+  const orphan = openAttempts(entries).find(
+    (attempt) => attempt.phase === phase && attempt.party_id === partyId,
+  );
+  return orphan?.idempotency_key ?? null;
+}
+
+/**
+ * The payload and the provider each recorded key went out against.
+ *
+ * Recovery re-issues a recorded key rather than deriving one, so nothing about that
+ * key is recomputed and nothing about it is checked either unless this is read. The
+ * digest says the words behind the key have not changed. The origin and the account
+ * say the namespace the key lives in has not changed. Keyed by the string that went
+ * on the wire, first record per key, because an ambiguous create re-issues the same
+ * key with the same payload.
+ */
+export interface AttemptRecord {
+  attempt: number;
+  payload_digest: string;
+  provider_origin: string | null;
+  provider_account: string | null;
+}
+
+export function attemptRecords(entries: LedgerEntry[]): Map<string, AttemptRecord> {
+  const records = new Map<string, AttemptRecord>();
+  for (const entry of entries) {
+    if (entry.kind !== "call_attempt" || records.has(entry.idempotency_key)) {
+      continue;
+    }
+    records.set(entry.idempotency_key, {
+      attempt: entry.attempt ?? 1,
+      payload_digest: entry.payload_digest,
+      provider_origin: entry.provider_origin ?? null,
+      provider_account: entry.provider_account ?? null,
+    });
+  }
+  return records;
 }
 
 /**
@@ -465,7 +573,9 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
   for (const open of openAttempts(entries)) {
     issues.push({
       entry: open.entry,
-      problem: `${open.party_id}'s ${open.phase} call was attempted${
+      problem: `${open.party_id}'s ${open.phase} call${
+        open.attempt > 1 ? `, attempt ${open.attempt},` : ""
+      } was attempted${
         open.call_id === null ? "" : ` and accepted as ${open.call_id}`
       } and nothing in this ledger settles it`,
     });

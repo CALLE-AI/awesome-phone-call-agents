@@ -16,9 +16,12 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { runCoordination } from "../src/coordinate.js";
+import type { CallePort } from "../src/calle.js";
+import { placeCall, runCoordination } from "../src/coordinate.js";
 import { readEntries, replay } from "../src/ledger.js";
 import { inspectLedger, resumeCoordination } from "../src/resume.js";
+import { confirmSchema, confirmTask } from "../src/script.js";
+import type { LedgerEntry } from "../src/types.js";
 import { coordinationRequest, PLUMBER, SUPER, TENANT } from "./fixtures.js";
 import { CalleCallError, stubPort, type StubScript } from "./stub.js";
 
@@ -230,6 +233,100 @@ test("an unresolved confirm never tells anybody it is off, and resume settles it
     "reconcile the unresolved call first, then tell everybody who said yes",
   );
   assert.equal(replay(readEntries(path)).ok, true);
+});
+
+/**
+ * Cancelling has to reach the reconciliation too.
+ *
+ * The first create came back ambiguous, so the call may exist and the same key is
+ * re-issued to find it. That second request is still a create: if the first one never
+ * landed, it places the call. Doing that after the run was canceled starts the call
+ * the cancellation was meant to stop, so the abort is honoured before it and the call
+ * is left unaccounted for under the key already on disk.
+ */
+test("cancelling before the reconciliation stops the create rather than placing the call", async () => {
+  const scripts = [...HAPPY, release(PLUMBER), release(TENANT), release(SUPER)];
+  scripts[4] = confirm(TENANT, { createErrors: [serverError()] });
+  const path = ledgerPath();
+  const port = stubPort(scripts);
+  const canceling = new AbortController();
+  // Cancelled at the moment the create fails, which is where the window is.
+  const watched: CallePort = {
+    ...port,
+    async createCall(input, key) {
+      try {
+        return await port.createCall(input, key);
+      } catch (error) {
+        canceling.abort();
+        throw error;
+      }
+    },
+  };
+  const result = await runCoordination({
+    request: coordinationRequest(),
+    port: watched,
+    ledgerPath: path,
+    pollIntervalMs: 1,
+    now: () => CLOCK,
+    signal: canceling.signal,
+  });
+  const tenantConfirms = port.creates.filter((call) => call.phase === "confirm" && call.phone === TENANT);
+  assert.equal(tenantConfirms.length, 1, "the create was not tried a second time after the cancellation");
+  assert.equal(result.outcome, "unresolved", "the call may exist, so it is not written off as canceled");
+  assert.equal(
+    port.creates.some((call) => call.phase === "release"),
+    false,
+    "and nobody is told it is off while a call that could confirm it may be live",
+  );
+  assert.deepEqual(result.unreleased, ["plumber"], "the yes already given is recorded as owed");
+
+  const entries = readEntries(path);
+  const commit = entries.filter((entry) => entry.kind === "commit").at(-1);
+  assert.ok(commit !== undefined && commit.kind === "commit");
+  assert.equal(commit.result.party_id, "tenant");
+  assert.equal(commit.result.call_status, "unresolved");
+  assert.equal(commit.result.call_id, null);
+  assert.equal(commit.result.failure_code, "internal_error, then canceled");
+  assert.equal(commit.result.idempotency_key, tenantConfirms[0]?.key, "under the key already on disk");
+  assert.deepEqual(
+    inspectLedger(entries).unsettled.map((held) => `${held.phase}:${held.party_id}`),
+    ["confirm:tenant"],
+    "so resume owns that call",
+  );
+  assert.equal(replay(entries).ok, true, JSON.stringify(replay(entries).issues));
+});
+
+/**
+ * The same rule one step earlier. A signal that has already fired means no create at
+ * all, so no key is claimed on disk and there is nothing for recovery to look for.
+ */
+test("a call placed after the signal has fired sends nothing and claims no key", async () => {
+  const port = stubPort([confirm(PLUMBER)]);
+  const request = coordinationRequest();
+  const party = request.parties[0]!;
+  const slot = request.slots[1]!;
+  const written: LedgerEntry[] = [];
+  const canceling = new AbortController();
+  canceling.abort();
+  const outcome = await placeCall({
+    request,
+    port,
+    party,
+    phase: "confirm",
+    slot,
+    task: confirmTask(request, party, slot),
+    schema: confirmSchema(),
+    timeoutMs: 1_000,
+    pollIntervalMs: 1,
+    signal: canceling.signal,
+    record: (entry) => void written.push(entry),
+  });
+  assert.equal(port.creates.length, 0, "nothing was sent");
+  assert.deepEqual(written, [], "so no key was written down either");
+  assert.equal(outcome.unresolved, false, "and there is nothing to reconcile");
+  assert.equal(outcome.idempotencyKey, null);
+  assert.equal(outcome.callId, null);
+  assert.equal(outcome.errorCode, "canceled");
 });
 
 test("an unresolved release call leaves the debt owed", async () => {

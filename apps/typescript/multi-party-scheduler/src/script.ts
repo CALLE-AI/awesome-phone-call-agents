@@ -226,8 +226,8 @@ export function releaseSchema(): JsonSchema {
 }
 
 /**
- * Stable per request, phase, party and slot and bound to the content of the
- * call.
+ * Stable per request, phase, party, slot and attempt and bound to the content of
+ * the call.
  *
  * The identifiers alone say which call this is. They do not say what it says, so
  * two runs with an edited script or a different result contract would share a
@@ -236,6 +236,14 @@ export function releaseSchema(): JsonSchema {
  * the payload that determines the call, so the same words reuse the same call and
  * different words get their own key. It uses the ledger's canonical JSON, so a
  * key and a request digest agree on what canonical means.
+ *
+ * The attempt number is what makes a retry a second call rather than a replay of
+ * the first. Everything above is stable across attempts by design, so a release
+ * call that ended without reaching anybody used to derive the key it had already
+ * used: the provider answered with the call that reached the machine and no second
+ * call was ever placed. The number comes from the ledger, so it is only ever
+ * incremented once the previous attempt's outcome is known and an ambiguous
+ * attempt is reconciled under its own key instead.
  */
 export function idempotencyKey(
   request: CoordinationRequest,
@@ -243,10 +251,11 @@ export function idempotencyKey(
   party: Party,
   slot: Slot | undefined,
   payload: unknown,
+  attempt = 1,
 ): string {
   const tail = slot === undefined ? "" : `-${slot.id}`;
   const digest = digestOf(payload).replace("sha256:", "").slice(0, 12);
-  return `mps-${request.requestId}-${phase}-${party.id}${tail}-${digest}`;
+  return `mps-${request.requestId}-${phase}-${party.id}${tail}-${digest}-a${attempt}`;
 }
 
 export function metadata(

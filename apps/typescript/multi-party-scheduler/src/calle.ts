@@ -9,6 +9,7 @@
  * carries the API key can be built against a host that is not trusted with it.
  */
 
+import { createHash } from "node:crypto";
 import { ConfigError } from "./config.js";
 import type { CallSnapshot, JsonSchema } from "./types.js";
 
@@ -26,9 +27,36 @@ export interface CallePort {
    * coordinator reads this to decide what it may do without durable state.
    */
   live?: boolean;
+  /**
+   * Where this port sends calls, as a URL origin.
+   *
+   * An idempotency key only means anything inside one provider, so the ledger
+   * records this beside every key it writes. Re-issuing a key against another
+   * origin would create the call there while the original stays ambiguous, which
+   * is a second phone ringing rather than the reconciliation it looks like.
+   */
+  origin?: string;
+  /**
+   * Which account this port authenticates as, as a short digest of the key.
+   *
+   * The namespace a key lives in is the account as well as the host. The key
+   * itself never reaches the ledger, only enough of a digest to tell two apart.
+   */
+  account?: string;
   createCall(input: CreateCallInput, idempotencyKey: string): Promise<CallSnapshot>;
   waitForResult(callId: string, options: { timeoutMs: number; intervalMs: number }): Promise<CallSnapshot>;
   getCall(callId: string): Promise<CallSnapshot>;
+}
+
+/**
+ * A short fingerprint of an API key.
+ *
+ * Enough to say that a resume is authenticating as the account the keys were
+ * written under and not enough to be the key. It is a digest of the whole key, so
+ * two keys that share a prefix do not share a fingerprint.
+ */
+export function accountFingerprint(apiKey: string): string {
+  return `key:${createHash("sha256").update(apiKey).digest("hex").slice(0, 16)}`;
 }
 
 export class CalleCallError extends Error {
@@ -180,6 +208,10 @@ export async function createSdkPort(options: {
     // A call through this port rings a real phone unless it is aimed at the fake
     // server on this machine.
     live: !isLoopbackHost(new URL(baseUrl).hostname),
+    // The namespace every idempotency key this port sends lives in. The ledger
+    // records both, so recovery can refuse to re-issue a key somewhere else.
+    origin: new URL(baseUrl).origin,
+    account: accountFingerprint(options.apiKey),
     async createCall(input, idempotencyKey) {
       try {
         return (await client.calls.create(

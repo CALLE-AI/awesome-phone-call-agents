@@ -7,7 +7,7 @@
  * the states a coordinator has to survive, so they are injected here instead.
  */
 
-import { CalleCallError, CalleWaitTimeout, type CallePort, type CreateCallInput } from "../src/calle.js";
+import { CalleCallError, CalleWaitTimeout, type CallePort } from "../src/calle.js";
 import type { CallSnapshot, TranscriptTurn } from "../src/types.js";
 
 /** What the caller says, so a confirm transcript carries the question a yes binds to. */
@@ -29,6 +29,11 @@ const BOT_LINES: Record<string, string[]> = {
 export interface StubScript {
   phase: string;
   phone: string;
+  /**
+   * Which attempt at that call this script answers. Omitted answers any attempt the
+   * list has nothing more specific for, which is what almost every test wants.
+   */
+  attempt?: number;
   /** Thrown from `createCall`, one per attempt, in order. */
   createErrors?: unknown[];
   /** Thrown from `waitForResult` when the create got through. */
@@ -51,11 +56,15 @@ export interface StubCall {
   key: string;
   phase: string;
   phone: string;
+  /** Which attempt at that call this create was, as the stub counted it. */
+  attempt: number;
 }
 
 export interface StubPort extends CallePort {
   /** Every create attempt, including the ones that threw. */
   creates: StubCall[];
+  /** Every call the stub actually created, in order, so a replay is not counted as one. */
+  created: string[];
 }
 
 export const STUB_COMPLETED_AT = "2026-08-04T17:01:20Z";
@@ -123,42 +132,64 @@ export function stubSnapshot(id: string, script: StubScript, answered: boolean):
   };
 }
 
-function scriptOf(scripts: StubScript[], input: CreateCallInput): StubScript {
-  const phase = String(input.metadata.phase ?? "");
-  const phone = input.recipients[0]?.phones[0] ?? "";
-  const found = scripts.find((script) => script.phase === phase && script.phone === phone);
+function scriptOf(scripts: StubScript[], phase: string, phone: string, attempt: number): StubScript {
+  const matching = scripts.filter((script) => script.phase === phase && script.phone === phone);
+  const found =
+    matching.find((script) => script.attempt === attempt) ??
+    matching.find((script) => script.attempt === undefined);
   if (found === undefined) {
-    throw new CalleCallError("invalid_recipient", `no stub script for ${phone} in ${phase}`, 400);
+    throw new CalleCallError("invalid_recipient", `no stub script for ${phone} in ${phase} attempt ${attempt}`, 400);
   }
   return found;
 }
 
-/** A port that answers from `scripts` and throws exactly what they ask it to. */
+/**
+ * A port that answers from `scripts` and throws exactly what they ask it to.
+ *
+ * The idempotency key is honoured the way the API honours it, because that is the
+ * whole difference between a retry and a replay. A key the stub has already answered
+ * hands back the same call, id included. A key it has not seen is a new call with a
+ * new id. `created` counts the second kind only, so a test can tell a second call
+ * from a second attempt at the first one.
+ */
 export function stubPort(scripts: StubScript[]): StubPort {
   const creates: StubCall[] = [];
-  const attempts = new Map<string, number>();
+  const created: string[] = [];
+  const tries = new Map<string, number>();
   const calls = new Map<string, StubScript>();
+  const byKey = new Map<string, string>();
+  const attemptOfCall = new Map<string, number>();
+  const placed = new Map<string, number>();
   let counter = 0;
 
   return {
     creates,
+    created,
     async createCall(input, idempotencyKey) {
-      const script = scriptOf(scripts, input);
-      creates.push({ key: idempotencyKey, phase: script.phase, phone: script.phone });
-      const attempt = attempts.get(idempotencyKey) ?? 0;
-      attempts.set(idempotencyKey, attempt + 1);
-      const failure = script.createErrors?.[attempt];
+      const phase = String(input.metadata.phase ?? "");
+      const phone = input.recipients[0]?.phones[0] ?? "";
+      const held = byKey.get(idempotencyKey);
+      // A key the provider has seen is that call again, so it is the attempt that key
+      // already belongs to. A key it has not seen is the next attempt at the call.
+      const attempt = held === undefined ? (placed.get(`${phase}:${phone}`) ?? 0) + 1 : (attemptOfCall.get(held) ?? 1);
+      const script = scriptOf(scripts, phase, phone, attempt);
+      creates.push({ key: idempotencyKey, phase, phone, attempt });
+      const tried = tries.get(idempotencyKey) ?? 0;
+      tries.set(idempotencyKey, tried + 1);
+      const failure = script.createErrors?.[tried];
       if (failure !== undefined) {
         throw failure;
       }
-      // The same key answers with the same call, the way CALL-E does.
-      const existing = [...calls.entries()].find(([, held]) => held === script);
-      if (existing !== undefined) {
-        return stubSnapshot(existing[0], script, false);
+      if (held !== undefined) {
+        return stubSnapshot(held, script, false);
       }
       counter += 1;
       const id = `call_stub${counter}`;
       calls.set(id, script);
+      byKey.set(idempotencyKey, id);
+      attemptOfCall.set(id, attempt);
+      placed.set(`${phase}:${phone}`, attempt);
+      created.push(id);
       return stubSnapshot(id, script, false);
     },
     async waitForResult(callId) {

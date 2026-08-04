@@ -136,6 +136,16 @@ gather or confirm call is placed, but the release round still runs: canceling th
 appointment does not cancel the duty to tell anybody who said yes. A second
 interrupt gives up on that too.
 
+No create goes out after the signal has fired, the reconciliation of an ambiguous
+create included. That one is easy to miss, because it does not look like a new call:
+the first create came back ambiguous and the same key is sent again to find the call
+CALL-E may already hold. It is still a create and if the first request never landed
+it places the call, so doing it after a cancellation starts the call the cancellation
+was meant to stop. The two cases are not recorded the same way either. Before the
+first create nothing has been sent, so no key is claimed and the call reads as never
+placed. Before the reconciliation the first request may already have been accepted,
+so the call is left unresolved under the key already on disk and `resume` settles it.
+
 The Developer API has no cancel endpoint, so a call that is already connected
 cannot be hung up. It is recorded with the status it had, which makes it unsettled,
 and `resume` settles it.
@@ -155,12 +165,15 @@ to leave nothing at all: no key to re-issue and no id to read. Two lines close i
 both written by `placeCall` rather than by its caller:
 
 - `call_attempt`, before the create. It carries the phase, the party, the masked
-  number, the slot, the exact `Idempotency-Key` and a sha256 of the canonical JSON
-  of the payload that key was taken over. That last field is what makes the record
-  content bound: given the request and this code the payload can be recomputed, so
-  the record can be shown to belong to that call rather than merely to a party and a
-  phase. One record per call, because an ambiguous create re-issues the same key
-  with the same payload, which is the same attempt.
+  number, the slot, which attempt at that call it is, the exact `Idempotency-Key`, a
+  sha256 of the canonical JSON of the payload that key was taken over and the
+  provider origin and account digest it is being sent to. The payload digest is what
+  makes the record content bound: given the request and this code the payload can be
+  recomputed, so the record can be shown to belong to that call rather than merely to
+  a party and a phase. The provider fields say which namespace the key lives in, since
+  a key means that call at one provider under one account and nowhere else. One record
+  per call, because an ambiguous create re-issues the same key with the same payload,
+  which is the same attempt.
 - `call_accepted`, as soon as a create returns an id and before anything waits on
   the call. A crash during the wait then leaves an id that can be read rather than
   a key that has to be re-issued.
@@ -195,6 +208,22 @@ that follows is still the only thing that says what a call did.
   the note. A duplicate confirm call rings somebody who may be on the line already.
   The run still tells everybody who said yes that it is off, so refusing costs a
   manual check rather than a duty
+- refuses to re-issue a key whose payload no longer matches. The digest recorded with
+  that key is compared against the payload this build would send under it. They differ
+  when a call script or a result contract moved between the crash and the resume and
+  the danger is the case where the first request never reached CALL-E: the key is
+  unknown there, so nothing is replayed and the create simply places a call saying
+  whatever this build now says. Fail closed and name it for a person
+- refuses to re-issue a key against another provider origin or another account. Both
+  are recorded with the key. An `Idempotency-Key` is a reservation inside one
+  namespace, so the same string sent elsewhere reserves nothing: it creates the call
+  there while the original stays ambiguous where it was placed, which is two calls to
+  one person wearing the look of a reconciliation. A different `--base-url` or a
+  different `CALLE_API_KEY` on the resume is all it takes
+- never mints a new attempt at a call while an earlier one is unaccounted for. The
+  attempt number is part of the key, so a new one is a call the provider has never
+  seen. That is only correct once the last outcome is known: while it is not, the key
+  that attempt went out under is re-issued instead
 - places the release calls that are owed, most recent yes first
 - writes a fresh outcome entry, so the ledger still replays as one history
 
@@ -261,16 +290,28 @@ who confirmed but could not be released is reported in `unreleased`.
 
 ## Idempotency
 
-Every call carries `mps-<request_id>-<phase>-<party>[-<slot>]-<digest>` as its
-`Idempotency-Key`. The identifiers say which call it is. The digest is the first 12
+Every call carries `mps-<request_id>-<phase>-<party>[-<slot>]-<digest>-a<attempt>` as
+its `Idempotency-Key`. The identifiers say which call it is. The digest is the first 12
 hex characters of a sha256 over the canonical JSON of the payload that determines
 the call: the task text, the result contract, the recipient and the metadata. It
-uses the same canonical JSON the ledger uses for its request digest.
+uses the same canonical JSON the ledger uses for its request digest. The attempt is
+which try at that call this is, counted from the ledger.
 
 Identifiers alone were not enough. Two runs with an edited script would share a
 key, so CALL-E would either replay the old call or reject the new body with
 `idempotency_conflict`. With the digest in the key, the same words reuse the same
 call and different words get their own key.
+
+The attempt number is there because everything else is stable across attempts by
+design and one call is placed more than once. A release call that ended without
+reaching a person leaves the debt owed, so the round calls again. Deriving the key
+again produced the string the first attempt had used, CALL-E answered with the call
+that reached the machine and nobody was called: a second ledger line and a second
+charge against the budget looked like a retry from the inside. The number comes from
+the ledger rather than from the process and it only moves once the previous attempt's
+outcome is known. While an attempt is unaccounted for, the person stays owed and that
+attempt is reconciled under its own key, because a second call to somebody who may be
+on the first one is what the whole protocol is built to avoid.
 
 That last property is also why recovery does not derive the key a second time.
 Every call entry in the ledger records the key its call went out under. The key
@@ -278,11 +319,20 @@ reaches the ledger before the create does, so it is on disk before it can have b
 used. `resume` sends that string back verbatim. A key derived again would read the
 task text out of this repo, so a run that crashed, an upgrade that touched one line
 of a script, then a resume would produce a key CALL-E has never seen and place a
-second call. Re-issuing the recorded key cannot do that: the same body hands back the
-same call and a body that no longer matches is refused with `idempotency_conflict`,
-which is ambiguous, so the round stops with the call unresolved rather than dialling
-anybody. An unsettled call with no recorded key at all is refused for the same
-reason, rather than dialled under a key nothing stands behind.
+second call.
+
+Re-issuing the recorded key is safe only while the key still stands for the same
+request to the same provider, so both are checked before it goes back on the wire.
+When CALL-E already holds the key, the same body hands back the same call and a body
+that no longer matches is refused with `idempotency_conflict`, which is ambiguous, so
+the round stops with the call unresolved rather than dialling anybody. When it does
+not hold the key, which is exactly the case recovery exists for, none of that applies:
+the create places a call with whatever body is sent. So the payload digest recorded
+with the key is compared against the payload this build would send and the provider
+origin and account are compared with the port in hand. A mismatch on any of them is a
+refusal and a line in the note. An unsettled call with no recorded key at all or with
+a key no attempt record stands behind, is refused for the same reason rather than
+dialled under a string nothing vouches for.
 
 The keys are the reservation that stops a person being dialled twice and that
 reservation lives at CALL-E. The ledger is not a substitute for it. What the ledger
