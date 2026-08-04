@@ -26,6 +26,7 @@ callback-state.json
 callback-writeback.json
 skills-lock.json
 docs/codex-implementation-plan.md
+docs/hackathon-implementation-route.md
 docs/superpowers/
 .vercel
 .env*
