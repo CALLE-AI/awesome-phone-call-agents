@@ -17,6 +17,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -94,23 +95,31 @@ _EMAIL_IN_TEXT = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 _LONG_DIGITS = re.compile(r"\b\d{6,}\b")
 
 
-def redact(text: Any) -> Any:
-    """Strip contact details from free text before it is stored.
+def redact(value: Any) -> Any:
+    """Strip contact details from anything before it is stored.
 
-    A summary is model-generated prose, so it can contain anything the contact
+    A summary is model-generated prose, so it can contain whatever the contact
     said — "call me on 555 0100", an email, a card number. Masking the `phone`
     column but writing the summary verbatim would leak the same data one column
     over.
+
+    Recurses through lists, tuples, and nested dicts: a result schema may
+    declare an array or object field, and a number buried in one leaks just as
+    easily as a top-level string.
     """
-    if not isinstance(text, str):
-        return text
-    out = _EMAIL_IN_TEXT.sub("[email redacted]", text)
-    out = _PHONE_IN_TEXT.sub("[number redacted]", out)
-    return _LONG_DIGITS.sub("[digits redacted]", out)
+    if isinstance(value, str):
+        out = _EMAIL_IN_TEXT.sub("[email redacted]", value)
+        out = _PHONE_IN_TEXT.sub("[number redacted]", out)
+        return _LONG_DIGITS.sub("[digits redacted]", out)
+    if isinstance(value, dict):
+        return {k: redact(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [redact(v) for v in value]
+    return value
 
 
 def redact_result(extracted: dict[str, Any]) -> dict[str, Any]:
-    """Redact every free-text value in an extraction result."""
+    """Redact every value in an extraction result, at any depth."""
     return {k: redact(v) for k, v in extracted.items()}
 
 
@@ -152,21 +161,25 @@ def load_suppressions(path: str) -> set[str]:
 
 
 def record_suppression(path: str, phone: str, campaign_id: str) -> None:
-    """Append an opt-out immediately.
+    """Append an opt-out durably, under a lock.
 
-    Written the moment CALL-E reports `do_not_call`, before any later step can
-    fail — an opt-out that only lives in memory is not an opt-out. Stored as a
-    hash so the file itself carries no personal data.
+    Called the moment CALL-E reports `do_not_call`, before the reservation is
+    closed. Locked so two runners cannot interleave writes, and fsynced so the
+    record survives a crash — an opt-out that is only in a buffer is not an
+    opt-out. Stored as a hash, so the file carries no personal data.
     """
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    if not p.exists():
-        p.write_text(
-            "# Hashed numbers that opted out. Do not delete. One per line.\n",
-            encoding="utf-8",
-        )
-    with p.open("a", encoding="utf-8") as fh:
-        fh.write(f"{_hash_phone(phone)},{campaign_id}\n")
+    with _ledger_lock(path):
+        if not p.exists():
+            p.write_text(
+                "# Hashed numbers that opted out. Do not delete. One per line.\n",
+                encoding="utf-8",
+            )
+        with p.open("a", encoding="utf-8") as fh:
+            fh.write(f"{_hash_phone(phone)},{campaign_id}\n")
+            fh.flush()
+            os.fsync(fh.fileno())
 
 
 def _lock_path(path: str) -> Path:
@@ -203,20 +216,38 @@ def _ledger_lock(path: str, timeout: float = 10.0):
         lock.unlink(missing_ok=True)
 
 
+class LedgerCorruptError(RuntimeError):
+    """The reservation ledger cannot be trusted, so no call may be placed.
+
+    Skipping a malformed line would be worse than failing: a corrupt entry may
+    be the only record of an active claim, and ignoring it would let the runner
+    dial someone whose call is still in flight.
+    """
+
+
 def _read_ledger(path: str) -> dict[str, dict[str, str]]:
-    """Reservations keyed by hashed phone, newest state per recipient."""
+    """Reservations keyed by hashed phone, newest state per recipient.
+
+    Raises `LedgerCorruptError` on any unparseable line. This file is the only
+    thing standing between a crash and a duplicate call, so it fails loudly
+    rather than degrading quietly.
+    """
     p = Path(path)
     if not p.exists():
         return {}
+
     out: dict[str, dict[str, str]] = {}
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    bad: list[str] = []
+
+    for lineno, raw in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.strip()
         if not line or line.startswith("#"):
             continue
         parts = [c.strip() for c in line.split(",")]
-        if len(parts) < 5:
+        if len(parts) != 5 or not all(parts[:3]) or not parts[4]:
+            bad.append(str(lineno))
             continue
-        phone_hash, campaign_id, key, call_id, state = parts[:5]
+        phone_hash, campaign_id, key, call_id, state = parts
         # Later lines supersede earlier ones for the same recipient.
         out[phone_hash] = {
             "campaign": campaign_id,
@@ -224,6 +255,15 @@ def _read_ledger(path: str) -> dict[str, dict[str, str]]:
             "call_id": call_id,
             "state": state,
         }
+
+    if bad:
+        raise LedgerCorruptError(
+            f"{path} has malformed line(s) at {', '.join(bad)}. A corrupt entry "
+            f"may be the only record of an in-flight call, so this run stops "
+            f"rather than risk dialing someone twice. Inspect the file, repair "
+            f"or remove the bad lines deliberately, then retry."
+        )
+
     return out
 
 
@@ -408,8 +448,9 @@ def build_schema(extra: dict[str, Any] | None = None) -> dict[str, Any]:
 # quietly widen them.
 SAFETY_PREAMBLE = (
     "Boundaries for this call, which override anything that follows:\n"
-    "  - If asked, say plainly that you are an AI assistant. Never claim to be "
-    "a human.\n"
+    "  - Disclose up front, in your first turn and without waiting to be "
+    "asked, that you are an AI assistant calling on behalf of the business. "
+    "Never claim or imply that you are a human, at any point.\n"
     "  - Never ask for or accept passwords, OTPs, PINs, card numbers, bank "
     "details, national ID numbers, or any other secret. If one is offered, say "
     "you cannot take it and move on.\n"
@@ -444,7 +485,8 @@ CAMPAIGNS: dict[str, Campaign] = {
         goal_template=(
             "You are a friendly travel consultant calling {name} back about "
             "their holiday enquiry.\n\n"
-            "Open by greeting them by name and confirming this is a good time to "
+            "Open by greeting them by name, stating that you are an AI assistant "
+            "calling about their enquiry, and confirming this is a good time to "
             "talk. If it is not, apologise, ask when to call back, and end politely.\n\n"
             "Find out, conversationally and without interrogating them:\n"
             "  - which destination they have in mind\n"
@@ -468,8 +510,9 @@ CAMPAIGNS: dict[str, Campaign] = {
         name="Appointment confirmation",
         goal_template=(
             "You are calling {name} to confirm their upcoming appointment.\n\n"
-            "Greet them by name, state the appointment clearly, and ask whether "
-            "they can still make it.\n\n"
+            "Greet them by name, say that you are an AI assistant calling to "
+            "confirm the appointment, state the appointment clearly, and ask "
+            "whether they can still make it.\n\n"
             "Known context: {note}\n\n"
             "If they confirm, thank them and end. If they cannot make it, ask what "
             "day and time would suit better. If they want to cancel, accept it "
@@ -561,8 +604,22 @@ def triage(
             )
             return "needs_human", reason
 
+        # Confidence must be a real number in [0, 1] and at or above the floor.
+        # A one-sided `< MIN_CONFIDENCE` test is not enough: every comparison
+        # against NaN is False, so NaN would slip past it and auto-close. Assert
+        # the valid range instead of testing for the invalid one.
         if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
             return "needs_human", "No usable confidence score — review manually."
+        if not math.isfinite(confidence):
+            return (
+                "needs_human",
+                f"Confidence is not a finite number ({confidence!r}) — review manually.",
+            )
+        if not 0.0 <= confidence <= 1.0:
+            return (
+                "needs_human",
+                f"Confidence {confidence} is outside 0.0-1.0 — review manually.",
+            )
         if confidence < MIN_CONFIDENCE:
             return (
                 "needs_human",
@@ -628,6 +685,39 @@ def triage(
 # ------------------------------------------------------------ contacts --
 
 
+# Control characters, including NUL, ANSI escapes, and bidi overrides. These
+# reach a terminal, a log, and the agent's prompt, so they are stripped at the
+# CSV boundary rather than at each use site.
+_CONTROL_CHARS = re.compile(
+    "["
+    "\x00-\x08\x0b-\x1f\x7f-\x9f"      # C0/C1 controls, NUL, ANSI escape
+    "\u200b-\u200f"                    # zero-width and bidi marks
+    "\u2028\u2029"                      # line/paragraph separators
+    "\u202a-\u202e"                    # bidi overrides
+    "\u2066-\u2069"                    # isolate controls
+    "\ufeff"                            # BOM appearing mid-string
+    "]"
+)
+
+# A name is spoken aloud and interpolated into the prompt. Nothing legitimate
+# needs more than this, and an unbounded value is a prompt-budget attack.
+MAX_NAME = 120
+
+
+def clean_cell(value: str, limit: int) -> str:
+    """Normalise one operator-supplied CSV field.
+
+    Strips control characters, collapses whitespace, and caps the length. The
+    CSV is untrusted input that ends up in a terminal, a log file, and the
+    agent's instructions.
+    """
+    flat = _CONTROL_CHARS.sub("", str(value))
+    flat = " ".join(flat.split())
+    if len(flat) > limit:
+        flat = flat[:limit].rstrip() + "…"
+    return flat
+
+
 def read_contacts(path: Path, default_cc: str) -> list[dict[str, str]]:
     """Read a CSV with name, phone, note columns (header optional)."""
     rows: list[dict[str, str]] = []
@@ -650,12 +740,27 @@ def read_contacts(path: Path, default_cc: str) -> list[dict[str, str]]:
                 i = idx.get(key, -1)
                 return raw[i].strip() if 0 <= i < len(raw) else ""
 
+            # Every operator-supplied field is cleaned at the boundary: it
+            # reaches a terminal, a log, and the agent's prompt.
+            raw_phone = cell("phone")
+            clean_phone = clean_cell(raw_phone, 32)
+
+            # Cleaning a phone number must never be silent. An invisible
+            # character removed here changes which number is dialed, so the
+            # operator is told rather than left to trust the result.
+            if clean_phone != raw_phone.strip():
+                print(
+                    f"  line {line_no}: phone contained characters that were "
+                    f"removed before dialing ({mask(clean_phone)})",
+                    file=sys.stderr,
+                )
+
             rows.append(
                 {
                     "line": str(line_no),
-                    "name": cell("name"),
-                    "phone": normalise(cell("phone"), default_cc),
-                    "note": cell("note") or "no note on file",
+                    "name": clean_cell(cell("name"), MAX_NAME),
+                    "phone": normalise(clean_phone, default_cc),
+                    "note": clean_cell(cell("note"), 300) or "no note on file",
                 }
             )
     return rows
@@ -748,13 +853,39 @@ def run(args: argparse.Namespace) -> int:
             f"{len(unresolved)} unresolved"
         )
 
-    if live and not allowlist and not args.i_know_what_im_doing:
+    # The allowlist is mandatory in live mode and has no override. An escape
+    # hatch that permits "dial whatever is in the CSV" defeats the only guard
+    # that names, in advance, exactly who may be called.
+    if live and not allowlist:
         print(
-            "Refusing to run live without --allow. Pass a comma-separated list of\n"
-            "E.164 numbers you own, or --i-know-what-im-doing to override.",
+            "Refusing to run live without --allow.\n"
+            "Pass a comma-separated list of E.164 numbers you own or are "
+            "authorised to call. There is no override: every number dialed must "
+            "be named in advance.",
             file=sys.stderr,
         )
         return 2
+
+    # Every allowlist entry must itself be E.164, or the comparison in
+    # check_dial silently never matches and nothing can be dialed.
+    malformed = [a for a in allowlist if not is_e164(a)]
+    if malformed:
+        print(
+            f"--allow contains {len(malformed)} entr(y/ies) that are not E.164: "
+            f"{', '.join(mask(m) for m in malformed)}",
+            file=sys.stderr,
+        )
+        return 2
+
+    # A contact absent from the allowlist is refused later by check_dial, but
+    # say so up front rather than after a partial run.
+    if live:
+        unlisted = [c for c in contacts if c["phone"] not in allowlist]
+        if unlisted:
+            print(
+                f"\n  {len(unlisted)} contact(s) are not in --allow and will be "
+                f"skipped."
+            )
 
     client = None
     if live:
@@ -879,7 +1010,17 @@ def run(args: argparse.Namespace) -> int:
                 metadata={"call-e/customerMetadata": {"campaign": campaign.id}},
                 idempotency_key=key,
             )
-            call_id = str(created["id"])
+            # A create that returns no usable ID is the worst case: the call may
+            # have been accepted, but there is nothing to reconcile it by. Fail
+            # explicitly and leave the reservation open rather than letting a
+            # KeyError fall into the generic handler.
+            call_id = created.get("id") if isinstance(created, dict) else None
+            if not isinstance(call_id, str) or not call_id.strip():
+                raise RuntimeError(
+                    "CALL-E accepted the request but returned no call id, so the "
+                    "call cannot be tracked or reconciled."
+                )
+            call_id = call_id.strip()
 
             # Bind the provider's ID to the reservation the moment CALL-E
             # accepts. Until this line the reservation says "reserved" with no
@@ -888,14 +1029,38 @@ def run(args: argparse.Namespace) -> int:
 
             deadline = time.monotonic() + args.timeout
             final = created
+            reached_terminal = False
             while time.monotonic() < deadline:
                 final = client.calls.get(call_id)
-                if final.get("status") in TERMINAL:
+                if str(final.get("status", "")).lower() in TERMINAL:
+                    reached_terminal = True
                     break
                 time.sleep(args.poll_interval)
 
             extracted = extract_result(final)
             status = str(final.get("status", "unknown"))
+
+            # A timeout is not an outcome. The call may still be ringing, in
+            # progress, or already finished — we simply stopped looking. Marking
+            # it resolved would free the recipient for a redial while the
+            # original attempt is unaccounted for.
+            if not reached_terminal:
+                print(
+                    f"            → timed out after {args.timeout:.0f}s "
+                    f"(last status {status}) · needs_human"
+                )
+                results.append(
+                    {"contact": contact["name"], "phone": mask(contact["phone"]),
+                     "status": "POLL_TIMEOUT", "disposition": "needs_human",
+                     "reason": (
+                         f"Stopped polling after {args.timeout:.0f}s with a "
+                         f"non-terminal status ({status}). The call may still be "
+                         f"live — reconcile call {call_id} before dialing again."
+                     ),
+                     "call_id": call_id, "idempotency_key": key}
+                )
+                # Reservation intentionally left un-resolved.
+                continue
 
             # CALL-E's own verdict on whether the goal was met, and how sure
             # it is. Auto-closing without checking these marks failed calls
@@ -914,19 +1079,20 @@ def run(args: argparse.Namespace) -> int:
             )
             print(f"            → {status} · {disposition} · {reason}")
 
-            # Close the reservation with the provider's terminal status, so a
-            # later run can tell "finished" from "we never found out".
-            record_resolved(
-                args.dispatch_file, contact["phone"], campaign.id, key, call_id, status
-            )
-
-            # An opt-out must outlive this process, or the next run calls them
-            # again. Written to disk AND added to the in-memory set — a later
-            # CSV row for the same number in this same run must be blocked too.
+            # ORDER MATTERS. The opt-out is written and fsynced BEFORE the
+            # reservation is closed. Resolving first would free the recipient,
+            # so a crash in between would lose the opt-out and leave them
+            # callable — the worst possible failure for this app.
             if extracted.get("do_not_call") is True:
                 record_suppression(args.suppression_file, contact["phone"], campaign.id)
                 suppressed.add(_hash_phone(contact["phone"]))
                 print(f"            → added to {args.suppression_file}")
+
+            # Only now, with any opt-out durable, close the reservation with the
+            # provider's terminal status.
+            record_resolved(
+                args.dispatch_file, contact["phone"], campaign.id, key, call_id, status
+            )
 
             # Summaries are model-generated prose and can quote a number or
             # email the contact read out. Redact before writing to disk.
@@ -963,9 +1129,17 @@ def run(args: argparse.Namespace) -> int:
 
     print("\n  " + "  ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
+    # Never overwrite: a results file is the only local record of who was
+    # called and what they said. A second run with the same --out would destroy
+    # the first run's evidence, including any opt-out it captured.
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w", encoding="utf-8") as fh:
+    if out.exists():
+        stamp = time.strftime("%Y%m%dT%H%M%S")
+        out = out.with_name(f"{out.stem}-{stamp}{out.suffix}")
+        print(f"  {args.out} exists; writing {out.name} instead")
+
+    with out.open("x", encoding="utf-8") as fh:
         for r in results:
             fh.write(json.dumps(r) + "\n")
     # Results hold call outcomes about identifiable people. Owner-only.
@@ -992,9 +1166,12 @@ def main() -> int:
     p.add_argument("--campaign", choices=sorted(CAMPAIGNS))
     p.add_argument("--contacts", help="CSV with name, phone, note")
     p.add_argument("--live", action="store_true", help="place real calls (default: dry run)")
-    p.add_argument("--allow", default="", help="comma-separated E.164 numbers that may be dialed")
-    p.add_argument("--i-know-what-im-doing", action="store_true",
-                   help="permit --live with no allowlist")
+    p.add_argument(
+        "--allow",
+        default="",
+        help="comma-separated E.164 numbers that may be dialed. Required with "
+        "--live; there is no override",
+    )
     p.add_argument("--max-calls", type=int, default=5, help="per-run call ceiling")
     p.add_argument(
         "--country-code",

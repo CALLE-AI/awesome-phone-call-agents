@@ -182,6 +182,7 @@ unknown, never permission.
 | Any non-completed status **with** extraction | **needs_human** — someone engaged; status alone is not evidence |
 | `failed` / `canceled`, no extraction | **unreachable** |
 | Unrecognised provider status | **needs_human** — never actioned on a guess |
+| Polling gave up before a terminal status | **needs_human** — the call may still be live |
 | Everything above satisfied | **auto_closed** |
 
 **Trusted fields.** `outcome`, `sentiment`, `summary`, `frustration_signals`,
@@ -203,8 +204,14 @@ consent to.
 | Guard | Behaviour |
 |---|---|
 | Dry run by default | Calls happen only with an explicit `--live` |
-| Explicit intent | `--live` refuses to run without `--allow` |
-| Allowlist | Only listed E.164 numbers can be dialed |
+| Explicit intent | `--live` refuses to run without `--allow`. **There is no override** |
+| Allowlist | Only listed E.164 numbers can be dialed; the entries are themselves validated |
+| Timeout is not an outcome | Giving up on polling escalates and leaves the reservation open |
+| Corruption fails closed | An unparseable ledger line stops the run rather than being skipped |
+| Untrusted provider values | Confidence must be finite and within 0.0-1.0; NaN and infinity escalate |
+| Untrusted CSV cells | Control characters stripped, lengths capped, alterations reported |
+| Recursive redaction | Nested lists and objects in a result are redacted, not just top-level strings |
+| Results never overwritten | A second run writes a timestamped file rather than destroying the first |
 | Per-run ceiling | `--max-calls` (default 5) caps one run |
 | E.164 validation | Malformed numbers, and numbers with no country code, rejected before reaching CALL-E |
 | Masking | Numbers are masked in all console output and results |
@@ -212,7 +219,7 @@ consent to.
 | Reservation ledger | One locked, per-recipient claim before any API call; a crash cannot cause a re-dial |
 | One call per person per run | A duplicate number in the input is called once, whatever the name or note says |
 | Suppression | `do_not_call` is written to disk *and* held in memory for the rest of the run |
-| Redaction | Numbers, emails, digit runs, and credentials stripped from stored results **and errors** |
+| Redaction | Numbers, emails, digit runs, and credentials stripped from stored results **and errors**, at any nesting depth |
 | No guessing | Region and locale are never inferred; state them with `--region` / `--locale` or omit them |
 | Prompt boundaries | Every goal is prefixed with AI disclosure, secret refusal, and sensitive-domain limits |
 | File modes | The results file is written `0600` |
@@ -251,6 +258,40 @@ connect before that number is dialed again.
 The lock is an atomic `O_CREAT | O_EXCL` file, so two runners sharing a ledger
 cannot both claim the same recipient. A stale lock names the process that holds
 it and can be deleted if no run is active.
+
+**Provider values are validated, not trusted.** `confidence` must be a finite
+number within `0.0-1.0`. A one-sided `< 0.6` test is not enough: every
+comparison against `NaN` returns False, so a `NaN` score would slip past it and
+auto-close the call. The valid range is asserted rather than the invalid one
+tested. A create response with no usable call ID raises rather than proceeding,
+because a call that cannot be identified cannot be reconciled.
+
+**CSV cells are cleaned at the boundary.** Control characters — NUL, ANSI
+escapes, zero-width spaces, bidi overrides — are stripped, and names and notes
+are length-capped, before any value reaches a terminal, a log, or the agent's
+prompt. When cleaning changes a phone number, the run says so on stderr: an
+invisible character removed from a number changes who is dialed, and that must
+never be silent.
+
+**Results files are never overwritten.** A results file is the only local record
+of who was called and what they said. A second run with the same `--out` writes
+a timestamped sibling instead of destroying the first run's evidence.
+
+**A timeout is not an outcome.** If polling gives up before the provider
+reports a terminal status, the call may still be ringing, in progress, or
+already finished — we simply stopped looking. That escalates to a human and the
+reservation is left open, because marking it resolved would free the recipient
+for a redial while the original attempt is unaccounted for.
+
+**Ledger corruption stops the run.** An unparseable line is refused rather than
+skipped: a corrupt entry may be the only record of an in-flight call, and
+ignoring it would permit a duplicate. The error names the offending line numbers
+so they can be repaired deliberately.
+
+**Opt-outs are written before the reservation closes.** `do_not_call` is
+fsynced to `--suppression-file` under a lock *before* the reservation is marked
+resolved. Resolving first would free the recipient, so a crash in between would
+lose the opt-out and leave them callable.
 
 **One call per person per run.** Separately from the ledger, the runner tracks
 numbers already handled in the current run. A resolved reservation frees a
@@ -349,7 +390,7 @@ python test_runner.py      # guards in isolation
 python test_live_path.py   # the whole live loop, with an injected fake client
 ```
 
-`test_runner.py` runs 148 checks over E.164 validation, masking, the dial gate,
+`test_runner.py` runs 192 checks over E.164 validation, masking, the dial gate,
 trusted-field validation, triage precedence, non-completed-status handling,
 idempotency, per-recipient reservations (including a 12-thread contention race),
 ledger corruption, in-run suppression, result and error redaction, prompt

@@ -16,9 +16,13 @@ from pathlib import Path
 
 from runner import (
     CAMPAIGNS,
+    LedgerCorruptError,
     _hash_phone,
     build_schema,
+    MAX_NAME,
     check_dial,
+    clean_cell,
+    extract_result,
     idempotency_key,
     is_e164,
     load_reservations,
@@ -370,6 +374,107 @@ check(
     len(redact_error(_FakeAPIError("x" * 5000))) <= 400,
 )
 
+# --- hostile provider payloads --------------------------------------------
+# Every finding below came from assuming the provider is actively hostile
+# rather than merely imperfect.
+print("\nHostile provider payloads")
+
+# NaN defeats a one-sided threshold test: every comparison with NaN is False,
+# so `confidence < MIN` would let it through and auto-close the call.
+for conf, why in [
+    (float("nan"), "NaN"),
+    (float("inf"), "infinity"),
+    (float("-inf"), "negative infinity"),
+    (-0.5, "negative"),
+    (2.5, "above 1.0"),
+    ("0.9", "numeric string"),
+    (True, "boolean True"),
+    (None, "null"),
+]:
+    check(
+        f"confidence {why} escalates",
+        triage("completed", complete(), task_completed=True, confidence=conf)[0]
+        == "needs_human",
+    )
+check(
+    "confidence at the floor auto-closes",
+    triage("completed", complete(), task_completed=True, confidence=0.6)[0]
+    == "auto_closed",
+)
+check(
+    "confidence 1.0 auto-closes",
+    triage("completed", complete(), task_completed=True, confidence=1.0)[0]
+    == "auto_closed",
+)
+
+# extract_result must survive any shape without raising.
+for payload, why in [
+    ({"structured_result": None}, "null result"),
+    ({"structured_result": "text"}, "string result"),
+    ({"structured_result": []}, "list result"),
+    ({"recipients": "not a list"}, "recipients as a string"),
+    ({"recipients": [None]}, "recipients containing null"),
+    ({}, "empty payload"),
+]:
+    try:
+        check(f"extract_result survives {why}", isinstance(extract_result(payload), dict))
+    except Exception:
+        check(f"extract_result survives {why}", False)
+
+# --- redaction must reach every depth -------------------------------------
+# A result schema may declare an array or object field, and a number buried in
+# one leaks exactly as easily as a top-level string.
+print("\nRedaction reaches nested values")
+nested = redact_result(
+    {
+        "summary": "ring 555-555-0100",
+        "notes": ["also 555-555-0199", "me@example.com"],
+        "meta": {"alt": "555-555-0177", "deep": {"x": "555-555-0166"}},
+    }
+)
+flat = json.dumps(nested).replace("-", "")
+for secret, where in [
+    ("5555550100", "top-level string"),
+    ("5555550199", "inside a list"),
+    ("5555550177", "inside a dict"),
+    ("5555550166", "two levels deep"),
+]:
+    check(f"redacted {where}", secret not in flat)
+check("email inside a list redacted", "@example.com" not in json.dumps(nested))
+check("non-string values pass through untouched", nested.get("meta") is not None)
+
+# --- hostile CSV cells ----------------------------------------------------
+# The CSV reaches a terminal, a log file, and the agent's prompt.
+print("\nHostile CSV cells")
+check("NUL byte stripped", "\x00" not in clean_cell("\x00Bob", 120))
+check("ANSI escape stripped", "\x1b" not in clean_cell("\x1b[31mred\x1b[0m", 120))
+check(
+    "zero-width space stripped",
+    clean_cell("+1555555010\u200b0", 32) == "+15555550100",
+)
+check("bidi override stripped", "\u202e" not in clean_cell("a\u202eb", 120))
+check("a 5000-char name is capped", len(clean_cell("A" * 5000, MAX_NAME)) <= MAX_NAME + 1)
+check("newlines collapsed", "\n" not in clean_cell("a\nb", 120))
+check("ordinary text survives", clean_cell("Aditi Sharma", 120) == "Aditi Sharma")
+
+# An invisible character must not smuggle a number past the allowlist.
+check(
+    "a cleaned number still fails an allowlist it is not on",
+    not check_dial(
+        normalise(clean_cell("+1555555999\u200b9", 32), ""),
+        0,
+        allowlist=["+15555550100"],
+        ceiling=9,
+    ).allowed,
+)
+
+# --- an unbounded note cannot blow the prompt budget ---------------------
+long_note = {"name": "A", "note": "n" * 10000}
+check(
+    "a 10k-char note cannot bloat the rendered goal",
+    len(render_goal(CAMPAIGNS["travel"], long_note)) < 4000,
+)
+
 # --- idempotency & suppression ----------------------------------------
 print("\nIdempotency and suppression")
 check(
@@ -483,19 +588,32 @@ with tempfile.TemporaryDirectory() as tmp:
     check(f"exactly one of 12 concurrent claims wins (got {sum(wins)})", sum(wins) == 1)
     check("the lock is released after contention", not Path(f"{ledger}.lock").exists())
 
-# A corrupt or hand-edited ledger must not crash a run or silently unblock.
+# A corrupt ledger must STOP the run. Skipping a bad line could erase the only
+# record of an in-flight call and so permit a duplicate.
 with tempfile.TemporaryDirectory() as tmp:
     ledger = str(Path(tmp) / "corrupt.txt")
     Path(ledger).write_text("garbage\n,,,,\nonly,three,fields\n", encoding="utf-8")
+
     try:
         load_reservations(ledger)
-        check("malformed ledger lines are skipped, not fatal", True)
-    except Exception:
-        check("malformed ledger lines are skipped, not fatal", False)
-    check(
-        "a reservation still works after corrupt lines",
-        reserve_recipient(ledger, "+15555550103", "travel", "k")[0],
+        check("a corrupt ledger raises rather than degrading", False)
+    except LedgerCorruptError as exc:
+        check("a corrupt ledger raises rather than degrading", True)
+        check("the error names the bad lines", "1, 2, 3" in str(exc))
+        check("the error explains the risk", "dialing someone twice" in str(exc))
+
+    try:
+        reserve_recipient(ledger, "+15555550103", "travel", "k")
+        check("no reservation is granted against a corrupt ledger", False)
+    except LedgerCorruptError:
+        check("no reservation is granted against a corrupt ledger", True)
+
+    # A well-formed ledger with a header and blank lines still parses.
+    good = str(Path(tmp) / "good.txt")
+    Path(good).write_text(
+        "# header\n\n   \nabc123,travel,k1,call_1,reserved\n", encoding="utf-8"
     )
+    check("comments and blank lines are tolerated", len(load_reservations(good)) == 1)
 
 # An opt-out recorded mid-run must block a later row for the same number.
 with tempfile.TemporaryDirectory() as tmp:
@@ -621,6 +739,49 @@ check(
     "ordinary notes survive intact",
     sanitise_note("asked about Bali in December") == "asked about Bali in December",
 )
+
+# AI disclosure must be proactive. "If asked" lets the agent stay silent for a
+# whole call, which is not disclosure.
+print("\nAI disclosure is proactive, not on request")
+for cid in CAMPAIGNS:
+    g = render_goal(CAMPAIGNS[cid], {"name": "X", "note": "n"})
+    check(f"{cid}: preamble requires up-front disclosure", "Disclose up front" in g)
+    check(f"{cid}: preamble says do not wait to be asked", "without waiting to be" in g)
+    check(
+        f"{cid}: the opening line itself states the agent is AI",
+        "AI assistant" in g.split("Boundaries for this call")[-1].split("\n\n", 1)[-1],
+    )
+
+# The suppression file is the last line of defence, so writes are locked and
+# fsynced — an opt-out buffered in memory is not an opt-out.
+print("\nSuppression writes are durable and locked")
+with tempfile.TemporaryDirectory() as tmp:
+    supp = str(Path(tmp) / "s.txt")
+    record_suppression(supp, "+15555550100", "travel")
+    check("opt-out readable immediately after the call returns",
+          len(load_suppressions(supp)) == 1)
+    check("suppression lock is released", not Path(f"{supp}.lock").exists())
+
+    written = Path(supp).read_text(encoding="utf-8")
+    check("stored as a hash, not a number", "5555550100" not in written)
+
+    # Concurrent writers must not lose an entry.
+    phones = [f"+1555555{i:04d}" for i in range(12)]
+    guard2 = threading.Lock()
+
+    def _opt_out(p: str) -> None:
+        with guard2:
+            record_suppression(supp, p, "travel")
+
+    ts = [threading.Thread(target=_opt_out, args=(p,)) for p in phones]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    check(
+        f"all 12 concurrent opt-outs persisted (got {len(load_suppressions(supp))})",
+        len(load_suppressions(supp)) == 13,
+    )
 
 # -------------------------------------------------------------- report --
 print()

@@ -83,6 +83,10 @@ class FakeCalls:
                     "callback_agreed": False,
                 },
             }
+        if self.outcome == "never_terminal":
+            # Always in progress: simulates a call the runner stops polling
+            # before the provider reports an outcome.
+            return {"id": call_id, "status": "in_progress"}
         return {"id": call_id, "status": "failed"}
 
 
@@ -102,7 +106,6 @@ def run_case(
         contacts=str(csv_path),
         live=True,
         allow="+15555550100,+15555550101",
-        i_know_what_im_doing=False,
         max_calls=9,
         country_code="",
         poll_interval=0.01,
@@ -193,6 +196,50 @@ with tempfile.TemporaryDirectory() as tmp:
         "the reservation stays open, so the number is not silently re-dialled",
         not ledger[runner._hash_phone("+15555550100")]["state"].startswith("resolved"),
     )
+
+print("\nA poll timeout is not an outcome")
+with tempfile.TemporaryDirectory() as tmp:
+    # The provider never reaches a terminal status, so the runner gives up
+    # waiting. That is not the same as the call having finished.
+    lines, args, fake = run_case(
+        "timeout", "never_terminal", ONE_ROW, tmp, timeout=0.05
+    )
+    check("escalated, not auto-closed", lines[0]["disposition"] == "needs_human")
+    check("status records the timeout", lines[0]["status"] == "POLL_TIMEOUT")
+    check("the reason names the call to reconcile", "call_fake_1" in lines[0]["reason"])
+
+    ledger = runner.load_reservations(args.dispatch_file)
+    state = ledger[runner._hash_phone("+15555550100")]["state"]
+    check(f"the reservation is NOT resolved (state={state})",
+          not state.startswith("resolved"))
+    check("so the recipient stays blocked from a redial",
+          not runner.reserve_recipient(args.dispatch_file, "+15555550100", "travel", "k2")[0])
+
+print("\nThe allowlist cannot be bypassed")
+with tempfile.TemporaryDirectory() as tmp:
+    # Live mode with an empty allowlist must refuse outright. There is no
+    # override flag any more.
+    csv_path = Path(tmp) / "x.csv"
+    csv_path.write_text(ONE_ROW, encoding="utf-8")
+    args = argparse.Namespace(
+        campaign="travel", contacts=str(csv_path), live=True, allow="",
+        max_calls=9, country_code="", poll_interval=0.01, timeout=1,
+        out=str(Path(tmp) / "o.jsonl"), batch_id="b1",
+        suppression_file=str(Path(tmp) / "s.txt"),
+        dispatch_file=str(Path(tmp) / "l.txt"),
+        region="", locale="", list_campaigns=False,
+    )
+    fake = FakeClient("clean")
+    original = runner.CalleClient
+    runner.CalleClient = lambda **_: fake  # type: ignore[assignment]
+    try:
+        rc = runner.run(args)
+    finally:
+        runner.CalleClient = original  # type: ignore[assignment]
+
+    check("live with an empty allowlist exits non-zero", rc == 2)
+    check("no call was created", len(fake.calls.created) == 0)
+    check("no override flag exists", not hasattr(args, "i_know_what_im_doing"))
 
 print("\nRegion and locale are never invented")
 with tempfile.TemporaryDirectory() as tmp:
