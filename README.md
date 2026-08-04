@@ -36,14 +36,25 @@ The community roadmap is a direction guide, not a fixed release plan. Small exam
 
 ## Table of Contents
 
-- [Community contributions](#community-contributions)
-- [Why this repository exists](#why-this-repository-exists)
-- [CLI reference](#cli-reference)
-- [Templates](#templates)
-- [Resource list](#resource-list)
-- [Contributing](#contributing)
-- [Community](#community)
-- [License](#license)
+- [Awesome Phone Call Agents](#awesome-phone-call-agents)
+  - [Community contributions](#community-contributions)
+  - [Table of Contents](#table-of-contents)
+  - [Why this repository exists](#why-this-repository-exists)
+  - [CLI reference](#cli-reference)
+  - [Templates](#templates)
+    - [Skill folder template](#skill-folder-template)
+    - [App directory template](#app-directory-template)
+    - [Plugin directory template](#plugin-directory-template)
+    - [README list entry template](#readme-list-entry-template)
+  - [Resource list](#resource-list)
+    - [Skills](#skills)
+    - [Apps](#apps)
+    - [Plugins](#plugins)
+    - [Safety patterns](#safety-patterns)
+  - [Contributing](#contributing)
+    - [Contribution workflow](#contribution-workflow)
+  - [Community](#community)
+  - [License](#license)
 
 ## Why this repository exists
 
@@ -138,6 +149,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/freshchain-resolver`](apps/python/freshchain-resolver/) | Python | Resolve delayed cold-chain receiving exceptions by phone and return a safe dispatch decision. |
 | [`apps/python/ringedingeding`](apps/python/ringedingeding/) | Python | Multi-recipient response aggregator that keeps answered, refused and unreached apart, reports every share against those who answered, and never reads silence as consent. |
 | [`apps/python/callback-window-coordinator`](apps/python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
+| [`apps/python/incidentops-ai`](apps/python/incidentops-ai/) | Python | Autonomous incident commander that uses Gemini for structured outage analysis and CALL-E for authorized live voice escalation, with Safe Demo Mode, call safeguards, evidence-aware acknowledgement, and auditable incident outcomes. |
 | [`apps/python/batch-runner`](apps/python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
 | [`apps/python/broker-login-client`](apps/python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
