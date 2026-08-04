@@ -11,7 +11,12 @@ import httpx
 import os
 import uuid
 
-CLINIQBRIDGE_BASE_URL = os.environ.get("CLINIQBRIDGE_BASE_URL", "https://cliniqbridge.onrender.com")
+# FIX (review round 6, point 4): no more silent hardcoded default host.
+# The same "explicit trusted destination" pattern already applied to
+# ALLOWED_FHIR_BASE_URLS in round 4 is now applied here too -- a real
+# clinical payload and the optional access token must never be sent to a
+# host the operator didn't explicitly configure.
+CLINIQBRIDGE_BASE_URL = os.environ.get("CLINIQBRIDGE_BASE_URL", "")
 CLINIQBRIDGE_API_KEY = os.environ.get("CLINIQBRIDGE_API_KEY", "")  # blank if unauthenticated
 
 # Default target FHIR server CliniqBridge writes to if none specified --
@@ -45,9 +50,15 @@ async def escalate_danger_signs(
     must never silently fall back to the public hapi.fhir.org test
     server, since that server is world-readable and unauthenticated.
     Callers must pass an explicitly approved destination (see
-    ALLOWED_FHIR_BASE_URLS in main.py). DEMO_FHIR_BASE_URL still exists
-    below for connectivity-testing scripts (create_test_patient.py) only.
+    ALLOWED_FHIR_BASE_URLS below for connectivity-testing scripts
+    (create_test_patient.py) only.
     """
+    if not CLINIQBRIDGE_BASE_URL:
+        raise RuntimeError(
+            "CLINIQBRIDGE_BASE_URL is not configured. No CliniqBridge "
+            "destination is approved -- set this explicitly before any "
+            "clinical payload or access token can be sent anywhere."
+        )
     results = []
     async with httpx.AsyncClient(timeout=30.0) as client:
         for sign in danger_signs:

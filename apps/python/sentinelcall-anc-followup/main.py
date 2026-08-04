@@ -73,7 +73,9 @@ def get_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS run_to_patient (
             run_id TEXT PRIMARY KEY,
-            patient_id TEXT NOT NULL
+            patient_id TEXT NOT NULL,
+            patient_first_name TEXT NOT NULL,
+            patient_date_of_birth TEXT NOT NULL
         )
     """)
     conn.execute("""
@@ -174,15 +176,45 @@ class FollowUpRequest(BaseModel):
 # FIX (review round 5, point 2): escalation must be able to VERIFY, from
 # the actual transcript, that the two-identifier check succeeded before
 # any clinical content was discussed -- not just trust that the script
-# was followed. The goal now instructs the agent to say an exact,
-# machine-checkable phrase only after both identifiers are confirmed, and
-# escalation refuses to proceed if that phrase is absent from the
-# transcript.
+# was followed. The goal instructs the agent to say an exact,
+# machine-checkable phrase only after both identifiers are confirmed.
+#
+# FIX (review round 6, point 2 -- partial, stated honestly): the
+# confirmation phrase alone is bot-spoken, not proof the RECIPIENT
+# actually supplied both identifiers -- an LLM could in principle say it
+# incorrectly. This is improved, not fully solved: escalation now ALSO
+# requires the transcript to contain a USER-spoken line matching the
+# patient's first name and a USER-spoken line containing their date of
+# birth (year, at minimum), tying the check to actual recipient-supplied
+# content rather than only the bot's closing phrase. This is still not
+# cryptographic proof of speaker identity over a phone line -- that is a
+# real limitation of voice-call identity verification generally, not
+# something this app can fully close, and it's documented as such in the
+# README.
 IDENTITY_CONFIRMED_PHRASE = "identity confirmed, thank you"
 
 
-def transcript_shows_identity_confirmed(transcript: str) -> bool:
-    return IDENTITY_CONFIRMED_PHRASE in transcript.lower()
+def transcript_shows_identity_confirmed(
+    transcript: str, patient_first_name: str, patient_date_of_birth: str
+) -> bool:
+    lowered = transcript.lower()
+    if IDENTITY_CONFIRMED_PHRASE not in lowered:
+        return False
+
+    user_lines = [
+        line for line in transcript.splitlines()
+        if re.sub(r"^\[\d{2}:\d{2}:\d{2}\]\s*", "", line.strip()).upper().startswith("USER:")
+    ]
+    user_text = " ".join(user_lines).lower()
+
+    name_present = patient_first_name.lower() in user_text
+    # Match at minimum the birth year -- transcripts of spoken dates are
+    # unreliable for exact day/month formatting, but the year is a
+    # reasonably robust signal a real date was actually stated.
+    dob_year = patient_date_of_birth.split("-")[0] if "-" in patient_date_of_birth else patient_date_of_birth
+    dob_present = dob_year in user_text
+
+    return name_present and dob_present
 
 
 def build_goal(patient_first_name: str, patient_date_of_birth: str, missed_visit_date: str) -> str:
@@ -242,7 +274,19 @@ async def trigger_followup(
         # the window. Previously this also deleted 'pending' rows after an
         # hour -- meaning a call genuinely still in flight past an hour lost
         # its dedup protection entirely and could be dispatched again.
-        db.execute("DELETE FROM call_requests WHERE ts < ? AND status = 'done'", (now - 3600,))
+        # FIX (review round 6, point 1): only clean up rows with a KNOWN,
+        # non-ambiguous outcome. Previously any 'done' row -- including
+        # error_uncertain_outcome, used when a call's actual dispatch
+        # status is genuinely unknown -- expired after an hour, after
+        # which the same Idempotency-Key could dispatch a real duplicate
+        # call while the original may already have been accepted.
+        # Ambiguous-outcome rows are now kept indefinitely, requiring a
+        # human to look before that key is ever reused.
+        db.execute(
+            "DELETE FROM call_requests WHERE ts < ? AND status = 'done' "
+            "AND response NOT LIKE '%error_uncertain_outcome%'",
+            (now - 3600,),
+        )
         db.commit()
 
         row = db.execute(
@@ -291,8 +335,9 @@ async def trigger_followup(
             run_id = run.get("run_id")
             if run_id:
                 db.execute(
-                    "INSERT OR REPLACE INTO run_to_patient (run_id, patient_id) VALUES (?, ?)",
-                    (run_id, req.patient_id),
+                    "INSERT OR REPLACE INTO run_to_patient "
+                    "(run_id, patient_id, patient_first_name, patient_date_of_birth) VALUES (?, ?, ?, ?)",
+                    (run_id, req.patient_id, req.patient_first_name, req.patient_date_of_birth),
                 )
                 db.commit()
             response = {
@@ -366,14 +411,17 @@ async def confirm_escalation(
         status, record_json = existing
         return {"status": status, "run_id": run_id, "record": json.loads(record_json) if record_json else None}
 
-    patient_row = db.execute("SELECT patient_id FROM run_to_patient WHERE run_id = ?", (run_id,)).fetchone()
+    patient_row = db.execute(
+        "SELECT patient_id, patient_first_name, patient_date_of_birth FROM run_to_patient WHERE run_id = ?",
+        (run_id,),
+    ).fetchone()
     if not patient_row:
         raise HTTPException(
             409,
             f"No patient binding found for run {run_id}. Escalation requires a "
             f"call that was created through this app's /followups endpoint.",
         )
-    bound_patient_id = patient_row[0]
+    bound_patient_id, bound_first_name, bound_dob = patient_row
 
     try:
         result = wait_for_call_result(run_id, poll_interval_seconds=3, max_wait_seconds=30)
@@ -385,16 +433,16 @@ async def confirm_escalation(
 
     transcript = result.get("result", {}).get("transcript", "")
 
-    # FIX (review round 5, point 2): refuse to escalate unless the
-    # transcript itself proves the two-identifier check actually
-    # succeeded. Previously escalation trusted that the call script was
-    # followed; now it verifies real evidence from the real transcript.
-    if not transcript_shows_identity_confirmed(transcript):
+    # FIX (review round 5+6): refuse to escalate unless the transcript
+    # shows both the bot's confirmation phrase AND recipient-supplied
+    # evidence of both identifiers -- see transcript_shows_identity_confirmed
+    # docstring above for exactly what this does and does not prove.
+    if not transcript_shows_identity_confirmed(transcript, bound_first_name, bound_dob):
         raise HTTPException(
             409,
-            f"Run {run_id}'s transcript does not show a confirmed two-identifier "
-            f"check. Escalation refused -- cannot write clinical data without "
-            f"verified proof identity was confirmed during the call.",
+            f"Run {run_id}'s transcript does not show sufficient evidence of a "
+            f"confirmed two-identifier check (bot confirmation phrase plus "
+            f"recipient-supplied name and birth year). Escalation refused.",
         )
 
     actual_signs, actual_urgent = extract_danger_signs_from_transcript(transcript)
