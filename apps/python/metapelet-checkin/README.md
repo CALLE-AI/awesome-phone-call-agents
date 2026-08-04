@@ -20,6 +20,8 @@ set CALLE_API_KEY=your_key
 set CALLE_BASE_URL=https://api.heycall-e.com
 ```
 
+`CALLE_BASE_URL` must stay on the official HTTPS origin `https://api.heycall-e.com` (validated before the API key is used).
+
 ## Preview (no call)
 
 ```bash
@@ -39,7 +41,9 @@ python client.py --request my-live-request.json --execute --confirm-recipient-op
 ## Side effects
 
 - `--execute` places a **real call** and uses CALL-E credits.
+- Live mode uses `create` + `wait_for_result` with a local `.call-state/` checkpoint (0600 files) so accepted `call_id` values survive crashes or wait timeouts.
 - Idempotency key: `metapelet-<workflow_id>-<digest>` — derived from workflow id, E.164 phone, region, locale, task text, and result schema. Reuse the **same request file** on retry; changing phone or task-shaping fields creates a new key.
+- Structured `mood` / `topics` are released only when `status` is `completed` and `task_completed` is true, with phone-like text redacted. Output files are written mode `0600` and never overwrite existing paths.
 
 ## Safety
 

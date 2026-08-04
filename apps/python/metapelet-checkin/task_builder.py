@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PERSONA_PATH = (
@@ -190,6 +191,11 @@ Call behavior:
 - Speak naturally, slowly, one question at a time.
 - Stay non-medical; no medication or doctor reminders.
 
+Crisis and emergency (required):
+- If the person describes an immediate medical emergency, danger, abuse, or mental-health crisis, do not counsel or troubleshoot.
+- Tell them to contact local emergency services or a human caregiver right away, end the call politely, and do not delay help.
+- Do not collect extra personal details during a crisis. Set wants_repeat_call to unknown unless they clearly decline future friendly calls.
+
 {close_question}
 
 After the call, fill the structured result: mood (short text), topics (2-5 items), wants_repeat_call (yes/no/unknown).
@@ -219,6 +225,34 @@ def idempotency_key(request: dict, task: str, result_schema: dict) -> str:
     return f"metapelet-{request['workflow_id']}-{digest}"
 
 
+def mask_name(name: str) -> str:
+    cleaned = str(name or "").strip()
+    if not cleaned:
+        return "[redacted]"
+    if len(cleaned) == 1:
+        return "*"
+    return f"{cleaned[0]}***"
+
+
+def redact_sensitive_text(value: Any) -> Any:
+    if isinstance(value, str):
+        return PHONE_LIKE_PATTERN.sub("[phone-redacted]", value)
+    if isinstance(value, list):
+        return [redact_sensitive_text(item) for item in value]
+    if isinstance(value, dict):
+        return {key: redact_sensitive_text(item) for key, item in value.items()}
+    return value
+
+
+def structured_result_for_export(call: dict[str, Any]) -> dict[str, Any] | None:
+    if call.get("status") != "completed" or call.get("task_completed") is not True:
+        return None
+    raw = call.get("structured_result")
+    if not isinstance(raw, dict):
+        return None
+    return redact_sensitive_text(raw)
+
+
 def preview_plan(request: dict) -> dict:
     masked = mask_phone(request["phone"])
     task = build_task(request, dial_phone=masked)
@@ -229,10 +263,10 @@ def preview_plan(request: dict) -> dict:
         "mode": "preview",
         "creates_phone_call": False,
         "masked_phone": masked,
+        "masked_recipient_name": mask_name(request.get("user_name", "")),
         "region": request["region"],
         "locale": request["locale"],
         "language": request.get("language", "en"),
-        "user_name": request.get("user_name"),
         "idempotency_preview": idempotency_key(request, task, load_result_schema()),
         "task_preview": task_preview,
         "result_schema": load_result_schema(),

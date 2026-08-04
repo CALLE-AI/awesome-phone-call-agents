@@ -9,8 +9,8 @@ import os
 import sys
 from pathlib import Path
 
+from call_runtime import execute_live, resolve_base_url, write_output
 from task_builder import (
-    build_recipients,
     build_task,
     idempotency_key,
     load_result_schema,
@@ -18,7 +18,6 @@ from task_builder import (
     validate_request,
 )
 
-DEFAULT_BASE_URL = "https://api.heycall-e.com"
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 
 
@@ -46,7 +45,12 @@ def _load_request(path: Path) -> dict:
         raise SystemExit(str(exc)) from exc
 
 
-def _run_live(request: dict, output: Path | None) -> int:
+def _run_live(request: dict, output: Path | None, timeout_seconds: float) -> int:
+    try:
+        base_url = resolve_base_url()
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
     api_key = os.environ.get("CALLE_API_KEY")
     if not api_key:
         raise SystemExit("Set CALLE_API_KEY in the environment or .env (do not commit).")
@@ -58,37 +62,28 @@ def _run_live(request: dict, output: Path | None) -> int:
             "Install dependencies: pip install -r requirements.txt"
         ) from exc
 
-    os.environ.setdefault("CALLE_BASE_URL", DEFAULT_BASE_URL)
-    client = CalleClient(api_key=api_key)
+    os.environ["CALLE_BASE_URL"] = base_url
+    client = CalleClient(api_key=api_key, base_url=base_url)
     task = build_task(request)
     schema = load_result_schema()
     idempotency = idempotency_key(request, task, schema)
 
     print("Placing one CALL-E call (live)...", flush=True)
-    call = client.calls.create_and_wait(
+    payload = execute_live(
+        request,
+        client,
         task=task,
-        recipients=build_recipients(request),
-        result_schema=schema,
+        schema=schema,
         idempotency_key=idempotency,
-        timeout_seconds=900.0,
+        timeout_seconds=timeout_seconds,
     )
-
-    redacted = {
-        "workflow_id": request["workflow_id"],
-        "idempotency_key": idempotency,
-        "status": call.get("status") if isinstance(call, dict) else getattr(call, "status", None),
-        "task_completed": call.get("task_completed")
-        if isinstance(call, dict)
-        else getattr(call, "task_completed", None),
-        "structured_result": call.get("structured_result")
-        if isinstance(call, dict)
-        else getattr(call, "structured_result", None),
-    }
-    text = json.dumps(redacted, ensure_ascii=False, indent=2)
-    sys.stdout.buffer.write(text.encode("utf-8"))
-    sys.stdout.buffer.write(b"\n")
+    rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    sys.stdout.buffer.write(rendered.encode("utf-8"))
     if output:
-        output.write_text(text + "\n", encoding="utf-8")
+        try:
+            write_output(output, payload)
+        except FileExistsError:
+            raise SystemExit(f"Refusing to overwrite existing output: {output}") from None
         print(f"Wrote {output}", flush=True)
     return 0
 
@@ -113,9 +108,15 @@ def main() -> int:
         help="Required with --execute: recipient consented",
     )
     parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=900.0,
+        help="Max seconds to wait for terminal call status",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
-        help="Write redacted structured result JSON here",
+        help="Write redacted result JSON here (0600, never overwrites)",
     )
     args = parser.parse_args()
 
@@ -130,8 +131,10 @@ def main() -> int:
 
     if not args.confirm_recipient_opt_in:
         raise SystemExit("Live calls require --confirm-recipient-opt-in.")
+    if args.timeout_seconds <= 0:
+        raise SystemExit("--timeout-seconds must be positive.")
 
-    return _run_live(request, args.output)
+    return _run_live(request, args.output, args.timeout_seconds)
 
 
 if __name__ == "__main__":
