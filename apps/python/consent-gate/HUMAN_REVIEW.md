@@ -26,3 +26,18 @@ The 24-hour rule applies only to a temporary rejection. A corroborated request
 never to call again creates a permanent do-not-call record. It may be cleared
 only after a new, independently verified opt-in; merely waiting 24 hours is not
 sufficient.
+
+A temporary request such as “end this call”, “hang up”, or “call me later” is
+accepted only when high-confidence task evidence is corroborated by the
+recipient transcript. It is persisted as `rejected` and starts the same 24-hour
+cooldown. Ambiguous extraction fails closed for reconciliation.
+
+The entrant also confirmed that ConsentGate will not accept medical, legal,
+financial, or emergency content and will not create recurring or hidden
+schedules. An accepted call can be ended verbally by the recipient; the pinned
+provider SDK has no operator-side cancellation endpoint, so live use is
+inappropriate when such a kill switch is required.
+
+Live tasks do not interpolate freeform purpose text. Version 0.1 allowlists
+only the fixed `accessibility_test` template; any new purpose kind requires a
+reviewed code change and regression coverage.

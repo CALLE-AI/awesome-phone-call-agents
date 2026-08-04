@@ -12,6 +12,7 @@ from pathlib import Path
 from .ledger import DurableLedger
 
 from .policy import (
+    ALLOWED_PURPOSES,
     PolicyError,
     build_manifest,
     load_plan,
@@ -27,6 +28,12 @@ NAMESPACE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,79}$")
 DO_NOT_CALL = re.compile(
     r"\b(do not call|don't call|never call|stop calling|remove me from|"
     r"do not contact|don't contact)\b",
+    re.IGNORECASE,
+)
+TEMPORARY_REFUSAL = re.compile(
+    r"\b(end (?:this )?call|hang up|stop (?:this )?call|not (?:a )?good time|"
+    r"call (?:me )?(?:back|later)|do not want to talk|don't want to talk|"
+    r"no thanks)\b",
     re.IGNORECASE,
 )
 
@@ -133,6 +140,16 @@ def _verified_outcome(result: dict) -> str:
         ):
             return "do_not_call"
         return "unknown"
+    if end_call_requested == "yes":
+        if (
+            do_not_call_requested == "no"
+            and _has_high_confidence_evidence(result)
+            and TEMPORARY_REFUSAL.search(
+                _transcript_text(result, recipient_only=True)
+            )
+        ):
+            return "rejected"
+        return "unknown"
     if (
         provider_status in {"no_answer", "failed"}
         and contact_made == "no"
@@ -143,7 +160,7 @@ def _verified_outcome(result: dict) -> str:
         provider_status == "completed"
         and contact_made == "yes"
         and reachability == "yes"
-        and end_call_requested in {"yes", "no"}
+        and end_call_requested == "no"
         and do_not_call_requested == "no"
         and _has_high_confidence_evidence(result)
     ):
@@ -152,13 +169,19 @@ def _verified_outcome(result: dict) -> str:
 
 
 def _request_for_plan(plan: dict, provider_namespace: str) -> dict:
+    # Never inject caller-controlled prose into a live task. validate_plan()
+    # binds purpose_kind to this exact allowlisted text before this function is
+    # reached; looking it up again provides defense in depth.
+    approved_purpose = ALLOWED_PURPOSES[plan["purpose_kind"]]
     task = (
         f"Begin by saying exactly: {plan['ai_disclosure']} "
-        f"Then: {plan['purpose']} "
+        f"Then: {approved_purpose} "
         "Distinguish a request to end only this call from a request never to be "
         "called again. Set end_call_requested or do_not_call_requested exactly "
         "as spoken, acknowledge either request, and end the call. "
-        "Do not request passwords, passcodes, payment data, or other secrets."
+        "Do not request passwords, passcodes, payment data, or other secrets. "
+        "Do not provide medical, legal, or financial advice, and do not handle "
+        "emergencies."
     )
     return {
         "task": task,
@@ -252,6 +275,7 @@ def _finalize_result(
         provider_status=result.get("status"),
         task_completed=result.get("task_completed"),
         outcome=outcome,
+        occurred_at=datetime.now(timezone.utc).isoformat(),
     )
     return {
         "status": result.get("status"),

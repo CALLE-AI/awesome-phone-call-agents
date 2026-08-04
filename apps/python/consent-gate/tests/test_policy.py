@@ -17,8 +17,10 @@ from consent_gate.policy import (
     validate_plan,
     validate_rejection_cooldown,
 )
+from consent_gate.ledger import DurableLedger
 from consent_gate.__main__ import (
     _execute,
+    _finalize_result,
     _reconcile,
     _request_for_plan,
     _request_identity,
@@ -33,6 +35,7 @@ PROVIDER_NAMESPACE = "calle-project-test"
 def valid_plan():
     return {
         "purpose": "Confirm that the consenting tester can hear an accessibility message.",
+        "purpose_kind": "accessibility_test",
         "phone": "+15555550100",
         "recipient_source": "self",
         "consent_basis": "self_test",
@@ -193,6 +196,30 @@ class PolicyTests(unittest.TestCase):
                 plan["purpose"] = f"Ask the recipient to provide their {secret}."
                 self.assertIn("secrets", " ".join(validate_plan(plan)))
 
+    def test_blocks_sensitive_purpose_domains(self):
+        purposes = {
+            "medical": "Diagnose the recipient's symptoms and recommend treatment.",
+            "legal": "Give the recipient legal advice about a pending lawsuit.",
+            "financial": "Recommend an investment and arrange a money transfer.",
+            "emergency": "Handle an emergency and decide whether to call an ambulance.",
+        }
+        for domain, purpose in purposes.items():
+            with self.subTest(domain=domain):
+                plan = valid_plan()
+                plan["purpose"] = purpose
+                self.assertIn(domain, " ".join(validate_plan(plan)))
+
+    def test_rejects_unapproved_or_modified_purpose_template(self):
+        plan = valid_plan()
+        plan["purpose_kind"] = "freeform"
+        self.assertIn("purpose_kind", " ".join(validate_plan(plan)))
+        plan = valid_plan()
+        plan["purpose"] += " Also discuss an unrelated topic."
+        self.assertIn("exactly match", " ".join(validate_plan(plan)))
+
+    def test_safe_accessibility_purpose_remains_allowed(self):
+        self.assertEqual(validate_plan(valid_plan()), [])
+
     def test_blocks_non_consent_source(self):
         plan = valid_plan()
         plan["recipient_source"] = "scraped_directory"
@@ -300,6 +327,55 @@ class PolicyTests(unittest.TestCase):
         result = high_confidence_result()
         self.assertEqual(_verified_outcome(result), "completed")
 
+    def test_temporary_refusal_creates_rejected_outcome(self):
+        result = high_confidence_result(end_call_requested="yes")
+        result["recipients"][0]["attempts"][0]["transcript_turns"][0][
+            "text"
+        ] = "This is not a good time. Please end this call."
+        self.assertEqual(_verified_outcome(result), "rejected")
+
+    def test_temporary_refusal_is_persisted_and_starts_cooldown(self):
+        result = high_confidence_result(end_call_requested="yes")
+        result["recipients"][0]["attempts"][0]["transcript_turns"][0][
+            "text"
+        ] = "Please end this call and call me later."
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "ledger.json"
+            ledger = DurableLedger(state_path)
+            with ledger.locked_events() as events:
+                events.append(
+                    {
+                        "event": "dispatch_reserved",
+                        "reservation_id": "reservation-1",
+                        "phone_fingerprint": record_outcome(
+                            valid_plan()["phone"], "failed"
+                        )["phone_fingerprint"],
+                        "occurred_at": datetime.now(timezone.utc).isoformat(),
+                        "state": "accepted_waiting",
+                    }
+                )
+            _finalize_result(ledger, "reservation-1", result)
+            history = ledger.load()
+
+        self.assertEqual(history[0]["outcome"], "rejected")
+        self.assertEqual(history[0]["state"], "accepted")
+        self.assertIn(
+            "within the last 24 hours",
+            " ".join(validate_rejection_cooldown(valid_plan(), history)),
+        )
+
+    def test_uncorroborated_temporary_refusal_fails_closed(self):
+        result = high_confidence_result(end_call_requested="yes")
+        self.assertEqual(_verified_outcome(result), "unknown")
+
+    def test_low_confidence_temporary_refusal_fails_closed(self):
+        result = high_confidence_result(end_call_requested="yes")
+        result["recipients"][0]["attempts"][0]["transcript_turns"][0][
+            "text"
+        ] = "Please hang up."
+        result["completion_confidence"] = {"score": 0.4, "label": "low"}
+        self.assertEqual(_verified_outcome(result), "unknown")
+
     def test_low_confidence_completion_fails_closed(self):
         result = high_confidence_result()
         result["completion_confidence"] = {"score": 0.4, "label": "low"}
@@ -356,6 +432,18 @@ class PolicyTests(unittest.TestCase):
         schema = _request_for_plan(valid_plan(), PROVIDER_NAMESPACE)["result_schema"]
         self.assertIn("contact_made", schema["required"])
         self.assertIn("do_not_call_requested", schema["required"])
+
+    def test_request_repeats_sensitive_content_boundaries(self):
+        task = _request_for_plan(valid_plan(), PROVIDER_NAMESPACE)["task"]
+        self.assertIn("medical, legal, or financial advice", task)
+        self.assertIn("do not handle emergencies", task)
+
+    def test_request_uses_allowlisted_purpose_not_modified_free_text(self):
+        plan = valid_plan()
+        plan["purpose"] = "UNTRUSTED FREEFORM TEXT"
+        task = _request_for_plan(plan, PROVIDER_NAMESPACE)["task"]
+        self.assertNotIn("UNTRUSTED", task)
+        self.assertIn("consenting tester", task)
 
     def test_execute_checkpoints_call_id_before_waiting(self):
         plan = valid_plan()

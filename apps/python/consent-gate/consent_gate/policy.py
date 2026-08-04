@@ -15,6 +15,7 @@ class PolicyError(ValueError):
 
 REQUIRED_FIELDS = {
     "purpose",
+    "purpose_kind",
     "phone",
     "recipient_source",
     "consent_basis",
@@ -31,6 +32,11 @@ REJECTION_COOLDOWN_HOURS = 24
 
 ALLOWED_RECIPIENT_SOURCES = {"self", "explicit_opt_in", "existing_customer_request"}
 ALLOWED_CONSENT_BASES = {"self_test", "written_opt_in", "requested_callback"}
+ALLOWED_PURPOSES = {
+    "accessibility_test": (
+        "Confirm that the consenting tester can hear an accessibility message."
+    ),
+}
 SUPPORTED_REGION_LANGUAGES = {
     "US": {"en"},
     "SG": {"en"},
@@ -58,6 +64,15 @@ SECRET_TERMS = re.compile(
     r"social security|bank login)\b",
     re.IGNORECASE,
 )
+SENSITIVE_CONTENT_TERMS = re.compile(
+    r"\b(medical|health(?:care)?|doctor|diagnos(?:e|is|tic)|treat(?:ment)?|"
+    r"prescription|medication|dosage|symptom|legal|lawyer|attorney|court|"
+    r"lawsuit|contract|legal rights?|financial|bank(?:ing)?|investment|invest|"
+    r"trading|stocks?|loan|debt|insurance|tax|payment|money transfer|"
+    r"emergenc(?:y|ies)|ambulance|police|fire department|suicid(?:e|al)|"
+    r"self[- ]?harm|crisis hotline|immediate danger)\b",
+    re.IGNORECASE,
+)
 
 
 def load_plan(path: str | Path) -> dict[str, Any]:
@@ -74,10 +89,21 @@ def validate_plan(plan: dict[str, Any]) -> list[str]:
         errors.append("missing fields: " + ", ".join(missing))
         return errors
 
+    purpose_kind = plan["purpose_kind"]
+    if purpose_kind not in ALLOWED_PURPOSES:
+        errors.append("purpose_kind is not an approved low-risk administrative use")
     if not isinstance(plan["purpose"], str) or len(plan["purpose"].strip()) < 15:
         errors.append("purpose must clearly describe the call in at least 15 characters")
     elif SECRET_TERMS.search(plan["purpose"]):
         errors.append("purpose must not request credentials, financial data, or secrets")
+    elif SENSITIVE_CONTENT_TERMS.search(plan["purpose"]):
+        errors.append(
+            "purpose must not contain medical, legal, financial, or emergency content"
+        )
+    elif purpose_kind in ALLOWED_PURPOSES and plan["purpose"].strip() != ALLOWED_PURPOSES[
+        purpose_kind
+    ]:
+        errors.append("purpose must exactly match its approved purpose_kind template")
 
     if not isinstance(plan["phone"], str) or not E164.fullmatch(plan["phone"]):
         errors.append("phone must be a valid E.164 number")

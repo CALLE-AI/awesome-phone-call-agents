@@ -1,5 +1,6 @@
 {
-  "purpose": "Confirm that a consenting tester can hear the automated accessibility message.",
+  "purpose": "Confirm that the consenting tester can hear an accessibility message.",
+  "purpose_kind": "accessibility_test",
   "phone": "+15555550100",
   "recipient_source": "self",
   "consent_basis": "self_test",

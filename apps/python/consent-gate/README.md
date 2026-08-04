@@ -10,7 +10,8 @@ ConsentGate blocks a CALL-E request until the caller has supplied:
 - a bounded retry policy;
 - temporary rejection cooldowns plus permanent do-not-call suppression;
 - explicit recording and retention choices; and
-- a human-readable purpose that does not request secrets.
+- an approved low-risk `purpose_kind` whose exact, fixed template does not
+  request secrets or contain medical, legal, financial, or emergency content.
 
 The default workflow is entirely offline. It validates a JSON plan, prints a
 redacted audit manifest, and never places a call. Live execution is deliberately
@@ -100,6 +101,23 @@ Because the current provider SDK does not expose verifiable recording and
 retention controls, live execution also requires `recording: false` and
 `retention_days: 0`.
 
+### Cancellation and scheduling
+
+Every `execute` invocation submits at most one immediate, one-off provider
+request. ConsentGate has no scheduler integration and never creates recurring
+jobs, background redials, or hidden schedules. A later attempt requires another
+explicit command (or a separately visible, user-approved host scheduler) and
+must pass the durable cooldown, attempt, and consent gates again.
+
+Once CALL-E has accepted a request, version 0.2.0 of the official SDK exposes
+no operator-side cancel endpoint. Pressing Ctrl-C only stops the local waiter;
+it does **not** cancel the accepted call, and the durable reservation remains
+blocked until `reconcile` records the terminal result. The recipient can cancel
+the active call by saying “end this call” or “hang up”; the bound task requires
+the agent to acknowledge that request and end immediately. If an operator-side
+kill switch is required, do not use live execution until the provider offers a
+verifiable cancellation control.
+
 ConsentGate distinguishes a request to end only the current call from an
 explicit request for no future calls. A corroborated do-not-call request is
 stored permanently and blocks every later attempt until a new verified opt-in
@@ -109,6 +127,17 @@ and a matching transcript statement. Completed outcomes similarly require
 usable evidence and high confidence. `failed` and `no_answer` are retry-safe
 only when terminal attempt records positively establish no contact and contain
 no transcript; ambiguous or partial contact stays blocked for reconciliation.
+A corroborated request to end only the current call is stored as a temporary
+rejection and starts the 24-hour cooldown; an uncorroborated or low-confidence
+extraction remains blocked for reconciliation.
+
+Caller-controlled purpose prose is never inserted into a live task. A plan must
+select an allowlisted `purpose_kind`, and its human-readable `purpose` must
+exactly match that kind's fixed template. Calls containing medical, legal,
+financial, or emergency content are rejected rather than delegated to the
+model. This version intentionally allowlists only the bundled, consented
+`accessibility_test`; adding another purpose requires a reviewed code change,
+template, and tests.
 
 Only call a number you control or a recipient who has explicitly agreed to the
 call. Comply with applicable calling, recording, privacy, and consumer
