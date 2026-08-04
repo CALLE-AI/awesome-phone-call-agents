@@ -8,9 +8,9 @@ version = "0.1.0-public-ref"
 description = "Reference app demonstrating the refusal-first pattern for AI phone-agent integration. Offline-fake default mode; live-mode stub refuses to dial by design."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "LICENSE_PLACEHOLDER_PENDING_HUMAN_DECISION" }
+license = { text = "MIT" }
 authors = [
-    { name = "ParcelBridge Submitter Placeholder" },
+    { name = "conanxin" },
 ]
 keywords = [
     "ai-phone-agent",
@@ -23,7 +23,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",  # placeholder; renegotiated at PR review
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -40,9 +40,6 @@ dev = [
 ]
 
 [project.scripts]
-# The CLI exposes two subcommands: ``demo`` and ``validate``.
-# Invoke with:  parcelbridge demo --offline
-#               parcelbridge validate
 parcelbridge = "parcelbridge.cli:main"
 
 [tool.setuptools]
@@ -61,7 +58,6 @@ markers = [
 ]
 
 [tool.parcelbridge]
-# Bundle metadata used by the upstream validator and the PR body.
 mode_default = "offline"
 live_mode_status = "documentation_stub"
 run_call_implemented = false
