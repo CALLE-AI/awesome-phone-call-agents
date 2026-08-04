@@ -1,0 +1,13 @@
+{
+  "scenario": "appointment_booking",
+  "phone_number": "+14155550100",
+  "authorized_recipient": true,
+  "region": "US",
+  "locale": "en-US",
+  "context": {
+    "client_name": "Taylor",
+    "business_name": "Example Dental",
+    "service": "dental cleaning",
+    "preferred_times": ["Tuesday morning", "Thursday afternoon"]
+  }
+}
