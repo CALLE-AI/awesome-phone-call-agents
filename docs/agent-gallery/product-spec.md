@@ -142,11 +142,16 @@ Confirmed against a real call on 2026-08-04. Full record:
   to human review regardless of what was read.
 - **Voicemail:** stated explicitly in the goal. The planner otherwise invents its own
   voicemail behavior, and leaving a voicemail is a real-world side effect.
-- **Deployment and call state:** Cloudflare Pages + Pages Functions (copying
-  `apps/typescript/call-neuron`'s working pipeline). No database: CALL-E is the system
-  of record; the browser polls a server endpoint that relays CALL-E status. Idempotency:
-  client `request_key` + immediate submit-disable + server-side duplicate check before
-  creation. No call data is stored server-side.
+- **Deployment and call state:** Vercel Edge Functions, chosen because the team already
+  has a Vercel account. Nothing in the hackathon rules or this repository requires a
+  particular host; the only real constraints are that a server-side runtime must hold the
+  credential and that judges need free access to a working demo. The earlier Cloudflare
+  choice came from copying `apps/typescript/call-neuron` and was preference, not
+  requirement. Handlers take web-standard `Request` and `Response`, so the host is two
+  thin route files deep. No database: CALL-E is the system of record; the browser polls a
+  server endpoint that relays CALL-E status. Idempotency: client `request_key` +
+  immediate submit-disable + an in-instance duplicate check. No call data is stored
+  server-side.
 - **Unknown-creation reconciliation:** stays a nice-to-have. The plan-then-confirm
   handshake means a lost `run_call` reply can be resolved by reusing the same
   `confirm_token`, which is single-use, so a duplicate call cannot be created by

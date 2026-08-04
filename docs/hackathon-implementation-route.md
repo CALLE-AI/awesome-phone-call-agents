@@ -135,7 +135,7 @@ src/workflows/
 └── appointment-recovery.ts
 ```
 
-React and Vite are reasonable choices because the repository already contains a working example using that stack: `apps/typescript/call-neuron` uses React 19, Vite, and Cloudflare Pages with Wrangler. Copy its setup rather than scaffolding from scratch. CALL-E credentials must remain in a server-side integration layer and must never be shipped to browser code.
+React and Vite are reasonable choices because the repository already contains a working example using that stack: `apps/typescript/call-neuron` uses React 19 and Vite. Copy its setup rather than scaffolding from scratch, but treat its host as one option rather than the answer. CALL-E credentials must remain in a server-side integration layer and must never be shipped to browser code.
 
 ## Key Technical Decisions
 
@@ -153,7 +153,7 @@ Record the final choice and its rationale in one paragraph in the product specif
 
 ### Deployment and Call State
 
-- **Hosting:** Cloudflare Pages with Pages Functions as the server layer, mirroring `call-neuron`'s working deploy pipeline.
+- **Hosting:** Vercel Edge Functions as the server layer. Neither the hackathon rules nor this repository requires any particular host: the real constraints are a server-side runtime to hold the credential, since browser code must never see it, and free judge access to a working demo. Pick whichever host the team already has an account for, and keep the handlers on web-standard `Request` and `Response` so the choice stays reversible.
 - **No database.** CALL-E is the system of record for call state. The server creates the call, returns the call ID to the browser, and exposes a status endpoint that relays CALL-E's own status. The browser polls that endpoint; no server process needs to outlive a request, which keeps serverless timeouts irrelevant even for multi-minute calls.
 - **Idempotency without persistence:** the client generates a request key when the user confirms, the submit control disables immediately, and the server rejects a repeated key within the session and checks CALL-E's call list before creating. This satisfies the duplicate-call gate for a one-call MVP without introducing storage.
 - Document in the README that no call data is stored server-side and that results live only in CALL-E and the user's browser session.
