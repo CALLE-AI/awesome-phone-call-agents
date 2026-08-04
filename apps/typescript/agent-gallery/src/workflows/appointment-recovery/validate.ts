@@ -1,5 +1,5 @@
-import { MAX_REPLACEMENT_WINDOWS } from "../workflows/appointment-recovery";
-import type { RecoveryRequest } from "../types";
+import { MAX_REPLACEMENT_WINDOWS } from "./workflow";
+import type { RecoveryRequest } from "./types";
 
 const E164_PATTERN = /^\+[1-9]\d{6,14}$/;
 

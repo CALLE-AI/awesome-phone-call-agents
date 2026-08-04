@@ -5,7 +5,7 @@ import {
   isTerminal,
   normalizeStatus,
   outcomeFromStatus,
-} from "../src/lib/outcome";
+} from "../src/workflows/appointment-recovery/outcome";
 
 test("normalizes statuses that CALL-E reports with a space", () => {
   assert.equal(normalizeStatus("NO ANSWER"), "NO_ANSWER");

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { maskE164 } from "../lib/mask";
-import type { RecoveryRequest } from "../types";
+import { maskE164 } from "../calle";
+import type { RecoveryRequest } from "../workflows/appointment-recovery/types";
 
 interface Props {
   request: RecoveryRequest;

@@ -1,4 +1,4 @@
-import { appointmentRecovery } from "../workflows/appointment-recovery";
+import { appointmentRecovery } from "../workflows/appointment-recovery/workflow";
 
 export function Landing({ onStart }: { onStart: () => void }) {
   return (

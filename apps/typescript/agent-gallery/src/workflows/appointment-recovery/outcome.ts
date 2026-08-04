@@ -1,7 +1,19 @@
-import type { Outcome } from "../types";
+import { classifyDelivery, isTerminalStatus, normalizeStatus } from "../../calle";
+import type { CalleRunOutcome, Delivery } from "../../calle";
+import type { Outcome } from "./types";
 
 /**
- * Conversational agreement read back from a completed call.
+ * Turns a delivered call into an appointment-recovery outcome.
+ *
+ * The generic half — which statuses are terminal, and whether a call was
+ * answered at all — lives in `src/calle/status.ts` and is shared by any
+ * workflow. Only the mapping from a delivery to a business meaning is here.
+ */
+
+export { isTerminalStatus, normalizeStatus };
+
+/**
+ * Conversational agreement read back from an answered call.
  *
  * CALL-E exposes no custom extraction schema, so these values come from reading
  * the call's own summary and transcript. `null` means the reading was not
@@ -14,56 +26,31 @@ export type Agreement =
   | "no_valid_window"
   | null;
 
-export interface CallEOutcome {
-  task_completed?: boolean;
-  completion_confidence?: { score: number; label: string };
-}
-
-/** Below this confidence a completed call is routed to human review. */
+/** Below this confidence an answered call is routed to human review. */
 export const CONFIDENCE_THRESHOLD = 0.6;
 
-const TERMINAL_STATUSES = new Set([
-  "COMPLETED",
-  "FAILED",
-  "NO_ANSWER",
-  "DECLINED",
-  "CANCELED",
-  "CANCELLED",
-  "VOICEMAIL",
-  "BUSY",
-  "EXPIRED",
-]);
-
-/** CALL-E reports some statuses with a space, for example "NO ANSWER". */
-export function normalizeStatus(raw: string): string {
-  return raw.trim().toUpperCase().replace(/\s+/g, "_");
-}
-
+/** Kept for callers holding a raw status string. */
 export function isTerminal(raw: string): boolean {
-  return TERMINAL_STATUSES.has(normalizeStatus(raw));
+  return isTerminalStatus(raw);
 }
 
 /**
- * Map a terminal CALL-E status to an outcome, or return null when the call
- * connected and the outcome depends on what was said.
- *
- * DECLINED is a rejected incoming call, not a customer refusing the offer, so
- * it resolves to `unreachable`: nobody had the conversation.
+ * Map a terminal status to an outcome, or return null when the call was
+ * answered and the outcome depends on what was said.
  */
 export function outcomeFromStatus(raw: string): Outcome | null {
-  switch (normalizeStatus(raw)) {
-    case "COMPLETED":
+  return outcomeFromDelivery(classifyDelivery(raw));
+}
+
+export function outcomeFromDelivery(delivery: Delivery): Outcome | null {
+  switch (delivery) {
+    case "answered":
       return null;
-    case "NO_ANSWER":
-    case "VOICEMAIL":
-    case "BUSY":
-    case "DECLINED":
+    case "unreachable":
       return "unreachable";
-    case "FAILED":
-    case "CANCELED":
-    case "CANCELLED":
+    case "failed":
       return "failed";
-    case "EXPIRED":
+    case "timed_out":
       return "timed_out";
     default:
       return "uncertain";
@@ -81,7 +68,7 @@ export function outcomeFromStatus(raw: string): Outcome | null {
 export function classifyOutcome(input: {
   status: string;
   agreement: Agreement;
-  calleOutcome?: CallEOutcome;
+  calleOutcome?: CalleRunOutcome;
 }): Outcome {
   const fromStatus = outcomeFromStatus(input.status);
   if (fromStatus !== null) return fromStatus;

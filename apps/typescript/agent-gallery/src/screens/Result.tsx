@@ -1,5 +1,5 @@
-import { NEXT_ACTIONS } from "../types";
-import type { RecoveryResult } from "../types";
+import { NEXT_ACTIONS } from "../workflows/appointment-recovery/types";
+import type { RecoveryResult } from "../workflows/appointment-recovery/types";
 
 interface Props {
   result: RecoveryResult;

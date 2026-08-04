@@ -10,14 +10,51 @@ safety-contracted phone workflows. The product specification lives at
 
 ## Status
 
-Scaffold. The offline flow (configure → validate → masked dry-run preview →
-authorization gate) works end to end, and outcome classification is implemented
-and tested. The live CALL-E client is still stubbed: the server layer returns
-`501 live_integration_pending` until the MCP calls land in Phase 4 of the
-[implementation route](../../../docs/hackathon-implementation-route.md).
+The offline flow (configure → validate → masked dry-run preview → authorization
+gate) works end to end, outcome classification is implemented and tested, and
+the CALL-E MCP client is written and covered against a fake server.
 
-The integration surface has been confirmed against a real call; see
+It has not yet been exercised against the live service from a deployed
+environment: that is the next step, and it needs `CALLE_ACCESS_TOKEN` and
+`CALLE_SERVER_URL` set on the deployment. Without those the app runs and
+previews normally and the call endpoint answers `503 not_configured`.
+
+The integration surface was confirmed against a real call; see
 [`calle-api-observations.md`](../../../docs/agent-gallery/calle-api-observations.md).
+
+## Architecture and reuse
+
+The code is split so that the CALL-E integration can be lifted into a different
+workflow without carrying appointment concepts with it.
+
+```text
+src/calle/                          reusable, workflow-agnostic
+├── client.ts                       MCP transport: plan_call, run_call, get_call_run
+├── status.ts                       run-status semantics and delivery classification
+└── mask.ts                         phone-number masking
+
+src/workflows/appointment-recovery/ this workflow only
+├── workflow.ts                     policy lists and the call goal
+├── types.ts                        request, result, and outcome contracts
+├── validate.ts                     input rules
+├── agreement.ts                    reads what an answered call agreed to
+├── outcome.ts                      delivery and agreement to business outcome
+└── result.ts                       operator-facing result
+```
+
+`src/calle/` may not import from `src/workflows/`, and it does not name any
+appointment concept. Both rules are enforced by `test/layering.test.ts` rather
+than left to good intentions, because the dependency inverts quietly the first
+time the adapter needs a domain constant.
+
+The split falls where knowledge actually differs. Which statuses are terminal,
+and the fact that a telephony `DECLINED` is a rejected call rather than a person
+saying no, are things every CALL-E workflow must get right, so they live in the
+adapter. Whether a given call recovered an appointment is only meaningful here.
+
+A second workflow would supply its own goal text, input contract, and reading of
+what the call agreed to, and reuse the adapter unchanged. It would not get a
+gallery UI for free: the screens are written against this workflow's contract.
 
 ## The problem and workflow boundary
 
@@ -111,10 +148,15 @@ npm test
 ```
 
 Tests cover E.164 and timezone validation, consent and window rules, number
-masking, and outcome classification, including a regression test built from the
-Phase 2 call where CALL-E reported `task_completed: true` at high confidence on
-a call that rebooked nothing. They run offline with no credentials and place no
-calls. `npm run verify` adds the typecheck and production build.
+masking, outcome classification, the MCP client against an in-process fake
+CALL-E server, and the layering boundary described above. Two are regression
+tests for defects that reached working code: CALL-E reporting
+`task_completed: true` at high confidence on a call that rebooked nothing, and
+classifying a result without the offered windows, which downgraded every
+successful reschedule to `uncertain`.
+
+Tests run offline with no credentials and place no calls. `npm run verify` adds
+the typecheck and production build.
 
 ## Opt-in live calls
 
@@ -124,7 +166,13 @@ credentials the app remains fully usable in dry-run form.
 
 ## Current limitations
 
-- The live CALL-E client is stubbed (`501 live_integration_pending`).
+- The CALL-E client has been verified against a fake server, not yet against the
+  live service from a deployment.
+- The duplicate guard holds request keys in one server isolate. Planning and
+  running happen in a single request, so a repeat submission would mint a fresh
+  single-use token and dial again; the guard plus the disabled submit control
+  covers a double-click, not a determined retry across cold starts. Durable
+  storage is the only complete answer and is out of scope for one call.
 - The agreement reader matches phrasing rather than understanding language. It
   handles negation and split sentences, but wording it does not recognize reads
   as inconclusive, which sends a correctly handled call to human review as
