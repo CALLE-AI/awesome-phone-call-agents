@@ -10,16 +10,24 @@ safety-contracted phone workflows. The product specification lives at
 
 ## Status
 
+Deployed and publicly reachable at
+<https://awesome-phone-call-agents.vercel.app>.
+
 The offline flow (configure → validate → masked dry-run preview → authorization
 gate) works end to end, outcome classification is implemented and tested, and
-the CALL-E MCP client is written and covered against a fake server.
+the CALL-E MCP client is written and covered against a fake server. The live
+call layer is deployed, its credentials are configured, and the access gate in
+front of it is verified against the running deployment.
 
-It has not yet been exercised against the live service from a deployed
-environment: that is the next step, and it needs `CALLE_ACCESS_TOKEN` and
-`CALLE_SERVER_URL` set on the deployment. Without those the app runs and
-previews normally and the call endpoint answers `503 not_configured`.
+It has not yet been exercised against the live CALL-E service from that
+deployment. Until one real call has been placed through the deployed UI, treat
+the deployed call path as unproven: passing offline tests and configured
+environment variables do not establish that the edge runtime completes the MCP
+handshake, that the deployed token is accepted, or that polling handles real
+production responses.
 
-The integration surface was confirmed against a real call; see
+The integration surface was confirmed against one real call placed through the
+`calle` CLI rather than through this app; see
 [`calle-api-observations.md`](../../../docs/agent-gallery/calle-api-observations.md).
 
 ## Architecture and reuse
@@ -103,6 +111,34 @@ The `confirm_token` that authorizes one call is also server-only: it is created,
 spent, and discarded inside a single request and never sent to the browser.
 Local live testing uses an untracked `.env.local`.
 
+## Who may place a call
+
+A third environment variable, `OPERATOR_ACCESS_CODE`, is required before this
+deployment will place or inspect a call:
+
+```bash
+npx vercel env add OPERATOR_ACCESS_CODE production
+```
+
+The browser's authorization checkbox records the operator's consent, but it is a
+value in a request body and anyone can send one, so it is not a security
+boundary. Both call endpoints therefore require the access code in an
+`x-access-code` header and compare it on the server, in constant time, against
+the environment variable.
+
+The gate fails closed. A deployment with no configured code cannot place calls
+at all, and reports the same `not_configured` error as a deployment with no
+CALL-E credentials, so an unauthenticated caller cannot learn which part of the
+configuration is absent. It runs before the request body is read, so an
+unauthorized caller cannot use the endpoint as a free validator.
+
+The status endpoint is gated on the same code, because a run's activity and
+transcript are the contents of a real conversation with a real person.
+
+Dry run reaches no endpoint, so a reviewer can explore the entire workflow —
+configure, validate, masked preview, the safety contract — without a code. Only
+leaving dry-run mode needs one.
+
 ## Dry-run and preview behavior
 
 Dry run is the default and is the entire flow until the final gate. The preview
@@ -111,14 +147,19 @@ offered windows, and the agent's may/may-never lists — without any network cal
 
 ## Real-world side effects
 
-Exactly one outbound phone call, and only after the operator checks an explicit
-"I authorize exactly one call to this number, now" box and presses the button,
-which disables immediately. Duplicate submissions with the same `request_key`
-return the already-created call instead of dialing again.
+Exactly one outbound phone call, and only after the operator supplies a valid
+access code, checks an explicit "I authorize exactly one call to this number,
+now" box, and presses the button, which disables immediately.
+
+A duplicate submission with the same `request_key` returns the already-created
+call instead of dialing again **when it reaches the same server isolate**. That
+covers a double-click, which is the realistic case. It is not a durable
+guarantee; see the duplicate-guard limitation below for what it does not
+cover.
 
 ## Input and output contracts
 
-See [`src/types.ts`](src/types.ts). Input: business (name, IANA timezone, E.164
+See [`types.ts`](src/workflows/appointment-recovery/types.ts). Input: business (name, IANA timezone, E.164
 callback number), customer (given name, E.164 phone, consent attestation),
 appointment (service, ISO 8601 original time, missed/unconfirmed status), and up
 to three future replacement windows, plus a client-generated `request_key`.
@@ -127,9 +168,10 @@ Output: one of eight terminal outcomes (`confirmed`, `rescheduled`,
 an optional agreed time, customer intent, notes, the CALL-E call id, and a
 mapped next action.
 
-Outcomes are derived in [`src/lib/outcome.ts`](src/lib/outcome.ts) from the
+Outcomes are derived in
+[`outcome.ts`](src/workflows/appointment-recovery/outcome.ts) from the
 call's terminal status and a conservative reading of the conversation produced
-by [`src/lib/agreement.ts`](src/lib/agreement.ts). That reader treats the
+by [`agreement.ts`](src/workflows/appointment-recovery/agreement.ts). That reader treats the
 summary and transcript as untrusted text, requires positive evidence for every
 conclusion, and returns "inconclusive" when signals conflict or when an
 acceptance names no offered window, so ambiguity reaches a human. CALL-E's
@@ -175,9 +217,12 @@ the typecheck and production build.
 
 ## Opt-in live calls
 
-Not yet available in the scaffold. When the live layer lands, live calling will
-require server-side credentials plus the per-call authorization gate; without
-credentials the app remains fully usable in dry-run form.
+Live calling is available on a deployment that has `CALLE_ACCESS_TOKEN`,
+`CALLE_SERVER_URL`, and `OPERATOR_ACCESS_CODE` set. It requires all three, plus
+the per-call authorization gate in the browser. Without them the app remains
+fully usable in dry-run form and the call endpoints answer `503 not_configured`.
+
+Tests never place calls and never need credentials.
 
 ## Current limitations
 
@@ -186,14 +231,27 @@ credentials the app remains fully usable in dry-run form.
 - The duplicate guard holds request keys in one server isolate. Planning and
   running happen in a single request, so a repeat submission would mint a fresh
   single-use token and dial again; the guard plus the disabled submit control
-  covers a double-click, not a determined retry across cold starts. Durable
-  storage is the only complete answer and is out of scope for one call.
+  covers a double-click, not a determined retry across cold starts. It also
+  records the run only after dialing, so two concurrent requests with the same
+  key can both pass the initial lookup. An atomic durable claim is the only
+  complete answer.
+- There is no rate limit. The access code is the only control on how many calls
+  an authorized operator can place, so a leaked code is a spending risk until it
+  is rotated. A per-isolate limiter would not meaningfully limit anything, for
+  the same reason the duplicate guard does not.
+- The `confirmed` outcome is currently unreachable from a real call. The
+  agreement reader returns only `accepted_window`, `refused`, `no_valid_window`,
+  or inconclusive, so an agent confirming the original slot classifies as
+  `uncertain` and routes to human review. That fails safe, but it is not the
+  documented behavior.
 - The agreement reader matches phrasing rather than understanding language. It
   handles negation and split sentences, but wording it does not recognize reads
   as inconclusive, which sends a correctly handled call to human review as
   `uncertain`. It errs toward review rather than toward a wrong booking.
-- The duplicate guard is per-isolate; the completed implementation relies on the
-  single-use `confirm_token` for real protection.
+- The call goal asks the agent to offer to confirm the original appointment for
+  both `missed` and `unconfirmed` statuses, though confirming an appointment
+  already in the past is not meaningful. The two statuses want different call
+  policies.
 - Replacement-window times are entered in the business's local time without
   cross-checking the stated timezone.
 - Single workflow, single call, English-language conversations only.
