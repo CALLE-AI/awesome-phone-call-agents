@@ -1059,7 +1059,41 @@ def extract_result(call: dict[str, Any]) -> dict[str, Any]:
 
 def run(args: argparse.Namespace) -> int:
     campaign = CAMPAIGNS[args.campaign]
-    contacts = read_contacts(Path(args.contacts), args.country_code)
+
+    # A mistyped path or an unreadable file is an ordinary operator error, not a
+    # bug. Report it as one: a raw traceback buries the actionable line and
+    # invites the operator to assume something worse went wrong.
+    # Checked before opening, because a directory raises IsADirectoryError on
+    # POSIX but PermissionError on Windows — testing the path gives the operator
+    # the same clear message on both.
+    contacts_path = Path(args.contacts)
+    if contacts_path.is_dir():
+        print(
+            f"--contacts is a directory, not a CSV file: {args.contacts}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        contacts = read_contacts(contacts_path, args.country_code)
+    except FileNotFoundError:
+        print(f"Contacts file not found: {args.contacts}", file=sys.stderr)
+        return 2
+    except PermissionError:
+        print(f"No permission to read {args.contacts}", file=sys.stderr)
+        return 2
+    except UnicodeDecodeError:
+        print(
+            f"{args.contacts} is not valid UTF-8 text. Re-save it as UTF-8 CSV.",
+            file=sys.stderr,
+        )
+        return 2
+    except csv.Error as exc:
+        # A malformed CSV (an unterminated quote, a line longer than the field
+        # limit) is an operator error too, not a bug in this app.
+        print(f"Could not parse {args.contacts} as CSV: {exc}", file=sys.stderr)
+        return 2
+
     if not contacts:
         print("No contacts found.", file=sys.stderr)
         return 1
@@ -1401,12 +1435,33 @@ def run(args: argparse.Namespace) -> int:
     # A one-second timestamp collides when two runs finish in the same second,
     # so the suffix is retried with a counter until `open("x")` wins. Neither
     # the old file nor this run's record can be lost.
+    # EVERY failure from here on is recoverable only by printing the record:
+    # a full disk, a read-only directory, an --out that is itself a directory, a
+    # revoked permission. None of them un-place the calls, so none of them may
+    # raise. `_dump_results` is the last resort in each case.
+    def _dump_results(why: str) -> int:
+        print(
+            f"{why} Dumping the run record below so it is not lost — these "
+            f"calls were really placed.",
+            file=sys.stderr,
+        )
+        for record in results:
+            print(json.dumps(record), file=sys.stderr)
+        return 1
+
     out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return _dump_results(f"Could not create {out.parent} ({exc.strerror}).")
+
     fh = None
     try:
         fh = out.open("x", encoding="utf-8")
     except FileExistsError:
+        # A one-second timestamp collides when two runs finish in the same
+        # second, so the suffix is retried with a counter until `open("x")`
+        # wins. Neither the old file nor this run's record can be lost.
         stamp = time.strftime("%Y%m%dT%H%M%S")
         for n in range(1, 1000):
             suffix = f"-{stamp}" if n == 1 else f"-{stamp}-{n}"
@@ -1415,23 +1470,32 @@ def run(args: argparse.Namespace) -> int:
                 fh = candidate.open("x", encoding="utf-8")
             except FileExistsError:
                 continue
+            except OSError as exc:
+                return _dump_results(
+                    f"Could not write {candidate} ({exc.strerror})."
+                )
             out = candidate
             print(f"  {args.out} exists; writing {out.name} instead")
             break
         if fh is None:
-            # Print the record rather than lose it — these calls really happened.
-            print(
-                f"Could not create a results file next to {args.out}. Dumping "
-                f"the run record to stdout so it is not lost:",
-                file=sys.stderr,
+            return _dump_results(
+                f"Could not find a free results filename next to {args.out}."
             )
-            for r in results:
-                print(json.dumps(r), file=sys.stderr)
-            return 1
+    except OSError as exc:
+        # IsADirectoryError, PermissionError, ENOSPC, a bad path — all arrive
+        # here, and all of them would otherwise be an unhandled traceback that
+        # discards the record.
+        return _dump_results(f"Could not write {out} ({exc.strerror}).")
 
-    with fh:
-        for r in results:
-            fh.write(json.dumps(r) + "\n")
+    try:
+        with fh:
+            for r in results:
+                fh.write(json.dumps(r) + "\n")
+    except OSError as exc:
+        # A disk that fills mid-write leaves a truncated file, so the full
+        # record still goes to stderr.
+        return _dump_results(f"Failed while writing {out} ({exc.strerror}).")
+
     # Results hold call outcomes about identifiable people. Owner-only.
     try:
         out.chmod(0o600)

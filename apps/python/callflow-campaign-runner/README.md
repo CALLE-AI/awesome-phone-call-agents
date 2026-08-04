@@ -163,6 +163,20 @@ schema-validated JSON. **Transcripts are never parsed or scraped.**
 Results are written as JSONL to `results/campaign_results.jsonl`
 (`--out` to change). **Phone numbers in the file are masked.**
 
+An existing file is never overwritten — a results file is the only local record
+of who was called and what they said. If `--out` already exists, a timestamped
+name is used instead (with a counter, so two runs finishing in the same second
+cannot collide).
+
+If the file cannot be written at all — a full disk, a read-only directory, an
+`--out` that is itself a directory — the run **prints every record to stderr
+instead of failing**. By that point the calls have really been placed, so
+discarding the record is not an option. Redirect stderr if you want to keep it:
+
+```bash
+python runner.py ... --live --allow +15555550100 2> run-record.txt
+```
+
 ### Triage rules
 
 Applied in order, and **fails closed** — an absent or malformed field is
@@ -439,11 +453,12 @@ records, result and error redaction, prompt boundaries, note sanitisation, CSV
 parsing, and goal rendering.
 
 `test_live_path.py` drives the full live loop against an injected fake client
-across 31 checks: a completed call, a duplicate number in one file, an opt-out
+across 42 checks: a completed call, a duplicate number in one file, an opt-out
 mid-run, a provider error, a poll timeout, an empty allowlist, region/locale
-handling, and a batch-id reuse that must not re-dial. Isolated tests missed a
-real duplicate-call bug that this caught — the first call had already resolved
-by the time the second row was read, freeing the reservation.
+handling, a batch-id reuse that must not re-dial, an unwritable `--out`, and an
+unreadable contacts file. Isolated tests missed a real duplicate-call bug that
+this caught — the first call had already resolved by the time the second row was
+read, freeing the reservation.
 
 Both exit non-zero on failure and place no calls.
 

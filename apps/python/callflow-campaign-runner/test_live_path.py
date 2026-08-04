@@ -11,6 +11,7 @@ Run:  python test_live_path.py
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sys
@@ -258,6 +259,78 @@ with tempfile.TemporaryDirectory() as tmp:
     recipient = fake.calls.created[0]["recipient"]
     check("region sent when stated", recipient.get("region") == "US")
     check("locale sent when stated", recipient.get("locale") == "en")
+
+print("\nThe run record is never lost, whatever happens to --out")
+# By the time results are written the calls have already been placed. No
+# filesystem failure may discard that record, so each one must fall back to
+# printing it rather than raising.
+with tempfile.TemporaryDirectory() as tmp:
+    blocked = Path(tmp) / "blocked"
+    blocked.mkdir()  # --out points at a directory: open("x") cannot succeed
+
+    csv_path = Path(tmp) / "c.csv"
+    csv_path.write_text(ONE_ROW, encoding="utf-8")
+    args = argparse.Namespace(
+        campaign="travel", contacts=str(csv_path), live=True,
+        allow="+15555550100", max_calls=9, country_code="",
+        poll_interval=0.01, timeout=5, out=str(blocked), batch_id="b1",
+        suppression_file=str(Path(tmp) / "s.txt"),
+        dispatch_file=str(Path(tmp) / "l.txt"),
+        region="", locale="", list_campaigns=False,
+    )
+    fake = FakeClient("clean")
+    original = runner.CalleClient
+    runner.CalleClient = lambda **_: fake  # type: ignore[assignment]
+    buffer = io.StringIO()
+    real_stderr = sys.stderr
+    sys.stderr = buffer
+    try:
+        rc = runner.run(args)
+    finally:
+        sys.stderr = real_stderr
+        runner.CalleClient = original  # type: ignore[assignment]
+
+    dumped = buffer.getvalue()
+    check("an unwritable --out does not raise", rc == 1)
+    check("the call was still placed", len(fake.calls.created) == 1)
+    check("the run record is printed rather than lost", "call_id" in dumped)
+    check("the dump explains the calls were real", "really placed" in dumped)
+    check(
+        "the dumped record is valid JSON",
+        any(
+            line.strip().startswith("{") and json.loads(line)
+            for line in dumped.splitlines()
+            if line.strip().startswith("{")
+        ),
+    )
+
+print("\nA missing or unreadable contacts file is an operator error, not a crash")
+with tempfile.TemporaryDirectory() as tmp:
+    for target, why, expected in [
+        (str(Path(tmp) / "nope.csv"), "a missing file", "not found"),
+        (tmp, "a directory", "directory"),
+    ]:
+        args = argparse.Namespace(
+            campaign="travel", contacts=target, live=False, allow="",
+            max_calls=9, country_code="", poll_interval=0.01, timeout=1,
+            out=str(Path(tmp) / "o.jsonl"), batch_id="b1",
+            suppression_file=str(Path(tmp) / "s.txt"),
+            dispatch_file=str(Path(tmp) / "l.txt"),
+            region="", locale="", list_campaigns=False,
+        )
+        buffer = io.StringIO()
+        real_stderr = sys.stderr
+        sys.stderr = buffer
+        try:
+            rc = runner.run(args)
+            raised = False
+        except Exception:  # noqa: BLE001
+            rc, raised = None, True
+        finally:
+            sys.stderr = real_stderr
+        check(f"{why} does not raise", not raised)
+        check(f"{why} exits non-zero", rc == 2)
+        check(f"{why} explains itself", expected in buffer.getvalue().lower())
 
 print("\nA completed recipient is not re-dialled by reusing the batch id")
 # The same ledger and the same --batch-id must refuse the second attempt, even
