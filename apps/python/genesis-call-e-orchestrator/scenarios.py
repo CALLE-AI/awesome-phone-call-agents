@@ -10,14 +10,15 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "title": "Appointment booking",
         "result_schema": {
             "type": "object",
+            "additionalProperties": False,
             "required": ["confirmed"],
             "properties": {
                 "confirmed": {"type": "boolean"},
-                "appointment_time": {"type": ["string", "null"]},
-                "provider": {"type": ["string", "null"]},
-                "location": {"type": ["string", "null"]},
-                "confirmation_number": {"type": ["string", "null"]},
-                "notes": {"type": ["string", "null"]},
+                "appointment_time": {"type": "string"},
+                "provider": {"type": "string"},
+                "location": {"type": "string"},
+                "confirmation_number": {"type": "string"},
+                "notes": {"type": "string"},
             },
         },
     },
@@ -25,15 +26,16 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "title": "Lead qualification",
         "result_schema": {
             "type": "object",
+            "additionalProperties": False,
             "required": ["qualified", "score", "opt_out"],
             "properties": {
                 "qualified": {"type": "boolean"},
-                "score": {"type": "integer", "minimum": 0, "maximum": 100},
+                "score": {"type": "integer"},
                 "pain_points": {"type": "array", "items": {"type": "string"}},
-                "budget": {"type": ["string", "null"]},
-                "timeline": {"type": ["string", "null"]},
+                "budget": {"type": "string"},
+                "timeline": {"type": "string"},
                 "decision_maker": {"type": "boolean"},
-                "next_steps": {"type": ["string", "null"]},
+                "next_steps": {"type": "string"},
                 "opt_out": {"type": "boolean"},
             },
         },
@@ -42,14 +44,15 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "title": "Service and vendor coordination",
         "result_schema": {
             "type": "object",
+            "additionalProperties": False,
             "required": ["vendor", "pricing", "availability"],
             "properties": {
-                "vendor": {"type": ["string", "null"]},
-                "pricing": {"type": "object"},
-                "availability": {"type": ["string", "null"]},
-                "recommendation": {"type": ["string", "null"]},
-                "contact_info": {"type": ["string", "null"]},
-                "notes": {"type": ["string", "null"]},
+                "vendor": {"type": "string"},
+                "pricing": {"type": "string"},
+                "availability": {"type": "string"},
+                "recommendation": {"type": "string"},
+                "contact_info": {"type": "string"},
+                "notes": {"type": "string"},
             },
         },
     },
@@ -66,7 +69,7 @@ def build_task(request: dict[str, Any]) -> str:
     if scenario == "appointment_booking":
         return (
             f"Call {context.get('business_name', 'the business')} on behalf of "
-            f"{context.get('client_name', 'the client')} to book "
+            f"{context.get('customer_name', context.get('client_name', 'the client'))} to book "
             f"{context.get('service', 'an appointment')}. Preferred times: "
             f"{json.dumps(context.get('preferred_times', []), ensure_ascii=False)}. "
             + disclosure
@@ -117,7 +120,7 @@ def simulated_result(scenario: str) -> dict[str, Any]:
         }
     return {
         "vendor": "Example Facilities",
-        "pricing": {"monthly": 780, "currency": "USD", "minimum_months": 3},
+        "pricing": "$780/month; three-month minimum",
         "availability": "Can start next Monday",
         "recommendation": "Meets requirements; human review required before acceptance.",
         "contact_info": "Jordan, operations desk",

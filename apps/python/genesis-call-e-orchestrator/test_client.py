@@ -43,6 +43,34 @@ def test_request_requires_e164_and_authorization():
         })
 
 
+def test_result_schemas_stay_within_calle_supported_subset():
+    supported_keywords = {"type", "properties", "required", "enum", "items", "description", "additionalProperties"}
+    supported_types = {"object", "array", "string", "integer", "number", "boolean"}
+
+    def validate(schema):
+        assert set(schema) <= supported_keywords
+        assert isinstance(schema.get("type"), str)
+        assert schema["type"] in supported_types
+        assert schema.get("additionalProperties") is not True
+        for child in (schema.get("properties") or {}).values():
+            validate(child)
+        if isinstance(schema.get("items"), dict):
+            validate(schema["items"])
+
+    for scenario in client.SCENARIOS.values():
+        validate(scenario["result_schema"])
+
+
+def test_appointment_task_accepts_ui_customer_name():
+    request = {
+        "scenario": "appointment_booking",
+        "phone_number": "+14155550100",
+        "authorized_recipient": True,
+        "context": {"customer_name": "Taylor", "business_name": "Example Dental"},
+    }
+    assert "on behalf of Taylor" in client.build_task(request)
+
+
 def test_live_path_calls_published_sdk_surface(monkeypatch, case_data):
     captured = {}
 

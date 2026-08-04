@@ -69,6 +69,11 @@ Every request includes:
 - optional `region` and `locale`; and
 - a scenario-specific `context` object.
 
+CALL-E validates destination coverage before dialing. Region/language availability
+is provider-controlled and may change; an unsupported combination returns a safe
+pre-call error with no call ID. Use only a combination CALL-E currently lists as
+supported, and do not relabel a destination or language to bypass that policy.
+
 Examples use the fictional North American range `+1 415-555-0100`.
 
 ## Safety and side effects
@@ -85,7 +90,7 @@ Examples use the fictional North American range `+1 415-555-0100`.
 
 ## Cancellation and rollback
 
-Omit `--execute`, leave `CALLE_LIVE_CALLS_ENABLED` unset, or omit the confirmation flag to prevent a call. After CALL-E accepts the task, this small app cannot guarantee cancellation; use CALL-E provider controls if available. Follow-up actions are returned as drafts or recommendations and do not modify calendars, CRMs, or vendor systems.
+Omit `--execute`, leave `CALLE_LIVE_CALLS_ENABLED` unset, or omit the confirmation flag to prevent a call. CALL-E 0.6 exposes no cancel/terminate endpoint, so after CALL-E accepts a task this app cannot stop it remotely. Follow-up actions are returned as drafts or recommendations and do not modify calendars, CRMs, or vendor systems.
 
 ## Tests
 
