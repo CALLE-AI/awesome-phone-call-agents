@@ -408,3 +408,80 @@ test("a concrete proposal of the offered time anchors, and so does a real questi
   // no offered time to lean on.
   assert.match(refusalEvidence(asked, "", [EARLIEST, AETNA]).quote, /^I am afraid we cannot book/);
 });
+
+test("a question in one clause does not make booking words in another an ask", () => {
+  const call = turns([
+    ["bot", "I am calling to book an appointment. Do you accept Aetna?"],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // One turn, two things said. The first states why the caller rang and the second asks
+  // about insurance, so the question mark belongs to the insurance question. Lending it
+  // to the booking words in the sentence before reports a refused appointment in a call
+  // where no slot was ever put to them.
+  const evidence = refusalEvidence(call, "", [AETNA]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+  // The same turn spliced with a comma instead of a full stop, which is how a
+  // transcript of speech writes it half the time.
+  const spliced = turns([
+    ["bot", "I am calling to book an appointment, do you accept Aetna?"],
+    ["user", "No, we do not take that plan."],
+  ]);
+  assert.equal(refusalEvidence(spliced, "", [AETNA]).quote, "");
+  // The agreement side of the same turn. Booking language the callee volunteers after
+  // it has no ask to answer either.
+  const volunteered = turns([
+    ["bot", "I am calling to book an appointment. Do you accept Aetna?"],
+    ["user", "Yes, we do. I have put her in for Thursday the thirteenth at nine forty."],
+  ]);
+  const agreement = agreementEvidence(volunteered, "slot_within_windows", "2026-08-13T09:40:00-07:00");
+  assert.equal(agreement.quote, "");
+  assert.match(agreement.otherQuote, /^Yes, we do/);
+});
+
+test("a request and its booking words in one clause still anchor", () => {
+  const call = turns([
+    [
+      "bot",
+      "Hello, I am an automated assistant calling on behalf of Fatima Haddad. Could you hold an appointment for her?",
+    ],
+    ["user", "I am afraid we cannot book that over the phone for somebody else."],
+  ]);
+  // Reading clause by clause must not cost the calls where the caller does ask. The
+  // request and the booking words are in the same sentence here, so the turn puts the
+  // arrangement to them and the refusal answers it.
+  assert.match(refusalEvidence(call, "", [EARLIEST, AETNA]).quote, /^I am afraid we cannot book/);
+});
+
+test("the last thing a turn puts to them is what the next turn answers", () => {
+  const call = turns([
+    ["bot", "Could you hold Thursday the thirteenth at nine forty? Do you accept Aetna?"],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // A real request for the slot and then a second question in the same turn. The no
+  // answers the question that was asked last, so it is not a refusal of the slot, which
+  // they have not answered at all.
+  const evidence = refusalEvidence(call, "2026-08-13T09:40:00-07:00", [AETNA]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+  // The other order, so the rule is about which came last and not about which kind of
+  // ask wins. Here the arrangement is the last thing put to them.
+  const arrangementLast = turns([
+    ["bot", "Do you accept Aetna? Could you hold Thursday the thirteenth at nine forty?"],
+    ["user", "No, we cannot book that, we are full that day."],
+  ]);
+  assert.match(
+    refusalEvidence(arrangementLast, "2026-08-13T09:40:00-07:00", [AETNA]).quote,
+    /^No, we cannot book/,
+  );
+  // The same two things in one sentence, joined instead of stopped. A coordinator with a
+  // fresh question after it opens a second thing put to them, so the insurance question
+  // is still the last one and the refusal is still an answer to it.
+  const joined = turns([
+    ["bot", "Could you hold Thursday the thirteenth at nine forty and do you accept Aetna?"],
+    ["user", "No, we do not take that plan."],
+  ]);
+  const insurance = refusalEvidence(joined, "2026-08-13T09:40:00-07:00", [AETNA]);
+  assert.equal(insurance.quote, "");
+  assert.match(insurance.otherQuote, /^No, we do not take that plan/);
+});

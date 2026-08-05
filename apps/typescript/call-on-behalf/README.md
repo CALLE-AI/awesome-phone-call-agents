@@ -65,14 +65,18 @@ The extraction proposes. The transcript decides.
   the first. A refusal aimed elsewhere is quoted as what was actually turned
   down. When one turn agrees and another refuses the same arrangement, the report
   stands behind neither and says a person has to read the transcript and call.
-- Raising the arrangement means asking for it or proposing the time itself. A
-  statement that only carries the word appointment or confirm raises nothing, so an
-  answer to the question before it stays an answer to that question. That holds even
-  when the statement also names some unrelated weekday: "our appointment desk is open
-  Monday" offers no slot. A time the caller proposes without a question mark counts
-  only when it is the time the report would print, because that is a time the callee
-  can say yes to. It is one rule and all three bindings use it: the agreement, the
-  refusal and the confirmation code that belongs to the agreement.
+- Raising the arrangement means asking for it or proposing the time itself, in one
+  clause. A statement that only carries the word appointment or confirm raises
+  nothing, so an answer to the question before it stays an answer to that question.
+  That holds even when the statement also names some unrelated weekday: "our
+  appointment desk is open Monday" offers no slot. A time the caller proposes without
+  a question mark counts only when it is the time the report would print, because
+  that is a time the callee can say yes to. The request and the booking words have to
+  be in the same clause, so "I am calling to book an appointment. Do you accept
+  Aetna?" asks about insurance and nothing else. Where a turn puts two things to them
+  the answer belongs to the one asked last. It is one rule and all three
+  bindings use it: the agreement, the refusal and the confirmation code that belongs
+  to the agreement.
 - A time no callee turn named is not read back as an offer. CALL-E's own note
   is printed with its name on it. Nothing in the report is both unchecked and
   unlabelled.
@@ -166,7 +170,7 @@ Node 20 or later.
 cd apps/typescript/call-on-behalf
 npm install
 npm run check   # tsc --noEmit
-npm test        # 138 tests, no credentials, no outbound calls
+npm test        # 142 tests, no credentials, no outbound calls
 npm run demo    # the six cases against the local fake CALL-E
 ```
 

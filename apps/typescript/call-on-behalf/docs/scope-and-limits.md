@@ -90,22 +90,39 @@ this one. The cost is a call where the only precise form of the time or the refe
 in a later turn: that reads as not named, so the report gives less than the extraction
 claimed rather than more.
 
-Raising the arrangement takes two things at once and not one word. The turn has to be
-about the arrangement, which is booking language or the time the extraction reported. It
-also has to put that to the callee, which is one of two things and not a third: a genuine
-request, meaning a booking turn phrased as a question or a request, or a concrete proposal,
-meaning a turn that names the offered time itself. A statement that only carries the word
-appointment, confirm or availability raises nothing, and neither does one that adds an
-unrelated weekday: "our appointment desk is open Monday", said between a question and its
-answer, offers no slot, so it must not make that answer a reply to the arrangement. That is
-why the proposal half is the offered time and not any weekday, and why a first-person
-purpose statement such as "I am calling to book an appointment" is not an ask: it says why
-the caller rang and puts no question to the callee. A time the caller states rather than
-asks still counts when it is the offered time, so "Thursday the thirteenth at nine forty
-would suit her" is an anchor and the tightening does not cost real proposals. One rule, used
-by all three bindings, so it cannot hold on the agreement and not on the refusal or the
-confirmation code. It fails closed the other way: an ask this does not catch leaves the
-evidence unbound, so the commitment reads `unconfirmed`.
+Raising the arrangement takes two things at once in one clause, not one word anywhere in
+the turn. The clause has to be about the arrangement, which is booking language or the time the
+extraction reported. It also has to put that to the callee, which is one of two things and
+not a third. A genuine request, meaning booking language phrased as a question or a
+request. Or a concrete proposal, meaning a clause that names the offered time itself. A
+statement that only carries the word appointment, confirm or availability raises nothing,
+and neither does one that adds an unrelated weekday: "our appointment desk is open Monday",
+said between a question and its answer, offers no slot, so it must not make that answer a
+reply to the arrangement. That is why the proposal half is the offered time and not any
+weekday. It is also why a first-person purpose statement such as "I am calling to book an
+appointment" is not an ask: it says why the caller rang and puts no question to the callee.
+
+One clause, because a turn is not one thing put to the callee. "I am calling to book an
+appointment. Do you accept Aetna?" is a purpose statement and then an insurance question,
+and the question mark belongs to the insurance question. Lending it to the booking words in
+front of it reported a refused appointment in a call where no slot had been put to anybody.
+So the request form and the booking language have to be in the same clause. Where one turn
+does put two things to them the answer belongs to whichever was asked last: "could you
+hold Thursday at nine forty? Do you accept Aetna?" then "no, we do not take that plan" is a
+no about insurance and no answer at all about the slot. Clauses are split on a sentence end,
+a semicolon, a colon, a comma, a dash or a line break, because speech splices two
+utterances with a comma as often as it writes a full stop.
+
+A time the caller states rather than asks still counts when it is the offered time, so
+"Thursday the thirteenth at nine forty would suit her" is an anchor and the tightening does
+not cost real proposals. The proposal arm reads the whole turn as well as the clause, so the
+day check still sees every day the turn named and "Wednesday, at nine forty" is not read as
+Thursday at nine forty. One rule, used by all three bindings, so it cannot hold on the
+agreement and not on the refusal or the confirmation code. It fails closed the other way: an
+ask this does not catch leaves the evidence unbound, so the commitment reads `unconfirmed`.
+A request whose booking word sits on the far side of a comma from its question form, "about
+the appointment, could you do Thursday?", is one of those. A turn that names the reported
+time anchors on the proposal arm whatever its punctuation.
 
 The time is matched as a wall clock, in the forms a transcript carries. When a turn
 names a day or a weekday it has to be the claimed one, so the same time on another

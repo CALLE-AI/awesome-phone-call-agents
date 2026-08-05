@@ -787,6 +787,50 @@ test("a statement about the appointment does not turn a refused question into a 
   );
 });
 
+test("a question asked in the same turn as a booking line is what the answer answers", async () => {
+  // One caller turn says why the call is happening and then asks about the plan. The
+  // callee turns down the plan. Nothing was ever put to them about holding a slot, so
+  // the question mark on the insurance question is not an ask for the booking words in
+  // front of it. Reading it that way tells somebody an appointment was refused in a
+  // call where nobody was asked for one.
+  await withFake(
+    [
+      {
+        phone: CLINIC,
+        botLines: [
+          BOT_LINES[0]!,
+          "I am calling to book an appointment. Do you take Blue Shield PPO?",
+          BOT_LINES[4]!,
+        ],
+        userLines: [
+          "Bayview Family Clinic, how can I help?",
+          "No, we do not take that plan.",
+          "Photo identification and the insurance card.",
+        ],
+        structuredResult: {
+          ...goodResult(),
+          answer_earliest: "",
+          answer_accepts_plan: "no",
+          commitment_made: "declined_by_callee",
+          offered_datetime: "",
+          confirmation_code: "",
+        },
+      },
+    ],
+    async (port) => {
+      const report = await runErrand({ request: errandRequest(), port, pollIntervalMs: 5 });
+      assert.equal(report.commitment, "unconfirmed");
+      assert.match(report.next_step, /nothing is settled either way/);
+      assert.equal(report.next_step.includes("would not arrange it on this call"), false);
+      assert.match(report.callee_notes, /no turn refuses the arrangement/);
+      assert.match(report.callee_notes, /we do not take that plan/);
+      // The question they did turn down is still answered, out of that same turn.
+      assert.equal(report.answers[1]!.answered, true);
+      assert.equal(report.answers[1]!.answer, "no");
+    },
+  );
+});
+
 test("a booking nobody asked for is not agreed and its reference number is dropped", async () => {
   // The same statement on the other two bindings. The callee volunteers a slot and a
   // reference in a call where the caller only asked about the plan. Reporting that as

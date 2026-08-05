@@ -10,7 +10,9 @@
  * Every one of those is anchored to what the caller had just put to the callee. A
  * sentence is evidence for the thing it was answering and for nothing else, which is
  * what stops a yes to one question standing in for an agreement and a no to another
- * standing in for a refusal of the errand.
+ * standing in for a refusal of the errand. What the caller put to them is read clause
+ * by clause, because a question mark at the end of a turn belongs to the thing it was
+ * asked about and not to everything else in that turn.
  *
  * A business declining to deal with an automated caller is a legitimate answer,
  * not an error to retry around. It is detected, reported and obeyed.
@@ -458,7 +460,7 @@ const COMMITMENT_PROMPT =
   /\b(?:book|books|booked|booking|hold|holding|reserve|reserving|reserved|schedule|scheduled|scheduling|reschedule|pencil|slot|slots|appointment|appointments|availability|confirm|confirming)\b/i;
 
 /**
- * Caller turns that put a question or a request to the callee, rather than tell them
+ * Caller clauses that put a question or a request to the callee, rather than tell them
  * something. The question mark is not required on its own, because a transcript of
  * speech does not always carry one and an asked question is still an asked question
  * without it, so the modal, auxiliary and request shapes a call script uses count too.
@@ -468,7 +470,11 @@ const COMMITMENT_PROMPT =
  * not one of them: it tells the callee why the caller rang and asks them nothing, so
  * it is not the caller putting the arrangement to them. A statement like that raises
  * the arrangement only when it also names the offered time, which is the proposal arm
- * in `raisesArrangement`, not an ask.
+ * in `clauseRaises`, not an ask.
+ *
+ * They are matched against one clause rather than a whole turn, because a question
+ * mark at the end of a turn belongs to the thing it was asked about and to nothing
+ * else in that turn.
  */
 const ASK_FORMS: RegExp[] = [
   /\?/,
@@ -478,15 +484,51 @@ const ASK_FORMS: RegExp[] = [
 ];
 
 /**
- * Whether a caller turn puts the arrangement to the callee.
+ * The clauses of a caller turn, in the order they were said.
  *
- * Two halves, because the words alone are not enough. The turn has to be about the
- * arrangement, which is booking language or the time the extraction reported. It
- * also has to put it to them, which is one of two things and not a third:
+ * A turn is not one thing put to the callee. "I am calling to book an appointment. Do
+ * you accept Aetna?" says why the caller rang and then asks about insurance. The
+ * question mark belongs to the insurance question alone. Classifying a turn whole let a
+ * request form anywhere in it license booking words anywhere else, so a no to the
+ * insurance question came back as a refused appointment in a call where no slot had
+ * been put to anybody.
  *
- * - a genuine request: a booking turn in a question or request form, "could you hold
+ * The split is where one thing said ends and the next begins: a sentence end, a
+ * semicolon, a colon, a comma, a dash or a line break. A comma is in there because a
+ * transcript of speech splices two utterances with one as often as it writes a full
+ * stop. The half carrying the question mark is then the whole turn's only ask. A
+ * coordinator counts as a break when a fresh question opens right after it, as in "do
+ * you accept Aetna and can we book Thursday?", because that is a second thing put to
+ * them inside one sentence.
+ *
+ * The cost is a request whose booking word sits on the far side of a comma from its
+ * question form. "About the appointment, could you do Thursday?" is two clauses and
+ * neither is both halves, so it anchors nothing and the commitment reads
+ * `unconfirmed`. That is the direction to be wrong in. A turn that names the time the
+ * extraction reported still anchors on the proposal arm whatever its punctuation.
+ */
+const CLAUSE_BREAK =
+  /(?<=[.!?])\s+|[;:,\r\n]+|\s+[-\u2013\u2014]{1,2}\s+|\s+(?:and|or|but|so|then)\s+(?=(?:can|could|would|will|shall|may|do|does|did|is|are|was|were|have|has|had)\s+(?:you|we|i|she|he|they|there)\b)/i;
+
+function clausesOf(text: string): string[] {
+  return text
+    .split(CLAUSE_BREAK)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+}
+
+/**
+ * Whether one clause puts the arrangement to the callee.
+ *
+ * Two halves and both of them inside this clause, which is what binds the request form
+ * to the booking words rather than to whatever else the turn happened to say. The
+ * clause has to be about the arrangement, which is booking language or the time the
+ * extraction reported. It also has to put that to them, which is one of two things and
+ * not a third:
+ *
+ * - a genuine request: booking language in a question or request form, "could you hold
  *   Thursday at nine forty?"
- * - a concrete proposal: a turn that names the offered time itself, "Thursday the
+ * - a concrete proposal: a clause that names the offered time itself, "Thursday the
  *   thirteenth at nine forty would suit her", which is a time they can say yes to
  *   whether or not it is phrased as a question.
  *
@@ -495,6 +537,60 @@ const ASK_FORMS: RegExp[] = [
  * and its answer, asks nothing and offers no slot, so it must not make that answer a
  * reply to the arrangement. That is why the proposal half is the offered time rather
  * than any weekday: a bare weekday in a statement proposes nothing to answer.
+ *
+ * The proposal arm asks the whole turn as well as the clause, so the day check inside
+ * `mentionsDatetime` still sees every day the turn named. Reading a clause alone would
+ * take "Wednesday, at nine forty" for Thursday at nine forty, because the half holding
+ * the clock names no day at all.
+ */
+function clauseRaises(clause: string, text: string, offered: string): boolean {
+  if (mentionsDatetime(clause, offered) && mentionsDatetime(text, offered)) {
+    return true;
+  }
+  return COMMITMENT_PROMPT.test(clause) && ASK_FORMS.some((form) => form.test(clause));
+}
+
+/**
+ * Which clause of a caller turn last put the arrangement to the callee. -1 when none
+ * of them did.
+ *
+ * Where it happened matters as much as whether it did, because a turn can raise the
+ * arrangement and then ask something else. What a callee answers is the last thing said
+ * to them.
+ */
+function arrangementAt(text: string, offered: string): number {
+  const clauses = clausesOf(text);
+  for (let at = clauses.length - 1; at >= 0; at -= 1) {
+    if (clauseRaises(clauses[at]!, text, offered)) {
+      return at;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Which clause of a caller turn last asked one of the errand's questions. -1 when none
+ * of them did.
+ *
+ * A question whose words run across a clause break is still asked and it ends where
+ * the turn ends, so it counts as the last thing said. Without that, a question the
+ * split happens to cut in half would go missing and hand the turn back to the
+ * arrangement, which is the reading this whole rule exists to stop.
+ */
+function questionAt(text: string, questions: ErrandQuestion[]): number {
+  const asked = (part: string): boolean =>
+    questions.some((question) => support(tokens(question.text), part) >= QUESTION_ASKED);
+  const clauses = clausesOf(text);
+  for (let at = clauses.length - 1; at >= 0; at -= 1) {
+    if (asked(clauses[at]!)) {
+      return at;
+    }
+  }
+  return asked(text) ? clauses.length - 1 : -1;
+}
+
+/**
+ * Whether a caller turn puts the arrangement to the callee anywhere in it.
  *
  * All three bindings run through here, the agreement, the refusal and the
  * confirmation code that belongs to the agreement, so the rule cannot hold on one
@@ -505,11 +601,7 @@ const ASK_FORMS: RegExp[] = [
  * than the extraction claimed.
  */
 function raisesArrangement(text: string, offered: string): boolean {
-  const proposesOffered = mentionsDatetime(text, offered);
-  if (!COMMITMENT_PROMPT.test(text) && !proposesOffered) {
-    return false;
-  }
-  return ASK_FORMS.some((form) => form.test(text)) || proposesOffered;
+  return arrangementAt(text, offered) >= 0;
 }
 
 /** Where the caller raised the arrangement. -1 when it never did. */
@@ -535,9 +627,14 @@ type LastAsk = "commitment" | "question" | null;
  * arrangement is skipped for the same reason, because mentioning an appointment is
  * not asking for one and the last real ask still stands.
  *
- * A turn that raises the arrangement counts as the arrangement even when it is also
- * one of the errand's questions, which is the usual case: "what is the earliest
- * appointment you have" is both.
+ * Inside a turn it is the last clause that counts, for the same reason it is the last
+ * turn. "Could you hold Thursday at nine forty? Do you accept Aetna?" raises the
+ * arrangement and then asks something else, so the no that follows is a no to the
+ * insurance question and the report must not read it as a refused booking.
+ *
+ * A clause that is both counts as the arrangement, which is the usual case: "what is
+ * the earliest appointment you have" is a question on the errand's list and the
+ * arrangement being put to them at the same time.
  */
 function lastAskBefore(
   turns: TranscriptTurn[],
@@ -550,11 +647,13 @@ function lastAskBefore(
     if (turn.speaker !== "bot") {
       continue;
     }
-    if (raisesArrangement(turn.text, offered)) {
-      return "commitment";
-    }
-    if (questions.some((question) => support(tokens(question.text), turn.text) >= QUESTION_ASKED)) {
+    const arrangement = arrangementAt(turn.text, offered);
+    const question = questionAt(turn.text, questions);
+    if (question > arrangement) {
       return "question";
+    }
+    if (arrangement >= 0) {
+      return "commitment";
     }
   }
   return null;
