@@ -257,13 +257,27 @@ function recordedRound(
   progress(
     `${ledgerPath} already records this coordination as ${closing.outcome} and every call in it is settled, so nothing was dialled and the recorded outcome is what this run returns.`,
   );
-  const slot = closing.slot_id === null ? undefined : slotById(request.slots, closing.slot_id);
+  // The returned result is built the way a live run builds it, from the request and the
+  // outcome kind, not lifted whole off the entry. Replay above already refuses a ledger
+  // whose confirmed_with, unreleased, slot_id or calls_placed does not match the derived
+  // history, so by here they agree. Rebuilding the request-bound fields the same way
+  // `coordinate` does keeps the two return paths identical and means a field can only
+  // ever leave here in the shape the protocol gives it: a verbal confirmation names the
+  // slot and every party, any other outcome names no slot and confirms nobody. slot_id
+  // is the one field replay does not check outside verbally_confirmed, so deriving it
+  // here rather than trusting the entry is what closes that last gap. unreleased and
+  // calls_placed are lifted, which is safe because replay proved each equals the derived
+  // value: a call this run did not place cannot be recounted and the owed set was pinned
+  // on both sides.
+  const isConfirmed = closing.outcome === "verbally_confirmed";
+  const slotId = isConfirmed ? closing.slot_id : null;
+  const slot = slotId === null ? undefined : slotById(request.slots, slotId);
   return {
     request_id: request.requestId,
     outcome: closing.outcome,
-    slot_id: closing.slot_id,
+    slot_id: slotId,
     slot_spoken: slot?.spoken ?? null,
-    confirmed_with: closing.confirmed_with,
+    confirmed_with: isConfirmed ? request.parties.map((party) => party.id) : [],
     unreleased: closing.unreleased,
     // The recorded count, not a fresh one. This run placed nothing, so claiming a
     // call of its own would be a second call in the accounting and none on a phone.

@@ -235,6 +235,12 @@ function ids(slots: Slot[]): string[] {
   return slots.map((slot) => slot.id);
 }
 
+/** Two party lists holding the same names, order and duplicates aside. */
+function sameParties(left: string[], right: string[]): boolean {
+  const normalize = (list: string[]): string => [...list].sort().join(" ");
+  return normalize(left) === normalize(right);
+}
+
 /** A call the ledger records as attempted and never accounts for. */
 export interface OpenAttempt {
   /** Line number of the attempt record, 1 based, so a replay issue can name it. */
@@ -818,6 +824,34 @@ export function replay(entries: LedgerEntry[]): ReplayVerification {
       }
       if (entry.outcome === "no_common_slot" && chosen !== null) {
         issues.push({ entry: index, problem: "no_common_slot, but a slot was chosen" });
+      }
+      // The fields the handback returns are checked against the replayed history, not
+      // trusted off the entry. `confirmed_with` and `unreleased` used to be handed
+      // straight back, so a ledger could close verbally_confirmed with an empty
+      // confirmation list or an unreleased list that named the wrong parties and still
+      // replay clean. Both are derived here and compared as sets. A verbal confirmation
+      // credits exactly the parties the answers credit (every party, since the check
+      // above already refuses a missing one) and owes nobody a release, so its
+      // unreleased list is empty. Any other outcome credits nobody and owes exactly the
+      // parties who said yes on a call and were not reached by a release call. A name
+      // missing from that owed set is caught above, a name in `unreleased` that the
+      // answers do not owe is caught here, so the two together pin the set on both sides.
+      const expectedConfirmed =
+        entry.outcome === "verbally_confirmed" ? parties.filter((party) => credited.get(party) === true) : [];
+      if (!sameParties(entry.confirmed_with, expectedConfirmed)) {
+        issues.push({
+          entry: index,
+          problem: `confirmed_with ${entry.confirmed_with.join(", ") || "empty"} does not match the parties the recorded answers credit (${expectedConfirmed.join(", ") || "empty"})`,
+        });
+      }
+      const expectedOwed =
+        entry.outcome === "verbally_confirmed" ? [] : spokenYes.filter((party) => !released.includes(party));
+      const spurious = entry.unreleased.filter((party) => !expectedOwed.includes(party));
+      if (spurious.length > 0) {
+        issues.push({
+          entry: index,
+          problem: `unreleased names ${spurious.join(", ")}, who the recorded answers do not owe a release call (owed: ${expectedOwed.join(", ") || "none"})`,
+        });
       }
       outcome = entry.outcome;
       closed = true;

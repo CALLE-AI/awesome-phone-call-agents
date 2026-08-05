@@ -627,4 +627,52 @@ test("a consistent completed ledger still hands back the recorded outcome and di
   });
 });
 
+/**
+ * The handback must not surface a field the replay did not verify. Before this, replay
+ * checked calls_placed, the credited set for verbally_confirmed and that owed parties
+ * were covered, but it never read the outcome entry's own confirmed_with, and its
+ * unreleased check was one-directional. So a clean completed ledger with confirmed_with
+ * edited to [] still replayed ok and was handed back as verbally_confirmed with an empty
+ * confirmation list, and a spurious name in unreleased was passed straight through.
+ *
+ * These build a real verbally_confirmed ledger, edit one returned field so the file is
+ * still syntactically complete but no longer matches the derived history, then assert the
+ * run refuses through the replay gate with nothing dialled.
+ */
+
+test("a completed verbally_confirmed ledger with confirmed_with emptied is refused (Ray's repro)", async () => {
+  await completedThenTampered(
+    (entries) => {
+      // Exactly Ray's edit: only confirmed_with is cleared. The three confirm calls and
+      // the slot are untouched, so every earlier check still passes. replay now derives
+      // the credited set and compares it to confirmed_with, which no longer matches.
+      const outcome = entries.find((entry): entry is OutcomeEntry => entry.kind === "outcome");
+      assert.ok(outcome !== undefined, "the ledger has an outcome entry");
+      assert.deepEqual(outcome.confirmed_with, ["plumber", "tenant", "superintendent"], "all three before the edit");
+      outcome.confirmed_with = [];
+    },
+    (message) =>
+      assert.match(message, /confirmed_with empty does not match the parties the recorded answers credit/),
+  );
+});
+
+test("a completed verbally_confirmed ledger with a spurious unreleased name is refused", async () => {
+  await completedThenTampered(
+    (entries) => {
+      // A verbal confirmation owes nobody a release call, so unreleased is empty on a
+      // clean one. Naming a party there is a debt the answers do not support. inspectLedger
+      // returns no owed release for a verbally_confirmed outcome whatever the entry says, so
+      // the outstanding check lets this through and only the replay set-comparison catches it.
+      const outcome = entries.find((entry): entry is OutcomeEntry => entry.kind === "outcome");
+      assert.ok(outcome !== undefined, "the ledger has an outcome entry");
+      assert.deepEqual(outcome.unreleased, [], "nobody owed on a clean confirmation");
+      outcome.unreleased = ["plumber"];
+    },
+    (message) =>
+      assert.match(message, /unreleased names plumber, who the recorded answers do not owe a release call/),
+  );
+});
+
+
+
 
