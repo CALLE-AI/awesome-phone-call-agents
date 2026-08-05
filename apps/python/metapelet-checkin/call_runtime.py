@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
+import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,6 +22,8 @@ from task_builder import (
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
 TRUSTED_BASE_URLS = frozenset({DEFAULT_BASE_URL})
 STATE_DIR = Path(__file__).resolve().parent / ".call-state"
+CHECKPOINT_VERSION = 1
+LOCK_TIMEOUT_SECONDS = 60.0
 
 
 def normalize_trusted_base_url(value: str | None) -> str:
@@ -46,9 +51,50 @@ def resolve_base_url() -> str:
     return normalize_trusted_base_url(os.environ.get("CALLE_BASE_URL"))
 
 
-def checkpoint_path(idempotency_key: str) -> Path:
-    digest = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:32]
-    return STATE_DIR / f"{digest}.json"
+def provider_account_hash(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:24]
+
+
+def checkpoint_path(provider_hash: str, workflow_id: str, idempotency_key: str) -> Path:
+    workflow_slug = hashlib.sha256(workflow_id.encode("utf-8")).hexdigest()[:16]
+    idem_slug = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()[:16]
+    return STATE_DIR / provider_hash / workflow_slug / f"{idem_slug}.json"
+
+
+def _lock_path(checkpoint: Path) -> Path:
+    return checkpoint.with_suffix(checkpoint.suffix + ".lock")
+
+
+@contextmanager
+def _checkpoint_lock(checkpoint: Path):
+    lock_path = _lock_path(checkpoint)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+    acquired = False
+    while time.monotonic() < deadline:
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode("ascii"))
+            os.close(fd)
+            acquired = True
+            break
+        except FileExistsError:
+            time.sleep(0.05)
+    if not acquired:
+        raise RuntimeError(f"Could not acquire checkpoint lock: {lock_path.name}")
+    try:
+        yield
+    finally:
+        try:
+            lock_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _quarantine_corrupt_checkpoint(path: Path) -> Path:
+    quarantine = path.with_name(f"{path.stem}.corrupt.{int(time.time())}{path.suffix}")
+    path.replace(quarantine)
+    return quarantine
 
 
 def read_checkpoint(path: Path) -> dict[str, Any]:
@@ -57,24 +103,55 @@ def read_checkpoint(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+        _quarantine_corrupt_checkpoint(path)
+        raise RuntimeError(
+            "Checkpoint file was corrupted and quarantined; review .corrupt file then retry."
+        )
+    if not isinstance(payload, dict):
+        _quarantine_corrupt_checkpoint(path)
+        raise RuntimeError("Checkpoint file was invalid and quarantined.")
+    if payload.get("version") not in (None, CHECKPOINT_VERSION):
+        raise RuntimeError("Unsupported checkpoint version.")
+    return payload
+
+
+def _validate_checkpoint_scope(
+    state: dict[str, Any],
+    *,
+    provider_hash: str,
+    workflow_id: str,
+    idempotency_key: str,
+) -> None:
+    if not state:
+        return
+    expected = {
+        "provider_account_hash": provider_hash,
+        "workflow_id": workflow_id,
+        "idempotency_key": idempotency_key,
+    }
+    for key, value in expected.items():
+        stored = state.get(key)
+        if stored is not None and stored != value:
+            raise RuntimeError(
+                f"Checkpoint {key} mismatch; switch API keys or workflow carefully before retry."
+            )
 
 
 def write_checkpoint(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(".tmp")
-    temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp_path = path.with_name(f".{uuid.uuid4().hex}.tmp")
+    body = json.dumps({**payload, "version": CHECKPOINT_VERSION}, ensure_ascii=False, indent=2) + "\n"
+    temp_path.write_text(body, encoding="utf-8")
     temp_path.replace(path)
     path.chmod(0o600)
 
 
 def write_output(path: Path | None, payload: dict[str, Any]) -> None:
-    rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if path is None:
         return
     destination = path.expanduser()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     with destination.open("x", encoding="utf-8") as handle:
         handle.write(rendered)
     destination.chmod(0o600)
@@ -93,115 +170,123 @@ def execute_live(
     task: str,
     schema: dict[str, Any],
     idempotency_key: str,
+    provider_hash: str,
     timeout_seconds: float,
 ) -> dict[str, Any]:
-    checkpoint = checkpoint_path(idempotency_key)
+    checkpoint = checkpoint_path(provider_hash, request["workflow_id"], idempotency_key)
     masked_phone = mask_phone(request["phone"])
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    state = read_checkpoint(checkpoint)
+    workflow_id = request["workflow_id"]
 
-    if state.get("idempotency_key") not in (None, idempotency_key):
-        raise RuntimeError("Checkpoint idempotency mismatch; use a new workflow request file.")
-
-    call_id = state.get("call_id")
-    if not isinstance(call_id, str) or not call_id:
-        write_checkpoint(
-            checkpoint,
-            {
-                "version": 1,
-                "phase": "reserved",
-                "idempotency_key": idempotency_key,
-                "workflow_id": request["workflow_id"],
-                "masked_phone": masked_phone,
-                "updated_at": now,
-            },
-        )
-        created = client.calls.create(
-            task=task,
-            recipients=build_recipients(request),
-            result_schema=schema,
+    with _checkpoint_lock(checkpoint):
+        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        state = read_checkpoint(checkpoint)
+        _validate_checkpoint_scope(
+            state,
+            provider_hash=provider_hash,
+            workflow_id=workflow_id,
             idempotency_key=idempotency_key,
         )
-        call_id = _call_field(created, "id")
+
+        call_id = state.get("call_id")
         if not isinstance(call_id, str) or not call_id:
             write_checkpoint(
                 checkpoint,
                 {
-                    "version": 1,
-                    "phase": "create_failed",
+                    "phase": "reserved",
+                    "provider_account_hash": provider_hash,
                     "idempotency_key": idempotency_key,
-                    "workflow_id": request["workflow_id"],
+                    "workflow_id": workflow_id,
                     "masked_phone": masked_phone,
+                    "updated_at": now,
+                },
+            )
+            created = client.calls.create(
+                task=task,
+                recipients=build_recipients(request),
+                result_schema=schema,
+                idempotency_key=idempotency_key,
+            )
+            call_id = _call_field(created, "id")
+            if not isinstance(call_id, str) or not call_id:
+                write_checkpoint(
+                    checkpoint,
+                    {
+                        "phase": "create_failed",
+                        "provider_account_hash": provider_hash,
+                        "idempotency_key": idempotency_key,
+                        "workflow_id": workflow_id,
+                        "masked_phone": masked_phone,
+                        "updated_at": datetime.now(timezone.utc)
+                        .replace(microsecond=0)
+                        .isoformat(),
+                    },
+                )
+                raise RuntimeError("CALL-E create response did not contain a call id")
+            write_checkpoint(
+                checkpoint,
+                {
+                    "phase": "accepted",
+                    "provider_account_hash": provider_hash,
+                    "idempotency_key": idempotency_key,
+                    "workflow_id": workflow_id,
+                    "masked_phone": masked_phone,
+                    "call_id": call_id,
                     "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
                 },
             )
-            raise RuntimeError("CALL-E create response did not contain a call id")
-        write_checkpoint(
-            checkpoint,
-            {
-                "version": 1,
-                "phase": "accepted",
-                "idempotency_key": idempotency_key,
-                "workflow_id": request["workflow_id"],
-                "masked_phone": masked_phone,
-                "call_id": call_id,
-                "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            },
-        )
 
-    try:
-        completed = client.calls.wait_for_result(
-            call_id,
-            timeout_seconds=timeout_seconds,
-            interval_seconds=2,
-        )
-    except Exception as exc:
-        write_checkpoint(
-            checkpoint,
-            {
-                "version": 1,
-                "phase": "wait_failed",
-                "idempotency_key": idempotency_key,
-                "workflow_id": request["workflow_id"],
-                "masked_phone": masked_phone,
-                "call_id": call_id,
-                "error": str(exc)[:240],
-                "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            },
-        )
-        raise
+        try:
+            completed = client.calls.wait_for_result(
+                call_id,
+                timeout_seconds=timeout_seconds,
+                interval_seconds=2,
+            )
+        except Exception as exc:
+            write_checkpoint(
+                checkpoint,
+                {
+                    "phase": "wait_failed",
+                    "provider_account_hash": provider_hash,
+                    "idempotency_key": idempotency_key,
+                    "workflow_id": workflow_id,
+                    "masked_phone": masked_phone,
+                    "call_id": call_id,
+                    "error": str(exc)[:240],
+                    "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+                },
+            )
+            raise
 
-    completed_dict = completed if isinstance(completed, dict) else {
-        "status": _call_field(completed, "status"),
-        "task_completed": _call_field(completed, "task_completed"),
-        "structured_result": _call_field(completed, "structured_result"),
-    }
-    export_result = structured_result_for_export(completed_dict)
-    payload = {
-        "mode": "execute",
-        "creates_phone_call": True,
-        "workflow_id": request["workflow_id"],
-        "idempotency_key": idempotency_key,
-        "call_id": call_id,
-        "status": completed_dict.get("status"),
-        "task_completed": completed_dict.get("task_completed"),
-        "structured_result": export_result,
-        "structured_result_released": export_result is not None,
-        "checkpoint": str(checkpoint),
-    }
-    write_checkpoint(
-        checkpoint,
-        {
-            "version": 1,
-            "phase": "finished",
+        completed_dict = completed if isinstance(completed, dict) else {
+            "status": _call_field(completed, "status"),
+            "task_completed": _call_field(completed, "task_completed"),
+            "structured_result": _call_field(completed, "structured_result"),
+        }
+        export_result = structured_result_for_export(completed_dict)
+        payload = {
+            "mode": "execute",
+            "creates_phone_call": True,
+            "workflow_id": workflow_id,
             "idempotency_key": idempotency_key,
-            "workflow_id": request["workflow_id"],
-            "masked_phone": masked_phone,
             "call_id": call_id,
             "status": completed_dict.get("status"),
             "task_completed": completed_dict.get("task_completed"),
+            "structured_result": export_result,
             "structured_result_released": export_result is not None,
-            "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-        },
-    )
-    return payload
+        }
+        write_checkpoint(
+            checkpoint,
+            {
+                "phase": "finished",
+                "provider_account_hash": provider_hash,
+                "idempotency_key": idempotency_key,
+                "workflow_id": workflow_id,
+                "masked_phone": masked_phone,
+                "call_id": call_id,
+                "status": completed_dict.get("status"),
+                "task_completed": completed_dict.get("task_completed"),
+                "structured_result_released": export_result is not None,
+                "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            },
+        )
+        return payload

@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-from call_runtime import execute_live, resolve_base_url, write_output
+from call_runtime import execute_live, provider_account_hash, resolve_base_url, write_output
 from task_builder import (
     build_task,
     idempotency_key,
@@ -67,6 +67,7 @@ def _run_live(request: dict, output: Path | None, timeout_seconds: float) -> int
     task = build_task(request)
     schema = load_result_schema()
     idempotency = idempotency_key(request, task, schema)
+    account_hash = provider_account_hash(api_key)
 
     print("Placing one CALL-E call (live)...", flush=True)
     payload = execute_live(
@@ -75,6 +76,7 @@ def _run_live(request: dict, output: Path | None, timeout_seconds: float) -> int
         task=task,
         schema=schema,
         idempotency_key=idempotency,
+        provider_hash=account_hash,
         timeout_seconds=timeout_seconds,
     )
     rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"

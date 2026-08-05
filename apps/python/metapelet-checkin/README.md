@@ -42,6 +42,7 @@ python client.py --request my-live-request.json --execute --confirm-recipient-op
 
 - `--execute` places a **real call** and uses CALL-E credits.
 - Live mode uses `create` + `wait_for_result` with a local `.call-state/` checkpoint (0600 files) so accepted `call_id` values survive crashes or wait timeouts.
+- Checkpoints are namespaced by **provider account hash** (SHA-256 of API key, never stored raw), **workflow_id**, and idempotency key; cross-process file locks prevent concurrent corruption.
 - Idempotency key: `metapelet-<workflow_id>-<digest>` — derived from workflow id, E.164 phone, region, locale, task text, and result schema. Reuse the **same request file** on retry; changing phone or task-shaping fields creates a new key.
 - Structured `mood` / `topics` are released only when `status` is `completed` and `task_completed` is true, with phone-like text redacted. Output files are written mode `0600` and never overwrite existing paths.
 
