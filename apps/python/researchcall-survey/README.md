@@ -137,4 +137,4 @@ hiding under a benign subject, and a full number reaching an output.
 
 This is a focused, self-contained proof of the instrument. The complete application —
 the eight-station workbench, form definitions, ethics configuration, web interface and the
-live CALL-E transport — lives at <https://github.com/lukisch/researchcall>.
+live CALL-E transport — lives at <https://github.com/ellmos-ai/researchcall>.

@@ -25,7 +25,7 @@ in configuration does not have a consent requirement.
 
 This is the collection edition: fixture-driven, no network, no telephone, no
 credentials, no scheduler. The full application lives at
-https://github.com/lukisch/researchcall
+https://github.com/ellmos-ai/researchcall
 """
 
 from __future__ import annotations
