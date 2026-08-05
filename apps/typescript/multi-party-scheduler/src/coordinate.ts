@@ -37,6 +37,7 @@ import {
   inspectLedger,
   LedgerError,
   readLedger,
+  replay,
   requestDigest,
 } from "./ledger.js";
 import { readConfirm, readGather, readRelease } from "./read.js";
@@ -172,6 +173,15 @@ export class AlreadyCoordinatedError extends LedgerError {}
  * one. Anything else about the file, a coordination that is not this one or lines no
  * run opened, is refused outright.
  *
+ * The handback is not a free pass either. A ledger is handed back only when a replay of
+ * it supports the outcome it records. A file that is syntactically complete, has no
+ * unsettled call and owes no release can still be inconsistent: an outcome of
+ * verbally_confirmed with a party never credited, a recorded slot the answers do not
+ * choose, a call count that does not match the entries. Returning one of those as a
+ * success would be this app vouching for a coordination that never happened, with
+ * nothing on a phone to show for it. So the replay runs before the handback and a ledger
+ * that fails it is refused rather than trusted.
+ *
  * Returns the result to hand back, or null when the ledger is fresh and this run may
  * go ahead. Refuses by throwing, before anything is dialled.
  */
@@ -218,6 +228,30 @@ function recordedRound(
   if (outstanding.length > 0) {
     throw new AlreadyCoordinatedError(
       `${ledgerPath} records this coordination as ${closing.outcome} with work still outstanding: ${outstanding.join(", ")}. That work is resume's, because a call is settled under the key it went out under and a release call that is owed is the one call this app may place a second time. ${recover}`,
+    );
+  }
+  // The checks above establish a shape: a closing outcome, no unsettled call and no
+  // owed release. They do not establish that the outcome the file records is the one
+  // its own answers imply. `inspectLedger` trusts `closing.outcome`, so a ledger that
+  // says verbally_confirmed with a party never credited, a slot the answers do not
+  // choose or a call count that does not match its entries would pass everything above
+  // and be handed back as a success with nothing dialled. `replay` is the check a plain
+  // reading cannot do: it re-derives the feasible set, the chosen slot, the credits and
+  // the call count and reports every place the history does not support the outcome. It
+  // runs here, after the outstanding check, so an interrupted-but-valid ledger has
+  // already gone to `resume` and anything replay still finds is a real inconsistency in
+  // a file that claims to be finished. That case is refused, not returned and not
+  // resumed. A gather call attempted with no result behind it lands here too: it is not
+  // in the outstanding list (a gather orphan is nobody's to finish, resume never gathers
+  // again) but replay flags it as an open attempt, so a ledger whose outcome may rest on
+  // a gather call that was live is refused rather than trusted. Fail closed.
+  const verification = replay(entries);
+  if (!verification.ok) {
+    const problems = verification.issues
+      .map((issue) => `entry ${issue.entry}: ${issue.problem}`)
+      .join("; ");
+    throw new AlreadyCoordinatedError(
+      `${ledgerPath} records this coordination as ${closing.outcome}, but a replay of the ledger does not support that: ${problems}. A completed ledger is handed back only when a replay of it agrees with the recorded outcome, so this run will not return a result the history contradicts. An inconsistency like this in a finished ledger is not an interrupted call for resume to settle, it is a history a person has to read. Nothing was dialled.`,
     );
   }
   progress(

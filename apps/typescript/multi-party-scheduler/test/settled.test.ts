@@ -470,3 +470,161 @@ test("one gather or confirm call per coordination, a release retry only when it 
     "asked for and settled is the one case that mints",
   );
 });
+
+/**
+ * A completed ledger is handed back only when a replay of it supports the outcome it
+ * records. These build a genuinely consistent completed ledger with a real run, then
+ * edit one entry so the file is still syntactically complete (it has an outcome, no
+ * unsettled call, owes no release) but no longer replays. A run pointed at one must
+ * refuse rather than hand back a success it cannot stand behind. It must not dial it.
+ *
+ * Before this the handback checked only for unsettled calls and owed releases, then
+ * trusted the closing outcome. So each of these was returned as a coordination that
+ * never happened, with nothing on a phone to show for it.
+ */
+
+type OutcomeEntry = Extract<LedgerEntry, { kind: "outcome" }>;
+type CommitEntry = Extract<LedgerEntry, { kind: "commit" }>;
+
+function tamperLedger(path: string, mutate: (entries: LedgerEntry[]) => void): void {
+  const entries = readEntries(path);
+  mutate(entries);
+  writeFileSync(path, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+}
+
+/**
+ * Run a real coordination to a clean verbally_confirmed ledger, confirm it replays,
+ * edit it, then run again and expect the edited file to be refused with nothing dialled.
+ */
+async function completedThenTampered(
+  mutate: (entries: LedgerEntry[]) => void,
+  check: (message: string) => void,
+): Promise<void> {
+  await withFake(CONFIRMED, async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(first.outcome, "verbally_confirmed");
+    const placed = fake.created.length;
+    assert.equal(placed, 6, "three gather calls and three confirm calls");
+    assert.equal(replay(readEntries(path)).ok, true, "the ledger replays clean before it is touched");
+
+    tamperLedger(path, mutate);
+    assert.equal(replay(readEntries(path)).ok, false, "and the edit is a real inconsistency");
+    const before = readFileSync(path, "utf8");
+
+    await assert.rejects(
+      () => runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 }),
+      (error: unknown) => {
+        assert.ok(error instanceof AlreadyCoordinatedError, `got ${String(error)}`);
+        assert.match(error.message, /a replay of the ledger does not support that/);
+        assert.match(error.message, /Nothing was dialled\./);
+        check(error.message);
+        return true;
+      },
+    );
+    assert.equal(fake.created.length, placed, "nothing was dialled");
+    assert.equal(readFileSync(path, "utf8"), before, "and nothing was written");
+  });
+}
+
+test("a completed ledger claiming verbally_confirmed with a party never credited is refused", async () => {
+  await completedThenTampered(
+    (entries) => {
+      // The superintendent's confirm call is edited to a yes that was never credited,
+      // while the outcome still claims all three confirmed. inspectLedger sees a settled
+      // call and, on a verbally_confirmed outcome, owes no release, so the old handback
+      // trusted it. replay does not: verbally_confirmed needs every party credited.
+      const commit = [...entries]
+        .reverse()
+        .find((entry): entry is CommitEntry => entry.kind === "commit" && entry.result.party_id === "superintendent");
+      assert.ok(commit !== undefined, "the ledger has a superintendent confirm call");
+      commit.result = { ...commit.result, confirmed: false };
+    },
+    (message) => assert.match(message, /superintendent never confirmed/),
+  );
+});
+
+test("a completed ledger whose recorded slot is not the one the answers choose is refused", async () => {
+  await completedThenTampered(
+    (entries) => {
+      // Everyone can do option 2 (thu-14) and that is the slot chosen and confirmed. The
+      // outcome is edited to name thu-10, a slot the recorded answers do not land on.
+      const outcome = entries.find((entry): entry is OutcomeEntry => entry.kind === "outcome");
+      assert.ok(outcome !== undefined, "the ledger has an outcome entry");
+      assert.equal(outcome.slot_id, "thu-14", "the real run confirmed thu-14");
+      outcome.slot_id = "thu-10";
+    },
+    (message) => assert.match(message, /confirmed slot thu-10 is not the chosen slot thu-14/),
+  );
+});
+
+test("a completed ledger whose calls_placed does not match its call entries is refused", async () => {
+  await completedThenTampered(
+    (entries) => {
+      // Six calls are recorded (three gather, three confirm). The outcome is edited to
+      // claim five, which no reading of the entries supports.
+      const outcome = entries.find((entry): entry is OutcomeEntry => entry.kind === "outcome");
+      assert.ok(outcome !== undefined, "the ledger has an outcome entry");
+      assert.equal(outcome.calls_placed, 6, "the real run placed six calls");
+      outcome.calls_placed = 5;
+    },
+    (message) => assert.match(message, /calls_placed 5 does not match the 6 call entries/),
+  );
+});
+
+/**
+ * The gather-orphan case, decided on purpose.
+ *
+ * A gather call attempted with no result behind it is not in inspectLedger's outstanding
+ * list: resume never gathers again, so there is nothing it could place to settle one and
+ * it is nobody's to finish. That is why the outstanding check lets this ledger through.
+ * replay still flags the open attempt, because the call may have been on the phone to
+ * somebody, so the outcome the file records cannot be trusted. A completed ledger with a
+ * live-looking gather call is refused rather than handed back. Routing it to resume would
+ * be wrong (resume cannot re-gather) and returning it would vouch for a coordination a
+ * possibly-live call could still change. Fail closed.
+ */
+test("a completed ledger carrying an unaccounted gather attempt is refused, not handed back", async () => {
+  await completedThenTampered(
+    (entries) => {
+      // A stray gather attempt for the plumber under a key no gather result settles. It
+      // reads as a call CALL-E may have accepted with the process dead before the answer
+      // landed. inspectLedger files it under unsettledGathers (not unsettled, not owed),
+      // so the old handback ignored it.
+      const started = entries.findIndex((entry) => entry.kind === "run_started");
+      entries.splice(
+        started + 1,
+        0,
+        attemptEntry("gather", "plumber", null, 2, "mps-ash-lane-3b-leak-gather-plumber-orphan-a2"),
+      );
+    },
+    (message) => assert.match(message, /plumber's gather call.*nothing in this ledger settles it/),
+  );
+});
+
+/**
+ * The regression guard for the reading path: a genuinely consistent completed ledger
+ * still replays, so it is still handed back with no call placed and the same result. The
+ * replay gate refuses inconsistent ledgers without touching this one.
+ */
+test("a consistent completed ledger still hands back the recorded outcome and dials nobody", async () => {
+  await withFake(CONFIRMED, async (port, fake) => {
+    const request = coordinationRequest();
+    const path = ledgerPath();
+    const first = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(first.outcome, "verbally_confirmed");
+    const placed = fake.created.length;
+    const before = readFileSync(path, "utf8");
+
+    const second = await runCoordination({ request, port, ledgerPath: path, pollIntervalMs: 5 });
+    assert.equal(fake.created.length, placed, "the reading run created no call");
+    assert.equal(second.outcome, first.outcome);
+    assert.equal(second.slot_id, first.slot_id);
+    assert.deepEqual(second.confirmed_with, first.confirmed_with);
+    assert.equal(second.calls_placed, first.calls_placed);
+    assert.equal(readFileSync(path, "utf8"), before, "and wrote nothing");
+  });
+});
+
+
