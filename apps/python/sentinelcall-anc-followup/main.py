@@ -272,22 +272,15 @@ async def trigger_followup(
 
         # FIX (review round 5, point 1a): only clean up RESOLVED rows past
         # the window. Previously this also deleted 'pending' rows after an
-        # hour -- meaning a call genuinely still in flight past an hour lost
-        # its dedup protection entirely and could be dispatched again.
-        # FIX (review round 6, point 1): only clean up rows with a KNOWN,
-        # non-ambiguous outcome. Previously any 'done' row -- including
-        # error_uncertain_outcome, used when a call's actual dispatch
-        # status is genuinely unknown -- expired after an hour, after
-        # which the same Idempotency-Key could dispatch a real duplicate
-        # call while the original may already have been accepted.
-        # Ambiguous-outcome rows are now kept indefinitely, requiring a
-        # human to look before that key is ever reused.
-        db.execute(
-            "DELETE FROM call_requests WHERE ts < ? AND status = 'done' "
-            "AND response NOT LIKE '%error_uncertain_outcome%'",
-            (now - 3600,),
-        )
-        db.commit()
+        # FIX (review round 7): the same reasoning extends to SUCCESSFUL
+        # call_started rows too -- if that row expires and the caller
+        # retries the same key later, the dedup protection is gone and a
+        # genuinely duplicate call can be dispatched. No idempotency
+        # record is auto-deleted anymore; a demo-scale table doesn't need
+        # automatic cleanup, and a production deployment should use a
+        # deliberate archival/TTL policy instead of silent deletion. This
+        # is now stated in the README rather than left as a live bug.
+        pass
 
         row = db.execute(
             "SELECT status, request_hash, response FROM call_requests WHERE idempotency_key = ?",
@@ -340,12 +333,24 @@ async def trigger_followup(
                     (run_id, req.patient_id, req.patient_first_name, req.patient_date_of_birth),
                 )
                 db.commit()
-            response = {
-                "status": "call_started",
-                "run_id": run_id,
-                "plan_id": plan["plan_id"],
-                "called": mask_phone(req.phone),
-            }
+                response = {
+                    "status": "call_started",
+                    "run_id": run_id,
+                    "plan_id": plan["plan_id"],
+                    "called": mask_phone(req.phone),
+                }
+            else:
+                # FIX (review round 7): run_call() returned without a
+                # run_id -- this is genuinely ambiguous (CALL-E accepted
+                # the request but we have no checkpoint to reconcile
+                # against), not a clean success. Previously this was
+                # mislabeled "call_started", which looked like confirmed
+                # success and gave no accepted-call checkpoint to verify.
+                response = {
+                    "status": "error_uncertain_outcome",
+                    "plan_id": plan["plan_id"],
+                    "detail": "run_call returned no run_id -- outcome unknown, do not assume the call was not placed.",
+                }
         db.execute(
             "UPDATE call_requests SET status = 'done', response = ? WHERE idempotency_key = ?",
             (json.dumps(response), idempotency_key),
