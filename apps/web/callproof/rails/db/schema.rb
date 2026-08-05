@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_01_234500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_05_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -378,6 +378,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_234500) do
   create_table "call_requests", force: :cascade do |t|
     t.string "agentkit_run_id"
     t.bigint "call_policy_id", null: false
+    t.string "confirmation_token"
     t.datetime "confirmed_at"
     t.datetime "created_at", null: false
     t.string "idempotency_key", null: false
@@ -390,6 +391,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_234500) do
     t.datetime "updated_at", null: false
     t.index ["agentkit_run_id"], name: "index_call_requests_on_agentkit_run_id", unique: true, where: "(agentkit_run_id IS NOT NULL)"
     t.index ["call_policy_id"], name: "index_call_requests_on_call_policy_id"
+    t.index ["confirmation_token"], name: "index_call_requests_on_confirmation_token", unique: true, where: "(confirmation_token IS NOT NULL)"
     t.index ["idempotency_key"], name: "index_call_requests_on_idempotency_key", unique: true
     t.index ["provider_profile_id"], name: "index_call_requests_on_provider_profile_id"
     t.check_constraint "live_mode = false OR confirmed_at IS NOT NULL", name: "callproof_live_calls_require_confirmation"

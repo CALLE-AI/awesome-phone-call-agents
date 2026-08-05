@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 class LiveCallsController < ApplicationController
+  include OperatorAuthenticated
+
+  before_action :authenticate_operator!
   before_action :load_call_request, only: %i[show confirm cancel]
 
   def new
@@ -41,7 +44,7 @@ class LiveCallsController < ApplicationController
 
   def confirm
     raise CallProviders::Calle::SafetyError, "confirmation phrase does not match" unless
-      params[:confirmation_phrase] == confirmation_phrase
+      ActiveSupport::SecurityUtils.secure_compare(params[:confirmation_phrase].to_s, confirmation_phrase)
     ensure_live_environment!
 
     @call_request.with_lock do
@@ -86,7 +89,7 @@ class LiveCallsController < ApplicationController
   end
 
   def confirmation_phrase
-    "PLACE CALL #{@call_request.id}"
+    @call_request.confirmation_phrase
   end
 
   def ensure_live_environment!

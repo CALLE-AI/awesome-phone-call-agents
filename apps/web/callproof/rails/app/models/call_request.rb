@@ -18,6 +18,14 @@ class CallRequest < ApplicationRecord
   validate :live_calls_are_disabled
 
   before_validation :set_idempotency_key, on: :create
+  before_validation :set_confirmation_token, on: :create
+
+  # Unpredictable phrase the operator must type to confirm a real call. It is
+  # derived from a random token (not the sequential id), so it cannot be guessed
+  # from the request URL.
+  def confirmation_phrase
+    "PLACE CALL #{confirmation_token}"
+  end
 
   def masked_phone_number
     return "" if recipient_phone_e164.blank?
@@ -29,6 +37,10 @@ class CallRequest < ApplicationRecord
 
   def set_idempotency_key
     self.idempotency_key ||= SecureRandom.uuid
+  end
+
+  def set_confirmation_token
+    self.confirmation_token ||= SecureRandom.urlsafe_base64(24)
   end
 
   def live_calls_are_disabled
