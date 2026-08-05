@@ -71,8 +71,8 @@ must already be in E.164 format, for example `+15550123456`.
 | `confirmed` | `result_confirmed = yes` | Log a "Confirmed" row to the sheet. No further action needed. |
 | `confirmed` | `result_confirmed = reschedule` | Log a "Reschedule requested" row with `result_preferred_time`. A human rebooks the appointment. |
 | `confirmed` | `result_confirmed = no` | Log a "Canceled" row. A human frees up the slot. |
-| `confirmed` | `result_confirmed = unknown` | Log an "Ambiguous - needs review" row. A human calls back. |
-| `review_required` | - | Log a "Needs review" row with `disposition_reason`. A human calls back. |
+| `review_required` | `result_confirmed = unknown` | Log an "Ambiguous - needs review" row with `review_excerpt` so the human sees what the patient actually said. The integration will not report `confirmed` for an `unknown` answer in a required field. |
+| `review_required` | - | Log a "Needs review" row with `disposition_reason` and `review_excerpt`. A human calls back. |
 | `result_invalid` | - | Log a "Needs review" row with `disposition_reason`. A human calls back. |
 | `failed` | - | Log a "Call failed - retry" row with `disposition_reason`. A human retries or calls back manually. |
 | `canceled` | - | Log a "Call canceled" row with `disposition_reason`. A human decides whether to retry. |
@@ -80,11 +80,17 @@ must already be in E.164 format, for example `+15550123456`.
 | `needs_human` | - | Log a "Needs review" row with `disposition_reason`. A human calls back. |
 | `outside_calling_window` | - | Log a "Not called - outside calling window" row with `disposition_reason`. No call was placed; a human reschedules the confirmation call for the next allowed hour rather than treating a no-show as a decline. |
 | `suppressed` | - | Log a "Not called - on do-not-call list" row with `disposition_reason`. No call was placed; a human follows up by another channel rather than dialing a number that has been placed on the Do Not Call List. |
+| `retry_policy_blocked` | - | Log a "Not called - too soon since last attempt" row with `disposition_reason`. No call was placed; the row is picked up again on a later run rather than being redialled now. |
+| any | `opt_out_requested = true` | Append the number to the Do Not Call List sheet **before** logging anything else, and mark the row do-not-contact. `disposition` will already be `needs_human` and `lead_state` `blocked_compliance` whatever the appointment answer was. |
 
-Only `confirmed` with `result_confirmed = yes` needs no follow-up. Every
-other outcome, including an ambiguous `confirmed` result, gets logged for a
+Only `confirmed` needs no follow-up. Every other outcome gets logged for a
 human to act on rather than being silently treated as a successful
 confirmation.
+
+**Simpler alternative:** if these twelve rows are more branching than you
+want to build, filter on `lead_state` instead - three branches (`qualified`,
+`needs_human`, `blocked_compliance`) cover the same ground, and
+`disposition_reason` still tells the human which case they are looking at.
 
 **Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
 at status `queued` for over two minutes while the phone was actually ringing

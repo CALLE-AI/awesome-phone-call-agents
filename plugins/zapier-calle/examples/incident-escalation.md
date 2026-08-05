@@ -108,6 +108,27 @@ engineer and their backup are expected to be reachable while on rotation,
 and a paging recipe should not carry a do-not-call list that could silently
 suppress the very page the rotation exists to deliver.
 
+There is no row for `retry_policy_blocked` either, and the reason is the
+same one twice over: leave `Previous Attempt Times` blank on both call steps.
+A retry cap exists to stop an outbound campaign from redialling someone who
+did not answer. Paging is the case where redialling is the entire point -
+the escalation ladder in this recipe *is* a second attempt - so a cap that
+refused the backup engineer's page because the primary had just been called
+would break the one guarantee an on-call rotation makes.
+
+**Do still watch `opt_out_requested`.** It is unlikely to fire on a paging
+call, but if an engineer says "stop calling me" to an automated pager, that
+is a conversation for a human to have and not something to escalate past.
+Route it to the incident channel rather than to the backup engineer.
+
+The general rule these three exceptions share: every guard in this
+integration is designed for outbound contact with someone who did not ask
+to be called. An on-call rotation inverts that premise - the recipient
+signed up to be reachable - so the guards that protect an unwilling
+recipient become obstacles to a willing one. Turning a safety control off is
+a decision worth making deliberately and writing down, which is why this
+recipe explains each one rather than silently omitting it.
+
 Escalating on ambiguity is deliberate. Only `confirmed` with
 `result_acknowledged = yes` stops the ladder; every other outcome, including
 an outcome that simply could not be classified, pages the backup engineer.

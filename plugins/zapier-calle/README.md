@@ -33,9 +33,23 @@ credentials required.
 The integration places a phone call through the CALL-E Developer API, then
 either waits inside the Zap for the call to finish or returns immediately so
 a later step can look the result up. Every terminal outcome, and every
-pre-flight refusal to dial, is classified into one of nine dispositions (see
+pre-flight refusal to dial, is classified into one of ten dispositions (see
 [Dispositions](#5-dispositions)) so a downstream step can branch on
-`is_actionable` instead of parsing free-text status strings.
+`is_actionable` instead of parsing free-text status strings - or on the
+three-value [`lead_state`](#lead-state) projection if ten is more than your
+workflow needs.
+
+The organising idea is that most of the work is knowing when *not* to call,
+and when not to believe the answer:
+
+- It won't dial outside a legal calling window, or a number on a do-not-call
+  list, or the same person too many times in a day.
+- It won't call an ambiguous outcome a success - including the case where
+  CALL-E itself reports high confidence, because it is confident that nobody
+  answered the question.
+- It won't let a call where the recipient asked to be left alone advance an
+  outreach sequence.
+- It won't accept a callback it cannot verify.
 
 Two ways to wire it into a Zap:
 
@@ -256,9 +270,10 @@ steps.
 
 | Field | Description |
 | --- | --- |
-| `disposition` | One of the nine values in [Dispositions](#5-dispositions). |
+| `disposition` | One of the ten values in [Dispositions](#5-dispositions). |
 | `disposition_reason` | Human-readable reason the disposition was chosen. |
 | `is_actionable` | `true` only when `disposition` is `confirmed`. |
+| `lead_state` | Coarse projection for branching: `qualified`, `needs_human`, or `blocked_compliance`. See [Lead state](#lead-state). |
 | `event_id` | The CALL-E webhook event id, when available. |
 | `event_type` | The CALL-E webhook event type, when available. |
 | `call_id` | The CALL-E call id. |
@@ -276,23 +291,46 @@ steps.
 | `recipients_completed` | Number of recipients whose status is `completed`. |
 | `recipients_failed` | Number of recipients whose status is `failed`. |
 | `transcript_text` | Full transcript, turns joined as `speaker: text` lines. |
+| `review_excerpt` | The recipient's last spoken turn, when the disposition is not `confirmed`; `null` otherwise. The line a human should read first. |
+| `review_excerpt_offset_seconds` | Seconds from the start of the attempt at which that line was spoken, or `null`. |
+| `opt_out_requested` | `true` when the recipient asked not to be called again (see [Opt-out capture](#opt-out-capture)). |
+| `opt_out_excerpt` | The quoted request, or `null`. |
+| `opt_out_offset_seconds` | Where in the call it was said, or `null`. |
 | `structured_result` | The raw structured result object, or `null`. |
 | `recipients` | The raw per-recipient array from CALL-E. |
 | `result_*` | Each key of `structured_result`, flattened to the top level. |
 
 `Start Call (No Wait)` additionally returns `dry_run` and
 `idempotency_key`; `Place Call and Wait for Outcome` returns a `preview`
-field instead of a `call_id` when run as a dry run.
+field instead of a `call_id` when run as a dry run. `Find Call Result` also
+returns `reconciliation_timed_out` (see
+[Reconciliation limit](#reconciliation-limit)).
 
 Phone numbers are masked in every output and error message before they leave
-the integration.
+the integration, including in `review_excerpt` and `opt_out_excerpt`.
+
+### Lead state
+
+Ten dispositions is the right vocabulary for auditing a call and the wrong
+one for building a Zapier Path. `lead_state` is the same information
+collapsed to the three branches a workflow actually needs:
+
+| `lead_state` | Dispositions | What to do |
+| --- | --- | --- |
+| `qualified` | `confirmed` | Write the result through. This is the only state that is safe to act on unattended. |
+| `blocked_compliance` | `outside_calling_window`, `suppressed`, `retry_policy_blocked`, and any call where `opt_out_requested` is `true` | Record why the call must not happen. Do not retry on the next run. |
+| `needs_human` | everything else, including any disposition this integration does not recognize | Send it to a person. |
+
+Nothing is lost - `disposition` and `disposition_reason` are still on the
+output. An unrecognized disposition maps to `needs_human`, never to
+`qualified`.
 
 ## 5. Dispositions
 
 | Disposition | `is_actionable` | When it applies |
 | --- | --- | --- |
-| `confirmed` | `true` | Call completed, `task_completed` was `true`, confidence label was `high`, and a non-empty structured result was extracted. |
-| `review_required` | `false` | Call completed but `task_completed` was not `true`, confidence label was not `high`, or the structured result was missing or empty. |
+| `confirmed` | `true` | Call completed, `task_completed` was `true`, the confidence label was `high` **and** its numeric score cleared the configured floor, and every field the caller declared required came back with a usable value. |
+| `review_required` | `false` | Call completed but `task_completed` was not `true`, the confidence label was not `high` or its score was below the floor, or the structured result was missing, empty, or carried no usable answer (see [Usable results](#usable-results)). |
 | `result_invalid` | `false` | CALL-E could not validate the structured result against the supplied `result_schema`. |
 | `failed` | `false` | The call failed (status `failed` or a `call.failed` event). |
 | `canceled` | `false` | The call was canceled before completion. |
@@ -300,10 +338,144 @@ the integration.
 | `needs_human` | `false` | Default, fail-closed branch: a malformed event, an unrecognized event type, a missing or unrecognized call status, or a callback that fails id verification (see [Callback verification](#callback-verification)). |
 | `outside_calling_window` | `false` | The call was refused before dialing because the current time in the recipient's configured timezone fell outside the calling window (see [Calling windows](#calling-windows)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
 | `suppressed` | `false` | The call was refused before dialing because the recipient number matched an entry on the supplied `Do Not Call List` (see [Suppression list](#suppression-list)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
+| `retry_policy_blocked` | `false` | The call was refused before dialing because the supplied attempt history would exceed the per-day cap or the minimum interval between attempts (see [Retry policy](#retry-policy)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
 
 Only `confirmed` sets `is_actionable` to `true`. An unrecognized status or
 event type is never treated as a success - it always resolves to
 `needs_human`.
+
+### Usable results
+
+A structured result being *present* is not the same as it carrying an
+*answer*, and the difference is where an automated call quietly goes wrong.
+
+CALL-E's schema guidance tells you to *"prefer string enums over booleans
+for business decisions that may be unclear, and include an `unknown` enum
+value when the call may not provide enough evidence."* The
+[`calle-script-advisor`](../../skills/calle-script-advisor) skill in this
+repository lints for exactly that. Follow the advice, and a call where
+nobody answered the question comes back looking like this:
+
+```json
+{
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": { "score": 0.88, "label": "high" },
+  "structured_result": { "confirmed": "unknown" }
+}
+```
+
+Every field says success. CALL-E is not wrong - it is confident in its
+judgment, and its judgment is that there was no answer. An integration that
+checks only whether `structured_result` exists writes "confirmed" into a
+CRM for a person who hung up.
+
+So this integration checks the values:
+
+- A required field carrying `unknown`, `unclear`, `not_stated` or
+  `undetermined` (any case, trimmed) is not an answer.
+- Nor is one that is `null`, `""`, `[]` or `{}`. But `false` and `0` **are**
+  answers and are treated as such.
+- A field your `result_schema` declares `required` that never came back at
+  all fails the same way, including inside nested required objects.
+- A field you did **not** require is ignored - you said it was optional.
+
+Both create actions check against the `result_schema` you supplied. The
+`Call Completed` trigger and `Find Call Result` reconcile calls that may
+have been placed anywhere - from CALL-E's CLI, its MCP tools, or another
+Zap - so they have no declared contract to compare against. They still check
+the values they can see, but they cannot detect a field that is missing,
+because nothing told them it was expected. Use `Place Call and Wait for
+Outcome` when you want the contract enforced.
+
+### Confidence score floor
+
+CALL-E returns both `completion_confidence.label` and a 0-1
+`completion_confidence.score`. The API declares the score required and
+bounded; the label is documented only by example ("for example `low`,
+`medium`, or `high`"). The label is therefore the looser field, and checking
+it alone accepts a `high` carrying a score of 0.05.
+
+`Minimum Confidence Score` defaults to **0.6** and is available on both
+create actions, the trigger, and the search. That number is a policy default
+chosen for this integration, not a threshold CALL-E publishes - raise it if
+your workflow acts on the result without review, lower it if you are seeing
+good calls sent to review. Set it to `0` to classify on the label alone.
+
+An unparseable value falls back to 0.6 rather than turning the check off, so
+a typo cannot silently loosen it.
+
+### Opt-out capture
+
+The `Do Not Call List` input can only stop a number you already knew about.
+The moment a person actually says *"stop calling me"* is inside a transcript
+nobody reads - and the call may otherwise be a complete success, with every
+required field answered.
+
+When the recipient asks not to be called again, this integration sets
+`opt_out_requested`, quotes the request in `opt_out_excerpt` with its offset
+into the call, forces `is_actionable` to `false` and `disposition` to
+`needs_human`, and routes `lead_state` to `blocked_compliance` - **whatever
+the business result was**. The extracted result stays on the output for
+whoever handles it. Wire that branch to append the number to the
+`Do Not Call List` your other Zaps read from, and the loop closes.
+
+The FCC's revocation rule accepts a request made by any reasonable means,
+including saying so on the call, and requires it to be honored within 10
+days.
+
+Only the recipient's own turns are scanned. State bot-disclosure laws push
+callers to read an opt-out offer aloud, so the agent's script routinely
+contains the phrases being matched; scanning both speakers would flag every
+compliant call.
+
+**Its ceiling, stated plainly:** this is a phrase list over English text, not
+intent classification. It will miss a revocation phrased in another language
+or in a form not on the list, and it can fire on a conditional request
+("don't call me before five"). A miss leaves prior behavior unchanged and a
+false positive only asks a human, which is why a list is acceptable here at
+all. The stronger version is to add an `opt_out_requested` enum field with an
+`unknown` member to your `result_schema`, which puts the judgment in CALL-E's
+extraction model; the phrase list then backs it up.
+
+### Retry policy
+
+Redialling someone who did not answer is the easiest way to turn a useful
+automation into harassment, and it is what a Zap does by default - the
+trigger fires again, the action runs again.
+
+Supplying `Previous Attempt Times` (ISO 8601 timestamps, comma or newline
+separated) enables enforcement: the call is refused with
+`retry_policy_blocked` if it would exceed `Max Attempts Per Day` (default 2)
+or fall inside `Minimum Hours Between Attempts` (default 4). Those defaults
+are the conservative end of common practice, not a single citable federal
+number, which is why they are inputs.
+
+The history is **stateless** - supplied fresh on every call, never stored by
+this integration, because a Zapier action has no durable storage. It comes
+from the same spreadsheet row or CRM record your Zap is already reading,
+exactly like the `Do Not Call List`. An unparseable timestamp, a
+future-dated one, or a history that cannot be read as text fails closed and
+refuses to dial.
+
+Like the calling-window guard and unlike suppression, a dry run previews the
+verdict rather than being blocked by it.
+
+### Reconciliation limit
+
+Zapier holds a waiting callback step for up to 30 days and offers no timeout
+hook: if CALL-E never posts back, `performResume` is simply never invoked.
+`Place Call and Wait for Outcome` therefore **cannot** time itself out from
+the inside, and no amount of configuration will change that.
+
+Build the timeout from the outside instead: `Start Call (No Wait)` → a
+Zapier **Delay** step → `Find Call Result` with `Reconciliation Limit
+(minutes)` set. A call still `queued` or `in_progress` that many minutes
+after CALL-E created it is reported as `needs_human` with
+`reconciliation_timed_out: true`, rather than sitting at `outcome_unknown`
+forever. Age is measured from CALL-E's own `created_at`, so a delayed or
+re-run step still measures the real age of the call. A call whose age cannot
+be read is escalated rather than assumed healthy.
 
 ### Callback verification
 
@@ -375,9 +547,13 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 146 tests across 15 files against a bundled
+`npm install && npm test` runs 273 tests across 21 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
-placed. `test/e2e-app.test.js` additionally drives the real app definition
+placed. `test/fixtures/` holds three committed payloads - a clean success, a
+provider-reported success that carries no answer, and a call carrying a
+revocation of consent - which `test/fixtures.test.js` drives through the
+real classifier, so they are executable evidence rather than documentation.
+`test/e2e-app.test.js` additionally drives the real app definition
 (`index.js`) through `zapier-platform-core`'s `createAppTester`, exercising
 the actual `beforeRequest`/`afterResponse` middleware chain rather than
 calling `operation.perform` in isolation.
@@ -479,6 +655,20 @@ Call 3 - recipient declined, started without waiting:
 - The `correlation_id` supplied on the request round-tripped back through
   CALL-E's `metadata` and was present on the reconciled result.
 - No raw phone digits appeared in the output.
+
+**Re-verified after the usable-result and confidence-score checks were
+added.** All three live payloads were replayed through the current
+classifier and produced the same dispositions recorded above - `failed`,
+`confirmed`, `review_required` - so nothing in this section is stale. Call
+2's confidence score was 0.95, comfortably above the 0.6 floor.
+
+Call 1's payload is also the production evidence behind the
+[usable-results check](#usable-results): CALL-E's extracted result for a
+call the recipient hung up on was literally `{"heard_clearly": "unknown"}`.
+On that call `task_completed` was `false`, so the classifier already caught
+it. Had CALL-E judged the task complete - which it does, as fixture
+`test/fixtures/fixture-user-hung-up.json` models - only the value check
+would have stood between that payload and a `confirmed`.
 
 **Why this call matters:** a declined call was reported by the platform with
 `status: completed`. An integration that branches on `status === 'completed'`

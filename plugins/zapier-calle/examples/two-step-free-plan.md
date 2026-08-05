@@ -82,6 +82,17 @@ disposition - not an action the Zap takes on your behalf.
 | `needs_human` | Read `disposition_reason`. The fail-closed default: a malformed event, an unrecognized status, or a callback that failed identity verification. Treat it as unresolved, not as a specific known outcome. |
 | `outside_calling_window` | Read `disposition_reason`. No call was placed at all - it was refused before dialing because the current local time in the recipient's configured timezone fell outside the calling window. Run the Zap again during the allowed window; only reachable if you set `Recipient Timezone (IANA)` on this step. |
 | `suppressed` | Read `disposition_reason` and `matched_entry`. No call was placed at all - the recipient number matched an entry on the `Do Not Call List` you supplied. Only reachable if you set `Do Not Call List` on this step. |
+| `retry_policy_blocked` | Read `disposition_reason`, `attempts_in_last_day` and `hours_since_last_attempt`. No call was placed at all - the attempt history you supplied says it would be too soon. Only reachable if you set `Previous Attempt Times` on this step. |
+
+Two output fields are worth looking at on any run that is not `confirmed`:
+`review_excerpt` is the last thing the recipient said, and
+`review_excerpt_offset_seconds` is where in the call they said it. Between
+them you usually do not need to read the whole `transcript_text`.
+
+If `opt_out_requested` comes back `true`, the recipient asked not to be
+called again. `disposition` will be `needs_human` no matter how well the
+call otherwise went; `opt_out_excerpt` quotes the request. Add that number
+to a `Do Not Call List` before running this Zap again.
 
 **Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
 at status `queued` for a 300-second polling window while the phone was

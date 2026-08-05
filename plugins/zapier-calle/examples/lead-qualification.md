@@ -85,10 +85,28 @@ the call step to convert it, or the call step will reject the number.
 | `needs_human` | Same as `review_required`: create a task for a human, write `disposition_reason` to the note. |
 | `outside_calling_window` | No call was placed. Create a HubSpot task to call back during the allowed window and write `disposition_reason` to the note - do not treat a fresh lead this way as uninterested. |
 | `suppressed` | No call was placed. Create a HubSpot task noting the contact is on the Do Not Call List and write `disposition_reason` to the note - do not dial this contact through another Zap step either. |
+| `retry_policy_blocked` | No call was placed - this lead has already been attempted too recently. Leave the record for the next run rather than creating a task; nothing needs a human yet. |
+
+**Handle `opt_out_requested` before the table above.** If it is `true`, the
+contact asked not to be called again during the call. Set the HubSpot
+do-not-call property, append the number to the Do Not Call List your other
+Zaps read from, and stop - regardless of what the qualification answer was.
+The integration will already have set `disposition` to `needs_human` and
+`lead_state` to `blocked_compliance`, so a `lead_state` filter catches this
+case without a separate branch.
 
 Only `confirmed` writes the qualification data onto the record as
 authoritative. Every other disposition routes to a human task instead of
 guessing at an interest level from an incomplete or unreadable call.
+
+**This is the recipe where the usable-result check earns its place.** CALL-E's
+own documentation uses lead qualification as its worked example, with an
+`interest_level` enum whose members include `unknown` - the value the model
+returns when the prospect never gave enough evidence. Declare
+`interest_level` required in your `Result Schema` and a call that comes back
+`unknown` is classified `review_required`, not `confirmed`, so it can never
+be written onto the record as an interest level. Without that check, "we
+could not tell" is stored as a qualification.
 
 **Note on `outcome_unknown` and `queued`:** in a live test call, a call sat
 at status `queued` for over two minutes while the phone was actually ringing

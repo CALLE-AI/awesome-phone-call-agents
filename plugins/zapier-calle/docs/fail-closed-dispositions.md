@@ -52,9 +52,18 @@ exposes several independent signals that need to be read together:
   `task_completed`).
 - **A confidence label** on whatever data was extracted (CALL-E:
   `completion_confidence.label`).
+- **A numeric confidence score**, which is often the stricter of the two.
+  CALL-E declares `completion_confidence.score` as required and bounded 0-1,
+  while `label` is documented only by example ("for example `low`, `medium`,
+  or `high`") - so the label is the looser, unenumerated field. Checking only
+  the label accepts a `high` carrying a score of 0.05. Check both, and make
+  the floor configurable rather than hard-coding a number the provider never
+  published.
 - **Nullability of the structured result itself** - a call can complete
   with `task_completed: true` and still carry no structured result, or an
   empty one.
+- **The values inside the structured result**, not just its presence. See
+  section 5 below; this is the signal most integrations skip.
 - **A failure code that is not a fixed enum.** Treat it as an opaque,
   unbounded string for logging and for a human to read, never as a value
   you branch on by exact match, since the provider can add new codes at any
@@ -81,17 +90,17 @@ happens to look plausible but actually belongs to the other vocabulary is
 how a wrong branch gets taken: a status meant for a human reading a CLI
 table gets fed into a machine comparison it was never designed for.
 
-## 4. The nine dispositions
+## 4. The ten dispositions
 
 Rather than exposing raw provider fields to the rest of your workflow,
 collapse them into a small, closed set of dispositions and make every
 downstream branch key off that set instead of the raw fields. CALL-E's
-integration uses nine:
+integration uses ten:
 
 | Disposition | Actionable? | When it applies |
 | --- | --- | --- |
-| `confirmed` | Yes | The call completed, the provider marked the task completed, confidence was high, and a non-empty structured result was extracted. |
-| `review_required` | No | The call completed but the task was not marked completed, confidence was not high, or the structured result was missing or empty. |
+| `confirmed` | Yes | The call completed, the provider marked the task completed, both the confidence label and the numeric score cleared their thresholds, and every field the caller declared required came back with a usable value. |
+| `review_required` | No | The call completed but the task was not marked completed, confidence was not high enough by label or by score, or the structured result was missing, empty, or carried no usable answer. |
 | `result_invalid` | No | The provider could not validate the extracted result against the schema you supplied. |
 | `failed` | No | The call failed outright (a failure status or failure event). |
 | `canceled` | No | The call was canceled before it completed. |
@@ -99,28 +108,42 @@ integration uses nine:
 | `needs_human` | No | Fail-closed default: a malformed event, an unrecognized event type, a missing or unrecognized status, or a callback that failed identity verification. |
 | `outside_calling_window` | No | The integration refused to place the call at all, because doing so would fall outside a configured quiet-hours window. See [Pre-flight refusals](#pre-flight-refusals) below - this one is not like the other seven. |
 | `suppressed` | No | The integration refused to place the call at all, because the recipient matched an entry on a caller-supplied do-not-call list. See [Pre-flight refusals](#pre-flight-refusals) below - like `outside_calling_window`, this one is not like the other seven. |
+| `retry_policy_blocked` | No | The integration refused to place the call at all, because the caller-supplied attempt history shows it would exceed a per-day cap or a minimum interval between attempts. Also a [pre-flight refusal](#pre-flight-refusals). |
 
 Only one disposition is actionable without a human in the loop. Every
-other disposition, including a `confirmed` call whose extracted data is
-itself ambiguous (for example an enum value of `unknown`), is designed to
-be read by a person before anything acts on it. The rule that makes this
-table work is that **the default is `needs_human`**: every code path that
-does not positively match one of the other six outcome-of-a-call
-dispositions falls through to it, rather than to `confirmed` or to a
-silent no-op.
+other disposition is designed to be read by a person before anything acts
+on it. The rule that makes this table work is that **the default is
+`needs_human`**: every code path that does not positively match one of the
+other six outcome-of-a-call dispositions falls through to it, rather than
+to `confirmed` or to a silent no-op.
+
+### Branching on ten values is its own problem
+
+A closed vocabulary is right for correctness and wrong for ergonomics. Ten
+string values is a wall of configuration in a visual workflow builder, and
+it forces every person who builds one to re-derive which values are safe to
+act on - a derivation that is the integration's job, not theirs. Publish a
+coarse projection alongside the precise one. CALL-E's integration emits
+`lead_state`, which is exactly three values: `qualified` (only
+`confirmed`), `blocked_compliance` (the three pre-flight refusals, plus any
+call where consent was revoked), and `needs_human` (everything else,
+including an unrecognized disposition). Nothing is lost, because the full
+`disposition` and `disposition_reason` stay on the output for anyone who
+needs them.
 
 ### Pre-flight refusals
 
-Seven of these nine dispositions classify a call that happened: the
+Seven of these ten dispositions classify a call that happened: the
 provider ran it, and the result - success, failure, ambiguity - is being
-read back. `outside_calling_window` and `suppressed` are a different kind
-of thing. Each is produced **before dialing**, by the integration itself
-rather than by the provider, when a policy the integration enforces - a
-quiet-hours window, or a do-not-call list - says the call should not be
-placed right now. CALL-E's `deriveDisposition` classifier - the function
-that turns a webhook event into one of the other seven values - never
-returns either of them; nothing about either one comes from a call
-outcome, because no call was placed.
+read back. `outside_calling_window`, `suppressed` and
+`retry_policy_blocked` are a different kind of thing. Each is produced
+**before dialing**, by the integration itself rather than by the provider,
+when a policy the integration enforces - a quiet-hours window, a
+do-not-call list, or a retry cap - says the call should not be placed right
+now. CALL-E's `deriveDisposition` classifier - the function that turns a
+webhook event into one of the other seven values - never returns any of
+them; nothing about them comes from a call outcome, because no call was
+placed.
 
 The general principle behind both: a refusal to place a call is a distinct
 outcome from any result of a call, and collapsing the two loses
@@ -134,7 +157,90 @@ them out of the vocabulary your provider's callback can produce, and route
 each one somewhere a human or a later retry step can see why the call
 never happened.
 
-## 5. Three rules
+## 5. A present result is not a usable result
+
+This is the check most integrations skip, and it is the one that lets an
+ambiguous call reach a success branch even after everything in section 4 is
+implemented correctly.
+
+The mistake is to treat the structured result as a boolean: it exists, so
+the call worked. But a good extraction model does not fail when the call
+produced no answer - it succeeds at reporting that there was no answer.
+CALL-E's own schema guidance says so directly: *"Prefer string enums over
+booleans for business decisions that may be unclear, and include an
+`unknown` enum value when the call may not provide enough evidence."* Follow
+that advice and the provider will hand you `{"qualified": "unknown"}` with
+`task_completed: true` and a `high` confidence label - because it is
+genuinely confident that the caller never answered the question.
+
+Every signal in section 4 agrees. The call is a success by every field the
+provider sends. And the answer is not there.
+
+So check the values, not just the envelope:
+
+1. **Reject unknown-like values.** Whatever token set your schema convention
+   uses (`unknown`, `unclear`, `not_stated`, `undetermined`), a required
+   field carrying one of them is not an answer. Compare case-insensitively
+   and after trimming.
+2. **Reject empty values** - `null`, `""`, `[]`, `{}`. But note that `false`
+   and `0` are *answers*, not absences. A guard written with a truthiness
+   test throws away every legitimate "no" and every legitimate zero. This is
+   the single easiest bug to write here.
+3. **Enforce the caller's own `required` list**, where you have it. If the
+   workflow declared a field required and the provider did not return it,
+   the contract the workflow was written against is not satisfied, whatever
+   the provider thinks of the call.
+4. **Only check what was required.** An optional field coming back `unknown`
+   is not a defect; the caller said it was optional.
+
+There is an asymmetry worth designing for: some surfaces know the schema and
+some do not. An action that placed the call has the `result_schema` it was
+placed with and can do all four checks. A webhook trigger reacting to a call
+placed from a CLI, an MCP tool, or someone else's workflow has no declared
+contract to compare against - it can still do checks 1 and 2 on the values
+it can see, but it cannot detect a *missing* field, because nothing told it
+what should have been there. Give each surface the strongest check it can
+support rather than lowering all of them to the weakest.
+
+Finally: if you also ship tooling that tells authors to add an `unknown`
+enum member - a linter, a template, a docs page - and your runtime then
+treats that value as a success, the two halves of your product contradict
+each other. Check the value.
+
+## 6. Revocation of consent is not a call outcome
+
+If the person says "stop calling me," that fact is in the transcript and
+nowhere else. It will not appear in the status, the completion flag, the
+confidence, or the structured result unless you explicitly asked for it -
+and the call may otherwise be a complete success, with every required field
+answered. An integration that classifies only the business outcome will
+report `confirmed`, and the workflow will advance the outreach sequence for
+someone who just asked never to be contacted again.
+
+Three design points:
+
+- **Surface it as its own field, not as a disposition value.** It is
+  orthogonal to whether the call produced an answer - both can be true at
+  once - so it needs to travel alongside the outcome, with the quote and its
+  offset into the call so a human can verify it.
+- **Let it override actionability.** Whatever the business result was, the
+  call must not be actionable and must route to the compliance branch. The
+  extracted result stays on the output for whoever handles it.
+- **Scan only the recipient's turns.** State bot-disclosure laws push
+  callers to read an opt-out offer aloud, so the agent's own script
+  routinely contains the exact phrases you are matching on. Scanning both
+  speakers flags every compliant call as a revocation.
+
+Be honest about the ceiling. A phrase list over one language is not intent
+classification: it misses other languages and over-triggers on conditional
+requests. Both failure directions are acceptable here only because a miss
+changes nothing and an over-trigger merely asks a human - check that
+property holds for your design before shipping one. The stronger version is
+to put an `opt_out_requested` enum (with an `unknown` member) in the result
+schema itself, which moves the judgment into the extraction model, and keep
+the phrase list as a backstop for callers who did not add the field.
+
+## 7. Three rules
 
 1. **The default branch is never success.** Whatever mechanism you use for
    "none of the above" - an `else`, a `default` case, a fallback route in a
@@ -154,7 +260,7 @@ never happened.
    state from both `confirmed` and `failed`, and let a human or a
    reconciliation step, not an automatic retry, decide what to do about it.
 
-## 6. Clarification is not failure
+## 8. Clarification is not failure
 
 A provider that supports open-ended instructions may reject a call request
 outright and ask a clarifying question instead of guessing at your intent.
@@ -174,7 +280,7 @@ them supply the missing information - a language, a region, a target
 identity - rather than retrying blind or writing the request off as
 broken.
 
-## 7. Non-terminal does not mean failed
+## 9. Non-terminal does not mean failed
 
 Do not infer failure from the absence of progress. Observed live against
 the production API: a real call task remained at status `queued` for a
@@ -193,7 +299,7 @@ a callback or webhook delivered when the provider reaches a terminal state
 over polling a status endpoint - it removes the window in which "no update
 yet" can be misread as "nothing happened."
 
-## 8. Idempotency
+## 10. Idempotency
 
 Retries and duplicate triggers are inevitable in any workflow platform.
 Key your idempotency guard on a digest of the canonical request payload -
@@ -207,7 +313,7 @@ per run but do not change what the call is - a freshly generated callback
 URL is the clearest example, since minting a new one on every attempt would
 otherwise make an identical retry hash differently and place a second call.
 
-## 9. Verifying the callback
+## 11. Verifying the callback
 
 A callback URL delivered to a third-party provider is generally
 unauthenticated: anything that discovers the URL can post to it, so its
@@ -220,7 +326,7 @@ no identifier, or if the two differ, treat the callback the same as any
 other unverifiable input - route it to the fail-closed review disposition
 rather than accepting its contents as the result of your call.
 
-## 10. How to test it
+## 12. How to test it
 
 The property worth asserting is not "each disposition returns the right
 string for a given input" in isolation, but a single global invariant
@@ -238,6 +344,28 @@ requests and generates no side-effecting resources (no callback URL, no
 call placed) - a dry run that quietly still performs the real action
 defeats the entire point of offering one.
 
-See `plugins/zapier-calle/lib/disposition.js` for a fail-closed classifier
-built around these rules, and `plugins/zapier-calle/test/disposition.test.js`
-for the invariant-style tests described above.
+Three assertions are worth writing explicitly, because each covers a bug
+that is easy to introduce and invisible until production:
+
+- **`false` and `0` are still confirmed.** The usable-value check in section
+  5 is one truthiness test away from discarding every legitimate "no."
+- **Every threshold input falls back rather than loosening.** A confidence
+  floor, an hour bound, a retry cap - feed each of them an array, an object,
+  and a garbage string, and assert the guard tightens to its default instead
+  of widening. `Number([])` is `0`, so the naive coercion turns an
+  accidentally-mapped empty list into the most permissive possible setting.
+- **The agent's own script cannot trigger the transcript scanners.** Feed a
+  transcript where the bot reads an opt-out disclosure and the recipient says
+  something ordinary, and assert nothing fires.
+
+Keep a small set of committed fixture payloads for the cases that are hard
+to describe in prose - a clean success, a provider-reported success that
+carries no answer, a call carrying a revocation - and run them through the
+real classifier in the test suite rather than leaving them as documentation
+nobody executes.
+
+See `plugins/zapier-calle/lib/disposition.js` and
+`plugins/zapier-calle/lib/result-quality.js` for a fail-closed classifier
+built around these rules, `plugins/zapier-calle/lib/opt-out.js` for the
+revocation scanner, and `plugins/zapier-calle/test/disposition.test.js` plus
+`plugins/zapier-calle/test/fixtures.test.js` for the tests described above.

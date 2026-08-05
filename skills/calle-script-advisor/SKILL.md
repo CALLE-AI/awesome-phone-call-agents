@@ -47,7 +47,8 @@ See `references/examples.md` for three complete worked examples that pass the li
 - Never invent a phone number. Use only the number the user provided or that the calling system resolved.
 - Never infer region, locale, or timezone from a phone number.
 - Never solicit sensitive personal data: Social Security numbers, credit card or bank account numbers, CVVs, PINs, passwords, dates of birth, or a mother's maiden name. See `references/safety.md`.
-- Always include an `unknown` (or `unclear` / `not_stated` / `undetermined`) enum member for anything the call may fail to establish. CALL-E's own docs recommend this explicitly.
+- Always include an `unknown` (or `unclear` / `not_stated` / `undetermined`) enum member for anything the call may fail to establish. CALL-E's own docs recommend this explicitly, and it is what lets a downstream integration tell "the answer is no" apart from "there was no answer" - the sibling `plugins/zapier-calle` refuses to mark a call actionable when a required field comes back with one of these values, so the enum member is not decoration.
+- Mark a field `required` only when the workflow genuinely cannot proceed without it. `required` is a contract: an integration that checks it will send the whole call to human review when the field is absent or unknown. Requiring a nice-to-have field turns every partially-successful call into manual work.
 - Never let the script imply a commitment the caller cannot honour - no promised callback times, approvals, or guarantees the agent is not authorized to make.
 
 Read `references/safety.md` before drafting any task that touches consent, disclosure, calling windows, or a do-not-call request.
