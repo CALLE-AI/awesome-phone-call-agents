@@ -1,8 +1,8 @@
-// 'outside_calling_window' and 'suppressed' are produced by the create
-// action before dialing (see lib/calling-window.js and lib/suppression.js
-// respectively), never by this webhook classifier. They are listed here
-// only so DISPOSITIONS stays the single source of truth for every value a
-// Zap can see; deriveDisposition below must never return either of them.
+// The last three are produced by the create actions before dialing (see
+// lib/calling-window.js, lib/suppression.js and lib/retry-policy.js), never
+// by this webhook classifier. They are listed here only so DISPOSITIONS
+// stays the single source of truth for every value a Zap can see;
+// deriveDisposition below must never return any of them.
 export const DISPOSITIONS = Object.freeze([
   'confirmed',
   'review_required',
@@ -13,7 +13,15 @@ export const DISPOSITIONS = Object.freeze([
   'needs_human',
   'outside_calling_window',
   'suppressed',
+  'retry_policy_blocked',
 ]);
+
+import {
+  findUnusableFields,
+  describeUnusableFields,
+  checkConfidenceScore,
+  DEFAULT_MIN_CONFIDENCE_SCORE,
+} from './result-quality.js';
 
 const KNOWN_EVENT_TYPES = new Set([
   'call.completed',
@@ -47,7 +55,7 @@ function structuredResultState(data) {
   return Object.keys(value).length > 0 ? 'ok' : 'empty';
 }
 
-function classify(event) {
+function classify(event, options) {
   if (!event || typeof event !== 'object') {
     return result('needs_human', 'Webhook event was missing or not an object.');
   }
@@ -94,12 +102,29 @@ function classify(event) {
     return result('review_required', `Completion confidence was ${truncate(label)}, not high.`);
   }
 
+  const scoreCheck = checkConfidenceScore(confidence, options.minConfidenceScore);
+  if (!scoreCheck.ok) {
+    return result('review_required', scoreCheck.reason);
+  }
+
   const structuredResult = structuredResultState(data);
   if (structuredResult === 'missing') {
     return result('review_required', 'Call completed but no structured result was extracted.');
   }
   if (structuredResult === 'empty') {
     return result('review_required', 'Call completed but the structured result was empty.');
+  }
+
+  // A present result is not the same as a usable one. CALL-E reports high
+  // confidence in its *judgment*, which includes being confident that the
+  // caller never answered the question - so `{"qualified": "unknown"}` is a
+  // high-confidence result carrying no answer.
+  const unusable = findUnusableFields(data.structured_result, options.resultSchema);
+  if (unusable.length > 0) {
+    return result(
+      'review_required',
+      `Structured result is not actionable: ${truncate(describeUnusableFields(unusable))}.`,
+    );
   }
 
   return result('confirmed', 'Call completed with a high-confidence validated result.');
@@ -109,9 +134,22 @@ function classify(event) {
 // classify as needs_human, never escape as an exception. Task 8 spreads this
 // return value straight into a Zap output, so a throw here would abort the
 // Zap instead of routing the call to human review.
-export function deriveDisposition(event) {
+//
+// `options.resultSchema` is the parsed result_schema the call was placed
+// with, when the caller has it. The create actions do; the Call Completed
+// trigger and Find Call Result do not, because they observe calls that may
+// have been placed anywhere - so they get the weaker schemaless check rather
+// than no check at all. `options.minConfidenceScore` defaults to the module
+// default; pass 0 to disable the score floor.
+export function deriveDisposition(event, options = {}) {
   try {
-    return classify(event);
+    return classify(event, {
+      resultSchema: options.resultSchema,
+      minConfidenceScore:
+        options.minConfidenceScore === undefined
+          ? DEFAULT_MIN_CONFIDENCE_SCORE
+          : options.minConfidenceScore,
+    });
   } catch {
     return result('needs_human', 'Could not classify the webhook event.');
   }
