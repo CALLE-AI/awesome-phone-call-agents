@@ -8,10 +8,18 @@
  *
  * Redacts:
  *   - phone numbers, via the same maskPhone() used elsewhere in this skill
- *     for consistency. Covers E.164 ("+15550101234"), grouped international
- *     display format ("+1 (555) 010-1234"), and common US/NANP formats with
- *     no "+" -- "(555) 201-1234", "555-201-1234", "555.201.1234", and bare
- *     "5552011234" -- all masking down to "+1555010****" / "555201****".
+ *     for consistency. FAILS CLOSED on shape: this skill is not US-only (it
+ *     takes a language/region parameter), so rather than only matching
+ *     specific country formats (E.164, NANP, ...) this looks for any digit
+ *     run of plausible phone-number length (7-15 digits, optionally
+ *     separated by spaces/dashes/dots/parens/a leading "+") and masks it --
+ *     covering E.164 ("+15550101234"), NANP ("555-201-1234"), UK-style with
+ *     no "+" ("020 7946 0958"), and other formats this skill hasn't been
+ *     explicitly taught. This deliberately trades precision for recall: it
+ *     will occasionally mask something that isn't a phone number (e.g. an
+ *     order ID). That's an accepted tradeoff for a PII-redaction fallback --
+ *     a missed real phone number is worse than an over-redacted non-number.
+ *     Digit runs shorter than 7 (e.g. a bare 4-digit year) are left alone.
  *   - email addresses (e.g. "jerlyn@designlady.com" -> "[redacted email]")
  *
  * KNOWN LIMITATION: this does not attempt to detect or redact spoken street
@@ -32,31 +40,35 @@ const path = require("path");
 
 const { maskPhone } = require("./phone-utils.js");
 
-// Two phone shapes, combined into ONE alternation regex so a single
-// `.replace()` pass picks non-overlapping matches -- combining them via two
-// separate sequential `.replace()` calls previously caused the same
-// substring to be masked twice (e.g. "+1555010********" instead of
-// "+1555010****"). Whichever alternative matches first at a given position
-// wins; the engine then continues past that match, so the other alternative
-// never gets a second chance at the same characters.
+// Fail-closed, shape-agnostic phone candidate: an optional leading "+"
+// followed by a run of digits/parens/spaces/dashes/dots, bounded so it can't
+// run away across unrelated text. This is intentionally NOT restricted to
+// any particular country's format (no NANP area-code/exchange constraint,
+// no E.164-specific structure) -- this skill supports a language/region
+// parameter, so a US-shaped-only pattern would silently miss real numbers
+// from callers elsewhere (e.g. UK "020 7946 0958", which has no "+" and
+// isn't NANP-shaped).
 //
-// 1. `+`-prefixed international/E.164 numbers (this repo's canonical
-//    grouped-display matcher from validate_repository.py's Dify checks --
-//    its separator class `[\s().-]*` allows zero separators, so it already
-//    covers bare "+15550101234" too, not just spaced/grouped display forms).
-const GROUPED_INTL_PHONE_RE = "(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)";
-// 2. Domestic NANP-shaped numbers with no `+`: "(555) 201-1234",
-//    "555-201-1234", "555.201.1234", "5552011234", with an optional leading
-//    "1". Area code and exchange digits are constrained to 2-9 (a real NANP
-//    rule) so this doesn't over-match arbitrary 10-digit numbers like order
-//    IDs -- deliberately narrower than a bare `\d{7,15}` catch-all.
-const NANP_PHONE_RE = "(?<!\\d)(?:1[\\s.-]?)?\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}(?!\\d)";
+// The regex only bounds the *candidate span* loosely; the actual "is this
+// phone-number length" decision is a digit count done in redactPhones()
+// below (7-15 digits), not encoded in the character-class quantifiers here
+// -- separators can appear at arbitrary positions, so counting digits after
+// matching is far simpler and more precise than trying to make the regex
+// itself enforce the count.
+const PHONE_CANDIDATE_RE = /(?<!\d)\+?[\d(][\d()\s.-]{5,26}\d(?!\d)/g;
+const MIN_PHONE_DIGITS = 7;
+const MAX_PHONE_DIGITS = 15;
 
-const PHONE_RE = new RegExp(`(?:${GROUPED_INTL_PHONE_RE})|(?:${NANP_PHONE_RE})`, "g");
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 function redactPhones(text) {
-  return text.replace(PHONE_RE, (match) => maskPhone(match));
+  return text.replace(PHONE_CANDIDATE_RE, (match) => {
+    const digitCount = (match.match(/\d/g) || []).length;
+    if (digitCount < MIN_PHONE_DIGITS || digitCount > MAX_PHONE_DIGITS) {
+      return match; // Not phone-length (e.g. a bare 4-digit year) -- leave it.
+    }
+    return maskPhone(match);
+  });
 }
 
 function redactEmails(text) {
