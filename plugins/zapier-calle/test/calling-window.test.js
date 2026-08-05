@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkCallingWindow } from '../lib/calling-window.js';
+import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
 
 describe('checkCallingWindow', () => {
   it('allows a weekday well inside the window', () => {
@@ -140,5 +140,43 @@ describe('checkCallingWindow', () => {
     });
     expect(result.localHour).toBe(0);
     expect(result.allowed).toBe(false);
+  });
+});
+
+describe('callingWindowOptionsFromInput', () => {
+  it('reads the four calling_window_* inputs', () => {
+    expect(
+      callingWindowOptionsFromInput({
+        calling_window_timezone: 'America/New_York',
+        calling_window_earliest_hour: '9',
+        calling_window_latest_hour: '20',
+        calling_window_block_sunday: 'true',
+      }),
+    ).toEqual({
+      timezone: 'America/New_York',
+      earliestHour: 9,
+      latestHour: 20,
+      blockSunday: true,
+    });
+  });
+
+  it('falls back to the TCPA defaults when the hours are absent', () => {
+    const options = callingWindowOptionsFromInput({});
+    expect(options.earliestHour).toBe(8);
+    expect(options.latestHour).toBe(21);
+  });
+
+  // Regression: Number([]) is 0, so a mapped Zapier line-item field arriving
+  // as an array used to widen the earliest hour to midnight instead of
+  // falling back to 8. A non-scalar input must never loosen the window.
+  it('does not let a non-scalar input widen the window', () => {
+    for (const value of [[], {}, true, 'not a number']) {
+      const options = callingWindowOptionsFromInput({
+        calling_window_earliest_hour: value,
+        calling_window_latest_hour: value,
+      });
+      expect(options.earliestHour).toBe(8);
+      expect(options.latestHour).toBe(21);
+    }
   });
 });

@@ -5,6 +5,8 @@
 // and an unusable timezone (invalid, or a raw UTC offset that cannot handle
 // daylight saving) must never fall through to allowing a call.
 
+import { toFiniteNumber } from './coerce.js';
+
 // Matches raw UTC-offset forms such as "+07:00", "-5", "UTC+7", "GMT-05:00".
 // A real IANA name always contains only letters, digits, "/", "_", and "-"
 // with at least one leading letter, so this pattern cannot false-positive on
@@ -124,9 +126,11 @@ export function checkCallingWindow(options = {}) {
   };
 }
 
+// A non-scalar input (a mapped Zapier line-item field arrives as an array)
+// used to coerce to 0 via Number([]), silently widening the window to
+// midnight. See lib/coerce.js.
 function toHour(value, fallback) {
-  if (value === undefined || value === null || value === '') return fallback;
-  return typeof value === 'number' ? value : Number(value);
+  return toFiniteNumber(value, fallback);
 }
 
 function toBool(value, fallback) {
