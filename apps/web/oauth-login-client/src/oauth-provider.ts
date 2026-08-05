@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   OAuthClientInformationMixed,
   OAuthClientMetadata,
   OAuthTokens,
@@ -14,17 +14,16 @@ import type { OAuthClientProvider, OAuthDiscoveryState } from "@modelcontextprot
  * characters to keep sessionStorage keys readable.
  */
 async function deriveNamespace(serverUrl: string): Promise<string> {
-  try {
-    const canonicalUrl = new URL(serverUrl).href;
-    const msgUint8 = new TextEncoder().encode(canonicalUrl);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const b64 = btoa(String.fromCharCode(...hashArray));
-    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  } catch {
-    // Fallback for unparseable URLs — use a fixed generic namespace
-    return 'default';
-  }
+  // Intentionally not catching: a hashing failure means the runtime is broken
+  // or the URL is invalid.  Falling back to a shared namespace would allow
+  // different servers to collide on the same storage keys (tokens, PKCE
+  // verifier, state, discovery data).  Fail closed instead.
+  const canonicalUrl = new URL(serverUrl).href;
+  const msgUint8 = new TextEncoder().encode(canonicalUrl);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const b64 = btoa(String.fromCharCode(...hashArray));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /** Generate a cryptographically random base64url-encoded state token (128 bits). */
@@ -77,8 +76,16 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     clientMetadataUrl?: string
   ): Promise<BrowserOAuthClientProvider> {
     const serverUrlObj = new URL(serverUrl);
-    if (serverUrlObj.protocol !== 'https:' && serverUrlObj.hostname !== 'localhost' && serverUrlObj.hostname !== '127.0.0.1') {
-      throw new Error("HTTPS is required for non-loopback MCP endpoints.");
+    const proto = serverUrlObj.protocol;
+    const host = serverUrlObj.hostname;
+    const isLoopback = host === 'localhost' || host === '127.0.0.1';
+    // Require https: for any host, or http: only on loopback.
+    // Any other scheme (ftp:, ws:, etc.) is rejected even on loopback.
+    if (proto !== 'https:' && !(proto === 'http:' && isLoopback)) {
+      throw new Error(
+        'MCP endpoint must use https: (any host) or http: (loopback only). ' +
+        `Received: ${serverUrl}`
+      );
     }
     const ns = await deriveNamespace(serverUrl);
     const storagePrefix = `calle_oauth_${ns}_`;
@@ -206,11 +213,42 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * Invalidate stored credentials (e.g., when recovery retries with stale credentials).
-   * Removing all credentials forces a re-login flow.
+   * Selectively invalidate stored credentials.
+   *
+   * MCP SDK 1.29 calls this with a specific scope after certain errors so that
+   * the retry path can reuse surviving state.  For example, after
+   * `invalid_grant` the SDK calls `invalidateCredentials("tokens")` and then
+   * retries the code exchange using the still-valid `clientInfo` and PKCE
+   * `codeVerifier`.  Deleting those here would break the retry.
+   *
+   * Supported scopes
+   * ----------------
+   * - `"tokens"`    — remove the access/refresh token set only
+   * - `"verifier"`  — remove the PKCE code verifier only
+   * - `"discovery"` — remove cached discovery state only
+   * - `"client"`    — remove registered client information only
+   * - `"all"` / undefined / anything else — remove everything (same as
+   *   `clearCredentials()`, used for explicit logout or full re-auth)
    */
-  invalidateCredentials(scope?: string): void {
-    this.clearCredentials();
+  invalidateCredentials(scope: 'all' | 'client' | 'tokens' | 'verifier' | 'discovery' | string = 'all'): void {
+    switch (scope) {
+      case 'tokens':
+        this.removeItem('tokens');
+        break;
+      case 'verifier':
+        this.removeItem('codeVerifier');
+        break;
+      case 'discovery':
+        this.removeItem('discoveryState');
+        break;
+      case 'client':
+        this.removeItem('clientInfo');
+        break;
+      default:
+        // 'all' or any unrecognised scope → wipe everything
+        this.clearCredentials();
+        break;
+    }
   }
 }
 

@@ -79,27 +79,26 @@ async function stubMcpServer(page: import('@playwright/test').Page) {
 // call to provider.state()) so tests can control the stored value.
 // ---------------------------------------------------------------------------
 
-/** The storage key prefix for the default fallback server URL used by the app. */
+/**
+ * Plant a state token directly in sessionStorage using the real provider so
+ * the key derivation (SHA-256 of the full canonical URL) always matches what
+ * production writes.
+ *
+ * The old helper used `btoa(origin)` which is a completely different hash
+ * than the SHA-256 the provider uses, so the mismatch/replay assertions were
+ * passing through the "no pending state" branch instead of the real validators.
+ */
 async function plantStateToken(page: import('@playwright/test').Page, token: string) {
-  await page.evaluate((tok) => {
-    // Mirror the namespace logic from BrowserOAuthClientProvider.
-    // The app falls back to the env var or the remote URL; in test mode the
-    // Vite dev server sets VITE_MCP_SERVER_URL to nothing, so the app uses the
-    // production fallback.  We cannot easily read import.meta.env here, so we
-    // write to every plausible namespace prefix.  The provider will find the
-    // first matching key.
-    //
-    // In practice, for the state-validation tests we navigate directly to the
-    // callback URL with ?state=<value>, so as long as the stored token matches
-    // (or is absent), the test controls the outcome.
-    const origins = [
-      'http://localhost:3001',                              // .env / .env.mock
-      'https://seleven-mcp-sg.airudder.com',               // production fallback
-    ];
-    for (const origin of origins) {
-      const ns = btoa(origin).replace(/[+/=]/g, '_').slice(0, 32);
-      sessionStorage.setItem(`calle_oauth_${ns}_state`, JSON.stringify(tok));
-    }
+  await page.evaluate(async (tok) => {
+    const Provider = (window as any).__BrowserOAuthClientProvider;
+    if (!Provider) throw new Error('BrowserOAuthClientProvider not exposed on window');
+    const SERVER_URL: string = (window as any).__SERVER_URL;
+    if (!SERVER_URL) throw new Error('__SERVER_URL not exposed on window');
+    // Create a provider for the same server the app uses so we hash the same URL.
+    const provider = await Provider.create('http://localhost:5173/', {}, SERVER_URL);
+    // Bypass the public state() API (which would generate a new random token)
+    // and write our controlled token directly via the private helper.
+    (provider as any).setItem('state', tok);
   }, token);
 }
 
