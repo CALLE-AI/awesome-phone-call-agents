@@ -184,6 +184,32 @@ describe('flattenResult', () => {
       ).toBe('needs_human');
     });
 
+    // Regression: two safety checks - the opt-out scan and the review
+    // excerpt - read `recipients`. When it is present but unreadable, both
+    // silently find nothing, and `opt_out_requested: false` stops meaning
+    // "no revocation" and starts meaning "I could not look". A call whose
+    // transcript could not be read must not be actionable.
+    it('refuses to confirm a payload whose transcript could not be read', () => {
+      for (const recipients of ['nope', 42, { 0: 'x' }, true]) {
+        const out = flattenResult(eventWith([], { recipients }));
+        expect(out.disposition, JSON.stringify(recipients)).toBe('review_required');
+        expect(out.is_actionable).toBe(false);
+        expect(out.lead_state).toBe('needs_human');
+        expect(out.disposition_reason).toMatch(/transcript|recipient/i);
+      }
+    });
+
+    it('still confirms when the recipients array is legitimately empty', () => {
+      const out = flattenResult(eventWith([], { recipients: [] }));
+      expect(out.disposition).toBe('confirmed');
+    });
+
+    it('still confirms when recipients is absent entirely', () => {
+      const event = eventWith([]);
+      delete event.data.recipients;
+      expect(flattenResult(event).disposition).toBe('confirmed');
+    });
+
     // The excerpt fields are transcript text, so they carry the same leak
     // risk as transcript_text and must go through the same masking.
     it('masks a phone number spoken inside an excerpt', () => {

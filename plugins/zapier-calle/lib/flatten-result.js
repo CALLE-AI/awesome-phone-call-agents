@@ -11,6 +11,19 @@ export function flattenResult(event, options = {}) {
   const derived = deriveDisposition(event, options);
   const data = (event && event.data) || {};
   const recipients = Array.isArray(data.recipients) ? data.recipients : [];
+
+  // Two safety checks below - the opt-out scan and the review excerpt - read
+  // the transcript out of `recipients`. If it is present but not an array,
+  // both quietly find nothing, and `opt_out_requested: false` stops meaning
+  // "nobody revoked consent" and starts meaning "nothing was examined". A
+  // result that silently skipped its own checks must not be actionable, so an
+  // unreadable transcript downgrades an otherwise-confirmed call. Absent is
+  // fine, and so is an empty array: those are readable answers, not failures.
+  const transcriptUnreadable =
+    Object.hasOwn(data, 'recipients') &&
+    data.recipients !== null &&
+    data.recipients !== undefined &&
+    !Array.isArray(data.recipients);
   const confidence = data.completion_confidence || {};
   const structured = data.structured_result && typeof data.structured_result === 'object'
     ? data.structured_result
@@ -20,9 +33,19 @@ export function flattenResult(event, options = {}) {
   // result stays on the output - a human still needs to see what was said -
   // but nothing downstream may treat this call as actionable.
   const optOut = detectOptOut(recipients);
-  const disposition = optOut.requested ? 'needs_human' : derived.disposition;
-  const reason = optOut.requested ? OPT_OUT_REASON : derived.reason;
-  const isActionable = optOut.requested ? false : derived.is_actionable;
+
+  let { disposition, reason, is_actionable: isActionable } = derived;
+  if (optOut.requested) {
+    disposition = 'needs_human';
+    reason = OPT_OUT_REASON;
+    isActionable = false;
+  } else if (transcriptUnreadable && disposition === 'confirmed') {
+    disposition = 'review_required';
+    reason =
+      'Call looked successful, but its recipients were not readable as a list, so the ' +
+      'transcript could not be checked for a request not to be called again.';
+    isActionable = false;
+  }
 
   const reviewTurn = disposition === 'confirmed' ? null : lastUserTurn(recipients);
 
