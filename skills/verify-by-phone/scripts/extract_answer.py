@@ -118,6 +118,19 @@ def turns_from_payload(payload: dict) -> list[dict]:
 # the Buckhead office" contains a negation and is still a confirmation.
 _NEGATION = r"\b(?:no|not|isn'?t|aren'?t|ain'?t|never|wrong|different|another)\b"
 _NEGATION_WINDOW = 40
+# An explicit correction states who WAS reached: "No, this is Buckhead Clinic".
+# It must win regardless of where the listing's name appears, before or after,
+# because the window alone is position-dependent: "Example Family Medicine?
+# No, this is Buckhead Clinic" opens with the name, nothing precedes it, and a
+# before-the-name check reads the echo as an affirmative mention. The
+# corrected-to identity decides the direction: naming somebody else is a
+# denial; naming the listing itself ("No, this is Example Family Medicine",
+# correcting a mispronunciation) is a confirmation.
+_CORRECTION = re.compile(
+    r"\b(?:no|nope)\b[^a-z0-9]{0,3}"
+    r"(?:this is|it'?s|you'?ve reached|we'?re|we are)\s+([^.?!;]{1,80})"
+)
+_CLAUSES = re.compile(r"[^.?!;]+[.?!;]?")
 
 
 def _org_tokens(org: str) -> set[str]:
@@ -164,15 +177,49 @@ def _name_mentions(lowered: str, tokens: set[str]) -> tuple[bool, bool]:
     A turn can do both, so both are reported and the caller decides. Denial
     wins, because an explicit "this is not X" must never be outvoted by an
     incidental affirmative-looking mention elsewhere in the same breath.
+
+    Three rules, in order:
+      - An explicit correction ("No, this is ...") is classified by WHO it
+        names: somebody else denies, the listing itself confirms. This is
+        deliberately position-independent, because the fourth review pass
+        showed the window alone is not: "Example Family Medicine? No, this is
+        Buckhead Clinic" opens with the name and nothing precedes it.
+      - A name mention inside a question ("Example Family Medicine?") asserts
+        nothing. The respondent is asking, not identifying.
+      - Otherwise the negation window before the name decides, per clause.
     """
     affirmative = negated = False
-    for tok in tokens:
-        for m in re.finditer(rf"\b{re.escape(tok)}\b", lowered):
-            prefix = lowered[max(0, m.start() - _NEGATION_WINDOW) : m.start()]
-            if re.search(_NEGATION, prefix):
-                negated = True
-            else:
-                affirmative = True
+    consumed: list[tuple[int, int]] = []
+    for cm in _CORRECTION.finditer(lowered):
+        tail = cm.group(1)
+        hit: re.Match[str] | None = None
+        for tok in tokens:
+            found = re.search(rf"\b{re.escape(tok)}\b", tail)
+            if found is not None and (hit is None or found.start() < hit.start()):
+                hit = found
+        if hit is None or re.search(_NEGATION, tail[: hit.start()]):
+            negated = True
+        else:
+            affirmative = True
+        consumed.append(cm.span(1))
+    for clause_m in _CLAUSES.finditer(lowered):
+        clause = clause_m.group(0)
+        is_question = clause.rstrip().endswith("?")
+        for tok in tokens:
+            for m in re.finditer(rf"\b{re.escape(tok)}\b", clause):
+                if any(a <= clause_m.start() + m.start() < b for a, b in consumed):
+                    continue
+                if is_question and "," not in clause[m.end() :]:
+                    # "Example Family Medicine?" is the respondent asking who
+                    # called, not stating who answered. A greeting keeps its
+                    # comma ("Northside, how can I help you?") and still
+                    # counts below.
+                    continue
+                prefix = clause[max(0, m.start() - _NEGATION_WINDOW) : m.start()]
+                if re.search(_NEGATION, prefix):
+                    negated = True
+                else:
+                    affirmative = True
     return affirmative, negated
 
 
@@ -185,12 +232,15 @@ def organization_denied(turns: list[dict], org: str | None = None) -> bool:
     about the wrong organization, and recording it against the listing would
     manufacture exactly the false confirmation this tool exists to prevent.
 
-    Two ways to deny. The fixed cue list catches "wrong number" and friends.
+    Three ways to deny. The fixed cue list catches "wrong number" and friends.
     The second, added after review, catches a NEGATED mention of the
     organization's own name: "No, this is not Example Family Medicine" matched
     no cue, and the name tokens inside it then made confirmation return True,
     so an explicit denial was read as a confirmation. That is worse than
-    fail-open, it is inverted.
+    fail-open, it is inverted. The third, added on the fourth review pass,
+    catches a CORRECTION naming somebody else: "Example Family Medicine? No,
+    this is Buckhead Clinic" has no negation before the name, so the window
+    misses it, and the correction must win wherever the name sits in the turn.
     """
     tokens = _org_tokens(org) if org else set()
     for turn in turns:
@@ -217,19 +267,24 @@ def organization_confirmed(turns: list[dict], org: str | None) -> bool:
     tool manufactures a false confirmation.
 
     Confirmation requires one of two things from a USER turn:
-      - the organization's own distinctive name, stated WITHOUT a negation in
-        front of it, which is what "Northside Family Medicine, how can I help
-        you" looks like, or
+      - the organization's own distinctive name, STATED rather than asked and
+        not under negation, which is what "Northside Family Medicine, how can
+        I help you" looks like. An echo question ("Example Family Medicine?")
+        asserts nothing, and a correction ("No, this is Example Family
+        Medicine") counts by what it names, or
       - an explicit affirmative answering an identity question.
 
     Generic pleasantries deliberately do not count. "Hello", "how can I help
     you", and "sure" are what any human says on any phone.
 
-    **Denial always wins.** Checked first and for the whole call, because
-    "No, this is not Example Family Medicine" contains the name and used to
-    return True here. An explicit denial read as a confirmation is worse than
-    fail-open: it is inverted, and it would attribute a later answer to a party
-    that had just told us they are not the listing.
+    **Denial or correction always wins, wherever it appears in the turn.**
+    Checked first and for the whole call, because "No, this is not Example
+    Family Medicine" contains the name and used to return True here, and
+    "Example Family Medicine? No, this is Buckhead Clinic" put the name BEFORE
+    the correction, where a before-the-name negation window cannot see it. An
+    explicit denial read as a confirmation is worse than fail-open: it is
+    inverted, and it would attribute a later answer to a party that had just
+    told us they are not the listing.
 
     Without --org there is nothing to confirm against, so this returns False
     and every claim abstains. That is the fail-closed direction on purpose.
