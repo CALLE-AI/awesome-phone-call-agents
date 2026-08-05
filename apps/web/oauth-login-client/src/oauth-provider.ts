@@ -8,10 +8,10 @@ import type { OAuthClientProvider, OAuthDiscoveryState } from "@modelcontextprot
 /**
  * Derive a stable, URL-safe storage namespace from a server URL.
  *
- * Uses only the canonical origin (scheme + host + port) so that path changes
- * on the same host share a namespace while a different host always gets its
- * own isolated bucket.  The result is base64url-encoded and capped at 32
- * characters to keep sessionStorage keys readable.
+ * Uses the full canonical URL (scheme + host + port + path) so that
+ * different paths on the same origin get distinct namespaces.  The result
+ * is base64url-encoded and capped at 32 characters to keep sessionStorage
+ * keys readable.
  */
 async function deriveNamespace(serverUrl: string): Promise<string> {
   // Intentionally not catching: a hashing failure means the runtime is broken
@@ -37,6 +37,96 @@ function generateState(): string {
     .replace(/=+$/, '');
 }
 
+// ---------------------------------------------------------------------------
+// Scheme / loopback helpers (shared by server URL and redirect URI checks)
+// ---------------------------------------------------------------------------
+
+/**
+ * Return true iff the hostname is a loopback address recognised by OAuth
+ * (localhost or any IPv4/IPv6 loopback).
+ */
+function isLoopbackHost(host: string): boolean {
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '[::1]' ||
+    // RFC 5735 127.0.0.0/8 — covers 127.x.x.x
+    /^127\.\d+\.\d+\.\d+$/.test(host)
+  );
+}
+
+/**
+ * Validate that a URL is safe for use as an OAuth endpoint.
+ *
+ * Accepted:
+ *   - https: on any host
+ *   - http:  on loopback only (RFC 8252 §8.3)
+ *
+ * All other combinations (plain http: on a public host, ftp:, ws:, etc.)
+ * are rejected to prevent authorization codes or tokens from being sent
+ * or received over a plaintext channel.
+ *
+ * @param url    The URL to check (string or URL object).
+ * @param label  Human-readable label used in error messages (e.g. "MCP endpoint").
+ */
+function assertSecureUrl(url: string | URL, label: string): void {
+  const parsed = typeof url === 'string' ? new URL(url) : url;
+  const proto = parsed.protocol;
+  const host = parsed.hostname;
+  if (proto !== 'https:' && !(proto === 'http:' && isLoopbackHost(host))) {
+    throw new Error(
+      `${label} must use https: (any host) or http: (loopback only). ` +
+      `Received: ${parsed.href}`
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Discovery state validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Names of fields in AuthorizationServerMetadata that must be HTTPS URLs
+ * (or HTTPS on non-loopback hosts).  Any http: value on a non-loopback host
+ * means the authorization code or client credentials would flow in the clear.
+ *
+ * We check these whenever discovery state is saved or loaded.
+ */
+const CRITICAL_AS_ENDPOINT_FIELDS = [
+  'authorization_endpoint',
+  'token_endpoint',
+  'registration_endpoint',
+] as const;
+
+/**
+ * Inspect an `OAuthDiscoveryState` and throw if any critical AS endpoint is
+ * reachable over plaintext HTTP on a non-loopback host, or if the
+ * `authorizationServerUrl` itself is plaintext on a non-loopback host.
+ *
+ * Also returns the bound issuer string (from `authorizationServerMetadata.issuer`
+ * or `authorizationServerUrl`) so the caller can persist/compare it.
+ */
+function validateDiscoveryState(state: OAuthDiscoveryState): string {
+  // The authorizationServerUrl represents the discovered AS — it must be secure.
+  assertSecureUrl(state.authorizationServerUrl, 'Authorization server URL');
+
+  const meta = state.authorizationServerMetadata;
+  if (meta) {
+    for (const field of CRITICAL_AS_ENDPOINT_FIELDS) {
+      const value = (meta as Record<string, unknown>)[field];
+      if (typeof value === 'string' && value.length > 0) {
+        assertSecureUrl(value, `Authorization server ${field}`);
+      }
+    }
+  }
+
+  // The canonical issuer to bind to is the metadata issuer when available,
+  // falling back to the authorizationServerUrl origin.
+  return (meta && typeof (meta as Record<string, unknown>).issuer === 'string')
+    ? (meta as Record<string, unknown>).issuer as string
+    : new URL(state.authorizationServerUrl).origin;
+}
+
 export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private readonly onRedirect: (url: URL) => void;
   private readonly redirectUri: string | URL;
@@ -44,7 +134,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   public readonly clientMetadataUrl?: string;
 
   /**
-   * Storage key prefix, namespaced by the canonical MCP server origin.
+   * Storage key prefix, namespaced by the canonical MCP server URL.
    * Isolates credentials so that a same-origin deployment that changes
    * SERVER_URL never reuses or leaks tokens to a different server.
    */
@@ -65,8 +155,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * Asynchronously creates a BrowserOAuthClientProvider by hashing the serverUrl
-   * to ensure a collision-resistant storage namespace.
+   * Asynchronously creates a BrowserOAuthClientProvider by:
+   *   1. Validating the MCP server URL scheme (https: or loopback http:).
+   *   2. Validating the redirect URI scheme with the same rule — preventing
+   *      a plaintext callback from receiving the authorization code when the
+   *      app is served from a non-loopback HTTP origin.
+   *   3. Hashing the full server URL to derive a collision-resistant storage
+   *      namespace that isolates credentials per server.
    */
   static async create(
     redirectUri: string | URL,
@@ -75,18 +170,15 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     onRedirect?: (url: URL) => void,
     clientMetadataUrl?: string
   ): Promise<BrowserOAuthClientProvider> {
-    const serverUrlObj = new URL(serverUrl);
-    const proto = serverUrlObj.protocol;
-    const host = serverUrlObj.hostname;
-    const isLoopback = host === 'localhost' || host === '127.0.0.1';
-    // Require https: for any host, or http: only on loopback.
-    // Any other scheme (ftp:, ws:, etc.) is rejected even on loopback.
-    if (proto !== 'https:' && !(proto === 'http:' && isLoopback)) {
-      throw new Error(
-        'MCP endpoint must use https: (any host) or http: (loopback only). ' +
-        `Received: ${serverUrl}`
-      );
-    }
+    // 1. Validate MCP server URL scheme.
+    assertSecureUrl(serverUrl, 'MCP endpoint');
+
+    // 2. Validate redirect URI scheme.
+    //    RFC 8252 §8.3 allows http: on loopback for native apps; we apply the
+    //    same rule for web clients to keep parity and block plaintext callbacks
+    //    from public HTTP origins.
+    assertSecureUrl(redirectUri, 'OAuth redirect URI');
+
     const ns = await deriveNamespace(serverUrl);
     const storagePrefix = `calle_oauth_${ns}_`;
     return new BrowserOAuthClientProvider(redirectUri, metadata, storagePrefix, onRedirect, clientMetadataUrl);
@@ -145,12 +237,72 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     return verifier;
   }
 
+  // ---------------------------------------------------------------------------
+  // Discovery state — with issuer binding and endpoint HTTPS validation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Persist discovery state after validating that:
+   *   1. All critical AS endpoints use HTTPS (or loopback HTTP).
+   *   2. The issuer is consistent with any previously bound issuer.
+   *
+   * On the first call the discovered issuer is stored as the "bound issuer" for
+   * this namespace.  On subsequent calls the new issuer must exactly match the
+   * bound value; a mismatch causes all credentials to be cleared and an error
+   * thrown, because the app could otherwise be silently redirecting to a
+   * different authorization server than the one it originally registered with.
+   */
   saveDiscoveryState(state: OAuthDiscoveryState): void {
+    // Validate endpoints and derive canonical issuer string.
+    const newIssuer = validateDiscoveryState(state);
+
+    const boundIssuer = this.getItem<string>("boundIssuer");
+    if (boundIssuer !== undefined && boundIssuer !== newIssuer) {
+      // The authorization server issuer changed.  Wipe all credentials so
+      // nothing associated with the old AS can be reused against the new one.
+      this.clearCredentials();
+      throw new Error(
+        `OAuth discovery issuer changed: expected "${boundIssuer}", ` +
+        `got "${newIssuer}". All credentials have been cleared. ` +
+        'Please log in again.'
+      );
+    }
+
+    // Persist the bound issuer (idempotent on repeat saves with the same value).
+    this.setItem("boundIssuer", newIssuer);
     this.setItem("discoveryState", state);
   }
 
+  /**
+   * Load cached discovery state and re-validate it before returning.
+   *
+   * Re-validation guards against a tampered sessionStorage entry that
+   * downgraded an endpoint to HTTP after the initial save (e.g. if another
+   * same-page script modified storage).
+   *
+   * Returns `undefined` if no state is cached or if validation fails (so the
+   * SDK falls back to fresh discovery rather than using potentially unsafe data).
+   */
   discoveryState(): OAuthDiscoveryState | undefined {
-    return this.getItem<OAuthDiscoveryState>("discoveryState");
+    const state = this.getItem<OAuthDiscoveryState>("discoveryState");
+    if (!state) return undefined;
+
+    try {
+      const issuer = validateDiscoveryState(state);
+      const boundIssuer = this.getItem<string>("boundIssuer");
+      if (boundIssuer !== undefined && boundIssuer !== issuer) {
+        // Bound issuer no longer matches the cached state — clear everything.
+        this.clearCredentials();
+        return undefined;
+      }
+    } catch {
+      // The cached state failed validation (e.g. a plaintext endpoint).
+      // Clear discovery so fresh, safe state is obtained on the next auth call.
+      this.removeItem("discoveryState");
+      return undefined;
+    }
+
+    return state;
   }
 
   // ---------------------------------------------------------------------------
@@ -203,11 +355,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   // ---------------------------------------------------------------------------
 
   /**
-   * Remove all stored credentials for this server namespace.
+   * Remove all stored credentials for this server namespace, including the
+   * bound issuer so that a fresh discovery cycle can bind a new one.
+   *
    * Call on logout or when switching MCP servers.
    */
   clearCredentials(): void {
-    ["clientInfo", "tokens", "codeVerifier", "discoveryState", "state"].forEach(
+    ["clientInfo", "tokens", "codeVerifier", "discoveryState", "state", "boundIssuer"].forEach(
       (k) => this.removeItem(k)
     );
   }
@@ -225,7 +379,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * ----------------
    * - `"tokens"`    — remove the access/refresh token set only
    * - `"verifier"`  — remove the PKCE code verifier only
-   * - `"discovery"` — remove cached discovery state only
+   * - `"discovery"` — remove cached discovery state only (preserves boundIssuer
+   *                   so the next discovery cycle is still issuer-checked)
    * - `"client"`    — remove registered client information only
    * - `"all"` / undefined / anything else — remove everything (same as
    *   `clearCredentials()`, used for explicit logout or full re-auth)
@@ -239,6 +394,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         this.removeItem('codeVerifier');
         break;
       case 'discovery':
+        // Remove only the cached discovery state.  The bound issuer is kept so
+        // that re-discovery must still return the same authorization server.
         this.removeItem('discoveryState');
         break;
       case 'client':
