@@ -4,8 +4,8 @@
 
 - Objective: Compete for **Most Practical Use Case**
 - Scope: Frozen to one human-approved commercial HVAC closeout call
-- Last updated: 2026-08-04
-- Current phase: Capture authorized live evidence and package the submission
+- Last updated: 2026-08-05
+- Current phase: Verify protected staging before capturing authorized live evidence
 
 ## Submission thesis
 
@@ -29,7 +29,7 @@ workflow or an expansion of the UI information architecture.
 
 ## Current readiness snapshot
 
-As of 2026-08-04:
+As of 2026-08-05:
 
 - the workflow is implemented from case creation through normalized result,
   creation of a human next-action task, and role-gated final disposition;
@@ -44,14 +44,16 @@ As of 2026-08-04:
   production build, and Playwright;
 - the fake-only judge environment is deployed at
   <https://fieldclose.dramaforge.icu/> and retains its build-time no-call gate;
-- the isolated protected staging environment is deployed with CALL-E and SMTP
-  configuration while live calls remain paused by default;
+- protected-workspace provisioning and SMTP provider self-test evidence exist,
+  but protected-staging deployment, isolation, production access, and deployed
+  CALL-E/SMTP configuration have not been verified with inspectable evidence;
 - no authorized live CALL-E result, upstream pull request, or final
   three-minute video is claimed.
 
-P0A and the two deployment steps in P0B are complete. Remaining work begins
-with participant authorization and one controlled live evidence run, followed
-by submission packaging. The only later product convenience is a preset
+P0A and the public deployment step in P0B are complete. Remaining work begins
+with protected-staging verification, then participant authorization and one
+controlled live evidence run, followed by submission packaging. The only later
+product convenience is a preset
 fictional work order for the demonstration; it must use the existing case
 workflow and must not create a new stage.
 
@@ -82,14 +84,15 @@ loop and its safety boundaries.
 | Item | Status | Done when |
 | --- | --- | --- |
 | Deploy a judge-accessible fake-only public version | Done | The stable HTTPS deployment documented in [Public Fake-Only Deployment](public-demo-deployment.md) contains no CALL-E credentials and preserves the fake-only build gate |
-| Establish an isolated protected staging environment | Done | Staging uses separate data and secrets, access is allow-listed, and live calls remain paused until an exact operator-approved evidence run |
-| Complete one authorized real CALL-E test | Blocked by participant authorization | One exact recipient, brief, timezone, and test window are approved; one call is accepted; one terminal result is retrieved; the operator records the disposition; and no duplicate call is created |
+| Establish an isolated protected staging environment | Pending verification | Inspectable evidence proves separate data and secrets, production authentication for an allow-listed operator, and a paused live-call gate |
+| Complete one authorized real CALL-E test | Blocked by staging verification and participant authorization | One exact recipient, brief, timezone, and test window are approved; one call is accepted; one terminal result is retrieved; the operator records the disposition; and no duplicate call is created |
 | Preserve a redacted live-evidence bundle | Pending live test | The bundle contains provider acceptance, redacted provider result, normalized result, recorded human disposition, final UI state, audit evidence, and duplicate check without private data |
 | Stabilize the three-minute golden path | Pending rehearsal | The path uses a preset case, ends with a recorded disposition, completes within three minutes in three consecutive rehearsals, and labels every waiting-time edit accurately |
 
 ### P0 dependency order
 
-Steps 1–7 are complete. P0B continues at participant authorization in step 8.
+Steps 1–6 are complete. P0B continues with protected-staging creation and
+verification in step 7 before participant authorization in step 8.
 
 1. Add the human-disposition persistence contract and migration.
 2. Implement the authorized, idempotent application service and HTTP route.

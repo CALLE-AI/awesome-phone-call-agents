@@ -16,7 +16,7 @@ function safePublicDemoEnvironment(): NodeJS.ProcessEnv {
     FIELDCLOSE_PROTECTED_OPERATOR_EMAILS: "",
     CALL_E_API_KEY: "",
     DATABASE_URL:
-      "postgresql://demo:password@ep-example-pooler.us-east-2.aws.neon.tech/fieldclose?sslmode=require",
+      "postgresql://demo:password@ep-example-pooler.us-east-2.aws.neon.tech/fieldclose?sslmode=verify-full",
     BETTER_AUTH_SECRET: "test-only-auth-secret-at-least-32-characters",
     BETTER_AUTH_URL: "https://fieldclose-demo.example.com",
     FIELDCLOSE_PUBLIC_BASE_URL: "https://fieldclose-demo.example.com",
@@ -61,6 +61,19 @@ describe("public fake-only deployment environment", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(
       "CALL_E_API_KEY must be absent from the public demo.",
+    );
+  });
+
+  it("rejects a remote database without certificate-verified TLS", () => {
+    const result = runVerifier({
+      ...safePublicDemoEnvironment(),
+      DATABASE_URL:
+        "postgresql://demo:password@ep-example-pooler.us-east-2.aws.neon.tech/fieldclose?sslmode=require",
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "DATABASE_URL must require certificate-verified TLS.",
     );
   });
 });

@@ -18,12 +18,13 @@ the durable, role-gated human-disposition closure through its browser and audit
 evidence.
 
 The fake-only judge environment is deployed at
-<https://fieldclose.dramaforge.icu/>. A separate protected staging environment
-is deployed for controlled integration evidence. The staging environment has
-CALL-E and SMTP configuration, but live calls remain paused until an operator
-explicitly authorizes the exact recipient and call brief. No authorized live
-CALL-E result, end-to-end authentication-email delivery, GitHub OAuth, or
-general role-management UI is claimed yet.
+<https://fieldclose.dramaforge.icu/>. The repository does not yet contain
+inspectable evidence that a separate protected staging environment is deployed,
+isolated, and accessible through production authentication, or that CALL-E and
+SMTP are configured in that environment. Those staging gates remain pending;
+live calls remain paused. No authorized live CALL-E result, end-to-end deployed
+authentication-email delivery, GitHub OAuth, or general role-management UI is
+claimed yet.
 
 ## Competition focus
 
@@ -119,8 +120,8 @@ Real phone calls are external side effects. The default development and test pat
 - Supported managed-hosting target: Vercel and Neon PostgreSQL
 
 The public demo uses only the deterministic fake provider and contains no
-CALL-E credential. The separate protected staging environment is the only place
-where an authorized live CALL-E test may be enabled.
+CALL-E credential. A separately verified protected staging environment is the
+only place where an authorized live CALL-E test may be enabled.
 
 ## Local development
 
@@ -158,7 +159,13 @@ pnpm db:migrate
 pnpm db:studio
 ```
 
-Set `DATABASE_URL` before `pnpm db:migrate` or `pnpm db:studio`. When it is omitted, Drizzle Kit targets `postgresql://fieldclose:fieldclose@127.0.0.1:5432/fieldclose`. Integration tests create an isolated PostgreSQL 17 container and never use the development database.
+Set `DATABASE_URL` before `pnpm db:migrate` or `pnpm db:studio`. When it is
+omitted, Drizzle Kit targets
+`postgresql://fieldclose:fieldclose@127.0.0.1:5432/fieldclose`. Every
+non-loopback production URL must include `sslmode=verify-full`; the application
+rejects `sslmode=require` because postgres.js does not verify the server
+certificate in that mode. Integration tests create an isolated PostgreSQL 17
+container and never use the development database.
 
 Validation commands:
 
@@ -207,9 +214,10 @@ credentials. All deployed authentication modes require a high-entropy
 The human-owned functional loop is complete: an authorized operator can persist
 a bounded disposition, resolve or cancel the human task, produce the final
 FieldClose case state, and audit the decision without mutating an external work
-order. The fake-only judge environment and protected staging are deployed.
-Remaining submission gates are one authorized live CALL-E evidence set, a
-stable three-minute golden path, and the upstream contribution under
+order. The fake-only judge environment is deployed; protected-staging
+deployment, isolation, and production-authentication evidence remain pending.
+Later gates include one authorized live CALL-E evidence set, a stable
+three-minute golden path, and the upstream contribution under
 `apps/web/fieldclose/`. See the
 [Hackathon submission plan](docs/hackathon-submission-plan.md) for status and
 acceptance gates. Submission-only drafts are kept under the local `submission/`

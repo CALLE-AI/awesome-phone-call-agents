@@ -190,6 +190,25 @@ describe("protected live closeout workflow", () => {
     expect(JSON.stringify(created)).not.toContain("+12025550142");
   });
 
+  it("rejects a non-US live recipient before storing protected contact data", async () => {
+    await expect(
+      createProtectedCloseoutCase(
+        db,
+        "live-owner",
+        workspaceId,
+        protectedCaseInput("WO-LIVE-NON-US", "+861012345678"),
+        keys,
+      ),
+    ).rejects.toMatchObject({
+      issues: [
+        expect.objectContaining({
+          path: ["contact", "phoneE164"],
+          message: "Enter an explicit US E.164 number beginning with +1.",
+        }),
+      ],
+    });
+  });
+
   it("blocks creating a protected case for a suppressed phone number", async () => {
     await createProtectedCase(db, "WO-LIVE-DNC-SUPPRESSED");
 

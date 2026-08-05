@@ -63,7 +63,7 @@ terminal for migrations. The public database must contain fictional data only.
 
 | Variable | Public-demo value |
 | --- | --- |
-| `DATABASE_URL` | Remote pooled PostgreSQL URL |
+| `DATABASE_URL` | Remote pooled PostgreSQL URL with `sslmode=verify-full` |
 | `BETTER_AUTH_SECRET` | At least 32 high-entropy characters |
 | `BETTER_AUTH_URL` | Canonical HTTPS deployment origin |
 | `FIELDCLOSE_PUBLIC_BASE_URL` | Same canonical HTTPS deployment origin |
@@ -88,7 +88,8 @@ GitHub OAuth is not needed for the judge flow and should remain unconfigured.
 1. Create a dedicated Neon project or database branch in the same broad region as
    the selected Vercel function region.
 2. From a trusted Node.js 24 terminal, set `DATABASE_URL` to the direct Neon URL
-   and run `pnpm db:migrate` once.
+   with `sslmode=verify-full` and run `pnpm db:migrate` once. Do not substitute
+   `sslmode=require`; postgres.js disables certificate verification in that mode.
 3. Create a Vercel project from the FieldClose repository and keep the project
    root at the repository root.
 4. Set the production environment variables listed above. Do not copy a local

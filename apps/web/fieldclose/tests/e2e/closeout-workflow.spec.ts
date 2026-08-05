@@ -269,10 +269,11 @@ test("keeps a protected live call explicit from authorization through asynchrono
   await page.getByLabel("Work-order reference").fill("WO-LIVE-E2E");
   await page.getByLabel("Contractor display name").fill("Authorized HVAC");
   await page.getByLabel("Site label").fill("Consenting test site");
+  await page.getByLabel("IANA timezone").selectOption("Asia/Shanghai");
   await page
     .getByLabel("Contact display name")
     .fill("Consenting site manager");
-  await page.getByLabel("Authorized E.164 number").fill("+12025550142");
+  await page.getByLabel("Authorized E.164 number").fill("+861012345678");
   await page
     .getByLabel("Authorization record")
     .fill("The consenting test participant confirmed this exact call.");
@@ -283,6 +284,11 @@ test("keeps a protected live call explicit from authorization through asynchrono
   await page
     .getByLabel("Exact reference text the agent may say")
     .fill("A technician visited the test rooftop unit yesterday.");
+  await page.getByRole("button", { name: "Create protected case" }).click();
+  await expect(
+    page.getByText("Enter an explicit US E.164 number beginning with +1."),
+  ).toBeVisible();
+  await page.getByLabel("Authorized E.164 number").fill("+12025550142");
   await page.getByRole("button", { name: "Create protected case" }).click();
 
   await expect(page.getByText("LIVE / EXTERNAL EFFECT")).toBeVisible();

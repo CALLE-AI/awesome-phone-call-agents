@@ -11,14 +11,16 @@
 - Protected workspace provisioning: Implemented for server-allow-listed operators
 - SMTP email delivery: Implemented; STARTTLS authentication and self-delivery
   verified with an operator-supplied provider configuration
+- Protected staging deployment and production access: Not yet verified
 - Hosted Resend delivery and GitHub OAuth verification: Not yet completed
 
 This document describes the implemented authentication boundary and workspace
 isolation rules. SMTP credentials remain external to this repository. The
 verification evidence confirms connection, TLS upgrade, authentication, and
 provider acceptance of one self-test message; it does not claim that a
-production deployment, hosted Resend sender, or GitHub OAuth application has
-been configured.
+protected production deployment, deployed SMTP sender, hosted Resend sender, or
+GitHub OAuth application has been configured. Protected-staging isolation and
+allow-listed production access therefore remain open evidence gates.
 
 ## Authentication boundary
 

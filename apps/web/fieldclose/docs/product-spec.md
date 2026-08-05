@@ -199,7 +199,7 @@ competition demonstration.
 
 ### Contact and authorization
 
-- **FC-010:** A case requires an authorized contact name or role, E.164 number, and explicit IANA timezone.
+- **FC-010:** A case requires an authorized contact name or role, E.164 number, and explicit IANA timezone. The initial live CALL-E scope accepts only US `+1` E.164 recipients because the provider request is fixed to `US` and `en-US`; fake cases may continue to use any explicit fictional E.164 fixture.
 - **FC-011:** The operator must affirm the business basis for contacting the recipient.
 - **FC-012:** The application must not infer contact authorization, country code, or timezone.
 - **FC-013:** A do-not-call or refusal result blocks further automated attempts for that contact and purpose.

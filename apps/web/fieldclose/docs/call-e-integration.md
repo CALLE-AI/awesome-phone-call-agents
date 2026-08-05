@@ -36,6 +36,11 @@ CALL_E_BASE_URL=https://api.heycall-e.com
 
 The API key is never returned by an application route or included in a provider task. No secondary result-delivery credential or public provider callback route is part of this integration.
 
+The initial live integration is intentionally US-only. Protected cases reject
+non-`+1` recipients before storage so the explicit phone number cannot disagree
+with the adapter's fixed `US` region and `en-US` locale. The fake provider keeps
+general fictional E.164 support for safe evaluation.
+
 ## Authenticated status refresh
 
 After CALL-E accepts the asynchronous create request, the active workbench refreshes the existing attempt through FieldClose:
@@ -135,6 +140,6 @@ creation outcomes remain frozen.
 The SDK adapter, live application path, authenticated status refresh, protected
 operator UI, and protected-workspace provisioning boundary are implemented and
 tested using an injected HTTP boundary that cannot place a phone call. The
-fake-only public and protected staging environments are deployed. The remaining
-live-integration gate is one separately authorized smoke test with a consenting
-recipient.
+fake-only public environment is deployed. Protected-staging deployment,
+isolation, production access, and server-side CALL-E configuration must be
+verified before the remaining authorized smoke test with a consenting recipient.

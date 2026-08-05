@@ -326,15 +326,15 @@ function AuthenticatedWorkbench({
   );
 
   const loadDetail = useCallback(
-    async (selectedWorkspace: Workspace, caseId: string) => {
+    async (selectedWorkspaceValue: Workspace, caseId: string) => {
       const caseDetail = await requestJson<CaseDetail>(
-        `/api/cases/${caseId}?workspaceId=${encodeURIComponent(selectedWorkspace.id)}`,
+        `/api/cases/${caseId}?workspaceId=${encodeURIComponent(selectedWorkspaceValue.id)}`,
       );
       setDetail(caseDetail);
 
       if (!caseDetail.attempt && caseDetail.case.status === "draft") {
         const previewResponse = await requestJson<{ preview: CallPreview }>(
-          `/api/cases/${caseId}/preview?workspaceId=${encodeURIComponent(selectedWorkspace.id)}&mode=${workspaceMode(selectedWorkspace)}`,
+          `/api/cases/${caseId}/preview?workspaceId=${encodeURIComponent(selectedWorkspaceValue.id)}&mode=${workspaceMode(selectedWorkspaceValue)}`,
         );
         setPreview(previewResponse.preview);
       } else {

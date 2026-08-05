@@ -48,6 +48,17 @@ function isRemotePostgresUrl(value) {
   }
 }
 
+function requiresCertificateVerifiedDatabaseTls(value) {
+  try {
+    const sslModes = new URL(value).searchParams.getAll("sslmode");
+    return (
+      sslModes.length === 1 && sslModes[0]?.toLowerCase() === "verify-full"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isBase64Key(value) {
   if (!/^[A-Za-z0-9+/]{43}=$/u.test(value)) {
     return false;
@@ -78,8 +89,11 @@ export function validatePublicDemoEnvironment(source) {
     );
   }
 
-  if (!isRemotePostgresUrl(text(source, "DATABASE_URL"))) {
+  const databaseUrl = text(source, "DATABASE_URL");
+  if (!isRemotePostgresUrl(databaseUrl)) {
     errors.push("DATABASE_URL must be a remote PostgreSQL connection URL.");
+  } else if (!requiresCertificateVerifiedDatabaseTls(databaseUrl)) {
+    errors.push("DATABASE_URL must require certificate-verified TLS.");
   }
   if (text(source, "BETTER_AUTH_SECRET").length < 32) {
     errors.push("BETTER_AUTH_SECRET must contain at least 32 characters.");

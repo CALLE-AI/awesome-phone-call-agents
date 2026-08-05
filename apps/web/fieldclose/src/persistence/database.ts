@@ -1,10 +1,11 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+import {
+  resolveDatabaseSslMode,
+  resolveDatabaseUrl,
+} from "@/config/database-url";
 import * as schema from "@/persistence/schema";
-
-const localDatabaseUrl =
-  "postgresql://fieldclose:fieldclose@127.0.0.1:5432/fieldclose";
 
 type DatabaseConnection = ReturnType<typeof createDatabase>;
 
@@ -16,6 +17,7 @@ export function createDatabase(connectionString: string) {
   const client = postgres(connectionString, {
     max: 5,
     prepare: false,
+    ssl: resolveDatabaseSslMode(connectionString),
   });
 
   return {
@@ -25,7 +27,16 @@ export function createDatabase(connectionString: string) {
 }
 
 export function getDatabase() {
-  const connectionString = process.env.DATABASE_URL?.trim() || localDatabaseUrl;
+  const nodeEnvironment =
+    process.env.NODE_ENV === "production"
+      ? "production"
+      : process.env.NODE_ENV === "test"
+        ? "test"
+        : "development";
+  const connectionString = resolveDatabaseUrl(
+    process.env.DATABASE_URL,
+    nodeEnvironment,
+  );
 
   if (!globalDatabase.fieldCloseDatabase) {
     globalDatabase.fieldCloseDatabase = createDatabase(connectionString);

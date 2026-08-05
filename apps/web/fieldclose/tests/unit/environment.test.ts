@@ -255,6 +255,37 @@ describe("server environment", () => {
     ).toThrow(/DATABASE_URL is required in production/);
   });
 
+  it("rejects a remote production database without certificate-verified TLS", () => {
+    const base = {
+      NODE_ENV: "production" as const,
+      BETTER_AUTH_URL: "https://fieldclose.example",
+    };
+
+    expect(() =>
+      parseServerEnvironment({
+        ...base,
+        DATABASE_URL:
+          "postgresql://fieldclose:password@database.example/fieldclose",
+      }),
+    ).toThrow(/sslmode=verify-full/);
+
+    expect(() =>
+      parseServerEnvironment({
+        ...base,
+        DATABASE_URL:
+          "postgresql://fieldclose:password@database.example/fieldclose?sslmode=require",
+      }),
+    ).toThrow(/sslmode=verify-full/);
+
+    expect(() =>
+      parseServerEnvironment({
+        ...base,
+        DATABASE_URL:
+          "postgresql://fieldclose:password@database.example/fieldclose?sslmode=verify-full",
+      }),
+    ).not.toThrow();
+  });
+
   it("requires TLS for SMTP delivery in production", () => {
     const base = {
       NODE_ENV: "production" as const,

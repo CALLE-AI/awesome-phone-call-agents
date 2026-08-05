@@ -21,7 +21,7 @@ import {
 } from "@/application/live-call-gate";
 import { lockAndCheckRecipientSuppression } from "@/application/recipient-suppression";
 import type { ServerEnvironment } from "@/config/environment";
-import { e164PhoneSchema } from "@/domain/phone-number";
+import { usE164PhoneSchema } from "@/domain/phone-number";
 import type { FieldCloseDatabase } from "@/persistence/database";
 import {
   auditEvents,
@@ -80,7 +80,7 @@ const protectedCaseInputSchema = z.object({
   contact: z.object({
     displayName: z.string().trim().min(1).max(120).nullable(),
     role: z.string().trim().min(1).max(64),
-    phoneE164: e164PhoneSchema,
+    phoneE164: usE164PhoneSchema,
     authorizationBasis: z.enum(liveAuthorizationBasisValues),
     authorizationNote: z.string().trim().min(10).max(500),
   }),

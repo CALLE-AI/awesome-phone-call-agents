@@ -5,11 +5,14 @@
 - Status: Accepted for the hackathon MVP
 - Decision date: 2026-07-28
 - Product form: Web application
-- Implementation status: MVP implemented; fake-only public and protected staging environments deployed
+- Implementation status: MVP implemented; fake-only public deployed; protected staging verification pending
 - Live-integration status: Selected but not yet verified with an authorized call
 - Review trigger: Revisit only if the CALL-E integration spike, hosting spike, or security controls fail
 
-This document records the implementation stack and operational shape selected for FieldClose. Deployment is verified separately from live CALL-E behavior; no authorized live-call result is claimed yet.
+This document records the implementation stack and operational shape selected
+for FieldClose. The public deployment is verified separately from the still
+pending protected-staging and live CALL-E evidence; no authorized live-call
+result is claimed yet.
 
 ## Decision
 
@@ -289,7 +292,7 @@ Two deployments have intentionally different capabilities:
 | Environment | Access | Provider | Live credentials |
 | --- | --- | --- | --- |
 | Public demo | Any authenticated user receives an isolated demo workspace; anonymous users see the sign-in experience | Fake only | Absent |
-| Protected live/staging | Allow-listed operator identities only | Fake by default; CALL-E only after explicit approval | Present in deployment secret storage |
+| Protected live/staging | Allow-listed operator identities only | Fake by default; CALL-E only after explicit approval | Required only in protected server secret storage; deployment verification pending |
 
 A live call requires both:
 
@@ -300,12 +303,14 @@ Both default to blocking live creation. Neither can be enabled from ordinary bro
 
 ## Hosting and operations
 
-### Current hackathon topology
+### Current deployment evidence and target protected topology
 
-- One Aliyun ECS host runs isolated public-demo and protected-staging application environments behind Caddy HTTPS.
-- PostgreSQL runs on the same host and is not exposed publicly.
-- The public environment contains no CALL-E credential and is forced to the fake provider.
-- Protected staging stores its CALL-E and authentication-email credentials only in server-side environment storage.
+- The Aliyun ECS public demo runs behind Caddy HTTPS, contains no CALL-E
+  credential, and is forced to the fake provider.
+- The protected target is a separate application environment with separate data
+  and server-side CALL-E and authentication-email secrets.
+- Inspectable evidence for protected deployment, isolation, production
+  authentication, and deployed CALL-E/SMTP configuration is still pending.
 
 ### Supported managed topology
 
@@ -343,6 +348,11 @@ CALL_E_API_KEY
 CALL_E_BASE_URL
 FIELDCLOSE_LIVE_CALLS_ENABLED=false
 ```
+
+A non-loopback production `DATABASE_URL` must include
+`sslmode=verify-full`. Runtime configuration rejects weaker modes, and the
+postgres.js client explicitly uses certificate-verified TLS for every remote
+database connection.
 
 Secrets must be absent from committed `.env` files. `.env.example` contains names and safe explanations only.
 

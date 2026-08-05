@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 
 import type { DemoCloseoutCaseInput } from "@/application/closeout-workflow";
 import type { ProtectedCloseoutCaseInput } from "@/application/live-closeout-workflow";
-import { e164PhoneSchema } from "@/domain/phone-number";
+import { e164PhoneSchema, usE164PhoneSchema } from "@/domain/phone-number";
 
 export type NewCaseInput =
   | DemoCloseoutCaseInput
@@ -62,7 +62,7 @@ export function NewCaseForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const phoneResult = e164PhoneSchema.safeParse(
+    const phoneResult = (live ? usE164PhoneSchema : e164PhoneSchema).safeParse(
       String(form.get("phoneE164") ?? ""),
     );
 
@@ -210,6 +210,7 @@ export function NewCaseForm({
               <option value="America/New_York">America/New_York</option>
               <option value="America/Denver">America/Denver</option>
               <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Asia/Shanghai">Asia/Shanghai</option>
             </select>
           </label>
         </div>
