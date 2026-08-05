@@ -7,9 +7,11 @@
  * address, or other identifying detail).
  *
  * Redacts:
- *   - phone numbers (E.164 and common grouped/display formats), via the
- *     same maskPhone() used elsewhere in this skill for consistency
- *     (e.g. "+15854142924" -> "+1585414****")
+ *   - phone numbers, via the same maskPhone() used elsewhere in this skill
+ *     for consistency. Covers E.164 ("+15854142924"), grouped international
+ *     display format ("+1 (585) 414-2924"), and common US/NANP formats with
+ *     no "+" -- "(585) 414-2924", "585-414-2924", "585.414.2924", and bare
+ *     "5854142924" -- all masking down to "+1585414****" / "585414****".
  *   - email addresses (e.g. "jerlyn@designlady.com" -> "[redacted email]")
  *
  * KNOWN LIMITATION: this does not attempt to detect or redact spoken street
@@ -30,17 +32,31 @@ const path = require("path");
 
 const { maskPhone } = require("./phone-utils.js");
 
-// Same grouped-display phone pattern validate_repository.py already treats as
-// this repo's canonical matcher, so redaction here stays consistent with
-// phone handling elsewhere in the codebase. Its separator character class
-// (`[\s().-]*`) allows zero separators between digits, so it already matches
-// bare E.164 numbers too -- a single pass, not a separate bare-number sweep,
-// which would otherwise double-mask the same substring.
-const GROUPED_PHONE_RE = /(?<!\w)\+[1-9](?:[\s().-]*\d){6,14}(?![\s().-]*\d)/g;
+// Two phone shapes, combined into ONE alternation regex so a single
+// `.replace()` pass picks non-overlapping matches -- combining them via two
+// separate sequential `.replace()` calls previously caused the same
+// substring to be masked twice (e.g. "+1585414********" instead of
+// "+1585414****"). Whichever alternative matches first at a given position
+// wins; the engine then continues past that match, so the other alternative
+// never gets a second chance at the same characters.
+//
+// 1. `+`-prefixed international/E.164 numbers (this repo's canonical
+//    grouped-display matcher from validate_repository.py's Dify checks --
+//    its separator class `[\s().-]*` allows zero separators, so it already
+//    covers bare "+15854142924" too, not just spaced/grouped display forms).
+const GROUPED_INTL_PHONE_RE = "(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)";
+// 2. Domestic NANP-shaped numbers with no `+`: "(585) 414-2924",
+//    "585-414-2924", "585.414.2924", "5854142924", with an optional leading
+//    "1". Area code and exchange digits are constrained to 2-9 (a real NANP
+//    rule) so this doesn't over-match arbitrary 10-digit numbers like order
+//    IDs -- deliberately narrower than a bare `\d{7,15}` catch-all.
+const NANP_PHONE_RE = "(?<!\\d)(?:1[\\s.-]?)?\\(?[2-9]\\d{2}\\)?[\\s.-]?[2-9]\\d{2}[\\s.-]?\\d{4}(?!\\d)";
+
+const PHONE_RE = new RegExp(`(?:${GROUPED_INTL_PHONE_RE})|(?:${NANP_PHONE_RE})`, "g");
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 function redactPhones(text) {
-  return text.replace(GROUPED_PHONE_RE, (match) => maskPhone(match));
+  return text.replace(PHONE_RE, (match) => maskPhone(match));
 }
 
 function redactEmails(text) {

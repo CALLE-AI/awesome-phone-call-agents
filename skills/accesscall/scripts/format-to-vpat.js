@@ -149,6 +149,12 @@ function validateIntakeResult(intake) {
       throw new Error(`intake-result field "${field}" has invalid value "${intake[field]}"`);
     }
   }
+  // Strict boolean type checks -- not just "is truthy" -- for both boolean
+  // schema fields. A string "false" is truthy in JS; without this check it
+  // would sail through validation and then get treated as true downstream.
+  if (typeof intake.consent_followup !== "boolean") {
+    throw new Error('intake-result field "consent_followup" must be a boolean');
+  }
   if (typeof intake.followup_contact_confirmed !== "boolean") {
     throw new Error('intake-result field "followup_contact_confirmed" must be a boolean');
   }
@@ -263,11 +269,15 @@ function buildRemarksParagraphs(intake, { autoMatched = false } = {}) {
   lines.push(`Remediation Priority: ${severityToPriority(intake.severity)} (severity: ${intake.severity})`);
   lines.push(`Assistive Technology Used: ${assistiveTechLabel(intake)}`);
   lines.push(`Task Attempted: ${intake.task_attempted}`);
-  if (intake.consent_followup) {
+  // Strict `=== true` on purpose, not truthiness: consent_followup and
+  // followup_contact_confirmed are boolean schema fields, and a string value
+  // like "false" (e.g. from unvalidated/hand-edited JSON) is truthy in JS --
+  // a loose check here would treat "false" as consent/confirmation.
+  if (intake.consent_followup === true) {
     // Never write an unconfirmed contact into the audit output as if it were
     // a real delivery address -- a misheard/unconfirmed email means the
     // caller who reported the barrier never gets helped.
-    if (intake.followup_contact_confirmed && intake.followup_contact) {
+    if (intake.followup_contact_confirmed === true && intake.followup_contact) {
       lines.push(`Follow-up Contact: ${intake.followup_contact}`);
     } else {
       lines.push("Follow-up Contact: Contact unconfirmed, verify manually.");
