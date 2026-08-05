@@ -38,9 +38,11 @@ Two consequences worth knowing:
 
 ## Webhooks
 
-The SDK ships a verifier for HMAC-SHA256 signatures over `timestamp + "." + raw_body` (`CALL-E-Signature: v1=<hex>` plus `CALL-E-Timestamp`), and its verifier checks the signature but not timestamp freshness, so integrators should enforce their own replay window over the exact raw bytes.
+The platform changelog dated 2026-07-29 ("Terminal webhook delivery") states that call tasks with `webhook_url` now send terminal event notifications, retried on non-2xx responses, carrying a `CALL-E-Event-Id` header for deduplication. Current deliveries are UNSIGNED: no webhook secret, no `CALL-E-Timestamp`, no `CALL-E-Signature`, and the SDK's `verify`/`unwrap` helpers are deprecated as of 0.6.0 ("current CALL-E webhooks are unsigned... must not be used to parse current deliveries").
 
-Observed live, late July 2026: `webhook_url` on call creation is ACCEPTED silently but NO webhook was delivered for a completed call (verified with a public tunnel capturing all traffic; the call reached terminal, the tunnel stayed healthy, nothing arrived). Until delivery demonstrably works, treat polling `GET /v1/calls/{id}` as the authoritative terminal path and the webhook as a future optimization, and keep any webhook receiver fail-closed.
+The security consequence is direct: an unsigned delivery proves nothing about its sender. Treat any webhook receiver as a public, untrusted-input boundary and never write call results from a webhook body. Use the delivery only as a wake-up signal: read the call id, fetch `GET /v1/calls/{call_id}` with your API key, and act on that authoritative snapshot. The platform docs recommend exactly this re-fetch before any sensitive side effect. Polling that endpoint remains the authoritative terminal path either way.
+
+History, because older notes and examples still describe the signed scheme: during our integration window (verified 2026-07-25 with a public tunnel on a completed call) `webhook_url` was accepted silently and nothing was delivered; delivery went live with the 2026-07-29 change. Earlier SDK versions shipped an HMAC-SHA256 verifier over `timestamp + "." + raw_body` that checked the signature but not timestamp freshness, so a legacy integration still running its own compatible signing layer must enforce a replay window over the exact raw bytes itself.
 
 ## Billing behaviors relevant to verification runs
 
