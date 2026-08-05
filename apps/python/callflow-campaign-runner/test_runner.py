@@ -17,6 +17,7 @@ from pathlib import Path
 from runner import (
     CAMPAIGNS,
     LedgerCorruptError,
+    SuppressionCorruptError,
     _UNSAFE_FIELD,
     _hash_phone,
     _is_resolved,
@@ -985,15 +986,133 @@ with tempfile.TemporaryDirectory() as tmp:
     except ValueError:
         check("a newline in the campaign id is refused at write time", True)
 
-    # A hand-edited junk line must not become a phantom entry: an opt-out list
-    # full of values that can never match is the appearance of protection
-    # without the effect.
+    # A malformed opt-out line must STOP THE RUN, not be skipped. Skipping is
+    # fail-open: the unreadable line may be the only record that someone asked
+    # never to be called, and dropping it makes them callable again.
     record_suppression(supp, "+15555550100", "travel")
     with open(supp, "a", encoding="utf-8") as fh:
         fh.write("not-a-digest,travel\nDEADBEEF\n")
-    loaded = load_suppressions(supp)
-    check("junk lines are not loaded as opt-outs", loaded == {_hash_phone("+15555550100")})
-    check("the genuine opt-out still loads", _hash_phone("+15555550100") in loaded)
+    try:
+        load_suppressions(supp)
+        check("a malformed opt-out line stops the run", False)
+    except SuppressionCorruptError as exc:
+        check("a malformed opt-out line stops the run", True)
+        check("the error names the bad lines", "not-a-digest" in str(exc))
+        check("the error explains the opt-out risk", "opt-out" in str(exc).lower())
+
+print("\nThe opt-out list fails closed, never open")
+with tempfile.TemporaryDirectory() as tmp:
+    h1 = _hash_phone("+15555550100")
+    h2 = _hash_phone("+15555550101")
+
+    # A crash mid-append leaves the final record torn. That record may be a real
+    # opt-out, so a file with no trailing newline is refused.
+    torn = str(Path(tmp) / "torn.txt")
+    Path(torn).write_text(f"# hdr\n{h1},travel\n{h2[:40]}", encoding="utf-8")
+    try:
+        load_suppressions(torn)
+        check("a torn final opt-out record stops the run", False)
+    except SuppressionCorruptError as exc:
+        check("a torn final opt-out record stops the run", True)
+        check("the error blames the missing newline", "newline" in str(exc))
+
+    for body, why in [
+        (f"# h\nDEADBEEF\n", "a short hex line"),
+        (f"# h\n{h1[:63]},c\n", "a 63-character digest"),
+        (f"# h\nnothex{'z' * 58},c\n", "a non-hex 64-char value"),
+    ]:
+        p = str(Path(tmp) / f"bad_{len(body)}_{why[2:7]}.txt")
+        Path(p).write_text(body, encoding="utf-8")
+        try:
+            load_suppressions(p)
+            check(f"{why} stops the run", False)
+        except SuppressionCorruptError:
+            check(f"{why} stops the run", True)
+
+    # And the guard must not be so strict that valid lists stop working.
+    good = str(Path(tmp) / "good.txt")
+    Path(good).write_text(
+        f"# hdr\n{h1},travel\n\n   \n{h2.upper()},appointment\n", encoding="utf-8"
+    )
+    loaded = load_suppressions(good)
+    check("comments, blanks, and uppercase digests all load", loaded == {h1, h2})
+    check("an absent opt-out file is not corruption",
+          load_suppressions(str(Path(tmp) / "none.txt")) == set())
+
+print("\nAn opt-out append is atomic and self-consistent")
+with tempfile.TemporaryDirectory() as tmp:
+    supp = str(Path(tmp) / "s.txt")
+    # Header and record are written in ONE os.write, so a crash cannot leave a
+    # header with no record or a half-written digest.
+    record_suppression(supp, "+15555550100", "travel")
+    text = Path(supp).read_text(encoding="utf-8")
+    check("the first append writes the header and record together",
+          text.count("# Hashed") == 1 and text.endswith("\n"))
+    record_suppression(supp, "+15555550101", "travel")
+    text = Path(supp).read_text(encoding="utf-8")
+    check("a second append adds no duplicate header", text.count("# Hashed") == 1)
+    check("every append ends with a newline", text.endswith("\n"))
+    check("both opt-outs load", len(load_suppressions(supp)) == 2)
+
+print("\nClaiming a recipient holds the opt-out lock too")
+# Reading the opt-out list under only the dispatch lock is fail-open, because
+# record_suppression locks the suppression file. Both locks must be held, and
+# always in the same order, so this can never deadlock.
+with tempfile.TemporaryDirectory() as tmp:
+    led = str(Path(tmp) / "l.txt")
+    supp = str(Path(tmp) / "s.txt")
+    phone = "+15555550100"
+
+    finished: list[str] = []
+    errors: list[str] = []
+    guard3 = threading.Lock()
+
+    def _claimer(i: int) -> None:
+        try:
+            reserve_recipient(led, f"+1555555{i:04d}", "c", f"k{i}",
+                              batch_id="b1", suppression_file=supp)
+            with guard3:
+                finished.append("claim")
+        except Exception as exc:  # noqa: BLE001
+            with guard3:
+                errors.append(f"{type(exc).__name__}: {exc}")
+
+    def _optouter(i: int) -> None:
+        try:
+            record_suppression(supp, f"+1555556{i:04d}", "c")
+            with guard3:
+                finished.append("optout")
+        except Exception as exc:  # noqa: BLE001
+            with guard3:
+                errors.append(f"{type(exc).__name__}: {exc}")
+
+    threads: list[threading.Thread] = []
+    for i in range(8):
+        threads.append(threading.Thread(target=_claimer, args=(i,)))
+        threads.append(threading.Thread(target=_optouter, args=(i,)))
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+
+    check(f"16 interleaved claims and opt-outs all finish (no deadlock, got "
+          f"{len(finished)})", len(finished) == 16)
+    check(f"none of them errored ({errors[:1]})", not errors)
+    check("no lock file is left behind",
+          not Path(f"{led}.lock").exists() and not Path(f"{supp}.lock").exists())
+    check("the opt-out list is still readable", len(load_suppressions(supp)) == 8)
+
+    # A recorded opt-out blocks a claim even when the ledger would allow it.
+    led2 = str(Path(tmp) / "l2.txt")
+    supp2 = str(Path(tmp) / "s2.txt")
+    reserve_recipient(led2, phone, "c", "k1", batch_id="b1")
+    record_resolved(led2, phone, "c", "k1", "call_1", "completed", batch_id="b1")
+    record_suppression(supp2, phone, "c")
+    granted, prior = reserve_recipient(led2, phone, "c", "k2", batch_id="b2",
+                                       suppression_file=supp2)
+    check("a resolved recipient who opted out cannot be re-claimed", not granted)
+    check("the refusal reports the suppression",
+          (prior or {}).get("state") == "suppressed")
 
 # --- provider status normalisation ----------------------------------------
 # The status is compared against fixed sets in three places (the poll loop,

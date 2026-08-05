@@ -147,22 +147,48 @@ def redact_error(exc: BaseException) -> str:
     return redact(text)[:400]
 
 
+class SuppressionCorruptError(RuntimeError):
+    """The opt-out list cannot be trusted, so no call may be placed.
+
+    Skipping a malformed opt-out line is FAIL-OPEN: the one record proving that
+    a person asked never to be called again is precisely the record whose loss
+    lets us call them. A torn or unreadable opt-out file therefore stops the
+    run, exactly as a corrupt reservation ledger does.
+    """
+
+
 def load_suppressions(path: str) -> set[str]:
     """Hashed numbers that must never be dialed again.
 
-    Only well-formed digests are collected. A line that is not a SHA-256 hex
-    digest cannot correspond to any number this app would dial, so keeping it
-    would add an entry that silently never matches — the appearance of an
-    opt-out list without the effect. Malformed lines are reported on stderr and
-    skipped rather than raising: refusing to load the opt-out list would be a
-    far worse failure than ignoring a line that could never match anyway.
+    Raises `SuppressionCorruptError` on any line this app would not itself have
+    written. Every line must be `<64-hex digest>,<campaign>` and the file must
+    end with a newline.
+
+    Silently skipping a malformed line fails OPEN — the skipped line may be the
+    only record of a real opt-out, and dropping it makes that person callable
+    again. A missing trailing newline means the last append was torn by a crash,
+    so the final record is presumed to be a real opt-out that did not finish
+    landing, and the run stops rather than dialing them.
+
+    An absent file is not corruption: nobody has opted out yet.
     """
     p = Path(path)
     if not p.exists():
         return set()
+
+    raw = p.read_text(encoding="utf-8")
+    if raw and not raw.endswith("\n"):
+        raise SuppressionCorruptError(
+            f"{path} does not end with a newline, so its last record was torn "
+            f"by an interrupted write. That record may be a real opt-out. This "
+            f"run stops rather than risk calling someone who asked not to be. "
+            f"Inspect the last line, complete or remove it deliberately, then "
+            f"retry."
+        )
+
     out: set[str] = set()
-    skipped = 0
-    for line in p.read_text(encoding="utf-8").splitlines():
+    bad: list[str] = []
+    for lineno, line in enumerate(raw.splitlines(), 1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -170,40 +196,81 @@ def load_suppressions(path: str) -> set[str]:
         if _HASH_RE.match(digest):
             out.add(digest)
         else:
-            skipped += 1
-    if skipped:
-        print(
-            f"  warning: {path} has {skipped} line(s) that are not SHA-256 "
-            f"digests; they cannot match any number and were ignored",
-            file=sys.stderr,
+            bad.append(f"{lineno} ({line[:24]!r} is not a SHA-256 digest)")
+
+    if bad:
+        raise SuppressionCorruptError(
+            f"{path} has invalid line(s): {'; '.join(bad)}. A malformed entry "
+            f"may be the only record of someone's opt-out, so this run stops "
+            f"rather than treating them as callable. Inspect the file, repair "
+            f"or remove the bad lines deliberately, then retry."
         )
+
     return out
 
 
 def record_suppression(path: str, phone: str, campaign_id: str) -> None:
-    """Append an opt-out durably, under a lock.
+    """Append an opt-out atomically and durably.
 
     Called the moment CALL-E reports `do_not_call`, before the reservation is
-    closed. Locked so two runners cannot interleave writes, and fsynced so the
-    record survives a crash — an opt-out that is only in a buffer is not an
-    opt-out. Stored as a hash, so the file carries no personal data.
+    closed. The record is built in full and written with a single `os.write`, so
+    a crash cannot leave a half-written digest that would later be skipped —
+    which would make an opted-out person callable again. fsynced before the
+    handle closes, because an opt-out that is only in a buffer is not an
+    opt-out, and the containing directory is fsynced too so the new file's
+    entry survives a power loss. Stored as a hash, so the file holds no
+    personal data.
+
+    Callers that must also read the opt-out list under the same lock should
+    hold `_suppression_lock(path)` and use `_append_suppression` directly.
     """
-    # Validated before the lock is taken: a comma would split the record and a
-    # newline would append an arbitrary extra line to the opt-out list.
+    with _suppression_lock(path):
+        _append_suppression(path, phone, campaign_id)
+
+
+def _append_suppression(path: str, phone: str, campaign_id: str) -> None:
+    """Append one opt-out record. The caller MUST hold the suppression lock."""
+    # Validated first: a comma would split the record and a line break would
+    # append an arbitrary extra line to the opt-out list.
     campaign_field = _safe_field("campaign id", campaign_id)
 
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    with _ledger_lock(path):
-        if not p.exists():
-            p.write_text(
-                "# Hashed numbers that opted out. Do not delete. One per line.\n",
-                encoding="utf-8",
-            )
-        with p.open("a", encoding="utf-8") as fh:
-            fh.write(f"{_hash_phone(phone)},{campaign_field}\n")
-            fh.flush()
-            os.fsync(fh.fileno())
+
+    header = (
+        b"" if p.exists()
+        else b"# Hashed numbers that opted out. Do not delete. One per line.\n"
+    )
+    record = f"{_hash_phone(phone)},{campaign_field}\n".encode()
+
+    # 0o600 at creation: this file links a campaign to people who refused it.
+    fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        # ONE write call for header+record together. Two writes could be torn
+        # between them, leaving a header with no record or a partial digest.
+        os.write(fd, header + record)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+    # fsync the directory as well, so a newly created file's directory entry is
+    # durable. Without this the record can survive while the file name does not.
+    _fsync_dir(p.parent)
+
+
+def _fsync_dir(directory: Path) -> None:
+    """Best-effort directory fsync. Not supported on Windows, where it is a
+    no-op rather than an error."""
+    try:
+        dfd = os.open(str(directory), os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(dfd)
+    except OSError:
+        pass  # Windows and some filesystems cannot fsync a directory
+    finally:
+        os.close(dfd)
 
 
 def _lock_path(path: str) -> Path:
@@ -212,11 +279,11 @@ def _lock_path(path: str) -> Path:
 
 @contextmanager
 def _ledger_lock(path: str, timeout: float = 10.0):
-    """Exclusive lock around ledger read-modify-write.
+    """Exclusive lock around a read-modify-write of `path`.
 
-    Two runners sharing a ledger would otherwise both read "not reserved" and
-    both dial. `O_CREAT | O_EXCL` is atomic on every platform, so exactly one
-    holder wins.
+    Two runners sharing a file would otherwise both read "not reserved" and both
+    dial. `O_CREAT | O_EXCL` is atomic on every platform, so exactly one holder
+    wins.
     """
     lock = _lock_path(path)
     lock.parent.mkdir(parents=True, exist_ok=True)
@@ -232,12 +299,50 @@ def _ledger_lock(path: str, timeout: float = 10.0):
                     f"run is active, delete the file and retry."
                 ) from None
             time.sleep(0.05)
+        except PermissionError:
+            # Windows raises this, not FileExistsError, when another thread is
+            # deleting the lock file at the moment we try to create it. It means
+            # the lock is contended, so retry rather than fail the run.
+            if time.monotonic() > deadline:
+                raise TimeoutError(
+                    f"Could not acquire {lock} within {timeout}s. If no other "
+                    f"run is active, delete the file and retry."
+                ) from None
+            time.sleep(0.05)
     try:
         os.write(fd, str(os.getpid()).encode())
         yield
     finally:
         os.close(fd)
         lock.unlink(missing_ok=True)
+
+
+# The opt-out list gets its own lock, distinct from any ledger's. A caller that
+# needs both must take them in this order — suppression first, then dispatch —
+# so two runners can never deadlock by holding one and waiting for the other.
+def _suppression_lock(path: str, timeout: float = 10.0):
+    """Exclusive lock around the opt-out list."""
+    return _ledger_lock(path, timeout)
+
+
+@contextmanager
+def _dial_claim_lock(dispatch_path: str, suppression_path: str | None,
+                     timeout: float = 10.0):
+    """Hold every lock needed to decide whether a number may be dialed.
+
+    Reading the opt-out list while holding only the dispatch lock is fail-open:
+    `record_suppression` locks the *suppression* file, so the two operations do
+    not exclude each other and a reservation can observe a half-written opt-out.
+    Both locks are held here, always suppression-then-dispatch, so an opt-out is
+    either fully visible or not yet begun.
+    """
+    if suppression_path is None:
+        with _ledger_lock(dispatch_path, timeout):
+            yield
+        return
+    with _suppression_lock(suppression_path, timeout):
+        with _ledger_lock(dispatch_path, timeout):
+            yield
 
 
 class LedgerCorruptError(RuntimeError):
@@ -508,7 +613,11 @@ def reserve_recipient(
     Returns `(reserved, existing)`. When `reserved` is False, `existing` holds
     the blocking record so the caller can reconcile rather than re-dial.
     """
-    with _ledger_lock(path):
+    # BOTH locks, suppression first. Holding only the dispatch lock while
+    # reading the opt-out list is fail-open: record_suppression locks the
+    # suppression file, so the two would not exclude each other and this check
+    # could read a half-written opt-out.
+    with _dial_claim_lock(path, suppression_file):
         # (1) Durable opt-out check, inside the lock and off disk.
         if suppression_file is not None:
             if _hash_phone(phone) in load_suppressions(suppression_file):
@@ -1103,13 +1212,25 @@ def run(args: argparse.Namespace) -> int:
 
     # Opt-outs from previous runs. Checked in dry run too, so a preview shows
     # exactly which contacts a live run would skip.
-    suppressed = load_suppressions(args.suppression_file)
+    #
+    # A corrupt opt-out list or ledger stops the run. Reported as an error
+    # rather than a traceback, because the operator has to repair a file and the
+    # message tells them which one and why.
+    try:
+        suppressed = load_suppressions(args.suppression_file)
+    except SuppressionCorruptError as exc:
+        print(f"\nOpt-out list cannot be trusted.\n{exc}", file=sys.stderr)
+        return 2
     if suppressed:
         print(f"\n  {len(suppressed)} number(s) suppressed from earlier opt-outs")
 
     # Reservations from earlier runs. An unresolved one may have connected, so
     # that recipient is not dialled again until a person reconciles it.
-    reservations = load_reservations(args.dispatch_file)
+    try:
+        reservations = load_reservations(args.dispatch_file)
+    except LedgerCorruptError as exc:
+        print(f"\nReservation ledger cannot be trusted.\n{exc}", file=sys.stderr)
+        return 2
     unresolved = [
         r for r in reservations.values() if not _is_resolved(r.get("state", ""))
     ]
@@ -1449,6 +1570,18 @@ def run(args: argparse.Namespace) -> int:
             print(json.dumps(record), file=sys.stderr)
         return 1
 
+    def _create_private(target: Path):
+        """Create `target` exclusively, owner-only from the very first byte.
+
+        `open("x")` then `chmod(0o600)` leaves a window in which identifiable
+        call data exists at whatever the umask allows — 0644 by default — and a
+        crash during the write leaves it that way permanently. Passing the mode
+        to `os.open` means the file is never group- or world-readable at any
+        point. Raises FileExistsError like `open("x")`, so callers are unchanged.
+        """
+        fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        return os.fdopen(fd, "w", encoding="utf-8")
+
     out = Path(args.out)
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -1457,7 +1590,7 @@ def run(args: argparse.Namespace) -> int:
 
     fh = None
     try:
-        fh = out.open("x", encoding="utf-8")
+        fh = _create_private(out)
     except FileExistsError:
         # A one-second timestamp collides when two runs finish in the same
         # second, so the suffix is retried with a counter until `open("x")`
@@ -1467,7 +1600,7 @@ def run(args: argparse.Namespace) -> int:
             suffix = f"-{stamp}" if n == 1 else f"-{stamp}-{n}"
             candidate = out.with_name(f"{out.stem}{suffix}{out.suffix}")
             try:
-                fh = candidate.open("x", encoding="utf-8")
+                fh = _create_private(candidate)
             except FileExistsError:
                 continue
             except OSError as exc:
@@ -1496,11 +1629,8 @@ def run(args: argparse.Namespace) -> int:
         # record still goes to stderr.
         return _dump_results(f"Failed while writing {out} ({exc.strerror}).")
 
-    # Results hold call outcomes about identifiable people. Owner-only.
-    try:
-        out.chmod(0o600)
-    except OSError:
-        pass  # best effort: some filesystems (e.g. Windows FAT) ignore modes
+    # The file was created 0o600, so no chmod is needed — and none is attempted,
+    # because a chmod here would only ever widen a window that no longer exists.
     print(f"  results → {out}\n")
 
     needs_human = counts.get("needs_human", 0)

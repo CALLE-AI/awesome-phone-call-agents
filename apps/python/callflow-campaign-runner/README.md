@@ -221,7 +221,8 @@ consent to.
 | Explicit intent | `--live` refuses to run without `--allow`. **There is no override** |
 | Allowlist | Only listed E.164 numbers can be dialed; the entries are themselves validated |
 | Timeout is not an outcome | Giving up on polling escalates and leaves the reservation open |
-| Corruption fails closed | An unparseable ledger line stops the run rather than being skipped |
+| Corruption fails closed | An unparseable ledger **or opt-out** line stops the run rather than being skipped |
+| Torn writes fail closed | An opt-out file not ending in a newline means an interrupted append, and stops the run |
 | Untrusted provider values | Confidence must be finite and within 0.0-1.0; NaN and infinity escalate |
 | Untrusted CSV cells | Control characters stripped, lengths capped, alterations reported |
 | Recursive redaction | Nested lists and objects in a result are redacted, not just top-level strings |
@@ -232,11 +233,12 @@ consent to.
 | Idempotency | Key binds campaign, number, batch, rendered task, and schema |
 | Reservation ledger | One locked, per-recipient claim before any API call; a crash cannot cause a re-dial |
 | One call per person per run | A duplicate number in the input is called once, whatever the name or note says |
-| Suppression | `do_not_call` is written to disk *and* held in memory for the rest of the run |
+| Suppression | `do_not_call` is appended atomically and fsynced *before* the reservation closes, and held in memory for the rest of the run |
+| One lock for one decision | Claiming a recipient holds the opt-out lock *and* the ledger lock, so an in-flight opt-out cannot be missed |
 | Redaction | Numbers, emails, digit runs, and credentials stripped from stored results **and errors**, at any nesting depth |
 | No guessing | Region and locale are never inferred; state them with `--region` / `--locale` or omit them |
 | Prompt boundaries | Every goal is prefixed with AI disclosure, secret refusal, and sensitive-domain limits |
-| File modes | The results file is written `0600` |
+| File modes | Results and opt-out files are **created** `0600`, never created-then-chmod'd |
 
 Masking always hides at least half the characters, so a malformed number
 cannot leak most of a real one through an error message.
@@ -318,7 +320,10 @@ different content keys, but the same phone rings. Duplicates are reported as
 whatever the contact said aloud — a phone number, an email, card digits.
 Masking the `phone` column while writing the summary verbatim would leak the
 same data one column over, so free-text values are redacted before they are
-written. The results file is created mode `0600`.
+written. The results file is **created** mode `0600` — via `os.open` with an
+explicit mode, not created and then `chmod`ed. Creating it first would leave a
+window in which identifiable call data sits at whatever the umask allows (0644
+by default), and a crash during the write would leave it that way permanently.
 
 **Errors are redacted too.** Provider exceptions echo the request back: the
 destination number, the rendered task, sometimes an `Authorization` header.
@@ -377,7 +382,7 @@ Each run is a foreground process:
 |---|---|
 | `--out` results | Yes. Output only. |
 | `--dispatch-file` reservations | **No.** Deleting it permits re-dialing recipients whose calls were never reconciled. |
-| `--suppression-file` opt-outs | **Never.** Deleting it re-enables calling people who asked you to stop. |
+| `--suppression-file` opt-outs | **Never.** Deleting it re-enables calling people who asked you to stop. A corrupt one stops the run rather than being partially loaded. |
 
 ### Reconciling an unresolved reservation
 
@@ -427,9 +432,23 @@ for a *different* recipient, which is exactly the duplicate call the ledger
 exists to prevent. Silently rewriting the value would be worse: the reservation
 would no longer match the batch the operator passed.
 
-The opt-out file is `phone_hash,campaign`. Lines whose first field is not a
-SHA-256 digest are reported and ignored — they cannot match any number, and
-keeping them would give the appearance of an opt-out list without the effect.
+#### Opt-out line format
+
+The opt-out file is `phone_hash,campaign`, and it **fails closed**: a malformed
+line, or a file that does not end with a newline, stops the run.
+
+That is deliberate. Skipping an unreadable line is fail-*open* — the line you
+cannot parse may be the only record that someone asked never to be called again,
+and ignoring it makes them callable. A missing trailing newline means the last
+append was torn by a crash, so the final record is presumed to be a real opt-out
+that did not finish landing.
+
+Appends are a single `os.write` of the header and record together, fsynced, with
+the containing directory fsynced too, so a crash cannot leave a half-written
+digest. The file is created `0600`.
+
+If a run stops on a corrupt opt-out list, inspect the named line, complete or
+remove it deliberately, then retry. Do not delete the file.
 
 ---
 
@@ -442,15 +461,16 @@ python test_runner.py      # guards in isolation
 python test_live_path.py   # the whole live loop, with an injected fake client
 ```
 
-`test_runner.py` runs 245 checks over E.164 validation, masking, the dial gate,
+`test_runner.py` runs 263 checks over E.164 validation, masking, the dial gate,
 trusted-field validation, triage precedence (including non-finite and
 out-of-range confidence scores), provider-status normalisation,
 non-completed-status handling, idempotency, per-recipient reservations
-(including a 12-thread contention race), ledger corruption and exact state
-validation, forward-only state transitions, the batch completion guard,
-suppression re-checked at claim time, delimiter injection into both on-disk
-records, result and error redaction, prompt boundaries, note sanitisation, CSV
-parsing, and goal rendering.
+(including 12- and 16-thread contention races), ledger corruption and exact
+state validation, forward-only state transitions, the batch completion guard,
+the opt-out list failing closed on torn and malformed records, atomic opt-out
+appends, claiming a recipient under both locks, delimiter injection into both
+on-disk records, result and error redaction, prompt boundaries, note
+sanitisation, CSV parsing, and goal rendering.
 
 `test_live_path.py` drives the full live loop against an injected fake client
 across 42 checks: a completed call, a duplicate number in one file, an opt-out
