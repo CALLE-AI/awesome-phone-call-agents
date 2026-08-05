@@ -11,8 +11,8 @@
  * the rest of the repo rather than inventing a second definition of E.164.
  *
  * Usage:
- *   node phone-utils.js --validate "+15854142924"
- *   node phone-utils.js --mask "+15854142924"
+ *   node phone-utils.js --validate "+15550101234"
+ *   node phone-utils.js --mask "+15550101234"
  */
 
 const path = require("path");
@@ -32,7 +32,7 @@ function assertE164(value) {
   if (!isE164(value)) {
     throw new Error(
       `"${value}" is not a valid E.164 phone number (expected a leading "+", a non-zero first digit, ` +
-        `and 7-15 total digits, e.g. "+15854142924"). Ask the user to correct it -- do not guess or reformat it yourself.`,
+        `and 7-15 total digits, e.g. "+15550101234"). Ask the user to correct it -- do not guess or reformat it yourself.`,
     );
   }
   return value;
@@ -40,7 +40,7 @@ function assertE164(value) {
 
 /**
  * Masks all but the leading digits of a phone number for logs and printed
- * summaries, e.g. "+15854142924" -> "+1585414****". The last 4 characters are
+ * summaries, e.g. "+15550101234" -> "+1555010****". The last 4 characters are
  * always masked; only pass the unmasked value to the actual plan_call/run_call
  * API invocation itself.
  */

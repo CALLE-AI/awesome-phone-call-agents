@@ -8,10 +8,10 @@
  *
  * Redacts:
  *   - phone numbers, via the same maskPhone() used elsewhere in this skill
- *     for consistency. Covers E.164 ("+15854142924"), grouped international
- *     display format ("+1 (585) 414-2924"), and common US/NANP formats with
- *     no "+" -- "(585) 414-2924", "585-414-2924", "585.414.2924", and bare
- *     "5854142924" -- all masking down to "+1585414****" / "585414****".
+ *     for consistency. Covers E.164 ("+15550101234"), grouped international
+ *     display format ("+1 (555) 010-1234"), and common US/NANP formats with
+ *     no "+" -- "(555) 201-1234", "555-201-1234", "555.201.1234", and bare
+ *     "5552011234" -- all masking down to "+1555010****" / "555201****".
  *   - email addresses (e.g. "jerlyn@designlady.com" -> "[redacted email]")
  *
  * KNOWN LIMITATION: this does not attempt to detect or redact spoken street
@@ -35,18 +35,18 @@ const { maskPhone } = require("./phone-utils.js");
 // Two phone shapes, combined into ONE alternation regex so a single
 // `.replace()` pass picks non-overlapping matches -- combining them via two
 // separate sequential `.replace()` calls previously caused the same
-// substring to be masked twice (e.g. "+1585414********" instead of
-// "+1585414****"). Whichever alternative matches first at a given position
+// substring to be masked twice (e.g. "+1555010********" instead of
+// "+1555010****"). Whichever alternative matches first at a given position
 // wins; the engine then continues past that match, so the other alternative
 // never gets a second chance at the same characters.
 //
 // 1. `+`-prefixed international/E.164 numbers (this repo's canonical
 //    grouped-display matcher from validate_repository.py's Dify checks --
 //    its separator class `[\s().-]*` allows zero separators, so it already
-//    covers bare "+15854142924" too, not just spaced/grouped display forms).
+//    covers bare "+15550101234" too, not just spaced/grouped display forms).
 const GROUPED_INTL_PHONE_RE = "(?<!\\w)\\+[1-9](?:[\\s().-]*\\d){6,14}(?![\\s().-]*\\d)";
-// 2. Domestic NANP-shaped numbers with no `+`: "(585) 414-2924",
-//    "585-414-2924", "585.414.2924", "5854142924", with an optional leading
+// 2. Domestic NANP-shaped numbers with no `+`: "(555) 201-1234",
+//    "555-201-1234", "555.201.1234", "5552011234", with an optional leading
 //    "1". Area code and exchange digits are constrained to 2-9 (a real NANP
 //    rule) so this doesn't over-match arbitrary 10-digit numbers like order
 //    IDs -- deliberately narrower than a bare `\d{7,15}` catch-all.
