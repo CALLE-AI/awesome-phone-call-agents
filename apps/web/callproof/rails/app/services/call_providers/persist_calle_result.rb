@@ -17,7 +17,8 @@ module CallProviders
 
     def initialize(phone_call, result)
       @phone_call = phone_call
-      @result = result
+      # Accept either the REST Developer-API shape or the MCP get_call_run shape.
+      @result = CallProviders::CalleResultNormalizer.canonicalize(result)
     end
 
     def call

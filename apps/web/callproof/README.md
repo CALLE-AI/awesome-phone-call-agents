@@ -99,12 +99,40 @@ export CALLE_WEBHOOK_URL='https://your-public-host.example/calle/webhook'
 ```
 
 The Rails adapter submits one `POST /v1/calls` request with a stable
-`Idempotency-Key`. It polls `GET /v1/calls/{call_id}` for recovery, normalizes
-terminal transcript turns, and passes the evidence to Call Analyzer. The API key
-is read only from the environment and is never stored in a call, contract,
-transcript, prompt, or fixture.
+`Idempotency-Key`. It sends the Bearer credential only over HTTPS to an
+allow-listed host, polls `GET /v1/calls/{call_id}` for recovery, treats
+timeout/5xx as ambiguous (no replacement call), normalizes terminal transcript
+turns, and passes the evidence to Call Analyzer. The API key is read only from
+the environment and is never stored in a call, contract, transcript, prompt, or
+fixture.
 
-No live call was made while developing or testing this contribution.
+### Verified live test (2026-08-05)
+
+One controlled live call was placed through the official CALL-E MCP surface
+(`plan_call` → `run_call` → `get_call_run`) to a consenting tester's own phone,
+to validate end-to-end connectivity and the result contract. No production data
+was involved.
+
+- Outcome `COMPLETED`, 28s call, `task_completed=true`, completion confidence
+  `0.93 (high)`; the agent disclosed the recording, made no commitments, obtained
+  the live confirmation, and ended within a minute.
+- Earlier attempts to the same number returned `DECLINED` (carrier-level reject:
+  no duration, no transcript). The pipeline treats that as a failed, unverifiable
+  call that never reaches the analyzer — the intended fail-closed behaviour.
+- A redacted copy of that `get_call_run` payload is committed at
+  `rails/test/fixtures/files/calle_mcp_get_call_run.json` and drives the
+  normalizer tests.
+
+### Two result shapes: REST and MCP
+
+CALL-E returns different result shapes on its REST Developer API (used by the
+durable Rails poller: `status` + `recipients[].attempts[].transcript_turns`) and
+its MCP `get_call_run` surface (`status` + nested `result` with `outcome`,
+`summary`, a newline-joined `transcript`, and `extracted.{calling,to_phones}`).
+`CallProviders::CalleResultNormalizer.canonicalize/1` detects the shape and
+returns the REST envelope in both cases, so a single validation and persistence
+path (`CallProviders::PersistCalleResult`) — recipient status, phone match, task
+completion, and confidence — serves either surface.
 
 ## Side effects and cancellation
 
