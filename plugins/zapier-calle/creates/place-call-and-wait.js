@@ -4,15 +4,19 @@ import { INPUT_FIELDS } from '../lib/input-fields.js';
 import { flattenResult } from '../lib/flatten-result.js';
 import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
 import { checkSuppression } from '../lib/suppression.js';
+import { checkRetryPolicy, retryPolicyOptionsFromInput } from '../lib/retry-policy.js';
+import { parseResultSchema } from '../lib/result-schema.js';
+import { toMinConfidenceScore } from '../lib/result-quality.js';
+import { toLeadState } from '../lib/lead-state.js';
 
 const perform = async (z, bundle) => {
   const dryRun = isDryRun(bundle.inputData.dry_run);
   // A callback URL is only useful if createCall is actually going to dial,
-  // so every gate that stops it from dialing - suppression, dry run, and
-  // calling-window enforcement - must also stop the URL from being minted
-  // here. Otherwise the Zap would strand itself waiting on a callback that
-  // never arrives. Suppression is checked even on a dry run, unlike the
-  // calling window - see the comment in start-call.js's createCall.
+  // so every gate that stops it from dialing - suppression, dry run, the
+  // calling window, and the retry policy - must also stop the URL from being
+  // minted here. Otherwise the Zap would strand itself waiting on a callback
+  // that never arrives. Suppression is checked even on a dry run, unlike the
+  // two timing guards - see the comment in start-call.js's createCall.
   const { payload, errors } = buildPayload(bundle.inputData, {});
   const suppressed =
     errors.length === 0 &&
@@ -21,10 +25,31 @@ const perform = async (z, bundle) => {
       suppressionList: bundle.inputData.suppression_list,
     }).suppressed;
   const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
-  const webhookUrl =
-    suppressed || dryRun || !windowCheck.allowed ? undefined : z.generateCallbackUrl();
+  const retryCheck = checkRetryPolicy(retryPolicyOptionsFromInput(bundle.inputData));
+  const blocked = suppressed || dryRun || !windowCheck.allowed || !retryCheck.allowed;
+  const webhookUrl = blocked ? undefined : z.generateCallbackUrl();
   return createCall(z, bundle, { webhookUrl });
 };
+
+// The schema and the confidence floor are inputs to this step, so this action
+// can hold the classifier to the caller's own contract - it can tell that a
+// field the caller declared required never came back. The Call Completed
+// trigger sees the same webhook without either, and gets the weaker
+// schemaless check.
+const classifierOptions = (bundle) => ({
+  resultSchema: parseResultSchema(bundle.inputData && bundle.inputData.result_schema).schema,
+  minConfidenceScore: toMinConfidenceScore(
+    bundle.inputData && bundle.inputData.min_confidence_score,
+  ),
+});
+
+const unresumable = (bundle, reason) => ({
+  ...bundle.outputData,
+  disposition: reason.disposition,
+  disposition_reason: reason.text,
+  is_actionable: false,
+  lead_state: toLeadState(reason.disposition),
+});
 
 const isNonEmptyId = (value) => typeof value === 'string' && value.length > 0;
 
@@ -33,12 +58,10 @@ const performResume = async (z, bundle) => {
   const startedCallId = bundle.outputData && bundle.outputData.call_id;
 
   if (!event || typeof event !== 'object') {
-    return {
-      ...bundle.outputData,
+    return unresumable(bundle, {
       disposition: 'outcome_unknown',
-      disposition_reason: 'CALL-E did not deliver a readable webhook payload.',
-      is_actionable: false,
-    };
+      text: 'CALL-E did not deliver a readable webhook payload.',
+    });
   }
 
   // A callback URL is unauthenticated, so an unverifiable callback must fail
@@ -48,31 +71,25 @@ const performResume = async (z, bundle) => {
   const eventIdPresent = isNonEmptyId(eventCallId);
 
   if (!startedIdKnown) {
-    return {
-      ...bundle.outputData,
+    return unresumable(bundle, {
       disposition: 'needs_human',
-      disposition_reason: 'Could not verify the callback: the call id this step started is unknown.',
-      is_actionable: false,
-    };
+      text: 'Could not verify the callback: the call id this step started is unknown.',
+    });
   }
   if (!eventIdPresent) {
-    return {
-      ...bundle.outputData,
+    return unresumable(bundle, {
       disposition: 'needs_human',
-      disposition_reason: 'Could not verify the callback: it carried no call id.',
-      is_actionable: false,
-    };
+      text: 'Could not verify the callback: it carried no call id.',
+    });
   }
   if (eventCallId !== startedCallId) {
-    return {
-      ...bundle.outputData,
+    return unresumable(bundle, {
       disposition: 'needs_human',
-      disposition_reason: `Callback described a different call (${eventCallId}) than the one this step started.`,
-      is_actionable: false,
-    };
+      text: `Callback described a different call (${eventCallId}) than the one this step started.`,
+    });
   }
 
-  return { ...bundle.outputData, ...flattenResult(event) };
+  return { ...bundle.outputData, ...flattenResult(event, classifierOptions(bundle)) };
 };
 
 export default {
@@ -91,6 +108,7 @@ export default {
       disposition: 'confirmed',
       disposition_reason: 'Call completed with a high-confidence validated result.',
       is_actionable: true,
+      lead_state: 'qualified',
       call_id: 'call_123',
       status: 'completed',
       task_completed: true,

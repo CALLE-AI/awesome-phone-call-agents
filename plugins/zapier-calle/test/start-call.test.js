@@ -163,6 +163,56 @@ describe('start-call', () => {
     expect(output.calling_window.allowed).toBe(true);
   });
 
+  describe('retry policy', () => {
+    const hoursAgo = (hours) => new Date(Date.now() - hours * 3600000).toISOString();
+
+    it('refuses to dial once the daily cap is reached and makes no request', async () => {
+      server = await startFakeCalle({});
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, { ...input, previous_attempts: [hoursAgo(20), hoursAgo(6)].join(',') }),
+      );
+
+      expect(output.disposition).toBe('retry_policy_blocked');
+      expect(output.lead_state).toBe('blocked_compliance');
+      expect(output.retry_policy_enforced).toBe(true);
+      expect(output.attempts_in_last_day).toBe(2);
+      expect(server.lastRequest()).toBeNull();
+    });
+
+    it('refuses when the last attempt is too recent', async () => {
+      server = await startFakeCalle({});
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, { ...input, previous_attempts: hoursAgo(1) }),
+      );
+      expect(output.disposition).toBe('retry_policy_blocked');
+      expect(server.lastRequest()).toBeNull();
+    });
+
+    it('dials when no history is supplied, preserving prior behavior', async () => {
+      server = await startFakeCalle({});
+      const output = await startCall.operation.perform(zFor(), bundleFor(server, input));
+      expect(output.call_id).toMatch(/^call_/);
+    });
+
+    // Like the calling window and unlike suppression, this guard is about
+    // timing, so a dry run previews its verdict instead of being blocked by
+    // it - otherwise a Zap could not be inspected after a recent attempt.
+    it('previews its verdict on a dry run rather than blocking the preview', async () => {
+      server = await startFakeCalle({});
+      const output = await startCall.operation.perform(
+        zFor(),
+        bundleFor(server, { ...input, dry_run: true, previous_attempts: hoursAgo(1) }),
+      );
+
+      expect(output.dry_run).toBe(true);
+      expect(output.retry_policy.enforced).toBe(true);
+      expect(output.retry_policy.allowed).toBe(false);
+      expect(server.lastRequest()).toBeNull();
+    });
+  });
+
   it('refuses to dial a number on the suppression list and makes no request', async () => {
     server = await startFakeCalle({});
     const output = await startCall.operation.perform(

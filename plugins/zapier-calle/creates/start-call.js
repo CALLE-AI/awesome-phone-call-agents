@@ -4,6 +4,7 @@ import { redactDeep } from '../lib/redact.js';
 import { baseUrl } from '../lib/client.js';
 import { checkCallingWindow, callingWindowOptionsFromInput } from '../lib/calling-window.js';
 import { checkSuppression } from '../lib/suppression.js';
+import { checkRetryPolicy, retryPolicyOptionsFromInput } from '../lib/retry-policy.js';
 
 export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   const { payload, key, errors } = buildPayload(bundle.inputData, { webhookUrl });
@@ -29,6 +30,7 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
       disposition: 'suppressed',
       disposition_reason: suppressionCheck.reason,
       is_actionable: false,
+      lead_state: 'blocked_compliance',
       suppression_enforced: true,
       matched_entry: suppressionCheck.matchedEntry,
       correlation_id: payload.metadata.correlation_id,
@@ -36,9 +38,10 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
   }
 
   const windowCheck = checkCallingWindow(callingWindowOptionsFromInput(bundle.inputData));
+  const retryCheck = checkRetryPolicy(retryPolicyOptionsFromInput(bundle.inputData));
 
-  // A dry run previews the request and places no call, so the calling-window
-  // guard - whose entire purpose is to stop a call from being placed - has
+  // A dry run previews the request and places no call, so the two timing
+  // guards - whose entire purpose is to stop a call from being placed - have
   // nothing to protect here. Blocking the preview instead of just answering
   // "would this be allowed?" makes it impossible to inspect a Zap outside the
   // window, which is exactly when someone is likely to be building one.
@@ -47,12 +50,20 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
       dry_run: true,
       call_id: null,
       disposition: 'outcome_unknown',
+      lead_state: 'needs_human',
       preview: redactDeep({ endpoint: `${baseUrl(bundle)}/v1/calls`, idempotency_key: key, payload }),
       calling_window: {
         enforced: windowCheck.enforced,
         allowed: windowCheck.allowed,
         local_hour: windowCheck.localHour,
         reason: windowCheck.reason,
+      },
+      retry_policy: {
+        enforced: retryCheck.enforced,
+        allowed: retryCheck.allowed,
+        attempts_in_last_day: retryCheck.attemptsInLastDay,
+        hours_since_last_attempt: retryCheck.hoursSinceLastAttempt,
+        reason: retryCheck.reason,
       },
     };
   }
@@ -64,8 +75,24 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
       disposition: 'outside_calling_window',
       disposition_reason: windowCheck.reason,
       is_actionable: false,
+      lead_state: 'blocked_compliance',
       calling_window_enforced: true,
       local_hour: windowCheck.localHour,
+      correlation_id: payload.metadata.correlation_id,
+    };
+  }
+
+  if (!retryCheck.allowed) {
+    return {
+      dry_run: false,
+      call_id: null,
+      disposition: 'retry_policy_blocked',
+      disposition_reason: retryCheck.reason,
+      is_actionable: false,
+      lead_state: 'blocked_compliance',
+      retry_policy_enforced: true,
+      attempts_in_last_day: retryCheck.attemptsInLastDay,
+      hours_since_last_attempt: retryCheck.hoursSinceLastAttempt,
       correlation_id: payload.metadata.correlation_id,
     };
   }
@@ -82,6 +109,7 @@ export const createCall = async (z, bundle, { webhookUrl } = {}) => {
     call_id: response.data.id,
     status: response.data.status,
     disposition: 'outcome_unknown',
+    lead_state: 'needs_human',
     idempotency_key: key,
     correlation_id: payload.metadata.correlation_id,
   };
@@ -103,6 +131,7 @@ export default {
       call_id: 'call_123',
       status: 'queued',
       disposition: 'outcome_unknown',
+      lead_state: 'needs_human',
       idempotency_key: '0'.repeat(64),
       correlation_id: 'incident-42',
     },

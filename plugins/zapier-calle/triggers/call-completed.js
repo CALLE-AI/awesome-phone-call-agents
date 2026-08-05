@@ -1,4 +1,5 @@
 import { flattenResult } from '../lib/flatten-result.js';
+import { toMinConfidenceScore } from '../lib/result-quality.js';
 
 // This trigger deliberately omits performSubscribe/performUnsubscribe. The
 // CALL-E Developer API exposes no webhook subscription endpoint to call
@@ -27,7 +28,17 @@ const perform = async (z, bundle) => {
     return [];
   }
 
-  return [flattenResult(event)];
+  // No result_schema is available to a trigger - this webhook may describe a
+  // call placed from CALL-E's CLI, an MCP tool, or another Zap entirely, so
+  // there is no declared contract to hold the result to. The classifier
+  // therefore runs its schemaless check: it can still see that a returned
+  // field came back `unknown` or empty, but it cannot know that a field the
+  // original caller required is absent.
+  return [
+    flattenResult(event, {
+      minConfidenceScore: toMinConfidenceScore(bundle.inputData && bundle.inputData.min_confidence_score),
+    }),
+  ];
 };
 
 export default {
@@ -55,11 +66,24 @@ export default {
   },
   operation: {
     type: 'hook',
+    inputFields: [
+      {
+        key: 'min_confidence_score',
+        label: 'Minimum Confidence Score',
+        type: 'string',
+        required: false,
+        default: '0.6',
+        helpText:
+          'A result is only marked confirmed when CALL-E\'s 0-1 confidence score is at least this value. Set to 0 to accept the confidence label alone.',
+      },
+    ],
     perform,
     sample: {
       disposition: 'confirmed',
       disposition_reason: 'Call completed with a high-confidence validated result.',
       is_actionable: true,
+      lead_state: 'qualified',
+      opt_out_requested: false,
       event_id: 'evt_123',
       event_type: 'call.completed',
       call_id: 'call_123',
