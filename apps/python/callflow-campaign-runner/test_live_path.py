@@ -11,6 +11,7 @@ Run:  python test_live_path.py
 from __future__ import annotations
 
 import argparse
+import errno
 import io
 import json
 import os
@@ -303,6 +304,136 @@ with tempfile.TemporaryDirectory() as tmp:
             if line.strip().startswith("{")
         ),
     )
+
+print("\nAn --out directory is refused on EVERY platform, not treated as a collision")
+# POSIX raises FileExistsError for os.open(<dir>, O_CREAT|O_EXCL) because O_EXCL
+# fails on any existing path; Windows raises PermissionError. Dispatching on the
+# errno sent POSIX into the name-collision branch, which wrote a sibling file and
+# reported success — hiding that the operator's chosen path is unusable. The
+# is_dir() check must decide this, so the behaviour is identical on both.
+with tempfile.TemporaryDirectory() as tmp:
+    blocked = Path(tmp) / "blocked"
+    blocked.mkdir()
+
+    _real_os_open = os.open
+
+    def _posix_os_open(path, flags, mode=0o777, *a, **k):
+        """Force the POSIX errno for a directory, on any host."""
+        if (flags & os.O_CREAT) and (flags & os.O_EXCL) and Path(str(path)).is_dir():
+            raise FileExistsError(errno.EEXIST, "File exists", str(path))
+        return _real_os_open(path, flags, mode, *a, **k)
+
+    for patch, platform_name in ((False, "this host"), (True, "POSIX semantics")):
+        csv_path = Path(tmp) / f"c_{int(patch)}.csv"
+        csv_path.write_text(ONE_ROW, encoding="utf-8")
+        args = argparse.Namespace(
+            campaign="travel", contacts=str(csv_path), live=True,
+            allow="+15555550100", max_calls=9, country_code="",
+            poll_interval=0.01, timeout=5, out=str(blocked), batch_id="b1",
+            suppression_file=str(Path(tmp) / f"s_{int(patch)}.txt"),
+            dispatch_file=str(Path(tmp) / f"l_{int(patch)}.txt"),
+            region="", locale="", list_campaigns=False,
+        )
+        fake = FakeClient("clean")
+        original = runner.CalleClient
+        runner.CalleClient = lambda **_: fake  # type: ignore[assignment]
+        buffer = io.StringIO()
+        real_stderr = sys.stderr
+        sys.stderr = buffer
+        if patch:
+            os.open = _posix_os_open  # type: ignore[assignment]
+        try:
+            rc = runner.run(args)
+        finally:
+            if patch:
+                os.open = _real_os_open  # type: ignore[assignment]
+            sys.stderr = real_stderr
+            runner.CalleClient = original  # type: ignore[assignment]
+
+        dumped = buffer.getvalue()
+        check(f"{platform_name}: an --out directory exits non-zero", rc == 1)
+        check(f"{platform_name}: the call was still placed",
+              len(fake.calls.created) == 1)
+        check(f"{platform_name}: the record is dumped", "call_id" in dumped)
+        check(f"{platform_name}: the dump says the calls were real",
+              "really placed" in dumped)
+        check(f"{platform_name}: it names the directory as the cause",
+              "is a directory" in dumped)
+        check(f"{platform_name}: NO sibling file is written instead",
+              not list(Path(tmp).glob("blocked-*")))
+
+print("\nA real name collision still writes a timestamped sibling")
+with tempfile.TemporaryDirectory() as tmp:
+    out = Path(tmp) / "r.jsonl"
+    out.write_text("{}\n", encoding="utf-8")
+    _, _, fake = run_case("collide", "clean", ONE_ROW, tmp, out=str(out))
+    siblings = [p.name for p in Path(tmp).glob("r-*.jsonl")]
+    check("a sibling file is written", len(siblings) == 1)
+    check("the original file is untouched", out.read_text(encoding="utf-8") == "{}\n")
+
+print("\nA claim failure mid-run keeps the records for calls already placed")
+# reserve_recipient can raise (corrupt opt-out list, corrupt ledger, lock
+# timeout). Those must stop the run but must NOT unwind past the results write:
+# earlier calls really happened and their records are the only local evidence.
+with tempfile.TemporaryDirectory() as tmp:
+    csv_path = Path(tmp) / "three.csv"
+    csv_path.write_text(
+        "name,phone,note\n"
+        "A,+15555550100,x\nB,+15555550101,y\nC,+15555550102,z\n",
+        encoding="utf-8",
+    )
+    supp = Path(tmp) / "s.txt"
+    args = argparse.Namespace(
+        campaign="travel", contacts=str(csv_path), live=True,
+        allow="+15555550100,+15555550101,+15555550102", max_calls=9,
+        country_code="", poll_interval=0.01, timeout=5,
+        out=str(Path(tmp) / "r.jsonl"), batch_id="b1",
+        suppression_file=str(supp), dispatch_file=str(Path(tmp) / "l.txt"),
+        region="", locale="", list_campaigns=False,
+    )
+
+    class CorruptAfterFirst(FakeCalls):
+        """Tear the opt-out file once the first call has been placed."""
+
+        def create(self, **kwargs: Any) -> dict[str, Any]:
+            created = super().create(**kwargs)
+            if len(self.created) == 1:
+                # A crash mid-append leaves no trailing newline, which
+                # load_suppressions must refuse rather than partially load.
+                supp.write_text("# hdr\n" + "a" * 40, encoding="utf-8")
+            return created
+
+    fake = FakeClient("clean")
+    fake.calls = CorruptAfterFirst("clean")
+    original = runner.CalleClient
+    runner.CalleClient = lambda **_: fake  # type: ignore[assignment]
+    buffer = io.StringIO()
+    real_stderr = sys.stderr
+    sys.stderr = buffer
+    try:
+        rc = runner.run(args)
+        escaped = None
+    except Exception as exc:  # noqa: BLE001
+        rc, escaped = None, exc
+    finally:
+        sys.stderr = real_stderr
+        runner.CalleClient = original  # type: ignore[assignment]
+
+    check("no exception escapes run()", escaped is None, )
+    check("the run reports failure", rc == 1)
+    check("it stopped before dialing everyone", len(fake.calls.created) < 3)
+
+    written = list(Path(tmp).glob("r*.jsonl"))
+    saved = written[0].read_text(encoding="utf-8") if written else ""
+    combined = saved + buffer.getvalue()
+    check("a results file was written despite the abort", bool(written))
+    check("it holds the completed call's record", "call_fake_1" in combined)
+    check("that record is auto_closed, so the call really completed",
+          "auto_closed" in combined)
+    check("the aborted claim is recorded", "CLAIM_FAILED" in combined)
+    check("the aborted claim needs a human", "needs_human" in combined)
+    check("every written line is valid JSON",
+          all(json.loads(line) for line in saved.splitlines() if line.strip()))
 
 print("\nA missing or unreadable contacts file is an operator error, not a crash")
 with tempfile.TemporaryDirectory() as tmp:

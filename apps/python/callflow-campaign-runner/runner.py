@@ -1288,10 +1288,61 @@ def run(args: argparse.Namespace) -> int:
     results: list[dict[str, Any]] = []
     made = 0
 
+    # Set when the state that decides who may be dialed becomes untrustworthy
+    # mid-run. The loop stops, but the results still get written.
+    claim_aborted = False
+
     # Recipients already handled in THIS run. A resolved reservation frees the
     # recipient for a future batch, which means a duplicate row inside one CSV
     # would otherwise be dialled a second time.
     seen_this_run: set[str] = set()
+
+    # The dialing loop is wrapped so that NOTHING can escape it before the
+    # records are written. `results` is mutated in place, so whatever the loop
+    # managed to accumulate is still there for the writer below even if the loop
+    # dies on an exception nobody anticipated. Once a call has been placed, its
+    # record is the only local evidence it happened.
+    unexpected: BaseException | None = None
+    try:
+        claim_aborted = _dial_all(
+            contacts, campaign, args, results,
+            live=live, allowlist=allowlist, suppressed=suppressed,
+            client=client, seen_this_run=seen_this_run,
+        )
+    except BaseException as exc:  # noqa: BLE001 - re-reported after the write
+        # Includes KeyboardInterrupt: an operator pressing Ctrl-C mid-campaign
+        # must still get the records for the calls already placed.
+        unexpected = exc
+        claim_aborted = True
+        print(
+            f"\n  Interrupted: {type(exc).__name__}. Writing the records for "
+            f"the calls already placed before exiting.",
+            file=sys.stderr,
+        )
+
+    return _finish_run(args, results, claim_aborted, unexpected)
+
+
+def _dial_all(
+    contacts: list[dict[str, str]],
+    campaign: Campaign,
+    args: argparse.Namespace,
+    results: list[dict[str, Any]],
+    *,
+    live: bool,
+    allowlist: list[str],
+    suppressed: set[str],
+    client: Any,
+    seen_this_run: set[str],
+) -> bool:
+    """Dial every eligible contact, appending one record per contact.
+
+    `results` is appended to in place so the caller keeps everything gathered so
+    far even if this function raises. Returns True if the run stopped early
+    because the state deciding who may be dialed became untrustworthy.
+    """
+    made = 0
+    claim_aborted = False
 
     for contact in contacts:
         label = f"{contact['name'][:18]:<18} {mask(contact['phone']):<16}"
@@ -1353,14 +1404,46 @@ def run(args: argparse.Namespace) -> int:
         # batch_id keeps a completed recipient claimed for this batch, and
         # suppression_file is re-read inside the lock so a concurrent runner's
         # opt-out cannot be missed by our start-up snapshot.
-        reserved, prior = reserve_recipient(
-            args.dispatch_file,
-            contact["phone"],
-            campaign.id,
-            key,
-            batch_id=args.batch_id,
-            suppression_file=args.suppression_file,
-        )
+        #
+        # Claiming can now RAISE — a corrupt opt-out list or ledger, or a lock
+        # timeout. Those must fail closed for this recipient, but they must not
+        # unwind the loop: earlier calls in this batch have already been placed,
+        # and the accumulated results are not written until after the loop. An
+        # escaping exception here would discard the only local record of real
+        # calls. Stop dialing, keep the record.
+        try:
+            reserved, prior = reserve_recipient(
+                args.dispatch_file,
+                contact["phone"],
+                campaign.id,
+                key,
+                batch_id=args.batch_id,
+                suppression_file=args.suppression_file,
+            )
+        except (LedgerCorruptError, SuppressionCorruptError, TimeoutError,
+                OSError) as exc:
+            safe = redact_error(exc)
+            print(f"  ABORTED   {label} could not claim the recipient: {safe}")
+            print(
+                "\n  Stopping before any further call. The state that decides "
+                "who may be dialed cannot be trusted, and the records for the "
+                "calls already placed are written below."
+            )
+            results.append(
+                {"contact": contact["name"], "phone": mask(contact["phone"]),
+                 "status": "CLAIM_FAILED", "disposition": "needs_human",
+                 "reason": (
+                     f"Could not claim this recipient ({safe}). No call was "
+                     f"placed. Repair the opt-out list or reservation ledger "
+                     f"before running again."
+                 ),
+                 "idempotency_key": key}
+            )
+            # Fail closed for every remaining contact rather than continuing
+            # with state we have just declared untrustworthy.
+            claim_aborted = True
+            break
+
         if not reserved:
             made += 1  # an unresolved attempt may have connected
             seen_this_run.add(phone_hash)
@@ -1522,6 +1605,23 @@ def run(args: argparse.Namespace) -> int:
                  "idempotency_key": key}
             )
 
+        except (MemoryError, SystemError) as exc:
+            # Resource exhaustion is not a per-call problem to log and move past:
+            # the next call would run in the same broken process. Re-raised so
+            # the caller's handler writes the records and stops the run. The
+            # reservation stays open, so this recipient is not silently re-dialed.
+            print(f"            → ABORTED {type(exc).__name__}")
+            results.append(
+                {"contact": contact["name"], "phone": mask(contact["phone"]),
+                 "status": "ABORTED", "disposition": "needs_human",
+                 "reason": (
+                     f"The run hit {type(exc).__name__} on this call. It may "
+                     f"still have been placed — reconcile before retrying."
+                 ),
+                 "idempotency_key": key}
+            )
+            raise
+
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
             # Provider errors echo the request back — destination number,
             # rendered task, sometimes an Authorization header. Never raw.
@@ -1541,11 +1641,27 @@ def run(args: argparse.Namespace) -> int:
                  "idempotency_key": key}
             )
 
+    return claim_aborted
+
+
+def _finish_run(
+    args: argparse.Namespace,
+    results: list[dict[str, Any]],
+    claim_aborted: bool,
+    unexpected: BaseException | None = None,
+) -> int:
+    """Write the run record, whatever happened during dialing.
+
+    Reached on every exit path from the dialing loop, including an unexpected
+    exception, so the records for calls that were really placed are never
+    discarded.
+    """
     counts: dict[str, int] = {}
     for r in results:
         counts[r["disposition"]] = counts.get(r["disposition"], 0) + 1
 
-    print("\n  " + "  ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+    if counts:
+        print("\n  " + "  ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
     # Never overwrite: a results file is the only local record of who was
     # called and what they said. A second run with the same --out would destroy
@@ -1588,6 +1704,18 @@ def run(args: argparse.Namespace) -> int:
     except OSError as exc:
         return _dump_results(f"Could not create {out.parent} ({exc.strerror}).")
 
+    # A directory must be rejected BEFORE opening, because the two platforms
+    # report it differently: POSIX raises FileExistsError (O_EXCL fails on any
+    # existing path, and a directory is one), Windows raises PermissionError.
+    # Relying on which errno arrives would send POSIX into the name-collision
+    # branch, which writes a sibling file and reports success — silently
+    # ignoring that the operator's chosen path is unusable.
+    if out.is_dir():
+        return _dump_results(
+            f"--out is a directory, not a file: {out}. No results file could "
+            f"be created."
+        )
+
     fh = None
     try:
         fh = _create_private(out)
@@ -1599,6 +1727,8 @@ def run(args: argparse.Namespace) -> int:
         for n in range(1, 1000):
             suffix = f"-{stamp}" if n == 1 else f"-{stamp}-{n}"
             candidate = out.with_name(f"{out.stem}{suffix}{out.suffix}")
+            if candidate.is_dir():
+                continue  # a directory of that name is not a usable candidate
             try:
                 fh = _create_private(candidate)
             except FileExistsError:
@@ -1636,6 +1766,27 @@ def run(args: argparse.Namespace) -> int:
     needs_human = counts.get("needs_human", 0)
     if needs_human:
         print(f"  {needs_human} call(s) need a human. Review them first.\n")
+
+    # An aborted claim is a failure even though the record was saved: the run did
+    # not process every contact, and the operator must repair a file before
+    # retrying. Reporting 0 here would let a scheduler treat it as a clean run.
+    if unexpected is not None:
+        print(
+            f"  Run stopped early on an unexpected "
+            f"{type(unexpected).__name__}: {redact_error(unexpected)}\n"
+            f"  The records above are complete for the calls that were placed.\n",
+            file=sys.stderr,
+        )
+        return 1
+
+    if claim_aborted:
+        print(
+            "  Run stopped early: the opt-out list or reservation ledger needs "
+            "repair. Records above are complete for the calls that were placed.\n",
+            file=sys.stderr,
+        )
+        return 1
+
     return 0
 
 

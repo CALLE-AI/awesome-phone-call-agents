@@ -177,6 +177,16 @@ discarding the record is not an option. Redirect stderr if you want to keep it:
 python runner.py ... --live --allow +15555550100 2> run-record.txt
 ```
 
+The same guarantee holds when the run stops part-way. If the state that decides
+who may be dialed becomes untrustworthy mid-batch — a corrupt opt-out list, a
+corrupt ledger, a lock timeout — the runner stops before the next call **and
+still writes the records for the calls already placed**, exiting non-zero. The
+blocked recipient is recorded as `CLAIM_FAILED` / `needs_human`.
+
+That also covers exceptions nobody anticipated, including `Ctrl-C`: the dialing
+loop is wrapped so nothing escapes it before the record is written. Once a call
+has been placed, its record is the only local evidence it happened.
+
 ### Triage rules
 
 Applied in order, and **fails closed** — an absent or malformed field is
@@ -227,6 +237,7 @@ consent to.
 | Untrusted CSV cells | Control characters stripped, lengths capped, alterations reported |
 | Recursive redaction | Nested lists and objects in a result are redacted, not just top-level strings |
 | Results never overwritten | A second run writes a timestamped file rather than destroying the first |
+| Records survive any exit | An aborted claim, an unexpected exception, or Ctrl-C still writes the records for calls already placed |
 | Per-run ceiling | `--max-calls` (default 5) caps one run |
 | E.164 validation | Malformed numbers, and numbers with no country code, rejected before reaching CALL-E |
 | Masking | Numbers are masked in all console output and results |
@@ -473,12 +484,19 @@ on-disk records, result and error redaction, prompt boundaries, note
 sanitisation, CSV parsing, and goal rendering.
 
 `test_live_path.py` drives the full live loop against an injected fake client
-across 42 checks: a completed call, a duplicate number in one file, an opt-out
+across 65 checks: a completed call, a duplicate number in one file, an opt-out
 mid-run, a provider error, a poll timeout, an empty allowlist, region/locale
-handling, a batch-id reuse that must not re-dial, an unwritable `--out`, and an
-unreadable contacts file. Isolated tests missed a real duplicate-call bug that
-this caught — the first call had already resolved by the time the second row was
-read, freeing the reservation.
+handling, a batch-id reuse that must not re-dial, an `--out` that is a directory
+(asserted under **both** Windows and POSIX `errno` semantics), a genuine name
+collision, a claim failure part-way through a batch, and an unreadable contacts
+file. Isolated tests missed a real duplicate-call bug that this caught — the
+first call had already resolved by the time the second row was read, freeing the
+reservation.
+
+Both suites are verified on Linux as well as Windows. Two platform-specific
+defects have already been caught this way: `os.open` on a directory raises
+`FileExistsError` on POSIX but `PermissionError` on Windows, and lock contention
+surfaces as `PermissionError` only on Windows.
 
 Both exit non-zero on failure and place no calls.
 
