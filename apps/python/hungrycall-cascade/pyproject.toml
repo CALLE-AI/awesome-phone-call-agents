@@ -1,0 +1,11 @@
+[project]
+name = "calle-sequential-call-cascade-app"
+version = "0.1.0"
+description = "Sequential call cascade that stops at the first candidate meeting every condition."
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
