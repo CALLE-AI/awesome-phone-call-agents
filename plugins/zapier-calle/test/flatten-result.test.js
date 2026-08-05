@@ -121,6 +121,82 @@ describe('flattenResult', () => {
     expect(serialized).not.toContain('15550123456');
   });
 
+  describe('review and compliance fields', () => {
+    const eventWith = (turns, dataOverrides = {}) => ({
+      id: 'evt_r',
+      type: 'call.completed',
+      data: {
+        id: 'call_r',
+        status: 'completed',
+        task_completed: true,
+        completion_confidence: { score: 0.9, label: 'high' },
+        structured_result: { confirmed: 'yes' },
+        recipients: [{ status: 'completed', attempts: [{ transcript_turns: turns }] }],
+        ...dataOverrides,
+      },
+    });
+
+    it('surfaces the last thing the recipient said when review is needed', () => {
+      const out = flattenResult(
+        eventWith(
+          [
+            { offset_seconds: 3, speaker: 'bot', text: 'Can you confirm Thursday?' },
+            { offset_seconds: 7, speaker: 'user', text: 'I might be able to, not sure yet.' },
+            { offset_seconds: 12, speaker: 'bot', text: 'Understood.' },
+          ],
+          { structured_result: { confirmed: 'unknown' } },
+        ),
+      );
+
+      expect(out.disposition).toBe('review_required');
+      expect(out.review_excerpt).toBe('I might be able to, not sure yet.');
+      expect(out.review_excerpt_offset_seconds).toBe(7);
+    });
+
+    it('offers no excerpt for a confirmed call', () => {
+      const out = flattenResult(
+        eventWith([{ offset_seconds: 7, speaker: 'user', text: 'Yes, confirmed.' }]),
+      );
+      expect(out.disposition).toBe('confirmed');
+      expect(out.review_excerpt).toBeNull();
+      expect(out.review_excerpt_offset_seconds).toBeNull();
+    });
+
+    it('overrides a confirmed result when the recipient revoked consent', () => {
+      const out = flattenResult(
+        eventWith([
+          { offset_seconds: 4, speaker: 'user', text: 'Yes fine, but stop calling me after this.' },
+        ]),
+      );
+
+      expect(out.opt_out_requested).toBe(true);
+      expect(out.is_actionable).toBe(false);
+      expect(out.disposition).toBe('needs_human');
+      expect(out.lead_state).toBe('blocked_compliance');
+      // The extracted answer is still there for whoever handles it.
+      expect(out.result_confirmed).toBe('yes');
+    });
+
+    it('assigns a lead_state to every result', () => {
+      expect(flattenResult(eventWith([])).lead_state).toBe('qualified');
+      expect(
+        flattenResult(eventWith([], { status: 'failed', failure_code: 'no_answer' })).lead_state,
+      ).toBe('needs_human');
+    });
+
+    // The excerpt fields are transcript text, so they carry the same leak
+    // risk as transcript_text and must go through the same masking.
+    it('masks a phone number spoken inside an excerpt', () => {
+      const out = flattenResult(
+        eventWith([
+          { offset_seconds: 4, speaker: 'user', text: 'Stop calling, try +15550123456 instead.' },
+        ]),
+      );
+      expect(out.opt_out_excerpt).not.toContain('5550123456');
+      expect(JSON.stringify(out)).not.toContain('15550123456');
+    });
+  });
+
   it('does not throw on a minimal failure event', () => {
     const out = flattenResult({
       id: 'evt_2',

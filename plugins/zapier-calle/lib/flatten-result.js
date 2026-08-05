@@ -1,15 +1,14 @@
 import { deriveDisposition } from './disposition.js';
 import { redactDeep } from './redact.js';
+import { detectOptOut, OPT_OUT_REASON } from './opt-out.js';
+import { toLeadState } from './lead-state.js';
+import { transcriptText, lastUserTurn } from './transcript.js';
 
-const transcriptText = (recipients) =>
-  recipients
-    .flatMap((recipient) => recipient.attempts || [])
-    .flatMap((attempt) => attempt.transcript_turns || [])
-    .map((turn) => `${turn.speaker}: ${turn.text}`)
-    .join('\n');
-
-export function flattenResult(event) {
-  const { disposition, reason, is_actionable } = deriveDisposition(event);
+// `options` carries what the caller knows that the payload does not: the
+// result_schema the call was placed with, and the confidence floor the user
+// configured. The Call Completed trigger has neither, and passes nothing.
+export function flattenResult(event, options = {}) {
+  const derived = deriveDisposition(event, options);
   const data = (event && event.data) || {};
   const recipients = Array.isArray(data.recipients) ? data.recipients : [];
   const confidence = data.completion_confidence || {};
@@ -17,10 +16,21 @@ export function flattenResult(event) {
     ? data.structured_result
     : {};
 
+  // A revocation of consent overrides the business outcome. The structured
+  // result stays on the output - a human still needs to see what was said -
+  // but nothing downstream may treat this call as actionable.
+  const optOut = detectOptOut(recipients);
+  const disposition = optOut.requested ? 'needs_human' : derived.disposition;
+  const reason = optOut.requested ? OPT_OUT_REASON : derived.reason;
+  const isActionable = optOut.requested ? false : derived.is_actionable;
+
+  const reviewTurn = disposition === 'confirmed' ? null : lastUserTurn(recipients);
+
   const flat = {
     disposition,
     disposition_reason: reason,
-    is_actionable,
+    is_actionable: isActionable,
+    lead_state: toLeadState(disposition, { optOutRequested: optOut.requested }),
     event_id: event && event.id,
     event_type: event && event.type,
     call_id: data.id,
@@ -38,6 +48,17 @@ export function flattenResult(event) {
     recipients_completed: recipients.filter((r) => r.status === 'completed').length,
     recipients_failed: recipients.filter((r) => r.status === 'failed').length,
     transcript_text: transcriptText(recipients),
+    // The line a human should read first, and where in the call to find it.
+    // CALL-E exposes no recording, so offset_seconds is the closest thing to
+    // "jump to the moment" that the API makes possible.
+    review_excerpt: reviewTurn ? reviewTurn.text : null,
+    review_excerpt_offset_seconds:
+      reviewTurn && typeof reviewTurn.offset_seconds === 'number'
+        ? reviewTurn.offset_seconds
+        : null,
+    opt_out_requested: optOut.requested,
+    opt_out_excerpt: optOut.excerpt,
+    opt_out_offset_seconds: optOut.offsetSeconds,
     structured_result: data.structured_result === undefined ? null : data.structured_result,
     recipients,
   };
