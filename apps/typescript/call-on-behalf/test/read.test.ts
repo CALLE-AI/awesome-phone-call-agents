@@ -148,8 +148,11 @@ test("confirming an existing appointment reads different from booking one", () =
     ["bot", "I am calling to confirm the appointment on Thursday."],
     ["user", "Yes, that is right, it is still on."],
   ]);
-  assert.equal(agreementEvidence(confirmed, "slot_within_windows").quote, "");
-  assert.match(agreementEvidence(confirmed, "confirm_existing").quote, /still on/);
+  // The appointment being confirmed is on Thursday, so that is the offered time the
+  // real flow passes here. The turn names it, so it anchors on the concrete-proposal
+  // arm rather than on the caller stating why they rang.
+  assert.equal(agreementEvidence(confirmed, "slot_within_windows", "Thursday").quote, "");
+  assert.match(agreementEvidence(confirmed, "confirm_existing", "Thursday").quote, /still on/);
 });
 
 test("a time is not named when the turn names another day", () => {
@@ -355,4 +358,53 @@ test("booking language after a statement about the arrangement is not an agreeme
   const supported = agreementEvidence(asked, "slot_within_windows", "2026-08-13T09:40:00-07:00");
   assert.match(supported.quote, /^I have put her in/);
   assert.equal(codeNamedBefore(asked, supported.index, "4471"), true);
+});
+
+test("a booking-keyword statement with an unrelated weekday is not a proposal", () => {
+  const call = turns([
+    ["bot", "Do you accept Aetna?"],
+    ["bot", "Our appointment desk is open Monday."],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // No slot was offered. "Our appointment desk is open Monday" carries a booking word
+  // and a weekday, but the weekday is not the offered time, so it proposes nothing.
+  // The refusal after it still answers the insurance question.
+  const evidence = refusalEvidence(call, "", [AETNA]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+});
+
+test("a caller purpose statement is not a question put to the callee", () => {
+  const call = turns([
+    ["bot", "Do you accept Aetna?"],
+    ["bot", "I am calling to book an appointment."],
+    ["user", "No, we do not take that plan."],
+  ]);
+  // "I am calling to book an appointment" states why the caller rang. It asks nothing
+  // and names no offered time, so it is not the caller putting the arrangement to them
+  // and the refusal still answers the insurance question.
+  const evidence = refusalEvidence(call, "", [AETNA]);
+  assert.equal(evidence.quote, "");
+  assert.match(evidence.otherQuote, /^No, we do not take that plan/);
+});
+
+test("a concrete proposal of the offered time anchors, and so does a real question", () => {
+  const proposed = turns([
+    ["bot", "Our appointment desk is open Thursday the thirteenth at nine forty."],
+    ["user", "I am afraid we cannot book that, we are full that day."],
+  ]);
+  // The same declarative shape as the unrelated-weekday case, but this one names the
+  // offered time itself, so it is a concrete proposal of the arrangement and the
+  // refusal answers it.
+  assert.match(
+    refusalEvidence(proposed, "2026-08-13T09:40:00-07:00", [EARLIEST, AETNA]).quote,
+    /^I am afraid we cannot book/,
+  );
+  const asked = turns([
+    ["bot", "Could you book her in for an appointment?"],
+    ["user", "I am afraid we cannot book that over the phone for somebody else."],
+  ]);
+  // A genuine request with no time. "Could you" is a real ask, so it anchors even with
+  // no offered time to lean on.
+  assert.match(refusalEvidence(asked, "", [EARLIEST, AETNA]).quote, /^I am afraid we cannot book/);
 });
