@@ -56,7 +56,8 @@ LOCKED_ETHICS: dict[str, str] = {
         "every later denominator."
     ),
     "no_high_risk_topics": (
-        "Medical, legal, financial and emergency subjects are refused, not handled."
+        "Medical, legal, financial and emergency topics are refused, not handled -- "
+        "checked for the study subject and for every single question."
     ),
 }
 
@@ -72,13 +73,19 @@ class EthicsViolation(RuntimeError):
     """Raised when a study tries to weaken a locked rule, or asks a locked question."""
 
 
-def check_topic(subject: str) -> None:
-    """Refuse high-risk subjects rather than handling them carefully."""
-    lowered = subject.lower()
+def check_topic(text: str, what: str = "subject") -> None:
+    """Refuse high-risk subjects and questions rather than handling them carefully.
+
+    The study subject is checked at load time. Every single question is checked
+    again when it is constructed, because a benign subject is no guarantee: a
+    transport survey can still smuggle in a medication question, and the person
+    on the phone answers the question, not the subject line.
+    """
+    lowered = text.lower()
     for word in HIGH_RISK:
         if re.search(rf"\b{re.escape(word)}", lowered):
             raise EthicsViolation(
-                f"subject touches a high-risk area ('{word}'); this instrument refuses it"
+                f"{what} touches a high-risk area ('{word}'); this instrument refuses it"
             )
 
 
@@ -186,6 +193,7 @@ class Response:
     category: str | None = None
 
     def __post_init__(self) -> None:
+        check_topic(self.question, what="question")
         if self.category is not None and not self.raw.strip():
             raise EthicsViolation(
                 f"question '{self.question}': a category without the words it came from "
@@ -199,7 +207,6 @@ class Interview:
     disposition: Disposition
     consent_given: bool = False
     responses: list[Response] = field(default_factory=list)
-    withdrawn: bool = False
     note: str = ""
 
     def __post_init__(self) -> None:
@@ -207,23 +214,28 @@ class Interview:
             raise EthicsViolation(
                 f"{self.person_id}: {len(self.responses)} answers recorded without consent"
             )
+        if self.disposition is Disposition.BROKE_OFF and self.responses:
+            # Someone who ended the call did not finish answering, and half an
+            # answer is not data. Partial answers after stopping are deleted,
+            # not stored and not emitted.
+            self.responses = []
 
 
 @dataclass
 class Record:
-    """A drawn person plus what became of them. Withdrawal empties it in place."""
+    """A drawn person plus what became of them. Withdrawal deletes it in place."""
 
-    drawn: Drawn
+    drawn: Drawn | None
     interview: Interview | None = None
-    anonymised: bool = False
+    withdrawn: bool = False
 
     @property
     def person_id(self) -> str:
-        return "<withdrawn>" if self.anonymised else self.drawn.entry.id
+        return "<withdrawn>" if self.withdrawn or self.drawn is None else self.drawn.entry.id
 
     @property
     def phone_masked(self) -> str:
-        return "" if self.anonymised else mask(self.drawn.entry.phone)
+        return "" if self.withdrawn or self.drawn is None else mask(self.drawn.entry.phone)
 
     @property
     def disposition(self) -> Disposition:
@@ -233,16 +245,18 @@ class Record:
 
 
 def withdraw(record: Record) -> Record:
-    """Honour a withdrawal: drop the identifier, the number and the answers.
+    """Honour a withdrawal: delete the identifier, the number and the answers.
 
-    Not a flag on a row that stays. The person asked to leave the data, so the
-    data leaves -- and `included_drawn` below stops counting them, which is what
-    keeps the denominator honest rather than merely smaller.
+    Not a flag on a row whose data stays. The drawn entry -- id and phone -- and
+    the whole interview -- person id, answers, note -- are deleted from the
+    record itself, not merely hidden from the output. What remains is the bare
+    fact that a withdrawal happened, so `withdrawn` can be counted and
+    `included_drawn` below stops counting them, which is what keeps the
+    denominator honest rather than merely smaller.
     """
-    record.anonymised = True
-    if record.interview is not None:
-        record.interview.responses = []
-        record.interview.withdrawn = True
+    record.withdrawn = True
+    record.drawn = None  # id and phone leave memory, not merely the report
+    record.interview = None  # person id, note and any answers leave with them
     return record
 
 
@@ -324,9 +338,9 @@ def build_report(study: str, seed: int, records: Sequence[Record]) -> Report:
     withdrawn = 0
 
     for record in records:
-        if record.anonymised:
+        if record.withdrawn or record.drawn is None:
             withdrawn += 1
-            continue  # out of every denominator, not merely marked
+            continue  # out of every denominator, and its data already deleted
         name = record.disposition.value
         dispositions[name] = dispositions.get(name, 0) + 1
         window = by_window.setdefault(record.drawn.window, {})
@@ -346,7 +360,7 @@ def collect_answers(records: Sequence[Record]) -> list[dict[str, Any]]:
     """Every coded answer with the words it was coded from, side by side."""
     rows: list[dict[str, Any]] = []
     for record in records:
-        if record.anonymised or record.interview is None:
+        if record.withdrawn or record.interview is None:
             continue
         for response in record.interview.responses:
             rows.append(

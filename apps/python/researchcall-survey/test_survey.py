@@ -139,6 +139,67 @@ def test_an_ordinary_subject_passes():
     check_topic("Public transport in rural districts")
 
 
+def test_a_high_risk_question_is_refused_even_under_a_benign_subject():
+    """A benign subject is no licence: every single question is screened too."""
+    with pytest.raises(EthicsViolation, match="question touches a high-risk"):
+        Response(
+            question="Which medication do you take every day?",
+            raw="I would rather not say.",
+        )
+
+
+def test_a_fixture_with_a_high_risk_question_is_refused_by_the_cli(tmp_path, capsys):
+    bad = tmp_path / "benign-subject-risky-question.json"
+    bad.write_text(
+        json.dumps(
+            {
+                "subject": "Public transport in rural districts",
+                "seed": 1,
+                "sample_size": 1,
+                "frame": [{"id": "r01", "phone": "+15550101001"}],
+                "fieldwork": {
+                    "r01": {
+                        "disposition": "completed",
+                        "consent_given": True,
+                        "responses": [
+                            {
+                                "question": "How is your household debt developing?",
+                                "raw": "Fine, I suppose.",
+                            }
+                        ],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(["--fixture", str(bad)]) == 2
+    assert "high-risk" in capsys.readouterr().err
+
+
+def test_broke_off_partial_answers_are_deleted_not_kept():
+    """The documented rule: a break-off keeps no partial answers."""
+    interview = Interview(
+        person_id="r13",
+        disposition=Disposition.BROKE_OFF,
+        consent_given=True,
+        responses=[Response("Q1", raw="Half an answer before hanging up.")],
+    )
+    assert interview.responses == []
+
+
+def test_broke_off_answers_reach_no_output():
+    rec = record(
+        "r13",
+        Disposition.BROKE_OFF,
+        consent_given=True,
+        responses=[Response("Q1", raw="Half an answer.", category="half")],
+    )
+    assert collect_answers([rec]) == []
+    report = build_report("s", 1, [rec])
+    assert report.dispositions == {"broke_off": 1}
+
+
 # -- coding stays checkable --------------------------------------------------------------
 
 
@@ -239,8 +300,26 @@ def test_withdrawal_removes_the_identifier_the_number_and_the_answers():
 
     assert rec.person_id == "<withdrawn>"
     assert rec.phone_masked == ""
-    assert rec.interview.responses == []
+    assert rec.interview is None
     assert collect_answers([rec]) == []
+
+
+def test_withdrawal_deletes_the_data_not_only_the_view():
+    """A withdrawal is a deletion, not a flag: after it, the id and phone are gone
+    from `Record.drawn` and the interview -- person id, note, answers -- is gone
+    from memory, not merely hidden from the rendered output."""
+    rec = record(
+        "r01",
+        Disposition.COMPLETED,
+        consent_given=True,
+        responses=[Response("Q", raw="Rarely.", category="rarely")],
+        note="Asked to be removed the next day.",
+    )
+    withdraw(rec)
+
+    assert rec.withdrawn is True
+    assert rec.drawn is None
+    assert rec.interview is None
 
 
 def test_a_withdrawn_record_leaves_every_denominator():
@@ -263,7 +342,7 @@ def test_a_withdrawn_record_leaves_every_denominator():
 def test_a_withdrawn_person_appears_in_no_output():
     _, seed, size, ethics, entries, fieldwork = load_study(STUDY)
     records = run_fieldwork(draw_sample(entries, size, seed), fieldwork)
-    withdrawn = [r for r in records if r.anonymised]
+    withdrawn = [r for r in records if r.withdrawn]
     assert withdrawn, "the shipped study contains a withdrawal"
 
     report = build_report("s", seed, records)

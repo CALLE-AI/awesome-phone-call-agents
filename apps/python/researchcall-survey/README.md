@@ -40,11 +40,13 @@ An uncoded raw answer is fine. Coded-without-source is not.
 
 ## Withdrawal removes, it does not flag
 
-A withdrawal drops the identifier, the number and the answers, and the record leaves every
-later denominator. In the shipped study one respondent completed the interview and then
-withdrew: their completion no longer counts, the drawn total stays at 12, and
-`included_drawn` falls to 11. A regression asserts that neither their id nor their number
-appears anywhere in either output.
+A withdrawal deletes the identifier, the number and the answers **from the record itself**
+— the drawn entry and the whole interview (person id, note, answers) leave memory, not
+merely the rendered output — and the record leaves every later denominator. In the shipped
+study one respondent completed the interview and then withdrew: their completion no longer
+counts, the drawn total stays at 12, and `included_drawn` falls to 11. Regressions assert
+that the data is gone from the record and that neither their id nor their number appears
+anywhere in either output.
 
 ## Locked ethics
 
@@ -53,7 +55,7 @@ appears anywhere in either output.
 | `explicit_consent_before_questions` | No question is asked before the person has consented in this call. |
 | `right_to_stop_immediately` | The interview ends the moment the person asks, without a further question. |
 | `right_to_withdraw_afterwards` | A withdrawal removes the identifier and the number, and the record leaves every later denominator. |
-| `no_high_risk_topics` | Medical, legal, financial and emergency subjects are refused, not handled. |
+| `no_high_risk_topics` | Medical, legal, financial and emergency topics are refused, not handled — checked for the study subject and for every single question. |
 
 A study file may **add** rules. It cannot overwrite these — the load path raises instead. A
 survey whose consent requirement can be switched off in configuration does not have a
@@ -105,8 +107,11 @@ Non-response by contact window:
 - **`consent_refused`, `broke_off`, `no_answer`, `busy`, `ineligible` and `not_attempted`
   stay distinct.** Collapsing them loses exactly the information a methods section needs.
 - **A break-off keeps no partial answers.** Someone who ended the call did not finish
-  answering, and half an answer is not data.
-- **High-risk subjects are refused at load time**, before a sample is even drawn.
+  answering, and half an answer is not data — partial answers after stopping are deleted
+  at construction, so they are never stored and never emitted.
+- **High-risk subjects are refused at load time**, before a sample is even drawn — and
+  every single question is screened again when it is constructed, because a benign
+  subject can still smuggle in a medical, legal, financial or emergency question.
 - Not for medical, legal, financial or emergency workflows — that is the same rule, stated
   where readers of this file expect it.
 
@@ -118,14 +123,15 @@ python -m pytest -q
 ```
 
 ```text
-....................................                                     [100%]
-36 passed in 0.12s
+.........................................                                [100%]
+41 passed in 0.76s
 ```
 
 The regressions guard the ways a study could flatter itself: an irreproducible sample, a
 person contacted twice, a locked ethics rule overwritten, answers recorded without consent,
-a category without its source, the wrong denominator, a withdrawal that only sets a flag,
-and a full number reaching an output.
+a category without its source, the wrong denominator, a withdrawal that only sets a flag
+instead of deleting the data, a break-off that keeps partial answers, a high-risk question
+hiding under a benign subject, and a full number reaching an output.
 
 ## The full application
 
