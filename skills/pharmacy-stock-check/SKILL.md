@@ -157,12 +157,33 @@ Offer the transcript. Every claim should be checkable against what was said.
   account on the machine, and file permissions are no protection at all against
   being committed. Write them to a dedicated directory and add that directory to
   `.gitignore` — this skill ships one covering its own runtime state.
-- **Bind the auth token to the endpoint you are calling.** Credential caches
-  are keyed by hash and more than one can exist — a second account, a different
-  environment, a stale login. Selecting whichever sorts last silently
-  authenticates as the wrong account, which here means calling from the wrong
-  number and billing the wrong balance. If the correct cache can't be
-  determined, refuse and make the caller choose.
+- **Bind the auth token to the endpoint you are calling, and refuse if you
+  can't.** A bearer token is issued for one origin; sending it elsewhere hands
+  a working credential to a party it was never meant for. That's a disclosure,
+  not a routing mistake.
+
+  Ask the CLI which endpoint it authenticated against (`calle auth status`
+  reports `server_url` and `cache_path`) rather than inferring it from the
+  cache directory hash. Refuse on mismatch.
+
+  **A single cache with no endpoint recorded is not acceptable either.** "Only
+  one exists" is not evidence that it belongs to this provider. If nothing
+  binds the credential, stop and make the operator name it explicitly.
+
+- **Namespace a pending call by everything that changes what it is.** Hashing
+  the recipient and the goal is not enough. The same number and the same
+  question routed through a different region is a different call; under a
+  different account or endpoint it is a different plan entirely, and a
+  `plan_id` issued by one provider is meaningless to another.
+
+  Include endpoint, account and region in the identity. Getting this wrong
+  fails in both directions: a stale plan gets resurrected under new routing, or
+  a live one is treated as absent — and "absent" means the recipient is dialled
+  again.
+
+  Version the ledger. When the identity scheme changes, old keys won't match
+  anything you compute, so unfinished entries must be refused rather than read
+  as absent.
 - **Persist `plan_id` and `run_id` to disk as soon as you receive them.**
   `plan_id` is CALL-E's idempotency key, but it only protects you if it survives
   a crash. On restart, resume the stored run instead of re-planning.

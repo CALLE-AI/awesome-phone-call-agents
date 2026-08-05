@@ -179,6 +179,28 @@ Bind the token to the endpoint being called. If the correct one cannot be
 determined, stop and ask. Guessing which identity to act as is not a recoverable
 error once the phone has rung.
 
+A single cache is not self-evidently the right one. "There's only one" says
+nothing about which provider issued it — and a bearer token sent to an origin it
+wasn't issued for is a working credential handed to a stranger. That failure is
+quieter and worse than a call placed from the wrong account: nothing visibly
+goes wrong, and the disclosure has already happened.
+
+## Identity of a pending action includes its configuration
+
+If you record "a call to this number about this thing is in progress", that
+record has to include everything that determines what the call *is* — which
+provider, which account, which region.
+
+Two failures fall out of getting it wrong, and they point in opposite
+directions. Too coarse, and a plan created under different routing gets reused
+or reconciled as though it were the same pending action. Too coarse in the other
+direction — a live call not recognised as live — and the recipient is dialled
+again.
+
+Version the store. When the identity scheme changes, previously written keys
+will not match anything you now compute, and an unmatched in-flight call reads
+as "never started".
+
 ## Cost is a safety property
 
 Calls cost money and free allowances are small. A workflow that silently spends

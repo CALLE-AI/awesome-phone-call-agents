@@ -267,22 +267,65 @@ in-flight set is tracked in-process as well.
 
 ---
 
-## Example 13 — ambiguous credentials, no guessing
+## Example 13 — a credential that can't be bound is refused
+
+Even with a single cached credential, if nothing ties it to the endpoint being
+called:
 
 ```bash
 $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live
-2 cached CALL-E tokens found and none records the endpoint
-https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth, so the correct
-account cannot be determined. Refusing to guess — calls would be placed
-and billed from whichever cache happens to sort last. Set
-CALLE_TOKEN_CACHE to one of:
+Found 1 cached CALL-E credential(s), none of which can be bound to
+https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth.
+
+`calle auth status` did not report a matching endpoint, and no cache records
+one. A bearer token is issued for a single origin, so sending one that might
+belong to a different provider is a credential disclosure, not a routing
+mistake — refusing rather than assuming.
+
+Either run `calle auth login` against
+https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth, or set
+CALLE_TOKEN_CACHE explicitly:
   /Users/you/.calle-mcp/cli/4811f3e.../token.json
-  /Users/you/.calle-mcp/cli/9c22ab1.../token.json
-or run `calle auth login` to refresh the intended account.
 ```
 
-Placing a call from the wrong account isn't recoverable once the phone has
-rung, so an ambiguous credential is a stop, not a default.
+"Only one exists" is not evidence that it belongs to this provider.
+
+And if the CLI is authenticated somewhere else entirely:
+
+```bash
+The CALL-E CLI is authenticated against https://other.example/mcp, but this
+skill is configured to call https://seleven-mcp-sg.airudder.com/mcp/...
+Refusing to send that credential to a different origin.
+```
+
+---
+
+## Example 14 — changing region does not reuse a plan
+
+A call to the same pharmacy about the same medication, routed through a
+different region, is a different call:
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies p.csv --region GB --live
+  …0100: resuming run 4BJPgjIFv3gZ
+
+$ python3 scripts/pharmacy_search.py --pharmacies p.csv --region US --live
+  …0100: planning              # different identity, not the GB run
+```
+
+Run identity is `sha256(endpoint | account | region | phone | goal)`. Reusing a
+plan across a routing or credential change would either resurrect a stale plan
+or, worse, treat a live call as absent and dial the pharmacist twice.
+
+Changing the identity scheme bumps `LEDGER_SCHEMA`. An older ledger holding
+unfinished entries is refused rather than read as empty:
+
+```
+Run ledger .pharmacy_runs.json uses an older identity scheme (schema None,
+now 2) and still holds 1 unfinished entry. Keys are now namespaced by
+endpoint, account and region, so those entries would not be found and their
+recipients would be dialled again.
+```
 
 ---
 
