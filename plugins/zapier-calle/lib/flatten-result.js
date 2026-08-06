@@ -68,8 +68,25 @@ export function flattenResult(event, options = {}) {
     correlation_id: (data.metadata && data.metadata.correlation_id) || null,
     completed_at: data.completed_at === undefined ? null : data.completed_at,
     recipients_total: recipients.length,
-    recipients_completed: recipients.filter((r) => r.status === 'completed').length,
-    recipients_failed: recipients.filter((r) => r.status === 'failed').length,
+    // `r &&` is not defensive noise: a null entry here used to throw straight
+    // out of flattenResult, and this return value is spread into a Zap
+    // output, so the throw aborted the Zap instead of routing the call to
+    // human review - the one outcome every other check in this file exists
+    // to prevent.
+    recipients_completed: recipients.filter((r) => r && r.status === 'completed').length,
+    recipients_failed: recipients.filter((r) => r && r.status === 'failed').length,
+    // How many times a phone actually rang. CALL-E dials more than once per
+    // recipient on its own - `attempts` is an array - and nothing else in the
+    // response says how many. A Zap that counts its own retries is therefore
+    // counting the wrong number, and can promise someone "at most three
+    // calls" while delivering three times that. Surfacing the real count is
+    // the only way a retry limit built on top of this integration can mean
+    // what it says.
+    attempts_total: recipients.reduce(
+      (total, recipient) =>
+        total + (Array.isArray(recipient && recipient.attempts) ? recipient.attempts.length : 0),
+      0,
+    ),
     transcript_text: transcriptText(recipients),
     // The line a human should read first, and where in the call to find it.
     // CALL-E exposes no recording, so offset_seconds is the closest thing to

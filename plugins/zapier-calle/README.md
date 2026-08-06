@@ -295,6 +295,7 @@ steps.
 | `recipients_total` | Number of recipients on the call. |
 | `recipients_completed` | Number of recipients whose status is `completed`. |
 | `recipients_failed` | Number of recipients whose status is `failed`. |
+| `attempts_total` | How many times a phone actually rang, summed across recipients. CALL-E redials on its own, so this is usually higher than the number of calls your Zap placed - see [Retry policy](#retry-policy). |
 | `transcript_text` | Full transcript, turns joined as `speaker: text` lines. |
 | `review_excerpt` | The recipient's last spoken turn, when the disposition is not `confirmed`; `null` otherwise. The line a human should read first. |
 | `review_excerpt_offset_seconds` | Seconds from the start of the attempt at which that line was spoken, or `null`. |
@@ -393,6 +394,60 @@ the values they can see, but they cannot detect a field that is missing,
 because nothing told them it was expected. Use `Place Call and Wait for
 Outcome` when you want the contract enforced.
 
+### Transcript grounding
+
+Every check above reads what the extraction model *concluded*. None of them
+can tell a conclusion drawn from the call apart from one drawn from thin
+air, because both arrive as the same well-formed JSON. A confident
+`{"budget": "over 50k"}` for a call where money was never mentioned passes
+all of them.
+
+Grounding closes that gap, and you opt in from your own `result_schema`: add
+a `<field>_quote` string beside any field whose answer matters, and describe
+it as the verbatim line that establishes the answer.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "confirmed": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "confirmed_quote": {
+      "type": "string",
+      "description": "The recipient's exact words that establish the answer above."
+    }
+  },
+  "required": ["confirmed", "confirmed_quote"]
+}
+```
+
+The quote is then verified against the transcript rather than trusted. If it
+does not appear in what the **recipient** said, the call is
+`review_required` and never actionable, whatever the confidence score says.
+Four ways that happens, each named in `disposition_reason`:
+
+| What happened | Why it is reported |
+| --- | --- |
+| The quote appears nowhere in the call | The answer was not established by anything spoken. |
+| The quote matches only a line the *agent* said | The model cited the question as evidence for the answer. |
+| The field was answered but the quote is blank or `unknown` | An answer with no evidence behind it. |
+| The quote is cited but the call produced no transcript | Nothing exists to check it against. |
+
+A field whose answer is itself `unknown` or empty is not asked for evidence
+- there is no claim to support, and [Usable results](#usable-results)
+already routes that call to review.
+
+A schema that declares no `_quote` fields is not checked at all, exactly as
+an absent `Do Not Call List` means suppression is not enforced. Upgrading
+changes nothing until you opt in.
+
+**Its ceiling.** Matching is normalized substring containment - casing,
+punctuation and spacing are ignored, meaning is not. A model that
+paraphrases honestly ("said they could attend" for "yeah I can make it") is
+reported as ungrounded, which costs a human review rather than a wrong
+answer. And a very short quote (`"yes"`) can match by coincidence, so
+grounding is weakest exactly where the answer is shortest. Write schema
+descriptions that ask for a full spoken sentence.
+
 ### Confidence score floor
 
 CALL-E returns both `completion_confidence.label` and a 0-1
@@ -465,6 +520,14 @@ refuses to dial.
 
 Like the calling-window guard and unlike suppression, a dry run previews the
 verdict rather than being blocked by it.
+
+**Count the dials, not your own runs.** CALL-E redials a recipient by itself
+- `recipients[].attempts` is an array - and nothing else in the response
+says how often. A Zap that counts only the calls *it* placed will therefore
+undercount, and a policy of "at most 3 attempts" can deliver several times
+that. The `attempts_total` output reports how many times the phone actually
+rang; feed that back into your `Previous Attempt Times` record rather than
+incrementing a counter of your own.
 
 ### Reconciliation limit
 
@@ -598,7 +661,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 303 tests across 22 files against a bundled
+`npm install && npm test` runs 323 tests across 23 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/fixtures/` holds three committed payloads - a clean success, a
 provider-reported success that carries no answer, and a call carrying a

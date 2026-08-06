@@ -30,7 +30,7 @@ function isPlainObject(value) {
 // literal `false` and a literal `0` are real extracted answers and must not
 // be treated as absent - the whole point of a boolean field is that one of
 // its two values is falsy.
-function isEmptyValue(value) {
+export function isEmptyValue(value) {
   if (value === null || value === undefined) return true;
   if (typeof value === 'string') return value.trim() === '';
   if (Array.isArray(value)) return value.length === 0;
@@ -38,7 +38,7 @@ function isEmptyValue(value) {
   return false;
 }
 
-function isUnknownValue(value) {
+export function isUnknownValue(value) {
   return typeof value === 'string' && UNKNOWN_VALUE_TOKENS.has(value.trim().toLowerCase());
 }
 

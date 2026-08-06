@@ -1,6 +1,6 @@
 {
   "name": "zapier-calle",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Zapier integration for CALL-E AI phone calls with fail-closed outcome dispositions.",
   "type": "module",
   "exports": {

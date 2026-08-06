@@ -18,6 +18,8 @@
 // `opt_out_requested` as an enum with an `unknown` member, which puts the
 // judgment in the extraction model where it belongs, and keep this as the
 // backstop for callers who did not add that field.
+import { normalizeSpeech } from './transcript.js';
+
 const OPT_OUT_PHRASES = [
   'stop calling',
   'stop contacting',
@@ -37,19 +39,7 @@ const OPT_OUT_PHRASES = [
 
 const MAX_EXCERPT_LENGTH = 300;
 
-// Compares on letters, digits and single spaces so punctuation and casing
-// cannot defeat a match. Apostrophes are deleted rather than turned into a
-// space, so "don't" collapses to "dont" and matches the listed phrase; every
-// other separator becomes a space, so "stop-calling" and "stop   calling"
-// both match "stop calling". Both straight and curly apostrophes count -
-// speech-to-text output routinely contains the curly one.
-function normalize(text) {
-  return String(text)
-    .toLowerCase()
-    .replace(/['‘’ʼ`]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
+const normalize = normalizeSpeech;
 
 const NORMALIZED_PHRASES = OPT_OUT_PHRASES.map((phrase) => ({
   phrase,

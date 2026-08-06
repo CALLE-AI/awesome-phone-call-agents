@@ -66,6 +66,27 @@ describe('flattenResult', () => {
     expect(out.recipients_failed).toBe(0);
   });
 
+  // CALL-E dials more than once per recipient on its own, and nothing else
+  // in the response says how often. A Zap enforcing "at most three calls"
+  // while counting only its own runs would undercount every time.
+  it('reports how many times a phone actually rang', () => {
+    expect(flattenResult(event).attempts_total).toBe(1);
+
+    const redialled = {
+      ...event,
+      data: {
+        ...event.data,
+        recipients: [{ status: 'completed', attempts: [{}, {}, {}] }, { status: 'failed', attempts: [{}] }],
+      },
+    };
+    expect(flattenResult(redialled).attempts_total).toBe(4);
+  });
+
+  it('reports zero attempts rather than failing on an unreadable recipient', () => {
+    const broken = { ...event, data: { ...event.data, recipients: [{ attempts: 'nope' }, null] } };
+    expect(flattenResult(broken).attempts_total).toBe(0);
+  });
+
   it('masks phone numbers everywhere they appear', () => {
     const serialized = JSON.stringify(flattenResult(event));
     expect(serialized).not.toContain('0123456');

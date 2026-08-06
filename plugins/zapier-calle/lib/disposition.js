@@ -22,6 +22,7 @@ import {
   checkConfidenceScore,
   DEFAULT_MIN_CONFIDENCE_SCORE,
 } from './result-quality.js';
+import { checkGrounding, describeUngrounded } from './grounding.js';
 
 const KNOWN_EVENT_TYPES = new Set([
   'call.completed',
@@ -124,6 +125,19 @@ function classify(event, options) {
     return result(
       'review_required',
       `Structured result is not actionable: ${truncate(describeUnusableFields(unusable))}.`,
+    );
+  }
+
+  // Last gate, and the only one that reads the transcript rather than the
+  // model's conclusions. Every check above asks whether the extraction says
+  // something usable; this one asks whether the recipient ever said it. Runs
+  // only when the caller's result_schema opted in by declaring `_quote`
+  // fields - see lib/grounding.js.
+  const grounding = checkGrounding(data.structured_result, data.recipients);
+  if (grounding.ungrounded.length > 0) {
+    return result(
+      'review_required',
+      `Structured result is not supported by the transcript: ${truncate(describeUngrounded(grounding.ungrounded))}.`,
     );
   }
 

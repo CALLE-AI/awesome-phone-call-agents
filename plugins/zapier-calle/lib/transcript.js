@@ -26,3 +26,20 @@ export function lastUserTurn(recipients) {
   );
   return turns.length > 0 ? turns[turns.length - 1] : null;
 }
+
+// Compares spoken text on letters, digits and single spaces, so punctuation,
+// casing and spacing cannot defeat a match. Apostrophes are deleted rather
+// than turned into a space, so "don't" collapses to "dont"; every other
+// separator becomes a space, so "stop-calling" and "stop   calling" both
+// normalize the same. Both straight and curly apostrophes count -
+// speech-to-text output routinely contains the curly one.
+//
+// Shared by lib/opt-out.js and lib/grounding.js, which both have to decide
+// whether one piece of text appears inside another piece of speech.
+export function normalizeSpeech(text) {
+  return String(text)
+    .toLowerCase()
+    .replace(/['‘’ʼ`]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}

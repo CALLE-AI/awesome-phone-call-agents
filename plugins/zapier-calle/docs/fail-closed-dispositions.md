@@ -207,6 +207,54 @@ enum member - a linter, a template, a docs page - and your runtime then
 treats that value as a success, the two halves of your product contradict
 each other. Check the value.
 
+## 5a. A usable result is not a *grounded* result
+
+Section 5 checks what the extraction model concluded. It cannot check
+whether the conversation supports the conclusion, because a fabricated
+answer and a real one arrive as the same well-formed JSON. Every gate so far
+- terminal status, completion flag, confidence score, non-unknown values -
+is satisfied by a confident `{"budget": "over 50k"}` for a call in which
+money was never mentioned.
+
+This is a different failure from section 5, and the opposite shape. There,
+the model correctly reported that it had no answer and the integration
+mistook that for one. Here, the model reports an answer it does not have.
+No amount of checking the *result* catches it, because the result looks
+perfect. The only thing that disagrees is the transcript.
+
+So ask for the evidence, and then verify it:
+
+1. **Make the schema carry a citation.** Alongside each field that matters,
+   ask for the verbatim line that establishes it - a `<field>_quote` string,
+   or whatever naming your convention prefers. This costs nothing at the
+   provider: the extraction model is already reading the transcript.
+2. **Check the citation against the transcript, and only against the
+   *recipient's* turns.** A quote that matches only the agent's own script
+   means the model cited the question as evidence for the answer - a
+   distinct and highly diagnosable failure, worth reporting separately from
+   "not found at all."
+3. **Do not demand evidence for a non-answer.** If the field itself came
+   back `unknown` or empty, section 5 already routed the call to review.
+   Asking for a quote as well reports the same call twice for the same
+   reason and trains people to ignore the second report.
+4. **Make it opt-in.** A schema that declares no citation fields should be
+   checked exactly as before. A safety check that changes the verdict on
+   workflows that never asked for it will be turned off wholesale.
+
+Know the ceiling before you ship it. Substring matching compares text, not
+meaning: a model that paraphrases honestly is reported as ungrounded. That
+error direction is the acceptable one - it costs a human review rather than
+a wrong answer written to a system of record - but say so out loud, because
+the reverse tradeoff is tempting and wrong. A very short citation ("yes")
+can also match by coincidence, which means grounding is weakest exactly
+where the answer is shortest.
+
+The real fix belongs at the provider: per-field evidence *offsets* rather
+than quoted text. Transcript turns here already carry an `offset_seconds`,
+so a `<field>_quote_offset` would let a consumer compare positions instead
+of strings and make a coincidental match impossible. Until that exists,
+verifying the text is strictly better than trusting it.
+
 ## 6. Revocation of consent is not a call outcome
 
 If the person says "stop calling me," that fact is in the transcript and
@@ -391,7 +439,7 @@ unset flag is the state a freshly built workflow is in, and if absence reads
 as "go ahead," the safety of the preview mode depends on everyone
 remembering to turn it on.
 
-Four assertions are worth writing explicitly, because each covers a bug
+Five assertions are worth writing explicitly, because each covers a bug
 that is easy to introduce and invisible until production:
 
 - **`false` and `0` are still confirmed.** The usable-value check in section
@@ -410,6 +458,13 @@ that is easy to introduce and invisible until production:
   loudly the moment someone "optimizes away" the verification fetch in
   section 11, which is exactly the change that looks like a harmless
   performance win.
+- **A citation nobody spoke is not evidence.** Take a payload that passes
+  every other gate - terminal, completed, high confidence, a populated
+  result with no unknown values - and change only the quoted line to
+  something absent from the transcript. Assert it is no longer actionable.
+  Pair it with the inverse, a schema declaring no citation fields at all,
+  asserting the verdict is unchanged; without that second test, section 5a
+  is free to quietly start failing workflows that never opted in.
 
 Keep a small set of committed fixture payloads for the cases that are hard
 to describe in prose - a clean success, a provider-reported success that
@@ -419,9 +474,11 @@ nobody executes.
 
 See `plugins/zapier-calle/lib/disposition.js` and
 `plugins/zapier-calle/lib/result-quality.js` for a fail-closed classifier
-built around these rules, `plugins/zapier-calle/lib/opt-out.js` for the
+built around these rules, `plugins/zapier-calle/lib/grounding.js` for the
+citation check in section 5a, `plugins/zapier-calle/lib/opt-out.js` for the
 revocation scanner, `plugins/zapier-calle/lib/reconcile.js` for the
 authenticated re-read in section 11, and
 `plugins/zapier-calle/test/disposition.test.js` plus
-`plugins/zapier-calle/test/fixtures.test.js` and
+`plugins/zapier-calle/test/fixtures.test.js`,
+`plugins/zapier-calle/test/grounding.test.js` and
 `plugins/zapier-calle/test/reconcile.test.js` for the tests described above.

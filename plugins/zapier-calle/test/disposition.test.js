@@ -261,4 +261,37 @@ describe('deriveDisposition', () => {
       expect(deriveDisposition(event()).disposition).toBe('confirmed');
     });
   });
+
+  describe('transcript grounding', () => {
+    const said = (text) => [
+      { attempts: [{ transcript_turns: [{ offset_seconds: 4, speaker: 'user', text }] }] },
+    ];
+
+    it('confirms an answer the recipient is recorded as having given', () => {
+      const grounded = event({}, {
+        structured_result: { confirmed: 'yes', confirmed_quote: 'yes that works for me' },
+        recipients: said('Yes, that works for me.'),
+      });
+      expect(deriveDisposition(grounded).disposition).toBe('confirmed');
+    });
+
+    // Every gate above this one passes: terminal status, task_completed,
+    // high confidence with a 0.92 score, and a populated structured result
+    // carrying no unknown-like value. Only the transcript disagrees.
+    it('refuses an otherwise-perfect result whose quote was never spoken', () => {
+      const invented = event({}, {
+        structured_result: { confirmed: 'yes', confirmed_quote: 'absolutely, sign us up today' },
+        recipients: said('I need to think about it.'),
+      });
+      const result = deriveDisposition(invented);
+      expect(result.disposition).toBe('review_required');
+      expect(result.is_actionable).toBe(false);
+      expect(result.reason).toContain('confirmed');
+    });
+
+    it('leaves a schema that never asked for quotes classified as before', () => {
+      const noQuotes = event({}, { recipients: said('I need to think about it.') });
+      expect(deriveDisposition(noQuotes).disposition).toBe('confirmed');
+    });
+  });
 });
