@@ -170,20 +170,34 @@ Offer the transcript. Every claim should be checkable against what was said.
   one exists" is not evidence that it belongs to this provider. If nothing
   binds the credential, stop and make the operator name it explicitly.
 
-- **Namespace a pending call by everything that changes what it is.** Hashing
-  the recipient and the goal is not enough. The same number and the same
-  question routed through a different region is a different call; under a
-  different account or endpoint it is a different plan entirely, and a
-  `plan_id` issued by one provider is meaningless to another.
+- **Keep the exclusion claim separate from the reconciliation identity.** These
+  are two different questions and they need different granularity.
 
-  Include endpoint, account and region in the identity. Getting this wrong
-  fails in both directions: a stale plan gets resurrected under new routing, or
-  a live one is treated as absent — and "absent" means the recipient is dialled
-  again.
+  *"Is there an unresolved call to this person about this thing?"* must be
+  answered on **recipient and purpose alone**. Fold endpoint, account or region
+  into that key and changing any of them makes a live call look absent — which
+  permits a second dial to someone already being rung.
 
-  Version the ledger. When the identity scheme changes, old keys won't match
-  anything you compute, so unfinished entries must be refused rather than read
-  as absent.
+  *"Can I resume this particular plan?"* needs the full configuration. So nest
+  it: a coarse claim keyed on `sha256(phone|goal)`, with the attempt's endpoint,
+  principal, region, `plan_id` and `run_id` recorded underneath.
+
+  On a configuration mismatch, do **neither**. Don't resume — a `plan_id` from
+  one endpoint or account is meaningless under another. Don't redial — the
+  earlier call may still be live. Surface it and let a human resolve it.
+
+- **Bind unfinished state to a stable principal, or fail closed.** Don't
+  namespace on the credential cache directory: CALL-E derives that from the
+  server URL, so re-authenticating as a different account on the same endpoint
+  reuses it — and an account-A run could be resumed with account-B credentials.
+
+  Derive the principal from the account itself (an id recorded in the cache, or
+  the `sub` claim of a JWT). If it can't be established, new calls may proceed,
+  but an unresolved call can no longer be confirmed as yours — so refuse to
+  reconcile it rather than guessing. `CALLE_ACCOUNT_ID` overrides.
+
+  Version the ledger. When claim keys change, old entries won't match anything
+  you compute, so unfinished ones must be refused rather than read as absent.
 - **Persist `plan_id` and `run_id` to disk as soon as you receive them.**
   `plan_id` is CALL-E's idempotency key, but it only protects you if it survives
   a crash. On restart, resume the stored run instead of re-planning.

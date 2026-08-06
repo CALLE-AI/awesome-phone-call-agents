@@ -185,21 +185,41 @@ wasn't issued for is a working credential handed to a stranger. That failure is
 quieter and worse than a call placed from the wrong account: nothing visibly
 goes wrong, and the disclosure has already happened.
 
-## Identity of a pending action includes its configuration
+## Exclusion and reconciliation are different questions
 
-If you record "a call to this number about this thing is in progress", that
-record has to include everything that determines what the call *is* — which
-provider, which account, which region.
+Recording "a call to this number about this thing is in progress" involves two
+questions that look like one, and answering them with a single key is a bug in
+whichever direction you resolve it.
 
-Two failures fall out of getting it wrong, and they point in opposite
-directions. Too coarse, and a plan created under different routing gets reused
-or reconciled as though it were the same pending action. Too coarse in the other
-direction — a live call not recognised as live — and the recipient is dialled
-again.
+**"Should I dial this person?"** must be answered on recipient and purpose
+alone. Any configuration you add to that key — endpoint, account, region —
+becomes a way to make a live call invisible. Change the value, the key changes,
+the pending entry isn't found, and someone already on the phone gets rung again.
 
-Version the store. When the identity scheme changes, previously written keys
-will not match anything you now compute, and an unmatched in-flight call reads
-as "never started".
+**"Can I resume this plan?"** needs the whole configuration, because a plan or
+run id issued by one provider under one account means nothing under another.
+
+So the claim is coarse and the attempt is specific, nested beneath it. When the
+stored attempt doesn't match the current configuration, the safe action is
+neither: don't resume something you can't act on, and don't redial someone whose
+earlier call may still be running. Stop and surface it.
+
+Version the store. When claim keys change, previously written entries won't
+match anything you now compute, and an unmatched in-flight call reads as "never
+started".
+
+## Know whose call it is
+
+Namespacing on a credential cache directory is not the same as knowing the
+account. If the provider derives that directory from the server URL — CALL-E
+does — then re-authenticating as someone else on the same endpoint reuses it,
+and one account's unfinished run can be resumed with another's credentials.
+
+Derive identity from the account: an id recorded alongside the credential, or
+the subject claim of a token. If it cannot be established, unfinished state
+cannot be confirmed as yours. Fail closed on reconciliation rather than assuming
+— resuming a stranger's run, or redialling on the assumption that no call
+exists, are both worse than stopping.
 
 ## Cost is a safety property
 

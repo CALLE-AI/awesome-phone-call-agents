@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import csv
 import fcntl
 import hashlib
@@ -51,7 +52,7 @@ RUN_DIR = Path(os.environ.get("PHARMACY_RUN_DIR", "call_runs"))
 # Bump when the run-identity scheme changes. An older ledger's keys won't match
 # anything we compute, so unfinished entries must be refused rather than read as
 # absent — "absent" means "dial them again".
-LEDGER_SCHEMA = 2
+LEDGER_SCHEMA = 3
 
 TERMINAL_STATUSES = {"COMPLETED", "NO ANSWER", "DECLINED", "FAILED", "CANCELLED"}
 TERMINAL_ACTIONS = {"report_result", "report_blocked", "none"}
@@ -225,6 +226,11 @@ class RunLocked(RuntimeError):
     """Another live process holds this recipient."""
 
 
+class ConfigurationMismatch(RuntimeError):
+    """An unresolved call exists under provider configuration we can't
+    reconcile against. Neither resumable nor safe to redial."""
+
+
 class AmbiguousRun(RuntimeError):
     """run_call was sent but no run_id was recorded. Whether a call was
     placed is unknown, so it must not be retried automatically."""
@@ -234,37 +240,38 @@ class AmbiguousRun(RuntimeError):
 class RunStore:
     """Crash-safe, concurrency-safe ledger of in-flight calls.
 
-    Losing this state means redialling a real person, so the failure modes
-    matter more than the happy path:
+    Two different keys, doing two different jobs — conflating them was a bug:
 
-    * **Locked.** Every read-modify-write runs under an exclusive `flock`, so
-      two processes can't both see "no entry" and both dial.
-    * **Atomic.** Writes go to a temp file, get fsynced, then `os.replace` —
-      a crash mid-write leaves the previous good file, never a truncated one.
-    * **Loud on corruption.** An unreadable ledger is quarantined and raises.
-      Silently substituting `{}` would present every in-flight run as new.
-    * **Terminal-first.** The entry is only marked `done` once the result is
-      recorded, and pruned separately. Clearing before the result is durable
-      opens a window where a crash loses both.
-    * **Ambiguity is not retryable.** If `run_call` was sent and the response
-      was lost, whether the phone rang is unknown. That state requires a human
-      decision, not an automatic retry.
+    * **The claim key is coarse**: recipient + purpose, nothing else. It is the
+      exclusion lock, and it must span every provider configuration. If it
+      included endpoint, account or region, changing any of those would make an
+      unresolved call look absent and permit a second dial to the same person.
+
+    * **The attempt record is specific**: endpoint, principal, region, plan and
+      run ids, nested under the claim. It is what reconciliation is checked
+      against. A stored attempt whose configuration differs from the current one
+      is neither resumed nor redialled — it's surfaced for a human, because we
+      can't act on another configuration's plan and can't assume the call never
+      happened.
+
+    Everything else is about surviving a crash without redialling: locked
+    read-modify-write, atomic private writes, loud failure on corruption,
+    terminal result recorded before the entry is retired, and an ambiguous
+    create that is never retried automatically.
 
     States: planned -> dialing -> running -> done
     """
 
     path: Path = field(default=Path(".pharmacy_runs.json"))
 
-    # Everything that changes what a call actually is. A plan created under a
-    # different endpoint, account or region is not the same pending action, and
-    # must not be reused or reconciled as if it were.
+    # Current provider configuration. Recorded on the attempt, compared on
+    # resume — never mixed into the claim key.
     server_url: str = SERVER_URL
-    account_ns: str = "unknown"
+    principal: str | None = None
 
-    # Keys currently in flight in THIS process. The file lock stops two
-    # processes racing; it does nothing about two coroutines in one process,
-    # because they share a pid. Duplicate rows dispatched by asyncio.gather
-    # would otherwise both claim and both dial.
+    # Claims held by THIS process. The file lock stops two processes racing; it
+    # does nothing about two coroutines in one process, because they share a
+    # pid.
     _active: set[str] = field(default_factory=set, repr=False)
 
     # -- locking ------------------------------------------------------------
@@ -290,8 +297,7 @@ class RunStore:
             raise StateCorrupted(
                 f"Run ledger {self.path} is unreadable and has been moved to "
                 f"{quarantine}. Refusing to continue: treating a corrupt ledger "
-                f"as empty would redial every in-flight recipient. Inspect the "
-                f"quarantined file, then remove it to start clean."
+                f"as empty would redial every in-flight recipient."
             ) from exc
 
         schema = raw.get("schema")
@@ -299,9 +305,6 @@ class RunStore:
         if schema == LEDGER_SCHEMA and isinstance(entries, dict):
             return entries
 
-        # An older ledger keyed entries differently. Its keys will not match
-        # anything we compute now, so every in-flight call would look absent —
-        # and get dialled again. Migrate silently only if nothing is pending.
         legacy = entries if isinstance(entries, dict) else raw
         pending = {
             k: v for k, v in legacy.items()
@@ -309,39 +312,42 @@ class RunStore:
         }
         if pending:
             raise StateCorrupted(
-                f"Run ledger {self.path} uses an older identity scheme "
-                f"(schema {schema!r}, now {LEDGER_SCHEMA}) and still holds "
-                f"{len(pending)} unfinished entr{'y' if len(pending)==1 else 'ies'}.\n"
-                f"Keys are now namespaced by endpoint, account and region, so "
-                f"those entries would not be found and their recipients would be "
-                f"dialled again. Let the in-flight calls finish, or inspect and "
-                f"remove the file deliberately:\n  {self.path}"
+                f"Run ledger {self.path} uses schema {schema!r} (now "
+                f"{LEDGER_SCHEMA}) and still holds {len(pending)} unfinished "
+                f"entr{'y' if len(pending) == 1 else 'ies'}. Claim keys changed, "
+                f"so those entries would not be found and their recipients would "
+                f"be dialled again. Let the in-flight calls finish, or remove the "
+                f"file deliberately:\n  {self.path}"
             )
         return {}
 
     def _write(self, entries: dict[str, Any]) -> None:
-        # 0600: this file holds confirm_tokens, which authorise placing a call.
         _write_private(self.path, json.dumps(
             {"schema": LEDGER_SCHEMA, "entries": entries}, indent=2
         ))
 
-    # -- api ----------------------------------------------------------------
+    # -- keys ---------------------------------------------------------------
 
-    def key(self, phone: str, goal: str, region: str) -> str:
-        """Identity of a pending call, across every dimension that changes it.
+    @staticmethod
+    def claim_key(phone: str, goal: str) -> str:
+        """Exclusion identity: who we are calling, and what about.
 
-        Hashing phone and goal alone is not enough. The same number and the
-        same question routed through a different region is a different call;
-        under a different account or endpoint it's a different plan entirely,
-        and a `plan_id` issued by one provider means nothing to another. Reusing
-        or reconciling across those boundaries either resurrects a stale plan or
-        silently treats a live one as absent — and the second of those redials a
-        pharmacist.
+        Deliberately free of provider configuration. This key answers "is there
+        an unresolved call to this person about this thing?", and that question
+        must have the same answer regardless of which endpoint, account or
+        region a previous attempt used.
         """
-        material = "|".join([
-            self.server_url, self.account_ns, region.upper(), phone, goal,
-        ])
-        return hashlib.sha256(material.encode()).hexdigest()[:32]
+        return hashlib.sha256(f"{phone}|{goal}".encode()).hexdigest()[:32]
+
+    def attempt_config(self, region: str) -> dict[str, Any]:
+        """The provider configuration a call is made under."""
+        return {
+            "endpoint": self.server_url,
+            "principal": self.principal,
+            "region": region.upper(),
+        }
+
+    # -- api ----------------------------------------------------------------
 
     @staticmethod
     def _alive(pid: int | None) -> bool:
@@ -353,19 +359,21 @@ class RunStore:
             return False
         return True
 
-    def claim(self, key: str, phone_masked: str, region: str = "") -> dict[str, Any]:
-        """Atomically take ownership of a recipient, or return the live entry.
+    def claim(self, key: str, phone_masked: str, region: str) -> dict[str, Any]:
+        """Take the exclusion claim for a recipient, or explain why we can't.
 
-        The read and the write happen under one lock, so there is no window in
-        which two processes both conclude the recipient is unclaimed. The
-        in-process set covers the case the file lock cannot: two coroutines in
-        the same process sharing a pid.
+        Raises rather than returning on every path where dialling would be
+        unsafe: another live process holds it, a previous create's outcome is
+        unknown, or the pending attempt was made under a configuration we
+        cannot reconcile against.
         """
         if key in self._active:
             raise RunLocked(
                 f"{phone_masked}: already in flight in this process. Duplicate "
                 f"entries for the same recipient and goal are not dialled twice."
             )
+
+        wanted = self.attempt_config(region)
 
         with self._locked():
             data = self._read()
@@ -376,11 +384,7 @@ class RunStore:
                     "state": "planned",
                     "pid": os.getpid(),
                     "phone_masked": phone_masked,
-                    # Recorded so a human inspecting a stuck entry can see
-                    # which configuration it belongs to.
-                    "server_url": self.server_url,
-                    "account_ns": self.account_ns,
-                    "region": region,
+                    "attempt": wanted,
                     "claimed_at": datetime.now(timezone.utc).isoformat(),
                 }
                 data[key] = entry
@@ -392,9 +396,41 @@ class RunStore:
                 raise AmbiguousRun(
                     f"{phone_masked}: a call was submitted but no run id was "
                     f"recorded, so whether the phone rang is unknown. Not "
-                    f"retrying automatically. Check the CALL-E dashboard for "
-                    f"plan {entry.get('plan_id')}, then either record the "
-                    f"run id or remove this entry to allow a redial."
+                    f"retrying automatically. Check plan "
+                    f"{(entry.get('attempt') or {}).get('plan_id')}, then record "
+                    f"the run id or remove this entry to allow a redial."
+                )
+
+            stored = entry.get("attempt") or {}
+            mismatch = {
+                field_name: (stored.get(field_name), wanted.get(field_name))
+                for field_name in ("endpoint", "principal", "region")
+                if stored.get(field_name) != wanted.get(field_name)
+            }
+            if mismatch:
+                detail = "; ".join(
+                    f"{k}: pending={was!r} now={now!r}"
+                    for k, (was, now) in mismatch.items()
+                )
+                raise ConfigurationMismatch(
+                    f"{phone_masked}: an unresolved call exists for this "
+                    f"recipient and goal, but it was made under a different "
+                    f"configuration ({detail}).\n"
+                    f"Not resuming — a plan or run id from one endpoint or "
+                    f"account is meaningless under another. Not redialling "
+                    f"either — the earlier call may still be live, and this "
+                    f"person should not be rung twice.\n"
+                    f"Resolve it under the original configuration, or remove "
+                    f"the entry deliberately once you know what happened."
+                )
+
+            if self.principal is None:
+                raise ConfigurationMismatch(
+                    f"{phone_masked}: an unresolved call exists, but the "
+                    f"authenticated account could not be identified, so it "
+                    f"cannot be confirmed as ours. Failing closed rather than "
+                    f"resuming another account's run or redialling. Set "
+                    f"CALLE_ACCOUNT_ID, or resolve the entry deliberately."
                 )
 
             owner = entry.get("pid")
@@ -415,20 +451,22 @@ class RunStore:
             return entry
 
     def update(self, key: str, **fields: Any) -> None:
+        """Update the entry. Keys in `attempt` are nested, not flattened."""
+        attempt_fields = {
+            k: fields.pop(k) for k in list(fields)
+            if k in {"plan_id", "confirm_token", "confirm_expires_at", "run_id"}
+        }
         with self._locked():
             data = self._read()
             entry = data.setdefault(key, {})
+            if attempt_fields:
+                entry.setdefault("attempt", {}).update(attempt_fields)
             entry.update(fields)
             entry["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._write(data)
 
     def mark_done(self, key: str, result_path: str | None = None) -> None:
-        """Record completion. Called only AFTER the terminal result is durable.
-
-        Deliberately not a delete: pruning is a separate step, so a crash
-        between recording the result and tidying the ledger can never lose
-        both.
-        """
+        """Record completion — only after the terminal result is durable."""
         self.update(key, state="done", result_path=result_path,
                     completed_at=datetime.now(timezone.utc).isoformat())
         self._active.discard(key)
@@ -452,10 +490,12 @@ class RunStore:
         with self._locked():
             data = self._read()
             entry = data.get(key)
-            if entry and entry.get("state") == "planned" and not entry.get("run_id"):
+            attempt = (entry or {}).get("attempt") or {}
+            if entry and entry.get("state") == "planned" and not attempt.get("run_id"):
                 data.pop(key)
                 self._write(data)
         self._active.discard(key)
+
 
 
 # --------------------------------------------------------------------------
@@ -614,6 +654,55 @@ def _endpoint_of(data: dict[str, Any]) -> str | None:
     return None
 
 
+def _jwt_claims(token: str) -> dict[str, Any]:
+    """Read a JWT payload without verifying it.
+
+    Verification is the server's job — we only want a stable identifier for the
+    account, so an unverified claim is fine for namespacing. It is NOT used for
+    any authorisation decision.
+    """
+    parts = token.split(".")
+    if len(parts) != 3:
+        return {}
+    try:
+        padded = parts[1] + "=" * (-len(parts[1]) % 4)
+        return json.loads(base64.urlsafe_b64decode(padded))
+    except Exception:
+        return {}
+
+
+def _principal_of(token: str, cache: dict[str, Any]) -> str | None:
+    """A stable identity for the authenticated account, or None.
+
+    Deliberately NOT the token-cache directory: CALL-E derives that from the
+    server URL, so re-authenticating as a different account on the same
+    endpoint reuses the same directory. Namespacing on it would let an
+    account-A run be resumed with account-B credentials.
+
+    Order: explicit override, an id recorded in the cache, then a JWT subject.
+    """
+    override = os.environ.get("CALLE_ACCOUNT_ID")
+    if override:
+        return override.strip()
+
+    for key in ("account_id", "accountId", "user_id", "userId", "sub",
+                "principal", "email", "account"):
+        value = cache.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, dict):
+            for inner in ("id", "sub", "email"):
+                if isinstance(value.get(inner), str):
+                    return value[inner].strip()
+
+    claims = _jwt_claims(token)
+    for key in ("sub", "account_id", "uid", "email", "client_id"):
+        value = claims.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _cli_auth_status() -> dict[str, Any] | None:
     """Ask the CALL-E CLI which cache belongs to which endpoint.
 
@@ -636,7 +725,7 @@ def _cli_auth_status() -> dict[str, Any] | None:
         return None
 
 
-def resolve_credential(server_url: str = SERVER_URL) -> tuple[str, str]:
+def resolve_credential(server_url: str = SERVER_URL) -> tuple[str, str | None]:
     """Return (access_token, account_namespace) for `server_url`, or refuse.
 
     A bearer token is issued for one origin. Sending it anywhere else hands a
@@ -657,7 +746,7 @@ def resolve_credential(server_url: str = SERVER_URL) -> tuple[str, str]:
         token = _extract_token(json.loads(path.read_text()))
         if not token:
             raise SystemExit(f"No access token found in {path}")
-        return token, os.environ.get("CALLE_ACCOUNT_NS") or path.parent.name
+        return token, _principal_of(token, json.loads(path.read_text()))
 
     status = _cli_auth_status()
     if status:
@@ -678,10 +767,11 @@ def resolve_credential(server_url: str = SERVER_URL) -> tuple[str, str]:
                     f"CALL-E CLI reports its cached credential is not usable "
                     f"({path}). Run: calle auth login"
                 )
-            token = _extract_token(json.loads(path.read_text()))
+            cache = json.loads(path.read_text())
+            token = _extract_token(cache)
             if not token:
                 raise SystemExit(f"No access token found in {path}")
-            return token, path.parent.name
+            return token, _principal_of(token, cache)
 
     candidates = sorted(TOKEN_CACHE.glob("*/token.json"))
     if not candidates:
@@ -701,7 +791,7 @@ def resolve_credential(server_url: str = SERVER_URL) -> tuple[str, str]:
         token = _extract_token(bound[0][1])
         if not token:
             raise SystemExit(f"No access token found in {bound[0][0]}")
-        return token, bound[0][0].parent.name
+        return token, _principal_of(token, bound[0][1])
     if len(bound) > 1:
         raise SystemExit(
             f"{len(bound)} cached tokens claim endpoint {server_url}. Set "
@@ -740,9 +830,15 @@ class Caller:
         self.store = store
         # Resolving the credential also tells us which account we're acting as,
         # which is part of a call's identity.
-        self._token, account_ns = resolve_credential(SERVER_URL)
+        self._token, principal = resolve_credential(SERVER_URL)
         self.store.server_url = SERVER_URL
-        self.store.account_ns = account_ns
+        self.store.principal = principal
+        if principal is None:
+            log.warning(
+                "Could not identify the authenticated account. New calls will "
+                "proceed, but an unresolved call cannot later be confirmed as "
+                "ours and will fail closed. Set CALLE_ACCOUNT_ID to avoid this."
+            )
 
     def _client(self):
         return self._Client(self._Transport(
@@ -819,7 +915,7 @@ class Caller:
     async def call(self, pharmacy: dict[str, str], goal: str, region: str
                    ) -> dict[str, Any] | None:
         phone = validate_e164(pharmacy["phone"])
-        key = self.store.key(phone, goal, region)
+        key = self.store.claim_key(phone, goal)
 
         # Atomic claim. Raises if another live process holds this recipient, or
         # if a previous attempt left an ambiguous create.
@@ -1016,7 +1112,7 @@ async def main() -> None:
         async with semaphore:
             try:
                 return await caller.call(pharmacy, goal, args.region)
-            except (AmbiguousRun, RunLocked) as exc:
+            except (AmbiguousRun, RunLocked, ConfigurationMismatch) as exc:
                 # Not failures to retry past — these exist to stop a redial.
                 log.error("  %s", exc)
                 return None
