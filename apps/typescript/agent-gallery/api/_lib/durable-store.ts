@@ -1,7 +1,10 @@
 export interface DurableStore {
   get<T>(key: string): Promise<T | null>;
   set<T>(key: string, value: T, ttlSeconds?: number): Promise<void>;
+  delete(key: string): Promise<void>;
   claim<T>(key: string, value: T, ttlSeconds: number): Promise<boolean>;
+  refreshClaim<T>(key: string, expectedValue: T, ttlSeconds: number): Promise<boolean>;
+  releaseClaim<T>(key: string, expectedValue: T): Promise<boolean>;
   increment(key: string, ttlSeconds: number): Promise<number>;
   addToIndex(key: string, score: number, member: string): Promise<void>;
   readIndex(key: string, limit?: number): Promise<string[]>;
@@ -31,8 +34,17 @@ export function createRedisRestStore(url: string, token: string, fetcher: typeof
     async set<T>(key: string, value: T, ttlSeconds?: number) {
       await command(["SET", key, JSON.stringify(value), ...(ttlSeconds ? ["EX", ttlSeconds] : [])]);
     },
+    async delete(key: string) { await command(["DEL", key]); },
     async claim<T>(key: string, value: T, ttlSeconds: number) {
       return await command<string | null>(["SET", key, JSON.stringify(value), "NX", "EX", ttlSeconds]) === "OK";
+    },
+    async releaseClaim<T>(key: string, expectedValue: T) {
+      const script = "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
+      return Number(await command<number>(["EVAL", script, 1, key, JSON.stringify(expectedValue)])) === 1;
+    },
+    async refreshClaim<T>(key: string, expectedValue: T, ttlSeconds: number) {
+      const script = "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('expire',KEYS[1],ARGV[2]) else return 0 end";
+      return Number(await command<number>(["EVAL", script, 1, key, JSON.stringify(expectedValue), ttlSeconds])) === 1;
     },
     async increment(key: string, ttlSeconds: number) {
       const response = await fetcher(`${endpoint}/multi-exec`, {
@@ -63,10 +75,19 @@ export class MemoryDurableStore implements DurableStore {
   private indexes = new Map<string, Map<string, number>>();
   async get<T>(key: string) { return (this.values.get(key) as T | undefined) ?? null; }
   async set<T>(key: string, value: T, _ttlSeconds?: number) { this.values.set(key, value); }
+  async delete(key: string) { this.values.delete(key); }
   async claim<T>(key: string, value: T, _ttlSeconds?: number) {
     if (this.values.has(key)) return false;
     this.values.set(key, value);
     return true;
+  }
+  async releaseClaim<T>(key: string, expectedValue: T) {
+    if (JSON.stringify(this.values.get(key)) !== JSON.stringify(expectedValue)) return false;
+    this.values.delete(key);
+    return true;
+  }
+  async refreshClaim<T>(key: string, expectedValue: T, _ttlSeconds: number) {
+    return JSON.stringify(this.values.get(key)) === JSON.stringify(expectedValue);
   }
   async increment(key: string, _ttlSeconds?: number) {
     const next = (this.counters.get(key) ?? 0) + 1;

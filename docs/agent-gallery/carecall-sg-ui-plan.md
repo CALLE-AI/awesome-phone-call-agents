@@ -927,6 +927,19 @@ The result must state:
 - Add host-owned scheduler integration.
 - Add pause, update, and delete behavior.
 
+### Phase 5B: Durable Call Queue and Reconciliation
+
+- Route manual and recurring calls through one durable queue.
+- Encrypt phone numbers while jobs wait.
+- Permit only one ongoing CareCall through a renewable durable lease.
+- Show queued position and allow cancellation before provider acceptance.
+- Recheck operator scope, call windows, schedule state, and limits immediately before dialing.
+- Use signed delayed delivery to wake short-lived workers and monitor provider status.
+- Release the active lease only after a terminal provider state.
+- Advance recurring schedules only after the prior occurrence settles.
+- Use the Vercel Hobby daily cron for reconciliation, never for late call execution.
+- Route missing jobs, expired leases, missed windows, and uncertain creation to human review without blind redialing.
+
 ### Phase 6: Accessibility and Verification
 
 - Keyboard and screen-reader audit.

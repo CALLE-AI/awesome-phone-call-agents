@@ -9,7 +9,7 @@ import {
 } from "../workflows/carecall";
 import { Icon } from "./Icon";
 
-type Stage = "authorize" | "live" | "result";
+type Stage = "authorize" | "queued" | "live" | "result";
 const E164 = /^\+[1-9]\d{7,14}$/;
 
 interface StatusPayload {
@@ -17,6 +17,10 @@ interface StatusPayload {
   activity?: { ts: string; level: string; message: string }[];
   calle_result?: CalleRunResult | null;
   carecall_result?: CareCallResult;
+  result?: CareCallResult;
+  run_id?: string;
+  queue_position?: number;
+  failure_reason?: string;
   error?: string;
 }
 
@@ -33,6 +37,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
   const [request, setRequest] = useState<CareCallRequest | null>(null);
   const [status, setStatus] = useState("starting");
   const [activity, setActivity] = useState<StatusPayload["activity"]>([]);
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [result, setResult] = useState<CareCallResult | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const requestKeyRef = useRef(crypto.randomUUID());
@@ -40,6 +45,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
 
   const stageTitle = useMemo(() => ({
     authorize: "Authorize one CareCall",
+    queued: "CareCall queued",
     live: "CareCall in progress",
     result: result?.outcome_label ?? "Call result",
   })[stage], [stage, result]);
@@ -86,19 +92,20 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
       }
       setSessionToken(sessionBody.token);
       onAuthenticated(sessionBody.token);
-      const response = await fetch("/api/calls", {
+      const response = await fetch("/api/carecall/jobs", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${sessionBody.token}` },
         body: JSON.stringify(payload),
       });
-      const body = await response.json() as { call_id?: string; error?: string; message?: string };
-      if (!response.ok || !body.call_id) {
+      const body = await response.json() as { job_id?: string; error?: string; message?: string };
+      if (!response.ok || !body.job_id) {
         setError(body.error === "invalid_access_code" ? "The operator access code was not accepted. No call was placed." : (body.message ?? body.error ?? "The call could not be started."));
         setSubmitting(false);
         return;
       }
-      setCallId(body.call_id);
-      setStage("live");
+      setCallId(body.job_id);
+      setStatus("queued");
+      setStage("queued");
     } catch {
       setError("The server could not confirm whether a call was created. Do not retry blindly; check CALL-E first.");
       setSubmitting(false);
@@ -106,13 +113,13 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
   }
 
   useEffect(() => {
-    if (stage !== "live" || !callId || !request) return;
+    if ((stage !== "queued" && stage !== "live") || !callId || !request) return;
     const activeRequest = request;
     const activeCallId = callId;
     let cancelled = false;
     async function poll() {
       try {
-        const response = await fetch(`/api/calls/${encodeURIComponent(activeCallId)}`, { headers: { authorization: `Bearer ${sessionToken}` } });
+        const response = await fetch(`/api/carecall/jobs/${encodeURIComponent(activeCallId)}`, { headers: { authorization: `Bearer ${sessionToken}` } });
         const body = await response.json() as StatusPayload;
         if (cancelled) return;
         if (!response.ok) {
@@ -121,8 +128,15 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
         }
         setStatus(body.status);
         setActivity(body.activity ?? []);
-        if (body.carecall_result || body.calle_result !== undefined) {
-          const completed = body.carecall_result ?? buildCareCallResult({ request: activeRequest, status: body.status, calle: body.calle_result ?? null, runId: activeCallId });
+        setQueuePosition(body.queue_position ?? null);
+        if (body.status === "ongoing") setStage("live");
+        if (body.status === "needs_review" || body.status === "cancelled") {
+          setError(body.status === "cancelled" ? "This queued call was cancelled before it started." : `The queued call needs human review${body.failure_reason ? `: ${body.failure_reason.replaceAll("_", " ")}` : "."}`);
+          setCallId(null);
+          return;
+        }
+        if (body.result || body.carecall_result || body.calle_result !== undefined) {
+          const completed = body.result ?? body.carecall_result ?? buildCareCallResult({ request: activeRequest, status: body.status, calle: body.calle_result ?? null, runId: body.run_id ?? activeCallId });
           setResult(completed);
           onCompleted(completed);
           setStage("result");
@@ -136,12 +150,19 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [callId, onCompleted, request, sessionToken, stage]);
 
+  async function cancelQueuedCall() {
+    if (!callId) return;
+    const response = await fetch(`/api/carecall/jobs/${encodeURIComponent(callId)}`, { method: "DELETE", headers: { authorization: `Bearer ${sessionToken}` } });
+    if (response.ok) { setStatus("cancelled"); setCallId(null); setError("This queued call was cancelled before it started."); }
+    else setError("The call has already started and cannot be recalled from the queue.");
+  }
+
   return (
     <div className="sheet-backdrop">
       <section aria-labelledby="execution-title" aria-modal="true" className="call-sheet execution-sheet" role="dialog">
         <header className="call-sheet__header">
           <div>
-            <span className="dry-run-badge" data-live={stage === "live"}><Icon name={stage === "result" ? "check" : "shield"} size={14} /> {stage === "authorize" ? "Live call gate" : stage === "live" ? "Real call · status polling" : "Structured result"}</span>
+            <span className="dry-run-badge" data-live={stage === "live"}><Icon name={stage === "result" ? "check" : stage === "queued" ? "clock" : "shield"} size={14} /> {stage === "authorize" ? "Live call gate" : stage === "queued" ? "Durable call queue" : stage === "live" ? "Real call · status polling" : "Structured result"}</span>
             <h2 id="execution-title" ref={titleRef} tabIndex={-1}>{stageTitle}</h2>
             <p>{senior.preferredName} · {routine.title} · {phone ? maskE164(phone) : senior.phoneMasked}</p>
           </div>
@@ -158,6 +179,14 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
               <label className="authorization-check"><input checked={confirmed} disabled={submitting} onChange={(event) => setConfirmed(event.target.checked)} type="checkbox" /><span>I confirm I am authorized to contact {senior.preferredName} and authorize exactly one call now for the {routine.title.toLowerCase()} shown in the preview.</span></label>
               {phone && !validPhone && <p className="field-error" role="alert">Use an international E.164 number, for example +65 followed by the local number.</p>}
               <section className="boundary-note"><Icon name="shield" size={18} /><p>CareCall records self-reports and requests human follow-up. It does not give medical advice or dispatch emergency services.</p></section>
+            </>
+          )}
+
+          {stage === "queued" && (
+            <>
+              <section className="live-state"><span className="live-pulse" /><div><p>Queue state</p><strong>{status === "cancelled" ? "cancelled" : `Waiting${queuePosition ? ` · position ${queuePosition}` : ""}`}</strong></div></section>
+              <section className="boundary-note"><Icon name="info" size={18} /><p>CareCall will recheck authorization, the permitted call window, and safety limits immediately before dialing. Another ongoing call must finish first; manual authorization expires after 30 minutes.</p></section>
+              <p className="muted-copy">You may close this sheet without cancelling the durable job. Use Cancel queued call to prevent it from starting.</p>
             </>
           )}
 
@@ -182,8 +211,9 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
         </div>
 
         <footer className="call-sheet__footer execution-footer">
-          <div><Icon name="info" size={17} /><span>{stage === "authorize" ? "Recurring schedules remain disabled in this milestone." : stage === "live" ? "The final transcript is treated as untrusted call data." : "Record any real follow-up in the authorized care system."}</span></div>
-          {stage === "authorize" && <button className="primary-button primary-button--attention" disabled={!confirmed || !validPhone || !operatorId || !accessCode || submitting} onClick={startCall} type="button">{submitting ? "Starting one call…" : "Place one CareCall"}</button>}
+          <div><Icon name="info" size={17} /><span>{stage === "authorize" ? "Authorization creates one cancellable queue job; it does not bypass an ongoing call." : stage === "queued" ? "Queued authorization is durable and cannot create more than one call." : stage === "live" ? "The final transcript is treated as untrusted call data." : "Record any real follow-up in the authorized care system."}</span></div>
+          {stage === "authorize" && <button className="primary-button primary-button--attention" disabled={!confirmed || !validPhone || !operatorId || !accessCode || submitting} onClick={startCall} type="button">{submitting ? "Queuing one call…" : "Queue one CareCall"}</button>}
+          {stage === "queued" && status !== "cancelled" && <button className="secondary-button" onClick={() => void cancelQueuedCall()} type="button">Cancel queued call</button>}
           {stage === "result" && <button className="primary-button" onClick={onClose} type="button">Done</button>}
         </footer>
       </section>

@@ -12,6 +12,7 @@
     "verify": "npm run check && npm test && npm run build"
   },
   "dependencies": {
+    "@upstash/qstash": "^2.11.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

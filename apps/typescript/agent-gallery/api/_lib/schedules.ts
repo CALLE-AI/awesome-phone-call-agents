@@ -18,6 +18,7 @@ export interface CareSchedule {
   organisation: CareCallRequest["organisation"];
   created_by: Pick<OperatorSession, "id" | "name" | "role" | "senior_ids">;
   created_at: string;
+  current_job_id?: string;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -59,4 +60,14 @@ export function nextOccurrence(after: Date, frequency: ScheduleFrequency, timeSg
   if (candidate <= after) candidate.setUTCDate(candidate.getUTCDate() + 1);
   while (frequency === "weekdays" && [0, 6].includes(new Date(candidate.getTime() + 8 * 60 * 60_000).getUTCDay())) candidate.setUTCDate(candidate.getUTCDate() + 1);
   return candidate;
+}
+
+export function nextEligibleOccurrence(after: Date, frequency: ScheduleFrequency, timeSgt: string, skipDates: string[]): Date {
+  let candidate = nextOccurrence(after, frequency, timeSgt);
+  for (let count = 0; count < 367; count += 1) {
+    const singaporeDate = new Date(candidate.getTime() + 8 * 60 * 60_000).toISOString().slice(0, 10);
+    if (!skipDates.includes(singaporeDate)) return candidate;
+    candidate = nextOccurrence(candidate, frequency, timeSgt);
+  }
+  throw new Error("Schedule has no eligible occurrence within one year.");
 }

@@ -38,11 +38,12 @@ export function isScheduledTimeWithinPermittedWindow(windowText: string, timeTex
 export function validateCareCallRequest(
   request: CareCallRequest,
   now = new Date(),
-  options: { enforceCurrentCallWindow?: boolean } = {},
+  options: { enforceCurrentCallWindow?: boolean; enforceCurrentAuthorization?: boolean } = {},
 ): string[] {
   const errors: string[] = [];
   if (request.workflow !== "carecall") errors.push("workflow must be carecall");
   if (!request.request_key?.trim()) errors.push("request_key is required");
+  else if (!/^[A-Za-z0-9:._-]{1,240}$/.test(request.request_key)) errors.push("request_key format is invalid");
   if (!request.organisation?.name?.trim()) errors.push("organisation name is required");
   if (request.organisation?.timezone !== "Asia/Singapore") errors.push("timezone must be Asia/Singapore");
   if (!request.senior?.preferred_name?.trim()) errors.push("senior preferred name is required");
@@ -61,7 +62,7 @@ export function validateCareCallRequest(
   if (!request.authorization?.authorized_at || Number.isNaN(authorizedAt)) {
     errors.push("authorization timestamp is invalid");
   } else {
-    if (Math.abs(now.getTime() - authorizedAt) > 5 * 60_000) errors.push("authorization must be current");
+    if (options.enforceCurrentAuthorization !== false && Math.abs(now.getTime() - authorizedAt) > 5 * 60_000) errors.push("authorization must be current");
     if (options.enforceCurrentCallWindow !== false && request.senior?.permitted_call_window && !withinPermittedWindow(request.senior.permitted_call_window, now)) {
       errors.push("current time is outside the senior's permitted call window");
     }

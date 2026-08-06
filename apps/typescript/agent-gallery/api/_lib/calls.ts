@@ -40,6 +40,10 @@ export interface CalleEnv extends OperatorAuthEnv {
   CARECALL_MAX_CALLS_PER_DAY?: string;
   CARECALL_DATA_ENCRYPTION_KEY?: string;
   CRON_SECRET?: string;
+  CARECALL_PUBLIC_BASE_URL?: string;
+  QSTASH_TOKEN?: string;
+  QSTASH_CURRENT_SIGNING_KEY?: string;
+  QSTASH_NEXT_SIGNING_KEY?: string;
   /** Tests inject a deterministic store; production uses the REST configuration above. */
   durableStore?: DurableStore;
 }
@@ -87,7 +91,7 @@ export function storeFor(env: CalleEnv): DurableStore | null {
   return createRedisRestStore(env.UPSTASH_REDIS_REST_URL, env.UPSTASH_REDIS_REST_TOKEN);
 }
 
-async function audit(store: DurableStore, operatorId: string, action: string, details: Record<string, unknown>) {
+export async function auditCareCall(store: DurableStore, operatorId: string, action: string, details: Record<string, unknown>) {
   const timestamp = Date.now();
   const id = crypto.randomUUID();
   const record = { id, operator_id: operatorId, action, details, created_at: new Date(timestamp).toISOString() };
@@ -177,7 +181,7 @@ function calleFailure(error: unknown): Response {
   return json({ error: "unexpected", message: "The call could not be started." }, 500);
 }
 
-export async function handleCreateCall(request: Request, env: CalleEnv): Promise<Response> {
+export async function handleCreateCall(request: Request, env: CalleEnv, options: { trustedQueuedAuthorization?: boolean } = {}): Promise<Response> {
   const usesOperatorSession = request.headers.has("authorization");
   let operator: OperatorSession | null = null;
   if (usesOperatorSession) {
@@ -206,7 +210,7 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
   const careCall = "workflow" in payload && payload.workflow === "carecall";
   if (careCall && !operator) return operatorFailure();
   const errors = careCall
-    ? validateCareCallRequest(payload as CareCallRequest)
+    ? validateCareCallRequest(payload as CareCallRequest, new Date(), { enforceCurrentAuthorization: !options.trustedQueuedAuthorization })
     : validateRequest(payload as RecoveryRequest);
   if (errors.length > 0) return json({ error: "invalid_request", details: errors }, 400);
 
@@ -230,14 +234,14 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
     const maximum = Math.max(1, Number(env.CARECALL_MAX_CALLS_PER_DAY ?? 20));
     if (count > maximum) {
       await store.set(claimKey, { ...pending, state: "failed", updated_at: new Date().toISOString() } satisfies CareCallClaim, 7 * 24 * 60 * 60);
-      await audit(store, operator!.id, "call_rate_limited", { request_key: careRequest.request_key, senior_id: careRequest.senior.id });
+      await auditCareCall(store, operator!.id, "call_rate_limited", { request_key: careRequest.request_key, senior_id: careRequest.senior.id });
       return json({ error: "daily_call_limit_reached", message: "The operator's daily CareCall limit has been reached." }, 429);
     }
     const snapshotTtl = 365 * 24 * 60 * 60;
     await store.set(`carecall:senior:${careRequest.senior.id}`, { id: careRequest.senior.id, preferred_name: careRequest.senior.preferred_name, phone_masked: `•••${careRequest.senior.phone_e164.slice(-3)}`, language: careRequest.senior.language, permitted_call_window: careRequest.senior.permitted_call_window }, snapshotTtl);
     await store.set(`carecall:consent:${careRequest.senior.id}`, { senior_id: careRequest.senior.id, authority_confirmed: true, confirmed_by: operator!.id, confirmed_at: careRequest.authorization.authorized_at }, snapshotTtl);
     await store.set(`carecall:routine:${careRequest.routine.id}`, { ...careRequest.routine, senior_id: careRequest.senior.id }, snapshotTtl);
-    await audit(store, operator!.id, "call_claimed", { request_key: careRequest.request_key, senior_id: careRequest.senior.id, routine_id: careRequest.routine.id });
+    await auditCareCall(store, operator!.id, "call_claimed", { request_key: careRequest.request_key, senior_id: careRequest.senior.id, routine_id: careRequest.routine.id });
   } else {
     const existing = startedCalls.get(payload.request_key);
     if (existing) return json({ call_id: existing, deduplicated: true });
@@ -280,13 +284,13 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
       const record: CareCallRunRecord = { run_id: run.run_id, request_key: careRequest.request_key, operator_id: operator!.id, senior_id: careRequest.senior.id, senior_name: careRequest.senior.preferred_name, routine_id: careRequest.routine.id, routine_title: careRequest.routine.title, routine_kind: careRequest.routine.kind, caregiver_name: careRequest.routine.caregiver_name, created_at: new Date().toISOString() };
       await store.set(`carecall:run:${run.run_id}`, record, 365 * 24 * 60 * 60);
       await store.set(claimKey, { state: "started", operator_id: operator!.id, senior_id: careRequest.senior.id, run_id: run.run_id, updated_at: new Date().toISOString() } satisfies CareCallClaim, 7 * 24 * 60 * 60);
-      await audit(store, operator!.id, "call_started", { run_id: run.run_id, request_key: careRequest.request_key, senior_id: careRequest.senior.id });
+      await auditCareCall(store, operator!.id, "call_started", { run_id: run.run_id, request_key: careRequest.request_key, senior_id: careRequest.senior.id });
     } else startedCalls.set(payload.request_key, run.run_id);
     return json({ call_id: run.run_id, status: run.status });
   } catch (error) {
     if (store && operator) {
       await store.set(claimKey, { state: "failed", operator_id: operator.id, senior_id: (payload as CareCallRequest).senior.id, updated_at: new Date().toISOString() } satisfies CareCallClaim, 7 * 24 * 60 * 60);
-      await audit(store, operator.id, "call_start_failed", { request_key: payload.request_key, senior_id: (payload as CareCallRequest).senior.id });
+      await auditCareCall(store, operator.id, "call_start_failed", { request_key: payload.request_key, senior_id: (payload as CareCallRequest).senior.id });
     }
     return calleFailure(error);
   }
@@ -355,7 +359,7 @@ export async function handleGetCallStatus(
       await store.set(`carecall:case:${caseRecord.id}`, caseRecord, 365 * 24 * 60 * 60);
       await store.addToIndex("carecall:cases:index", Date.now(), caseRecord.id);
     }
-    await audit(store, operator.id, "call_completed", { run_id: runId, senior_id: careRecord.senior_id, outcome: result.outcome, urgency: result.urgency });
+    await auditCareCall(store, operator.id, "call_completed", { run_id: runId, senior_id: careRecord.senior_id, outcome: result.outcome, urgency: result.urgency });
     return json({ status: run.status, activity, carecall_result: result });
   }
 
@@ -380,5 +384,9 @@ export function envFromProcess(): CalleEnv {
     CARECALL_MAX_CALLS_PER_DAY: env.CARECALL_MAX_CALLS_PER_DAY,
     CARECALL_DATA_ENCRYPTION_KEY: env.CARECALL_DATA_ENCRYPTION_KEY,
     CRON_SECRET: env.CRON_SECRET,
+    CARECALL_PUBLIC_BASE_URL: env.CARECALL_PUBLIC_BASE_URL,
+    QSTASH_TOKEN: env.QSTASH_TOKEN,
+    QSTASH_CURRENT_SIGNING_KEY: env.QSTASH_CURRENT_SIGNING_KEY,
+    QSTASH_NEXT_SIGNING_KEY: env.QSTASH_NEXT_SIGNING_KEY,
   };
 }

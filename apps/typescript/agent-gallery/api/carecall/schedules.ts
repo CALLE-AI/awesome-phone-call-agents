@@ -1,14 +1,14 @@
 import { envFromProcess, storeFor } from "../_lib/calls";
+import { cancelQueuedJobForSchedule, enqueueScheduledOccurrence, type QueueRuntimeEnv } from "../_lib/call-queue";
 import { authenticateOperator, operatorCanAccessSenior } from "../_lib/operator-auth";
-import { encryptSchedulePhone, nextOccurrence, type CareSchedule, type ScheduleFrequency, type ScheduleStatus } from "../_lib/schedules";
+import { encryptSchedulePhone, nextEligibleOccurrence, type CareSchedule, type ScheduleFrequency, type ScheduleStatus } from "../_lib/schedules";
 import { isScheduledTimeWithinPermittedWindow, validateCareCallRequest, type CareCallRequest } from "../../src/workflows/carecall";
 
 export const config = { runtime: "edge" };
 const headers = { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" };
 const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers });
 
-export default async function handler(request: Request): Promise<Response> {
-  const env = envFromProcess();
+export async function handleSchedules(request: Request, env: QueueRuntimeEnv): Promise<Response> {
   const operator = await authenticateOperator(request, env);
   if (!operator) return json({ error: "invalid_operator_session" }, 401);
   const store = storeFor(env);
@@ -27,11 +27,25 @@ export default async function handler(request: Request): Promise<Response> {
     if (!Number.isFinite(reviewTime) || reviewTime <= Date.now()) return json({ error: "review_date_must_be_future" }, 400);
     if (body.skip_dates && (body.skip_dates.length > 366 || body.skip_dates.some((date) => !/^\d{4}-\d{2}-\d{2}$/.test(date)))) return json({ error: "invalid_skip_dates" }, 400);
     const id = `schedule-${body.call.routine.id}`;
-    const next = nextOccurrence(new Date(), body.frequency, body.time_sgt);
+    const next = nextEligibleOccurrence(new Date(), body.frequency, body.time_sgt, body.skip_dates ?? []);
     const schedule: CareSchedule = { id, status: "active", frequency: body.frequency, time_sgt: body.time_sgt, next_run: next.toISOString(), review_date: body.review_date, skip_dates: body.skip_dates ?? [], phone_ciphertext: await encryptSchedulePhone(body.call.senior.phone_e164, env.CARECALL_DATA_ENCRYPTION_KEY), senior: { id: body.call.senior.id, preferred_name: body.call.senior.preferred_name, language: body.call.senior.language, permitted_call_window: body.call.senior.permitted_call_window }, routine: body.call.routine, organisation: body.call.organisation, created_by: { id: operator.id, name: operator.name, role: operator.role, senior_ids: operator.senior_ids }, created_at: new Date().toISOString() };
-    const created = await store.claim(`carecall:schedule:${id}`, schedule, 2 * 365 * 24 * 60 * 60);
-    if (!created) return json({ error: "schedule_already_exists" }, 409);
+    const existing = await store.get<CareSchedule>(`carecall:schedule:${id}`);
+    if (existing && existing.status !== "cancelled") return json({ error: "schedule_already_exists" }, 409);
+    if (!existing) {
+      const created = await store.claim(`carecall:schedule:${id}`, schedule, 2 * 365 * 24 * 60 * 60);
+      if (!created) return json({ error: "schedule_already_exists" }, 409);
+    } else await store.set(`carecall:schedule:${id}`, schedule, 2 * 365 * 24 * 60 * 60);
     await store.addToIndex("carecall:schedules:due", next.getTime(), id);
+    try {
+      const job = await enqueueScheduledOccurrence(schedule, env);
+      schedule.current_job_id = job.id;
+      await store.set(`carecall:schedule:${id}`, schedule, 2 * 365 * 24 * 60 * 60);
+    } catch {
+      schedule.status = "needs_review";
+      await store.set(`carecall:schedule:${id}`, schedule, 2 * 365 * 24 * 60 * 60);
+      await store.removeFromIndex("carecall:schedules:due", id);
+      return json({ error: "schedule_queue_unavailable", message: "The schedule was saved for review, but no call was queued." }, 503);
+    }
     return json({ schedule: { ...schedule, phone_ciphertext: undefined } }, 201);
   }
 
@@ -44,13 +58,23 @@ export default async function handler(request: Request): Promise<Response> {
     if (!operatorCanAccessSenior(operator, schedule.senior.id)) return json({ error: "senior_scope_denied" }, 403);
     if (schedule.status === "cancelled" && body.status !== "cancelled") return json({ error: "cancelled_schedule_requires_new_authorization" }, 409);
     schedule.status = body.status;
-    if (body.status === "cancelled") schedule.phone_ciphertext = "";
-    if (body.status === "active") schedule.next_run = nextOccurrence(new Date(), schedule.frequency, schedule.time_sgt).toISOString();
+    if (body.status !== "active") await cancelQueuedJobForSchedule(schedule.current_job_id, env, `schedule_${body.status}`);
+    if (body.status === "cancelled") { schedule.phone_ciphertext = ""; schedule.current_job_id = undefined; }
+    if (body.status === "paused") schedule.current_job_id = undefined;
+    if (body.status === "active") {
+      schedule.next_run = nextEligibleOccurrence(new Date(), schedule.frequency, schedule.time_sgt, schedule.skip_dates).toISOString();
+      try { schedule.current_job_id = (await enqueueScheduledOccurrence(schedule, env)).id; }
+      catch { schedule.status = "needs_review"; }
+    }
     await store.set(`carecall:schedule:${schedule.id}`, schedule, 2 * 365 * 24 * 60 * 60);
-    if (body.status === "active") await store.addToIndex("carecall:schedules:due", Date.parse(schedule.next_run), schedule.id);
+    if (schedule.status === "active") await store.addToIndex("carecall:schedules:due", Date.parse(schedule.next_run), schedule.id);
     else await store.removeFromIndex("carecall:schedules:due", schedule.id);
     return json({ schedule: { ...schedule, phone_ciphertext: undefined } });
   }
 
   return json({ error: "method_not_allowed" }, 405);
+}
+
+export default function handler(request: Request): Promise<Response> {
+  return handleSchedules(request, envFromProcess());
 }

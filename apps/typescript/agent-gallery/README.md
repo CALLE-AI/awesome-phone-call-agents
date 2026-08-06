@@ -30,7 +30,10 @@ The CareCall single-call and controlled-recurrence foundation is implemented:
 - durable request claims, daily spending limits, call ownership, outcomes, attention cases, and audit events
 - caregiver-authorized daily or weekday schedules with an explicit review date
 - encrypted scheduled phone numbers, dated call exceptions, and terminal cancellation that removes the ciphertext
-- a host-owned scheduler with stable occurrence keys, no blind call retries, and fail-closed human review
+- one durable queue for manual and scheduled calls, with a single active-call lease and cancellable queued jobs
+- signed QStash delivery for exact-time wake-ups and background provider-status monitoring
+- a once-daily host reconciliation cron that repairs state but never initiates late calls
+- stable occurrence keys, no blind call retries, and fail-closed human review
 - English-only live-call enforcement until other languages are verified
 - accessible focus, reduced-motion, reduced-transparency, high-contrast, and dark-mode behavior
 
@@ -84,31 +87,31 @@ UPSTASH_REDIS_REST_TOKEN=<server-side standard token>
 CARECALL_MAX_CALLS_PER_DAY=20
 CARECALL_DATA_ENCRYPTION_KEY=<at least 32 random characters, stored server-side>
 CRON_SECRET=<high-entropy scheduler bearer secret>
+CARECALL_PUBLIC_BASE_URL=https://<production-host>
+QSTASH_TOKEN=<server-side QStash publishing token>
+QSTASH_CURRENT_SIGNING_KEY=<QStash current signing key>
+QSTASH_NEXT_SIGNING_KEY=<QStash next signing key>
 ```
 
-Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sessions are HMAC-signed, expire after 30 minutes, and are checked against the current operator configuration on every protected request. The Redis standard token, data-encryption key, and scheduler secret must remain server-side.
+Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sessions are HMAC-signed, expire after 30 minutes, and are checked against the current operator configuration on every protected request. Redis, QStash, data-encryption, and scheduler credentials must remain server-side.
 
-## Recurring schedule operation
+## Queue and recurring schedule operation
 
-The host invokes `GET /api/carecall/scheduler` once per minute with `Authorization: Bearer $CRON_SECRET`. The repository does not register that cron in `vercel.json`, because Vercel Hobby projects accept only daily cron jobs and a daily scheduler cannot safely honor arbitrary call times or permitted windows. Use a trusted external minute scheduler, or add the following entry to `vercel.json` on a Vercel plan that supports it:
+Manual and recurring authorizations both create encrypted durable call jobs. QStash delivers a signed, minimal message containing only the job ID to `/api/carecall/worker`; the worker verifies both current and next signing keys before reading the protected job from Redis.
 
-```json
-{
-  "crons": [
-    { "path": "/api/carecall/scheduler", "schedule": "* * * * *" }
-  ]
-}
-```
+The queue permits one ongoing CareCall at a time. If the active lease is occupied, later calls remain queued. Manual authorization expires after 30 minutes rather than waiting indefinitely. When provider status becomes terminal, a delayed status message records the conservative outcome, releases the lease, and wakes the next job. Delivery retries cannot create another phone call because the call request still passes through the durable request claim.
 
-For each due occurrence, the scheduler:
+Immediately before dialing, the worker rechecks:
 
-1. checks that the schedule remains active, within its review period, and not listed as a dated exception
-2. rechecks the creating operator against the current operator configuration
-3. decrypts the phone number only while constructing the server-side request
-4. submits exactly one CALL-E request with a stable key derived from the schedule and occurrence
-5. advances the next occurrence only after CALL-E accepts the call
+1. operator and senior scope
+2. recurring schedule status and review period
+3. the senior's permitted Singapore call window
+4. daily spending and durable idempotency limits
+5. cancellation and the stable occurrence key
 
-An expired review date, revoked operator, invalid stored record, or failed call start moves the schedule to `needs_review` and removes it from the due index. The scheduler does not blindly retry calls. Pausing removes a schedule from the due index; cancellation is terminal, removes the stored phone ciphertext, and requires a new authorization to schedule again. Cancellation cannot recall a call that the provider has already accepted, so operators should pause or cancel before the due time.
+The Hobby-compatible Vercel cron in `vercel.json` runs once daily and invokes `/api/carecall/scheduler` with `CRON_SECRET`. It is a reconciliation safety net only: it repairs missing status checks, identifies missing jobs, expires reviews, and sends missed occurrences to human review. It never places a late call. Exact-time execution comes from QStash delayed delivery rather than the daily cron.
+
+An expired review date, revoked operator, invalid encrypted record, missed occurrence, or failed call start moves the job and schedule to `needs_review`. Queued manual calls can be cancelled before they start. Schedule pause invalidates its queued occurrence; cancellation also removes stored phone ciphertext and requires new authorization. An ongoing provider call cannot be recalled.
 
 ## UI structure
 
@@ -137,7 +140,7 @@ The older `screens/` and `workflows/appointment-recovery/` directories remain te
 
 ## Next implementation milestone
 
-Pilot readiness and organisation administration:
+Phase 5B queue hardening is implemented. Pilot readiness and organisation administration follow:
 
 1. Verify one consenting end-to-end English call from the deployed interface with durable operations configured.
 2. Run controlled recurring-call acceptance tests covering pause, cancellation, review expiry, host overlap, and provider failure.
@@ -154,5 +157,6 @@ The live CareCall path requires:
 - explicit authority to contact the senior
 - a one-call or explicit recurring authorization gate after preview
 - immediate submit disabling and durable duplicate prevention with stable request keys
+- a shared durable call queue with one active-call lease and signed worker delivery
 - clear pause and terminal cancellation for every recurring routine
 - no credentials or live calls in default tests

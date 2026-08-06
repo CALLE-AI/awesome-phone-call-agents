@@ -25,6 +25,17 @@ test("durable claims are atomic and return the original record", async () => {
   assert.deepEqual(await store.get("request-1"), { state: "pending" });
 });
 
+test("durable leases refresh and release only for their current owner", async () => {
+  const store = new MemoryDurableStore();
+  const owner = { job_id: "job-1" };
+  assert.equal(await store.claim("active-call", owner, 60), true);
+  assert.equal(await store.refreshClaim("active-call", { job_id: "job-2" }, 60), false);
+  assert.equal(await store.refreshClaim("active-call", owner, 60), true);
+  assert.equal(await store.releaseClaim("active-call", { job_id: "job-2" }), false);
+  assert.equal(await store.releaseClaim("active-call", owner), true);
+  assert.equal(await store.get("active-call"), null);
+});
+
 test("durable counters and indexes survive separate operations", async () => {
   const store = new MemoryDurableStore();
   assert.equal(await store.increment("daily", 60), 1);
