@@ -60,7 +60,7 @@ export async function discoverLine(line: LineConfig, calls: CallePort, model: Mo
       resultSchema: MAPPING_SCHEMA,
       metadata: { linecanary_discover: line.id },
     },
-    idempotencyKeyFor(`discover-${line.id}`, new Date()),
+    idempotencyKeyFor(`discover-${line.id}`, line.phone, new Date()),
   );
   const terminal = await calls.waitForResult(created.id, { timeoutMs: 300_000, intervalMs: 5_000 });
   if (terminal.status !== "completed" || terminal.structuredResult === null) {

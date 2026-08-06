@@ -22,7 +22,7 @@ function normalizeCode(value: string): string {
 
 export async function verifyLine(
   line: LineConfig,
-  port: CallePort,
+  port: CallePort | null,
   store: BaselineStore,
   now: () => Date = () => new Date(),
 ): Promise<{ ok: boolean; detail: string }> {
@@ -37,6 +37,9 @@ export async function verifyLine(
     return { ok: true, detail: `Recorded attestation for ${line.id}: ${line.ownership.statement}` };
   }
 
+  if (port === null) {
+    throw new Error("greeting_code verification places a call and needs a CALL-E port.");
+  }
   const expected = line.ownership.code;
   // The task deliberately never mentions codes: asking an agent to "report a
   // verification code" trips provider anti-fraud guardrails (they cannot know
@@ -64,7 +67,7 @@ export async function verifyLine(
       },
       metadata: { linecanary_verify: line.id },
     },
-    idempotencyKeyFor(`verify-${line.id}`, now()),
+    idempotencyKeyFor(`verify-${line.id}`, line.phone, now()),
   );
   const terminal = await port.waitForResult(created.id, { timeoutMs: 300_000, intervalMs: 5_000 });
 

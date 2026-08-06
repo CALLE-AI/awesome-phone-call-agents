@@ -10,7 +10,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { openStore } from "./baseline.js";
-import type { Config } from "./config.js";
+import { ConfigError, type Config } from "./config.js";
 import { renderCheckLog, renderDashboard, renderStatus } from "./pages.js";
 import { buildDashboardState } from "./state.js";
 
@@ -41,7 +41,18 @@ function authorized(header: string | undefined, password: string): boolean {
   return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
+const LOOPBACK = new Set(["127.0.0.1", "::1", "localhost"]);
+
 export function startDashboard(config: Config, options: DashboardOptions): Promise<DashboardServer> {
+  const host = options.host ?? "127.0.0.1";
+  if (!LOOPBACK.has(host) && options.password === undefined) {
+    // Operator surfaces carry full transcripts. Binding them beyond loopback
+    // without a password would publish them; refuse rather than expose.
+    throw new ConfigError(
+      `Refusing to bind the operator dashboard to ${host} without a password. ` +
+        "Set LINECANARY_DASHBOARD_PASSWORD, or bind to 127.0.0.1. The public status pages are the only unauthenticated surface.",
+    );
+  }
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
     const isPublic = url.pathname === "/status" || url.pathname.startsWith("/status/");
@@ -106,7 +117,7 @@ export function startDashboard(config: Config, options: DashboardOptions): Promi
   });
 
   return new Promise((resolve) => {
-    server.listen(options.port, options.host ?? "127.0.0.1", () => {
+    server.listen(options.port, host, () => {
       const address = server.address() as AddressInfo;
       resolve({
         port: address.port,

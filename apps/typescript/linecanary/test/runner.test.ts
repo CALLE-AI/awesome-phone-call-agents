@@ -100,7 +100,7 @@ test("live run calls once per check, appends outcomes and reports ok on first ru
     const task = fake.created[0].task;
     assert.ok(task.startsWith(DISCLOSURE_PREAMBLE), "disclosure preamble must lead the task");
     assert.ok(task.includes("Ask for Saturday hours."));
-    assert.ok(fake.created[0].idempotencyKey?.startsWith("linecanary:hours:"));
+    assert.ok(fake.created[0].idempotencyKey?.startsWith("linecanary:hours:+15550100:"), "key must be scoped by check AND phone");
   });
 });
 
@@ -210,4 +210,72 @@ test("live calls are refused outside the configured call window", async () => {
     });
     assert.ok(tuesday.runs.every((run) => run.skipped === "outside-call-window"));
   });
+});
+
+test("a failing first run fails the report even with no baseline to diff against", async () => {
+  await withLiveRun(
+    [
+      { phone: "+15550100", structuredResult: { answered: false }, turns: [] },
+      PASSING_SCENARIOS[1],
+    ],
+    async (fake, store) => {
+      const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+      const report = await runChecks(config(), port, store, { live: true, timeoutMs: 5_000, intervalMs: 10 });
+      // First run establishes the baseline, so no regressions exist yet —
+      // but a failing outcome must still fail the report (fail closed).
+      assert.equal(report.runs.find((run) => run.planned.checkId === "hours")?.outcome?.status, "fail");
+      assert.deepEqual(report.regressions, []);
+      assert.equal(report.ok, false);
+    },
+  );
+});
+
+test("an ambiguous create is reconciled on the next run with the same key — the line rings once", async () => {
+  await withLiveRun(
+    [
+      { ...PASSING_SCENARIOS[0], apiError: { status: 500, code: "internal_error", times: 1, afterCreate: true } },
+      PASSING_SCENARIOS[1],
+    ],
+    async (fake, store) => {
+      const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+      const first = await runChecks(config(), port, store, { live: true, timeoutMs: 5_000, intervalMs: 10 });
+      assert.equal(first.ok, false);
+      assert.match(first.runs.find((run) => run.planned.checkId === "hours")?.error ?? "", /ambiguous/);
+      const pending = store.pending("hours");
+      assert.ok(pending !== null, "an ambiguous create must persist a pending attempt");
+
+      const second = await runChecks(config(), port, store, { live: true, only: ["hours"], timeoutMs: 5_000, intervalMs: 10 });
+      assert.equal(second.ok, true);
+      assert.equal(second.runs.find((run) => run.planned.checkId === "hours")?.outcome?.status, "pass");
+      // The provider replayed the stored create for the reused key:
+      // exactly one call ever reached the line.
+      assert.equal(fake.created.filter((call) => call.phones.includes("+15550100")).length, 1);
+      assert.equal(store.history("hours").length, 1);
+      assert.equal(store.pending("hours"), null);
+    },
+  );
+});
+
+test("a poll timeout is recovered on the next run by its call id, without dialing again", async () => {
+  await withLiveRun(
+    [
+      { ...PASSING_SCENARIOS[0], pollsBeforeTerminal: 999 },
+      PASSING_SCENARIOS[1],
+    ],
+    async (fake, store) => {
+      const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+      const first = await runChecks(config(), port, store, { live: true, only: ["hours"], timeoutMs: 150, intervalMs: 25 });
+      assert.equal(first.ok, false);
+      assert.match(first.runs.find((run) => run.planned.checkId === "hours")?.error ?? "", /timeout/);
+      const pending = store.pending("hours");
+      assert.ok(pending?.callId, "a timeout after create must persist the call id");
+
+      fake.setScenario(PASSING_SCENARIOS[0]);
+      const second = await runChecks(config(), port, store, { live: true, only: ["hours"], timeoutMs: 5_000, intervalMs: 10 });
+      assert.equal(second.ok, true);
+      assert.equal(fake.created.filter((call) => call.phones.includes("+15550100")).length, 1);
+      assert.equal(store.history("hours").length, 1);
+      assert.equal(store.pending("hours"), null);
+    },
+  );
 });

@@ -27,7 +27,7 @@ Add the line + checks to your config (see
 then:
 
 ```bash
-npx tsx src/cli.ts verify dental-ivr --config <config>   # hears LC-7391 in the greeting
+npx tsx src/cli.ts verify dental-ivr --live --config <config>   # hears LC-7391 in the greeting
 npx tsx src/cli.ts run --config <config> --live
 ```
 

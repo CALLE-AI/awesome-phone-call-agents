@@ -22,7 +22,7 @@ LineCanary live @ 2026-08-03 — ATTENTION
 3. **Run on your schedule — inside your window.** Cron or GitHub Actions owns recurrence; each invocation places at most one call per check, and only inside your configured `callWindow`. Every call opens with an AI disclosure.
 4. **Assert, baseline, diff.** Deterministic assertions on the schema-validated result (`equals`/`contains`/`matches`/`oneOf`/`exists`), timing bounds from transcript offsets, confidence floors — then regression detection against the line's own history (new failures, regressed assertions, answer-time blowouts, confidence drops, recoveries).
 5. **Get paged with substance.** Console + exit codes for CI, Slack webhook for humans. Alerts name the check, the assertion and the delta — never full phone numbers.
-6. **Start from a phone call, not a blank config.** `linecanary discover <line>` places one mapping call; AI listens to the whole journey and drafts your checks in config format — review, merge, monitor.
+6. **Start from a phone call, not a blank config.** `linecanary discover <line> --live` places one mapping call (only on a line you have already verified); AI listens to the whole journey and drafts your checks in config format — review, merge, monitor.
 7. **See it, share it.** `linecanary serve` renders the operator dashboard — line health, answer-time trends, regression events, and the full timed transcript of what the canary heard on every call. `/status/<line-id>` (or `linecanary status --html --line <id>`) renders a public, client-safe status page **per line** — uptime percentage included, no tasks, no transcripts, no numbers, and never another client's lines. `/check/<id>` is the call log: every stored call browsable with its full transcript.
 
 ## Quickstart
@@ -32,13 +32,13 @@ npm install
 npx tsx src/cli.ts init                 # writes linecanary.config.json
 # edit lines + checks, put your verification code in the line's greeting
 export CALLE_API_KEY=calle_live_…
-npx tsx src/cli.ts verify main-office   # one call, proves you control the line
+npx tsx src/cli.ts verify main-office --live   # one call, proves you control the line
 npx tsx src/cli.ts run                  # dry-run: prints the plan, calls nothing
 npx tsx src/cli.ts run --live           # places the calls, writes baselines
 npx tsx src/cli.ts serve                # dashboard at http://127.0.0.1:4477
 npx tsx src/cli.ts status --html status.html --title "Main line"  # public status page
 npx tsx src/cli.ts explain ivr-billing-branch   # AI incident note (needs ANTHROPIC_API_KEY)
-npx tsx src/cli.ts discover main-office         # one call maps the line, AI drafts your checks
+npx tsx src/cli.ts discover main-office --live  # one call maps the line, AI drafts your checks
 ```
 
 No CALL-E account yet? `npm run demo` runs the whole loop — healthy day, silent IVR breakage, regression alert — against a local fake server with zero network and zero calls.

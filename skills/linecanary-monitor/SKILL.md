@@ -61,7 +61,7 @@ npm install
 
 npx tsx src/cli.ts init                          # starter config
 npx tsx src/cli.ts run                           # dry-run: plan only, no calls
-npx tsx src/cli.ts verify <line-id>              # one call; needs CALLE_API_KEY
+npx tsx src/cli.ts verify <line-id> --live       # one call; needs CALLE_API_KEY
 npx tsx src/cli.ts run --live --json report.json # the real thing
 npx tsx src/cli.ts report                        # stored history per check
 ```

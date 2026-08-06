@@ -2,7 +2,7 @@
  * The linecanary CLI.
  *
  *   linecanary init   [--config path]                      write a starter config
- *   linecanary verify <line-id> [--config path]            prove line ownership
+ *   linecanary verify <line-id> --live [--config path]     prove line ownership
  *   linecanary run    [--config path] [--live] [--only a,b] [--json path]
  *   linecanary report [--config path]                      print stored history
  *
@@ -28,13 +28,13 @@ import { verifyLine } from "./verify.js";
 
 const USAGE = `usage:
   linecanary init   [--config path]
-  linecanary verify <line-id> [--config path]
+  linecanary verify <line-id> --live [--config path]
   linecanary run    [--config path] [--live] [--only id,id] [--json path]
   linecanary report [--config path]
   linecanary serve  [--config path] [--port n] [--title text]
   linecanary status [--config path] [--html out.html] [--title text] [--line id]
   linecanary explain <check-id> [--config path] [--save]
-  linecanary discover <line-id> [--config path] [--out draft.json]`;
+  linecanary discover <line-id> --live [--config path] [--out draft.json]`;
 
 interface Flags {
   config: string;
@@ -127,8 +127,15 @@ async function commandVerify(flags: Flags): Promise<number> {
     process.stderr.write(`No line ${lineId} in ${flags.config}.\n`);
     return 2;
   }
+  if (line.ownership.method === "greeting_code" && !flags.live) {
+    process.stdout.write(
+      `DRY RUN — no call placed. verify would place one greeting-code verification call to ${line.phone} (${line.id}).\n` +
+        `Re-run with --live to place it: linecanary verify ${line.id} --live\n`,
+    );
+    return 0;
+  }
   const store = openStore(config.baselineDir, config.historyLimit);
-  const port = await makePort();
+  const port = line.ownership.method === "greeting_code" ? await makePort() : null;
   const result = await verifyLine(line, port, store);
   process.stdout.write(`${result.detail}\n`);
   return result.ok ? 0 : 1;
@@ -292,6 +299,22 @@ async function commandDiscover(flags: Flags): Promise<number> {
   if (line === undefined) {
     process.stderr.write(`No line ${lineId} in ${flags.config}.\n`);
     return 2;
+  }
+  const store = openStore(config.baselineDir, config.historyLimit);
+  const verification = store.verification(line.id);
+  if (verification === null || verification.phone !== line.phone) {
+    process.stderr.write(
+      `Line ${lineId} is not ownership-verified. Discovery places a real call, so it holds to the same gate as live runs.\n` +
+        `Run first: linecanary verify ${lineId} --live\n`,
+    );
+    return 2;
+  }
+  if (!flags.live) {
+    process.stdout.write(
+      `DRY RUN — no call placed. discover would place one mapping call to ${line.phone} (${line.id}).\n` +
+        `Re-run with --live to place it: linecanary discover ${lineId} --live\n`,
+    );
+    return 0;
   }
   process.stdout.write(`Placing one discovery call to ${line.id} to map the caller journey…\n`);
   const calls = await makePort();

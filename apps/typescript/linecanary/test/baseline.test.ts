@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../src/baseline.js";
@@ -65,4 +65,32 @@ test("line verification round-trips and is null when absent", () => {
   const reopened = openStore(dir);
   assert.equal(reopened.verification("main-office")?.method, "greeting_code");
   assert.equal(reopened.verification("other-line"), null);
+});
+
+test("a corrupt history file is quarantined loudly, never silently reset", () => {
+  const dir = join(mkdtempSync(join(tmpdir(), "linecanary-store-")), "baselines");
+  const store = openStore(dir);
+  store.append(outcome({ callId: "call_1" }));
+  const file = join(dir, "hours.history.json");
+  writeFileSync(file, "{ this is not json");
+
+  assert.deepEqual(store.history("hours"), []);
+  assert.equal(existsSync(file), false, "the corrupt file must be moved aside");
+  assert.ok(
+    readdirSync(dir).some((name) => name.startsWith("hours.history.json.corrupt-")),
+    "the corrupt file must survive under a quarantine name",
+  );
+});
+
+test("pending attempts round-trip and clear", () => {
+  const dir = join(mkdtempSync(join(tmpdir(), "linecanary-store-")), "baselines");
+  const store = openStore(dir);
+  assert.equal(store.pending("hours"), null);
+  store.recordPending({ checkId: "hours", idempotencyKey: "linecanary:hours:+15550100:2026-08-06T18:00", callId: null, at: "2026-08-06T18:00:00Z" });
+  assert.equal(store.pending("hours")?.callId, null);
+  store.recordPending({ checkId: "hours", idempotencyKey: "linecanary:hours:+15550100:2026-08-06T18:00", callId: "call_9", at: "2026-08-06T18:00:00Z" });
+  assert.equal(openStore(dir).pending("hours")?.callId, "call_9");
+  store.clearPending("hours");
+  assert.equal(store.pending("hours"), null);
+  store.clearPending("hours"); // idempotent
 });

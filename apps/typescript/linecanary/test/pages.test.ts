@@ -184,3 +184,7 @@ test("basic auth guards operator surfaces but never the public status pages", as
     await server.close();
   }
 });
+
+test("binding the dashboard beyond loopback without a password is refused", () => {
+  assert.throws(() => startDashboard(config(), { port: 0, host: "0.0.0.0" }), /password/);
+});

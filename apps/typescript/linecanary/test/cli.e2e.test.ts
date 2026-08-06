@@ -86,8 +86,13 @@ test("init → verify → live run → regression → exit codes", { timeout: 12
     assert.match(unverified.stdout, /unverified-line/);
     assert.equal(fake.created.length, 0);
 
+    // verify without --live is a preview, never a call
+    const dryVerify = await cli(["verify", "main-office", "--config", configPath], env);
+    assert.equal(dryVerify.code, 0, dryVerify.stderr);
+    assert.match(dryVerify.stdout, /DRY RUN/);
+
     // verify the line via greeting code
-    const verify = await cli(["verify", "main-office", "--config", configPath], env);
+    const verify = await cli(["verify", "main-office", "--live", "--config", configPath], env);
     assert.equal(verify.code, 0, verify.stderr);
     assert.match(verify.stdout, /verified/);
     assert.equal(fake.created.length, 1);

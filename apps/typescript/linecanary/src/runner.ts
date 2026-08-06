@@ -12,6 +12,7 @@
 import { evaluateCheck, type CheckOutcome } from "./assert.js";
 import type { BaselineStore } from "./baseline.js";
 import { ApiError, CallTimeoutError, type CallePort } from "./calle.js";
+import type { CallSnapshot } from "./types.js";
 import type { CallWindow, CheckConfig, Config, LineConfig } from "./config.js";
 import { diffAgainstBaseline, type Regression } from "./diff.js";
 
@@ -76,8 +77,10 @@ export function insideCallWindow(window: CallWindow, at: Date): boolean {
   return clock >= window.start && clock < window.end;
 }
 
-export function idempotencyKeyFor(checkId: string, startedAt: Date): string {
-  return `linecanary:${checkId}:${startedAt.toISOString().slice(0, 16)}`;
+export function idempotencyKeyFor(checkId: string, phone: string, startedAt: Date): string {
+  // Scoped by target phone: two configs reusing a check id under one
+  // provider account must never collide on a key with different bodies.
+  return `linecanary:${checkId}:${phone}:${startedAt.toISOString().slice(0, 16)}`;
 }
 
 export async function runChecks(
@@ -123,28 +126,50 @@ export async function runChecks(
       throw new Error("Live run requires a CALL-E port.");
     }
 
+    const pending = store.pending(check.id);
     try {
-      const created = await port.createCall(
-        {
-          task,
-          recipients: [{ phones: [line.phone], region: line.region, locale: line.locale }],
-          resultSchema: check.resultSchema,
-          metadata: { linecanary_check: check.id, linecanary_line: line.id },
-        },
-        idempotencyKeyFor(check.id, startedAt),
-      );
-      const terminal = await port.waitForResult(created.id, {
-        timeoutMs: options.timeoutMs,
-        intervalMs: options.intervalMs,
-      });
+      let terminal: CallSnapshot;
+      if (pending !== null && pending.callId !== null) {
+        // A previous run created this call but never recorded its result.
+        // Recover that result; do not dial the line again.
+        terminal = await port.waitForResult(pending.callId, {
+          timeoutMs: options.timeoutMs,
+          intervalMs: options.intervalMs,
+        });
+      } else {
+        // Reusing a pending key makes the provider replay the earlier create
+        // (identical body) instead of ringing the line a second time.
+        const key = pending?.idempotencyKey ?? idempotencyKeyFor(check.id, line.phone, startedAt);
+        store.recordPending({ checkId: check.id, idempotencyKey: key, callId: null, at: startedAt.toISOString() });
+        const created = await port.createCall(
+          {
+            task,
+            recipients: [{ phones: [line.phone], region: line.region, locale: line.locale }],
+            resultSchema: check.resultSchema,
+            metadata: { linecanary_check: check.id, linecanary_line: line.id },
+          },
+          key,
+        );
+        store.recordPending({ checkId: check.id, idempotencyKey: key, callId: created.id, at: startedAt.toISOString() });
+        terminal = await port.waitForResult(created.id, {
+          timeoutMs: options.timeoutMs,
+          intervalMs: options.intervalMs,
+        });
+      }
       const outcome = evaluateCheck(check, line.id, terminal);
       run.outcome = outcome;
       run.regressions = diffAgainstBaseline(outcome, store.history(check.id));
       store.append(outcome);
+      store.clearPending(check.id);
     } catch (error) {
       hadError = true;
       if (error instanceof ApiError) {
         run.error = `${error.code}${error.ambiguous ? " (ambiguous: a call may exist)" : ""}: ${error.message}`;
+        if (!error.ambiguous) {
+          // A definitive refusal (or a vanished call id): nothing exists to
+          // reconcile, so the next run may dial fresh.
+          store.clearPending(check.id);
+        }
       } else if (error instanceof CallTimeoutError) {
         run.error = `timeout waiting for the call result: ${error.message}`;
       } else {
@@ -154,6 +179,10 @@ export async function runChecks(
   }
 
   const regressions = runs.flatMap((run) => run.regressions);
-  const ok = !hadError && !regressions.some((entry) => ALERTING_KINDS.has(entry.kind));
+  // Fail closed: a failing outcome is a failure even with no baseline to
+  // diff against — a first-run failure must page, not establish itself as
+  // the baseline of a "healthy" check.
+  const failedOutcome = runs.some((run) => run.outcome !== null && run.outcome.status !== "pass");
+  const ok = !hadError && !failedOutcome && !regressions.some((entry) => ALERTING_KINDS.has(entry.kind));
   return { startedAt: startedAt.toISOString(), live: options.live, runs, regressions, ok };
 }

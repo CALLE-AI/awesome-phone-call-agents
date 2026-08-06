@@ -23,7 +23,7 @@ It passed at 19:36, so the breakage is in that window."
    greeting), checks for the caller journeys that matter (menu integrity,
    the appointment branch, hours question).
 2. Dry-run first — show the user the planned calls: `npx tsx src/cli.ts run`.
-3. `npx tsx src/cli.ts verify clinic-main` (one call; requires
+3. `npx tsx src/cli.ts verify clinic-main --live` (one call; requires
    `CALLE_API_KEY`).
 4. First live run baselines: `npx tsx src/cli.ts run --live`.
 5. Recurrence belongs to the host: offer the GitHub Actions workflow from
