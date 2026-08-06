@@ -37,6 +37,13 @@ Three shapes, which cover every provider the examples were written against.
 `path` walks the decoded JSON key by key. A missing key, plus a value that is not a
 non-empty string, is a refusal naming the path the descriptor declared.
 
+`urlField` is the one shape where the provider decides what this app fetches next,
+so the link is checked before it is followed: https, a host you named with
+`--allow-host` or `VOICE_ALLOWED_HOSTS`, no credentials in the URL itself and no
+literal address in loopback, link-local or private space. A provider whose audio
+sits on a separate CDN host needs that host named too. The link is fetched without
+the credential, because the key belongs to the endpoint.
+
 ## Order of operations
 
 Worth knowing, because it decides what has happened when a run fails.
@@ -49,6 +56,14 @@ Worth knowing, because it decides what has happened when a run fails.
 4. The credential is read from the environment. Missing means nothing is sent.
 5. The request goes out. A non-2xx status, plus a response with no audio at the
    declared location, is a refusal and no file is written.
+6. A redirect is followed by hand, up to three hops. Every `Location` goes through
+   the same check as the endpoint. The headers are rebuilt for the hop only after
+   it passes. A hop that stays on the origin the request started from is the same
+   destination, so a provider can still move a path. A hop anywhere else has to be
+   https on a host you named, so the credential cannot follow a `Location` off the
+   allowlist.
+7. An audio URL in the response is checked the same way, then fetched without the
+   credential.
 
 ## The shipped examples
 

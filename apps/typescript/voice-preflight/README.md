@@ -141,6 +141,14 @@ Rendered audio is cached under a digest of provider, voice and text and written
 `0600`. An unchanged script is never paid for twice. An edited one is always
 re-read.
 
+**A provider does not get to redirect that.** Redirects are followed by hand, up to
+three hops. Every hop goes through the same host and protocol check as the endpoint
+before the headers are rebuilt for it. A hop that stays on the origin the request
+started from is the same destination, so a provider can still move a path.
+Anything else has to be https on a host you named. The same check runs on an audio
+URL a `urlField` provider returns, which is fetched without the credential and may
+not point at loopback, link-local or private space.
+
 ## Exit codes
 
 | Code | Meaning |

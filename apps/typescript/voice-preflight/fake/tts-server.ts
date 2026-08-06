@@ -9,6 +9,11 @@
  * Two routes on purpose, because the descriptor supports two audio locations:
  * `/speak` answers with the bytes in the body, `/speak-json` answers with the
  * same bytes base64 encoded inside a JSON field.
+ *
+ * Three more exist for the trust boundaries a provider controls at runtime:
+ * `/redirect` answers with a Location, `/speak-url` answers with a URL where it
+ * claims the audio is and `/audio.wav` serves bytes without asking for the
+ * credential, the way a link a provider hands out behaves.
  */
 
 import { createServer, type Server } from "node:http";
@@ -48,13 +53,19 @@ export interface FakeOptions {
   authHeader?: string;
   /** Force a status, so a test can drive the failure path. */
   failWith?: number;
+  /** Where `/redirect` points. Relative stays on this origin, absolute leaves it. */
+  redirectTo?: string;
+  /** Status `/redirect` answers with. 302 by default. */
+  redirectStatus?: number;
+  /** URL `/speak-url` reports as the place the audio is. */
+  audioUrl?: string;
 }
 
 export interface FakeProvider {
   url: string;
   server: Server;
   /** Every request seen, so a test can assert what was sent. */
-  seen: Array<{ path: string; auth: string | undefined; body: string }>;
+  seen: Array<{ method: string; path: string; auth: string | undefined; body: string }>;
   close: () => Promise<void>;
 }
 
@@ -69,8 +80,20 @@ export async function startFakeProvider(options: FakeOptions): Promise<FakeProvi
       const body = Buffer.concat(chunks).toString("utf8");
       const auth = req.headers[authHeader];
       const path = (req.url ?? "/").split("?")[0] ?? "/";
-      seen.push({ path, auth: typeof auth === "string" ? auth : undefined, body });
+      seen.push({
+        method: req.method ?? "GET",
+        path,
+        auth: typeof auth === "string" ? auth : undefined,
+        body,
+      });
 
+      // A link a provider hands out is fetched without the credential, so this
+      // route does not ask for one.
+      if (path === "/audio.wav") {
+        res.writeHead(200, { "content-type": "audio/wav" });
+        res.end(wavOfSeconds(1));
+        return;
+      }
       if (options.failWith !== undefined) {
         res.writeHead(options.failWith, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "forced" }));
@@ -79,6 +102,13 @@ export async function startFakeProvider(options: FakeOptions): Promise<FakeProvi
       if (auth !== options.expectKey) {
         res.writeHead(401, { "content-type": "application/json" });
         res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      if (path === "/redirect") {
+        res.writeHead(options.redirectStatus ?? 302, {
+          location: options.redirectTo ?? "/speak",
+        });
+        res.end();
         return;
       }
       let text = "";
@@ -92,6 +122,11 @@ export async function startFakeProvider(options: FakeOptions): Promise<FakeProvi
         text = "";
       }
       const wav = wavOfSeconds(text.length / CHARS_PER_SECOND);
+      if (path === "/speak-url") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ data: { url: options.audioUrl ?? "/audio.wav" } }));
+        return;
+      }
       if (path === "/speak-json") {
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ result: { audio: wav.toString("base64") } }));
