@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { routines } from "../carecall/fixtures";
+import { useRoutineDirectory } from "../carecall/routine-directory-context";
 import { useSeniorDirectory } from "../carecall/senior-directory-context";
 import type { CareRoutine } from "../carecall/types";
 import {
@@ -31,6 +31,7 @@ function initials(name: string): string {
 
 export function Calls({ sessionToken, onAuthenticated, onNotice, onPreview }: { sessionToken: string; onAuthenticated: (token: string) => void; onNotice: (message: string) => void; onPreview: (routine: CareRoutine) => void }) {
   const { seniors } = useSeniorDirectory();
+  const { findRoutine } = useRoutineDirectory();
   const [operatorId, setOperatorId] = useState("mei-chen");
   const [accessCode, setAccessCode] = useState("");
   const [signingIn, setSigningIn] = useState(false);
@@ -199,7 +200,7 @@ export function Calls({ sessionToken, onAuthenticated, onNotice, onPreview }: { 
               // links to the routine as it stands now. A job whose routine or
               // senior is no longer in the directory stays plain text rather
               // than opening a sheet that cannot be built.
-              const linkedRoutine = routines.find((routine) => routine.id === job.routine.id);
+              const linkedRoutine = findRoutine(job.routine.id);
               const openable = linkedRoutine && knownSenior;
               return (
                 <article className="call-record" data-state={job.status} key={job.job_id}>

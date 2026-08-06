@@ -1,4 +1,4 @@
-export type CareCallRoutineKind = "medication" | "meal";
+export type CareCallRoutineKind = "medication" | "meal" | "hydration" | "wellbeing" | "appointment";
 
 export type CareCallMedicationOutcome =
   | "self_reported_taken"
@@ -19,9 +19,44 @@ export type CareCallMealOutcome =
   | "declined"
   | "requests_help";
 
+export type CareCallHydrationOutcome =
+  | "self_reported_drank"
+  | "will_drink"
+  | "unsure_if_drank"
+  | "no_drink_available"
+  | "declined"
+  | "requests_help"
+  | "not_feeling_well";
+
+/**
+ * A wellbeing check-in records what the senior chose to say about themselves.
+ * CareCall does not assess mood, screen for depression, or infer a condition
+ * the senior did not state, so every option here is either a plain self-report
+ * or a request to involve a human.
+ */
+export type CareCallWellbeingOutcome =
+  | "self_reported_well"
+  | "reports_feeling_low"
+  | "wants_company"
+  | "not_feeling_well"
+  | "declined"
+  | "requests_help";
+
+export type CareCallAppointmentOutcome =
+  | "appointment_acknowledged"
+  | "will_attend"
+  | "needs_transport"
+  | "cannot_attend"
+  | "unsure_of_appointment"
+  | "declined"
+  | "requests_help";
+
 export type CareCallOutcome =
   | CareCallMedicationOutcome
   | CareCallMealOutcome
+  | CareCallHydrationOutcome
+  | CareCallWellbeingOutcome
+  | CareCallAppointmentOutcome
   | "no_answer"
   | "failed"
   | "timed_out"

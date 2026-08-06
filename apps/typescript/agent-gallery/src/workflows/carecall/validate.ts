@@ -1,4 +1,7 @@
-import type { CareCallRequest } from "./types";
+import type { CareCallRequest, CareCallRoutineKind } from "./types";
+
+/** The kinds a live call may run. A kind reaches this list only once it has its own outcome vocabulary. */
+export const careCallRoutineKinds: readonly CareCallRoutineKind[] = ["medication", "meal", "hydration", "wellbeing", "appointment"];
 
 const E164 = /^\+[1-9]\d{7,14}$/;
 const PERMITTED_CALL_WINDOW = /^(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
@@ -78,7 +81,7 @@ export function validateCareCallRequest(
   if (!request.routine?.caregiver_instruction?.trim()) errors.push("caregiver instruction is required");
   if (!request.routine?.caregiver_name?.trim()) errors.push("caregiver name is required");
   if (!request.routine?.trust_phrase?.trim()) errors.push("trust phrase is required");
-  if (!(["medication", "meal"] as const).includes(request.routine?.kind)) errors.push("routine kind is invalid");
+  if (!careCallRoutineKinds.includes(request.routine?.kind)) errors.push("routine kind is invalid");
   if (request.authorization?.exactly_one_call !== true) errors.push("exactly one call must be authorized");
   const authorizedAt = Date.parse(request.authorization?.authorized_at ?? "");
   if (!request.authorization?.authorized_at || Number.isNaN(authorizedAt)) {

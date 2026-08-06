@@ -1,4 +1,4 @@
-import { routines } from "../carecall/fixtures";
+import { useRoutineDirectory } from "../carecall/routine-directory-context";
 import { useSeniorDirectory } from "../carecall/senior-directory-context";
 import type { AttentionCase, CareRoutine } from "../carecall/types";
 import { Icon } from "../components/Icon";
@@ -6,6 +6,7 @@ import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
 
 export function NeedsAttention({ cases, onPreview, onNotice, resolvedIds, onResolve }: { cases: AttentionCase[]; onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; resolvedIds: Set<string>; onResolve: (caseId: string) => void }) {
   const { seniors } = useSeniorDirectory();
+  const { findRoutine } = useRoutineDirectory();
   return (
     <div className="page">
       <header className="page-intro page-intro--compact">
@@ -21,7 +22,7 @@ export function NeedsAttention({ cases, onPreview, onNotice, resolvedIds, onReso
         <section className="attention-list" aria-label="Open care cases">
           {cases.map((item) => {
             const senior = seniors.find((candidate) => candidate.id === item.seniorId)!;
-            const routine = routines.find((candidate) => candidate.id === item.routineId)!;
+            const routine = findRoutine(item.routineId)!;
             const isAcknowledged = resolvedIds.has(item.id);
             return (
               <article className="surface case-card" data-priority={item.priority} data-resolved={isAcknowledged} key={item.id}>

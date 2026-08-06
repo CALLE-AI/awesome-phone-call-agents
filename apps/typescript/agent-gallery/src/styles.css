@@ -3764,3 +3764,140 @@ p {
   background: var(--accent-soft);
   text-decoration: underline;
 }
+
+/* Routine builder: kind picker, plan source, and planned-enhancement note */
+
+.routine-kind-field {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 9px;
+}
+
+.routine-kind-field legend {
+  padding: 0;
+  color: var(--label);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.routine-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 9px;
+}
+
+.routine-kind-option {
+  display: flex;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.routine-kind-option[data-selected="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.routine-kind-option input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.routine-kind-option > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.routine-kind-option strong {
+  color: var(--label);
+  font-size: 13px;
+  font-weight: 660;
+}
+
+.routine-kind-option small {
+  color: var(--secondary-label);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.senior-edit-grid textarea {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 12px;
+  color: var(--label);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 520;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.preview-block--boundary .preview-boundary {
+  margin: 0;
+  color: var(--secondary-label);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plan-source {
+  display: flex;
+  margin: 10px 0 0;
+  color: var(--secondary-label);
+  font-size: 12px;
+  line-height: 1.45;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.plan-source .icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.future-note {
+  display: flex;
+  padding: 15px;
+  border: 1px dashed var(--separator-strong);
+  border-radius: 14px;
+  background: var(--surface-muted);
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.future-note__mark {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.future-note strong {
+  display: block;
+  color: var(--label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.future-note p {
+  margin: 6px 0 0;
+  color: var(--secondary-label);
+  font-size: 13px;
+  line-height: 1.55;
+}

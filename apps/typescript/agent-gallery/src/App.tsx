@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { attentionCases, routines } from "./carecall/fixtures";
+import { attentionCases } from "./carecall/fixtures";
+import { RoutineDirectoryProvider, useRoutineDirectory } from "./carecall/routine-directory-context";
 import { seniorIsCallable } from "./carecall/senior-directory";
 import { SeniorDirectoryProvider, useSeniorDirectory } from "./carecall/senior-directory-context";
 import type { AttentionCase, CareRoutine, NavigationId, TimelineItem } from "./carecall/types";
 import { CallPreviewSheet } from "./components/CallPreviewSheet";
 import { CareCallExecutionSheet } from "./components/CareCallExecutionSheet";
 import { Icon, type IconName } from "./components/Icon";
+import { RoutineBuilderSheet } from "./components/RoutineBuilderSheet";
 import { ScheduleActivationSheet } from "./components/ScheduleActivationSheet";
 import { Calls } from "./screens-care/Calls";
 import { CareRoutines } from "./screens-care/CareRoutines";
@@ -40,18 +42,22 @@ function Brand() {
 export function App() {
   return (
     <SeniorDirectoryProvider>
-      <CareWorkspace />
+      <RoutineDirectoryProvider>
+        <CareWorkspace />
+      </RoutineDirectoryProvider>
     </SeniorDirectoryProvider>
   );
 }
 
 function CareWorkspace() {
   const { seniors, findSenior } = useSeniorDirectory();
+  const { findRoutine, createRoutine } = useRoutineDirectory();
   const [view, setView] = useState<NavigationId>("today");
   const [selectedSeniorId, setSelectedSeniorId] = useState(seniors[0].id);
   const [previewRoutine, setPreviewRoutine] = useState<CareRoutine | null>(null);
   const [executionRoutine, setExecutionRoutine] = useState<CareRoutine | null>(null);
   const [scheduleRoutine, setScheduleRoutine] = useState<CareRoutine | null>(null);
+  const [buildingRoutine, setBuildingRoutine] = useState(false);
   const [resolvedAttentionIds, setResolvedAttentionIds] = useState<Set<string>>(new Set());
   const [runtimeAttentionCases, setRuntimeAttentionCases] = useState<AttentionCase[]>([]);
   const [durableAttentionCases, setDurableAttentionCases] = useState<AttentionCase[]>([]);
@@ -71,7 +77,7 @@ function CareWorkspace() {
   }, []);
 
   function previewFromTimeline(item: TimelineItem) {
-    const routine = routines.find((candidate) => candidate.id === item.routineId);
+    const routine = findRoutine(item.routineId);
     if (routine) setPreviewRoutine(routine);
   }
 
@@ -193,6 +199,7 @@ function CareWorkspace() {
           {view === "seniors" && (
             <Seniors
               attentionCases={allAttentionCases}
+              onNewRoutine={() => setBuildingRoutine(true)}
               onNotice={setNotice}
               onPreview={setPreviewRoutine}
               onSelect={setSelectedSeniorId}
@@ -200,7 +207,7 @@ function CareWorkspace() {
               selectedId={selectedSeniorId}
             />
           )}
-          {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} sessionToken={operatorSessionToken} />}
+          {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} onNewRoutine={() => setBuildingRoutine(true)} sessionToken={operatorSessionToken} />}
           {view === "attention" && (
             <NeedsAttention
               cases={allAttentionCases}
@@ -237,6 +244,18 @@ function CareWorkspace() {
             setPreviewRoutine(null);
           }}
           onActivate={() => { setScheduleRoutine(previewRoutine); setPreviewRoutine(null); }}
+        />
+      )}
+      {buildingRoutine && (
+        <RoutineBuilderSheet
+          initialSeniorId={selectedSeniorId}
+          onClose={() => setBuildingRoutine(false)}
+          onCreate={(draft, senior) => {
+            createRoutine(draft, senior);
+            setBuildingRoutine(false);
+            setNotice(`${draft.title} created for this demo session. It stays paused until a schedule or single call is authorized.`);
+          }}
+          seniors={seniors}
         />
       )}
       {scheduleRoutine && scheduleSenior && seniorIsCallable(scheduleSenior) && (

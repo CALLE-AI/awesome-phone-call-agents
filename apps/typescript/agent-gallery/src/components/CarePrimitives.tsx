@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "./Icon";
+import { routineKindProfile } from "../carecall/routine-kinds";
 import type { RoutineKind, TimelineStatus } from "../carecall/types";
 
 export function SeniorAvatar({ initials, tone, size = "regular" }: { initials: string; tone: string; size?: "small" | "regular" | "large" }) {
@@ -9,7 +10,7 @@ export function SeniorAvatar({ initials, tone, size = "regular" }: { initials: s
 export function RoutineIcon({ kind }: { kind: RoutineKind }) {
   return (
     <span className="routine-icon" data-kind={kind} aria-hidden="true">
-      <Icon name={kind === "medication" ? "medication" : "food"} size={18} />
+      <Icon name={routineKindProfile(kind).icon} size={18} />
     </span>
   );
 }

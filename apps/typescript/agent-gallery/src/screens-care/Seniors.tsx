@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { routines } from "../carecall/fixtures";
+import { useRoutineDirectory } from "../carecall/routine-directory-context";
 import { useSeniorDirectory } from "../carecall/senior-directory-context";
 import { routineIsSchedulable, seniorIsCallable, withdrawalImpact } from "../carecall/senior-directory";
 import type { AttentionCase, CareRoutine, SeniorEdit } from "../carecall/types";
@@ -15,12 +15,14 @@ interface SeniorsProps {
   onSelect: (seniorId: string) => void;
   onPreview: (routine: CareRoutine) => void;
   onNotice: (message: string) => void;
+  onNewRoutine: () => void;
 }
 
 const withdrawalDate = () => new Intl.DateTimeFormat("en-SG", { timeZone: "Asia/Singapore", dateStyle: "medium" }).format(new Date());
 
-export function Seniors({ selectedId, attentionCases, resolvedIds, onSelect, onPreview, onNotice }: SeniorsProps) {
+export function Seniors({ selectedId, attentionCases, resolvedIds, onSelect, onPreview, onNotice, onNewRoutine }: SeniorsProps) {
   const { seniors, editSenior, withdrawSeniorFromCare, restoreSeniorToCare } = useSeniorDirectory();
+  const { routinesForSenior } = useRoutineDirectory();
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -29,7 +31,7 @@ export function Seniors({ selectedId, attentionCases, resolvedIds, onSelect, onP
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const selected = seniors.find((senior) => senior.id === selectedId) ?? seniors[0];
-  const selectedRoutines = routines.filter((routine) => routine.seniorId === selected.id);
+  const selectedRoutines = routinesForSenior(selected.id);
   const callable = seniorIsCallable(selected);
 
   const visibleSeniors = useMemo(() => {
@@ -217,7 +219,7 @@ export function Seniors({ selectedId, attentionCases, resolvedIds, onSelect, onP
           <div className="profile-section">
             <SectionHeading
               title="Care routines"
-              action={<button className="text-button" type="button" onClick={() => onNotice("The routine builder is ready for the next implementation pass.")}><Icon name="plus" size={16} /> Add routine</button>}
+              action={<button className="text-button" type="button" onClick={onNewRoutine}><Icon name="plus" size={16} /> Add routine</button>}
             />
             <div className="profile-routines">
               {selectedRoutines.map((routine) => (

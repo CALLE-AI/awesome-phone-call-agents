@@ -1,6 +1,6 @@
 # CareCall SG
 
-CareCall SG is a Singapore-focused care companion calling workspace for caregiver-authorized medication reminders, meal check-ins, self-reported outcomes, and human escalation.
+CareCall SG is a Singapore-focused care companion calling workspace for caregiver-authorized reminders and check-ins, self-reported outcomes, and human escalation.
 
 > CareCall reminds seniors about approved everyday routines, records what they report, and directs exceptions to a human. It does not provide medical advice, verify adherence, dispatch emergency services, or replace human care.
 
@@ -13,14 +13,15 @@ The CareCall single-call and controlled-recurrence foundation is implemented:
 - responsive desktop and mobile navigation
 - Today dashboard and care timeline
 - fictional Singapore senior profiles
-- medication and meal care routines
+- medication, meal, hydration, wellbeing, and appointment care routines, each with its own outcome vocabulary and stated boundary
+- an operator routine builder with a live trust-first opening and conversation-plan preview
 - visible durable pause, resume, and cancellation controls
 - exception-only Needs Attention workspace
 - Singapore timezone, call-window, privacy, and safety settings
 - masked phone numbers
 - dry-run call preview with trust-first opening and explicit safety boundaries
 - separate authorization for exactly one real call
-- CareCall-specific medication and meal request validation
+- CareCall-specific per-kind request validation
 - trust-first CALL-E goals with medical, emergency, and anti-scam boundaries
 - live provider-status polling and conservative structured outcomes
 - operational urgency (`contact now`, `follow up today`, or `review`)
@@ -48,7 +49,7 @@ CareCall may:
 
 - repeat a caregiver-approved reminder
 - ask one clear follow-up question at a time
-- record only self-reported medication or meal outcomes
+- record only self-reported outcomes from the routine kind's own vocabulary
 - ask whether food is available or a planned delivery arrived
 - offer a callback from an authorized caregiver
 - route ambiguity, uncertainty, and requests for help to a human
@@ -143,6 +144,18 @@ Withdrawal is a state change rather than a deletion. A withdrawn senior keeps th
 
 These records are demo-session state. There is no durable senior store; edits are not persisted, and nothing is sent to the server.
 
+## Care routines
+
+An operator can write a care routine from Care Routines or from a senior's profile. A routine describes a call; it is created paused and places nothing until a schedule or a single call is separately authorized.
+
+Five kinds are supported: medication, meal, hydration, wellbeing, and appointment. Each kind carries its own permitted outcome vocabulary, its own conversation plan, and its own stated boundary. The vocabularies are keyed by kind in `src/workflows/carecall/result.ts`, so a kind added without one is a type error rather than a kind that silently inherits another's outcomes and reports a result the call never established. A wellbeing check-in records only what the senior chose to say — CareCall does not assess mood, screen for any condition, or interpret what it hears — and an appointment reminder repeats only caregiver-confirmed details without booking, moving, or cancelling anything.
+
+The trust-first opening and the four-step conversation plan are derived from the kind rather than authored per routine, so the preview an operator reads always describes what the agent is actually instructed to do. The parts an operator writes — the caregiver-approved wording and the trust phrase — are the parts that reach the provider.
+
+The builder refuses a call time outside the senior's permitted window when the routine is written. The worker would otherwise send that occurrence to human review, which is safe but silent, leaving the operator with no idea why the reminder never went out.
+
+A later pass could draft the opening and plan from the senior's care record, past outcomes, and an organisation's approved phrasing library, retrieved with RAG and composed through an AI API, so an operator reviews a proposed plan instead of writing one. That is recorded in the builder as a planned enhancement and is not implemented. Any such draft would remain a suggestion: the caregiver-approved wording, the kind's fixed boundary, and the separate authorization step would still gate every call.
+
 ## UI structure
 
 ```text
@@ -151,6 +164,9 @@ src/
 ├── carecall/
 │   ├── fixtures.ts           fictional Singapore care records
 │   ├── call-operations.ts    call-list contracts and state/time presentation
+│   ├── routine-kinds.ts      per-kind icon, purpose, plan, and stated boundary
+│   ├── routine-directory.ts  routine drafting, validation, and creation rules
+│   ├── routine-directory-context.tsx demo-session routine state shared by screens
 │   ├── senior-directory.ts   senior edit, withdrawal, and callability rules
 │   ├── senior-directory-context.tsx demo-session senior state shared by screens
 │   └── types.ts              UI-domain contracts
@@ -158,6 +174,7 @@ src/
 │   ├── CallPreviewSheet.tsx  masked, no-side-effect dry-run preview
 │   ├── CareCallExecutionSheet.tsx authorization, live polling, and result
 │   ├── ScheduleActivationSheet.tsx explicit recurring authorization
+│   ├── RoutineBuilderSheet.tsx kind picker with live opening and plan preview
 │   ├── SeniorEditSheet.tsx   validated senior record editing
 │   ├── SeniorWithdrawSheet.tsx confirmed withdrawal with stated impact
 │   ├── CarePrimitives.tsx    status, avatar, and routine components

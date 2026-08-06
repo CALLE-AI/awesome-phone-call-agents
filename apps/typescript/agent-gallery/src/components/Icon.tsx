@@ -5,6 +5,7 @@ export type IconName =
   | "chevron"
   | "clock"
   | "close"
+  | "droplet"
   | "food"
   | "heart"
   | "home"
@@ -28,6 +29,7 @@ const paths: Record<IconName, React.ReactNode> = {
   clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
   close: <path d="m6 6 12 12M18 6 6 18"/>,
   food: <><path d="M4 3v7a3 3 0 0 0 3 3V3M4 7h6M7 13v8"/><path d="M16 3v18M16 3c3 1.5 4 4 4 7v2h-4"/></>,
+  droplet: <path d="M12 2.7 6.9 8.3a7 7 0 1 0 10.2 0L12 2.7Z"/>,
   heart: <path d="M20.8 5.8a5.4 5.4 0 0 0-7.6 0L12 7l-1.2-1.2a5.4 5.4 0 0 0-7.6 7.6L12 22l8.8-8.6a5.4 5.4 0 0 0 0-7.6Z"/>,
   home: <><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-7h6v7"/></>,
   info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></>,

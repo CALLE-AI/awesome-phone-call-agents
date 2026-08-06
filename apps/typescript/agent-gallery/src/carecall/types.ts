@@ -1,6 +1,9 @@
+import type { CareCallRoutineKind } from "../workflows/carecall";
+
 export type NavigationId = "today" | "calls" | "seniors" | "routines" | "attention" | "settings";
 
-export type RoutineKind = "medication" | "meal";
+/** Kept identical to the workflow contract so a kind cannot exist in the interface but not in a call. */
+export type RoutineKind = CareCallRoutineKind;
 
 export type RoutineStatus = "active" | "paused";
 

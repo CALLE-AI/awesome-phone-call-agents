@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { conversationPlanFor, routineKindProfile } from "../carecall/routine-kinds";
 import { seniorIsCallable } from "../carecall/senior-directory";
 import type { CareRoutine, Senior } from "../carecall/types";
 import { Icon } from "./Icon";
@@ -11,7 +12,8 @@ export function CallPreviewSheet({ routine, senior, onClose, onAuthorize, onActi
 
   useModalDialog(sheetRef, closeRef, onClose);
 
-  const isMedication = routine.kind === "medication";
+  const profile = routineKindProfile(routine.kind);
+  const plan = conversationPlanFor(routine.kind, senior.preferredName, senior.caregiver);
   const languageVerified = senior.language === "English";
   const callable = seniorIsCallable(senior);
 
@@ -46,11 +48,21 @@ export function CallPreviewSheet({ routine, senior, onClose, onAuthorize, onActi
           <section className="preview-block">
             <p className="preview-label"><Icon name="routine" size={16} /> Conversation plan</p>
             <ol className="conversation-plan">
-              <li><span>1</span><div><strong>Identify and reassure</strong><p>Confirm the preferred name and explain why the call was authorized.</p></div></li>
-              <li><span>2</span><div><strong>{isMedication ? "Repeat the approved reminder" : "Check food access first"}</strong><p>{routine.caregiverInstruction}</p></div></li>
-              <li><span>3</span><div><strong>Record only a self-report</strong><p>{isMedication ? "Ask whether the senior reports already taking it, will do so shortly, or is unsure." : "Ask whether the senior reports eating, plans to eat shortly, or needs help accessing food."}</p></div></li>
-              <li><span>4</span><div><strong>Escalate uncertainty</strong><p>Offer a callback from {senior.caregiver}; never fill in an ambiguous answer.</p></div></li>
+              {plan.map((step, index) => (
+                <li key={step.title}>
+                  <span>{index + 1}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{index === 1 ? routine.caregiverInstruction : step.detail}</p>
+                  </div>
+                </li>
+              ))}
             </ol>
+          </section>
+
+          <section className="preview-block preview-block--boundary">
+            <p className="preview-label"><Icon name="shield" size={16} /> {profile.callLabel} boundary</p>
+            <p className="preview-boundary">{profile.boundary}</p>
           </section>
 
           <div className="preview-policy-grid">

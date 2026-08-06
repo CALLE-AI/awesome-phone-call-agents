@@ -5,10 +5,12 @@ import {
   buildCareCallResult,
   detectCareCallSafetyFlags,
   validateCareCallRequest,
+  careCallRoutineKinds,
   type CareCallRequest,
+  type CareCallRoutineKind,
 } from "../src/workflows/carecall";
 
-function request(kind: "medication" | "meal" = "medication"): CareCallRequest {
+function request(kind: CareCallRoutineKind = "medication"): CareCallRequest {
   return {
     workflow: "carecall",
     request_key: "carecall-test-1",
@@ -204,5 +206,94 @@ test("every documented terminal provider state maps to a care result", () => {
   for (const [status, outcome] of expected) {
     const result = buildCareCallResult({ request: request(), status, calle: null, runId: `run-${status}` });
     assert.equal(result.outcome, outcome, status);
+  }
+});
+
+test("every routine kind the interface offers is accepted by request validation", () => {
+  const now = new Date("2026-08-06T10:00:00+08:00");
+  for (const kind of careCallRoutineKinds) {
+    const payload = request(kind);
+    payload.authorization.authorized_at = now.toISOString();
+    assert.deepEqual(validateCareCallRequest(payload, now), [], `${kind} should validate`);
+  }
+});
+
+test("an unknown routine kind is rejected rather than defaulted", () => {
+  const now = new Date("2026-08-06T10:00:00+08:00");
+  const payload = request();
+  payload.authorization.authorized_at = now.toISOString();
+  (payload.routine as { kind: string }).kind = "transport";
+  assert.ok(validateCareCallRequest(payload, now).includes("routine kind is invalid"));
+});
+
+const outcomeByKind: Record<CareCallRoutineKind, string> = {
+  medication: "self_reported_taken",
+  meal: "self_reported_ate",
+  hydration: "self_reported_drank",
+  wellbeing: "self_reported_well",
+  appointment: "appointment_acknowledged",
+};
+
+test("each kind reports its own successful self-report and needs no follow-up", () => {
+  for (const kind of careCallRoutineKinds) {
+    const result = buildCareCallResult({
+      request: request(kind),
+      status: "COMPLETED",
+      calle: { extracted: { carecall_outcome: outcomeByKind[kind] }, outcome: { completion_confidence: { score: 0.95, label: "high" } } },
+      runId: `run-${kind}`,
+    });
+    assert.equal(result.outcome, outcomeByKind[kind], `${kind} should read its own outcome`);
+    assert.equal(result.self_reported, true, `${kind} should be marked self-reported`);
+    assert.equal(result.follow_up_required, false, `${kind} should need no follow-up`);
+  }
+});
+
+test("an outcome belonging to another kind is refused and sent to human review", () => {
+  for (const kind of careCallRoutineKinds) {
+    for (const [otherKind, outcome] of Object.entries(outcomeByKind)) {
+      if (otherKind === kind) continue;
+      const result = buildCareCallResult({
+        request: request(kind),
+        status: "COMPLETED",
+        calle: { extracted: { carecall_outcome: outcome }, outcome: { completion_confidence: { score: 0.95, label: "high" } } },
+        runId: "run-cross",
+      });
+      assert.equal(result.outcome, "uncertain", `${kind} must not accept ${outcome}`);
+      assert.equal(result.self_reported, false);
+    }
+  }
+});
+
+test("a senior who reports feeling low is escalated for contact, not interpreted", () => {
+  const result = buildCareCallResult({
+    request: request("wellbeing"),
+    status: "COMPLETED",
+    calle: { extracted: { carecall_outcome: "reports_feeling_low" }, outcome: { completion_confidence: { score: 0.95, label: "high" } } },
+    runId: "run-wellbeing",
+  });
+  assert.equal(result.outcome, "reports_feeling_low");
+  assert.equal(result.urgency, "contact-now");
+  assert.equal(result.self_reported, false);
+  assert.match(result.next_action, /Joanne Lim/);
+});
+
+test("hydration and appointment concerns escalate without claiming anything was done", () => {
+  const cases: Array<[CareCallRoutineKind, string, string]> = [
+    ["hydration", "no_drink_available", "contact-now"],
+    ["hydration", "unsure_if_drank", "follow-up-today"],
+    ["appointment", "needs_transport", "follow-up-today"],
+    ["appointment", "cannot_attend", "follow-up-today"],
+  ];
+  for (const [kind, outcome, urgency] of cases) {
+    const result = buildCareCallResult({
+      request: request(kind),
+      status: "COMPLETED",
+      calle: { extracted: { carecall_outcome: outcome }, outcome: { completion_confidence: { score: 0.95, label: "high" } } },
+      runId: "run-escalation",
+    });
+    assert.equal(result.outcome, outcome, `${kind}/${outcome}`);
+    assert.equal(result.urgency, urgency, `${kind}/${outcome} urgency`);
+    assert.equal(result.self_reported, false);
+    assert.equal(result.follow_up_required, true);
   }
 });
