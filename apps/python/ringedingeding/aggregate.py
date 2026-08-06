@@ -24,7 +24,7 @@ Three rules follow from that, and they are what the tests defend:
 
 This is the collection edition: fixture-driven, no network, no telephone, no
 credentials, no scheduler. The full application lives at
-https://github.com/lukisch/ringedingeding
+https://github.com/ellmos-ai/ringedingeding
 """
 
 from __future__ import annotations
