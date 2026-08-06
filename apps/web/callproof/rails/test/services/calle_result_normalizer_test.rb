@@ -1,7 +1,12 @@
 require "test_helper"
 
 class CalleResultNormalizerTest < ActiveSupport::TestCase
-  # Captured from a real CALL-E MCP get_call_run (28s completed test call).
+  # Verbatim capture of a real CALL-E MCP get_call_run (28s completed test call). The
+  # transcript inside is Spanish because the call itself was placed in Spanish — it is
+  # evidence, so it is stored as returned rather than translated. The app's own UI and
+  # copy are English throughout; the only other Spanish in this codebase is the
+  # transcript-matching vocabulary in the analyzer's TERM_SYNONYMS, which exists so a
+  # Spanish-language call can still be audited.
   def mcp_payload
     JSON.parse(file_fixture("calle_mcp_get_call_run.json").read)
   end
