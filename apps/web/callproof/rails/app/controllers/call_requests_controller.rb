@@ -6,9 +6,10 @@ class CallRequestsController < ApplicationController
   before_action :load_call_request
   # The public safe demo shows fictional demo requests. Operator/live-workflow requests
   # carry real objectives and recipient data — including previews stored before
-  # confirmation (live_mode=false) — so they require operator authentication. Gate on
-  # origin (operator_initiated), NOT on live_mode, or previews would leak.
-  before_action :authenticate_operator!, if: -> { @call_request.operator_initiated? }
+  # confirmation (live_mode=false) — so they require operator authentication. The
+  # predicate checks operator_initiated OR live_mode OR confirmed_at (defense in depth):
+  # gating on operator_initiated alone would expose any row predating that column.
+  before_action :authenticate_operator!, if: -> { @call_request.requires_operator_auth? }
 
   def show
     @analysis = @call_request.call_analysis

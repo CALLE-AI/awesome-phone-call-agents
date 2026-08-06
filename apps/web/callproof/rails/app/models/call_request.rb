@@ -27,6 +27,14 @@ class CallRequest < ApplicationRecord
     "PLACE CALL #{confirmation_token}"
   end
 
+  # Does viewing this request require operator credentials? Checked on SEVERAL signals
+  # as defense in depth, not on operator_initiated alone: a row written before that
+  # column existed (or by any other path that reaches live execution) must still be
+  # protected rather than fall through as a public demo request.
+  def requires_operator_auth?
+    operator_initiated? || live_mode? || confirmed_at.present?
+  end
+
   def masked_phone_number
     return "" if recipient_phone_e164.blank?
 

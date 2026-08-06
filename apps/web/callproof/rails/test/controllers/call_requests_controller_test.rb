@@ -39,6 +39,27 @@ class CallRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "a live request predating the operator_initiated flag still requires auth" do
+    # Defense in depth: simulates a row created before the backfill/column existed.
+    # Gating on operator_initiated alone would make this anonymously readable.
+    request = operator_request
+    request.update_columns(operator_initiated: false, live_mode: true, confirmed_at: Time.current)
+
+    get call_request_path(request)
+    assert_response :unauthorized
+
+    get call_request_path(request), headers: operator_auth_headers
+    assert_response :success
+  end
+
+  test "a confirmed request without either flag still requires auth" do
+    request = operator_request
+    request.update_columns(operator_initiated: false, live_mode: false, confirmed_at: Time.current)
+
+    get call_request_path(request)
+    assert_response :unauthorized
+  end
+
   test "a public demo request is viewable without authentication" do
     provider, policy = Demo::Setup.call
     request = CallRequest.create!(

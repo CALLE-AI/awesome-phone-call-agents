@@ -19,6 +19,13 @@ module CallProviders
       Errno::ETIMEDOUT, EOFError, SocketError, IOError
     ].freeze
 
+    # 4xx codes that do NOT prove the call was rejected, so they must never be reported
+    # as "no call was placed":
+    #   409 — idempotency conflict. The SAME Idempotency-Key is already in flight or
+    #         already created a call, i.e. the original call most likely EXISTS.
+    #   408 — the server timed out reading the request; it may still have processed it.
+    AMBIGUOUS_HTTP_CODES = %w[408 409].freeze
+
     # Canonical CALL-E API host the Bearer credential may be sent to. A custom
     # base URL must be explicitly allow-listed via CALLE_ALLOWED_HOSTS.
     DEFAULT_ALLOWED_HOSTS = %w[api.heycall-e.com].freeze
@@ -76,7 +83,9 @@ module CallProviders
 
       code = response.code.to_s
       return JSON.parse(response.body) if code == "200"
-      raise AmbiguousError, "CALL-E status fetch returned #{code}" if code.start_with?("5")
+      if code.start_with?("5") || AMBIGUOUS_HTTP_CODES.include?(code)
+        raise AmbiguousError, "CALL-E status fetch returned #{code}"
+      end
 
       raise Error, "CALL-E HTTP #{code}: #{response.body}"
     end
@@ -188,15 +197,15 @@ module CallProviders
       code = response.code.to_s
       return JSON.parse(response.body) if %w[200 201 202].include?(code)
 
-      # 5xx (and other non-2xx that indicate the server may have partially
-      # processed the request) are treated as ambiguous: the call might exist.
-      if code.start_with?("5")
+      # 5xx, plus the 4xx codes that do not prove rejection (409 idempotency conflict,
+      # 408), are ambiguous: the call may already exist.
+      if code.start_with?("5") || AMBIGUOUS_HTTP_CODES.include?(code)
         raise AmbiguousError,
               "CALL-E create returned #{code}; outcome unknown, no replacement will be placed. " \
               "Reconcile with Idempotency-Key #{idempotency_key} before retrying."
       end
 
-      # 4xx is a definitive rejection: the call was not placed.
+      # Any other 4xx is a definitive rejection: the call was not placed.
       raise Error, "CALL-E HTTP #{code}: #{response.body}"
     end
 

@@ -104,6 +104,46 @@ class CallProvidersCalleTest < ActiveJob::TestCase
     ENV["CALLPROOF_LIVE_CALLS"] = previous_live
   end
 
+  test "a 409 idempotency conflict is ambiguous, not a definitive no-call" do
+    previous_live = ENV["CALLPROOF_LIVE_CALLS"]
+    ENV["CALLPROOF_LIVE_CALLS"] = "true"
+    request, contract = live_confirmed_request
+    attempts = 0
+    transport = lambda do |_uri, _req|
+      attempts += 1
+      Struct.new(:code, :body).new("409", '{"error":"idempotency key already used"}')
+    end
+
+    assert_raises(CallProviders::Calle::AmbiguousError) do
+      CallProviders::Calle.new(
+        api_key: "test-key", webhook_url: "https://rails.test/calle/webhook", transport: transport
+      ).call(call_request: request, contract: contract)
+    end
+
+    # The original call may exist; never report "no call was placed".
+    assert_equal "unresolved", request.reload.status
+    assert_equal 1, attempts, "must not auto-retry"
+  ensure
+    ENV["CALLPROOF_LIVE_CALLS"] = previous_live
+  end
+
+  test "a definitive 4xx rejection is still a hard error" do
+    previous_live = ENV["CALLPROOF_LIVE_CALLS"]
+    ENV["CALLPROOF_LIVE_CALLS"] = "true"
+    request, contract = live_confirmed_request
+    transport = ->(_uri, _req) { Struct.new(:code, :body).new("400", '{"error":"bad phone"}') }
+
+    error = assert_raises(CallProviders::Calle::Error) do
+      CallProviders::Calle.new(
+        api_key: "test-key", webhook_url: "https://rails.test/calle/webhook", transport: transport
+      ).call(call_request: request, contract: contract)
+    end
+    assert_not_kind_of CallProviders::Calle::AmbiguousError, error
+    assert_not_equal "unresolved", request.reload.status
+  ensure
+    ENV["CALLPROOF_LIVE_CALLS"] = previous_live
+  end
+
   private
 
   def live_confirmed_request

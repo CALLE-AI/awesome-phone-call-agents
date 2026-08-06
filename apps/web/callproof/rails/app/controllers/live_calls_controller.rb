@@ -74,7 +74,9 @@ class LiveCallsController < ApplicationController
 
   # Reconcile an unresolved live request. Re-attempts the create with the SAME stable
   # Idempotency-Key, so CALL-E deduplicates — this cannot place a second call. Resolves
-  # to running (call exists), failed (definitive 4xx), or stays unresolved (still ambiguous).
+  # to running (call exists), or failed ONLY on a definitive rejection. Codes that do not
+  # prove rejection (409 idempotency conflict, 408, 5xx) keep the request unresolved:
+  # telling the operator "no call was placed" there could be a lie.
   def reconcile
     ensure_live_environment!
     raise CallProviders::Calle::SafetyError, "call is not awaiting reconciliation" unless
