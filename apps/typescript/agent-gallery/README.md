@@ -90,6 +90,7 @@ CARECALL_DATA_ENCRYPTION_KEY=<at least 32 random characters, stored server-side>
 CRON_SECRET=<high-entropy scheduler bearer secret>
 CARECALL_PUBLIC_BASE_URL=https://<production-host>
 QSTASH_TOKEN=<server-side QStash publishing token>
+QSTASH_URL=https://qstash-us-east-1.upstash.io
 QSTASH_CURRENT_SIGNING_KEY=<QStash current signing key>
 QSTASH_NEXT_SIGNING_KEY=<QStash next signing key>
 ```
@@ -100,7 +101,7 @@ See the [CareCall environment variable reference](../../../docs/agent-gallery/ca
 
 ## Queue and recurring schedule operation
 
-Manual and recurring authorizations both create encrypted durable call jobs. QStash delivers a signed, minimal message containing only the job ID to `/api/carecall/worker`; the worker verifies both current and next signing keys before reading the protected job from Redis.
+Manual and recurring authorizations both create encrypted durable call jobs. QStash delivers a signed, minimal message containing only the job ID to `/api/carecall/worker`; the worker verifies both current and next signing keys before reading the protected job from Redis. Set `QSTASH_URL` to the origin for the same region that issued the token and signing keys; the US origin is `https://qstash-us-east-1.upstash.io`, while omitting the variable uses the SDK's EU default.
 
 The queue permits one ongoing CareCall at a time. If the active lease is occupied, later calls remain queued. Manual authorization expires after 30 minutes rather than waiting indefinitely. When provider status becomes terminal, a delayed status message records the conservative outcome, releases the lease, and wakes the next job. Delivery retries cannot create another phone call because the call request still passes through the durable request claim.
 

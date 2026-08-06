@@ -14,6 +14,7 @@ function readyEnvironment() {
     CARECALL_OPERATORS_JSON: JSON.stringify([{ id: "operator-1", name: "Operator One", role: "coordinator", access_code_sha256: "a".repeat(64), senior_ids: ["senior-1"] }]),
     CARECALL_DATA_ENCRYPTION_KEY: "test-encryption-key-that-is-at-least-32-characters",
     CARECALL_PUBLIC_BASE_URL: "https://carecall.example.test",
+    QSTASH_URL: "https://qstash-us-east-1.upstash.io",
     QSTASH_TOKEN: "test-qstash-token",
     QSTASH_CURRENT_SIGNING_KEY: "test-current-signing-key",
     QSTASH_NEXT_SIGNING_KEY: "test-next-signing-key",
@@ -39,6 +40,13 @@ test("configuration preflight validates every live-call dependency without retur
   const checks = configurationChecks(readyEnvironment());
   assert.ok(Object.values(checks).every(Boolean));
   assert.deepEqual(Object.keys(checks), ["operator_auth", "durable_store", "data_encryption", "call_provider", "public_worker_url", "queue_delivery", "queue_signatures", "reconciliation_auth"]);
+});
+
+test("queue delivery accepts a secure regional QStash origin and rejects a path or insecure URL", () => {
+  const { queuePublisher: _publisher, ...regional } = readyEnvironment();
+  assert.equal(configurationChecks(regional).queue_delivery, true);
+  assert.equal(configurationChecks({ ...regional, QSTASH_URL: "https://qstash-us-east-1.upstash.io/v2" }).queue_delivery, false);
+  assert.equal(configurationChecks({ ...regional, QSTASH_URL: "http://qstash-us-east-1.upstash.io" }).queue_delivery, false);
 });
 
 test("readiness reports an empty healthy queue using counts and states only", async () => {

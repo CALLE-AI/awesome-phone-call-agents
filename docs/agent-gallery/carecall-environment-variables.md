@@ -71,6 +71,7 @@ resetting the database password revokes both:
 
 | Variable | Classification | Purpose and usage | How to obtain it | Renewal and rotation |
 | --- | --- | --- | --- | --- |
+| `QSTASH_URL` | Configuration | Selects the regional QStash API origin used to publish queue messages. The token, signing keys, and URL must belong to the same region. | Use `https://qstash-us-east-1.upstash.io` for the US region. The EU region uses `https://qstash-eu-central-1.upstash.io`; omitting the variable uses the SDK's EU-compatible default `https://qstash.upstash.io`. | **No rotation.** Change only during an intentional regional migration, following Upstash's migration procedure for active resources. |
 | `QSTASH_TOKEN` | Secret | Authorizes the server to publish immediate and delayed queue messages to QStash. | Copy the QStash authorization token from the Upstash Console. | **Every 180 days or per security policy**, and immediately after suspected exposure or privileged team departure. Resetting the QStash token invalidates the old credential; update Vercel, redeploy, and test publishing before resuming authorizations. |
 | `QSTASH_CURRENT_SIGNING_KEY` | Secret | Verifies signatures created with QStash's current signing key. | Copy the current signing key from the QStash Console or retrieve it through the signing-keys API using `QSTASH_TOKEN`. | **Rotate as a pair every 180 days or after suspected exposure.** Follow the two-key procedure below. Never rotate twice before the new pair is deployed. |
 | `QSTASH_NEXT_SIGNING_KEY` | Secret | Provides overlap during signing-key rollover so messages signed with the next key remain valid. | Copy the next signing key alongside the current key. | **Rotate with the current key.** It is not an independent credential and must always be updated from the same QStash key response. |
@@ -279,7 +280,7 @@ Set the exact stable HTTPS origin for the target deployment. Replace the
 placeholder; do not include a trailing slash or a path:
 
 ```sh
-printf '%s' 'https://your-stable-preview-domain.example' \
+printf '%s' 'https://awesome-phone-call-agents.vercel.app' \
   | vercel env update CARECALL_PUBLIC_BASE_URL preview
 ```
 
@@ -291,35 +292,59 @@ identical to the worker callback destination.
 
 Copy `QSTASH_TOKEN` from the QStash section of the Upstash Console. Enter it at
 a hidden shell prompt, use it to retrieve the current signing-key pair, and
-transfer all three values without displaying them:
+transfer the URL and all three credential values without displaying the
+credentials. The example below uses the US region:
 
 ```sh
-read -s "CARECALL_QSTASH_TOKEN?QStash token: "
-echo
+carecall_restore_qstash() {
+  local carecall_qstash_url='https://qstash-us-east-1.upstash.io'
+  local carecall_qstash_token
+  local carecall_qstash_keys
 
-printf '%s' "$CARECALL_QSTASH_TOKEN" \
-  | vercel env update QSTASH_TOKEN preview --sensitive
+  read -s "carecall_qstash_token?QStash token: "
+  echo
 
-CARECALL_QSTASH_KEYS="$(curl --fail --silent --show-error \
-  --request GET \
-  --url https://qstash.upstash.io/v2/keys \
-  --header "Authorization: Bearer $CARECALL_QSTASH_TOKEN")"
+  carecall_qstash_keys="$(curl --fail --silent --show-error \
+    --request GET \
+    --url "$carecall_qstash_url/v2/keys" \
+    --header "Authorization: Bearer $carecall_qstash_token")" || {
+      echo 'QStash rejected the token or could not be reached.' >&2
+      return 1
+    }
 
-printf '%s' "$CARECALL_QSTASH_KEYS" \
-  | jq -jr '.current' \
-  | vercel env update QSTASH_CURRENT_SIGNING_KEY preview --sensitive
+  printf '%s' "$carecall_qstash_keys" \
+    | jq -e '(.current | type == "string" and length > 0)
+      and (.next | type == "string" and length > 0)' >/dev/null || {
+        echo 'QStash returned an invalid signing-key response.' >&2
+        return 1
+      }
 
-printf '%s' "$CARECALL_QSTASH_KEYS" \
-  | jq -jr '.next' \
-  | vercel env update QSTASH_NEXT_SIGNING_KEY preview --sensitive
+  printf '%s' "$carecall_qstash_url" \
+    | vercel env add QSTASH_URL preview --force
 
-unset CARECALL_QSTASH_TOKEN CARECALL_QSTASH_KEYS
+  printf '%s' "$carecall_qstash_token" \
+    | vercel env add QSTASH_TOKEN preview --force --sensitive
+
+  printf '%s' "$carecall_qstash_keys" \
+    | jq -jr '.current' \
+    | vercel env add QSTASH_CURRENT_SIGNING_KEY preview --force --sensitive
+
+  printf '%s' "$carecall_qstash_keys" \
+    | jq -jr '.next' \
+    | vercel env add QSTASH_NEXT_SIGNING_KEY preview --force --sensitive
+}
+
+carecall_restore_qstash
+unset -f carecall_restore_qstash
 ```
 
 This retrieves the existing key pair; it does not rotate it. Do not call the
 rotation endpoint merely to recover the current keys. The response fields and
 endpoint are documented in Upstash's
 [Get Signing Keys reference](https://upstash.com/docs/qstash/api-reference/signing-keys/get-signing-keys).
+Use the region that issued the token; Upstash documents the independent US and
+EU origins in its
+[multi-region guide](https://upstash.com/docs/qstash/howto/multi-region).
 
 ### 7. Verify and redeploy
 

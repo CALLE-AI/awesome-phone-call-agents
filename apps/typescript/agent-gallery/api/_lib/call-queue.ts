@@ -60,6 +60,16 @@ const jsonHeaders = { "cache-control": "no-store", "content-type": "application/
 const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: jsonHeaders });
 
 function jobKey(id: string) { return `carecall:job:${id}`; }
+function qstashBaseUrl(env: QueueRuntimeEnv): string | undefined | null {
+  if (!env.QSTASH_URL) return undefined;
+  try {
+    const url = new URL(env.QSTASH_URL);
+    return url.protocol === "https:" && (url.pathname === "/" || url.pathname === "") && !url.search && !url.hash
+      ? url.origin
+      : null;
+  } catch { return null; }
+}
+
 function publicWorkerUrl(env: QueueRuntimeEnv): string | null {
   if (!env.CARECALL_PUBLIC_BASE_URL) return null;
   try {
@@ -69,14 +79,15 @@ function publicWorkerUrl(env: QueueRuntimeEnv): string | null {
 }
 
 export function queueConfigured(env: QueueRuntimeEnv): boolean {
-  return Boolean(env.CARECALL_DATA_ENCRYPTION_KEY && publicWorkerUrl(env) && (env.queuePublisher || env.QSTASH_TOKEN));
+  return Boolean(env.CARECALL_DATA_ENCRYPTION_KEY && publicWorkerUrl(env) && (env.queuePublisher || (env.QSTASH_TOKEN && qstashBaseUrl(env) !== null)));
 }
 
 export async function publishQueueWake(env: QueueRuntimeEnv, message: QueueWakeMessage, notBefore?: number): Promise<void> {
   if (env.queuePublisher) return env.queuePublisher(message, notBefore);
   const url = publicWorkerUrl(env);
-  if (!env.QSTASH_TOKEN || !url) throw new Error("CareCall queue delivery is not configured.");
-  const client = new Client({ token: env.QSTASH_TOKEN });
+  const baseUrl = qstashBaseUrl(env);
+  if (!env.QSTASH_TOKEN || !url || baseUrl === null) throw new Error("CareCall queue delivery is not configured.");
+  const client = new Client({ token: env.QSTASH_TOKEN, ...(baseUrl ? { baseUrl } : {}) });
   const deduplicationBytes = message.type === "status" ? new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${message.type}:${message.job_id}:${message.version}`))) : null;
   const deduplicationId = deduplicationBytes ? `carecall-${[...deduplicationBytes].slice(0, 16).map((byte) => byte.toString(16).padStart(2, "0")).join("")}` : undefined;
   await client.publishJSON({

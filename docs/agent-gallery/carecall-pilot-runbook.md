@@ -13,7 +13,7 @@ Configure these server-side values in the Vercel environment used for the pilot.
 - `CARECALL_DATA_ENCRYPTION_KEY`
 - `CARECALL_MAX_CALLS_PER_DAY`
 - `CARECALL_PUBLIC_BASE_URL`
-- `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, and `QSTASH_NEXT_SIGNING_KEY`
+- `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, and `QSTASH_NEXT_SIGNING_KEY`
 - `CRON_SECRET`
 
 Use the [CareCall environment variable reference](./carecall-environment-variables.md) for safe acquisition, environment scoping, expiry checks, and rotation procedures. Never copy real values into this runbook.
