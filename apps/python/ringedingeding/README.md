@@ -146,4 +146,4 @@ number reaching an output.
 
 This is a focused, self-contained proof of the aggregation. The complete application —
 call orchestration, the hash-chained record, web interface and the live CALL-E transport —
-lives at <https://github.com/lukisch/ringedingeding>.
+lives at <https://github.com/ellmos-ai/ringedingeding>.
