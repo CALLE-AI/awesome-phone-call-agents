@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
 
-export function Settings({ onNotice }: { onNotice: (message: string) => void }) {
+export function Settings({ onNotice, onSafetyPolicy }: { onNotice: (message: string) => void; onSafetyPolicy: () => void }) {
   const [dailyDigest, setDailyDigest] = useState(true);
   const [weekendCalls, setWeekendCalls] = useState(true);
 
@@ -45,7 +45,7 @@ export function Settings({ onNotice }: { onNotice: (message: string) => void }) 
               <div><Icon name="check" size={17} /><span><strong>No hidden recurring schedules</strong><small>Every active routine is visible, pausable, and cancellable.</small></span></div>
               <div><Icon name="check" size={17} /><span><strong>Medical uncertainty goes to a human</strong><small>The agent never recommends a dose, repeat, skip, or medication change.</small></span></div>
             </div>
-            <button className="secondary-button" type="button" onClick={() => onNotice("Privacy controls are documented in the CareCall SG implementation plan.")}>Review data policy</button>
+            <div className="settings-actions"><button className="secondary-button" type="button" onClick={onSafetyPolicy}><Icon name="shield" size={16} /> View safety policy</button><button className="secondary-button" type="button" onClick={() => onNotice("Privacy controls are documented in the CareCall SG implementation plan.")}>Review data policy</button></div>
           </section>
 
           <section className="surface settings-section" id="team">

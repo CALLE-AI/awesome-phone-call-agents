@@ -4,6 +4,7 @@ import { maskE164 } from "../calle";
 import type { CareRoutine, Senior } from "../carecall/types";
 import {
   buildCareCallResult,
+  careCallSafetyFlagDetails,
   type CareCallRequest,
   type CareCallResult,
 } from "../workflows/carecall";
@@ -205,7 +206,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
             <>
               <section className="result-hero" data-follow-up={result.follow_up_required}><Icon name={result.follow_up_required ? "attention" : "check"} size={24} /><div><p>{result.self_reported ? "Senior self-report" : "Care outcome"}</p><h3>{result.outcome_label}</h3><span>{result.next_action}</span></div></section>
               <dl className="result-details"><div><dt>Human follow-up</dt><dd>{result.follow_up_required ? "Required" : "Not currently required"}</dd></div><div><dt>Operational urgency</dt><dd>{result.urgency.replaceAll("-", " ")}</dd></div><div><dt>Provider status</dt><dd>{result.provider_status}</dd></div><div><dt>Audit ID</dt><dd>{result.call_id}</dd></div><div><dt>Evidence</dt><dd>{result.evidence ?? "No reliable conversational evidence was returned."}</dd></div></dl>
-              {result.safety_flags.length > 0 && <section className="execution-error" role="alert"><strong>Safety review flags</strong><ul className="safety-flag-list">{result.safety_flags.map((flag) => <li key={flag}>{flag.replaceAll("_", " ")}</li>)}</ul></section>}
+              {result.safety_flags.length > 0 && <section className="execution-error" role="alert"><strong>Safety review flags</strong><ul className="safety-flag-list">{result.safety_flags.map((flag) => <li key={flag}>{careCallSafetyFlagDetails[flag]?.label ?? flag}</li>)}</ul></section>}
               <section className="boundary-note"><Icon name="info" size={18} /><p>Provider completion is kept separate from the senior’s reported care outcome. Ambiguity always routes to human review.</p></section>
             </>
           )}

@@ -9,7 +9,7 @@ import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
 
 type Filter = "all" | RoutineKind;
 
-export function CareRoutines({ onPreview, onNotice, onNewRoutine, sessionToken }: { onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; onNewRoutine: () => void; sessionToken: string }) {
+export function CareRoutines({ onPreview, onNotice, onNewRoutine, onSafetyPolicy, sessionToken }: { onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; onNewRoutine: () => void; onSafetyPolicy: () => void; sessionToken: string }) {
   const { seniors } = useSeniorDirectory();
   const { routines } = useRoutineDirectory();
   const [filter, setFilter] = useState<Filter>("all");
@@ -116,7 +116,7 @@ export function CareRoutines({ onPreview, onNotice, onNewRoutine, sessionToken }
           <h2>CareCall repeats instructions. It does not make medical decisions.</h2>
           <p>Medication uncertainty is always routed to a human. Silence or ambiguity is never recorded as completion.</p>
         </div>
-        <button className="text-button" type="button" onClick={() => onNotice("Safety policy: remind, record self-reports, and escalate uncertainty to a human.")}>View safety policy <Icon name="chevron" size={15} /></button>
+        <button className="text-button" type="button" onClick={onSafetyPolicy}>View safety policy <Icon name="chevron" size={15} /></button>
       </section>
     </div>
   );

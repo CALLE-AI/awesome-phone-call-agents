@@ -8,6 +8,7 @@ import { CallPreviewSheet } from "./components/CallPreviewSheet";
 import { CareCallExecutionSheet } from "./components/CareCallExecutionSheet";
 import { Icon, type IconName } from "./components/Icon";
 import { RoutineBuilderSheet } from "./components/RoutineBuilderSheet";
+import { SafetyPolicySheet } from "./components/SafetyPolicySheet";
 import { ScheduleActivationSheet } from "./components/ScheduleActivationSheet";
 import { Calls } from "./screens-care/Calls";
 import { CareRoutines } from "./screens-care/CareRoutines";
@@ -15,7 +16,7 @@ import { NeedsAttention } from "./screens-care/NeedsAttention";
 import { Seniors } from "./screens-care/Seniors";
 import { Settings } from "./screens-care/Settings";
 import { Today } from "./screens-care/Today";
-import type { CareCallResult } from "./workflows/carecall";
+import { careCallSafetyFlagDetails, type CareCallResult } from "./workflows/carecall";
 
 // Retained while the previous appointment-recovery screens remain available as
 // a migration reference. They are no longer mounted by the CareCall shell.
@@ -58,6 +59,7 @@ function CareWorkspace() {
   const [executionRoutine, setExecutionRoutine] = useState<CareRoutine | null>(null);
   const [scheduleRoutine, setScheduleRoutine] = useState<CareRoutine | null>(null);
   const [buildingRoutine, setBuildingRoutine] = useState(false);
+  const [showSafetyPolicy, setShowSafetyPolicy] = useState(false);
   const [resolvedAttentionIds, setResolvedAttentionIds] = useState<Set<string>>(new Set());
   const [runtimeAttentionCases, setRuntimeAttentionCases] = useState<AttentionCase[]>([]);
   const [durableAttentionCases, setDurableAttentionCases] = useState<AttentionCase[]>([]);
@@ -89,7 +91,7 @@ function CareWorkspace() {
       : result.urgency === "follow-up-today" ? "today" : "review";
     const priorityLabel = priority === "contact-now" ? "Contact now" : priority === "today" ? "Follow up today" : "Review when available";
     const flags = result.safety_flags.length > 0
-      ? ` Safety flags: ${result.safety_flags.map((flag) => flag.replaceAll("_", " ")).join(", ")}.`
+      ? ` Safety flags: ${result.safety_flags.map((flag) => careCallSafetyFlagDetails[flag]?.label ?? flag).join(", ")}.`
       : "";
     setRuntimeAttentionCases((current) => current.some((item) => item.id === `live-${result.call_id}`) ? current : [
       ...current,
@@ -207,7 +209,7 @@ function CareWorkspace() {
               selectedId={selectedSeniorId}
             />
           )}
-          {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} onNewRoutine={() => setBuildingRoutine(true)} sessionToken={operatorSessionToken} />}
+          {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} onNewRoutine={() => setBuildingRoutine(true)} onSafetyPolicy={() => setShowSafetyPolicy(true)} sessionToken={operatorSessionToken} />}
           {view === "attention" && (
             <NeedsAttention
               cases={allAttentionCases}
@@ -217,7 +219,7 @@ function CareWorkspace() {
               onResolve={resolveAttentionCase}
             />
           )}
-          {view === "settings" && <Settings onNotice={setNotice} />}
+          {view === "settings" && <Settings onNotice={setNotice} onSafetyPolicy={() => setShowSafetyPolicy(true)} />}
         </main>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -246,6 +248,7 @@ function CareWorkspace() {
           onActivate={() => { setScheduleRoutine(previewRoutine); setPreviewRoutine(null); }}
         />
       )}
+      {showSafetyPolicy && <SafetyPolicySheet onClose={() => setShowSafetyPolicy(false)} />}
       {buildingRoutine && (
         <RoutineBuilderSheet
           initialSeniorId={selectedSeniorId}

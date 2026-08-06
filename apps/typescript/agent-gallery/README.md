@@ -156,6 +156,14 @@ The builder refuses a call time outside the senior's permitted window when the r
 
 A later pass could draft the opening and plan from the senior's care record, past outcomes, and an organisation's approved phrasing library, retrieved with RAG and composed through an AI API, so an operator reviews a proposed plan instead of writing one. That is recorded in the builder as a planned enhancement and is not implemented. Any such draft would remain a suggestion: the caregiver-approved wording, the kind's fixed boundary, and the separate authorization step would still gate every call.
 
+## Safety policy
+
+The safety policy is readable in the workspace from Care Routines and from Settings, rather than living only in this file.
+
+Its per-kind boundaries, permitted outcomes, review flags, and urgency levels are read from the code that enforces them. The kind boundaries come from `src/carecall/routine-kinds.ts`, the permitted outcomes from the vocabularies in `src/workflows/carecall/result.ts`, and the flag and urgency descriptions from `src/workflows/carecall/safety.ts`, beside the patterns that raise them. Only the standing may/never rules are written as prose, and `test/safety-policy.test.ts` fails if any derived section drifts from what the workflow applies or if a flag reaches an operator without a stated meaning and response.
+
+Safety flags are shown by name and consequence wherever they appear, rather than as bare identifiers. A flag records that wording appeared in a call; it does not establish who said it or that it is true, and any flag other than possible immediate danger forces the outcome to uncertain.
+
 ## UI structure
 
 ```text
@@ -165,6 +173,7 @@ src/
 │   ├── fixtures.ts           fictional Singapore care records
 │   ├── call-operations.ts    call-list contracts and state/time presentation
 │   ├── routine-kinds.ts      per-kind icon, purpose, plan, and stated boundary
+│   ├── safety-policy.ts      operator-facing policy assembled from the enforcing code
 │   ├── routine-directory.ts  routine drafting, validation, and creation rules
 │   ├── routine-directory-context.tsx demo-session routine state shared by screens
 │   ├── senior-directory.ts   senior edit, withdrawal, and callability rules
@@ -175,6 +184,7 @@ src/
 │   ├── CareCallExecutionSheet.tsx authorization, live polling, and result
 │   ├── ScheduleActivationSheet.tsx explicit recurring authorization
 │   ├── RoutineBuilderSheet.tsx kind picker with live opening and plan preview
+│   ├── SafetyPolicySheet.tsx readable policy with boundaries, flags, and urgency
 │   ├── SeniorEditSheet.tsx   validated senior record editing
 │   ├── SeniorWithdrawSheet.tsx confirmed withdrawal with stated impact
 │   ├── CarePrimitives.tsx    status, avatar, and routine components

@@ -33,6 +33,15 @@ const OUTCOMES_BY_KIND: Record<CareCallRoutineKind, CareCallOutcome[]> = {
 
 const permittedFor = (kind: CareCallRoutineKind): Set<CareCallOutcome> => new Set(OUTCOMES_BY_KIND[kind] ?? []);
 
+/** Every outcome a call of this kind may report, for showing operators the limit up front. */
+export function outcomesForKind(kind: CareCallRoutineKind): CareCallOutcome[] {
+  return OUTCOMES_BY_KIND[kind] ?? [];
+}
+
+export function careCallOutcomeLabel(outcome: CareCallOutcome): string {
+  return labels[outcome] ?? outcome.replaceAll("_", " ");
+}
+
 const labels: Record<CareCallOutcome, string> = {
   self_reported_taken: "Self-reported taken",
   will_take_as_instructed: "Will take as instructed",
