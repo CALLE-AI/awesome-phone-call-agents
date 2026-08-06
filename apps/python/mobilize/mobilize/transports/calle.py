@@ -19,7 +19,12 @@ import httpx
 
 from mobilize.core.commitment import calibrated_commitment
 from mobilize.core.types import Candidate, CallOutcome, CallResult, utcnow
-from mobilize.transports.base import MOBILIZE_RESULT_SCHEMA, build_task_prompt
+from mobilize.transports.base import (
+    MOBILIZE_RESULT_SCHEMA,
+    build_task_prompt,
+    validate_e164,
+    validate_trusted_base_url,
+)
 
 CALLE_BASE_URL = os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com")
 TERMINAL_STATUSES = {"completed", "failed", "canceled"}
@@ -27,6 +32,7 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 
 class CalleTransport:
     def __init__(self, *, api_key: str | None = None, base_url: str = CALLE_BASE_URL, region: str = "US", locale: str = "en-US"):
+        validate_trusted_base_url(base_url)
         self._api_key = api_key or os.environ["CALLE_API_KEY"]
         self._region = region
         self._locale = locale
@@ -35,23 +41,31 @@ class CalleTransport:
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
             timeout=30.0,
         )
-        # candidate_id keyed cache so poll() can attach it back onto the result,
-        # since the CALL-E call object itself has no notion of our candidate ids.
-        self._candidate_prior: dict[str, float] = {}
+        # Full candidate, keyed by call_id, so poll() can bind a returned
+        # result back to the specific candidate it was dispatched for and
+        # refuse to count a confirmation that doesn't match.
+        self._candidate_by_call_id: dict[str, Candidate] = {}
 
-    async def dispatch(self, candidate: Candidate, need_label: str, location: str) -> str:
+    async def dispatch(self, candidate: Candidate, need_label: str, location: str, *, idempotency_key: str) -> str:
+        validate_e164(candidate.phone)
         body = {
             "task": build_task_prompt(need_label, location),
             "recipients": [{"phones": [candidate.phone], "region": self._region, "locale": self._locale}],
             "result_schema": MOBILIZE_RESULT_SCHEMA,
             "metadata": {"candidate_id": candidate.id},
         }
-        headers = {"Idempotency-Key": f"mobilize:{candidate.id}:{need_label}"[:255]}
+        # Use the ledger's own precomputed key as CALL-E's Idempotency-Key,
+        # not an ad hoc one built here. If the process crashes after CALL-E
+        # accepts the call but before the ledger write completes, a retry on
+        # restart sends this exact same key -- CALL-E returns the original
+        # call instead of placing a second one.
+        headers = {"Idempotency-Key": idempotency_key[:255]}
         response = await self._client.post("/v1/calls", json=body, headers=headers)
         response.raise_for_status()
         payload = response.json()
-        self._candidate_prior[payload["id"]] = candidate.historical_showup_rate
-        return payload["id"]
+        call_id = payload["id"]
+        self._candidate_by_call_id[call_id] = candidate
+        return call_id
 
     async def poll(self, call_id: str) -> CallResult | None:
         response = await self._client.get(f"/v1/calls/{call_id}")
@@ -61,17 +75,50 @@ class CalleTransport:
         if call.get("status") not in TERMINAL_STATUSES:
             return None
 
-        return _to_call_result(call_id, call, self._candidate_prior.get(call_id, 0.5))
+        expected_candidate = self._candidate_by_call_id.get(call_id)
+        return _to_call_result(call_id, call, expected_candidate)
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
 
-def _to_call_result(call_id: str, call: dict, prior_showup_rate: float) -> CallResult:
+def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | None) -> CallResult:
     recipients = call.get("recipients") or []
     recipient = recipients[0] if recipients else {}
     structured = recipient.get("structured_result") or call.get("structured_result") or {}
-    candidate_id = (call.get("metadata") or {}).get("candidate_id", "unknown")
+    returned_candidate_id = (call.get("metadata") or {}).get("candidate_id", "unknown")
+
+    # Bind the result to the candidate we actually dispatched to before
+    # trusting anything it says. Two independent checks: the metadata we
+    # attached at dispatch time round-trips, and the phone CALL-E dialed
+    # matches the candidate's phone. A mismatch on either means something is
+    # wrong upstream (a reused call_id, a metadata bug, a provider mixup) and
+    # this result must never silently count as a confirmation.
+    mismatch = False
+    if expected_candidate is not None:
+        if returned_candidate_id != expected_candidate.id:
+            mismatch = True
+        recipient_phones = recipient.get("phones") or []
+        if recipient_phones and expected_candidate.phone not in recipient_phones:
+            mismatch = True
+
+    candidate_id = expected_candidate.id if expected_candidate is not None else returned_candidate_id
+
+    if mismatch:
+        return CallResult(
+            call_id=call_id,
+            candidate_id=candidate_id,
+            outcome=CallOutcome.FAILED,
+            commitment_score=0.0,
+            stated_yes=False,
+            evidence=(
+                f"Result binding mismatch: expected candidate {candidate_id!r}, "
+                f"call metadata/phone did not match. Discarded rather than counted."
+            ),
+            transcript=[],
+            completed_at=utcnow(),
+            raw=call,
+        )
 
     attempts = recipient.get("attempts") or []
     transcript: list[dict] = []
@@ -80,6 +127,7 @@ def _to_call_result(call_id: str, call: dict, prior_showup_rate: float) -> CallR
 
     can_come = structured.get("can_come", "unknown")
     evidence = structured.get("evidence_summary", "") or (call.get("summary") or "")
+    prior_showup_rate = expected_candidate.historical_showup_rate if expected_candidate is not None else 0.5
 
     if call.get("status") == "failed" or recipient.get("status") == "failed":
         outcome, commitment = CallOutcome.NO_ANSWER, 0.0

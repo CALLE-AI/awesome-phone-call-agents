@@ -37,18 +37,27 @@ async def mobilize(
     mobilization_id: str | None = None,
     poll_interval_s: float = 0.05,
     poll_timeout_s: float = 30.0,
+    recovery_timeout_s: float = 5.0,
     on_progress: ProgressCallback | None = None,
     governance_state: GovernanceState | None = None,
     governance_policy: GovernancePolicy | None = None,
 ) -> MobilizeResult:
     mobilization_id = mobilization_id or f"mob_{uuid.uuid4().hex[:10]}"
     start = time.monotonic()
+    deadline_at = start + need.deadline_minutes * 60
 
     if governance_state is not None:
         policy = governance_policy or GovernancePolicy()
+        original_pool_size = len(pool)
         pool = filter_callable(pool, state=governance_state, policy=policy)
+        if len(pool) < original_pool_size and on_progress:
+            on_progress("governance_filtered", {
+                "blocked": original_pool_size - len(pool),
+                "remaining": len(pool),
+            })
 
-    remaining = {c.id: c for c in pool}
+    by_id = {c.id: c for c in pool}
+    remaining = dict(by_id)
     all_results: list[CallResult] = []
     waves: list[Wave] = []
     confirmed: list[CallResult] = []
@@ -59,28 +68,58 @@ async def mobilize(
         if on_progress:
             on_progress(event, data)
 
-    # Recover from a prior crash: any candidate already dispatched for this
-    # mobilization_id must never be dispatched again -- that is the one
-    # inviolable guarantee. Against the real CALL-E transport, `poll()` on a
-    # recovered call_id continues to work after a process restart (call
-    # state lives server-side), so an in-flight call is naturally picked up
-    # again on the next wave's poll loop. SimulatedTransport holds pending
-    # state in memory, so a fresh instance after a real process restart has
-    # no way to resolve a pre-crash simulated call_id -- this is a property
-    # of the simulator, not of the ledger or the dispatch guarantee itself.
+    def _record_confirmation_if_applicable(result: CallResult) -> None:
+        nonlocal time_to_fill
+        if result.outcome in CONFIRMED_OUTCOMES and result.commitment_score >= COMMITMENT_THRESHOLD:
+            confirmed.append(result)
+            if len(confirmed) == need.count and time_to_fill is None:
+                time_to_fill = time.monotonic() - start
+                emit("need_met", {"time_to_fill_seconds": time_to_fill, "confirmed": len(confirmed)})
+
+    # Recover from a prior crash. Every candidate already dispatched for this
+    # mobilization_id must never be dispatched again -- that guarantee comes
+    # from the ledger record alone and holds regardless of what follows. What
+    # follows is an attempt to actually recover their outcome: poll each
+    # recovered call_id (works against the real transport, since call state
+    # lives server-side and survives a process restart; SimulatedTransport
+    # holds state in memory, so a fresh instance has no way to resolve a
+    # pre-crash simulated call_id and will simply time out here -- a property
+    # of the simulator, not of this recovery logic).
+    in_flight = ledger.in_flight(mobilization_id)
     for candidate_id in list(remaining):
-        existing_call_id = ledger.already_dispatched(mobilization_id, candidate_id)
-        if existing_call_id:
+        if ledger.already_dispatched(mobilization_id, candidate_id):
             remaining.pop(candidate_id, None)
             calls_used += 1
 
+    if in_flight:
+        emit("recovering_in_flight", {"count": len(in_flight)})
+        recovery_deadline = time.monotonic() + recovery_timeout_s
+        pending_recovery = dict(in_flight)
+        while pending_recovery and time.monotonic() < recovery_deadline:
+            for candidate_id, call_id in list(pending_recovery.items()):
+                result = await transport.poll(call_id)
+                if result is None:
+                    continue
+                pending_recovery.pop(candidate_id)
+                all_results.append(result)
+                ledger.record_result(mobilization_id, candidate_id, call_id, _serialize(result))
+                emit("call_result", {"candidate_id": candidate_id, "outcome": result.outcome.value, "commitment": result.commitment_score})
+                _record_confirmation_if_applicable(result)
+            if pending_recovery:
+                await asyncio.sleep(poll_interval_s)
+        for candidate_id in pending_recovery:
+            emit("recovery_unresolved", {"candidate_id": candidate_id})
+
     wave_index = 0
-    while should_dispatch_next_wave(
-        confirmed_count=len(confirmed),
-        need_count=need.count,
-        calls_used=calls_used,
-        max_calls=need.max_calls,
-        remaining_pool_size=len(remaining),
+    while (
+        time.monotonic() < deadline_at
+        and should_dispatch_next_wave(
+            confirmed_count=len(confirmed),
+            need_count=need.count,
+            calls_used=calls_used,
+            max_calls=need.max_calls,
+            remaining_pool_size=len(remaining),
+        )
     ):
         remaining_needed = need.count - len(confirmed)
         budget_left = need.max_calls - calls_used
@@ -91,20 +130,27 @@ async def mobilize(
         wave = Wave(index=wave_index, candidate_ids=[c.id for c in plan.candidates])
         emit("wave_dispatch", {"wave": wave_index, "candidates": [c.id for c in plan.candidates]})
 
-        call_ids: dict[str, str] = {}
-        for candidate in plan.candidates:
-            key = ledger.idempotency_key(mobilization_id, candidate.id)
-            call_id = await transport.dispatch(candidate, need.label, need.location)
+        async def _dispatch_one(candidate: Candidate) -> tuple[str, str]:
+            idem_key = ledger.idempotency_key(mobilization_id, candidate.id)
+            call_id = await transport.dispatch(candidate, need.label, need.location, idempotency_key=idem_key)
             ledger.record_dispatch(mobilization_id, candidate.id, call_id)
-            call_ids[candidate.id] = call_id
-            calls_used += 1
-            remaining.pop(candidate.id, None)
             if governance_state is not None:
                 record_call(candidate, state=governance_state)
+            return candidate.id, call_id
+
+        # Fire every dispatch in this wave concurrently -- this is the
+        # mechanism the whole project is named for. A sequential loop here
+        # would await each network round trip in turn, silently serializing
+        # what the README, the skill, and the demo all describe as parallel.
+        dispatched = await asyncio.gather(*(_dispatch_one(c) for c in plan.candidates))
+        call_ids: dict[str, str] = dict(dispatched)
+        calls_used += len(call_ids)
+        for candidate_id in call_ids:
+            remaining.pop(candidate_id, None)
 
         pending = dict(call_ids)
-        deadline = time.monotonic() + poll_timeout_s
-        while pending and time.monotonic() < deadline:
+        poll_deadline = min(time.monotonic() + poll_timeout_s, deadline_at)
+        while pending and time.monotonic() < poll_deadline:
             for candidate_id, call_id in list(pending.items()):
                 result = await transport.poll(call_id)
                 if result is None:
@@ -114,12 +160,7 @@ async def mobilize(
                 all_results.append(result)
                 ledger.record_result(mobilization_id, candidate_id, call_id, _serialize(result))
                 emit("call_result", {"candidate_id": candidate_id, "outcome": result.outcome.value, "commitment": result.commitment_score})
-
-                if result.outcome in CONFIRMED_OUTCOMES and result.commitment_score >= COMMITMENT_THRESHOLD:
-                    confirmed.append(result)
-                    if len(confirmed) == need.count and time_to_fill is None:
-                        time_to_fill = time.monotonic() - start
-                        emit("need_met", {"time_to_fill_seconds": time_to_fill, "confirmed": len(confirmed)})
+                _record_confirmation_if_applicable(result)
 
             if pending:
                 await asyncio.sleep(poll_interval_s)

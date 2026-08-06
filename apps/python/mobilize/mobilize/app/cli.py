@@ -21,8 +21,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from mobilize.core.dispatcher import mobilize
 from mobilize.core.ledger import Ledger
+from mobilize.core.policy import GovernancePolicy, GovernanceState
 from mobilize.core.types import Candidate, Need
 from mobilize.sim.population import generate_population
+from mobilize.transports.base import validate_e164
 from mobilize.transports.simulated import SimulatedTransport
 
 GREEN, YELLOW, RED, DIM, RESET = "\033[92m", "\033[93m", "\033[91m", "\033[2m", "\033[0m"
@@ -74,6 +76,13 @@ async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
         print("CALLE_API_KEY not set. Export it before running --real.", file=sys.stderr)
         sys.exit(1)
 
+    for p in phones:
+        try:
+            validate_e164(p)
+        except ValueError as exc:
+            print(f"Refusing to dispatch: {exc}", file=sys.stderr)
+            sys.exit(1)
+
     candidates = [
         Candidate(id=f"real_{i}", phone=p, name=f"Recipient {i}", days_since_last_action=90,
                    distance_km=5, historical_accept_rate=0.5, historical_showup_rate=0.5)
@@ -83,6 +92,11 @@ async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
                 location="City Hospital", max_calls=len(candidates))
     ledger = Ledger("/tmp/mobilize_real_ledger.jsonl")
     transport = CalleTransport()
+    # Real calls always run under governance -- do-not-call, cooldowns,
+    # contact fatigue, and calling-hour windows -- by default, not as
+    # something the caller has to remember to opt into.
+    governance_state = GovernanceState()
+    governance_policy = GovernancePolicy()
 
     print(f"⚠️  REAL CALL-E CALLS to {len(phones)} number(s). This spends real call credits.")
     confirm = input("Type 'yes' to proceed: ")
@@ -91,7 +105,8 @@ async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
         return
 
     result = await mobilize(need, candidates, transport, ledger=ledger, on_progress=_print_event,
-                             mobilization_id=f"real_{int(time.time())}")
+                             mobilization_id=f"real_{int(time.time())}",
+                             governance_state=governance_state, governance_policy=governance_policy)
     print(f"\nFilled: {result.filled}   Confirmed: {len(result.confirmed)}   Calls used: {result.calls_used}")
     await transport.aclose()
 

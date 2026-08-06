@@ -31,8 +31,10 @@ except ImportError:
 
 from mobilize.core.dispatcher import mobilize
 from mobilize.core.ledger import Ledger
+from mobilize.core.policy import GovernancePolicy, GovernanceState
 from mobilize.core.types import Candidate, Need
 from mobilize.sim.population import generate_population
+from mobilize.transports.base import E164_RE
 from mobilize.transports.simulated import SimulatedTransport
 
 mcp = MCPServer("mobilize")
@@ -78,13 +80,38 @@ async def mobilize_simulated(
 async def mobilize_real(
     need_label: str,
     phones: list[str],
+    confirm: bool = False,
     count: int | None = None,
     deadline_minutes: float = 60,
 ) -> dict:
     """Place REAL CALL-E calls to exactly the E.164 phone numbers listed in
     `phones` -- never more. Requires CALLE_API_KEY in the environment. Use
     only for numbers you own or are explicitly authorized to call. This
-    spends real call credits; there is no default expansion to a larger pool."""
+    spends real call credits; there is no default expansion to a larger pool.
+
+    `confirm` must be explicitly set to true. Calling this with confirm=false
+    (the default) returns a preview of exactly what would be dialed instead
+    of placing any calls -- an agent must make a second, explicit call with
+    confirm=true to actually dispatch. This mirrors the CLI's typed 'yes'
+    confirmation; an MCP tool has no interactive prompt, so the two-call
+    pattern is the equivalent safeguard.
+
+    Real calls run under governance by default: do-not-call, cooldowns,
+    contact fatigue, and calling-hour windows are enforced, not optional."""
+    invalid = [p for p in phones if not E164_RE.match(p)]
+    if invalid:
+        return {"error": f"Not valid E.164 phone numbers, refusing to dispatch: {invalid}"}
+
+    if not confirm:
+        return {
+            "preview": True,
+            "would_call": phones,
+            "need_label": need_label,
+            "count_needed": count or len(phones),
+            "deadline_minutes": deadline_minutes,
+            "message": "No calls placed. Call again with confirm=true to actually dispatch.",
+        }
+
     from mobilize.transports.calle import CalleTransport
 
     if "CALLE_API_KEY" not in os.environ:
@@ -99,8 +126,11 @@ async def mobilize_real(
                 location="", max_calls=len(candidates))
     ledger = Ledger("/tmp/mobilize_mcp_real_ledger.jsonl")
     transport = CalleTransport()
+    governance_state = GovernanceState()
+    governance_policy = GovernancePolicy()
 
-    result = await mobilize(need, candidates, transport, ledger=ledger)
+    result = await mobilize(need, candidates, transport, ledger=ledger,
+                             governance_state=governance_state, governance_policy=governance_policy)
     await transport.aclose()
     return {
         "filled": result.filled,

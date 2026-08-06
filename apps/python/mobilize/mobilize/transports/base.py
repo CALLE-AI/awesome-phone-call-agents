@@ -7,9 +7,35 @@ and the identical code path runs against `CalleTransport` for real calls.
 
 from __future__ import annotations
 
+import re
 from typing import Protocol
+from urllib.parse import urlparse
 
 from mobilize.core.types import Candidate, CallResult
+
+# Same pattern CALL-E's own OpenAPI spec uses for CallTaskRecipientRequest.phones.
+E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+
+# CALL-E's real API host. Sending the bearer token to any other host would leak
+# it, so CalleTransport refuses to talk to anything outside this allow-list.
+TRUSTED_CALLE_HOSTS = {"api.heycall-e.com"}
+
+
+def validate_e164(phone: str) -> None:
+    if not E164_RE.match(phone):
+        raise ValueError(f"Phone number is not valid E.164: {phone!r}")
+
+
+def validate_trusted_base_url(base_url: str) -> None:
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https":
+        raise ValueError(f"CALLE_BASE_URL must use https, got: {base_url!r}")
+    if parsed.hostname not in TRUSTED_CALLE_HOSTS:
+        raise ValueError(
+            f"CALLE_BASE_URL host {parsed.hostname!r} is not in the trusted "
+            f"host allow-list {TRUSTED_CALLE_HOSTS}. Refusing to send the "
+            f"CALL-E bearer token to an untrusted host."
+        )
 
 MOBILIZE_RESULT_SCHEMA = {
     "type": "object",
@@ -56,8 +82,18 @@ def build_task_prompt(need_label: str, location: str) -> str:
 
 
 class Transport(Protocol):
-    async def dispatch(self, candidate: Candidate, need_label: str, location: str) -> str:
-        """Place a call, returning a call_id immediately (non-blocking)."""
+    async def dispatch(self, candidate: Candidate, need_label: str, location: str, *, idempotency_key: str) -> str:
+        """Place a call, returning a call_id immediately (non-blocking).
+
+        `idempotency_key` is precomputed by the caller from the ledger
+        (mobilization_id + candidate_id) and must be threaded through to the
+        real CALL-E API's own Idempotency-Key header. That's what makes a
+        crash between the provider accepting the call and the ledger write
+        completing safe: a retry on restart reuses the identical key, so
+        CALL-E returns the same call rather than placing a second one --
+        durability from an idempotent downstream, not from write ordering
+        alone.
+        """
         ...
 
     async def poll(self, call_id: str) -> CallResult | None:

@@ -93,6 +93,13 @@ is ever dispatched** — this is honest, and it's still the load-bearing
 mechanism of the whole project. See `mobilize/core/planner.py` and
 `mobilize/core/dispatcher.py`.
 
+**Dispatch within a wave is actually concurrent**, via `asyncio.gather`, not
+a `for` loop awaiting each call in turn — a sequential loop would silently
+serialize the exact thing this project claims to do.
+`mobilize/tests/test_dispatch_parallelism.py` proves this directly: against
+a transport with artificial per-dispatch latency, dispatching 8 candidates
+takes roughly one delay window, not eight.
+
 ### 2. Commitment calibration — a stated yes is not a confirmation
 
 People say yes to be agreeable and don't follow through. `mobilize/core/commitment.py`
@@ -110,22 +117,46 @@ margin — greedy-by-prior-score, which is the correct policy for maximizing
 expected count under a cardinality constraint over independent trials. See
 `mobilize/core/planner.py::plan_wave`.
 
-### 4. Write-ahead ledger — never double-dial, never lose a confirmation
+### 4. Durability — idempotency-keyed dispatch plus crash recovery that actually polls
 
-Every dispatch is logged *before* the call is placed, keyed by
-`(mobilization_id, candidate_id)`, using CALL-E's own `Idempotency-Key`
-request header end to end. See `mobilize/core/ledger.py`.
+Each dispatch is written to the ledger *after* the provider accepts the
+call (a `call_id` doesn't exist before that), so durability doesn't come
+from write-ordering alone — it comes from a precomputed, ledger-derived key
+(`(mobilization_id, candidate_id)`) passed straight through as CALL-E's own
+`Idempotency-Key` request header. If the process crashes between the
+provider accepting the call and the ledger write completing, a retry on
+restart resends the identical key and CALL-E returns the original call
+instead of placing a second one. See `mobilize/core/ledger.py` and
+`mobilize/transports/calle.py`.
+
+On restart, recovered in-flight candidates are never re-dispatched *and*
+are actively polled for their outcome (bounded by `recovery_timeout_s`) —
+against the real transport this recovers genuine results, since call state
+lives server-side and survives a process restart.
 
 **This is proven, not asserted:** `mobilize/tests/test_crash_safety.py`
 `SIGKILL`s a real subprocess mid-dispatch and restarts it against the same
 ledger file — the same methodology used to crash-test a from-scratch LSM-tree
-key-value store in an earlier project. All 26 tests pass, including this one.
+key-value store in an earlier project. `mobilize/tests/test_recovery_polling.py`
+separately proves a recovered in-flight call is polled and its result counted,
+not silently abandoned. 40 tests pass, including both.
 
 ### 5. Governance — consent is enforced in code, not just policy
 
 `mobilize/core/policy.py` enforces do-not-call, cooldowns, contact-fatigue
 limits, and calling-hour windows *before* a candidate is ever handed to a
-transport. See [skills/mobilize/references/safety.md](skills/mobilize/references/safety.md).
+transport. **Both real-call entry points (CLI `--real` and the MCP
+`mobilize_real` tool) run under governance by default** — it is not
+something a caller has to remember to opt into. See
+[skills/mobilize/references/safety.md](skills/mobilize/references/safety.md).
+
+### 6. Result binding — never trust a response you can't verify
+
+Before a CALL-E result counts toward a confirmation, `mobilize` checks that
+the returned `metadata.candidate_id` and phone number actually match the
+candidate the call was dispatched to. A mismatch is treated as a failed
+result, not silently trusted — see `mobilize/transports/calle.py::_to_call_result`
+and `mobilize/tests/test_transport_validation.py`.
 
 ## Evaluation
 
@@ -214,8 +245,14 @@ python -m mobilize.app.cli --real --phones +1XXXXXXXXXX --need-label "your test 
 ```
 
 This calls **only** the exact numbers you pass — never a larger pool — and
-requires an explicit `yes` confirmation before dispatching. Use a number you
-own or are authorized to call.
+requires an explicit `yes` confirmation before dispatching. Every number is
+validated as E.164 before anything is sent; malformed input is rejected
+with no network call made. Real calls run under governance by default
+(do-not-call, cooldowns, contact fatigue, calling-hour windows) and
+`CalleTransport` refuses to send its bearer token to any host outside
+CALL-E's own API — both closed off, not just documented, after external
+review (see `mobilize/transports/base.py::validate_trusted_base_url`).
+Use a number you own or are authorized to call.
 
 ### MCP server
 
@@ -225,7 +262,11 @@ python -m mobilize.mcp.server
 
 Exposes `mobilize_simulated` (free) and `mobilize_real` (spends credits,
 never expands beyond the phones explicitly given) as MCP tools, so any
-MCP-compatible agent can trigger a mobilization directly.
+MCP-compatible agent can trigger a mobilization directly. `mobilize_real`
+requires `confirm=true` explicitly — called without it, it returns a
+preview of exactly what would be dialed and places no calls. An MCP tool
+has no interactive prompt, so this two-call pattern is the equivalent of
+the CLI's typed `yes` confirmation.
 
 ### Live dashboard
 
@@ -251,7 +292,8 @@ mobilize/
 ├── mcp/            # MCP server
 ├── app/            # CLI demo runner
 ├── artifacts/       # committed real-call transcripts and results
-└── tests/          # 26 tests incl. property-based and real-subprocess crash tests
+└── tests/          # 40 tests incl. property-based, real-subprocess crash, and
+                    #   concurrency/validation tests added after external review
 skills/mobilize/    # Agent Skill (SKILL.md) wrapping mobilize() for reuse
 ```
 

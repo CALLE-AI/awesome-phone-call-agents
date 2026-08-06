@@ -32,8 +32,13 @@ class SimulatedTransport:
         self._max_latency_s = max_latency_s
         self.calls_placed = 0
 
-    async def dispatch(self, candidate: Candidate, need_label: str, location: str) -> str:
+    async def dispatch(self, candidate: Candidate, need_label: str, location: str, *, idempotency_key: str) -> str:
         donor = self._by_id[candidate.id]
+        # Real de-duplication-by-idempotency-key is a property of CALL-E's
+        # server, which SimulatedTransport doesn't model -- it always places
+        # a fresh simulated call. This matches the existing, documented
+        # limitation that a fresh SimulatedTransport instance after a real
+        # process restart has no memory of prior simulated calls.
         call_id = f"sim_{uuid.uuid4().hex[:12]}"
         outcome = simulate_call(donor, self._rng)
         latency = self._rng.uniform(self._min_latency_s, self._max_latency_s)
