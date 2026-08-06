@@ -2,14 +2,7 @@ import { flattenResult } from '../lib/flatten-result.js';
 import { baseUrl } from '../lib/client.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
 import { toLeadState } from '../lib/lead-state.js';
-
-const EVENT_TYPE_BY_STATUS = {
-  completed: 'call.completed',
-  failed: 'call.failed',
-  canceled: 'call.completed',
-  queued: 'call.completed',
-  in_progress: 'call.completed',
-};
+import { syntheticEvent } from '../lib/reconcile.js';
 
 const NON_TERMINAL_STATUSES = new Set(['queued', 'in_progress']);
 const MS_PER_MINUTE = 60000;
@@ -53,12 +46,11 @@ const perform = async (z, bundle) => {
   const response = await z.request({ url: `${baseUrl(bundle)}/v1/calls/${encodeURIComponent(callId)}` });
   const data = response.data;
 
-  const synthetic = {
-    id: `lookup_${callId}`,
-    type: EVENT_TYPE_BY_STATUS[data.status] || 'call.completed',
-    created_at: data.completed_at || data.created_at,
-    data,
-  };
+  // This search is the one surface that never had an authentication problem:
+  // it reads the call straight from CALL-E over the connection's API key. That
+  // is exactly what the two webhook surfaces now do before classifying, using
+  // the same synthetic-event shape.
+  const synthetic = syntheticEvent(data);
 
   // No result_schema is available here: this search can reconcile a call
   // placed from anywhere, including CALL-E's CLI, so there is no declared
@@ -81,11 +73,12 @@ const perform = async (z, bundle) => {
         is_actionable: false,
         lead_state: toLeadState('needs_human'),
         reconciliation_timed_out: true,
+        verified: true,
       },
     ];
   }
 
-  return [{ ...flat, reconciliation_timed_out: false }];
+  return [{ ...flat, reconciliation_timed_out: false, verified: true }];
 };
 
 export default {
@@ -131,6 +124,7 @@ export default {
       status: 'completed',
       is_actionable: true,
       reconciliation_timed_out: false,
+      verified: true,
     },
   },
 };

@@ -20,9 +20,10 @@ The quickest way to confirm it works end to end is
 two-step recipe that runs on Zapier's free plan and needs no third-party
 app connection beyond the CALL-E account itself.
 
-**Leave `Dry Run` set to `true` for the first run.** It returns a masked
-preview and places no call. Only turn it off deliberately, as its own
-step, and only with a phone number you are authorized to call.
+**`Dry Run` starts on.** A newly added action previews instead of calling
+anyone: it returns a masked preview and sends nothing to CALL-E. Turn it off
+deliberately, as its own step, once you have read the preview, and only with
+a phone number you are authorized to call.
 
 Building from source is not required to try it. The source lives in this
 directory; `npm install && npm test` runs the full suite with no
@@ -126,7 +127,7 @@ infers either from the phone number.
 | `suppression_list` (Do Not Call List) | No | Numbers that must never be dialled, separated by commas or newlines. Matching is digits-only. See [Suppression list](#suppression-list). |
 | `result_schema` (Result Schema (JSON)) | No | JSON Schema for the structured result. See the allowlist in [Result schema support](#result-schema-support). |
 | `correlation_id` (Correlation ID) | No | Your own record id, echoed back on the result as `correlation_id`. |
-| `dry_run` (Dry Run) | No | Defaults to `false`. See [Dry run](#8-dry-run). |
+| `dry_run` (Dry Run) | No | Defaults to `true`, and a blank or unset value is also a dry run. Placing a real call takes an explicit `false`. See [Dry run](#8-dry-run). |
 
 `Find Call Result` takes a single required `Call ID` input - the `call_id`
 returned by either create action - and returns the same output shape as the
@@ -171,12 +172,15 @@ branch on that field inside your Zap rather than assuming every event
 means success.
 
 **The webhook endpoint is unauthenticated.** CALL-E signs nothing and
-Zapier verifies nothing about who posts to a static webhook URL, so a
-`disposition` of `confirmed` is the only field this trigger fail-closes
-on - never treat `correlation_id` as proof that an event came from a real
-CALL-E call, since it is an echoed value a forged request could set to
-anything. Static webhook triggers like this one are only permitted on
-private Zapier integrations, which this one is.
+Zapier verifies nothing about who posts to a static webhook URL. The
+trigger therefore treats the delivered body as a notification rather than
+as data: it takes the call id the body names, reads that call back from
+CALL-E over your own connection, and reports what CALL-E says. A delivery
+naming a call your connection cannot see does not fire the Zap at all. See
+[Webhook verification](#webhook-verification) for the full table, including
+what happens when CALL-E cannot be reached. Static webhook triggers like
+this one are only permitted on private Zapier integrations, which this one
+is.
 
 ### Result schema support
 
@@ -274,6 +278,7 @@ steps.
 | `disposition_reason` | Human-readable reason the disposition was chosen. |
 | `is_actionable` | `true` only when `disposition` is `confirmed`. |
 | `lead_state` | Coarse projection for branching: `qualified`, `needs_human`, or `blocked_compliance`. See [Lead state](#lead-state). |
+| `verified` | `true` when the fields above were read back from CALL-E over your own API key rather than taken from a webhook body. See [Webhook verification](#webhook-verification). |
 | `event_id` | The CALL-E webhook event id, when available. |
 | `event_type` | The CALL-E webhook event type, when available. |
 | `call_id` | The CALL-E call id. |
@@ -477,16 +482,55 @@ forever. Age is measured from CALL-E's own `created_at`, so a delayed or
 re-run step still measures the real age of the call. A call whose age cannot
 be read is escalated rather than assumed healthy.
 
-### Callback verification
+### Webhook verification
 
-A Zapier callback URL is unauthenticated: anything that discovers the URL
-could post to it. Before `performResume` accepts a callback as the result of
-the call this step started, it checks that the call id the step recorded
-when it placed the call, and the call id carried in the callback body, are
-both present and equal. If the id this step started is unknown, if the
-callback carries no id, or if the two ids differ, `performResume` returns
-`needs_human` rather than trusting the callback body. This check is the
-reason a resumed payload can be trusted.
+Both webhook surfaces - the resumable callback behind
+`Place Call and Wait for Outcome` and the `Call Completed` trigger - receive
+an unsigned body on an unauthenticated URL. CALL-E publishes no signing
+secret and no subscription handshake, so nothing in the request itself
+proves it came from CALL-E.
+
+Matching the call id does not fix that, and it is worth being precise about
+why: the id arrives inside the same untrusted body. An attacker who knows
+the URL and the id can echo the id back, and an id-matching check waves the
+payload through. Everything after it - `task_completed`, the confidence, the
+structured result, and therefore `disposition: confirmed` and
+`is_actionable: true` - would then be whatever the sender chose to type.
+
+So a delivered body is treated as a notification, never as evidence. It says
+"call X may be finished". The integration then asks CALL-E directly, over
+the connection's own API key, what actually happened to call X, and
+classifies **that** response. Every field a Zap acts on comes from an
+authenticated read.
+
+The two surfaces differ only in what they can do when the lookup does not
+succeed:
+
+| Situation | `Place Call and Wait for Outcome` | `Call Completed` |
+| --- | --- | --- |
+| Body does not name the call this step started | `needs_human`, no lookup made | n/a - the trigger has no prior call |
+| CALL-E has no such call on this connection | `needs_human` | Ignored: no Zap run at all |
+| CALL-E unreachable, rate limited, or erroring | `needs_human`, `verified: false` | `needs_human`, `verified: false` |
+| CALL-E returns the call | Classified from CALL-E's record, `verified: true` | Classified from CALL-E's record, `verified: true` |
+
+A call the connection cannot see is not the Zap's call - a forged post, a
+stale delivery, or a webhook wired to another CALL-E project - so the
+trigger declines to fire at all rather than manufacture a run. A lookup that
+merely *failed*, though, is the opposite problem: CALL-E being briefly
+unreachable must not silently swallow a real outcome, so that case comes
+through marked unverified and never actionable, where a human sees it.
+
+The id checks in `performResume` still run first. They are a cheap filter,
+not authentication - they reject a callback that is not even claiming to be
+about this step's call before spending an API request on it.
+
+`verified` is on the output of every entry point. `Find Call Result` reports
+`verified: true` unconditionally: it reads the call from CALL-E itself and
+never had a webhook to distrust in the first place.
+
+An attacker who floods a discovered callback URL can therefore cause extra
+authenticated lookups of calls the account can already see. They cannot
+manufacture a result.
 
 ## 6. Status vocabulary note
 
@@ -512,16 +556,23 @@ API) actually returns.
 
 ## 8. Dry run
 
-Set Dry Run to `true` to preview a call without placing one. A dry run never
-calls `z.generateCallbackUrl()` and sends no request to CALL-E - it returns a
+Dry Run is on by default, so an action that has just been added to a Zap
+previews instead of calling anyone. A dry run never calls
+`z.generateCallbackUrl()` and sends no request to CALL-E - it returns a
 masked preview of the endpoint, idempotency key, and payload instead.
 
 Only an explicit negative places a real call: `false`, `'false'` in any
-letter case, `0`, `'0'`, an empty or whitespace-only string, `null`, or
-`undefined`. Every other value - including `true`, any other string, a
-number other than `0`, or any unrecognized input - is treated as a dry run.
-This is deliberate: an integration that cannot confidently tell a value
-means "no" refuses to place the call rather than guess.
+letter case, `0`, or `'0'`. Every other value is a dry run - `true`, any
+other string, a number other than `0`, an unrecognized input, and, most
+importantly, **nothing at all**: unset, `null`, or an empty string.
+
+That last part is the whole point. A field nobody ever set, a field a Zap
+mapped from an upstream value that turned out to be blank, and a field that
+did not exist when the Zap was built all arrive the same way, and none of
+them is a person deciding to dial a real phone number. Going live is an
+explicit act, so it takes an explicit value; everything short of that
+previews. An integration that cannot confidently tell a value means "no"
+refuses to place the call rather than guess.
 
 Example dry-run preview payload uses `+15550123456` as the recipient number.
 
@@ -547,7 +598,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 276 tests across 21 files against a bundled
+`npm install && npm test` runs 303 tests across 22 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/fixtures/` holds three committed payloads - a clean success, a
 provider-reported success that carries no answer, and a call carrying a

@@ -125,8 +125,8 @@ export const INPUT_FIELDS = [
     label: 'Dry Run',
     type: 'boolean',
     required: false,
-    default: 'false',
+    default: 'true',
     helpText:
-      'When true, returns a masked preview and places no call. Any unrecognized value is also treated as a dry run so no unintended call is placed.',
+      'Starts on, so a newly built Zap previews instead of calling anyone. When on, returns a masked preview and places no call. Turn it off deliberately, once, when you are ready to dial for real - a blank or unrecognized value is treated as a dry run, so a call is only ever placed by an explicit choice.',
   },
 ];

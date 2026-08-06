@@ -1,5 +1,7 @@
 import { flattenResult } from '../lib/flatten-result.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
+import { fetchAuthoritativeCall, syntheticEvent } from '../lib/reconcile.js';
+import { toLeadState } from '../lib/lead-state.js';
 
 // This trigger deliberately omits performSubscribe/performUnsubscribe. The
 // CALL-E Developer API exposes no webhook subscription endpoint to call
@@ -9,17 +11,17 @@ import { toMinConfidenceScore } from '../lib/result-quality.js';
 // CALL-E's own settings, instead of Zapier registering it automatically.
 // Static webhooks are only permitted on private Zapier integrations, which
 // this one is.
+const classifierOptions = (bundle) => ({
+  minConfidenceScore: toMinConfidenceScore(bundle.inputData && bundle.inputData.min_confidence_score),
+});
+
 const perform = async (z, bundle) => {
   const event = bundle.cleanedRequest;
 
   // The webhook endpoint is unauthenticated: CALL-E has no signing secret
   // or subscription handshake to verify a delivery against, so a payload
   // reaching this trigger could be a real CALL-E event or a forged POST
-  // from anyone who has discovered the URL. flattenResult still runs every
-  // field through redactDeep (masking phone numbers), but that is data
-  // hygiene, not proof of origin - a downstream Zap should branch on
-  // `disposition` and must not treat `correlation_id` as authenticated,
-  // since it is just an echoed value, not a verified one.
+  // from anyone who has discovered the URL.
   //
   // Fail closed on shape rather than throw: a malformed or empty POST body
   // means there is nothing to trigger on, and returning [] tells Zapier
@@ -28,17 +30,48 @@ const perform = async (z, bundle) => {
     return [];
   }
 
+  // The delivered body is a notification, never evidence. The only thing taken
+  // from it is the call id it names - and that id is then handed to CALL-E over
+  // this connection's own API key, so every field the Zap goes on to act on
+  // comes from an authenticated response rather than from whoever POSTed here.
+  const claimedCallId = event.data.id;
+  const authoritative = await fetchAuthoritativeCall(z, bundle, claimedCallId);
+
+  // A call this connection cannot see is not this Zap's call - a forged POST,
+  // a stale delivery, or a webhook wired to the wrong CALL-E project. Trigger
+  // nothing at all rather than manufacture a run for it.
+  if (authoritative.notFound) {
+    return [];
+  }
+
+  // Any other failure means the lookup could not be done, not that the call is
+  // fake - CALL-E being briefly unreachable must not silently swallow a real
+  // outcome. Surface it, from the delivered body, marked unverified and never
+  // actionable, so a human sees the call rather than losing it.
+  if (!authoritative.ok) {
+    const unverified = flattenResult(event, classifierOptions(bundle));
+    return [
+      {
+        ...unverified,
+        disposition: 'needs_human',
+        disposition_reason:
+          'A call outcome was received on the webhook URL, but it could not be confirmed ' +
+          `with CALL-E, so nothing in it may be acted on. ${authoritative.reason}`,
+        is_actionable: false,
+        lead_state: toLeadState('needs_human'),
+        verified: false,
+      },
+    ];
+  }
+
   // No result_schema is available to a trigger - this webhook may describe a
   // call placed from CALL-E's CLI, an MCP tool, or another Zap entirely, so
   // there is no declared contract to hold the result to. The classifier
   // therefore runs its schemaless check: it can still see that a returned
   // field came back `unknown` or empty, but it cannot know that a field the
   // original caller required is absent.
-  return [
-    flattenResult(event, {
-      minConfidenceScore: toMinConfidenceScore(bundle.inputData && bundle.inputData.min_confidence_score),
-    }),
-  ];
+  const verifiedEvent = syntheticEvent(authoritative.data, { id: event.id, type: event.type });
+  return [{ ...flattenResult(verifiedEvent, classifierOptions(bundle)), verified: true }];
 };
 
 export default {
@@ -58,11 +91,13 @@ export default {
       "1. Copy the webhook URL Zapier shows below this trigger once it's set up.\n" +
       "2. In CALL-E, open your project's webhook settings.\n" +
       "3. Paste the copied URL into the project's webhook URL field and save.\n\n" +
-      'Once connected, every call your CALL-E project places - whether started from a Zap, ' +
-      "the CALL-E CLI, an MCP tool, or anywhere else - will send its terminal outcome to " +
-      'this Zap. This URL is unauthenticated, so treat it like any other shared secret, ' +
-      'and branch your Zap on the `disposition` field rather than assuming every event it ' +
-      'receives came from a real CALL-E call.',
+      'Once connected, every call your CALL-E project places - from a Zap, the CALL-E ' +
+      'CLI, an MCP tool, or anywhere else - sends its terminal outcome to this Zap.\n\n' +
+      'This URL is unauthenticated, so nothing that arrives on it is trusted on its own: ' +
+      'every outcome is re-read from CALL-E over your own connection before this trigger ' +
+      'reports it. A delivery naming a call your connection cannot see is ignored, and one ' +
+      'that cannot be confirmed comes through as needs_human with `verified` false. Branch ' +
+      'on `disposition`.',
   },
   operation: {
     type: 'hook',
@@ -83,6 +118,7 @@ export default {
       disposition_reason: 'Call completed with a high-confidence validated result.',
       is_actionable: true,
       lead_state: 'qualified',
+      verified: true,
       opt_out_requested: false,
       event_id: 'evt_123',
       event_type: 'call.completed',

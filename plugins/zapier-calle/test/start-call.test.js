@@ -25,12 +25,33 @@ const bundleFor = (server, inputData) => ({
   inputData,
 });
 
+// Dialing is opt-in: every test below that expects a real request has to say
+// so, exactly as a user does. Omitting the field is covered on its own.
 const input = {
   task: 'Call the on-call engineer and get an acknowledgement.',
   phone: '+15550123456',
+  dry_run: false,
 };
 
 describe('start-call', () => {
+  it('places no call when dry_run was never set', async () => {
+    server = await startFakeCalle({});
+    const { dry_run: _omitted, ...withoutDryRun } = input;
+    const output = await startCall.operation.perform(zFor(), bundleFor(server, withoutDryRun));
+
+    expect(output.dry_run).toBe(true);
+    expect(output.call_id).toBe(null);
+    expect(server.lastRequest()).toBe(null);
+  });
+
+  it('places no call when dry_run maps to an empty value', async () => {
+    server = await startFakeCalle({});
+    const output = await startCall.operation.perform(zFor(), bundleFor(server, { ...input, dry_run: '' }));
+
+    expect(output.dry_run).toBe(true);
+    expect(server.lastRequest()).toBe(null);
+  });
+
   it('creates a call and returns the call id', async () => {
     server = await startFakeCalle({});
     const output = await startCall.operation.perform(zFor(), bundleFor(server, input));
@@ -281,9 +302,18 @@ describe('start-call', () => {
 });
 
 describe('isDryRun', () => {
-  it('treats explicit negatives as a real call', () => {
-    for (const value of [false, 'false', 'FALSE', 0, '0', '', '   ', null, undefined]) {
+  it('places a real call only for an explicit negative', () => {
+    for (const value of [false, 'false', 'FALSE', ' false ', 0, '0']) {
       expect(isDryRun(value)).toBe(false);
+    }
+  });
+
+  // The whole point of the default: a Zap nobody has switched to live yet, a
+  // mapped field that resolved to nothing, an input that did not exist when
+  // the Zap was built - none of them may dial a real person.
+  it('treats an absent or blank value as a dry run rather than as permission to dial', () => {
+    for (const value of [undefined, null, '', '   ']) {
+      expect(isDryRun(value)).toBe(true);
     }
   });
 
@@ -297,5 +327,14 @@ describe('isDryRun', () => {
     for (const value of ['maybe', 'nope!', {}, [], 42, 'undefined']) {
       expect(isDryRun(value)).toBe(true);
     }
+  });
+});
+
+describe('the Dry Run input field', () => {
+  const dryRunField = startCall.operation.inputFields.find((f) => f.key === 'dry_run');
+
+  it('ships switched on, so a newly configured action previews instead of calling', () => {
+    expect(dryRunField.default).toBe('true');
+    expect(isDryRun(dryRunField.default)).toBe(true);
   });
 });

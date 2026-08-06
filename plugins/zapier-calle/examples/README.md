@@ -21,10 +21,12 @@ paid Zapier plan regardless of which apps those steps use.
 
 ## Shared note
 
-Every recipe ships with Dry Run set to `true`. Follow the recipe's own
-"What to check before turning it on" section, verify the Zap behaves as
-expected, and only then turn Dry Run off deliberately - it is never turned
-off as part of copying the recipe.
+Every recipe ships with Dry Run set to `true`, which is also where the field
+starts on its own: a newly added action previews rather than calling anyone,
+and a blank value counts as a preview too. Follow the recipe's own "What to
+check before turning it on" section, verify the Zap behaves as expected, and
+only then turn Dry Run off deliberately - it is never turned off as part of
+copying the recipe.
 
 Every recipe also sets Region and Locale explicitly rather than leaving them
 blank. CALL-E does not infer either from the phone number, and can reject a

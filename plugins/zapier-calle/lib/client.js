@@ -24,6 +24,11 @@ const MAX_QUESTIONS_LENGTH = 500;
 
 export function checkForErrors(response, z, bundle) {
   if (response.status < 400) return response;
+  // A caller that asked to inspect the status itself gets to. Only the
+  // reconciliation lookup does this, because it has to tell "CALL-E has no
+  // such call" apart from "CALL-E could not be reached" - a thrown error
+  // flattens both into one string.
+  if (response.skipThrowForStatus) return response;
 
   let parsed = null;
   let detail = '';

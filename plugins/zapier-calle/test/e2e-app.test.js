@@ -22,7 +22,17 @@ afterEach(async () => {
 
 const authData = (apiKey) => ({ apiKey, baseUrl: server.url });
 
-const CALL_INPUT = { task: 'Call the on-call engineer.', phone: '+15550123456' };
+// dry_run is explicitly false here because it defaults to a dry run: placing a
+// real call takes a deliberate opt-in, and these tests are the ones opting in.
+const CALL_INPUT = { task: 'Call the on-call engineer.', phone: '+15550123456', dry_run: false };
+
+const COMPLETED_RECORD = {
+  status: 'completed',
+  task_completed: true,
+  completion_confidence: { score: 0.95, label: 'high' },
+  structured_result: { acknowledged: 'yes' },
+  completed_at: '2026-08-02T00:05:00Z',
+};
 
 describe('authentication through the real Zapier runtime', () => {
   it('sends the Bearer header built by beforeRequest and succeeds against /v1/goals', async () => {
@@ -72,6 +82,19 @@ describe('start_call through the real Zapier runtime', () => {
     expect(output.dry_run).toBe(true);
     expect(server.lastRequest()).toBe(null);
   });
+
+  it('makes zero network requests when dry_run is left unset', async () => {
+    server = await startFakeCalle({});
+    const { dry_run: _omitted, ...withoutDryRun } = CALL_INPUT;
+
+    const output = await appTester(App.creates.start_call.operation.perform, {
+      authData: authData('k'),
+      inputData: withoutDryRun,
+    });
+
+    expect(output.dry_run).toBe(true);
+    expect(server.lastRequest()).toBe(null);
+  });
 });
 
 describe('place_call_and_wait through the real Zapier runtime', () => {
@@ -112,13 +135,59 @@ describe('place_call_and_wait through the real Zapier runtime', () => {
 
     expect(server.lastRequest().body.webhook_url).toBeTruthy();
 
+    // The call really did finish, so CALL-E's own record says so too.
+    server.setStatus(performed.call_id, COMPLETED_RECORD);
+
     const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
+      authData: authData('k'),
       outputData: performed,
       cleanedRequest: completedEvent(performed.call_id),
     });
 
     expect(resumed.disposition).toBe('confirmed');
     expect(resumed.is_actionable).toBe(true);
+    expect(resumed.verified).toBe(true);
+    // The resume made its own authenticated GET back to CALL-E, through the
+    // real middleware chain - Bearer header and all.
+    expect(server.lastRequest().method).toBe('GET');
+    expect(server.lastRequest().path).toBe(`/v1/calls/${performed.call_id}`);
+    expect(server.lastRequest().headers.authorization).toBe('Bearer k');
+  });
+
+  // The whole reason the resume re-reads the call: the callback body is
+  // unsigned, so a body claiming a clean success proves nothing on its own.
+  it('refuses to confirm a callback that CALL-E does not back up', async () => {
+    server = await startFakeCalle({});
+
+    const performed = await appTester(App.creates.place_call_and_wait.operation.perform, {
+      authData: authData('k'),
+      inputData: CALL_INPUT,
+    });
+
+    // The record is left exactly as CALL-E created it - still queued - while
+    // the callback body insists the call completed with a clean result.
+    const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
+      authData: authData('k'),
+      outputData: performed,
+      cleanedRequest: completedEvent(performed.call_id),
+    });
+
+    expect(resumed.is_actionable).toBe(false);
+    expect(resumed.disposition).not.toBe('confirmed');
+  });
+
+  it('fails closed when CALL-E has no record of the call the callback names', async () => {
+    server = await startFakeCalle({});
+
+    const resumed = await appTester(App.creates.place_call_and_wait.operation.performResume, {
+      authData: authData('k'),
+      outputData: { call_id: 'call_never_placed' },
+      cleanedRequest: completedEvent('call_never_placed'),
+    });
+
+    expect(resumed.disposition).toBe('needs_human');
+    expect(resumed.is_actionable).toBe(false);
+    expect(resumed.verified).toBe(false);
   });
 
   it('fails closed when the callback describes a different call than the one started', async () => {
@@ -148,13 +217,7 @@ describe('find_call_result through the real Zapier runtime', () => {
       inputData: CALL_INPUT,
     });
 
-    server.setStatus(performed.call_id, {
-      status: 'completed',
-      task_completed: true,
-      completion_confidence: { score: 0.95, label: 'high' },
-      structured_result: { acknowledged: 'yes' },
-      completed_at: '2026-08-02T00:05:00Z',
-    });
+    server.setStatus(performed.call_id, COMPLETED_RECORD);
 
     const results = await appTester(App.searches.find_call_result.operation.perform, {
       authData: authData('k'),

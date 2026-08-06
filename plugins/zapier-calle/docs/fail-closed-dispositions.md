@@ -313,18 +313,61 @@ per run but do not change what the call is - a freshly generated callback
 URL is the clearest example, since minting a new one on every attempt would
 otherwise make an identical retry hash differently and place a second call.
 
-## 11. Verifying the callback
+## 11. A webhook body is a notification, not a result
 
-A callback URL delivered to a third-party provider is generally
-unauthenticated: anything that discovers the URL can post to it, so its
-mere arrival is not proof it describes the call you actually started.
-Before trusting a callback body as the outcome of a specific call, confirm
-it references an identifier your workflow recorded when it placed that
-call (a call ID, a correlation ID) and that the two match exactly. If the
-identifier your workflow started with is unknown, if the callback carries
-no identifier, or if the two differ, treat the callback the same as any
-other unverifiable input - route it to the fail-closed review disposition
-rather than accepting its contents as the result of your call.
+A callback or webhook URL handed to a third-party provider is generally
+unauthenticated: anything that discovers the URL can post to it, so its mere
+arrival is not proof it describes the call you actually started.
+
+The tempting fix is to match an identifier - confirm the body references the
+call ID your workflow recorded when it placed the call. Do that; it is
+cheap, and it rejects a body that is not even claiming to be about your
+call. But be clear about what it is worth, because it is easy to mistake for
+authentication and it is not:
+
+**The identifier travels inside the same untrusted body.** An attacker who
+knows the URL and the ID can send both. An ID-matching check then waves the
+payload through, and every field behind it - the completion flag, the
+confidence, the extracted result - is whatever the sender chose to type.
+That is a forged `confirmed` written into a CRM. Matching a value the
+attacker supplies against a value you already know proves only that they
+knew it too.
+
+The property you actually need is that the data came from the provider, and
+if the transport cannot give you that, get it from the content instead:
+
+> Treat the delivered body as a notification, never as data. It tells you
+> *which* call to go look at. Then fetch that call from the provider over
+> your own authenticated credential, and classify the response you get back.
+
+Every field the workflow acts on is then something the provider told you
+directly. A forged post at worst causes an authenticated lookup of a call
+your account can already see. Note also that the caller can still influence
+the *envelope* it hands you - an event type, say - so make sure a hostile
+value there can only move the verdict toward less actionable, never toward
+success.
+
+If the provider does publish a signature (an HMAC over the raw body with a
+shared secret), verify it and you can skip the extra fetch. Verify it
+against the **raw** bytes, before any JSON parsing or normalization, and
+compare in constant time. If it publishes nothing - which is the situation
+this pattern was written for - the fetch is the substitute.
+
+Handle the two ways a lookup can fail differently, because they mean
+opposite things:
+
+- **The provider says the call does not exist.** The payload is not about
+  anything you own: a forgery, a stale delivery, or a webhook wired to
+  another project. Emit nothing at all. Manufacturing a review item for
+  every forged post hands an attacker a way to flood a human's queue.
+- **The lookup could not be completed** - a timeout, a rate limit, a 5xx.
+  You have learned nothing about the call, and a real outcome must not be
+  silently dropped because the provider was briefly unreachable. Emit it,
+  marked unverified, routed to review, never actionable.
+
+Carry that distinction on the output as a field of its own (`verified`), so
+a downstream step can tell "the provider confirmed this" from "nobody could
+check."
 
 ## 12. How to test it
 
@@ -342,9 +385,13 @@ none of them produce the actionable disposition.
 Separately, assert that a dry-run or preview code path makes zero network
 requests and generates no side-effecting resources (no callback URL, no
 call placed) - a dry run that quietly still performs the real action
-defeats the entire point of offering one.
+defeats the entire point of offering one. Assert it for the case where the
+preview flag was **never set at all**, not only where it was set to true: an
+unset flag is the state a freshly built workflow is in, and if absence reads
+as "go ahead," the safety of the preview mode depends on everyone
+remembering to turn it on.
 
-Three assertions are worth writing explicitly, because each covers a bug
+Four assertions are worth writing explicitly, because each covers a bug
 that is easy to introduce and invisible until production:
 
 - **`false` and `0` are still confirmed.** The usable-value check in section
@@ -357,6 +404,12 @@ that is easy to introduce and invisible until production:
 - **The agent's own script cannot trigger the transcript scanners.** Feed a
   transcript where the bot reads an opt-out disclosure and the recipient says
   something ordinary, and assert nothing fires.
+- **A webhook body cannot outrank the provider.** Post a body claiming a
+  perfect success for a call the provider reports as unfinished or empty, and
+  assert the result is not actionable. This is the one assertion that fails
+  loudly the moment someone "optimizes away" the verification fetch in
+  section 11, which is exactly the change that looks like a harmless
+  performance win.
 
 Keep a small set of committed fixture payloads for the cases that are hard
 to describe in prose - a clean success, a provider-reported success that
@@ -367,5 +420,8 @@ nobody executes.
 See `plugins/zapier-calle/lib/disposition.js` and
 `plugins/zapier-calle/lib/result-quality.js` for a fail-closed classifier
 built around these rules, `plugins/zapier-calle/lib/opt-out.js` for the
-revocation scanner, and `plugins/zapier-calle/test/disposition.test.js` plus
-`plugins/zapier-calle/test/fixtures.test.js` for the tests described above.
+revocation scanner, `plugins/zapier-calle/lib/reconcile.js` for the
+authenticated re-read in section 11, and
+`plugins/zapier-calle/test/disposition.test.js` plus
+`plugins/zapier-calle/test/fixtures.test.js` and
+`plugins/zapier-calle/test/reconcile.test.js` for the tests described above.

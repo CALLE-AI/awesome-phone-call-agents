@@ -3,22 +3,22 @@ import { idempotencyKey } from './idempotency.js';
 
 const E164_RE = /^\+[1-9]\d{7,14}$/;
 
-const FALSY_DRY_RUN = new Set(['false', '0', '']);
-const TRUTHY_DRY_RUN = new Set(['true', 'yes', 'y', 'on', '1']);
+const FALSY_DRY_RUN = new Set(['false', '0']);
 
-// Fail closed: only an unambiguous negative places a real call. Anything else
-// (an unrecognized string, an object, a number other than 0/1, ...) is treated
-// as a dry run so an unclear intent never results in an unintended phone call.
+// Fail closed: only an unambiguous negative places a real call. Everything
+// else is a dry run - an unrecognized string, an object, a number other than
+// 0, and, most importantly, *nothing at all*.
+//
+// Absence is the case that matters. A field that was never set, that a Zap
+// mapped from an empty upstream value, or that predates this input existing
+// arrives here as `undefined`, `null`, or `''`. Reading any of those as "go
+// ahead and dial" means a Zap can place a real call to a real person without
+// anyone ever having chosen to leave preview mode. Going live is an explicit
+// act, so it takes an explicit value; anything less previews.
 export function isDryRun(value) {
-  if (value === false || value === null || value === undefined) return false;
-  if (value === true) return true;
-  if (value === 0) return false;
-  if (value === 1) return true;
+  if (value === false || value === 0) return false;
   if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (FALSY_DRY_RUN.has(normalized)) return false;
-    if (TRUTHY_DRY_RUN.has(normalized)) return true;
-    return true;
+    return !FALSY_DRY_RUN.has(value.trim().toLowerCase());
   }
   return true;
 }

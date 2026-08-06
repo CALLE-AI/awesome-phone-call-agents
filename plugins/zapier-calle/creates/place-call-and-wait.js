@@ -8,6 +8,7 @@ import { checkRetryPolicy, retryPolicyOptionsFromInput } from '../lib/retry-poli
 import { parseResultSchema } from '../lib/result-schema.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
 import { toLeadState } from '../lib/lead-state.js';
+import { fetchAuthoritativeCall, syntheticEvent } from '../lib/reconcile.js';
 
 const perform = async (z, bundle) => {
   const dryRun = isDryRun(bundle.inputData.dry_run);
@@ -49,6 +50,7 @@ const unresumable = (bundle, reason) => ({
   disposition_reason: reason.text,
   is_actionable: false,
   lead_state: toLeadState(reason.disposition),
+  verified: false,
 });
 
 const isNonEmptyId = (value) => typeof value === 'string' && value.length > 0;
@@ -66,6 +68,10 @@ const performResume = async (z, bundle) => {
 
   // A callback URL is unauthenticated, so an unverifiable callback must fail
   // closed to needs_human rather than fall through to a confirmed result.
+  // The id checks below are a cheap first filter, not authentication - they
+  // reject a callback that is not even claiming to be about this step's call
+  // before spending an API request on it. What actually makes the result
+  // trustworthy is the authenticated re-fetch further down.
   const eventCallId = event.data && event.data.id;
   const startedIdKnown = isNonEmptyId(startedCallId);
   const eventIdPresent = isNonEmptyId(eventCallId);
@@ -89,7 +95,30 @@ const performResume = async (z, bundle) => {
     });
   }
 
-  return { ...bundle.outputData, ...flattenResult(event, classifierOptions(bundle)) };
+  // Everything above only established that the body is *about* the right call.
+  // The body itself is never classified: a forged POST to a discovered callback
+  // URL could otherwise carry task_completed, a high confidence and a clean
+  // structured_result and be written into a CRM as a real answer. Ask CALL-E,
+  // over the connection's own API key, what this call actually did, and
+  // classify that instead. The delivered body contributes nothing but its
+  // envelope - and an unreadable or unreachable answer means no actionable
+  // result at all.
+  const authoritative = await fetchAuthoritativeCall(z, bundle, startedCallId);
+  if (!authoritative.ok) {
+    return unresumable(bundle, {
+      disposition: 'needs_human',
+      text:
+        'A callback arrived for this call, but its outcome could not be confirmed with ' +
+        `CALL-E, so it was not trusted. ${authoritative.reason}`,
+    });
+  }
+
+  const verified = syntheticEvent(authoritative.data, { id: event.id, type: event.type });
+  return {
+    ...bundle.outputData,
+    ...flattenResult(verified, classifierOptions(bundle)),
+    verified: true,
+  };
 };
 
 export default {
@@ -109,6 +138,7 @@ export default {
       disposition_reason: 'Call completed with a high-confidence validated result.',
       is_actionable: true,
       lead_state: 'qualified',
+      verified: true,
       call_id: 'call_123',
       status: 'completed',
       task_completed: true,
