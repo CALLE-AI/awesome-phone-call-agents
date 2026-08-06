@@ -4,6 +4,7 @@ import { handleCreateCall, handleGetCallStatus } from "../api/_lib/calls";
 import { ACCESS_CODE_HEADER } from "../src/access";
 import { FAKE_SERVER_URL, FAKE_TOKEN, createFakeCalle } from "./fake-calle-server";
 import type { RecoveryRequest } from "../src/workflows/appointment-recovery/types";
+import type { CareCallRequest } from "../src/workflows/carecall";
 
 const ACCESS_CODE = "test-operator-code";
 
@@ -28,6 +29,31 @@ function validRequest(key: string): RecoveryRequest {
       status: "missed",
     },
     replacement_windows: [{ start: "2099-08-07T10:00:00+08:00", end: "2099-08-07T12:00:00+08:00" }],
+  };
+}
+
+function validCareCallRequest(key: string): CareCallRequest {
+  return {
+    workflow: "carecall",
+    request_key: key,
+    organisation: { name: "Queenstown Care Team", timezone: "Asia/Singapore" },
+    senior: {
+      id: "mdm-lim",
+      preferred_name: "Mdm Lim",
+      phone_e164: "+6580000000",
+      language: "English",
+      authority_confirmed: true,
+      permitted_call_window: "12:00 AM–11:59 PM",
+    },
+    routine: {
+      id: "lim-morning-medication",
+      kind: "medication",
+      title: "Morning medication",
+      caregiver_instruction: "Repeat the approved morning reminder.",
+      caregiver_name: "Joanne Lim",
+      trust_phrase: "Joanne asked me to call about your morning routine.",
+    },
+    authorization: { exactly_one_call: true, authorized_at: new Date().toISOString() },
   };
 }
 
@@ -102,6 +128,17 @@ test("a valid request plans and runs one call", async () => {
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.call_id, "run-1");
+  assert.deepEqual(fake.toolCalls, ["plan_call", "run_call"]);
+});
+
+test("a valid CareCall request uses the same protected one-call handshake", async () => {
+  const fake = createFakeCalle();
+  const response = await withFakeCalle(fake, () =>
+    handleCreateCall(post(validCareCallRequest("carecall-happy-path")), CONFIGURED),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).call_id, "run-1");
   assert.deepEqual(fake.toolCalls, ["plan_call", "run_call"]);
 });
 

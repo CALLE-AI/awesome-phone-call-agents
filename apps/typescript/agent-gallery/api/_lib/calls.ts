@@ -21,6 +21,11 @@ import type { CalleActivity, CalleRun } from "../../src/calle";
 import { validateRequest } from "../../src/workflows/appointment-recovery/validate";
 import { buildCallGoal } from "../../src/workflows/appointment-recovery/workflow";
 import type { RecoveryRequest } from "../../src/workflows/appointment-recovery/types";
+import {
+  buildCareCallGoal,
+  validateCareCallRequest,
+  type CareCallRequest,
+} from "../../src/workflows/carecall";
 
 export interface CalleEnv {
   CALLE_ACCESS_TOKEN?: string;
@@ -137,9 +142,9 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
   const body = await request.text();
   if (body.length > REQUEST_LIMIT) return json({ error: "request_too_large" }, 413);
 
-  let payload: RecoveryRequest;
+  let payload: RecoveryRequest | CareCallRequest;
   try {
-    payload = JSON.parse(body) as RecoveryRequest;
+    payload = JSON.parse(body) as RecoveryRequest | CareCallRequest;
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
@@ -151,7 +156,10 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
   if (existing) return json({ call_id: existing, deduplicated: true });
 
   // The browser already validated, but a server must never trust that.
-  const errors = validateRequest(payload);
+  const careCall = "workflow" in payload && payload.workflow === "carecall";
+  const errors = careCall
+    ? validateCareCallRequest(payload as CareCallRequest)
+    : validateRequest(payload as RecoveryRequest);
   if (errors.length > 0) return json({ error: "invalid_request", details: errors }, 400);
 
   const client = clientFor(env);
@@ -167,8 +175,12 @@ export async function handleCreateCall(request: Request, env: CalleEnv): Promise
 
   try {
     const plan = await client.planCall({
-      to_phones: [payload.customer.phone_e164],
-      goal: buildCallGoal(payload),
+      to_phones: [careCall
+        ? (payload as CareCallRequest).senior.phone_e164
+        : (payload as RecoveryRequest).customer.phone_e164],
+      goal: careCall
+        ? buildCareCallGoal(payload as CareCallRequest)
+        : buildCallGoal(payload as RecoveryRequest),
       language: "English",
     });
 
