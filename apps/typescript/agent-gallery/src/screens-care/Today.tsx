@@ -1,4 +1,5 @@
-import { seniors, timeline } from "../carecall/fixtures";
+import { timeline } from "../carecall/fixtures";
+import { useSeniorDirectory } from "../carecall/senior-directory-context";
 import type { AttentionCase, NavigationId, TimelineItem } from "../carecall/types";
 import { Icon } from "../components/Icon";
 import { RoutineIcon, SectionHeading, SeniorAvatar, StatusPill } from "../components/CarePrimitives";
@@ -12,6 +13,7 @@ interface TodayProps {
 }
 
 export function Today({ attentionCount, attentionCases, resolvedIds, onNavigate, onPreview }: TodayProps) {
+  const { seniors } = useSeniorDirectory();
   const urgentCase = attentionCases.find((item) => !resolvedIds.has(item.id));
   const urgentSenior = urgentCase ? seniors.find((senior) => senior.id === urgentCase.seniorId) : undefined;
   const metrics = [

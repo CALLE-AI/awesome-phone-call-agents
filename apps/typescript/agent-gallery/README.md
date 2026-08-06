@@ -127,6 +127,18 @@ Set `CARECALL_PUBLIC_BASE_URL` and `CRON_SECRET` in the terminal environment usi
 
 An expired review date, revoked operator, invalid encrypted record, missed occurrence, or failed call start moves the job and schedule to `needs_review`. Queued manual calls can be cancelled before they start. Schedule pause invalidates its queued occurrence; cancellation also removes stored phone ciphertext and requires new authorization. An ongoing provider call cannot be recalled.
 
+## Senior records
+
+An operator can edit a senior's name, preferred name, language, permitted call window, and caregiver details from the care directory, and can withdraw a senior from care calls.
+
+The permitted call window is validated against the same pattern the workflow parses. An unreadable window is treated as outside every window, so an unchecked typo would silently stop that senior's reminders instead of failing visibly; the editor rejects it before it is stored.
+
+The phone number is not editable. The record holds only a masked number, and the E.164 number is supplied by an authorized operator at the moment a call is authorized.
+
+Withdrawal is a state change rather than a deletion. A withdrawn senior keeps their call history and open care cases, so past records keep their subject, while every path that can dial is closed: routines stop being scheduled, the preview becomes read-only, and neither one-call authorization nor schedule activation is offered. Withdrawal cannot recall a call the provider has already accepted. A withdrawn senior can be restored, after which routines must still be resumed individually.
+
+These records are demo-session state. There is no durable senior store; edits are not persisted, and nothing is sent to the server.
+
 ## UI structure
 
 ```text
@@ -135,16 +147,20 @@ src/
 ├── carecall/
 │   ├── fixtures.ts           fictional Singapore care records
 │   ├── call-operations.ts    call-list contracts and state/time presentation
+│   ├── senior-directory.ts   senior edit, withdrawal, and callability rules
+│   ├── senior-directory-context.tsx demo-session senior state shared by screens
 │   └── types.ts              UI-domain contracts
 ├── components/
 │   ├── CallPreviewSheet.tsx  masked, no-side-effect dry-run preview
 │   ├── CareCallExecutionSheet.tsx authorization, live polling, and result
 │   ├── ScheduleActivationSheet.tsx explicit recurring authorization
+│   ├── SeniorEditSheet.tsx   validated senior record editing
+│   ├── SeniorWithdrawSheet.tsx confirmed withdrawal with stated impact
 │   ├── CarePrimitives.tsx    status, avatar, and routine components
 │   └── Icon.tsx              dependency-free interface icons
 ├── screens-care/
 │   ├── Today.tsx
-│   ├── Seniors.tsx
+│   ├── Seniors.tsx           care directory with record editing and withdrawal
 │   ├── CareRoutines.tsx
 │   ├── Calls.tsx             protected queue, active-call, and history console
 │   ├── NeedsAttention.tsx

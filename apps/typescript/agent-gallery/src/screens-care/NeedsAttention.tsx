@@ -1,9 +1,11 @@
-import { routines, seniors } from "../carecall/fixtures";
+import { routines } from "../carecall/fixtures";
+import { useSeniorDirectory } from "../carecall/senior-directory-context";
 import type { AttentionCase, CareRoutine } from "../carecall/types";
 import { Icon } from "../components/Icon";
 import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
 
 export function NeedsAttention({ cases, onPreview, onNotice, resolvedIds, onResolve }: { cases: AttentionCase[]; onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; resolvedIds: Set<string>; onResolve: (caseId: string) => void }) {
+  const { seniors } = useSeniorDirectory();
   return (
     <div className="page">
       <header className="page-intro page-intro--compact">

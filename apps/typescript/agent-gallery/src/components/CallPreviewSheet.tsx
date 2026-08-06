@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { seniorIsCallable } from "../carecall/senior-directory";
 import type { CareRoutine, Senior } from "../carecall/types";
 import { Icon } from "./Icon";
 import { RoutineIcon, SeniorAvatar } from "./CarePrimitives";
@@ -12,6 +13,7 @@ export function CallPreviewSheet({ routine, senior, onClose, onAuthorize, onActi
 
   const isMedication = routine.kind === "medication";
   const languageVerified = senior.language === "English";
+  const callable = seniorIsCallable(senior);
 
   return (
     <div className="sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -74,11 +76,20 @@ export function CallPreviewSheet({ routine, senior, onClose, onAuthorize, onActi
         </div>
 
         <footer className="call-sheet__footer">
-          <div><Icon name="info" size={17} /><span>{languageVerified ? "A real call requires a separate one-call authorization." : `${senior.language} calling is not enabled until language quality is verified.`}</span></div>
+          <div>
+            <Icon name="info" size={17} />
+            <span>
+              {!callable
+                ? `${senior.preferredName} is withdrawn from care calls. This preview is read-only.`
+                : languageVerified
+                  ? "A real call requires a separate one-call authorization."
+                  : `${senior.language} calling is not enabled until language quality is verified.`}
+            </span>
+          </div>
           <div className="call-sheet__actions">
             <button className="secondary-button" onClick={onClose} type="button">Close preview</button>
-            <button className="secondary-button" disabled={!languageVerified} onClick={onActivate} type="button">Activate schedule</button>
-            <button className="primary-button" disabled={!languageVerified} onClick={onAuthorize} type="button">Authorize one call</button>
+            <button className="secondary-button" disabled={!languageVerified || !callable} onClick={onActivate} type="button">Activate schedule</button>
+            <button className="primary-button" disabled={!languageVerified || !callable} onClick={onAuthorize} type="button">Authorize one call</button>
           </div>
         </footer>
       </section>

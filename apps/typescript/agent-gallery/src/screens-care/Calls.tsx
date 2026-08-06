@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { seniors } from "../carecall/fixtures";
+import { useSeniorDirectory } from "../carecall/senior-directory-context";
 import {
   callStateLabel,
   callStateTone,
@@ -28,6 +28,7 @@ function initials(name: string): string {
 }
 
 export function Calls({ sessionToken, onAuthenticated, onNotice }: { sessionToken: string; onAuthenticated: (token: string) => void; onNotice: (message: string) => void }) {
+  const { seniors } = useSeniorDirectory();
   const [operatorId, setOperatorId] = useState("mei-chen");
   const [accessCode, setAccessCode] = useState("");
   const [signingIn, setSigningIn] = useState(false);
@@ -89,7 +90,7 @@ export function Calls({ sessionToken, onAuthenticated, onNotice }: { sessionToke
     const options = new Map(seniors.map((senior) => [senior.id, senior.preferredName]));
     for (const job of jobs) options.set(job.senior.id, job.senior.preferred_name);
     return [...options.entries()].sort((left, right) => left[1].localeCompare(right[1]));
-  }, [jobs]);
+  }, [jobs, seniors]);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();

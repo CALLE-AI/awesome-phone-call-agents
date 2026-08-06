@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { routines, seniors } from "../carecall/fixtures";
+import { routines } from "../carecall/fixtures";
+import { useSeniorDirectory } from "../carecall/senior-directory-context";
+import { seniorIsCallable } from "../carecall/senior-directory";
 import type { CareRoutine, RoutineKind } from "../carecall/types";
 import { Icon } from "../components/Icon";
 import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
@@ -7,6 +9,7 @@ import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
 type Filter = "all" | RoutineKind;
 
 export function CareRoutines({ onPreview, onNotice, sessionToken }: { onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; sessionToken: string }) {
+  const { seniors } = useSeniorDirectory();
   const [filter, setFilter] = useState<Filter>("all");
   const [pausedIds, setPausedIds] = useState<Set<string>>(new Set());
   const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
@@ -64,13 +67,14 @@ export function CareRoutines({ onPreview, onNotice, sessionToken }: { onPreview:
             </button>
           ))}
         </div>
-        <p>{visibleRoutines.filter((routine) => !pausedIds.has(routine.id) && !cancelledIds.has(routine.id)).length} active in this demo session</p>
+        <p>{visibleRoutines.filter((routine) => !pausedIds.has(routine.id) && !cancelledIds.has(routine.id) && seniorIsCallable(seniors.find((candidate) => candidate.id === routine.seniorId))).length} active in this demo session</p>
       </div>
 
       <section className="routine-grid" aria-label="Care routines">
         {visibleRoutines.map((routine) => {
           const senior = seniors.find((candidate) => candidate.id === routine.seniorId)!;
-          const paused = pausedIds.has(routine.id);
+          const withdrawn = !seniorIsCallable(senior);
+          const paused = pausedIds.has(routine.id) || withdrawn;
           const cancelled = cancelledIds.has(routine.id);
           return (
             <article className="surface routine-card" data-paused={paused} key={routine.id}>
@@ -78,7 +82,7 @@ export function CareRoutines({ onPreview, onNotice, sessionToken }: { onPreview:
                 <RoutineIcon kind={routine.kind} />
                 <span className="routine-type">{routine.kind === "medication" ? "Medication reminder" : "Meal check-in"}</span>
                 <span className="schedule-state" data-state={cancelled ? "cancelled" : paused ? "paused" : "active"}>
-                  <span aria-hidden="true" /> {cancelled ? "Cancelled" : paused ? "Paused" : "Active"}
+                  <span aria-hidden="true" /> {cancelled ? "Cancelled" : withdrawn ? "Senior withdrawn" : paused ? "Paused" : "Active"}
                 </span>
               </header>
               <h2>{routine.title}</h2>
@@ -94,13 +98,13 @@ export function CareRoutines({ onPreview, onNotice, sessionToken }: { onPreview:
                 </div>
                 <div>
                   <dt><Icon name="clock" size={16} /> Next call</dt>
-                  <dd>{cancelled ? "Authorization removed" : paused ? "Not scheduled while paused" : routine.nextRun}</dd>
+                  <dd>{cancelled ? "Authorization removed" : withdrawn ? "Stopped · senior withdrawn from care" : paused ? "Not scheduled while paused" : routine.nextRun}</dd>
                 </div>
               </dl>
               <footer>
                 <button className="secondary-button" type="button" onClick={() => onPreview(routine)}>Preview call</button>
-                {!cancelled && <button className="quiet-button" type="button" onClick={() => void setScheduleState(routine, paused ? "active" : "paused")}>{paused ? "Resume" : "Pause"}</button>}
-                {sessionToken && !cancelled && <button className="quiet-button" type="button" onClick={() => void setScheduleState(routine, "cancelled")}>Cancel</button>}
+                {!cancelled && !withdrawn && <button className="quiet-button" type="button" onClick={() => void setScheduleState(routine, paused ? "active" : "paused")}>{paused ? "Resume" : "Pause"}</button>}
+                {sessionToken && !cancelled && !withdrawn && <button className="quiet-button" type="button" onClick={() => void setScheduleState(routine, "cancelled")}>Cancel</button>}
               </footer>
             </article>
           );

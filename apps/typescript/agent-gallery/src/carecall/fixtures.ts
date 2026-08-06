@@ -16,6 +16,7 @@ export const seniors: Senior[] = [
     nextReminderLabel: "Dinner check-in",
     attentionCount: 0,
     avatar: "blue",
+    status: "active",
   },
   {
     id: "mr-rahman",
@@ -32,6 +33,7 @@ export const seniors: Senior[] = [
     nextReminderLabel: "Lunch check-in",
     attentionCount: 0,
     avatar: "mint",
+    status: "active",
   },
   {
     id: "mdm-devi",
@@ -48,6 +50,7 @@ export const seniors: Senior[] = [
     nextReminderLabel: "Afternoon medication",
     attentionCount: 1,
     avatar: "lilac",
+    status: "active",
   },
   {
     id: "mr-tan",
@@ -64,6 +67,7 @@ export const seniors: Senior[] = [
     nextReminderLabel: "Dinner check-in",
     attentionCount: 0,
     avatar: "sand",
+    status: "active",
   },
 ];
 

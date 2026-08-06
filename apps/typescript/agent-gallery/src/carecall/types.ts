@@ -12,6 +12,8 @@ export type TimelineStatus =
   | "needs-caregiver"
   | "no-answer";
 
+export type SeniorStatus = "active" | "withdrawn";
+
 export interface Senior {
   id: string;
   name: string;
@@ -27,6 +29,22 @@ export interface Senior {
   nextReminderLabel: string;
   attentionCount: number;
   avatar: "blue" | "lilac" | "mint" | "sand";
+  status: SeniorStatus;
+  withdrawnOn?: string;
+}
+
+/**
+ * The fields an operator may change directly. The phone number is deliberately
+ * absent: the record stores only a masked number, and the E.164 number is
+ * supplied at authorization time, so there is nothing here to edit.
+ */
+export interface SeniorEdit {
+  name: string;
+  preferredName: string;
+  language: string;
+  callWindow: string;
+  caregiver: string;
+  caregiverRelationship: string;
 }
 
 export interface CareRoutine {

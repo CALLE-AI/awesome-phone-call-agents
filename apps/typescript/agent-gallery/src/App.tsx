@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { attentionCases, routines, seniors } from "./carecall/fixtures";
+import { attentionCases, routines } from "./carecall/fixtures";
+import { seniorIsCallable } from "./carecall/senior-directory";
+import { SeniorDirectoryProvider, useSeniorDirectory } from "./carecall/senior-directory-context";
 import type { AttentionCase, CareRoutine, NavigationId, TimelineItem } from "./carecall/types";
 import { CallPreviewSheet } from "./components/CallPreviewSheet";
 import { CareCallExecutionSheet } from "./components/CareCallExecutionSheet";
@@ -36,6 +38,15 @@ function Brand() {
 }
 
 export function App() {
+  return (
+    <SeniorDirectoryProvider>
+      <CareWorkspace />
+    </SeniorDirectoryProvider>
+  );
+}
+
+function CareWorkspace() {
+  const { seniors, findSenior } = useSeniorDirectory();
   const [view, setView] = useState<NavigationId>("today");
   const [selectedSeniorId, setSelectedSeniorId] = useState(seniors[0].id);
   const [previewRoutine, setPreviewRoutine] = useState<CareRoutine | null>(null);
@@ -114,9 +125,9 @@ export function App() {
     });
   }, [operatorSessionToken]);
 
-  const previewSenior = previewRoutine
-    ? seniors.find((senior) => senior.id === previewRoutine.seniorId) ?? null
-    : null;
+  const previewSenior = previewRoutine ? findSenior(previewRoutine.seniorId) ?? null : null;
+  const executionSenior = executionRoutine ? findSenior(executionRoutine.seniorId) ?? null : null;
+  const scheduleSenior = scheduleRoutine ? findSenior(scheduleRoutine.seniorId) ?? null : null;
   const liveCases = durableAttentionCases.length > 0 ? durableAttentionCases : runtimeAttentionCases;
   const allAttentionCases = [...attentionCases, ...liveCases.filter((item) => !attentionCases.some((fixture) => fixture.id === item.id))];
   const openAttentionCount = allAttentionCases.filter((item) => !resolvedAttentionIds.has(item.id)).length;
@@ -179,7 +190,16 @@ export function App() {
         <main className="workspace-main" id="main-content" ref={mainRef} tabIndex={-1}>
           {view === "today" && <Today attentionCount={openAttentionCount} attentionCases={allAttentionCases} resolvedIds={resolvedAttentionIds} onNavigate={navigate} onPreview={previewFromTimeline} />}
           {view === "calls" && <Calls sessionToken={operatorSessionToken} onAuthenticated={setOperatorSessionToken} onNotice={setNotice} />}
-          {view === "seniors" && <Seniors selectedId={selectedSeniorId} onSelect={setSelectedSeniorId} onPreview={setPreviewRoutine} />}
+          {view === "seniors" && (
+            <Seniors
+              attentionCases={allAttentionCases}
+              onNotice={setNotice}
+              onPreview={setPreviewRoutine}
+              onSelect={setSelectedSeniorId}
+              resolvedIds={resolvedAttentionIds}
+              selectedId={selectedSeniorId}
+            />
+          )}
           {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} sessionToken={operatorSessionToken} />}
           {view === "attention" && (
             <NeedsAttention
@@ -219,11 +239,18 @@ export function App() {
           onActivate={() => { setScheduleRoutine(previewRoutine); setPreviewRoutine(null); }}
         />
       )}
-      {scheduleRoutine && <ScheduleActivationSheet routine={scheduleRoutine} senior={seniors.find((senior) => senior.id === scheduleRoutine.seniorId)!} onClose={() => setScheduleRoutine(null)} onActivated={(token) => { setOperatorSessionToken(token); setNotice(`${scheduleRoutine.title} schedule activated. It can be paused or cancelled from Care Routines.`); }} />}
-      {executionRoutine && (
+      {scheduleRoutine && scheduleSenior && seniorIsCallable(scheduleSenior) && (
+        <ScheduleActivationSheet
+          routine={scheduleRoutine}
+          senior={scheduleSenior}
+          onClose={() => setScheduleRoutine(null)}
+          onActivated={(token) => { setOperatorSessionToken(token); setNotice(`${scheduleRoutine.title} schedule activated. It can be paused or cancelled from Care Routines.`); }}
+        />
+      )}
+      {executionRoutine && executionSenior && seniorIsCallable(executionSenior) && (
         <CareCallExecutionSheet
           routine={executionRoutine}
-          senior={seniors.find((senior) => senior.id === executionRoutine.seniorId)!}
+          senior={executionSenior}
           onCompleted={recordCareCallResult}
           onAuthenticated={setOperatorSessionToken}
           onClose={() => setExecutionRoutine(null)}

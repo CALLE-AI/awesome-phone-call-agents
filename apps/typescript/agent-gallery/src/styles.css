@@ -3503,3 +3503,148 @@ p {
   }
   .schedule-fields { grid-template-columns: 1fr; }
 }
+
+/* Senior record editing and withdrawal */
+
+.dry-run-badge[data-tone="attention"] {
+  color: var(--attention);
+  background: var(--attention-soft);
+}
+
+.senior-actions {
+  position: relative;
+}
+
+.action-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 216px;
+  padding: 6px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
+  gap: 2px;
+}
+
+.action-menu button {
+  display: flex;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--label);
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 560;
+  text-align: left;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-menu button:hover {
+  background: var(--surface-muted);
+}
+
+.action-menu__danger {
+  color: var(--danger);
+}
+
+.withdrawn-badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--attention);
+  background: var(--attention-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.senior-row[data-withdrawn="true"] .senior-avatar {
+  opacity: 0.55;
+}
+
+.senior-row[data-withdrawn="true"] .senior-row__copy strong {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.withdrawn-notice {
+  display: flex;
+  margin-bottom: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--attention);
+  border-radius: 14px;
+  background: var(--attention-soft);
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.withdrawn-notice .icon {
+  color: var(--attention);
+  flex: 0 0 auto;
+}
+
+.withdrawn-notice strong {
+  display: block;
+  color: var(--label);
+  font-size: 14px;
+}
+
+.withdrawn-notice p {
+  margin: 3px 0 0;
+  color: var(--secondary-label);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.profile-routine[data-unavailable="true"] {
+  opacity: 0.62;
+}
+
+.master-list__empty {
+  margin: 0;
+  padding: 18px 16px;
+  color: var(--secondary-label);
+  font-size: 13px;
+}
+
+.call-sheet--form .call-sheet__content {
+  gap: 18px;
+}
+
+.senior-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.senior-edit-grid .field-error {
+  margin: 0;
+  font-weight: 560;
+}
+
+.withdraw-routine-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 7px;
+}
+
+.withdraw-routine-list li {
+  display: flex;
+  color: var(--secondary-label);
+  font-size: 13px;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .senior-edit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

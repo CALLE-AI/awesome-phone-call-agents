@@ -1,6 +1,16 @@
 import type { CareCallRequest } from "./types";
 
 const E164 = /^\+[1-9]\d{7,14}$/;
+const PERMITTED_CALL_WINDOW = /^(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+
+/**
+ * An unparsable window fails closed and blocks every call for that senior, so
+ * anything that lets an operator change a window must check the format first
+ * rather than discovering it when a reminder silently stops going out.
+ */
+export function isPermittedCallWindowFormat(windowText: string): boolean {
+  return PERMITTED_CALL_WINDOW.test(windowText.trim());
+}
 
 function minutesFromClock(hourText: string, minuteText: string, meridiem: string): number {
   let hour = Number(hourText) % 12;
@@ -9,7 +19,7 @@ function minutesFromClock(hourText: string, minuteText: string, meridiem: string
 }
 
 function withinPermittedWindow(windowText: string, instant: Date): boolean {
-  const match = windowText.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const match = windowText.match(PERMITTED_CALL_WINDOW);
   if (!match) return false;
   const parts = new Intl.DateTimeFormat("en-SG", {
     timeZone: "Asia/Singapore",
@@ -26,7 +36,7 @@ function withinPermittedWindow(windowText: string, instant: Date): boolean {
 }
 
 export function isScheduledTimeWithinPermittedWindow(windowText: string, timeText: string): boolean {
-  const windowMatch = windowText.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const windowMatch = windowText.match(PERMITTED_CALL_WINDOW);
   const timeMatch = timeText.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
   if (!windowMatch || !timeMatch) return false;
   const current = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
