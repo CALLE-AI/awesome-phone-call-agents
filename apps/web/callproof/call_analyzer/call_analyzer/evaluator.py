@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Iterable
 
-from .schemas import AnalysisRequest, Evidence, Verdict
+from .schemas import AnalysisRequest, CallContract, Evidence, TranscriptTurn, Verdict
 
 
 MONEY_PATTERN = re.compile(r"\$\s?(\d+(?:\.\d{1,2})?)")
@@ -19,6 +19,25 @@ NEGATION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Domain vocabulary used to corroborate a contract term against the transcript. Contract
+# terms are snake_case identifiers ("delivery_changed", "confirm_order_number"); each
+# token is expanded so a Spanish or paraphrased transcript still matches.
+TERM_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "delivery": ("delivery", "deliver", "shipment", "ship", "entrega", "entregar", "envio", "envío"),
+    "order": ("order", "pedido", "orden"),
+    "payment": ("payment", "pay", "paid", "pago", "pagar"),
+    "product": ("product", "producto", "item", "articulo", "artículo"),
+    "substitution": ("substitution", "substitute", "sustitucion", "sustitución", "sustituir"),
+    "date": ("date", "fecha", "day", "dia", "día"),
+    "time": ("time", "hora", "horario", "schedule"),
+    "price": ("price", "precio", "cost", "costo"),
+    "surcharge": ("surcharge", "recargo", "fee", "cargo"),
+    "confirm": ("confirm", "confirmed", "confirmation", "confirma", "confirmo", "confirmar"),
+    "identity": ("identity", "identify", "identidad", "identific"),
+    "recording": ("recording", "recorded", "record", "graba", "grabada", "grabación", "grabacion"),
+    "cancel": ("cancel", "cancellation", "cancela", "cancelar", "cancelación"),
+}
+
 # A verdict only auto-verifies (no human review) when confidence clears this bar.
 CONFIDENCE_AUTO_VERIFY = 0.75
 
@@ -26,50 +45,79 @@ CONFIDENCE_AUTO_VERIFY = 0.75
 class DeterministicEvaluator:
     """Safe first provider; replace with Altur's LLM factory after the boundary is stable.
 
-    Two rules make this defensible:
+    Three rules make a verdict defensible here:
 
-    * Completion follows the CONTRACT's declared ``success_conditions`` and the
-      transcript — never an unrelated truthy field. A result carrying
-      ``order_number_confirmed=True`` while the declared condition ``delivery_changed``
-      is False is a FAILED objective, not a complete one.
-    * Confidence is derived from evidence strength, never assumed. A payload whose
-      surcharge or goal cannot be located in the transcript yields low confidence and is
-      routed to human review instead of being auto-verified.
+    * **Completion follows the contract, not a truthy field.** A success condition counts
+      only when it is declared in ``success_conditions``, reported met by the provider,
+      AND corroborated by the transcript.
+    * **A structured claim needs positive transcript support.** ``delivery_changed=True``
+      over a transcript that only discusses an unrelated fee is *unsupported*: it is
+      routed to human review instead of auto-verified.
+    * **Every declared policy term is evaluated.** ``required_disclosures`` and
+      ``forbidden_commitments`` are checked, not assumed satisfied, and anything missing,
+      violated, or unverifiable drops ``policy_adherence`` and forces review.
+
+    The corroboration here is *topical* (domain vocabulary), not semantic: it can tell
+    that nothing in the call is about the delivery, but it cannot judge nuanced wording.
+    That is deliberate — it fails toward human review, and the LLM provider is the path
+    to semantic judgement.
     """
 
     def evaluate(self, request: AnalysisRequest) -> Verdict:
-        maximum = int(request.call_contract.allowed_commitments.get("maximum_surcharge_cents", 0))
+        contract = request.call_contract
+        turns = list(request.transcript.turns)
+        maximum = int(contract.allowed_commitments.get("maximum_surcharge_cents", 0))
+
         surcharge, surcharge_source = self._surcharge(request)
         surcharge_turn_ids, evidence_matched = self._evidence_turns(request, surcharge)
-        violation = surcharge > maximum
+        surcharge_violation = surcharge > maximum
 
-        goal_completion, unmet, contradiction_turn_ids = self._goal_completion(request)
-        # A true contradiction is the structured result claiming success (no unmet
-        # conditions) while the transcript denies it. When the result ALSO reports the
-        # objective unmet, result and transcript agree — that is a clean failure, not a
-        # disagreement.
+        goal_completion, unmet, unsupported, contradiction_turn_ids = self._assess_goal(
+            contract, request.provider_result or {}, turns
+        )
+        # A true contradiction is the structured result claiming success while the
+        # transcript denies it. When the result also reports the objective unmet, result
+        # and transcript agree — a clean failure, not a disagreement.
         contradicted = bool(contradiction_turn_ids) and not unmet
+
+        missing_disclosures = self._missing_disclosures(contract, turns)
+        forbidden_found = self._forbidden_commitments(contract, turns)
+
+        # Policy adherence covers EVERY declared policy term, not just the surcharge.
+        policy_adherence = not (surcharge_violation or missing_disclosures or forbidden_found)
+        unauthorized_commitment = surcharge_violation or bool(forbidden_found)
+
         confidence = self._confidence(
-            surcharge_source, evidence_matched, goal_completion, contradicted
+            surcharge_source=surcharge_source,
+            evidence_matched=evidence_matched,
+            goal_completion=goal_completion,
+            contradicted=contradicted,
+            unsupported=bool(unsupported),
         )
         weak_evidence = confidence < CONFIDENCE_AUTO_VERIFY
 
-        # Human review whenever there is a violation OR the evidence is too weak to
-        # trust OR the goal is not clearly complete.
-        needs_review = violation or weak_evidence or goal_completion != "complete"
+        # Human review on any violation, weak evidence, an objective that is not clearly
+        # complete, or an unsupported/unevaluated policy claim.
+        needs_review = (
+            not policy_adherence
+            or weak_evidence
+            or goal_completion != "complete"
+            or bool(unsupported)
+        )
 
         finding, summary, explanation = self._narrative(
-            violation=violation,
+            surcharge_violation=surcharge_violation,
             weak_evidence=weak_evidence,
             surcharge=surcharge,
             maximum=maximum,
             surcharge_source=surcharge_source,
             goal_completion=goal_completion,
             unmet=unmet,
+            unsupported=unsupported,
             contradicted=contradicted,
+            missing_disclosures=missing_disclosures,
+            forbidden_found=forbidden_found,
         )
-        # Cite what actually supports the finding: for an unmet objective that is the
-        # transcript turn denying it, otherwise the turn carrying the amount.
         turn_ids = (
             contradiction_turn_ids
             if finding == "objective_not_met" and contradiction_turn_ids
@@ -82,13 +130,23 @@ class DeterministicEvaluator:
                 "The structured result reports success while the transcript states the "
                 "objective could not be completed."
             )
+        for condition in unsupported:
+            contradictions.append(
+                f"The structured result reports '{condition}' met, but no transcript turn "
+                "corroborates it."
+            )
 
         return Verdict(
             goal_completion=goal_completion,
-            policy_adherence=not violation,
-            unauthorized_commitment=violation,
+            policy_adherence=policy_adherence,
+            unauthorized_commitment=unauthorized_commitment,
             result_confidence=round(confidence, 2),
-            risk_score=self._risk_score(violation, weak_evidence, goal_completion),
+            risk_score=self._risk_score(
+                surcharge_violation=surcharge_violation,
+                weak_evidence=weak_evidence,
+                goal_completion=goal_completion,
+                policy_adherence=policy_adherence,
+            ),
             needs_human_review=needs_review,
             summary=summary,
             negotiated_terms={
@@ -96,41 +154,73 @@ class DeterministicEvaluator:
                 "maximum_authorized_surcharge_cents": maximum,
                 "surcharge_evidence_source": surcharge_source,
                 "unmet_success_conditions": unmet,
+                "unsupported_success_conditions": unsupported,
+                "forbidden_commitments_detected": forbidden_found,
             },
+            missing_disclosures=missing_disclosures,
             contradictions=contradictions,
             evidence=[Evidence(finding=finding, turn_ids=turn_ids, explanation=explanation)],
         )
 
+    # ── transcript corroboration ──────────────────────────────────────────────────
+
+    def _terms(self, contract_term: str) -> list[tuple[str, ...]]:
+        """Expand a snake_case contract term into groups of acceptable transcript words."""
+        groups: list[tuple[str, ...]] = []
+        for token in re.split(r"[^a-zA-Z0-9áéíóúñü]+", contract_term.lower()):
+            if len(token) < 4:  # "of", "the", "no" carry no topical signal
+                continue
+            groups.append(TERM_SYNONYMS.get(token, (token,)))
+        return groups
+
+    def _supporting_turns(self, contract_term: str, turns: Iterable[TranscriptTurn]) -> list[int]:
+        """Turn ids that topically corroborate `contract_term`, ignoring denials.
+
+        A turn supports the term when it mentions any of its expanded token groups and
+        does not itself deny the objective.
+        """
+        groups = self._terms(contract_term)
+        if not groups:
+            return []
+
+        supporting = []
+        for turn in turns:
+            text = turn.text.lower()
+            if NEGATION_PATTERN.search(turn.text):
+                continue
+            if any(any(word in text for word in group) for group in groups):
+                supporting.append(turn.id)
+        return supporting
+
     # ── goal completion ───────────────────────────────────────────────────────────
 
-    def _goal_completion(self, request: AnalysisRequest) -> tuple[str, list[str], list[int]]:
-        """Return (status, unmet_conditions, contradiction_turn_ids).
+    def _assess_goal(
+        self, contract: CallContract, result: dict[str, Any], turns: list[TranscriptTurn]
+    ) -> tuple[str, list[str], list[str], list[int]]:
+        """Return (status, unmet, unsupported, contradiction_turn_ids).
 
-        Completion is judged ONLY against the contract's declared success conditions,
-        cross-checked with the transcript. Nothing else may promote a call to
-        ``complete``.
+        `unmet` are conditions the provider itself does not report as met.
+        `unsupported` are conditions the provider reports met with NO transcript
+        corroboration — a claim we refuse to auto-verify.
         """
-        result: dict[str, Any] = request.provider_result or {}
-        conditions = list(request.call_contract.success_conditions)
-        contradiction_turn_ids = [
-            turn.id for turn in request.transcript.turns if NEGATION_PATTERN.search(turn.text)
-        ]
+        conditions = list(contract.success_conditions)
+        contradiction_turn_ids = [t.id for t in turns if NEGATION_PATTERN.search(t.text)]
 
         if not conditions:
-            # Nothing declared to verify — cannot claim completion.
-            return "unknown", [], contradiction_turn_ids
+            return "unknown", [], [], contradiction_turn_ids
         if not result:
-            return "unknown", conditions, contradiction_turn_ids
+            return "unknown", conditions, [], contradiction_turn_ids
 
         unmet = [c for c in conditions if not self._condition_met(c, result)]
+        claimed = [c for c in conditions if c not in unmet]
+        unsupported = [c for c in claimed if not self._supporting_turns(c, turns)]
 
         if unmet and len(unmet) == len(conditions):
-            return "failed", unmet, contradiction_turn_ids
-        if unmet:
-            return "partial", unmet, contradiction_turn_ids
-        # Every declared condition is satisfied; a transcript that denies it still blocks
-        # auto-verification.
-        return ("partial" if contradiction_turn_ids else "complete"), [], contradiction_turn_ids
+            return "failed", unmet, unsupported, contradiction_turn_ids
+        if unmet or unsupported or contradiction_turn_ids:
+            # Anything short of "every condition met AND corroborated" is not complete.
+            return "partial", unmet, unsupported, contradiction_turn_ids
+        return "complete", [], [], contradiction_turn_ids
 
     def _condition_met(self, condition: str, result: dict[str, Any]) -> bool:
         if condition in result:
@@ -154,11 +244,30 @@ class DeterministicEvaluator:
             return value.strip().lower() not in {"", "false", "no", "none", "null"}
         return bool(value)
 
+    # ── declared policy terms ─────────────────────────────────────────────────────
+
+    def _missing_disclosures(
+        self, contract: CallContract, turns: list[TranscriptTurn]
+    ) -> list[str]:
+        """Declared disclosures with no transcript support. Never assumed satisfied."""
+        return [d for d in contract.required_disclosures if not self._supporting_turns(d, turns)]
+
+    def _forbidden_commitments(
+        self, contract: CallContract, turns: list[TranscriptTurn]
+    ) -> list[str]:
+        """Declared forbidden commitments that the call appears to have discussed."""
+        return [f for f in contract.forbidden_commitments if self._supporting_turns(f, turns)]
+
     # ── scoring ───────────────────────────────────────────────────────────────────
 
     def _confidence(
-        self, surcharge_source: str, evidence_matched: bool, goal_completion: str,
-        contradicted: bool
+        self,
+        *,
+        surcharge_source: str,
+        evidence_matched: bool,
+        goal_completion: str,
+        contradicted: bool,
+        unsupported: bool,
     ) -> float:
         """Build confidence from concrete, checkable support rather than a constant."""
         score = 0.4
@@ -181,12 +290,20 @@ class DeterministicEvaluator:
         if contradicted:
             # The structured result and the transcript disagree — never auto-verify.
             score -= 0.25
+        if unsupported:
+            # A success claim nothing in the call corroborates.
+            score -= 0.3
 
         return max(0.05, min(0.95, score))
 
-    def _risk_score(self, violation: bool, weak_evidence: bool, goal_completion: str) -> float:
-        if violation:
+    def _risk_score(
+        self, *, surcharge_violation: bool, weak_evidence: bool, goal_completion: str,
+        policy_adherence: bool
+    ) -> float:
+        if surcharge_violation:
             return 0.91
+        if not policy_adherence:
+            return 0.8
         if goal_completion == "failed":
             return 0.75
         if weak_evidence or goal_completion != "complete":
@@ -198,21 +315,45 @@ class DeterministicEvaluator:
     def _narrative(
         self,
         *,
-        violation: bool,
+        surcharge_violation: bool,
         weak_evidence: bool,
         surcharge: int,
         maximum: int,
         surcharge_source: str,
         goal_completion: str,
         unmet: list[str],
+        unsupported: list[str],
         contradicted: bool,
+        missing_disclosures: list[str],
+        forbidden_found: list[str],
     ) -> tuple[str, str, str]:
-        if violation:
+        if surcharge_violation:
             return (
                 "unauthorized_surcharge",
                 "The call achieved its goal but accepted a surcharge above the authorized limit.",
                 f"The agent accepted {self._money(surcharge)}, exceeding the authorized "
                 f"limit of {self._money(maximum)}.",
+            )
+        if forbidden_found:
+            return (
+                "forbidden_commitment_discussed",
+                "The call touched a commitment the contract forbids.",
+                "Forbidden commitments detected in the transcript: "
+                f"{', '.join(forbidden_found)}. Human review required.",
+            )
+        if missing_disclosures:
+            return (
+                "missing_disclosure",
+                "A disclosure the contract requires was not found in the call.",
+                f"Required disclosures with no transcript support: "
+                f"{', '.join(missing_disclosures)}. They are not assumed satisfied.",
+            )
+        if unsupported:
+            return (
+                "unsupported_success_claim",
+                "The reported success is not supported by anything said on the call.",
+                f"The provider reports {', '.join(unsupported)} met, but no transcript turn "
+                "corroborates it; not auto-verifying.",
             )
         if goal_completion in ("failed", "partial"):
             detail = (
@@ -253,7 +394,8 @@ class DeterministicEvaluator:
             "policy_compliance",
             "The call achieved its goal and stayed within the authorized commitments.",
             f"The accepted surcharge of {self._money(surcharge)} is within the "
-            f"authorized limit of {self._money(maximum)}, supported by transcript evidence.",
+            f"authorized limit of {self._money(maximum)}, every declared success condition "
+            "is corroborated by the transcript, and no declared policy term was breached.",
         )
 
     # ── surcharge helpers ─────────────────────────────────────────────────────────

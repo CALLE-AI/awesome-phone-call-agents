@@ -159,3 +159,140 @@ def test_partially_met_conditions_are_not_complete():
     assert verdict.goal_completion == "partial"
     assert verdict.needs_human_review is True
     assert verdict.negotiated_terms["unmet_success_conditions"] == ["delivery_time_confirmed"]
+
+
+def test_success_claim_without_transcript_support_is_not_auto_verified():
+    """Reviewer repro: delivery_changed=true, but the call only discusses a $1.00 fee.
+
+    The amount coincidentally matches the transcript, which previously produced
+    complete / 0.95 / risk 0.08 / no review. Nothing in the call is about the delivery,
+    so the success claim must not be auto-verified.
+    """
+    request = _request(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "Hello, checking in about your account."},
+            {"id": 2, "speaker": "recipient", "text": "There is a $1.00 support fee this month."},
+        ],
+        provider_result={"surcharge_cents": 100, "delivery_changed": True},
+    )
+
+    verdict = DeterministicEvaluator().evaluate(request)
+
+    assert verdict.goal_completion != "complete"
+    assert verdict.needs_human_review is True
+    assert verdict.result_confidence < 0.75
+    assert verdict.risk_score > 0.08
+    assert verdict.evidence[0].finding == "unsupported_success_claim"
+    assert verdict.negotiated_terms["unsupported_success_conditions"] == ["delivery_changed"]
+    assert any("corroborates" in c for c in verdict.contradictions)
+
+
+def test_missing_required_disclosure_breaks_policy_adherence():
+    request = AnalysisRequest.model_validate(
+        {
+            "schema_version": "1.0",
+            "request_id": str(uuid4()),
+            "call_id": "call-789",
+            "submitted_at": "2026-08-01T22:30:00Z",
+            "call_contract": {
+                "objective": "Move delivery to Friday",
+                "success_conditions": ["delivery_changed"],
+                "allowed_commitments": {"maximum_surcharge_cents": 25000},
+                "required_disclosures": ["recording_notice"],
+                "escalation_conditions": ["surcharge_above_limit"],
+            },
+            "transcript": {
+                "language": "en",
+                "turns": [
+                    {"id": 1, "speaker": "agent", "text": "Can we move the delivery?"},
+                    {"id": 2, "speaker": "recipient", "text": "Yes, with a $120.00 surcharge."},
+                ],
+            },
+            "provider_result": {"surcharge_cents": 12000, "delivery_changed": True},
+            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
+        }
+    )
+
+    verdict = DeterministicEvaluator().evaluate(request)
+
+    # The disclosure is declared but never made -> not assumed satisfied.
+    assert verdict.missing_disclosures == ["recording_notice"]
+    assert verdict.policy_adherence is False
+    assert verdict.needs_human_review is True
+    assert verdict.evidence[0].finding == "missing_disclosure"
+
+
+def test_forbidden_commitment_discussed_breaks_policy_adherence():
+    request = AnalysisRequest.model_validate(
+        {
+            "schema_version": "1.0",
+            "request_id": str(uuid4()),
+            "call_id": "call-790",
+            "submitted_at": "2026-08-01T22:30:00Z",
+            "call_contract": {
+                "objective": "Move delivery to Friday",
+                "success_conditions": ["delivery_changed"],
+                "allowed_commitments": {"maximum_surcharge_cents": 25000},
+                "forbidden_commitments": ["product_substitution"],
+                "escalation_conditions": ["surcharge_above_limit"],
+            },
+            "transcript": {
+                "language": "en",
+                "turns": [
+                    {"id": 1, "speaker": "agent", "text": "Can we move the delivery?"},
+                    {
+                        "id": 2,
+                        "speaker": "agent",
+                        "text": "I can offer a product substitution instead, $120.00.",
+                    },
+                ],
+            },
+            "provider_result": {"surcharge_cents": 12000, "delivery_changed": True},
+            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
+        }
+    )
+
+    verdict = DeterministicEvaluator().evaluate(request)
+
+    assert verdict.policy_adherence is False
+    assert verdict.unauthorized_commitment is True
+    assert verdict.needs_human_review is True
+    assert verdict.negotiated_terms["forbidden_commitments_detected"] == ["product_substitution"]
+
+
+def test_fully_supported_call_still_auto_verifies():
+    """The happy path must survive: corroborated condition, disclosure made, no breach."""
+    request = AnalysisRequest.model_validate(
+        {
+            "schema_version": "1.0",
+            "request_id": str(uuid4()),
+            "call_id": "call-791",
+            "submitted_at": "2026-08-01T22:30:00Z",
+            "call_contract": {
+                "objective": "Move delivery to Friday",
+                "success_conditions": ["delivery_changed"],
+                "allowed_commitments": {"maximum_surcharge_cents": 25000},
+                "required_disclosures": ["recording_notice"],
+                "forbidden_commitments": ["product_substitution"],
+                "escalation_conditions": ["surcharge_above_limit"],
+            },
+            "transcript": {
+                "language": "en",
+                "turns": [
+                    {"id": 1, "speaker": "agent", "text": "This call is being recorded."},
+                    {"id": 2, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
+                    {"id": 3, "speaker": "recipient", "text": "Yes, with a $120.00 surcharge."},
+                ],
+            },
+            "provider_result": {"surcharge_cents": 12000, "delivery_changed": True},
+            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
+        }
+    )
+
+    verdict = DeterministicEvaluator().evaluate(request)
+
+    assert verdict.goal_completion == "complete"
+    assert verdict.policy_adherence is True
+    assert verdict.missing_disclosures == []
+    assert verdict.needs_human_review is False
+    assert verdict.evidence[0].finding == "policy_compliance"
