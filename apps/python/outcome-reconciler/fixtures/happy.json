@@ -1,0 +1,11 @@
+{
+  "description": "Normal completion on the documented Calls API surface.",
+  "surface": "rest.calls",
+  "recipient_phone": "+15550101234",
+  "expected": {"outcome": "completed", "entry_id": "rest.calls.completed"},
+  "sequence": [
+    {"payload": {"id": "call_reserved_fixture_happy", "status": "queued", "failure_code": null, "created_at": "2026-08-06T10:00:00Z"}},
+    {"payload": {"id": "call_reserved_fixture_happy", "status": "in_progress", "failure_code": null, "created_at": "2026-08-06T10:00:00Z"}},
+    {"payload": {"id": "call_reserved_fixture_happy", "status": "completed", "failure_code": null, "duration_seconds": 42, "created_at": "2026-08-06T10:00:00Z", "completed_at": "2026-08-06T10:00:42Z"}}
+  ]
+}

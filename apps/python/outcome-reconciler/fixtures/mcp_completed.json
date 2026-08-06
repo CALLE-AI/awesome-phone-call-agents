@@ -1,0 +1,9 @@
+{
+  "description": "Terminal MCP status with no published contract; never translated into a semantic outcome.",
+  "surface": "mcp.get_call_run",
+  "recipient_phone": "+15550101234",
+  "expected": {"outcome": "unresolved", "reason": "undocumented_code"},
+  "sequence": [
+    {"payload": {"run_id": "run_reserved_fixture_mcp", "status": "COMPLETED", "duration_seconds": 31, "summary": "Recipient confirmed."}}
+  ]
+}

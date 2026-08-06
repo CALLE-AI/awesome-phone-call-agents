@@ -1,0 +1,10 @@
+{
+  "description": "Zero-duration DECLINED with no media, indistinguishable from a pre-media failure (upstream issue #82).",
+  "surface": "mcp.get_call_run",
+  "recipient_phone": "+15550101234",
+  "expected": {"outcome": "unresolved", "reason": "inconsistent_payload"},
+  "sequence": [
+    {"payload": {"run_id": "run_reserved_fixture_zero", "status": "IN_PROGRESS"}},
+    {"payload": {"run_id": "run_reserved_fixture_zero", "status": "DECLINED", "hangup_type": "ByCallee", "duration_seconds": 0, "recording_url": null, "transcript": []}}
+  ]
+}
