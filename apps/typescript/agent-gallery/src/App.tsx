@@ -189,7 +189,7 @@ function CareWorkspace() {
 
         <main className="workspace-main" id="main-content" ref={mainRef} tabIndex={-1}>
           {view === "today" && <Today attentionCount={openAttentionCount} attentionCases={allAttentionCases} resolvedIds={resolvedAttentionIds} onNavigate={navigate} onPreview={previewFromTimeline} />}
-          {view === "calls" && <Calls sessionToken={operatorSessionToken} onAuthenticated={setOperatorSessionToken} onNotice={setNotice} />}
+          {view === "calls" && <Calls sessionToken={operatorSessionToken} onAuthenticated={setOperatorSessionToken} onNotice={setNotice} onPreview={setPreviewRoutine} />}
           {view === "seniors" && (
             <Seniors
               attentionCases={allAttentionCases}

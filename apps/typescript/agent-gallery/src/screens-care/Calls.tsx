@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { routines } from "../carecall/fixtures";
 import { useSeniorDirectory } from "../carecall/senior-directory-context";
+import type { CareRoutine } from "../carecall/types";
 import {
   callStateLabel,
   callStateTone,
@@ -27,7 +29,7 @@ function initials(name: string): string {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "CC";
 }
 
-export function Calls({ sessionToken, onAuthenticated, onNotice }: { sessionToken: string; onAuthenticated: (token: string) => void; onNotice: (message: string) => void }) {
+export function Calls({ sessionToken, onAuthenticated, onNotice, onPreview }: { sessionToken: string; onAuthenticated: (token: string) => void; onNotice: (message: string) => void; onPreview: (routine: CareRoutine) => void }) {
   const { seniors } = useSeniorDirectory();
   const [operatorId, setOperatorId] = useState("mei-chen");
   const [accessCode, setAccessCode] = useState("");
@@ -193,11 +195,32 @@ export function Calls({ sessionToken, onAuthenticated, onNotice }: { sessionToke
             {jobs.map((job) => {
               const knownSenior = seniors.find((senior) => senior.id === job.senior.id);
               const duration = elapsedCallSeconds(job, now);
+              // The record shows the routine title as it was at call time, but
+              // links to the routine as it stands now. A job whose routine or
+              // senior is no longer in the directory stays plain text rather
+              // than opening a sheet that cannot be built.
+              const linkedRoutine = routines.find((routine) => routine.id === job.routine.id);
+              const openable = linkedRoutine && knownSenior;
               return (
                 <article className="call-record" data-state={job.status} key={job.job_id}>
                   <div className="call-record__summary">
                     <SeniorAvatar initials={knownSenior?.initials ?? initials(job.senior.preferred_name)} tone={knownSenior?.avatar ?? "blue"} />
-                    <div className="call-record__identity"><strong>{job.senior.preferred_name}</strong><span>{job.routine.title}</span></div>
+                    <div className="call-record__identity">
+                      <strong>{job.senior.preferred_name}</strong>
+                      {openable
+                        ? (
+                          <button
+                            className="routine-link"
+                            onClick={() => onPreview(linkedRoutine)}
+                            title={`Open the ${job.routine.title.toLowerCase()} care routine`}
+                            type="button"
+                          >
+                            <span>{job.routine.title}</span>
+                            <Icon name="chevron" size={14} />
+                          </button>
+                        )
+                        : <span title={linkedRoutine ? undefined : "This routine is no longer in the care directory."}>{job.routine.title}</span>}
+                    </div>
                     <RoutineIcon kind={job.routine.kind} />
                     <div className="call-record__state"><span className="call-state-pill" data-tone={callStateTone(job)}><span aria-hidden="true" />{callStateLabel(job, now)}</span><small>{job.source === "manual" ? "Manual authorization" : "Recurring schedule"}</small></div>
                     <div className="call-record__timing"><strong>{formatCallDuration(duration)}</strong><span>{job.status === "queued" ? formatCallTime(job.scheduled_for) : formatCallTime(job.completed_at ?? job.started_at ?? job.updated_at)}</span></div>

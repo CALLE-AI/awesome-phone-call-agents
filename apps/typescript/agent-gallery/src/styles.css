@@ -3728,3 +3728,39 @@ p {
   font: inherit;
   font-weight: 520;
 }
+
+/* Routine link from a call record */
+
+.routine-link {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 24px;
+  margin-left: -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--accent);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 580;
+  text-align: left;
+  align-items: center;
+  gap: 3px;
+}
+
+.routine-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routine-link .icon {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+
+.routine-link:hover {
+  background: var(--accent-soft);
+  text-decoration: underline;
+}

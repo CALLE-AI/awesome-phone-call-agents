@@ -107,6 +107,8 @@ The queue permits one ongoing CareCall at a time. If the active lease is occupie
 
 The Calls destination reads a protected, senior-scoped operational list that refreshes every five seconds. It shows waiting, active, completed, cancelled, and needs-review records with provider timing when available. Provider duration is preferred; an observed start-to-completion duration is identified as a fallback. Full phone numbers, encrypted phone data, access codes, caregiver instructions, and transcripts are never returned by the list endpoint or rendered in the console.
 
+Each record links to the care routine that produced the call, opening the same routine plan the Today and Needs Attention destinations open. The record keeps the routine title recorded at call time, so a later rename does not rewrite history, while the link resolves the routine as it stands now. A record whose routine or senior is no longer in the care directory stays plain text and says so rather than opening a plan that cannot be rebuilt.
+
 Immediately before dialing, the worker rechecks:
 
 1. operator and senior scope
