@@ -121,13 +121,18 @@ vercel link
 
 The command forms below follow Vercel's current
 [`vercel env` reference](https://vercel.com/docs/cli/env). The local directory
-must be linked to the correct project and team before any update.
+may be linked to the correct project and team. To make the target explicit and
+keep the commands working from an unlinked checkout, set the project name once:
+
+```sh
+CARECALL_VERCEL_PROJECT='awesome-phone-call-agents'
+```
 
 Confirm the target before changing anything:
 
 ```sh
-vercel env ls preview
-vercel env ls production
+vercel env ls preview --project "$CARECALL_VERCEL_PROJECT"
+vercel env ls production --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 The examples below target Preview first. Change `preview` to `production` only
@@ -147,36 +152,59 @@ First verify that the official CALL-E CLI cache is usable. This does not print
 the access token:
 
 ```sh
-calle auth status
+env \
+  CALLE_SOURCE=skills_sh \
+  CALLE_INTEGRATION=skills_sh_skill \
+  CALLE_INTEGRATION_VERSION=0.1.0 \
+  calle auth status
 ```
 
 If `usable` is `false`, refresh the cache through the official authorization
 flow before continuing:
 
 ```sh
-calle auth login --start-only --no-browser-open
+env \
+  CALLE_SOURCE=skills_sh \
+  CALLE_INTEGRATION=skills_sh_skill \
+  CALLE_INTEGRATION_VERSION=0.1.0 \
+  calle auth login --start-only --no-browser-open
 # Complete the displayed browser authorization, then:
-calle auth login --no-browser-open
+env \
+  CALLE_SOURCE=skills_sh \
+  CALLE_INTEGRATION=skills_sh_skill \
+  CALLE_INTEGRATION_VERSION=0.1.0 \
+  calle auth login --no-browser-open
 ```
 
 Transfer the cached token directly into Vercel without displaying it. These
 commands require `jq`:
 
 ```sh
-CARECALL_CALLE_STATUS="$(calle auth status)"
+CARECALL_CALLE_STATUS="$(env \
+  CALLE_SOURCE=skills_sh \
+  CALLE_INTEGRATION=skills_sh_skill \
+  CALLE_INTEGRATION_VERSION=0.1.0 \
+  calle auth status)"
 CARECALL_CALLE_CACHE="$(printf '%s' "$CARECALL_CALLE_STATUS" | jq -r '.cache_path')"
 
-jq -jr '.token.access_token' "$CARECALL_CALLE_CACHE" \
-  | vercel env update CALLE_ACCESS_TOKEN preview --sensitive
+jq -e -j -r \
+  '.token.access_token | select(type == "string" and length > 0)' \
+  "$CARECALL_CALLE_CACHE" \
+  | vercel env add CALLE_ACCESS_TOKEN preview \
+      --force --sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 
 printf '%s' "$CARECALL_CALLE_STATUS" \
-  | jq -jr '.server_url' \
-  | vercel env update CALLE_SERVER_URL preview
+  | jq -e -j -r \
+      '.server_url | select(type == "string" and startswith("https://"))' \
+  | vercel env add CALLE_SERVER_URL preview \
+      --force --no-sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 
 unset CARECALL_CALLE_STATUS CARECALL_CALLE_CACHE
 ```
 
-Repeat the two `vercel env update` commands with `production` only if the same
+Repeat the two `vercel env add` commands with `production` only if the same
 CALL-E identity and endpoint are approved for Production. Prefer separate
 provider credentials when available.
 
@@ -197,7 +225,9 @@ CARECALL_OPERATOR_HASH="$(printf '%s' "$CARECALL_OPERATOR_CODE" | shasum -a 256 
 
 jq -nc --arg hash "$CARECALL_OPERATOR_HASH" \
   '[{"id":"mei-chen","name":"Mei Chen","role":"coordinator","access_code_sha256":$hash,"senior_ids":["mdm-lim"]}]' \
-  | vercel env update CARECALL_OPERATORS_JSON preview --sensitive
+  | vercel env update CARECALL_OPERATORS_JSON preview \
+      --sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 
 unset CARECALL_OPERATOR_CODE CARECALL_OPERATOR_HASH
 ```
@@ -206,14 +236,18 @@ Use `mei-chen` as the Operator ID and the cleartext value saved in the password
 manager as the Operator sign-in code. Do not use the public test credential
 from the repository. If the real roster has additional operators or senior
 scopes, construct the complete JSON instead of replacing it with this
-single-operator example.
+single-operator example. A short code may be used only with fictional POC data;
+replace it with a password-manager-generated code of at least 16 characters
+before any consenting participant or real care information is involved.
 
 Generate a new session-signing secret and transfer it directly:
 
 ```sh
 openssl rand -base64 48 \
   | tr -d '\n' \
-  | vercel env update CARECALL_SESSION_SECRET preview --sensitive
+  | vercel env update CARECALL_SESSION_SECRET preview \
+      --sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 Changing `CARECALL_SESSION_SECRET` immediately invalidates existing operator
@@ -227,8 +261,12 @@ URL and **Standard** REST token from the REST API section. The read-only token
 will not work. Paste each value only when the Vercel CLI prompts:
 
 ```sh
-vercel env update UPSTASH_REDIS_REST_URL preview --sensitive
-vercel env update UPSTASH_REDIS_REST_TOKEN preview --sensitive
+vercel env update UPSTASH_REDIS_REST_URL preview \
+  --sensitive --yes \
+  --project "$CARECALL_VERCEL_PROJECT"
+vercel env update UPSTASH_REDIS_REST_TOKEN preview \
+  --sensitive --yes \
+  --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 If the existing Standard token is no longer available, reset the database
@@ -242,7 +280,9 @@ If encrypted schedules or queued jobs already exist, restore the exact existing
 store:
 
 ```sh
-vercel env update CARECALL_DATA_ENCRYPTION_KEY preview --sensitive
+vercel env update CARECALL_DATA_ENCRYPTION_KEY preview \
+  --sensitive --yes \
+  --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 Do **not** generate a replacement merely because the old value is unavailable:
@@ -253,7 +293,9 @@ directly:
 ```sh
 openssl rand -base64 48 \
   | tr -d '\n' \
-  | vercel env update CARECALL_DATA_ENCRYPTION_KEY preview --sensitive
+  | vercel env update CARECALL_DATA_ENCRYPTION_KEY preview \
+      --sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 If the old key is irrecoverable, pause schedules, cancel or drain queued jobs,
@@ -265,7 +307,9 @@ Set the controlled-pilot daily call limit:
 
 ```sh
 printf '%s' '5' \
-  | vercel env update CARECALL_MAX_CALLS_PER_DAY preview
+  | vercel env update CARECALL_MAX_CALLS_PER_DAY preview \
+      --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 Generate a new reconciliation/readiness secret:
@@ -273,15 +317,23 @@ Generate a new reconciliation/readiness secret:
 ```sh
 openssl rand -hex 32 \
   | tr -d '\n' \
-  | vercel env update CRON_SECRET preview --sensitive
+  | vercel env update CRON_SECRET preview \
+      --sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 ```
 
-Set the exact stable HTTPS origin for the target deployment. Replace the
-placeholder; do not include a trailing slash or a path:
+Set the exact stable HTTPS origin for the target deployment. Use the branch
+alias shown by Vercel for a draft-PR Preview, not the production domain or the
+one-off deployment URL. Replace the placeholder; do not include a trailing
+slash or a path:
 
 ```sh
-printf '%s' 'https://awesome-phone-call-agents.vercel.app' \
-  | vercel env update CARECALL_PUBLIC_BASE_URL preview
+CARECALL_PUBLIC_BASE_URL='https://your-branch-stable-preview-alias.vercel.app'
+
+printf '%s' "$CARECALL_PUBLIC_BASE_URL" \
+  | vercel env add CARECALL_PUBLIC_BASE_URL preview \
+      --force --no-sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
 ```
 
 Use a branch-stable Preview URL or custom domain, not a commit-specific Vercel
@@ -320,18 +372,26 @@ carecall_restore_qstash() {
       }
 
   printf '%s' "$carecall_qstash_url" \
-    | vercel env add QSTASH_URL preview --force
+    | vercel env add QSTASH_URL preview \
+        --force --no-sensitive --yes \
+        --project "$CARECALL_VERCEL_PROJECT"
 
   printf '%s' "$carecall_qstash_token" \
-    | vercel env add QSTASH_TOKEN preview --force --sensitive
+    | vercel env add QSTASH_TOKEN preview \
+        --force --sensitive --yes \
+        --project "$CARECALL_VERCEL_PROJECT"
 
   printf '%s' "$carecall_qstash_keys" \
     | jq -jr '.current' \
-    | vercel env add QSTASH_CURRENT_SIGNING_KEY preview --force --sensitive
+    | vercel env add QSTASH_CURRENT_SIGNING_KEY preview \
+        --force --sensitive --yes \
+        --project "$CARECALL_VERCEL_PROJECT"
 
   printf '%s' "$carecall_qstash_keys" \
     | jq -jr '.next' \
-    | vercel env add QSTASH_NEXT_SIGNING_KEY preview --force --sensitive
+    | vercel env add QSTASH_NEXT_SIGNING_KEY preview \
+        --force --sensitive --yes \
+        --project "$CARECALL_VERCEL_PROJECT"
 }
 
 carecall_restore_qstash
@@ -351,32 +411,71 @@ EU origins in its
 Check that every required name exists in the intended environment:
 
 ```sh
-vercel env ls preview
+vercel env ls preview --project "$CARECALL_VERCEL_PROJECT"
 ```
 
-Environment changes apply only to new deployments. Create or redeploy the
-Preview deployment, then run the protected preflight with Preview variables
-injected without writing them to a local `.env` file:
+Environment changes apply only to new deployments. Redeploy the branch-stable
+Preview alias after every credential update:
 
 ```sh
-vercel deploy
-vercel env run -e preview -- npm run preflight
+vercel redeploy "$CARECALL_PUBLIC_BASE_URL" --target preview
 ```
+
+Vercel Sensitive values are write-only: `vercel env run`, `vercel env pull`,
+and the dashboard cannot recover `CRON_SECRET` after it is stored. Export the
+known secret from the approved password manager at a hidden prompt and run the
+protected, read-only preflight against the same stable alias:
+
+```sh
+CARECALL_PUBLIC_BASE_URL='https://your-branch-stable-preview-alias.vercel.app'
+read -s "CRON_SECRET?CRON_SECRET: "
+echo
+export CRON_SECRET CARECALL_PUBLIC_BASE_URL
+
+npm run preflight
+
+unset CRON_SECRET CARECALL_PUBLIC_BASE_URL
+```
+
+If the current `CRON_SECRET` was not saved, rotate it and keep the replacement
+only in the current shell until the redeployed Preview passes preflight:
+
+```sh
+CARECALL_PUBLIC_BASE_URL='https://your-branch-stable-preview-alias.vercel.app'
+CARECALL_NEW_CRON_SECRET="$(openssl rand -hex 32)"
+
+printf '%s' "$CARECALL_NEW_CRON_SECRET" \
+  | vercel env update CRON_SECRET preview \
+      --sensitive --yes \
+      --project "$CARECALL_VERCEL_PROJECT"
+
+export CRON_SECRET="$CARECALL_NEW_CRON_SECRET"
+export CARECALL_PUBLIC_BASE_URL
+
+vercel redeploy "$CARECALL_PUBLIC_BASE_URL" --target preview
+npm run preflight
+
+unset CRON_SECRET CARECALL_PUBLIC_BASE_URL CARECALL_NEW_CRON_SECRET
+```
+
+Save the replacement in the approved password manager before unsetting it if
+future manual preflight checks must reuse the same credential.
 
 Proceed to Production only after Preview reports `ready: true` and
-`healthy: true`:
+`healthy: true`. Repeat the same explicit-origin and hidden-secret procedure
+with the Production environment; never reuse a Preview-only callback origin.
+
+The CLI cannot confirm that a secret is semantically correct merely because
+its name exists. The preflight and a fictional non-dialing queue test are the
+required checks. Avoid `vercel env pull` for routine recovery because it writes
+retrievable environment values to a plaintext local file. Sensitive values are
+omitted rather than recovered.
+
+After completing the work, remove the project helper from the shell:
 
 ```sh
-vercel env ls production
-vercel deploy --prod
-vercel env run -e production -- npm run preflight
+unset CARECALL_VERCEL_PROJECT
 ```
-
-The CLI cannot confirm that a secret is semantically correct just because its
-name exists. The preflight and a fictional non-dialing queue test are the
-required checks. Avoid `vercel env pull` for routine recovery because it writes
-environment values to a plaintext local file; `vercel env run` keeps them in
-the command environment instead.
 
 ## Rotation procedure
 

@@ -2,7 +2,7 @@
 
 Date: 6 August 2026
 
-Scope: repository and local browser verification only
+Scope: repository, local browser, and credentialed Preview readiness
 
 Live calls placed: none
 
@@ -10,6 +10,7 @@ Live calls placed: none
 
 | Area | Evidence | Result |
 | --- | --- | --- |
+| Credentialed Preview readiness | The protected endpoint reported `ready: true`, `healthy: true`, all eight configuration checks passing, an empty queue, no active call, no review cases, and no operational alerts. | Pass |
 | Queue concurrency | Two due jobs share one active lease; the second remains queued until terminal release. | Pass |
 | Duplicate delivery | Repeated dispatch of the same job produces one provider run. | Pass |
 | Cancellation | Queued cancellation clears encrypted phone data and creates no provider run. | Pass |
@@ -37,8 +38,7 @@ The semantic styles also contain explicit dark-mode, increased-contrast, reduced
 
 Phase 6 is not complete until the following occur in the intended staging deployment:
 
-- Vercel environment variables are configured from the approved secret stores.
-- `npm run preflight` returns `ready: true` and no unexplained operational alerts.
+- Any temporary POC operator code is replaced with a password-manager-generated code of at least 16 characters before a consenting participant or real care information is involved.
 - The full queue acceptance matrix is repeated against deployed Redis and signed QStash delivery.
 - Queue, active, history, and needs-review transitions are confirmed in the deployed Calls console using only authorized senior records.
 - Provider-reported start, completion, and duration values are compared with the deployed console; the fallback is visibly identified as CareCall-observed.
