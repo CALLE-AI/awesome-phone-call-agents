@@ -20,6 +20,7 @@ Current apps:
 | [`typescript/multi-party-scheduler`](typescript/multi-party-scheduler/) | TypeScript | Two-phase appointment scheduling over phone calls: gather availability, confirm one time with everybody by voice, release everybody who confirmed when the commit fails and resume an interrupted run. |
 | [`python/callback-window-coordinator`](python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
 | [`python/batch-runner`](python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
+| [`python/outcome-reconciler`](python/outcome-reconciler/) | Python | Resolves a call reference to one terminal outcome by polling with bounded budgets, mapping only documented status values, and preserving the raw upstream payload when no documented outcome applies. |
 | [`python/broker-login-client`](python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`typescript/broker-login-client`](typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |

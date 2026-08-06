@@ -119,6 +119,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
+- [`call-outcome-reconciler`](skills/call-outcome-reconciler/) - Client-side reliability layer that resolves a CALL-E call reference to one terminal outcome, mapping only documented cases and reporting ambiguous or never-terminating calls as explicitly unresolved.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
@@ -143,6 +144,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/callback-window-coordinator`](apps/python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/python/callflow-campaign-runner`](apps/python/callflow-campaign-runner/) | Python | CSV-driven outbound campaign runner that triages structured results into auto-closed, retry, and needs-human queues. |
 | [`apps/python/batch-runner`](apps/python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
+| [`apps/python/outcome-reconciler`](apps/python/outcome-reconciler/) | Python | Resolves a call reference to one terminal outcome by polling with bounded budgets, mapping only documented status values, and preserving the raw upstream payload when no documented outcome applies. |
 | [`apps/python/broker-login-client`](apps/python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`apps/typescript/broker-login-client-standalone`](apps/typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
