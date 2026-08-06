@@ -118,6 +118,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
+- [`accessproof`](skills/accessproof/) - User-authorized venue access-question workflow that returns condition-level staff-reported evidence with explicit unknowns.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
