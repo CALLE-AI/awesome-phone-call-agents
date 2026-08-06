@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" width="960" height="620" role="img" aria-labelledby="title desc">
+  <title id="title">Call outcome reconciler state machine</title>
+  <desc id="desc">Polling observes upstream states until a terminal value or a budget trips. Reconciliation then applies structural checks, consistency guards, documented mapping entries, and unmappable values, producing exactly one of six outcomes. Anything not documented resolves to unresolved with a reason.</desc>
+
+  <rect width="960" height="620" fill="#ffffff"/>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrowMuted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a8442a"/>
+    </marker>
+  </defs>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+
+    <!-- Section 1: polling -->
+    <text x="40" y="42" font-size="13" font-weight="700" fill="#1f2328" letter-spacing="0.6">1. POLLING — what is observed</text>
+
+    <rect x="40" y="58" width="128" height="44" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="104" y="85" font-size="14" fill="#1f2328" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">queued</text>
+
+    <line x1="168" y1="80" x2="216" y2="80" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+    <rect x="220" y="58" width="140" height="44" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="290" y="85" font-size="14" fill="#1f2328" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">in_progress</text>
+
+    <path d="M 290 58 C 250 22, 330 22, 290 58" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="290" y="18" font-size="11" fill="#57606a" text-anchor="middle">backoff 2s → 60s, jitter ±10%</text>
+
+    <line x1="360" y1="80" x2="408" y2="80" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+    <rect x="412" y="50" width="196" height="60" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="510" y="74" font-size="13" fill="#1f2328" text-anchor="middle">terminal value observed</text>
+    <text x="510" y="94" font-size="12" fill="#57606a" text-anchor="middle">(operational, not semantic)</text>
+
+    <rect x="640" y="50" width="280" height="60" rx="6" fill="#fff8f5" stroke="#e2a08a"/>
+    <text x="780" y="74" font-size="13" fill="#8c3a1f" text-anchor="middle">…or a budget trips first</text>
+    <text x="780" y="94" font-size="12" fill="#a8442a" text-anchor="middle">wall clock 900s / 60 observations</text>
+
+    <line x1="608" y1="80" x2="636" y2="80" stroke="#57606a" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+    <!-- Section 2: reconciliation -->
+    <text x="40" y="152" font-size="13" font-weight="700" fill="#1f2328" letter-spacing="0.6">2. RECONCILIATION — evaluated in order, keyed by surface</text>
+
+    <!-- decision chain -->
+    <rect x="40" y="170" width="330" height="48" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="60" y="199" font-size="13" fill="#1f2328">structural checks</text>
+
+    <rect x="40" y="238" width="330" height="48" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="60" y="267" font-size="13" fill="#1f2328">consistency guards</text>
+
+    <rect x="40" y="306" width="330" height="48" rx="6" fill="#ffffff" stroke="#2da44e" stroke-width="1.6"/>
+    <text x="60" y="329" font-size="13" fill="#1f2328">documented entry?</text>
+    <text x="60" y="346" font-size="11" fill="#57606a">documented: true, cites a source</text>
+
+    <rect x="40" y="374" width="330" height="48" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="60" y="403" font-size="13" fill="#1f2328">published but unmappable?</text>
+
+    <rect x="40" y="442" width="330" height="48" rx="6" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="60" y="471" font-size="13" fill="#1f2328">anything else</text>
+
+    <line x1="205" y1="218" x2="205" y2="234" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="205" y1="286" x2="205" y2="302" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="205" y1="354" x2="205" y2="370" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="205" y1="422" x2="205" y2="438" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+    <!-- exits to unresolved -->
+    <line x1="370" y1="194" x2="556" y2="194" stroke="#a8442a" stroke-width="1.4" marker-end="url(#arrowMuted)"/>
+    <text x="378" y="188" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">malformed_payload</text>
+
+    <line x1="370" y1="262" x2="556" y2="262" stroke="#a8442a" stroke-width="1.4" marker-end="url(#arrowMuted)"/>
+    <text x="378" y="256" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">inconsistent_payload</text>
+
+    <line x1="370" y1="398" x2="556" y2="398" stroke="#a8442a" stroke-width="1.4" marker-end="url(#arrowMuted)"/>
+    <text x="378" y="392" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">undocumented_failure_detail</text>
+    <text x="378" y="412" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">ambiguous_documented_code</text>
+
+    <line x1="370" y1="466" x2="556" y2="466" stroke="#a8442a" stroke-width="1.4" marker-end="url(#arrowMuted)"/>
+    <text x="378" y="460" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">undocumented_code</text>
+
+    <!-- budget exit down the right -->
+    <path d="M 780 110 L 780 140 L 660 140 L 660 520" fill="none" stroke="#a8442a" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arrowMuted)"/>
+    <text x="672" y="160" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">polling_budget_exhausted</text>
+    <text x="672" y="176" font-size="11" fill="#a8442a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">plan_timeout</text>
+
+    <!-- unresolved box -->
+    <rect x="560" y="176" width="200" height="330" rx="8" fill="#fff8f5" stroke="#e2a08a" stroke-width="1.6"/>
+    <text x="660" y="212" font-size="16" fill="#8c3a1f" text-anchor="middle" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">unresolved</text>
+    <text x="660" y="240" font-size="12" fill="#8c3a1f" text-anchor="middle">carries a reason and</text>
+    <text x="660" y="258" font-size="12" fill="#8c3a1f" text-anchor="middle">the last raw payload</text>
+    <text x="660" y="292" font-size="12" fill="#8c3a1f" text-anchor="middle">a successful result,</text>
+    <text x="660" y="310" font-size="12" fill="#8c3a1f" text-anchor="middle">not an error</text>
+
+    <!-- semantic outcomes -->
+    <line x1="205" y1="490" x2="205" y2="524" stroke="#2da44e" stroke-width="1.8" marker-end="url(#arrow)"/>
+    <path d="M 370 330 L 440 330 L 440 552 L 372 552" fill="none" stroke="#2da44e" stroke-width="1.8" marker-end="url(#arrow)"/>
+    <text x="448" y="326" font-size="11" fill="#1a7f37">matched → traced by entry id</text>
+
+    <text x="40" y="524" font-size="13" font-weight="700" fill="#1f2328" letter-spacing="0.6">3. OUTCOME — exactly one is emitted</text>
+
+    <rect x="40" y="536" width="128" height="34" rx="17" fill="#eaf6ec" stroke="#2da44e"/>
+    <text x="104" y="558" font-size="12" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">completed</text>
+
+    <rect x="176" y="536" width="146" height="34" rx="17" fill="#eaf6ec" stroke="#2da44e"/>
+    <text x="249" y="558" font-size="12" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">not_connected</text>
+
+    <rect x="330" y="536" width="110" height="34" rx="17" fill="#eaf6ec" stroke="#2da44e"/>
+    <text x="385" y="558" font-size="12" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">declined</text>
+
+    <rect x="448" y="536" width="112" height="34" rx="17" fill="#eaf6ec" stroke="#2da44e"/>
+    <text x="504" y="558" font-size="12" fill="#1a7f37" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">cancelled</text>
+
+    <rect x="568" y="536" width="192" height="34" rx="17" fill="#fafbfc" stroke="#d0d7de" stroke-dasharray="4 3"/>
+    <text x="664" y="558" font-size="12" fill="#8c959f" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">infrastructure_failure</text>
+
+    <text x="772" y="552" font-size="11" fill="#8c959f">currently unreachable:</text>
+    <text x="772" y="567" font-size="11" fill="#8c959f">no published code documents it</text>
+
+    <!-- footer note -->
+    <text x="40" y="600" font-size="11.5" fill="#57606a">Raw upstream payloads are preserved verbatim throughout. An undocumented value is never translated into a semantic outcome.</text>
+  </g>
+</svg>
