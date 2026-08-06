@@ -13,11 +13,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from task_builder import (
-    build_recipients,
-    mask_phone,
-    structured_result_for_export,
-)
+from task_builder import build_recipients, mask_phone, structured_result_for_export
+from safety_text import export_execute_payload
 
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
 TRUSTED_BASE_URLS = frozenset({DEFAULT_BASE_URL})
@@ -289,4 +286,4 @@ def execute_live(
                 "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
             },
         )
-        return payload
+        return export_execute_payload(payload)
