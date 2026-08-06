@@ -95,6 +95,8 @@ QSTASH_NEXT_SIGNING_KEY=<QStash next signing key>
 
 Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sessions are HMAC-signed, expire after 30 minutes, and are checked against the current operator configuration on every protected request. Redis, QStash, data-encryption, and scheduler credentials must remain server-side.
 
+See the [CareCall environment variable reference](../../../docs/agent-gallery/carecall-environment-variables.md) for each variable's consumer, safe setup method, renewal trigger, and rotation procedure. It deliberately contains no deployment values.
+
 ## Queue and recurring schedule operation
 
 Manual and recurring authorizations both create encrypted durable call jobs. QStash delivers a signed, minimal message containing only the job ID to `/api/carecall/worker`; the worker verifies both current and next signing keys before reading the protected job from Redis.

@@ -16,6 +16,8 @@ Configure these server-side values in the Vercel environment used for the pilot.
 - `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, and `QSTASH_NEXT_SIGNING_KEY`
 - `CRON_SECRET`
 
+Use the [CareCall environment variable reference](./carecall-environment-variables.md) for safe acquisition, environment scoping, expiry checks, and rotation procedures. Never copy real values into this runbook.
+
 Use a distinct preview or staging environment first. Ensure `CARECALL_PUBLIC_BASE_URL` points to that exact HTTPS deployment so QStash signs the same worker URL the application verifies.
 
 Run the protected, read-only preflight from a trusted terminal:
