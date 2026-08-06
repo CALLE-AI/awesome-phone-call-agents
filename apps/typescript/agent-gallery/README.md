@@ -90,7 +90,15 @@ Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sess
 
 ## Recurring schedule operation
 
-The host invokes `GET /api/carecall/scheduler` with `Authorization: Bearer $CRON_SECRET`. The included `vercel.json` requests a once-per-minute production cron; confirm that the selected Vercel plan supports that frequency, or invoke the same endpoint from another trusted host scheduler.
+The host invokes `GET /api/carecall/scheduler` once per minute with `Authorization: Bearer $CRON_SECRET`. The repository does not register that cron in `vercel.json`, because Vercel Hobby projects accept only daily cron jobs and a daily scheduler cannot safely honor arbitrary call times or permitted windows. Use a trusted external minute scheduler, or add the following entry to `vercel.json` on a Vercel plan that supports it:
+
+```json
+{
+  "crons": [
+    { "path": "/api/carecall/scheduler", "schedule": "* * * * *" }
+  ]
+}
+```
 
 For each due occurrence, the scheduler:
 
