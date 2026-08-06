@@ -27,6 +27,14 @@ export type CareCallOutcome =
   | "timed_out"
   | "uncertain";
 
+export type CareCallUrgency = "none" | "contact-now" | "follow-up-today" | "review";
+
+export type CareCallSafetyFlag =
+  | "possible_immediate_danger"
+  | "possible_medication_advice"
+  | "possible_sensitive_data_request"
+  | "possible_unconfirmed_dispatch_claim";
+
 export interface CareCallRequest {
   workflow: "carecall";
   request_key: string;
@@ -65,4 +73,6 @@ export interface CareCallResult {
   evidence: string | null;
   call_id: string;
   provider_status: string;
+  urgency: CareCallUrgency;
+  safety_flags: CareCallSafetyFlag[];
 }

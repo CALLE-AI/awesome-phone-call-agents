@@ -2989,6 +2989,16 @@ p {
   line-height: 1.45;
 }
 
+.safety-flag-list {
+  display: grid;
+  margin: 8px 0 0;
+  padding-left: 19px;
+  color: var(--secondary-label);
+  font-size: 12px;
+  line-height: 1.45;
+  gap: 4px;
+}
+
 @media (max-width: 720px) {
   .demo-state {
     display: none;

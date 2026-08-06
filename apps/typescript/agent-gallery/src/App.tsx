@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { attentionCases, routines, seniors } from "./carecall/fixtures";
-import type { CareRoutine, NavigationId, TimelineItem } from "./carecall/types";
+import type { AttentionCase, CareRoutine, NavigationId, TimelineItem } from "./carecall/types";
 import { CallPreviewSheet } from "./components/CallPreviewSheet";
 import { CareCallExecutionSheet } from "./components/CareCallExecutionSheet";
 import { Icon, type IconName } from "./components/Icon";
@@ -9,6 +9,7 @@ import { NeedsAttention } from "./screens-care/NeedsAttention";
 import { Seniors } from "./screens-care/Seniors";
 import { Settings } from "./screens-care/Settings";
 import { Today } from "./screens-care/Today";
+import type { CareCallResult } from "./workflows/carecall";
 
 // Retained while the previous appointment-recovery screens remain available as
 // a migration reference. They are no longer mounted by the CareCall shell.
@@ -37,6 +38,7 @@ export function App() {
   const [previewRoutine, setPreviewRoutine] = useState<CareRoutine | null>(null);
   const [executionRoutine, setExecutionRoutine] = useState<CareRoutine | null>(null);
   const [resolvedAttentionIds, setResolvedAttentionIds] = useState<Set<string>>(new Set());
+  const [runtimeAttentionCases, setRuntimeAttentionCases] = useState<AttentionCase[]>([]);
   const [notice, setNotice] = useState("");
   const mainRef = useRef<HTMLElement>(null);
 
@@ -56,10 +58,37 @@ export function App() {
     if (routine) setPreviewRoutine(routine);
   }
 
+  const recordCareCallResult = useCallback((result: CareCallResult) => {
+    if (!result.follow_up_required || !executionRoutine) return;
+    const routine = executionRoutine;
+    const priority: AttentionCase["priority"] = result.urgency === "contact-now"
+      ? "contact-now"
+      : result.urgency === "follow-up-today" ? "today" : "review";
+    const priorityLabel = priority === "contact-now" ? "Contact now" : priority === "today" ? "Follow up today" : "Review when available";
+    const flags = result.safety_flags.length > 0
+      ? ` Safety flags: ${result.safety_flags.map((flag) => flag.replaceAll("_", " ")).join(", ")}.`
+      : "";
+    setRuntimeAttentionCases((current) => current.some((item) => item.id === `live-${result.call_id}`) ? current : [
+      ...current,
+      {
+        id: `live-${result.call_id}`,
+        seniorId: routine.seniorId,
+        routineId: routine.id,
+        priority,
+        priorityLabel,
+        title: result.outcome_label,
+        createdAt: new Intl.DateTimeFormat("en-SG", { timeZone: "Asia/Singapore", dateStyle: "medium", timeStyle: "short" }).format(new Date()),
+        context: `Live CareCall result: ${result.evidence ?? "no reliable conversational evidence"}.${flags}`,
+        nextAction: result.next_action,
+      },
+    ]);
+  }, [executionRoutine]);
+
   const previewSenior = previewRoutine
     ? seniors.find((senior) => senior.id === previewRoutine.seniorId) ?? null
     : null;
-  const openAttentionCount = attentionCases.length - resolvedAttentionIds.size;
+  const allAttentionCases = [...attentionCases, ...runtimeAttentionCases];
+  const openAttentionCount = allAttentionCases.filter((item) => !resolvedAttentionIds.has(item.id)).length;
 
   return (
     <div className="care-app">
@@ -117,11 +146,12 @@ export function App() {
         </header>
 
         <main className="workspace-main" id="main-content" ref={mainRef} tabIndex={-1}>
-          {view === "today" && <Today attentionCount={openAttentionCount} resolvedIds={resolvedAttentionIds} onNavigate={navigate} onPreview={previewFromTimeline} />}
+          {view === "today" && <Today attentionCount={openAttentionCount} attentionCases={allAttentionCases} resolvedIds={resolvedAttentionIds} onNavigate={navigate} onPreview={previewFromTimeline} />}
           {view === "seniors" && <Seniors selectedId={selectedSeniorId} onSelect={setSelectedSeniorId} onPreview={setPreviewRoutine} />}
           {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} />}
           {view === "attention" && (
             <NeedsAttention
+              cases={allAttentionCases}
               onPreview={setPreviewRoutine}
               onNotice={setNotice}
               resolvedIds={resolvedAttentionIds}
@@ -160,6 +190,7 @@ export function App() {
         <CareCallExecutionSheet
           routine={executionRoutine}
           senior={seniors.find((senior) => senior.id === executionRoutine.seniorId)!}
+          onCompleted={recordCareCallResult}
           onClose={() => setExecutionRoutine(null)}
         />
       )}

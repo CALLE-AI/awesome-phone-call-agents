@@ -20,7 +20,7 @@ interface StatusPayload {
   error?: string;
 }
 
-export function CareCallExecutionSheet({ routine, senior, onClose }: { routine: CareRoutine; senior: Senior; onClose: () => void }) {
+export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }: { routine: CareRoutine; senior: Senior; onClose: () => void; onCompleted: (result: CareCallResult) => void }) {
   const [stage, setStage] = useState<Stage>("authorize");
   const [phone, setPhone] = useState("");
   const [accessCode, setAccessCode] = useState("");
@@ -106,7 +106,9 @@ export function CareCallExecutionSheet({ routine, senior, onClose }: { routine: 
         setStatus(body.status);
         setActivity(body.activity ?? []);
         if (body.calle_result !== undefined) {
-          setResult(buildCareCallResult({ request: activeRequest, status: body.status, calle: body.calle_result ?? null, runId: activeCallId }));
+          const completed = buildCareCallResult({ request: activeRequest, status: body.status, calle: body.calle_result ?? null, runId: activeCallId });
+          setResult(completed);
+          onCompleted(completed);
           setStage("result");
         }
       } catch {
@@ -116,7 +118,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose }: { routine: 
     void poll();
     const timer = window.setInterval(poll, 3000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [accessCode, callId, request, stage]);
+  }, [accessCode, callId, onCompleted, request, stage]);
 
   return (
     <div className="sheet-backdrop">
@@ -153,7 +155,8 @@ export function CareCallExecutionSheet({ routine, senior, onClose }: { routine: 
           {stage === "result" && result && (
             <>
               <section className="result-hero" data-follow-up={result.follow_up_required}><Icon name={result.follow_up_required ? "attention" : "check"} size={24} /><div><p>{result.self_reported ? "Senior self-report" : "Care outcome"}</p><h3>{result.outcome_label}</h3><span>{result.next_action}</span></div></section>
-              <dl className="result-details"><div><dt>Human follow-up</dt><dd>{result.follow_up_required ? "Required" : "Not currently required"}</dd></div><div><dt>Provider status</dt><dd>{result.provider_status}</dd></div><div><dt>Audit ID</dt><dd>{result.call_id}</dd></div><div><dt>Evidence</dt><dd>{result.evidence ?? "No reliable conversational evidence was returned."}</dd></div></dl>
+              <dl className="result-details"><div><dt>Human follow-up</dt><dd>{result.follow_up_required ? "Required" : "Not currently required"}</dd></div><div><dt>Operational urgency</dt><dd>{result.urgency.replaceAll("-", " ")}</dd></div><div><dt>Provider status</dt><dd>{result.provider_status}</dd></div><div><dt>Audit ID</dt><dd>{result.call_id}</dd></div><div><dt>Evidence</dt><dd>{result.evidence ?? "No reliable conversational evidence was returned."}</dd></div></dl>
+              {result.safety_flags.length > 0 && <section className="execution-error" role="alert"><strong>Safety review flags</strong><ul className="safety-flag-list">{result.safety_flags.map((flag) => <li key={flag}>{flag.replaceAll("_", " ")}</li>)}</ul></section>}
               <section className="boundary-note"><Icon name="info" size={18} /><p>Provider completion is kept separate from the senior’s reported care outcome. Ambiguity always routes to human review.</p></section>
             </>
           )}

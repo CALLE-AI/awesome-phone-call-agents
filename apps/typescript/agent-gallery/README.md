@@ -23,10 +23,13 @@ The CareCall single-call MVP foundation is implemented:
 - CareCall-specific medication and meal request validation
 - trust-first CALL-E goals with medical, emergency, and anti-scam boundaries
 - live provider-status polling and conservative structured outcomes
+- operational urgency (`contact now`, `follow up today`, or `review`)
+- safety flags for possible immediate danger, medical advice, sensitive-data requests, and unconfirmed dispatch claims
+- session routing of live exceptions into Needs Attention
 - English-only live-call enforcement until other languages are verified
 - accessible focus, reduced-motion, reduced-transparency, high-contrast, and dark-mode behavior
 
-The interface uses fictional demo data and says so visibly. Pause, follow-up, and settings changes are session-only demonstrations; no scheduler, database, digest, or external care record is connected. The full phone number is entered only at the one-call authorization gate and is not stored in the fixture or browser persistence.
+The interface uses fictional demo data and says so visibly. Pause, follow-up, settings, and live-call exception routing are session-only demonstrations; no scheduler, database, digest, or external care record is connected. The full phone number is entered only at the one-call authorization gate and is not stored in the fixture or browser persistence.
 
 The CareCall path is implemented but has not yet been verified with a consenting recipient through the deployed interface. Do not represent it as operationally proven until that opt-in verification is complete.
 
@@ -90,10 +93,10 @@ The older `screens/` and `workflows/appointment-recovery/` directories remain te
 
 Operational hardening before recurring schedules or a care pilot:
 
-1. Verify one consenting end-to-end English call from the deployed interface.
+1. Add durable storage for identities, consent, routines, calls, outcomes, attention cases, and audit events.
 2. Replace the shared access code with authenticated operator identity and senior scope.
-3. Add durable idempotency, rate limiting, spending controls, and an audit store.
-4. Persist care outcomes and route exceptions into Needs Attention.
+3. Add durable idempotency, rate limiting, and spending controls.
+4. Verify one consenting end-to-end English call from the deployed interface.
 5. Add host-owned recurrence only after pause, cancellation, quiet-hour, and retry behavior are durable.
 
 ## Credentials and live-call safety

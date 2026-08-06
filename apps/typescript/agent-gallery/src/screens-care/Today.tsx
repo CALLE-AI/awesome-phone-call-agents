@@ -1,16 +1,17 @@
-import { attentionCases, seniors, timeline } from "../carecall/fixtures";
-import type { NavigationId, TimelineItem } from "../carecall/types";
+import { seniors, timeline } from "../carecall/fixtures";
+import type { AttentionCase, NavigationId, TimelineItem } from "../carecall/types";
 import { Icon } from "../components/Icon";
 import { RoutineIcon, SectionHeading, SeniorAvatar, StatusPill } from "../components/CarePrimitives";
 
 interface TodayProps {
   attentionCount: number;
+  attentionCases: AttentionCase[];
   resolvedIds: Set<string>;
   onNavigate: (destination: NavigationId) => void;
   onPreview: (item: TimelineItem) => void;
 }
 
-export function Today({ attentionCount, resolvedIds, onNavigate, onPreview }: TodayProps) {
+export function Today({ attentionCount, attentionCases, resolvedIds, onNavigate, onPreview }: TodayProps) {
   const urgentCase = attentionCases.find((item) => !resolvedIds.has(item.id));
   const urgentSenior = urgentCase ? seniors.find((senior) => senior.id === urgentCase.seniorId) : undefined;
   const metrics = [

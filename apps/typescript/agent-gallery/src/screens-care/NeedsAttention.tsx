@@ -1,9 +1,9 @@
-import { attentionCases, routines, seniors } from "../carecall/fixtures";
-import type { CareRoutine } from "../carecall/types";
+import { routines, seniors } from "../carecall/fixtures";
+import type { AttentionCase, CareRoutine } from "../carecall/types";
 import { Icon } from "../components/Icon";
 import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
 
-export function NeedsAttention({ onPreview, onNotice, resolvedIds, onResolve }: { onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; resolvedIds: Set<string>; onResolve: (caseId: string) => void }) {
+export function NeedsAttention({ cases, onPreview, onNotice, resolvedIds, onResolve }: { cases: AttentionCase[]; onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; resolvedIds: Set<string>; onResolve: (caseId: string) => void }) {
   return (
     <div className="page">
       <header className="page-intro page-intro--compact">
@@ -12,12 +12,12 @@ export function NeedsAttention({ onPreview, onNotice, resolvedIds, onResolve }: 
           <h1>Needs Attention</h1>
           <p className="page-summary">Only cases where a human decision or follow-up is useful.</p>
         </div>
-        <div className="attention-summary"><strong>{attentionCases.length - resolvedIds.size}</strong><span>Open cases</span></div>
+        <div className="attention-summary"><strong>{cases.filter((item) => !resolvedIds.has(item.id)).length}</strong><span>Open cases</span></div>
       </header>
 
       <div className="attention-layout">
         <section className="attention-list" aria-label="Open care cases">
-          {attentionCases.map((item) => {
+          {cases.map((item) => {
             const senior = seniors.find((candidate) => candidate.id === item.seniorId)!;
             const routine = routines.find((candidate) => candidate.id === item.routineId)!;
             const isAcknowledged = resolvedIds.has(item.id);
