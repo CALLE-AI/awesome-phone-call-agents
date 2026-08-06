@@ -96,6 +96,263 @@ Use this order to avoid downtime:
 | --- | --- | --- | --- | --- |
 | `OPERATOR_ACCESS_CODE` | Secret | Legacy access-code gate for the appointment-recovery workflow. CareCall operator sessions do not use it. | Generate a long random value in a password manager only if the legacy workflow remains enabled. | **Event-driven.** Rotate after suspected exposure, operator-access changes, or according to the legacy workflow's security policy. Remove it when that workflow is disabled. |
 
+## Recreate and reinsert the variables in Vercel
+
+Vercel can list configured variable names, but a value marked sensitive is
+non-readable after it is stored. Do not expect `vercel env ls` or the dashboard
+to recover those values. Retrieve provider-issued credentials from the provider,
+retrieve the CALL-E token from the local CLI cache without printing it, or
+generate a replacement value as described below.
+
+Run these commands from the Vercel project directory:
+
+```sh
+cd apps/typescript/agent-gallery
+```
+
+Install and link the official Vercel CLI if necessary:
+
+```sh
+npm install --global vercel
+vercel login
+vercel link
+```
+
+The command forms below follow Vercel's current
+[`vercel env` reference](https://vercel.com/docs/cli/env). The local directory
+must be linked to the correct project and team before any update.
+
+Confirm the target before changing anything:
+
+```sh
+vercel env ls preview
+vercel env ls production
+```
+
+The examples below target Preview first. Change `preview` to `production` only
+when the Preview deployment is healthy. `vercel env update` replaces an
+existing variable and reads its new value from the prompt or standard input.
+If the variable does not exist yet, use `vercel env add` with the same name and
+environment instead. Add `--sensitive` for every secret or sensitive
+configuration value.
+
+Do not use `echo "secret" | ...`: the cleartext may be written to shell history.
+The commands below either prompt securely or pipe a generated/provider value
+directly without printing it.
+
+### 1. CALL-E token and server URL
+
+First verify that the official CALL-E CLI cache is usable. This does not print
+the access token:
+
+```sh
+calle auth status
+```
+
+If `usable` is `false`, refresh the cache through the official authorization
+flow before continuing:
+
+```sh
+calle auth login --start-only --no-browser-open
+# Complete the displayed browser authorization, then:
+calle auth login --no-browser-open
+```
+
+Transfer the cached token directly into Vercel without displaying it. These
+commands require `jq`:
+
+```sh
+CARECALL_CALLE_STATUS="$(calle auth status)"
+CARECALL_CALLE_CACHE="$(printf '%s' "$CARECALL_CALLE_STATUS" | jq -r '.cache_path')"
+
+jq -jr '.token.access_token' "$CARECALL_CALLE_CACHE" \
+  | vercel env update CALLE_ACCESS_TOKEN preview --sensitive
+
+printf '%s' "$CARECALL_CALLE_STATUS" \
+  | jq -jr '.server_url' \
+  | vercel env update CALLE_SERVER_URL preview
+
+unset CARECALL_CALLE_STATUS CARECALL_CALLE_CACHE
+```
+
+Repeat the two `vercel env update` commands with `production` only if the same
+CALL-E identity and endpoint are approved for Production. Prefer separate
+provider credentials when available.
+
+### 2. Operator ID and sign-in code
+
+The operator sign-in code is the original cleartext code; Vercel stores only
+its SHA-256 hash inside `CARECALL_OPERATORS_JSON`. The hash cannot be converted
+back into the sign-in code. If the cleartext was not saved, create a new long
+code in a password manager and replace the hash.
+
+For the current single-operator pilot, enter the new code when prompted. This
+builds the JSON and transfers it to Vercel without printing the code or hash:
+
+```sh
+read -s "CARECALL_OPERATOR_CODE?New operator sign-in code: "
+echo
+CARECALL_OPERATOR_HASH="$(printf '%s' "$CARECALL_OPERATOR_CODE" | shasum -a 256 | awk '{print $1}')"
+
+jq -nc --arg hash "$CARECALL_OPERATOR_HASH" \
+  '[{"id":"mei-chen","name":"Mei Chen","role":"coordinator","access_code_sha256":$hash,"senior_ids":["mdm-lim"]}]' \
+  | vercel env update CARECALL_OPERATORS_JSON preview --sensitive
+
+unset CARECALL_OPERATOR_CODE CARECALL_OPERATOR_HASH
+```
+
+Use `mei-chen` as the Operator ID and the cleartext value saved in the password
+manager as the Operator sign-in code. Do not use the public test credential
+from the repository. If the real roster has additional operators or senior
+scopes, construct the complete JSON instead of replacing it with this
+single-operator example.
+
+Generate a new session-signing secret and transfer it directly:
+
+```sh
+openssl rand -base64 48 \
+  | tr -d '\n' \
+  | vercel env update CARECALL_SESSION_SECRET preview --sensitive
+```
+
+Changing `CARECALL_SESSION_SECRET` immediately invalidates existing operator
+sessions. Operators can sign in again with their unchanged cleartext access
+codes.
+
+### 3. Upstash Redis values
+
+Open the Upstash Console, select the pilot Redis database, and copy the REST
+URL and **Standard** REST token from the REST API section. The read-only token
+will not work. Paste each value only when the Vercel CLI prompts:
+
+```sh
+vercel env update UPSTASH_REDIS_REST_URL preview --sensitive
+vercel env update UPSTASH_REDIS_REST_TOKEN preview --sensitive
+```
+
+If the existing Standard token is no longer available, reset the database
+password in Upstash, then update every affected deployment immediately. That
+reset invalidates the old REST tokens.
+
+### 4. Phone-data encryption key
+
+If encrypted schedules or queued jobs already exist, restore the exact existing
+`CARECALL_DATA_ENCRYPTION_KEY` from the approved password manager or secret
+store:
+
+```sh
+vercel env update CARECALL_DATA_ENCRYPTION_KEY preview --sensitive
+```
+
+Do **not** generate a replacement merely because the old value is unavailable:
+existing phone ciphertext cannot be decrypted with a new key. For a fresh
+environment with no schedules or queued jobs, generate the initial key
+directly:
+
+```sh
+openssl rand -base64 48 \
+  | tr -d '\n' \
+  | vercel env update CARECALL_DATA_ENCRYPTION_KEY preview --sensitive
+```
+
+If the old key is irrecoverable, pause schedules, cancel or drain queued jobs,
+deploy a new key, and recreate every recurring authorization.
+
+### 5. Pilot limits, cron secret, and callback origin
+
+Set the controlled-pilot daily call limit:
+
+```sh
+printf '%s' '5' \
+  | vercel env update CARECALL_MAX_CALLS_PER_DAY preview
+```
+
+Generate a new reconciliation/readiness secret:
+
+```sh
+openssl rand -hex 32 \
+  | tr -d '\n' \
+  | vercel env update CRON_SECRET preview --sensitive
+```
+
+Set the exact stable HTTPS origin for the target deployment. Replace the
+placeholder; do not include a trailing slash or a path:
+
+```sh
+printf '%s' 'https://your-stable-preview-domain.example' \
+  | vercel env update CARECALL_PUBLIC_BASE_URL preview
+```
+
+Use a branch-stable Preview URL or custom domain, not a commit-specific Vercel
+deployment URL. QStash signature verification depends on this origin remaining
+identical to the worker callback destination.
+
+### 6. QStash token and signing keys
+
+Copy `QSTASH_TOKEN` from the QStash section of the Upstash Console. Enter it at
+a hidden shell prompt, use it to retrieve the current signing-key pair, and
+transfer all three values without displaying them:
+
+```sh
+read -s "CARECALL_QSTASH_TOKEN?QStash token: "
+echo
+
+printf '%s' "$CARECALL_QSTASH_TOKEN" \
+  | vercel env update QSTASH_TOKEN preview --sensitive
+
+CARECALL_QSTASH_KEYS="$(curl --fail --silent --show-error \
+  --request GET \
+  --url https://qstash.upstash.io/v2/keys \
+  --header "Authorization: Bearer $CARECALL_QSTASH_TOKEN")"
+
+printf '%s' "$CARECALL_QSTASH_KEYS" \
+  | jq -jr '.current' \
+  | vercel env update QSTASH_CURRENT_SIGNING_KEY preview --sensitive
+
+printf '%s' "$CARECALL_QSTASH_KEYS" \
+  | jq -jr '.next' \
+  | vercel env update QSTASH_NEXT_SIGNING_KEY preview --sensitive
+
+unset CARECALL_QSTASH_TOKEN CARECALL_QSTASH_KEYS
+```
+
+This retrieves the existing key pair; it does not rotate it. Do not call the
+rotation endpoint merely to recover the current keys. The response fields and
+endpoint are documented in Upstash's
+[Get Signing Keys reference](https://upstash.com/docs/qstash/api-reference/signing-keys/get-signing-keys).
+
+### 7. Verify and redeploy
+
+Check that every required name exists in the intended environment:
+
+```sh
+vercel env ls preview
+```
+
+Environment changes apply only to new deployments. Create or redeploy the
+Preview deployment, then run the protected preflight with Preview variables
+injected without writing them to a local `.env` file:
+
+```sh
+vercel deploy
+vercel env run -e preview -- npm run preflight
+```
+
+Proceed to Production only after Preview reports `ready: true` and
+`healthy: true`:
+
+```sh
+vercel env ls production
+vercel deploy --prod
+vercel env run -e production -- npm run preflight
+```
+
+The CLI cannot confirm that a secret is semantically correct just because its
+name exists. The preflight and a fictional non-dialing queue test are the
+required checks. Avoid `vercel env pull` for routine recovery because it writes
+environment values to a plaintext local file; `vercel env run` keeps them in
+the command environment instead.
+
 ## Rotation procedure
 
 Vercel applies environment-variable changes only to new deployments. For a
