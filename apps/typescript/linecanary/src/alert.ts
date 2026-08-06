@@ -55,19 +55,43 @@ export function formatReport(report: RunReport): string {
   return lines.join("\n");
 }
 
+function hasRecovery(report: RunReport): boolean {
+  return report.regressions.some((entry) => entry.kind === "recovered");
+}
+
+/** Bad news always pages; a recovery closes the loop with good news. */
 function needsAttention(report: RunReport): boolean {
-  return !report.ok;
+  return !report.ok || hasRecovery(report);
 }
 
 export function slackPayload(report: RunReport): Record<string, unknown> {
-  const headline = `🐤 LineCanary: ${report.regressions.length} regression(s) at ${report.startedAt}`;
-  return {
-    text: headline,
-    blocks: [
-      { type: "header", text: { type: "plain_text", text: "LineCanary alert", emoji: true } },
-      { type: "section", text: { type: "mrkdwn", text: "```" + formatReport(report) + "```" } },
-    ],
-  };
+  const headline = report.ok
+    ? `✅ LineCanary: recovered at ${report.startedAt}`
+    : `🐤 LineCanary: ${report.regressions.length} regression(s) at ${report.startedAt}`;
+  const blocks: Record<string, unknown>[] = [
+    { type: "header", text: { type: "plain_text", text: "LineCanary alert", emoji: true } },
+    { type: "section", text: { type: "mrkdwn", text: "```" + formatReport(report) + "```" } },
+  ];
+  // What the canary heard on the failing calls — the last few line-side turns,
+  // so the person paged sees the evidence without opening the dashboard.
+  for (const run of report.runs) {
+    const outcome = run.outcome;
+    if (outcome === null || outcome.status === "pass" || outcome.transcript === undefined) {
+      continue;
+    }
+    const heard =
+      outcome.transcript.length === 0
+        ? "(dead air — no conversation)"
+        : outcome.transcript
+            .slice(-4)
+            .map((turn) => `[${turn.offsetSeconds ?? "?"}s] ${turn.speaker === "bot" ? "canary" : "line"}: ${turn.text}`)
+            .join("\n");
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*${outcome.checkId} — what the canary heard:*\n` + "```" + heard.slice(0, 600) + "```" },
+    });
+  }
+  return { text: headline, blocks };
 }
 
 export async function sendSlack(webhookUrl: string, report: RunReport, fetchImpl: typeof fetch = fetch): Promise<void> {

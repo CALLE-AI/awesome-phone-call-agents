@@ -19,9 +19,11 @@ LineCanary live @ 2026-08-03 — ATTENTION
 
 1. **Describe checks as code.** `linecanary.config.json` lives in your repo: which lines, what the test caller should do, what the structured result must look like, how fast the line must answer.
 2. **Verify ownership.** LineCanary refuses to call a line until you prove control of it — put a short code in the line's greeting and run `linecanary verify`; or record a written attestation for client lines. Compliance is a gate, not a footnote.
-3. **Run on your schedule.** Cron or GitHub Actions owns recurrence; each invocation places at most one call per check. Every call opens with an AI disclosure.
+3. **Run on your schedule — inside your window.** Cron or GitHub Actions owns recurrence; each invocation places at most one call per check, and only inside your configured `callWindow`. Every call opens with an AI disclosure.
 4. **Assert, baseline, diff.** Deterministic assertions on the schema-validated result (`equals`/`contains`/`matches`/`oneOf`/`exists`), timing bounds from transcript offsets, confidence floors — then regression detection against the line's own history (new failures, regressed assertions, answer-time blowouts, confidence drops, recoveries).
 5. **Get paged with substance.** Console + exit codes for CI, Slack webhook for humans. Alerts name the check, the assertion and the delta — never full phone numbers.
+6. **Start from a phone call, not a blank config.** `linecanary discover <line>` places one mapping call; AI listens to the whole journey and drafts your checks in config format — review, merge, monitor.
+7. **See it, share it.** `linecanary serve` renders the operator dashboard — line health, answer-time trends, regression events, and the full timed transcript of what the canary heard on every call. `/status/<line-id>` (or `linecanary status --html --line <id>`) renders a public, client-safe status page **per line** — uptime percentage included, no tasks, no transcripts, no numbers, and never another client's lines. `/check/<id>` is the call log: every stored call browsable with its full transcript.
 
 ## Quickstart
 
@@ -33,6 +35,10 @@ export CALLE_API_KEY=calle_live_…
 npx tsx src/cli.ts verify main-office   # one call, proves you control the line
 npx tsx src/cli.ts run                  # dry-run: prints the plan, calls nothing
 npx tsx src/cli.ts run --live           # places the calls, writes baselines
+npx tsx src/cli.ts serve                # dashboard at http://127.0.0.1:4477
+npx tsx src/cli.ts status --html status.html --title "Main line"  # public status page
+npx tsx src/cli.ts explain ivr-billing-branch   # AI incident note (needs ANTHROPIC_API_KEY)
+npx tsx src/cli.ts discover main-office         # one call maps the line, AI drafts your checks
 ```
 
 No CALL-E account yet? `npm run demo` runs the whole loop — healthy day, silent IVR breakage, regression alert — against a local fake server with zero network and zero calls.
@@ -66,9 +72,13 @@ No CALL-E account yet? `npm run demo` runs the whole loop — healthy day, silen
     "minConfidence": 0.6
   }],
   "alerts": { "slackWebhookUrl": "env:LINECANARY_SLACK_WEBHOOK" },
-  "baselineDir": "baselines"
+  "baselineDir": "baselines",
+  "callWindow": { "timezone": "America/Los_Angeles", "start": "08:00", "end": "20:00", "days": [1,2,3,4,5] },
+  "historyLimit": 200
 }
 ```
+
+`callWindow` is a hard guard: outside it, live runs place no calls (skipped as `outside-call-window`) — your monitoring never becomes a 3 a.m. nuisance call. `historyLimit` controls stored runs per check (default 200 ≈ four days at 30-minute cadence).
 
 Exit codes: `0` all good · `1` regressions or check failures · `2` the run itself broke (config, credentials, API). Baselines are plain JSON under `baselineDir` — commit them, cache them in Actions, or mount them on a volume.
 
@@ -82,7 +92,8 @@ Exit codes: `0` all good · `1` regressions or check failures · `2` the run its
 - **The host owns recurrence.** No internal scheduler, no self-retry: one invocation, at most one call per check, idempotency-keyed against double-fires.
 - **Transcripts are data, never instructions.** Everything a callee says is compared against expectations, not obeyed. See [docs/threat-model.md](docs/threat-model.md).
 - **Own lines only.** Ownership verification is enforced in the runner, and every call self-identifies as an automated test call. See [docs/compliance.md](docs/compliance.md).
-- **No framework, one dependency.** `@call-e/calle` is the only runtime dependency; tests drive the real SDK against the local fake server in `fake/`.
+- **No framework, two dependencies.** `@call-e/calle` for calls and `@anthropic-ai/sdk` for the optional `explain` analysis (loaded lazily — never touched unless you use it); tests drive the real SDKs against fakes.
+- **Regressions get explained, not just reported.** `linecanary explain <check>` runs a two-model pipeline — a fast model digests the call transcripts, a frontier model writes the incident note: what broke, the evidence, the likely layer at fault, next steps. Transcripts stay inside data tags end to end.
 
 ## Prior art and scope
 
@@ -90,7 +101,7 @@ Enterprise call-assurance suites (Cyara, Hammer/VistaCX, Klearcom) do outside-in
 
 | Path | Responsibility |
 | --- | --- |
-| `src/` | config, CALL-E port, assertion engine, baseline diff, runner, alerts, CLI |
+| `src/` | config, CALL-E port, assertion engine, baseline diff, runner, alerts, dashboard + status pages, CLI |
 | `fake/` | local fake CALL-E API server (loopback only, no credentials, no calls) |
 | `test/` | unit + e2e tests, real SDK against the fake server |
 | `demo/` | `npm run demo` — pass → silent breakage → regression alert |

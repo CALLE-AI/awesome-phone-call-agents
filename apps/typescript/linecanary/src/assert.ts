@@ -10,7 +10,7 @@
 
 import type { Assertion, CheckConfig } from "./config.js";
 import { extractTiming, type TimingMetrics } from "./timing.js";
-import type { CallSnapshot } from "./types.js";
+import type { CallSnapshot, TranscriptTurn } from "./types.js";
 
 export interface AssertionResult {
   assertion: Assertion;
@@ -34,6 +34,8 @@ export interface CheckOutcome {
   failureCode: string | null;
   callId: string;
   at: string;
+  /** What the canary heard, turn by turn. Older stored outcomes may lack it. */
+  transcript?: TranscriptTurn[];
 }
 
 const MISSING = Symbol("missing");
@@ -93,6 +95,7 @@ export function evaluateCheck(check: CheckConfig, lineId: string, snapshot: Call
     confidence,
     callId: snapshot.id,
     at,
+    transcript: turns,
   };
 
   if (snapshot.status !== "completed") {

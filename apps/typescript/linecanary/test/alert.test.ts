@@ -23,11 +23,23 @@ const REGRESSED: RunReport = report({
   ok: false,
   runs: [
     run({
-      outcome: outcome({ status: "fail" }),
+      outcome: outcome({
+        status: "fail",
+        transcript: [
+          { offsetSeconds: 0, speaker: "bot", text: "Automated test call." },
+          { offsetSeconds: 6, speaker: "user", text: "…silence, then a click." },
+        ],
+      }),
       regressions: [{ checkId: "hours", kind: "new_failure", detail: "answered: expected true, got false" }],
     }),
   ],
   regressions: [{ checkId: "hours", kind: "new_failure", detail: "answered: expected true, got false" }],
+});
+
+test("slack payload includes what the canary heard on failing checks", () => {
+  const payload = JSON.stringify(slackPayload(REGRESSED));
+  assert.match(payload, /what the canary heard/);
+  assert.match(payload, /silence, then a click/);
 });
 
 test("phone masking keeps only the plus sign and the last two digits", () => {
@@ -86,4 +98,21 @@ test("exit codes: 0 ok, 1 regressions or failures, 2 run errors", () => {
   assert.equal(exitCode(report()), 0);
   assert.equal(exitCode(REGRESSED), 1);
   assert.equal(exitCode(report({ ok: false, runs: [run({ error: "internal_error: boom", outcome: null })] })), 2);
+});
+
+test("a recovery pages with good news even though the report is ok", async () => {
+  const recovered = report({
+    ok: true,
+    runs: [run({ regressions: [{ checkId: "hours", kind: "recovered", detail: "recovered at 2026-08-04T12:00:00Z" }] })],
+    regressions: [{ checkId: "hours", kind: "recovered", detail: "recovered at 2026-08-04T12:00:00Z" }],
+  });
+  const posts: string[] = [];
+  const fetchStub = (async (_url: string | URL | Request, init?: RequestInit) => {
+    posts.push(String(init?.body));
+    return new Response("ok", { status: 200 });
+  }) as typeof fetch;
+  await sendSlack("https://hooks.slack.example/T0/B0", recovered, fetchStub);
+  assert.equal(posts.length, 1, "recovery must notify");
+  assert.match(posts[0], /recovered/);
+  assert.match(posts[0], /✅/);
 });

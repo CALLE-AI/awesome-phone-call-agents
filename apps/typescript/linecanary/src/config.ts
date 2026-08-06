@@ -18,6 +18,8 @@ export type Ownership =
 
 export interface LineConfig {
   id: string;
+  /** Human-facing name, e.g. "Sample Dental — main line". Falls back to id. */
+  name?: string;
   phone: string;
   region?: string;
   locale?: string;
@@ -38,6 +40,8 @@ export interface TimingBounds {
 
 export interface CheckConfig {
   id: string;
+  /** Human-facing name, e.g. "Billing menu option". Falls back to id. */
+  name?: string;
   line: string;
   task: string;
   resultSchema: JsonSchema;
@@ -46,11 +50,26 @@ export interface CheckConfig {
   minConfidence?: number;
 }
 
+export interface CallWindow {
+  /** IANA timezone the window is evaluated in, e.g. "America/Los_Angeles". */
+  timezone: string;
+  /** Inclusive start, "HH:MM" 24h. */
+  start: string;
+  /** Exclusive end, "HH:MM" 24h. Must be after start. */
+  end: string;
+  /** Days 0 (Sunday) – 6 (Saturday); omitted = every day. */
+  days?: number[];
+}
+
 export interface Config {
   lines: LineConfig[];
   checks: CheckConfig[];
   alerts?: { slackWebhookUrl?: string };
   baselineDir: string;
+  /** Live calls are only placed inside this window; omitted = always. */
+  callWindow?: CallWindow;
+  /** Stored runs per check. Default 200. */
+  historyLimit: number;
 }
 
 const E164 = /^\+[1-9]\d{6,14}$/;
@@ -109,6 +128,7 @@ function parseLine(value: unknown, index: number): LineConfig {
   }
   return {
     id,
+    name: record.name === undefined ? undefined : asString(record.name, `${where}.name`),
     phone,
     region: record.region === undefined ? undefined : asString(record.region, `${where}.region`),
     locale: record.locale === undefined ? undefined : asString(record.locale, `${where}.locale`),
@@ -196,7 +216,16 @@ function parseCheck(value: unknown, index: number, lineIds: Set<string>): CheckC
   if (assertions.length === 0 && timing === undefined && minConfidence === undefined) {
     fail(`${where} (${id}) checks nothing: add assertions, timing bounds or minConfidence.`);
   }
-  return { id, line, task, resultSchema: schema, assert: assertions, timing, minConfidence };
+  return {
+    id,
+    name: record.name === undefined ? undefined : asString(record.name, `${where}.name`),
+    line,
+    task,
+    resultSchema: schema,
+    assert: assertions,
+    timing,
+    minConfidence,
+  };
 }
 
 function uniqueIds(values: { id: string }[], what: string): void {
@@ -250,5 +279,41 @@ export function loadConfig(path: string): Config {
   const baselineDir =
     record.baselineDir === undefined ? "baselines" : asString(record.baselineDir, "config.baselineDir");
 
-  return { lines, checks, alerts, baselineDir };
+  let callWindow: CallWindow | undefined;
+  if (record.callWindow !== undefined) {
+    const window = asRecord(record.callWindow, "config.callWindow");
+    const timezone = asString(window.timezone, "config.callWindow.timezone");
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    } catch {
+      fail(`config.callWindow.timezone ${timezone} is not a valid IANA timezone.`);
+    }
+    const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
+    const start = asString(window.start, "config.callWindow.start");
+    const end = asString(window.end, "config.callWindow.end");
+    if (!clock.test(start) || !clock.test(end)) {
+      fail("config.callWindow start/end must be HH:MM in 24-hour time.");
+    }
+    if (start >= end) {
+      fail("config.callWindow.start must be before end (overnight windows are not supported).");
+    }
+    let days: number[] | undefined;
+    if (window.days !== undefined) {
+      if (!Array.isArray(window.days) || window.days.length === 0 || window.days.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
+        fail("config.callWindow.days must be integers 0 (Sunday) through 6 (Saturday).");
+      }
+      days = window.days as number[];
+    }
+    callWindow = { timezone, start, end, days };
+  }
+
+  let historyLimit = 200;
+  if (record.historyLimit !== undefined) {
+    if (typeof record.historyLimit !== "number" || !Number.isInteger(record.historyLimit) || record.historyLimit < 10 || record.historyLimit > 5000) {
+      fail("config.historyLimit must be an integer between 10 and 5000.");
+    }
+    historyLimit = record.historyLimit;
+  }
+
+  return { lines, checks, alerts, baselineDir, callWindow, historyLimit };
 }

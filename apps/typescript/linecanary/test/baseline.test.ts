@@ -39,9 +39,9 @@ test("history round-trips through the filesystem in insertion order", () => {
   assert.deepEqual(reopened.history("other-check"), []);
 });
 
-test("history is capped at 50 entries, dropping the oldest", () => {
+test("history is capped at the configured limit, dropping the oldest", () => {
   const dir = join(mkdtempSync(join(tmpdir(), "linecanary-store-")), "baselines");
-  const store = openStore(dir);
+  const store = openStore(dir, 50);
   for (let index = 0; index < 55; index += 1) {
     store.append(outcome({ callId: `call_${index}` }));
   }

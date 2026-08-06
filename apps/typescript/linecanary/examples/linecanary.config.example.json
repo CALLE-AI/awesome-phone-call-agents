@@ -5,7 +5,11 @@
       "phone": "+15550100",
       "region": "US",
       "locale": "en-US",
-      "ownership": { "method": "greeting_code", "code": "LC-7391" }
+      "ownership": {
+        "method": "greeting_code",
+        "code": "LC-7391"
+      },
+      "name": "Sample Dental \u2014 main line"
     },
     {
       "id": "client-clinic",
@@ -15,7 +19,8 @@
       "ownership": {
         "method": "attestation",
         "statement": "Monitored under the managed-services agreement with Example Clinic dated 2026-08-01; the client authorizes automated test calls to this line."
-      }
+      },
+      "name": "Example Clinic \u2014 front desk"
     }
   ],
   "checks": [
@@ -26,18 +31,35 @@
       "resultSchema": {
         "type": "object",
         "properties": {
-          "answered": { "type": "boolean", "description": "True when the line was answered by a person or agent." },
-          "hours_answer": { "type": "string", "description": "The verbatim answer about Saturday hours." }
+          "answered": {
+            "type": "boolean",
+            "description": "True when the line was answered by a person or agent."
+          },
+          "hours_answer": {
+            "type": "string",
+            "description": "The verbatim answer about Saturday hours."
+          }
         },
-        "required": ["answered"],
+        "required": [
+          "answered"
+        ],
         "additionalProperties": false
       },
       "assert": [
-        { "path": "answered", "equals": true },
-        { "path": "hours_answer", "matches": "saturday|weekend" }
+        {
+          "path": "answered",
+          "equals": true
+        },
+        {
+          "path": "hours_answer",
+          "matches": "saturday|weekend"
+        }
       ],
-      "timing": { "maxSecondsToAnswer": 20 },
-      "minConfidence": 0.6
+      "timing": {
+        "maxSecondsToAnswer": 20
+      },
+      "minConfidence": 0.6,
+      "name": "Reception hours"
     },
     {
       "id": "ivr-billing-path",
@@ -46,19 +68,51 @@
       "resultSchema": {
         "type": "object",
         "properties": {
-          "billing_option": { "type": "string", "description": "The option number announced for billing, e.g. '3'." },
-          "menu_options": { "type": "string", "description": "The announced options in order." }
+          "billing_option": {
+            "type": "string",
+            "description": "The option number announced for billing, e.g. '3'."
+          },
+          "menu_options": {
+            "type": "string",
+            "description": "The announced options in order."
+          }
         },
-        "required": ["billing_option"],
+        "required": [
+          "billing_option"
+        ],
         "additionalProperties": false
       },
       "assert": [
-        { "path": "billing_option", "equals": "3" },
-        { "path": "menu_options", "contains": "appointments" }
+        {
+          "path": "billing_option",
+          "equals": "3"
+        },
+        {
+          "path": "menu_options",
+          "contains": "appointments"
+        }
       ],
-      "timing": { "maxSecondsToAnswer": 10 }
+      "timing": {
+        "maxSecondsToAnswer": 10
+      },
+      "name": "Billing menu option"
     }
   ],
-  "alerts": { "slackWebhookUrl": "env:LINECANARY_SLACK_WEBHOOK" },
-  "baselineDir": "baselines"
+  "alerts": {
+    "slackWebhookUrl": "env:LINECANARY_SLACK_WEBHOOK"
+  },
+  "baselineDir": "baselines",
+  "callWindow": {
+    "timezone": "America/Los_Angeles",
+    "start": "08:00",
+    "end": "20:00",
+    "days": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "historyLimit": 200
 }

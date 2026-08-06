@@ -34,6 +34,7 @@ const config: Config = {
     },
   ],
   baselineDir: join(mkdtempSync(join(tmpdir(), "linecanary-demo-")), "baselines"),
+  historyLimit: 200,
 };
 
 const healthy = {

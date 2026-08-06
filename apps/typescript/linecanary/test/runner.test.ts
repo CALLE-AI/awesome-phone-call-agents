@@ -39,6 +39,7 @@ function config(): Config {
       },
     ],
     baselineDir: "unused",
+    historyLimit: 200,
   };
 }
 
@@ -179,5 +180,34 @@ test("--only filters checks and marks the rest filtered", async () => {
     assert.equal(fake.created.length, 1);
     assert.equal(report.runs.find((run) => run.planned.checkId === "hours")?.skipped, "filtered");
     assert.equal(report.runs.find((run) => run.planned.checkId === "greeting")?.outcome?.status, "pass");
+  });
+});
+
+test("live calls are refused outside the configured call window", async () => {
+  await withLiveRun(PASSING_SCENARIOS, async (fake, store) => {
+    const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+    const windowed: Config = {
+      ...config(),
+      callWindow: { timezone: "UTC", start: "08:00", end: "20:00" },
+    };
+    // 03:00 UTC — outside the window.
+    const night = await runChecks(windowed, port, store, {
+      live: true, timeoutMs: 5_000, intervalMs: 10, now: () => new Date("2026-08-04T03:00:00Z"),
+    });
+    assert.ok(night.runs.every((run) => run.skipped === "outside-call-window"));
+    assert.equal(fake.created.length, 0);
+    assert.equal(night.ok, true);
+    // 12:00 UTC — inside; calls go out.
+    const day = await runChecks(windowed, port, store, {
+      live: true, timeoutMs: 5_000, intervalMs: 10, now: () => new Date("2026-08-04T12:00:00Z"),
+    });
+    assert.equal(day.runs.filter((run) => run.outcome !== null).length, 2);
+    assert.equal(fake.created.length, 2);
+    // Day-of-week restriction: Tuesday 2026-08-04 excluded when days=[0,6].
+    const weekend: Config = { ...config(), callWindow: { timezone: "UTC", start: "08:00", end: "20:00", days: [0, 6] } };
+    const tuesday = await runChecks(weekend, port, store, {
+      live: true, timeoutMs: 5_000, intervalMs: 10, now: () => new Date("2026-08-04T12:00:00Z"),
+    });
+    assert.ok(tuesday.runs.every((run) => run.skipped === "outside-call-window"));
   });
 });

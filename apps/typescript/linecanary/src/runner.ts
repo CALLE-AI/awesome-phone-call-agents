@@ -12,7 +12,7 @@
 import { evaluateCheck, type CheckOutcome } from "./assert.js";
 import type { BaselineStore } from "./baseline.js";
 import { ApiError, CallTimeoutError, type CallePort } from "./calle.js";
-import type { CheckConfig, Config, LineConfig } from "./config.js";
+import type { CallWindow, CheckConfig, Config, LineConfig } from "./config.js";
 import { diffAgainstBaseline, type Regression } from "./diff.js";
 
 export const DISCLOSURE_PREAMBLE =
@@ -39,7 +39,7 @@ export interface CheckRun {
   planned: PlannedCall;
   outcome: CheckOutcome | null;
   regressions: Regression[];
-  skipped: "dry-run" | "unverified-line" | "filtered" | null;
+  skipped: "dry-run" | "unverified-line" | "filtered" | "outside-call-window" | null;
   error: string | null;
 }
 
@@ -58,6 +58,24 @@ function lineFor(config: Config, check: CheckConfig): LineConfig {
   return config.lines.find((line) => line.id === check.line)!;
 }
 
+/** True when `at` falls inside the operator's calling window. */
+export function insideCallWindow(window: CallWindow, at: Date): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: window.timezone,
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(at);
+  const get = (type: string): string => parts.find((part) => part.type === type)?.value ?? "";
+  const clock = `${get("hour").padStart(2, "0")}:${get("minute").padStart(2, "0")}`;
+  const dayIndex = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  if (window.days !== undefined && !window.days.includes(dayIndex)) {
+    return false;
+  }
+  return clock >= window.start && clock < window.end;
+}
+
 export function idempotencyKeyFor(checkId: string, startedAt: Date): string {
   return `linecanary:${checkId}:${startedAt.toISOString().slice(0, 16)}`;
 }
@@ -72,6 +90,8 @@ export async function runChecks(
   const startedAt = now();
   const runs: CheckRun[] = [];
   let hadError = false;
+  const outsideWindow =
+    options.live && config.callWindow !== undefined && !insideCallWindow(config.callWindow, startedAt);
 
   for (const check of config.checks) {
     const line = lineFor(config, check);
@@ -86,6 +106,12 @@ export async function runChecks(
     }
     if (!options.live) {
       run.skipped = "dry-run";
+      continue;
+    }
+    if (outsideWindow) {
+      // The operator said when this line may ring. Outside that window the
+      // canary stays quiet; the next scheduled run inside the window catches up.
+      run.skipped = "outside-call-window";
       continue;
     }
     const verification = store.verification(line.id);

@@ -11,7 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CheckOutcome } from "./assert.js";
 
-const HISTORY_CAP = 50;
+const DEFAULT_HISTORY_CAP = 200;
 
 export interface LineVerification {
   lineId: string;
@@ -21,11 +21,21 @@ export interface LineVerification {
   callId: string | null;
 }
 
+export interface IncidentNote {
+  checkId: string;
+  /** The call the note explains — shown only while this is the latest run. */
+  callId: string;
+  at: string;
+  markdown: string;
+}
+
 export interface BaselineStore {
   history(checkId: string): CheckOutcome[];
   append(outcome: CheckOutcome): void;
   verification(lineId: string): LineVerification | null;
   recordVerification(verification: LineVerification): void;
+  note(checkId: string): IncidentNote | null;
+  recordNote(note: IncidentNote): void;
 }
 
 function readJson<T>(path: string, fallback: T): T {
@@ -41,7 +51,7 @@ function historyFile(dir: string, checkId: string): string {
   return join(dir, `${checkId.replaceAll(/[^A-Za-z0-9_-]/g, "_")}.history.json`);
 }
 
-export function openStore(dir: string): BaselineStore {
+export function openStore(dir: string, historyCap: number = DEFAULT_HISTORY_CAP): BaselineStore {
   mkdirSync(dir, { recursive: true });
   const linesFile = join(dir, "lines.json");
 
@@ -53,11 +63,17 @@ export function openStore(dir: string): BaselineStore {
       const path = historyFile(dir, outcome.checkId);
       const history = readJson<CheckOutcome[]>(path, []);
       history.push(outcome);
-      writeFileSync(path, JSON.stringify(history.slice(-HISTORY_CAP), null, 2));
+      writeFileSync(path, JSON.stringify(history.slice(-historyCap), null, 2));
     },
     verification(lineId) {
       const verifications = readJson<Record<string, LineVerification>>(linesFile, {});
       return verifications[lineId] ?? null;
+    },
+    note(checkId) {
+      return readJson<IncidentNote | null>(join(dir, `${checkId.replaceAll(/[^A-Za-z0-9_-]/g, "_")}.note.json`), null);
+    },
+    recordNote(note) {
+      writeFileSync(join(dir, `${note.checkId.replaceAll(/[^A-Za-z0-9_-]/g, "_")}.note.json`), JSON.stringify(note, null, 2));
     },
     recordVerification(verification) {
       const verifications = readJson<Record<string, LineVerification>>(linesFile, {});

@@ -18,28 +18,44 @@ import { exitCode, formatReport, sendSlack } from "./alert.js";
 import { openStore } from "./baseline.js";
 import { createSdkPort, DEFAULT_BASE_URL, type CallePort } from "./calle.js";
 import { ConfigError, loadConfig, type Config } from "./config.js";
+import { discoverLine } from "./discover.js";
+import { createAnthropicPort, explainCheck } from "./explain.js";
+import { renderStatus } from "./pages.js";
 import { runChecks } from "./runner.js";
+import { startDashboard } from "./serve.js";
+import { buildDashboardState } from "./state.js";
 import { verifyLine } from "./verify.js";
 
 const USAGE = `usage:
   linecanary init   [--config path]
   linecanary verify <line-id> [--config path]
   linecanary run    [--config path] [--live] [--only id,id] [--json path]
-  linecanary report [--config path]`;
+  linecanary report [--config path]
+  linecanary serve  [--config path] [--port n] [--title text]
+  linecanary status [--config path] [--html out.html] [--title text] [--line id]
+  linecanary explain <check-id> [--config path] [--save]
+  linecanary discover <line-id> [--config path] [--out draft.json]`;
 
 interface Flags {
   config: string;
   live: boolean;
+  save: boolean;
+  explain: boolean;
+  line: string | undefined;
+  out: string | undefined;
   only: string[] | undefined;
   json: string | undefined;
+  html: string | undefined;
+  port: number;
+  title: string | undefined;
   positional: string[];
 }
 
 function parseFlags(argv: string[]): Flags {
-  const flags: Flags = { config: "linecanary.config.json", live: false, only: undefined, json: undefined, positional: [] };
+  const flags: Flags = { config: "linecanary.config.json", live: false, save: false, explain: false, line: undefined, out: undefined, only: undefined, json: undefined, html: undefined, port: 4477, title: undefined, positional: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--config" || argument === "--json" || argument === "--only") {
+    if (["--config", "--json", "--only", "--html", "--port", "--title", "--line", "--out"].includes(argument)) {
       const value = argv[index + 1];
       if (value === undefined) {
         throw new ConfigError(`${argument} needs a value.`);
@@ -47,9 +63,23 @@ function parseFlags(argv: string[]): Flags {
       index += 1;
       if (argument === "--config") flags.config = value;
       else if (argument === "--json") flags.json = value;
-      else flags.only = value.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+      else if (argument === "--html") flags.html = value;
+      else if (argument === "--title") flags.title = value;
+      else if (argument === "--line") flags.line = value;
+      else if (argument === "--out") flags.out = value;
+      else if (argument === "--port") {
+        const port = Number(value);
+        if (!Number.isInteger(port) || port < 0 || port > 65535) {
+          throw new ConfigError(`--port must be an integer between 0 and 65535.`);
+        }
+        flags.port = port;
+      } else flags.only = value.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
     } else if (argument === "--live") {
       flags.live = true;
+    } else if (argument === "--save") {
+      flags.save = true;
+    } else if (argument === "--explain") {
+      flags.explain = true;
     } else if (argument.startsWith("--")) {
       throw new ConfigError(`Unknown flag ${argument}.\n${USAGE}`);
     } else {
@@ -97,7 +127,7 @@ async function commandVerify(flags: Flags): Promise<number> {
     process.stderr.write(`No line ${lineId} in ${flags.config}.\n`);
     return 2;
   }
-  const store = openStore(config.baselineDir);
+  const store = openStore(config.baselineDir, config.historyLimit);
   const port = await makePort();
   const result = await verifyLine(line, port, store);
   process.stdout.write(`${result.detail}\n`);
@@ -106,7 +136,7 @@ async function commandVerify(flags: Flags): Promise<number> {
 
 async function commandRun(flags: Flags): Promise<number> {
   const config: Config = loadConfig(flags.config);
-  const store = openStore(config.baselineDir);
+  const store = openStore(config.baselineDir, config.historyLimit);
   const port = flags.live ? await makePort() : null;
   const report = await runChecks(config, port, store, {
     live: flags.live,
@@ -117,6 +147,34 @@ async function commandRun(flags: Flags): Promise<number> {
   process.stdout.write(`${formatReport(report)}\n`);
   if (flags.json !== undefined) {
     writeFileSync(flags.json, JSON.stringify(report, null, 2));
+  }
+  if (flags.live && flags.explain) {
+    const failing = report.runs.filter((run) =>
+      run.regressions.some((entry) => entry.kind === "new_failure" || entry.kind === "still_failing"),
+    );
+    for (const run of failing) {
+      try {
+        const check = config.checks.find((candidate) => candidate.id === run.planned.checkId)!;
+        const history = store.history(check.id);
+        const latest = history[history.length - 1];
+        const passes = history.filter((entry) => entry.status === "pass");
+        const port2 = await createAnthropicPort();
+        const note = await explainCheck(
+          {
+            check,
+            latest,
+            lastPass: passes.length === 0 ? null : passes[passes.length - 1],
+            regressions: run.regressions,
+            answerSeconds: history.map((entry) => entry.timing.secondsToAnswer),
+          },
+          port2,
+        );
+        store.recordNote({ checkId: check.id, callId: latest.callId, at: new Date().toISOString(), markdown: note });
+        process.stdout.write(`AI incident note saved for ${check.id}.\n`);
+      } catch (error) {
+        process.stderr.write(`explain failed for ${run.planned.checkId}: ${String(error)}\n`);
+      }
+    }
   }
   if (flags.live && config.alerts?.slackWebhookUrl !== undefined) {
     try {
@@ -130,7 +188,7 @@ async function commandRun(flags: Flags): Promise<number> {
 
 function commandReport(flags: Flags): number {
   const config = loadConfig(flags.config);
-  const store = openStore(config.baselineDir);
+  const store = openStore(config.baselineDir, config.historyLimit);
   for (const check of config.checks) {
     const history = store.history(check.id);
     if (history.length === 0) {
@@ -143,6 +201,109 @@ function commandReport(flags: Flags): number {
       const confidence = outcome.confidence === null ? "" : ` confidence=${outcome.confidence}`;
       process.stdout.write(`  ${outcome.at}  ${outcome.status}${timing}${confidence}\n`);
     }
+  }
+  return 0;
+}
+
+async function commandServe(flags: Flags): Promise<number> {
+  const config = loadConfig(flags.config);
+  const envPort = process.env.PORT === undefined ? undefined : Number(process.env.PORT);
+  const server = await startDashboard(config, {
+    port: envPort !== undefined && Number.isInteger(envPort) ? envPort : flags.port,
+    host: process.env.HOST,
+    statusTitle: flags.title,
+    password: process.env.LINECANARY_DASHBOARD_PASSWORD,
+  });
+  process.stdout.write(`LineCanary dashboard: http://127.0.0.1:${server.port}/\n`);
+  process.stdout.write(`Public status page:   http://127.0.0.1:${server.port}/status\n`);
+  process.stdout.write(`State as JSON:        http://127.0.0.1:${server.port}/api/state\n`);
+  await new Promise(() => undefined); // runs until interrupted
+  return 0;
+}
+
+function commandStatus(flags: Flags): number {
+  const config = loadConfig(flags.config);
+  if (flags.line !== undefined && !config.lines.some((line) => line.id === flags.line)) {
+    process.stderr.write(`No line ${flags.line} in ${flags.config}.\n`);
+    return 2;
+  }
+  const store = openStore(config.baselineDir, config.historyLimit);
+  const state = buildDashboardState(config, store);
+  const title = flags.title ?? (flags.line === undefined ? undefined : state.lines.find((line) => line.id === flags.line)?.name);
+  const html = renderStatus(state, title, flags.line);
+  if (flags.html === undefined) {
+    process.stdout.write(html);
+  } else {
+    writeFileSync(flags.html, html);
+    process.stdout.write(`Wrote ${flags.html}\n`);
+  }
+  return 0;
+}
+
+async function commandExplain(flags: Flags): Promise<number> {
+  const checkId = flags.positional[0];
+  if (checkId === undefined) {
+    process.stderr.write(`explain needs a check id.\n${USAGE}\n`);
+    return 2;
+  }
+  const config = loadConfig(flags.config);
+  const check = config.checks.find((candidate) => candidate.id === checkId);
+  if (check === undefined) {
+    process.stderr.write(`No check ${checkId} in ${flags.config}.\n`);
+    return 2;
+  }
+  const store = openStore(config.baselineDir, config.historyLimit);
+  const history = store.history(checkId);
+  if (history.length === 0) {
+    process.stderr.write(`No runs recorded for ${checkId} — run the check first.\n`);
+    return 2;
+  }
+  const latest = history[history.length - 1];
+  const passes = history.filter((entry) => entry.status === "pass");
+  const lastPass = passes.length === 0 ? null : passes[passes.length - 1];
+  const { diffAgainstBaseline } = await import("./diff.js");
+  const port = await createAnthropicPort();
+  const note = await explainCheck(
+    {
+      check,
+      latest,
+      lastPass,
+      regressions: diffAgainstBaseline(latest, history.slice(0, -1)),
+      answerSeconds: history.map((entry) => entry.timing.secondsToAnswer),
+    },
+    port,
+  );
+  process.stdout.write(`${note}\n`);
+  if (flags.save) {
+    store.recordNote({ checkId, callId: latest.callId, at: new Date().toISOString(), markdown: note });
+    process.stdout.write(`\nSaved — the dashboard will show this note while ${latest.callId} is the latest run.\n`);
+  }
+  return 0;
+}
+
+async function commandDiscover(flags: Flags): Promise<number> {
+  const lineId = flags.positional[0];
+  if (lineId === undefined) {
+    process.stderr.write(`discover needs a line id.\n${USAGE}\n`);
+    return 2;
+  }
+  const config = loadConfig(flags.config);
+  const line = config.lines.find((candidate) => candidate.id === lineId);
+  if (line === undefined) {
+    process.stderr.write(`No line ${lineId} in ${flags.config}.\n`);
+    return 2;
+  }
+  process.stdout.write(`Placing one discovery call to ${line.id} to map the caller journey…\n`);
+  const calls = await makePort();
+  const model = await createAnthropicPort();
+  const result = await discoverLine(line, calls, model);
+  process.stdout.write(`\nHeard on the line:\n  greeting: ${result.heard.greeting}\n  menu:     ${result.heard.menuOptions}\n  notes:    ${result.heard.notes}\n\n`);
+  const draft = JSON.stringify(result.checks, null, 2);
+  if (flags.out !== undefined) {
+    writeFileSync(flags.out, draft);
+    process.stdout.write(`Draft checks written to ${flags.out} — review, adjust, then merge into ${flags.config} under "checks".\n`);
+  } else {
+    process.stdout.write(`Draft checks — review, adjust, then merge into ${flags.config} under "checks":\n${draft}\n`);
   }
   return 0;
 }
@@ -162,6 +323,18 @@ async function main(): Promise<number> {
     }
     if (command === "report") {
       return commandReport(flags);
+    }
+    if (command === "serve") {
+      return await commandServe(flags);
+    }
+    if (command === "status") {
+      return commandStatus(flags);
+    }
+    if (command === "explain") {
+      return await commandExplain(flags);
+    }
+    if (command === "discover") {
+      return await commandDiscover(flags);
     }
     process.stderr.write(`${USAGE}\n`);
     return 2;

@@ -8,12 +8,14 @@
     "check": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
     "demo": "tsx demo/run-local.ts",
-    "cli": "tsx src/cli.ts"
+    "cli": "tsx src/cli.ts",
+    "start": "sh deploy/start.sh"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@call-e/calle": "0.2.2"
   },
   "devDependencies": {
