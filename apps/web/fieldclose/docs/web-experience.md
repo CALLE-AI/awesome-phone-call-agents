@@ -122,7 +122,9 @@ than offering a retry. The workbench displays the provider call identifier,
 backend to refresh the existing call every five seconds before loading redacted
 case state. If provider acceptance occurred but the local acceptance write did
 not complete, the panel offers `Recover CALL-E acceptance`; that action reuses
-the same attempt and provider idempotency key. At 600 seconds, an unresolved
+the same attempt and provider idempotency key after the server's 60-second
+creation-claim lease. During the lease, repeated execution stays `in_progress`
+without a second provider invocation. At 600 seconds, an unresolved
 final lookup moves the case to manual reconciliation; the operator can still
 refresh that same call later without redialing.
 

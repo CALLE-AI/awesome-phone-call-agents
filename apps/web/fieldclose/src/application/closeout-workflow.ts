@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { normalizeProviderSnapshot } from "@/application/result-normalizer";
@@ -1096,10 +1096,27 @@ export async function persistAmbiguousCreation(
         errorCode: safeErrorCode(errorCode),
         updatedAt: now,
       })
-      .where(eq(callAttempts.id, attemptId))
+      .where(
+        and(
+          eq(callAttempts.id, attemptId),
+          isNotNull(callAttempts.requestedAt),
+          eq(callAttempts.creationDisposition, "not_requested"),
+        ),
+      )
       .returning();
 
-    if (!attempt || attempt.caseId !== caseId) {
+    if (!attempt) {
+      const current = await readAttemptCurrentState(
+        transaction,
+        attemptId,
+        caseId,
+        "ambiguous creation outcome",
+      );
+
+      return executionFromAttempt(current);
+    }
+
+    if (attempt.caseId !== caseId) {
       throw new WorkflowPolicyError(
         "attempt_scope_mismatch",
         "The ambiguous creation outcome did not match the attempt",
@@ -1149,10 +1166,27 @@ export async function persistFailedCreation(
         errorCode: safeErrorCode(errorCode),
         updatedAt: now,
       })
-      .where(eq(callAttempts.id, attemptId))
+      .where(
+        and(
+          eq(callAttempts.id, attemptId),
+          isNotNull(callAttempts.requestedAt),
+          eq(callAttempts.creationDisposition, "not_requested"),
+        ),
+      )
       .returning();
 
-    if (!attempt || attempt.caseId !== caseId) {
+    if (!attempt) {
+      const current = await readAttemptCurrentState(
+        transaction,
+        attemptId,
+        caseId,
+        "creation failure",
+      );
+
+      return executionFromAttempt(current);
+    }
+
+    if (attempt.caseId !== caseId) {
       throw new WorkflowPolicyError(
         "attempt_scope_mismatch",
         "The creation failure did not match the attempt",
@@ -1205,10 +1239,26 @@ export async function persistAcceptedCallRetrievalFailure(
         errorCode: sanitizedErrorCode,
         updatedAt: now,
       })
-      .where(eq(callAttempts.id, attemptId))
+      .where(
+        and(
+          eq(callAttempts.id, attemptId),
+          isNotNull(callAttempts.requestedAt),
+        ),
+      )
       .returning();
 
-    if (!attempt || attempt.caseId !== caseId) {
+    if (!attempt) {
+      const current = await readAttemptCurrentState(
+        transaction,
+        attemptId,
+        caseId,
+        "provider retrieval failure",
+      );
+
+      return executionFromAttempt(current);
+    }
+
+    if (attempt.caseId !== caseId) {
       throw new WorkflowPolicyError(
         "attempt_scope_mismatch",
         "The provider retrieval failure did not match the attempt",
@@ -1511,6 +1561,53 @@ function safeAttempt(
     creationDisposition: attempt.creationDisposition,
     errorCode: attempt.errorCode,
   };
+}
+
+/**
+ * Re-reads an attempt after a conditional outcome update matched no row,
+ * which means a concurrent writer already recorded an outcome. The recorded
+ * state is returned so the losing writer does not overwrite the winner.
+ */
+export async function readAttemptCurrentState(
+  db: Parameters<Parameters<FieldCloseDatabase["transaction"]>[0]>[0],
+  attemptId: string,
+  caseId: string,
+  outcome: string,
+) {
+  const [attempt] = await db
+    .select()
+    .from(callAttempts)
+    .where(
+      and(eq(callAttempts.id, attemptId), eq(callAttempts.caseId, caseId)),
+    )
+    .limit(1);
+
+  if (!attempt) {
+    throw new WorkflowPolicyError(
+      "attempt_scope_mismatch",
+      `The ${outcome} did not match the attempt`,
+    );
+  }
+
+  return attempt;
+}
+
+/**
+ * Builds a safe execution result from the attempt's currently recorded state.
+ * Used only for the losing side of a concurrent outcome write.
+ */
+export function executionFromAttempt(
+  attempt: typeof callAttempts.$inferSelect,
+): FakeExecutionResult {
+  if (attempt.creationDisposition === "ambiguous_requires_reconciliation") {
+    return incompleteExecution("reconciliation_required", attempt);
+  }
+
+  if (attempt.creationDisposition === "failed_before_acceptance") {
+    return incompleteExecution("failed", attempt);
+  }
+
+  return incompleteExecution("in_progress", attempt);
 }
 
 export function hashCanonical(value: object) {

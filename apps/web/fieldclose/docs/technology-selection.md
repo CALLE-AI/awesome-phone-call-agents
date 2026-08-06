@@ -6,13 +6,15 @@
 - Decision date: 2026-07-28
 - Product form: Web application
 - Implementation status: MVP implemented; fake-only public deployed; protected staging verification pending
-- Live-integration status: Selected but not yet verified with an authorized call
+- Live-integration status: One authorized local CALL-E attempt verified with a contact exception; successful conversation and protected-staging execution remain unverified
 - Review trigger: Revisit only if the CALL-E integration spike, hosting spike, or security controls fail
 
 This document records the implementation stack and operational shape selected
-for FieldClose. The public deployment is verified separately from the still
-pending protected-staging and live CALL-E evidence; no authorized live-call
-result is claimed yet.
+for FieldClose. The public fake-only deployment and the authorized local CALL-E
+evidence are verified separately. The live run reached a Sonetel forwarding
+announcement rather than the participant, preserved every requested HVAC field
+as `not_asked`, and routed the result to a human. It is not evidence of a
+successful conversation or of the still-pending protected-staging deployment.
 
 ## Decision
 

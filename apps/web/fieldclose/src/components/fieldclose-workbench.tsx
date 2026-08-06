@@ -326,15 +326,15 @@ function AuthenticatedWorkbench({
   );
 
   const loadDetail = useCallback(
-    async (selectedWorkspaceValue: Workspace, caseId: string) => {
+    async (selectedWorkspace: Workspace, caseId: string) => {
       const caseDetail = await requestJson<CaseDetail>(
-        `/api/cases/${caseId}?workspaceId=${encodeURIComponent(selectedWorkspaceValue.id)}`,
+        `/api/cases/${caseId}?workspaceId=${encodeURIComponent(selectedWorkspace.id)}`,
       );
       setDetail(caseDetail);
 
       if (!caseDetail.attempt && caseDetail.case.status === "draft") {
         const previewResponse = await requestJson<{ preview: CallPreview }>(
-          `/api/cases/${caseId}/preview?workspaceId=${encodeURIComponent(selectedWorkspaceValue.id)}&mode=${workspaceMode(selectedWorkspaceValue)}`,
+          `/api/cases/${caseId}/preview?workspaceId=${encodeURIComponent(selectedWorkspace.id)}&mode=${workspaceMode(selectedWorkspace)}`,
         );
         setPreview(previewResponse.preview);
       } else {
@@ -353,7 +353,7 @@ function AuthenticatedWorkbench({
       try {
         setError(null);
         setWorkspaceLoadState("loading");
-        const demoResponse = await requestJson<{ "workspace": Workspace }>(
+        const demoResponse = await requestJson<{ workspace: Workspace }>(
           "/api/workspaces",
           { method: "POST" },
         );
@@ -1587,8 +1587,8 @@ function LiveCallView({
             : accepted
               ? "FieldClose checks CALL-E every five seconds while this page is active. No automatic retry will run while this call is unresolved."
               : recoveryPending
-                ? "The previous acceptance write did not complete. FieldClose will reuse the same provider idempotency key to recover the existing call identifier."
-              : "The server will recheck the kill switch, contact authorization, do-not-call state, exact brief, and local calling window before it invokes CALL-E."}
+                ? "The previous acceptance write may not have completed. For one minute after the original claim, this action only rechecks local state; afterward it reuses the same provider idempotency key to recover the existing call identifier."
+                : "The server will recheck the kill switch, contact authorization, do-not-call state, exact brief, and local calling window before it invokes CALL-E."}
         </p>
         <div className="attempt-facts">
           <span>
@@ -2440,10 +2440,10 @@ function createCallingWindow(timezone: string) {
   };
 }
 
-function workspaceMode(workspaceValue: Workspace | null): "fake" | "live" {
-  return workspaceValue?.kind === "protected" &&
-    workspaceValue.provider === "call_e" &&
-    workspaceValue.liveCallsAllowed
+function workspaceMode(workspace: Workspace | null): "fake" | "live" {
+  return workspace?.kind === "protected" &&
+    workspace.provider === "call_e" &&
+    workspace.liveCallsAllowed
     ? "live"
     : "fake";
 }

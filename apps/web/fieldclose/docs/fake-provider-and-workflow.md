@@ -35,7 +35,7 @@ The browser cannot choose the attempt identifier, idempotency key, provider stat
 
 Case and attempt rows are locked while approval and execution claims are evaluated. Repeating an approval for the unchanged current attempt returns the existing approval. Repeating execution after a stored result returns the existing attempt and result without invoking the provider again.
 
-Before crossing the provider boundary, FieldClose stores `requestedAt` and moves the case to `calling`. A concurrent execution that observes the claim but no provider acceptance returns `in_progress`; it does not create a second call.
+Before crossing the provider boundary, FieldClose durably claims provider creation by storing `requestedAt` and moving the case to `calling` inside the same locked transaction. A concurrent execution that observes a claim less than 60 seconds old returns `in_progress` without invoking the provider. After that lease, an explicit recovery may reuse the same provider idempotency key. Accepted, failed, and ambiguous updates are conditional on no outcome having been recorded, so a later writer returns the persisted state instead of overwriting it.
 
 ## Ambiguous creation
 

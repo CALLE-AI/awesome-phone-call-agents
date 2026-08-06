@@ -239,6 +239,16 @@ FieldClose therefore uses the following pattern:
 5. If the result of creation is ambiguous, freeze further automated creation for the case.
 6. Reconcile the original attempt before permitting a new one.
 
+The execution claim in step 3 is durable: it is written inside the same locked
+transaction that evaluates the request, so a concurrent execution observes the
+claim. For the next 60 seconds, another execution returns the claimed attempt as
+`in_progress` without crossing the provider boundary. After that lease, an
+explicit recovery may reuse the same request and stable idempotency key to
+recover an acceptance write lost during interruption. Accepted, failed, and
+ambiguous outcome updates are conditional on the outcome still being
+unrecorded; a later writer returns the current persisted state instead of
+overwriting it.
+
 A browser refresh, timeout, or repeated button click must never generate a new idempotency key for the same approved attempt.
 
 ## Provider adapter contract
@@ -384,7 +394,8 @@ The selected architecture remains subject to concrete implementation evidence. C
 - [x] A complete fake-provider browser flow with desktop and mobile Playwright evidence
 - [x] Durable human disposition, task resolution, final case transition, and
   browser evidence
-- [ ] An authorized asynchronous CALL-E creation smoke test
+- [x] An authorized asynchronous CALL-E creation smoke test, completed locally
+  with a contact exception and redacted evidence
 - [x] CALL-E lookup throttling, reconciliation, and late-recovery tests
 
 Failure of a spike may reopen the affected technology choice. It does not relax the product or safety invariants.

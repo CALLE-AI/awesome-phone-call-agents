@@ -11,20 +11,32 @@ technology selection, the durable PostgreSQL workflow through human-task
 creation, credential and email-code authentication, authenticated workspaces,
 the protected HTTP API, the responsive fake case-to-result browser experience,
 the official CALL-E server-SDK adapter, authenticated bounded status refresh
-with idempotent terminal-result processing, server-gated protected live approval
-and asynchronous execution, the protected-workspace operator UI, allow-listed
-protected-workspace provisioning with immutable administration evidence, and
-the durable, role-gated human-disposition closure through its browser and audit
-evidence.
+with idempotent terminal-result processing, durably claimed and conditionally
+recorded provider creation that keeps concurrent executions consistent,
+server-gated protected live approval and asynchronous execution, the
+protected-workspace operator UI, allow-listed protected-workspace provisioning
+with immutable administration evidence, and the durable, role-gated
+human-disposition closure through its browser and audit evidence.
 
 The fake-only judge environment is deployed at
-<https://fieldclose.dramaforge.icu/>. The repository does not yet contain
-inspectable evidence that a separate protected staging environment is deployed,
-isolated, and accessible through production authentication, or that CALL-E and
-SMTP are configured in that environment. Those staging gates remain pending;
-live calls remain paused. No authorized live CALL-E result, end-to-end deployed
-authentication-email delivery, GitHub OAuth, or general role-management UI is
-claimed yet.
+<https://fieldclose.dramaforge.icu/>. On 2026-08-06, one explicitly authorized
+CALL-E attempt was completed from a local protected workspace. CALL-E accepted
+and completed one provider task, but the call reached a Sonetel free-trial
+forwarding announcement instead of the intended participant. FieldClose kept
+all three HVAC answers as `not_asked`, routed the case to `human_follow_up` and
+`contact_review`, and required the operator to record the final
+`manual_follow_up_handoff`. The redacted private evidence records one attempt,
+one provider creation, one result, one disposition, and no retry or duplicate
+creation.
+
+That run verifies the live provider boundary, conservative normalization,
+idempotent creation, and human decision boundary. It does not verify a
+successful participant conversation or an isolated protected-staging
+deployment. Inspectable staging isolation, production authentication, and
+deployed CALL-E/SMTP evidence remain pending. The global live-call kill switch
+is paused and workspace live permission is disabled after the test. End-to-end
+deployed authentication-email delivery, GitHub OAuth, and general
+role-management UI are not claimed.
 
 ## Competition focus
 
@@ -142,7 +154,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-`pnpm setup:local-demo` fills only missing local authentication and phone-protection secrets in the ignored `.env.local` file. It does not print secret values or enable live calls. Re-running it preserves existing non-empty settings.
+`pnpm setup:local-demo` fills only missing local authentication and phone-protection secrets in the ignored `.env.local` file. It does not print secret values or enable live calls. Re-running it preserves existing non-empty settings. The writer refuses a symlink or other non-regular target, narrows an existing regular file to owner-only permissions (0600) before overwriting it, and verifies the result before reporting success.
 
 `pnpm db:migrate` must complete before the application starts so every route
 uses the current authentication and closeout schema, including the final human
@@ -216,9 +228,13 @@ a bounded disposition, resolve or cancel the human task, produce the final
 FieldClose case state, and audit the decision without mutating an external work
 order. The fake-only judge environment is deployed; protected-staging
 deployment, isolation, and production-authentication evidence remain pending.
-Later gates include one authorized live CALL-E evidence set, a stable
-three-minute golden path, and the upstream contribution under
-`apps/web/fieldclose/`. See the
+A redacted local evidence set now records one authorized CALL-E attempt with a
+contact exception and the resulting human disposition. The upstream
+contribution is open for review as
+[`apps/web/fieldclose/` PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96).
+Remaining submission gates are protected-staging verification, a stable
+sub-three-minute golden path, final upstream review fixes, and Devpost
+packaging. See the
 [Hackathon submission plan](docs/hackathon-submission-plan.md) for status and
 acceptance gates. Submission-only drafts are kept under the local `submission/`
 directory and are ignored by Git.

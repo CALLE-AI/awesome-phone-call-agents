@@ -132,14 +132,20 @@ Those creation gates do not prevent lookup of an already accepted call. Once a
 provider call ID is stored, repeated browser execution returns that call and
 does not invoke creation again. If CALL-E accepted the stable idempotency key but
 the local acceptance write did not complete, the workbench offers an explicit
-recovery action. Recovery reuses the same attempt and idempotency key so CALL-E
+recovery action after the durable 60-second creation-claim lease. While that
+lease is active, concurrent execution returns `in_progress` without invoking
+CALL-E again. Recovery reuses the same attempt and idempotency key so CALL-E
 returns the same logical call; it never creates a new FieldClose attempt or
 changes the approved recipient or brief. Failed-before-acceptance and ambiguous
 creation outcomes remain frozen.
 
 The SDK adapter, live application path, authenticated status refresh, protected
 operator UI, and protected-workspace provisioning boundary are implemented and
-tested using an injected HTTP boundary that cannot place a phone call. The
-fake-only public environment is deployed. Protected-staging deployment,
-isolation, production access, and server-side CALL-E configuration must be
-verified before the remaining authorized smoke test with a consenting recipient.
+covered through the injected HTTP boundary. A separately authorized local test
+also created exactly one real CALL-E task and retrieved its terminal result.
+The call reached a Sonetel free-trial forwarding announcement rather than the
+intended participant, so FieldClose preserved all approved HVAC questions as
+`not_asked` and routed the case to human follow-up. This verifies the provider
+boundary but not a successful conversation. The fake-only public environment is
+deployed; protected-staging isolation, production access, and deployed
+CALL-E/SMTP configuration still require inspectable verification.

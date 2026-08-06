@@ -277,7 +277,12 @@ unauthenticated desktop and mobile entry states plus the mocked HTTP-boundary
 fake-provider workflow through recorded human disposition and the final audit
 state. `pnpm validate` runs the complete default validation chain and provides
 the automated evidence for the P0A closure; live-provider verification remains
-a separate opt-in activity.
+a separate opt-in activity. On 2026-08-06, one separately authorized local
+CALL-E attempt produced redacted evidence of provider acceptance, terminal
+result retrieval, uncertainty-preserving normalization, human routing, final
+operator disposition, and duplicate protection. The call reached a Sonetel
+free-trial forwarding announcement, so the participant was not connected and
+all three HVAC questions remained `not_asked`.
 
 Markdown documentation is checked separately with `markdownlint-cli2`. Formatting is enforced through the lint and production-build toolchain; a dedicated formatter has not been added.
 
@@ -314,8 +319,8 @@ Do not commit private evidence locations or credentials to a public repository.
 - [x] Disposition persistence, task resolution, final case state, and audit
   creation are atomic, idempotent, and covered end to end.
 - [ ] Logs, fixtures, screenshots, and video contain no private data.
-- [ ] At least one authorized live CALL-E invocation is verified.
-- [ ] A real result drives a visible FieldClose state transition.
-- [ ] Known limitations are stated in README and Devpost materials.
-- [ ] Public setup works without live credentials in fake mode.
-- [ ] Live mode remains explicit and opt-in.
+- [x] At least one authorized live CALL-E invocation is verified.
+- [x] A real result drives a visible FieldClose state transition.
+- [x] Known limitations are stated in README and Devpost materials.
+- [x] Public setup works without live credentials in fake mode.
+- [x] Live mode remains explicit and opt-in.

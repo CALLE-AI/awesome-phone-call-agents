@@ -14,6 +14,7 @@ import {
   cancelProtectedCloseoutCase,
   createProtectedCloseoutCase,
   executeApprovedLiveAttempt,
+  liveCreationClaimLeaseMs,
   previewLiveCallBrief,
   refreshAcceptedLiveAttempt,
   type LiveAttemptApprovalInput,
@@ -712,6 +713,91 @@ describe("protected live closeout workflow", () => {
     });
   });
 
+  it("serializes concurrent live creation to one consistent recorded outcome", async () => {
+    const fixture = await createProtectedCase(db, "WO-LIVE-CONCURRENT-EXECUTE");
+    const preview = await previewLiveCallBrief(
+      db,
+      environment,
+      "live-owner",
+      workspaceId,
+      fixture.caseId,
+      keys,
+    );
+    const approved = await approveLiveAttempt(
+      db,
+      environment,
+      "live-owner",
+      workspaceId,
+      fixture.caseId,
+      approvalInput(preview.briefHash),
+      keys,
+    );
+    const provider = new RecordingCallEProvider({
+      disposition: "created",
+      providerCallId: "call_live_concurrent_execute",
+      taskStatus: "queued",
+    });
+
+    const results = await Promise.all([
+      executeApprovedLiveAttempt(
+        db,
+        environment,
+        "live-owner",
+        workspaceId,
+        approved.attempt.id,
+        provider,
+        keys,
+        approvedNow,
+      ),
+      executeApprovedLiveAttempt(
+        db,
+        environment,
+        "live-owner",
+        workspaceId,
+        approved.attempt.id,
+        provider,
+        keys,
+        approvedNow,
+      ),
+    ]);
+
+    expect(provider.requests).toHaveLength(1);
+
+    // Both requests remain bound to the same attempt. The request that loses
+    // the durable creation claim can return before provider acceptance is
+    // stored, so only the winning response is required to carry the call ID.
+    expect(results.every((result) => result.state === "in_progress")).toBe(
+      true,
+    );
+    expect(
+      results.every(
+        (result) => result.attempt.id === approved.attempt.id,
+      ),
+    ).toBe(true);
+    expect(
+      results.filter(
+        (result) =>
+          result.attempt.providerCallId === "call_live_concurrent_execute",
+      ),
+    ).toHaveLength(1);
+
+    // The durable attempt row must carry one consistent creation outcome.
+    const [stored] = await db
+      .select({
+        providerCallId: callAttempts.providerCallId,
+        creationDisposition: callAttempts.creationDisposition,
+        acceptedAt: callAttempts.acceptedAt,
+      })
+      .from(callAttempts)
+      .where(eq(callAttempts.id, approved.attempt.id))
+      .limit(1);
+    expect(stored).toMatchObject({
+      providerCallId: "call_live_concurrent_execute",
+      creationDisposition: "created",
+    });
+    expect(stored?.acceptedAt).toBeInstanceOf(Date);
+  });
+
   it("recovers a calling attempt whose provider acceptance was not stored", async () => {
     const fixture = await createProtectedCase(db, "WO-LIVE-ACCEPTANCE-RECOVERY");
     const preview = await previewLiveCallBrief(
@@ -744,6 +830,9 @@ describe("protected live closeout workflow", () => {
       providerCallId: "call_live_recovered",
       taskStatus: "queued",
     });
+    const recoveryNow = new Date(
+      approvedNow.getTime() + liveCreationClaimLeaseMs,
+    );
 
     const recovered = await executeApprovedLiveAttempt(
       db,
@@ -753,7 +842,7 @@ describe("protected live closeout workflow", () => {
       approved.attempt.id,
       provider,
       keys,
-      approvedNow,
+      recoveryNow,
     );
 
     expect(recovered).toMatchObject({

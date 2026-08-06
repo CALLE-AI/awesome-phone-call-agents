@@ -4,8 +4,8 @@
 
 - Objective: Compete for **Most Practical Use Case**
 - Scope: Frozen to one human-approved commercial HVAC closeout call
-- Last updated: 2026-08-05
-- Current phase: Verify protected staging before capturing authorized live evidence
+- Last updated: 2026-08-06
+- Current phase: Close upstream review blockers, verify protected staging, and produce the final demonstration
 
 ## Submission thesis
 
@@ -29,7 +29,7 @@ workflow or an expansion of the UI information architecture.
 
 ## Current readiness snapshot
 
-As of 2026-08-05:
+As of 2026-08-06:
 
 - the workflow is implemented from case creation through normalized result,
   creation of a human next-action task, and role-gated final disposition;
@@ -39,6 +39,11 @@ As of 2026-08-05:
 - the deterministic fake path, protected live path, conservative result
   handling, duplicate protection, reconciliation, and audit behavior have
   automated coverage through final human disposition;
+- provider creation is durably claimed before the provider boundary and every
+  accepted, failed, or ambiguous outcome update is conditional on the claimed
+  state, so concurrent executions converge on one consistent recorded outcome;
+- the local demo secret writer narrows its target to owner-only permissions and
+  refuses symlink and other non-regular targets before writing;
 - the repository validation gate has passed locally across type-check, lint,
   unit tests, Drizzle schema validation, PostgreSQL integration tests,
   production build, and Playwright;
@@ -47,13 +52,22 @@ As of 2026-08-05:
 - protected-workspace provisioning and SMTP provider self-test evidence exist,
   but protected-staging deployment, isolation, production access, and deployed
   CALL-E/SMTP configuration have not been verified with inspectable evidence;
-- no authorized live CALL-E result, upstream pull request, or final
-  three-minute video is claimed.
+- one authorized local CALL-E attempt has a redacted private evidence bundle:
+  CALL-E accepted and completed one provider task, the Sonetel trial forwarding
+  announcement prevented participant connection, every HVAC answer remained
+  `not_asked`, and the result routed through human follow-up to one recorded
+  disposition without a retry or duplicate provider creation;
+- the current upstream contribution is open as
+  [PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96), with
+  final review-blocker fixes and validation still pending;
+- no successful participant conversation, protected-staging live execution, or
+  final sub-three-minute video is claimed.
 
-P0A and the public deployment step in P0B are complete. Remaining work begins
-with protected-staging verification, then participant authorization and one
-controlled live evidence run, followed by submission packaging. The only later
-product convenience is a preset
+P0A, the public deployment step, and one local authorized live-evidence run are
+complete. The local run does not replace the independent protected-staging
+gate. Remaining work begins with closing the upstream blockers and verifying
+protected staging, followed by demonstration and submission packaging. The only
+later product convenience is a preset
 fictional work order for the demonstration; it must use the existing case
 workflow and must not create a new stage.
 
@@ -73,7 +87,7 @@ work-order mutation.
 | Implement the application service and API | Done | An owner/operator can atomically record one route-appropriate disposition; exact repeats are idempotent and stale or conflicting requests fail without mutation |
 | Implement the operator disposition UI | Done | Result and exception views provide the permitted action, bounded note, submitted state, final case state, resolved task, and visible audit evidence |
 | Add complete automated coverage | Done | Unit and PostgreSQL tests cover every outcome, permissions, route constraints, idempotency, stale state, audit redaction, and task/case atomicity; Playwright covers case creation through final human disposition |
-| Pass formal validation after closure | Done | `pnpm validate` passes with 84 unit, 49 PostgreSQL integration, and 13 Playwright tests plus type-check, lint, migration validation, and production build |
+| Pass formal validation after closure | Done | `pnpm validate` passes with 107 unit, 64 PostgreSQL integration, and 15 Playwright tests plus type-check, lint, migration validation, and production build |
 
 Every P0A item now passes, so P0B deployment work may begin. No deployment should
 be treated as a release candidate unless it preserves the validated functional
@@ -85,14 +99,15 @@ loop and its safety boundaries.
 | --- | --- | --- |
 | Deploy a judge-accessible fake-only public version | Done | The stable HTTPS deployment documented in [Public Fake-Only Deployment](public-demo-deployment.md) contains no CALL-E credentials and preserves the fake-only build gate |
 | Establish an isolated protected staging environment | Pending verification | Inspectable evidence proves separate data and secrets, production authentication for an allow-listed operator, and a paused live-call gate |
-| Complete one authorized real CALL-E test | Blocked by staging verification and participant authorization | One exact recipient, brief, timezone, and test window are approved; one call is accepted; one terminal result is retrieved; the operator records the disposition; and no duplicate call is created |
-| Preserve a redacted live-evidence bundle | Pending live test | The bundle contains provider acceptance, redacted provider result, normalized result, recorded human disposition, final UI state, audit evidence, and duplicate check without private data |
+| Complete one authorized real CALL-E test | Done locally with contact exception | One exact recipient, brief, timezone, and window were approved; CALL-E accepted and completed one task; the participant was not connected; uncertainty was preserved; one human disposition was recorded; and no duplicate provider creation occurred |
+| Preserve a redacted live-evidence bundle | Done privately | The gitignored bundle contains authorization, preflight, provider acceptance, terminal normalized result, human disposition, audit and duplicate evidence, cleanup state, and verified SHA-256 hashes without the full number, email, raw provider ID, transcript, recording, or credentials |
 | Stabilize the three-minute golden path | Pending rehearsal | The path uses a preset case, ends with a recorded disposition, completes within three minutes in three consecutive rehearsals, and labels every waiting-time edit accurately |
 
 ### P0 dependency order
 
-Steps 1–6 are complete. P0B continues with protected-staging creation and
-verification in step 7 before participant authorization in step 8.
+Steps 1–6 are complete. A separately authorized local protected-workspace run
+also completed steps 8–10 with a contact exception, but step 7 remains an
+independent deployment gate and must not be described as verified.
 
 1. Add the human-disposition persistence contract and migration.
 2. Implement the authorized, idempotent application service and HTTP route.
@@ -117,11 +132,11 @@ P1 makes the project reviewable and acceptable as an upstream contribution.
 
 | Item | Status | Done when |
 | --- | --- | --- |
-| Package the contribution under `apps/web/fieldclose/` | Pending | The runnable app is placed in the upstream repository with only the files needed to install, run, test, and understand it |
+| Package the contribution under `apps/web/fieldclose/` | Done; update pending | PR #96 contains the runnable app; the final concurrency and local-secret-writer fixes must be synchronized before review completion |
 | Complete the contribution README | Partial | The packaged README covers requirements, installation, fake/no-call default, credential handling, opt-in live side effects, cancellation limits, validation, and known limitations |
-| Run upstream repository validation | Pending packaging | `python3 scripts/validate_repository.py` passes from the Awesome Phone Call Agents repository root |
-| Open the upstream pull request | Pending validation | A scoped English PR is open, contains no secrets or private evidence, and links to the public fake-only demo where permitted |
-| Add the PR URL to Devpost | Pending PR | The submitted Devpost project contains the final upstream PR URL |
+| Run upstream repository validation | Rerun pending | The published PR snapshot passed; rerun `python3 scripts/validate_repository.py` after synchronizing the final blocker fixes |
+| Open the upstream pull request | Done; draft review active | [PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96) is the active contribution and supersedes PRs #93 and #72 |
+| Add the PR URL to Devpost | Pending | The submitted Devpost project contains the final PR #96 URL |
 | Finish the English Devpost About text | Pending | The copy leads with the practical HVAC closeout problem, explains the human boundary and six mechanisms, and makes only evidence-supported claims |
 
 The packaging checklist follows the current
@@ -179,7 +194,8 @@ Do not submit until all of the following are true:
   persisted disposition, resolved task, final case state, and audit history.
 - [ ] The public fake-only URL passes the signed-out judge smoke test.
 - [ ] The protected staging environment is isolated from the public project.
-- [ ] One authorized live CALL-E attempt has redacted, inspectable evidence.
+- [x] One authorized live CALL-E attempt has redacted, inspectable private
+  evidence and an explicitly documented contact exception.
 - [ ] The video completes the fixed golden path in three minutes.
 - [ ] The upstream packaged app passes `scripts/validate_repository.py`.
 - [ ] The upstream PR URL is present in Devpost.

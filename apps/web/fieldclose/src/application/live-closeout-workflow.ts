@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
   buildApprovalBrief,
+  executionFromAttempt,
   hashCanonical,
   loadCaseContext,
   persistAcceptedCallRetrievalFailure,
   persistAmbiguousCreation,
   persistFailedCreation,
   persistProviderSnapshot,
+  readAttemptCurrentState,
   type CallExecutionResult,
   type SafeAttemptView,
   WorkflowPolicyError,
@@ -64,6 +66,7 @@ const liveAuthorizationBasisValues = [
 ] as const;
 export const liveStatusPollIntervalMs = 5_000;
 export const liveStatusPollTimeoutMs = 600_000;
+export const liveCreationClaimLeaseMs = 60_000;
 
 const protectedCaseInputSchema = z.object({
   workOrderRef: z.string().trim().min(1).max(80),
@@ -659,11 +662,27 @@ export async function executeApprovedLiveAttempt(
         lastCheckedAt: acceptedAt,
         updatedAt: acceptedAt,
       })
-      .where(eq(callAttempts.id, preparation.attemptId))
+      .where(
+        and(
+          eq(callAttempts.id, preparation.attemptId),
+          isNotNull(callAttempts.requestedAt),
+          eq(callAttempts.creationDisposition, "not_requested"),
+        ),
+      )
       .returning();
 
     if (!attempt) {
-      throw new Error("The accepted live attempt could not be stored");
+      const current = await readAttemptCurrentState(
+        transaction,
+        preparation.attemptId,
+        preparation.caseId,
+        "accepted live attempt",
+      );
+
+      return {
+        lostRace: true as const,
+        result: executionFromAttempt(current),
+      };
     }
 
     await transaction.insert(auditEvents).values({
@@ -679,14 +698,17 @@ export async function executeApprovedLiveAttempt(
       },
     });
 
-    return attempt;
+    return {
+      lostRace: false as const,
+      result: {
+        state: "in_progress" as const,
+        attempt: safeAttempt(attempt),
+        result: null,
+      },
+    };
   });
 
-  return {
-    state: "in_progress",
-    attempt: safeAttempt(accepted),
-    result: null,
-  };
+  return accepted.result;
 }
 
 export async function refreshAcceptedLiveAttempt(
@@ -964,6 +986,17 @@ async function prepareLiveProviderRequest(
     }
 
     if (
+      attempt.requestedAt &&
+      now.getTime() - attempt.requestedAt.getTime() <
+        liveCreationClaimLeaseMs
+    ) {
+      return {
+        kind: "existing" as const,
+        result: incompleteExecution("in_progress", attempt),
+      };
+    }
+
+    if (
       attempt.mode !== "live" ||
       attempt.provider !== "call_e" ||
       !["approved", "calling"].includes(closeoutCase.status) ||
@@ -1080,6 +1113,21 @@ async function prepareLiveProviderRequest(
       .set({ status: "calling", updatedAt: now })
       .where(eq(closeoutCases.id, closeoutCase.id));
 
+    const [claimedAttempt] = await transaction
+      .update(callAttempts)
+      .set({ requestedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(callAttempts.id, attempt.id),
+          eq(callAttempts.creationDisposition, "not_requested"),
+        ),
+      )
+      .returning();
+
+    if (!claimedAttempt) {
+      throw new Error("The live attempt could not be claimed");
+    }
+
     await transaction.insert(auditEvents).values({
       caseId: closeoutCase.id,
       attemptId: attempt.id,
@@ -1091,6 +1139,7 @@ async function prepareLiveProviderRequest(
         provider: "call_e",
         idempotencyKey: attempt.idempotencyKey,
         serverPreflightPassed: true,
+        recovery: Boolean(attempt.requestedAt),
       },
     });
 
