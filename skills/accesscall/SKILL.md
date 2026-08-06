@@ -107,7 +107,7 @@ If the caller disclosed a self-harm/suicidal-ideation/crisis situation, report t
 - [`references/example-output.json`](references/example-output.json) — example parsed result
 - [`scripts/parse-recap.js`](scripts/parse-recap.js) — extracts the labeled recap from a transcript (bot-attributed final turn only) and validates it against the schema
 - [`scripts/phone-utils.js`](scripts/phone-utils.js) — E.164 validation and phone-number masking
-- [`scripts/call-lock.js`](scripts/call-lock.js) — durable, `plan_id`-owned dispatch lock (atomic acquire, compare-and-delete release only on a confirmed terminal call status) preventing a duplicate call to the same recipient, backed by an append-only dispatch history that refuses to replay a `plan_id` even after its lock is released
+- [`scripts/call-lock.js`](scripts/call-lock.js) — durable, `plan_id`-owned dispatch lock preventing a duplicate call to the same recipient. Every mutation (fresh acquire, override, and compare-and-delete release) runs inside a per-recipient mutex, so concurrent overrides can't both observe "someone else holds it" and both proceed; backed by an append-only dispatch history that refuses to replay a `plan_id` even after its lock is released, and fails closed (throws) rather than guessing if the journal itself is corrupted
 - [`scripts/redact-transcript.js`](scripts/redact-transcript.js) — masks phone-length digit sequences (any format, not just US) and email addresses in a transcript before it's shown to a user
 - [`scripts/format-to-vpat.js`](scripts/format-to-vpat.js) — inserts a validated result into a VPAT 2.4 docx template (see Setup above: requires `npm install` first)
 - [`package.json`](package.json) — declares `format-to-vpat.js`'s dependencies (`docx`, `jszip`, `xml-js`)
