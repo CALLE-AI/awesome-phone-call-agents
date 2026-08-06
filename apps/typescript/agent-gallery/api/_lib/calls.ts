@@ -38,6 +38,8 @@ export interface CalleEnv extends OperatorAuthEnv {
   UPSTASH_REDIS_REST_URL?: string;
   UPSTASH_REDIS_REST_TOKEN?: string;
   CARECALL_MAX_CALLS_PER_DAY?: string;
+  CARECALL_DATA_ENCRYPTION_KEY?: string;
+  CRON_SECRET?: string;
   /** Tests inject a deterministic store; production uses the REST configuration above. */
   durableStore?: DurableStore;
 }
@@ -376,5 +378,7 @@ export function envFromProcess(): CalleEnv {
     UPSTASH_REDIS_REST_URL: env.UPSTASH_REDIS_REST_URL,
     UPSTASH_REDIS_REST_TOKEN: env.UPSTASH_REDIS_REST_TOKEN,
     CARECALL_MAX_CALLS_PER_DAY: env.CARECALL_MAX_CALLS_PER_DAY,
+    CARECALL_DATA_ENCRYPTION_KEY: env.CARECALL_DATA_ENCRYPTION_KEY,
+    CRON_SECRET: env.CRON_SECRET,
   };
 }

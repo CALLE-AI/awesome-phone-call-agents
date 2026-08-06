@@ -1361,6 +1361,10 @@ p {
   color: var(--secondary-label);
 }
 
+.schedule-state[data-state="cancelled"] {
+  color: var(--danger);
+}
+
 .routine-card h2 {
   margin-bottom: 12px;
   font-size: 21px;
@@ -2821,6 +2825,12 @@ p {
   font-weight: 520;
 }
 
+.execution-field select {
+  width: 100%; min-height: 46px; padding: 0 13px; border: 1px solid var(--separator-strong); border-radius: 12px; color: var(--label); background: var(--surface); font: inherit;
+}
+
+.schedule-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
 .execution-field small {
   color: var(--secondary-label);
   font-size: 11px;
@@ -3016,4 +3026,5 @@ p {
     grid-template-columns: 1fr;
     gap: 4px;
   }
+  .schedule-fields { grid-template-columns: 1fr; }
 }

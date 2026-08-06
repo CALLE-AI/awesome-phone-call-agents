@@ -8,13 +8,13 @@ The product and UI implementation source of truth is [`docs/agent-gallery/careca
 
 ## Current status
 
-The CareCall single-call MVP foundation is implemented:
+The CareCall single-call and controlled-recurrence foundation is implemented:
 
 - responsive desktop and mobile navigation
 - Today dashboard and care timeline
 - fictional Singapore senior profiles
 - medication and meal care routines
-- visible pause and resume controls
+- visible durable pause, resume, and cancellation controls
 - exception-only Needs Attention workspace
 - Singapore timezone, call-window, privacy, and safety settings
 - masked phone numbers
@@ -28,10 +28,13 @@ The CareCall single-call MVP foundation is implemented:
 - session routing of live exceptions into Needs Attention
 - signed, expiring operator sessions with senior-scoped authorization
 - durable request claims, daily spending limits, call ownership, outcomes, attention cases, and audit events
+- caregiver-authorized daily or weekday schedules with an explicit review date
+- encrypted scheduled phone numbers, dated call exceptions, and terminal cancellation that removes the ciphertext
+- a host-owned scheduler with stable occurrence keys, no blind call retries, and fail-closed human review
 - English-only live-call enforcement until other languages are verified
 - accessible focus, reduced-motion, reduced-transparency, high-contrast, and dark-mode behavior
 
-The interface uses fictional demo data and says so visibly. Pause and settings changes remain session-only demonstrations; no scheduler or digest is connected. When the durable operations environment is configured, live-call ownership, snapshots, outcomes, attention cases, acknowledgements, limits, and audits are stored server-side. The full phone number is entered only at the one-call authorization gate; durable snapshots retain only a masked suffix.
+The interface uses fictional demo data and says so visibly. Settings changes remain session-only demonstrations. When the durable operations environment is configured, live-call ownership, snapshots, outcomes, attention cases, acknowledgements, limits, audits, and recurring schedules are stored server-side. The full phone number is entered only at a one-call or recurring authorization gate; call snapshots retain only a masked suffix, while active recurring schedules retain an encrypted phone number until cancellation.
 
 The CareCall path is implemented but has not yet been verified with a consenting recipient through the deployed interface. Do not represent it as operationally proven until that opt-in verification is complete.
 
@@ -79,9 +82,25 @@ CARECALL_OPERATORS_JSON=[{"id":"mei-chen","name":"Mei Chen","role":"coordinator"
 UPSTASH_REDIS_REST_URL=<server-side Redis REST URL>
 UPSTASH_REDIS_REST_TOKEN=<server-side standard token>
 CARECALL_MAX_CALLS_PER_DAY=20
+CARECALL_DATA_ENCRYPTION_KEY=<at least 32 random characters, stored server-side>
+CRON_SECRET=<high-entropy scheduler bearer secret>
 ```
 
-Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sessions are HMAC-signed, expire after 30 minutes, and are checked against the current operator configuration on every protected request. The Redis standard token must remain server-side.
+Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sessions are HMAC-signed, expire after 30 minutes, and are checked against the current operator configuration on every protected request. The Redis standard token, data-encryption key, and scheduler secret must remain server-side.
+
+## Recurring schedule operation
+
+The host invokes `GET /api/carecall/scheduler` with `Authorization: Bearer $CRON_SECRET`. The included `vercel.json` requests a once-per-minute production cron; confirm that the selected Vercel plan supports that frequency, or invoke the same endpoint from another trusted host scheduler.
+
+For each due occurrence, the scheduler:
+
+1. checks that the schedule remains active, within its review period, and not listed as a dated exception
+2. rechecks the creating operator against the current operator configuration
+3. decrypts the phone number only while constructing the server-side request
+4. submits exactly one CALL-E request with a stable key derived from the schedule and occurrence
+5. advances the next occurrence only after CALL-E accepts the call
+
+An expired review date, revoked operator, invalid stored record, or failed call start moves the schedule to `needs_review` and removes it from the due index. The scheduler does not blindly retry calls. Pausing removes a schedule from the due index; cancellation is terminal, removes the stored phone ciphertext, and requires a new authorization to schedule again. Cancellation cannot recall a call that the provider has already accepted, so operators should pause or cancel before the due time.
 
 ## UI structure
 
@@ -94,6 +113,7 @@ src/
 ├── components/
 │   ├── CallPreviewSheet.tsx  masked, no-side-effect dry-run preview
 │   ├── CareCallExecutionSheet.tsx authorization, live polling, and result
+│   ├── ScheduleActivationSheet.tsx explicit recurring authorization
 │   ├── CarePrimitives.tsx    status, avatar, and routine components
 │   └── Icon.tsx              dependency-free interface icons
 ├── screens-care/
@@ -109,11 +129,11 @@ The older `screens/` and `workflows/appointment-recovery/` directories remain te
 
 ## Next implementation milestone
 
-Operational hardening before recurring schedules or a care pilot:
+Pilot readiness and organisation administration:
 
 1. Verify one consenting end-to-end English call from the deployed interface with durable operations configured.
-2. Add host-owned recurrence only after pause, cancellation, quiet-hour, and retry behavior are durable.
-3. Add organisation-managed operator provisioning and code rotation instead of environment JSON.
+2. Run controlled recurring-call acceptance tests covering pause, cancellation, review expiry, host overlap, and provider failure.
+3. Add organisation-managed operator provisioning, credential rotation, schedule listings, and encryption-key rotation instead of environment JSON.
 
 ## Credentials and live-call safety
 
@@ -121,10 +141,10 @@ The existing API routes read CALL-E credentials only from server-side environmen
 
 The live CareCall path requires:
 
-- a server-checked operator access code (identity and senior-scoped authorization remain a hardening milestone)
+- a server-checked operator identity with senior-scoped authorization
 - an E.164 phone number, masked outside necessary input
 - explicit authority to contact the senior
-- a one-call authorization gate after preview
-- immediate submit disabling and an in-instance duplicate guard; durable duplicate prevention remains required before a pilot
-- clear cancellation for every recurring routine
+- a one-call or explicit recurring authorization gate after preview
+- immediate submit disabling and durable duplicate prevention with stable request keys
+- clear pause and terminal cancellation for every recurring routine
 - no credentials or live calls in default tests

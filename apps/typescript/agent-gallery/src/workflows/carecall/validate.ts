@@ -25,7 +25,21 @@ function withinPermittedWindow(windowText: string, instant: Date): boolean {
   return start <= end ? current >= start && current <= end : current >= start || current <= end;
 }
 
-export function validateCareCallRequest(request: CareCallRequest, now = new Date()): string[] {
+export function isScheduledTimeWithinPermittedWindow(windowText: string, timeText: string): boolean {
+  const windowMatch = windowText.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  const timeMatch = timeText.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!windowMatch || !timeMatch) return false;
+  const current = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
+  const start = minutesFromClock(windowMatch[1], windowMatch[2], windowMatch[3]);
+  const end = minutesFromClock(windowMatch[4], windowMatch[5], windowMatch[6]);
+  return start <= end ? current >= start && current <= end : current >= start || current <= end;
+}
+
+export function validateCareCallRequest(
+  request: CareCallRequest,
+  now = new Date(),
+  options: { enforceCurrentCallWindow?: boolean } = {},
+): string[] {
   const errors: string[] = [];
   if (request.workflow !== "carecall") errors.push("workflow must be carecall");
   if (!request.request_key?.trim()) errors.push("request_key is required");
@@ -48,7 +62,7 @@ export function validateCareCallRequest(request: CareCallRequest, now = new Date
     errors.push("authorization timestamp is invalid");
   } else {
     if (Math.abs(now.getTime() - authorizedAt) > 5 * 60_000) errors.push("authorization must be current");
-    if (request.senior?.permitted_call_window && !withinPermittedWindow(request.senior.permitted_call_window, now)) {
+    if (options.enforceCurrentCallWindow !== false && request.senior?.permitted_call_window && !withinPermittedWindow(request.senior.permitted_call_window, now)) {
       errors.push("current time is outside the senior's permitted call window");
     }
   }

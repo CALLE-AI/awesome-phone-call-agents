@@ -3,7 +3,7 @@ import type { CareRoutine, Senior } from "../carecall/types";
 import { Icon } from "./Icon";
 import { RoutineIcon, SeniorAvatar } from "./CarePrimitives";
 
-export function CallPreviewSheet({ routine, senior, onClose, onAuthorize }: { routine: CareRoutine; senior: Senior; onClose: () => void; onAuthorize: () => void }) {
+export function CallPreviewSheet({ routine, senior, onClose, onAuthorize, onActivate }: { routine: CareRoutine; senior: Senior; onClose: () => void; onAuthorize: () => void; onActivate: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
 
@@ -100,6 +100,7 @@ export function CallPreviewSheet({ routine, senior, onClose, onAuthorize }: { ro
           <div><Icon name="info" size={17} /><span>{languageVerified ? "A real call requires a separate one-call authorization." : `${senior.language} calling is not enabled until language quality is verified.`}</span></div>
           <div className="call-sheet__actions">
             <button className="secondary-button" onClick={onClose} type="button">Close preview</button>
+            <button className="secondary-button" disabled={!languageVerified} onClick={onActivate} type="button">Activate schedule</button>
             <button className="primary-button" disabled={!languageVerified} onClick={onAuthorize} type="button">Authorize one call</button>
           </div>
         </footer>

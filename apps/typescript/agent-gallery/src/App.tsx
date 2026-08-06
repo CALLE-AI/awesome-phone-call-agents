@@ -4,6 +4,7 @@ import type { AttentionCase, CareRoutine, NavigationId, TimelineItem } from "./c
 import { CallPreviewSheet } from "./components/CallPreviewSheet";
 import { CareCallExecutionSheet } from "./components/CareCallExecutionSheet";
 import { Icon, type IconName } from "./components/Icon";
+import { ScheduleActivationSheet } from "./components/ScheduleActivationSheet";
 import { CareRoutines } from "./screens-care/CareRoutines";
 import { NeedsAttention } from "./screens-care/NeedsAttention";
 import { Seniors } from "./screens-care/Seniors";
@@ -37,6 +38,7 @@ export function App() {
   const [selectedSeniorId, setSelectedSeniorId] = useState(seniors[0].id);
   const [previewRoutine, setPreviewRoutine] = useState<CareRoutine | null>(null);
   const [executionRoutine, setExecutionRoutine] = useState<CareRoutine | null>(null);
+  const [scheduleRoutine, setScheduleRoutine] = useState<CareRoutine | null>(null);
   const [resolvedAttentionIds, setResolvedAttentionIds] = useState<Set<string>>(new Set());
   const [runtimeAttentionCases, setRuntimeAttentionCases] = useState<AttentionCase[]>([]);
   const [durableAttentionCases, setDurableAttentionCases] = useState<AttentionCase[]>([]);
@@ -175,7 +177,7 @@ export function App() {
         <main className="workspace-main" id="main-content" ref={mainRef} tabIndex={-1}>
           {view === "today" && <Today attentionCount={openAttentionCount} attentionCases={allAttentionCases} resolvedIds={resolvedAttentionIds} onNavigate={navigate} onPreview={previewFromTimeline} />}
           {view === "seniors" && <Seniors selectedId={selectedSeniorId} onSelect={setSelectedSeniorId} onPreview={setPreviewRoutine} />}
-          {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} />}
+          {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} sessionToken={operatorSessionToken} />}
           {view === "attention" && (
             <NeedsAttention
               cases={allAttentionCases}
@@ -211,8 +213,10 @@ export function App() {
             setExecutionRoutine(previewRoutine);
             setPreviewRoutine(null);
           }}
+          onActivate={() => { setScheduleRoutine(previewRoutine); setPreviewRoutine(null); }}
         />
       )}
+      {scheduleRoutine && <ScheduleActivationSheet routine={scheduleRoutine} senior={seniors.find((senior) => senior.id === scheduleRoutine.seniorId)!} onClose={() => setScheduleRoutine(null)} onActivated={(token) => { setOperatorSessionToken(token); setNotice(`${scheduleRoutine.title} schedule activated. It can be paused or cancelled from Care Routines.`); }} />}
       {executionRoutine && (
         <CareCallExecutionSheet
           routine={executionRoutine}

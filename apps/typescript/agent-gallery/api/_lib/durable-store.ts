@@ -5,6 +5,8 @@ export interface DurableStore {
   increment(key: string, ttlSeconds: number): Promise<number>;
   addToIndex(key: string, score: number, member: string): Promise<void>;
   readIndex(key: string, limit?: number): Promise<string[]>;
+  readDueIndex(key: string, maximumScore: number, limit?: number): Promise<string[]>;
+  removeFromIndex(key: string, member: string): Promise<void>;
 }
 
 interface RedisResult<T = unknown> { result?: T; error?: string }
@@ -48,6 +50,10 @@ export function createRedisRestStore(url: string, token: string, fetcher: typeof
     async readIndex(key: string, limit = 100) {
       return await command<string[]>(["ZREVRANGE", key, 0, Math.max(0, limit - 1)]);
     },
+    async readDueIndex(key: string, maximumScore: number, limit = 20) {
+      return await command<string[]>(["ZRANGEBYSCORE", key, "-inf", maximumScore, "LIMIT", 0, limit]);
+    },
+    async removeFromIndex(key: string, member: string) { await command(["ZREM", key, member]); },
   };
 }
 
@@ -75,4 +81,8 @@ export class MemoryDurableStore implements DurableStore {
   async readIndex(key: string, limit = 100) {
     return [...(this.indexes.get(key) ?? new Map()).entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([member]) => member);
   }
+  async readDueIndex(key: string, maximumScore: number, limit = 20) {
+    return [...(this.indexes.get(key) ?? new Map()).entries()].filter(([, score]) => score <= maximumScore).sort((a, b) => a[1] - b[1]).slice(0, limit).map(([member]) => member);
+  }
+  async removeFromIndex(key: string, member: string) { this.indexes.get(key)?.delete(member); }
 }

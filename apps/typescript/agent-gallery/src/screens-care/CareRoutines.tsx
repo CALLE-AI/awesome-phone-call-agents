@@ -6,16 +6,28 @@ import { RoutineIcon, SeniorAvatar } from "../components/CarePrimitives";
 
 type Filter = "all" | RoutineKind;
 
-export function CareRoutines({ onPreview, onNotice }: { onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void }) {
+export function CareRoutines({ onPreview, onNotice, sessionToken }: { onPreview: (routine: CareRoutine) => void; onNotice: (message: string) => void; sessionToken: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [pausedIds, setPausedIds] = useState<Set<string>>(new Set());
+  const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
   const visibleRoutines = useMemo(
     () => routines.filter((routine) => filter === "all" || routine.kind === filter),
     [filter],
   );
 
-  function togglePause(routine: CareRoutine) {
+  async function setScheduleState(routine: CareRoutine, status: "active" | "paused" | "cancelled") {
+    if (status === "cancelled" && !window.confirm(`Cancel ${routine.title}? The stored phone number will be removed and a new authorization will be required to schedule it again.`)) return;
     const willResume = pausedIds.has(routine.id);
+    if (sessionToken) {
+      const response = await fetch("/api/carecall/schedules", { method: "PATCH", headers: { authorization: `Bearer ${sessionToken}`, "content-type": "application/json" }, body: JSON.stringify({ schedule_id: `schedule-${routine.id}`, status }) });
+      if (!response.ok) { onNotice("The durable schedule could not be changed. No scheduler state was assumed."); return; }
+    }
+    if (status === "cancelled") {
+      setPausedIds((current) => new Set(current).add(routine.id));
+      setCancelledIds((current) => new Set(current).add(routine.id));
+      onNotice(`${routine.title} schedule cancelled. Its stored phone ciphertext was removed; new authorization is required to schedule it again.`);
+      return;
+    }
     setPausedIds((current) => {
       const next = new Set(current);
       if (next.has(routine.id)) {
@@ -26,8 +38,8 @@ export function CareRoutines({ onPreview, onNotice }: { onPreview: (routine: Car
       return next;
     });
     onNotice(willResume
-      ? `${routine.title} appears resumed for this demo session. No scheduler was changed.`
-      : `${routine.title} appears paused for this demo session. No scheduler was changed.`);
+      ? `${routine.title} resumed${sessionToken ? " in the durable scheduler" : " for this demo session"}.`
+      : `${routine.title} paused${sessionToken ? " in the durable scheduler" : " for this demo session"}.`);
   }
 
   return (
@@ -52,20 +64,21 @@ export function CareRoutines({ onPreview, onNotice }: { onPreview: (routine: Car
             </button>
           ))}
         </div>
-        <p>{visibleRoutines.filter((routine) => !pausedIds.has(routine.id)).length} active in this demo session</p>
+        <p>{visibleRoutines.filter((routine) => !pausedIds.has(routine.id) && !cancelledIds.has(routine.id)).length} active in this demo session</p>
       </div>
 
       <section className="routine-grid" aria-label="Care routines">
         {visibleRoutines.map((routine) => {
           const senior = seniors.find((candidate) => candidate.id === routine.seniorId)!;
           const paused = pausedIds.has(routine.id);
+          const cancelled = cancelledIds.has(routine.id);
           return (
             <article className="surface routine-card" data-paused={paused} key={routine.id}>
               <header>
                 <RoutineIcon kind={routine.kind} />
                 <span className="routine-type">{routine.kind === "medication" ? "Medication reminder" : "Meal check-in"}</span>
-                <span className="schedule-state" data-state={paused ? "paused" : "active"}>
-                  <span aria-hidden="true" /> {paused ? "Paused" : "Active"}
+                <span className="schedule-state" data-state={cancelled ? "cancelled" : paused ? "paused" : "active"}>
+                  <span aria-hidden="true" /> {cancelled ? "Cancelled" : paused ? "Paused" : "Active"}
                 </span>
               </header>
               <h2>{routine.title}</h2>
@@ -81,12 +94,13 @@ export function CareRoutines({ onPreview, onNotice }: { onPreview: (routine: Car
                 </div>
                 <div>
                   <dt><Icon name="clock" size={16} /> Next call</dt>
-                  <dd>{paused ? "Not scheduled while paused" : routine.nextRun}</dd>
+                  <dd>{cancelled ? "Authorization removed" : paused ? "Not scheduled while paused" : routine.nextRun}</dd>
                 </div>
               </dl>
               <footer>
                 <button className="secondary-button" type="button" onClick={() => onPreview(routine)}>Preview call</button>
-                <button className="quiet-button" type="button" onClick={() => togglePause(routine)}>{paused ? "Resume" : "Pause"}</button>
+                {!cancelled && <button className="quiet-button" type="button" onClick={() => void setScheduleState(routine, paused ? "active" : "paused")}>{paused ? "Resume" : "Pause"}</button>}
+                {sessionToken && !cancelled && <button className="quiet-button" type="button" onClick={() => void setScheduleState(routine, "cancelled")}>Cancel</button>}
               </footer>
             </article>
           );

@@ -64,6 +64,13 @@ export async function issueOperatorSession(operatorId: string, accessCode: strin
   return `${payload}.${base64url(await signature(payload, env.CARECALL_SESSION_SECRET))}`;
 }
 
+export async function issueTrustedOperatorSession(operator: Pick<OperatorSession, "id" | "name" | "role" | "senior_ids">, env: OperatorAuthEnv, now = Date.now()): Promise<string | null> {
+  if (!env.CARECALL_SESSION_SECRET || !operators(env).some((candidate) => candidate.id === operator.id)) return null;
+  const session: OperatorSession = { ...operator, issued_at: now, expires_at: now + 5 * 60_000 };
+  const payload = base64url(encoder.encode(JSON.stringify(session)));
+  return `${payload}.${base64url(await signature(payload, env.CARECALL_SESSION_SECRET))}`;
+}
+
 export async function authenticateOperator(request: Request, env: OperatorAuthEnv, now = Date.now()): Promise<OperatorSession | null> {
   if (!env.CARECALL_SESSION_SECRET) return null;
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
