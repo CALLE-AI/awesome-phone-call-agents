@@ -299,6 +299,48 @@ Worth noting what CALL-E got right there: the pharmacist said "10 units" against
 a request for 21, and the result is `partial` rather than `yes`. It also
 converted "just two days" into `hold_duration_hours: 48`.
 
+## Known limitations
+
+Stated rather than discovered, because each one is a boundary on a guarantee
+this skill otherwise makes.
+
+**The exclusion lock is single-host.** It uses `flock` on a sidecar file, which
+coordinates processes on one machine. It does not coordinate across machines,
+and its behaviour on NFS and some network filesystems is unreliable. Two
+operators running this against a shared drive get no mutual exclusion, and the
+duplicate-dial protection is only as good as the lock. A multi-host deployment
+needs a real lease — a database row, or a lock service.
+
+**Principal resolution currently returns nothing on CALL-E, so resume needs
+`CALLE_ACCOUNT_ID`.** Identity is looked for in an id recorded alongside the
+credential, then in the `sub` claim of a JWT. As of writing, the CALL-E CLI
+cache records `server_url`, `auth_base_url`, `issued_at`, `expires_at` and
+`token` — no account identifier — and the token is opaque rather than a JWT.
+
+So no principal can be established, and unfinished state fails closed rather
+than risk resuming one account's run under another's credentials. That is the
+safe behaviour, but it means **cross-process resume does not work out of the box**:
+
+```bash
+export CALLE_ACCOUNT_ID=me@example.com    # any stable value you control
+```
+
+Any consistent string works — it only has to change when the authenticated
+account changes. Endpoint binding is unaffected: `server_url` *is* recorded, so
+credentials are still bound to the right origin automatically.
+
+This resolves itself if the provider exposes an account identifier in the
+credential cache or issues a token with a subject claim.
+
+**Verification is manual, not automated.** There is a runnable end-to-end path
+(see the testing hotline above) and the dry run is fully offline, but there is
+no committed test suite. The concurrency, crash and credential behaviours were
+verified with throwaway scripts rather than tests a reviewer can re-run.
+
+**The budget ceiling is local.** It counts what this installation has spent. It
+does not know the provider-side balance, so it protects against a runaway loop,
+not against a quota consumed elsewhere.
+
 ## References
 
 Read `references/calle-mcp-integration.md` for MCP surface behaviour, including
