@@ -16,9 +16,9 @@
   --accent: #086bd8;
   --accent-hover: #005bbf;
   --accent-soft: #e8f2ff;
-  --success: #24845a;
+  --success: #1f744e;
   --success-soft: #e8f6ee;
-  --attention: #b35b16;
+  --attention: #a64f0e;
   --attention-soft: #fff1e5;
   --danger: #c13b3b;
   --danger-soft: #ffebeb;
@@ -1118,6 +1118,7 @@ p {
 .icon-button {
   display: inline-grid;
   width: 44px;
+  min-width: 44px;
   height: 44px;
   padding: 0;
   border: 1px solid var(--separator);
@@ -1125,6 +1126,7 @@ p {
   color: var(--secondary-label);
   background: var(--surface);
   cursor: pointer;
+  flex: 0 0 44px;
   place-items: center;
 }
 

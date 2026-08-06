@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { handleCancelCareCallJob, handleEnqueueCareCall, handleQueueWorker, processQueueMessage, type CareCallJob, type QueueWakeMessage } from "../api/_lib/call-queue";
+import { handleCancelCareCallJob, handleEnqueueCareCall, handleQueueWorker, processQueueMessage, queueOperationalSnapshot, type CareCallJob, type QueueWakeMessage } from "../api/_lib/call-queue";
 import { MemoryDurableStore } from "../api/_lib/durable-store";
 import { issueOperatorSession } from "../api/_lib/operator-auth";
 import type { CareCallRequest } from "../src/workflows/carecall";
@@ -125,4 +125,35 @@ test("the public queue worker rejects unsigned delivery", async () => {
   env.queueVerifier = async () => false;
   const response = await handleQueueWorker(new Request("https://example.test/api/carecall/worker", { method: "POST", body: JSON.stringify({ type: "dispatch", job_id: "job-1" }) }), env);
   assert.equal(response.status, 401);
+});
+
+test("duplicate dispatch delivery never creates a second provider call", async () => {
+  const { env } = environment();
+  await handleEnqueueCareCall(await authorizedRequest(request("duplicate-dispatch"), env), env);
+  const fake = createFakeCalle({ statusSequence: ["IN_PROGRESS"] });
+  await withFakeCalle(() => processQueueMessage({ type: "dispatch", job_id: "job-duplicate-dispatch" }, env), fake);
+  await withFakeCalle(() => processQueueMessage({ type: "dispatch", job_id: "job-duplicate-dispatch" }, env), fake);
+  assert.equal(fake.runCallAttempts, 1);
+});
+
+test("a lost active lease routes an ongoing call to human review without redialing", async () => {
+  const { env } = environment();
+  await handleEnqueueCareCall(await authorizedRequest(request("lost-lease"), env), env);
+  const fake = createFakeCalle({ statusSequence: ["IN_PROGRESS"] });
+  await withFakeCalle(() => processQueueMessage({ type: "dispatch", job_id: "job-lost-lease" }, env), fake);
+  const ongoing = await env.durableStore.get<CareCallJob>("carecall:job:job-lost-lease");
+  assert.equal(ongoing?.state, "ongoing");
+  await env.durableStore.delete("carecall:queue:active");
+  await withFakeCalle(() => processQueueMessage({ type: "status", job_id: ongoing!.id, version: ongoing!.status_check_version ?? 0 }, env), fake);
+  const reviewed = await env.durableStore.get<CareCallJob>("carecall:job:job-lost-lease");
+  assert.equal(reviewed?.state, "needs_review");
+  assert.equal(reviewed?.failure_reason, "active_lease_lost");
+  assert.equal(fake.runCallAttempts, 1);
+  assert.equal((await queueOperationalSnapshot(env)).needs_review_count, 1);
+});
+
+test("malformed signed worker messages are rejected before queue processing", async () => {
+  const { env } = environment();
+  const response = await handleQueueWorker(new Request("https://example.test/api/carecall/worker", { method: "POST", body: JSON.stringify({ type: "status" }) }), env);
+  assert.equal(response.status, 400);
 });

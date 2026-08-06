@@ -8,6 +8,7 @@ import {
   type CareCallResult,
 } from "../workflows/carecall";
 import { Icon } from "./Icon";
+import { useModalDialog } from "./useModalDialog";
 
 type Stage = "authorize" | "queued" | "live" | "result";
 const E164 = /^\+[1-9]\d{7,14}$/;
@@ -40,6 +41,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [result, setResult] = useState<CareCallResult | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
   const requestKeyRef = useRef(crypto.randomUUID());
   const validPhone = E164.test(phone);
 
@@ -51,6 +53,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
   })[stage], [stage, result]);
 
   useEffect(() => { titleRef.current?.focus(); }, [stage]);
+  useModalDialog(sheetRef, titleRef, onClose, stage !== "live");
 
   async function startCall() {
     const payload: CareCallRequest = {
@@ -158,8 +161,8 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
   }
 
   return (
-    <div className="sheet-backdrop">
-      <section aria-labelledby="execution-title" aria-modal="true" className="call-sheet execution-sheet" role="dialog">
+    <div className="sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && stage !== "live") onClose(); }}>
+      <section aria-labelledby="execution-title" aria-modal="true" className="call-sheet execution-sheet" ref={sheetRef} role="dialog">
         <header className="call-sheet__header">
           <div>
             <span className="dry-run-badge" data-live={stage === "live"}><Icon name={stage === "result" ? "check" : stage === "queued" ? "clock" : "shield"} size={14} /> {stage === "authorize" ? "Live call gate" : stage === "queued" ? "Durable call queue" : stage === "live" ? "Real call · status polling" : "Structured result"}</span>
@@ -184,7 +187,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
 
           {stage === "queued" && (
             <>
-              <section className="live-state"><span className="live-pulse" /><div><p>Queue state</p><strong>{status === "cancelled" ? "cancelled" : `Waiting${queuePosition ? ` · position ${queuePosition}` : ""}`}</strong></div></section>
+              <section aria-atomic="true" aria-live="polite" className="live-state"><span className="live-pulse" /><div><p>Queue state</p><strong>{status === "cancelled" ? "cancelled" : `Waiting${queuePosition ? ` · position ${queuePosition}` : ""}`}</strong></div></section>
               <section className="boundary-note"><Icon name="info" size={18} /><p>CareCall will recheck authorization, the permitted call window, and safety limits immediately before dialing. Another ongoing call must finish first; manual authorization expires after 30 minutes.</p></section>
               <p className="muted-copy">You may close this sheet without cancelling the durable job. Use Cancel queued call to prevent it from starting.</p>
             </>
@@ -192,7 +195,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, 
 
           {stage === "live" && (
             <>
-              <section className="live-state"><span className="live-pulse" /><div><p>Current delivery state</p><strong>{status.replaceAll("_", " ").toLowerCase()}</strong></div></section>
+              <section aria-atomic="true" aria-live="polite" className="live-state"><span className="live-pulse" /><div><p>Current delivery state</p><strong>{status.replaceAll("_", " ").toLowerCase()}</strong></div></section>
               <section className="preview-block"><p className="preview-label">Settled activity</p>{activity?.length ? <ol className="activity-list">{activity.map((entry, index) => <li key={`${entry.ts}-${index}`}><time>{new Date(entry.ts).toLocaleTimeString("en-SG", { hour: "numeric", minute: "2-digit", second: "2-digit" })}</time><span>{entry.message}</span></li>)}</ol> : <p>Preparing the call and waiting for the first provider update…</p>}</section>
               <p className="muted-copy">Do not close or retry while creation or delivery is uncertain. This view will move to a result when CALL-E reaches a terminal state.</p>
             </>

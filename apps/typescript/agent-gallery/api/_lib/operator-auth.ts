@@ -48,6 +48,22 @@ function operators(env: OperatorAuthEnv): OperatorConfig[] {
   } catch { return []; }
 }
 
+/** Validate operator configuration without exposing identities, hashes, or scope. */
+export function operatorConfigurationValid(env: OperatorAuthEnv): boolean {
+  if (!env.CARECALL_SESSION_SECRET || env.CARECALL_SESSION_SECRET.length < 32) return false;
+  const configured = operators(env);
+  return configured.length > 0 && configured.every((operator) => (
+    typeof operator.id === "string"
+    && operator.id.length > 0
+    && typeof operator.name === "string"
+    && operator.name.length > 0
+    && ["coordinator", "admin", "viewer"].includes(operator.role)
+    && /^[a-f0-9]{64}$/i.test(operator.access_code_sha256)
+    && Array.isArray(operator.senior_ids)
+    && operator.senior_ids.every((id) => typeof id === "string" && id.length > 0)
+  ));
+}
+
 function equal(left: string, right: string): boolean {
   if (left.length !== right.length) return false;
   let mismatch = 0;

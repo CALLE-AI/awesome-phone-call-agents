@@ -942,11 +942,13 @@ The result must state:
 
 ### Phase 6: Accessibility and Verification
 
-- Keyboard and screen-reader audit.
-- Large-text and zoom audit.
-- Contrast audit.
+- Add a protected, PII-free deployment readiness and queue-operations preflight.
+- Add a pilot runbook, queue acceptance matrix, operational alerts, and stop conditions.
+- Keyboard and screen-reader audit, including modal focus containment and restoration.
+- Large-text and 200% zoom audit.
+- Light, dark, and increased-contrast audit.
 - Reduced-motion and reduced-transparency audit.
-- Responsive audit.
+- Responsive desktop and mobile audit.
 - One consenting live medication reminder.
 - One consenting live meal check-in.
 - Verify no secrets or personal data are committed.
@@ -973,12 +975,10 @@ The result must state:
 
 ## Immediate Next Step
 
-Begin Phase 1 by restructuring the current Agent Gallery shell into CareCall SG with:
+Complete Phase 6 against a credentialed staging deployment:
 
-1. Semantic design tokens.
-2. Responsive navigation.
-3. Today dashboard.
-4. Fictional senior fixtures.
-5. A reusable status and care-timeline component.
-
-Do not connect new screens to live CALL-E execution until the dry-run care-domain flow and safety outcomes are working offline.
+1. Run the protected readiness preflight and resolve every configuration failure or operational alert.
+2. Complete the fictional queue acceptance matrix and accessibility/device gate in the pilot runbook.
+3. Place one harmless English meal check-in to a consenting team member.
+4. Place one fictional-instruction English medication reminder only after the meal scenario passes.
+5. Keep the pull request in draft and the call-volume limit at pilot level until evidence is reviewed.

@@ -45,6 +45,7 @@ const JOB_TTL = 365 * 24 * 60 * 60;
 const ACTIVE_LEASE_TTL = 2 * 60 * 60;
 const ACTIVE_LEASE_KEY = "carecall:queue:active";
 const READY_INDEX = "carecall:queue:ready";
+const REVIEW_INDEX = "carecall:queue:needs-review";
 const jsonHeaders = { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" };
 const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: jsonHeaders });
 
@@ -138,6 +139,7 @@ async function createJob(
     job.updated_at = new Date().toISOString();
     await store.set(jobKey(id), job, JOB_TTL);
     await store.removeFromIndex(READY_INDEX, id);
+    await store.addToIndex(REVIEW_INDEX, Date.now(), id);
     throw error;
   }
   await auditCareCall(store, operator.id, "call_queued", { job_id: id, request_key: request.request_key, source: options.source, scheduled_for: job.scheduled_for });
@@ -191,6 +193,7 @@ async function markNeedsReview(job: CareCallJob, env: QueueRuntimeEnv, reason: s
   job.updated_at = new Date().toISOString();
   await store.set(jobKey(job.id), job, JOB_TTL);
   await store.removeFromIndex(READY_INDEX, job.id);
+  await store.addToIndex(REVIEW_INDEX, Date.now(), job.id);
   await store.releaseClaim(ACTIVE_LEASE_KEY, { job_id: job.id });
   if (job.schedule_id) {
     const schedule = await store.get<CareSchedule>(`carecall:schedule:${job.schedule_id}`);
@@ -356,6 +359,7 @@ async function monitorJob(job: CareCallJob, version: number, env: QueueRuntimeEn
   job.result = body.carecall_result;
   job.updated_at = new Date().toISOString();
   await store.set(jobKey(job.id), job, JOB_TTL);
+  await store.removeFromIndex(REVIEW_INDEX, job.id);
   await store.releaseClaim(ACTIVE_LEASE_KEY, { job_id: job.id });
   await auditCareCall(store, job.operator.id, "queued_call_completed", { job_id: job.id, run_id: job.run_id, source: job.source });
 
@@ -413,6 +417,7 @@ export async function handleCancelCareCallJob(request: Request, id: string, env:
   job.updated_at = new Date().toISOString();
   await store.set(jobKey(id), job, JOB_TTL);
   await store.removeFromIndex(READY_INDEX, id);
+  await store.removeFromIndex(REVIEW_INDEX, id);
   await auditCareCall(store, operator.id, "queued_call_cancelled", { job_id: id, source: job.source });
   return json({ job_id: id, status: job.state });
 }
@@ -477,4 +482,76 @@ export async function reconcileDueSchedules(env: QueueRuntimeEnv, now = new Date
     results.push({ schedule_id: id, state: "needs_review" });
   }
   return results;
+}
+
+export interface QueueOperationalSnapshot {
+  queue_depth: number;
+  queue_scan_truncated: boolean;
+  oldest_queued_age_seconds: number | null;
+  active_call: boolean;
+  active_state: CareCallJobState | null;
+  active_age_seconds: number | null;
+  needs_review_count: number;
+  needs_review_scan_truncated: boolean;
+  needs_review_reasons: Record<string, number>;
+  alerts: string[];
+}
+
+/** A PII-free operational view for protected health and deployment checks. */
+export async function queueOperationalSnapshot(env: QueueRuntimeEnv, now = new Date()): Promise<QueueOperationalSnapshot> {
+  const store = storeFor(env);
+  if (!store) throw new Error("queue_not_configured");
+  const scanLimit = 250;
+  const readyIds = await store.readDueIndex(READY_INDEX, now.getTime(), scanLimit);
+  const queuedJobs: CareCallJob[] = [];
+  for (const id of readyIds) {
+    const job = await store.get<CareCallJob>(jobKey(id));
+    if (job?.state === "queued") queuedJobs.push(job);
+    else await store.removeFromIndex(READY_INDEX, id);
+  }
+
+  const reviewIds = await store.readIndex(REVIEW_INDEX, scanLimit);
+  const reasons: Record<string, number> = {};
+  let needsReviewCount = 0;
+  for (const id of reviewIds) {
+    const job = await store.get<CareCallJob>(jobKey(id));
+    if (job?.state !== "needs_review") {
+      await store.removeFromIndex(REVIEW_INDEX, id);
+      continue;
+    }
+    needsReviewCount += 1;
+    const reason = job.failure_reason ?? "unspecified";
+    reasons[reason] = (reasons[reason] ?? 0) + 1;
+  }
+
+  const lease = await store.get<{ job_id?: string }>(ACTIVE_LEASE_KEY);
+  const activeJob = lease?.job_id ? await store.get<CareCallJob>(jobKey(lease.job_id)) : null;
+  const oldestQueuedAt = queuedJobs.reduce<number | null>((oldest, job) => {
+    const timestamp = Date.parse(job.scheduled_for);
+    return Number.isFinite(timestamp) && (oldest === null || timestamp < oldest) ? timestamp : oldest;
+  }, null);
+  const activeUpdatedAt = activeJob ? Date.parse(activeJob.updated_at) : Number.NaN;
+  const secondsSince = (timestamp: number) => Math.max(0, Math.floor((now.getTime() - timestamp) / 1000));
+  const oldestQueuedAge = oldestQueuedAt === null ? null : secondsSince(oldestQueuedAt);
+  const activeAge = Number.isFinite(activeUpdatedAt) ? secondsSince(activeUpdatedAt) : null;
+  const alerts: string[] = [];
+  if (queuedJobs.length >= 5) alerts.push("queue_backlog");
+  if (oldestQueuedAge !== null && oldestQueuedAge > 5 * 60) alerts.push("oldest_queued_over_five_minutes");
+  if (lease && !activeJob) alerts.push("active_lease_missing_job");
+  if (activeJob && !["starting", "ongoing"].includes(activeJob.state)) alerts.push("active_lease_terminal_job");
+  if (activeAge !== null && activeAge > 30 * 60) alerts.push("active_call_stale");
+  if (needsReviewCount > 0) alerts.push("human_review_required");
+
+  return {
+    queue_depth: queuedJobs.length,
+    queue_scan_truncated: readyIds.length === scanLimit,
+    oldest_queued_age_seconds: oldestQueuedAge,
+    active_call: Boolean(activeJob),
+    active_state: activeJob?.state ?? null,
+    active_age_seconds: activeAge,
+    needs_review_count: needsReviewCount,
+    needs_review_scan_truncated: reviewIds.length === scanLimit,
+    needs_review_reasons: reasons,
+    alerts,
+  };
 }

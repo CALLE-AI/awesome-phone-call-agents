@@ -111,6 +111,14 @@ Immediately before dialing, the worker rechecks:
 
 The Hobby-compatible Vercel cron in `vercel.json` runs once daily and invokes `/api/carecall/scheduler` with `CRON_SECRET`. It is a reconciliation safety net only: it repairs missing status checks, identifies missing jobs, expires reviews, and sends missed occurrences to human review. It never places a late call. Exact-time execution comes from QStash delayed delivery rather than the daily cron.
 
+Before a controlled pilot, run the protected configuration and operations preflight from a trusted terminal. It reads no secret values and places no call:
+
+```sh
+npm run preflight
+```
+
+Set `CARECALL_PUBLIC_BASE_URL` and `CRON_SECRET` in the terminal environment using the same secret source as the deployment. The response reports configuration booleans plus PII-free queue depth, active-call state, queue age, review counts, grouped reasons, and operational alerts. See the [pilot runbook](../../../docs/agent-gallery/carecall-pilot-runbook.md) for the acceptance matrix, accessibility gate, controlled-call procedure, and stop conditions, and the [Phase 6 verification record](../../../docs/agent-gallery/carecall-phase6-verification.md) for completed local evidence and remaining credentialed checks.
+
 An expired review date, revoked operator, invalid encrypted record, missed occurrence, or failed call start moves the job and schedule to `needs_review`. Queued manual calls can be cancelled before they start. Schedule pause invalidates its queued occurrence; cancellation also removes stored phone ciphertext and requires new authorization. An ongoing provider call cannot be recalled.
 
 ## UI structure
@@ -140,7 +148,7 @@ The older `screens/` and `workflows/appointment-recovery/` directories remain te
 
 ## Next implementation milestone
 
-Phase 5B queue hardening is implemented. Pilot readiness and organisation administration follow:
+Phase 5B queue hardening and Phase 6A automated pilot safeguards are implemented. Credentialed staging and consenting live-call verification remain:
 
 1. Verify one consenting end-to-end English call from the deployed interface with durable operations configured.
 2. Run controlled recurring-call acceptance tests covering pause, cancellation, review expiry, host overlap, and provider failure.

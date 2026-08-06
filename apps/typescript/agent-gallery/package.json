@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "deploy": "npx vercel deploy --prod",
+    "preflight": "node scripts/carecall-preflight.mjs",
     "check": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "verify": "npm run check && npm test && npm run build"

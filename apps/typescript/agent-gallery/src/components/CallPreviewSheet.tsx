@@ -1,37 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import type { CareRoutine, Senior } from "../carecall/types";
 import { Icon } from "./Icon";
 import { RoutineIcon, SeniorAvatar } from "./CarePrimitives";
+import { useModalDialog } from "./useModalDialog";
 
 export function CallPreviewSheet({ routine, senior, onClose, onAuthorize, onActivate }: { routine: CareRoutine; senior: Senior; onClose: () => void; onAuthorize: () => void; onActivate: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    closeRef.current?.focus();
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-      if (event.key === "Tab") {
-        const focusable = [...(sheetRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? [])]
-          .filter((element) => element.getClientRects().length > 0);
-        const first = focusable[0];
-        const last = focusable.at(-1);
-        if (event.shiftKey && document.activeElement === first && last) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last && first) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      previouslyFocused?.focus();
-    };
-  }, [onClose]);
+  useModalDialog(sheetRef, closeRef, onClose);
 
   const isMedication = routine.kind === "medication";
   const languageVerified = senior.language === "English";
