@@ -26,10 +26,12 @@ The CareCall single-call MVP foundation is implemented:
 - operational urgency (`contact now`, `follow up today`, or `review`)
 - safety flags for possible immediate danger, medical advice, sensitive-data requests, and unconfirmed dispatch claims
 - session routing of live exceptions into Needs Attention
+- signed, expiring operator sessions with senior-scoped authorization
+- durable request claims, daily spending limits, call ownership, outcomes, attention cases, and audit events
 - English-only live-call enforcement until other languages are verified
 - accessible focus, reduced-motion, reduced-transparency, high-contrast, and dark-mode behavior
 
-The interface uses fictional demo data and says so visibly. Pause, follow-up, settings, and live-call exception routing are session-only demonstrations; no scheduler, database, digest, or external care record is connected. The full phone number is entered only at the one-call authorization gate and is not stored in the fixture or browser persistence.
+The interface uses fictional demo data and says so visibly. Pause and settings changes remain session-only demonstrations; no scheduler or digest is connected. When the durable operations environment is configured, live-call ownership, snapshots, outcomes, attention cases, acknowledgements, limits, and audits are stored server-side. The full phone number is entered only at the one-call authorization gate; durable snapshots retain only a masked suffix.
 
 The CareCall path is implemented but has not yet been verified with a consenting recipient through the deployed interface. Do not represent it as operationally proven until that opt-in verification is complete.
 
@@ -65,6 +67,22 @@ npm run verify
 
 Default tests are offline, require no credentials, and place no calls.
 
+## Durable operations configuration
+
+CareCall live calls fail closed unless both operator identity and durable storage are configured. The appointment-recovery migration path continues to use its existing access-code gate.
+
+Required CareCall environment variables:
+
+```text
+CARECALL_SESSION_SECRET=<at least 32 random characters>
+CARECALL_OPERATORS_JSON=[{"id":"mei-chen","name":"Mei Chen","role":"coordinator","access_code_sha256":"<sha256 hex>","senior_ids":["mdm-lim"]}]
+UPSTASH_REDIS_REST_URL=<server-side Redis REST URL>
+UPSTASH_REDIS_REST_TOKEN=<server-side standard token>
+CARECALL_MAX_CALLS_PER_DAY=20
+```
+
+Operator codes are stored only as SHA-256 hashes in the JSON configuration. Sessions are HMAC-signed, expire after 30 minutes, and are checked against the current operator configuration on every protected request. The Redis standard token must remain server-side.
+
 ## UI structure
 
 ```text
@@ -93,11 +111,9 @@ The older `screens/` and `workflows/appointment-recovery/` directories remain te
 
 Operational hardening before recurring schedules or a care pilot:
 
-1. Add durable storage for identities, consent, routines, calls, outcomes, attention cases, and audit events.
-2. Replace the shared access code with authenticated operator identity and senior scope.
-3. Add durable idempotency, rate limiting, and spending controls.
-4. Verify one consenting end-to-end English call from the deployed interface.
-5. Add host-owned recurrence only after pause, cancellation, quiet-hour, and retry behavior are durable.
+1. Verify one consenting end-to-end English call from the deployed interface with durable operations configured.
+2. Add host-owned recurrence only after pause, cancellation, quiet-hour, and retry behavior are durable.
+3. Add organisation-managed operator provisioning and code rotation instead of environment JSON.
 
 ## Credentials and live-call safety
 

@@ -39,6 +39,8 @@ export function App() {
   const [executionRoutine, setExecutionRoutine] = useState<CareRoutine | null>(null);
   const [resolvedAttentionIds, setResolvedAttentionIds] = useState<Set<string>>(new Set());
   const [runtimeAttentionCases, setRuntimeAttentionCases] = useState<AttentionCase[]>([]);
+  const [durableAttentionCases, setDurableAttentionCases] = useState<AttentionCase[]>([]);
+  const [operatorSessionToken, setOperatorSessionToken] = useState("");
   const [notice, setNotice] = useState("");
   const mainRef = useRef<HTMLElement>(null);
 
@@ -84,10 +86,35 @@ export function App() {
     ]);
   }, [executionRoutine]);
 
+  useEffect(() => {
+    if (!operatorSessionToken) return;
+    let cancelled = false;
+    async function loadCases() {
+      try {
+        const response = await fetch("/api/carecall/cases", { headers: { authorization: `Bearer ${operatorSessionToken}` } });
+        const body = await response.json() as { cases?: AttentionCase[] };
+        if (!cancelled && response.ok && body.cases) setDurableAttentionCases(body.cases);
+      } catch { /* Session-only cases remain visible when durable refresh fails. */ }
+    }
+    void loadCases();
+    return () => { cancelled = true; };
+  }, [operatorSessionToken, runtimeAttentionCases]);
+
+  const resolveAttentionCase = useCallback((caseId: string) => {
+    setResolvedAttentionIds((current) => new Set(current).add(caseId));
+    if (!operatorSessionToken || !caseId.startsWith("live-")) return;
+    void fetch("/api/carecall/cases", {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${operatorSessionToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ case_id: caseId, acknowledged: true }),
+    });
+  }, [operatorSessionToken]);
+
   const previewSenior = previewRoutine
     ? seniors.find((senior) => senior.id === previewRoutine.seniorId) ?? null
     : null;
-  const allAttentionCases = [...attentionCases, ...runtimeAttentionCases];
+  const liveCases = durableAttentionCases.length > 0 ? durableAttentionCases : runtimeAttentionCases;
+  const allAttentionCases = [...attentionCases, ...liveCases.filter((item) => !attentionCases.some((fixture) => fixture.id === item.id))];
   const openAttentionCount = allAttentionCases.filter((item) => !resolvedAttentionIds.has(item.id)).length;
 
   return (
@@ -155,7 +182,7 @@ export function App() {
               onPreview={setPreviewRoutine}
               onNotice={setNotice}
               resolvedIds={resolvedAttentionIds}
-              onResolve={(caseId) => setResolvedAttentionIds((current) => new Set(current).add(caseId))}
+              onResolve={resolveAttentionCase}
             />
           )}
           {view === "settings" && <Settings onNotice={setNotice} />}
@@ -191,6 +218,7 @@ export function App() {
           routine={executionRoutine}
           senior={seniors.find((senior) => senior.id === executionRoutine.seniorId)!}
           onCompleted={recordCareCallResult}
+          onAuthenticated={setOperatorSessionToken}
           onClose={() => setExecutionRoutine(null)}
         />
       )}

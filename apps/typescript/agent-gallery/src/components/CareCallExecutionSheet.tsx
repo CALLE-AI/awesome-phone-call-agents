@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ACCESS_CODE_HEADER } from "../access";
 import type { CalleRunResult } from "../calle";
 import { maskE164 } from "../calle";
 import type { CareRoutine, Senior } from "../carecall/types";
@@ -17,13 +16,16 @@ interface StatusPayload {
   status: string;
   activity?: { ts: string; level: string; message: string }[];
   calle_result?: CalleRunResult | null;
+  carecall_result?: CareCallResult;
   error?: string;
 }
 
-export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }: { routine: CareRoutine; senior: Senior; onClose: () => void; onCompleted: (result: CareCallResult) => void }) {
+export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted, onAuthenticated }: { routine: CareRoutine; senior: Senior; onClose: () => void; onCompleted: (result: CareCallResult) => void; onAuthenticated: (token: string) => void }) {
   const [stage, setStage] = useState<Stage>("authorize");
   const [phone, setPhone] = useState("");
   const [accessCode, setAccessCode] = useState("");
+  const [operatorId, setOperatorId] = useState("mei-chen");
+  const [sessionToken, setSessionToken] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
   const [activity, setActivity] = useState<StatusPayload["activity"]>([]);
   const [result, setResult] = useState<CareCallResult | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const requestKeyRef = useRef(crypto.randomUUID());
   const validPhone = E164.test(phone);
 
   const stageTitle = useMemo(() => ({
@@ -46,7 +49,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
   async function startCall() {
     const payload: CareCallRequest = {
       workflow: "carecall",
-      request_key: crypto.randomUUID(),
+      request_key: requestKeyRef.current,
       organisation: { name: "Queenstown Care Team", timezone: "Asia/Singapore" },
       senior: {
         id: senior.id,
@@ -70,9 +73,22 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
     setError(null);
     setRequest(payload);
     try {
+      const sessionResponse = await fetch("/api/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ operator_id: operatorId, access_code: accessCode }),
+      });
+      const sessionBody = await sessionResponse.json() as { token?: string; message?: string };
+      if (!sessionResponse.ok || !sessionBody.token) {
+        setError(sessionBody.message ?? "Operator sign-in was not accepted. No call was placed.");
+        setSubmitting(false);
+        return;
+      }
+      setSessionToken(sessionBody.token);
+      onAuthenticated(sessionBody.token);
       const response = await fetch("/api/calls", {
         method: "POST",
-        headers: { "content-type": "application/json", [ACCESS_CODE_HEADER]: accessCode },
+        headers: { "content-type": "application/json", authorization: `Bearer ${sessionBody.token}` },
         body: JSON.stringify(payload),
       });
       const body = await response.json() as { call_id?: string; error?: string; message?: string };
@@ -96,7 +112,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
     let cancelled = false;
     async function poll() {
       try {
-        const response = await fetch(`/api/calls/${encodeURIComponent(activeCallId)}`, { headers: { [ACCESS_CODE_HEADER]: accessCode } });
+        const response = await fetch(`/api/calls/${encodeURIComponent(activeCallId)}`, { headers: { authorization: `Bearer ${sessionToken}` } });
         const body = await response.json() as StatusPayload;
         if (cancelled) return;
         if (!response.ok) {
@@ -105,8 +121,8 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
         }
         setStatus(body.status);
         setActivity(body.activity ?? []);
-        if (body.calle_result !== undefined) {
-          const completed = buildCareCallResult({ request: activeRequest, status: body.status, calle: body.calle_result ?? null, runId: activeCallId });
+        if (body.carecall_result || body.calle_result !== undefined) {
+          const completed = body.carecall_result ?? buildCareCallResult({ request: activeRequest, status: body.status, calle: body.calle_result ?? null, runId: activeCallId });
           setResult(completed);
           onCompleted(completed);
           setStage("result");
@@ -118,7 +134,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
     void poll();
     const timer = window.setInterval(poll, 3000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [accessCode, callId, onCompleted, request, stage]);
+  }, [callId, onCompleted, request, sessionToken, stage]);
 
   return (
     <div className="sheet-backdrop">
@@ -137,7 +153,8 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
             <>
               <section className="authorization-warning"><Icon name="attention" size={20} /><div><strong>This places one real phone call.</strong><p>The number and access code are used for this call only and are not saved in the browser.</p></div></section>
               <label className="execution-field"><span>Authorized senior phone number</span><input autoComplete="off" inputMode="tel" onChange={(event) => setPhone(event.target.value.trim())} placeholder="+65…" type="tel" value={phone} /><small>Enter the E.164 number from the protected senior record. The demo fixture stores only a masked number.</small></label>
-              <label className="execution-field"><span>Operator access code</span><input autoComplete="off" onChange={(event) => setAccessCode(event.target.value)} type="password" value={accessCode} /></label>
+              <label className="execution-field"><span>Operator ID</span><input autoComplete="username" onChange={(event) => setOperatorId(event.target.value.trim())} type="text" value={operatorId} /></label>
+              <label className="execution-field"><span>Operator sign-in code</span><input autoComplete="current-password" onChange={(event) => setAccessCode(event.target.value)} type="password" value={accessCode} /></label>
               <label className="authorization-check"><input checked={confirmed} disabled={submitting} onChange={(event) => setConfirmed(event.target.checked)} type="checkbox" /><span>I confirm I am authorized to contact {senior.preferredName} and authorize exactly one call now for the {routine.title.toLowerCase()} shown in the preview.</span></label>
               {phone && !validPhone && <p className="field-error" role="alert">Use an international E.164 number, for example +65 followed by the local number.</p>}
               <section className="boundary-note"><Icon name="shield" size={18} /><p>CareCall records self-reports and requests human follow-up. It does not give medical advice or dispatch emergency services.</p></section>
@@ -166,7 +183,7 @@ export function CareCallExecutionSheet({ routine, senior, onClose, onCompleted }
 
         <footer className="call-sheet__footer execution-footer">
           <div><Icon name="info" size={17} /><span>{stage === "authorize" ? "Recurring schedules remain disabled in this milestone." : stage === "live" ? "The final transcript is treated as untrusted call data." : "Record any real follow-up in the authorized care system."}</span></div>
-          {stage === "authorize" && <button className="primary-button primary-button--attention" disabled={!confirmed || !validPhone || !accessCode || submitting} onClick={startCall} type="button">{submitting ? "Starting one call…" : "Place one CareCall"}</button>}
+          {stage === "authorize" && <button className="primary-button primary-button--attention" disabled={!confirmed || !validPhone || !operatorId || !accessCode || submitting} onClick={startCall} type="button">{submitting ? "Starting one call…" : "Place one CareCall"}</button>}
           {stage === "result" && <button className="primary-button" onClick={onClose} type="button">Done</button>}
         </footer>
       </section>

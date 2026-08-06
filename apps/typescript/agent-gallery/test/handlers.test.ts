@@ -5,6 +5,8 @@ import { ACCESS_CODE_HEADER } from "../src/access";
 import { FAKE_SERVER_URL, FAKE_TOKEN, createFakeCalle } from "./fake-calle-server";
 import type { RecoveryRequest } from "../src/workflows/appointment-recovery/types";
 import type { CareCallRequest } from "../src/workflows/carecall";
+import { MemoryDurableStore } from "../api/_lib/durable-store";
+import { issueOperatorSession } from "../api/_lib/operator-auth";
 
 const ACCESS_CODE = "test-operator-code";
 
@@ -12,6 +14,9 @@ const CONFIGURED = {
   CALLE_ACCESS_TOKEN: FAKE_TOKEN,
   CALLE_SERVER_URL: FAKE_SERVER_URL,
   OPERATOR_ACCESS_CODE: ACCESS_CODE,
+  CARECALL_SESSION_SECRET: "test-session-secret-that-is-at-least-32-characters",
+  CARECALL_OPERATORS_JSON: JSON.stringify([{ id: "mei-chen", name: "Mei Chen", role: "coordinator", access_code_sha256: "1427b7e058bb398ae674d86981bc0e4f796661abc0ccbba06c3e9ec611f9f07f", senior_ids: ["mdm-lim"] }]),
+  durableStore: new MemoryDurableStore(),
 };
 
 function validRequest(key: string): RecoveryRequest {
@@ -63,6 +68,22 @@ function post(body: unknown, accessCode: string | null = ACCESS_CODE): Request {
     headers: accessCode === null ? {} : { [ACCESS_CODE_HEADER]: accessCode },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
+}
+
+async function careCallPost(body: unknown): Promise<Request> {
+  const token = await issueOperatorSession("mei-chen", ACCESS_CODE, CONFIGURED);
+  assert.ok(token);
+  return new Request("https://app.invalid/api/calls", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+async function careCallPostFor(body: unknown, env: typeof CONFIGURED): Promise<Request> {
+  const token = await issueOperatorSession("mei-chen", ACCESS_CODE, env);
+  assert.ok(token);
+  return new Request("https://app.invalid/api/calls", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
 }
 
 /** A status request carrying an access code, as the polling browser sends it. */
@@ -134,12 +155,66 @@ test("a valid request plans and runs one call", async () => {
 test("a valid CareCall request uses the same protected one-call handshake", async () => {
   const fake = createFakeCalle();
   const response = await withFakeCalle(fake, () =>
-    handleCreateCall(post(validCareCallRequest("carecall-happy-path")), CONFIGURED),
+    careCallPost(validCareCallRequest("carecall-happy-path")).then((request) => handleCreateCall(request, CONFIGURED)),
   );
 
   assert.equal(response.status, 200);
   assert.equal((await response.json()).call_id, "run-1");
   assert.deepEqual(fake.toolCalls, ["plan_call", "run_call"]);
+});
+
+test("CareCall fails closed without durable storage", async () => {
+  const { durableStore: _store, ...withoutStore } = CONFIGURED;
+  const request = await careCallPostFor(validCareCallRequest("no-durable-store"), CONFIGURED);
+  const response = await handleCreateCall(request, withoutStore);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "durable_storage_not_configured");
+});
+
+test("CareCall enforces the operator's senior scope", async () => {
+  const env = { ...CONFIGURED, durableStore: new MemoryDurableStore() };
+  const payload = validCareCallRequest("scope-denied");
+  payload.senior.id = "another-senior";
+  const response = await handleCreateCall(await careCallPostFor(payload, env), env);
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error, "senior_scope_denied");
+});
+
+test("durable request claims prevent a second CareCall dial", async () => {
+  const env = { ...CONFIGURED, durableStore: new MemoryDurableStore() };
+  const fake = createFakeCalle();
+  const payload = validCareCallRequest("durable-dedupe");
+  const first = await withFakeCalle(fake, async () => handleCreateCall(await careCallPostFor(payload, env), env));
+  const second = await withFakeCalle(fake, async () => handleCreateCall(await careCallPostFor(payload, env), env));
+  assert.equal(first.status, 200);
+  assert.equal((await second.json()).deduplicated, true);
+  assert.equal(fake.runCallAttempts, 1);
+});
+
+test("durable daily call limits stop additional spending", async () => {
+  const env = { ...CONFIGURED, durableStore: new MemoryDurableStore(), CARECALL_MAX_CALLS_PER_DAY: "1" };
+  const fake = createFakeCalle();
+  await withFakeCalle(fake, async () => handleCreateCall(await careCallPostFor(validCareCallRequest("limit-first"), env), env));
+  const response = await withFakeCalle(fake, async () => handleCreateCall(await careCallPostFor(validCareCallRequest("limit-second"), env), env));
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error, "daily_call_limit_reached");
+  assert.equal(fake.runCallAttempts, 1);
+});
+
+test("terminal CareCall outcomes and attention cases are persisted server-side", async () => {
+  const store = new MemoryDurableStore();
+  const env = { ...CONFIGURED, durableStore: store };
+  const fake = createFakeCalle({ statusSequence: ["COMPLETED"], terminalResult: { summary: "CARECALL_OUTCOME=unsure_if_taken", call_id: "call-care-1" } });
+  const createRequest = await careCallPostFor(validCareCallRequest("persisted-outcome"), env);
+  await withFakeCalle(fake, () => handleCreateCall(createRequest, env));
+  const token = await issueOperatorSession("mei-chen", ACCESS_CODE, env);
+  assert.ok(token);
+  const statusRequest = new Request("https://app.invalid/api/calls/run-1", { headers: { authorization: `Bearer ${token}` } });
+  const response = await withFakeCalle(fake, () => handleGetCallStatus(statusRequest, "run-1", env));
+  const body = await response.json();
+  assert.equal(body.carecall_result.outcome, "unsure_if_taken");
+  assert.equal(body.carecall_result.urgency, "contact-now");
+  assert.equal((await store.get<{ title: string }>("carecall:case:live-call-care-1"))?.title, "Unsure whether already taken");
 });
 
 test("resubmitting the same request key does not dial twice", async () => {
