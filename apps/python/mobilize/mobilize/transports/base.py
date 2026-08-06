@@ -96,6 +96,13 @@ class Transport(Protocol):
         """
         ...
 
-    async def poll(self, call_id: str) -> CallResult | None:
-        """Return the result if the call has reached a terminal state, else None."""
+    async def poll(self, call_id: str, *, expected_candidate: Candidate | None = None) -> CallResult | None:
+        """Return the result if the call has reached a terminal state, else None.
+
+        `expected_candidate` lets the caller supply binding context the
+        transport may not have itself -- CalleTransport's own dispatch-time
+        cache is in-memory and empty after a process restart, so without
+        this, result-binding validation would silently stop happening
+        during exactly the crash-recovery path it matters most for.
+        """
         ...

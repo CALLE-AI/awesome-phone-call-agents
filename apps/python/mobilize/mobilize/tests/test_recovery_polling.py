@@ -28,7 +28,7 @@ class PreResolvedTransport:
         self.dispatch_calls += 1
         return f"new_call_{candidate.id}"
 
-    async def poll(self, call_id):
+    async def poll(self, call_id, *, expected_candidate=None):
         self.poll_calls.append(call_id)
         return self._prefilled.get(call_id)
 

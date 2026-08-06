@@ -85,6 +85,7 @@ async def mobilize_real(
     confirm: bool = False,
     count: int | None = None,
     deadline_minutes: float = 60,
+    mobilization_id: str | None = None,
 ) -> dict:
     """Place REAL CALL-E calls to exactly the E.164 phone numbers listed in
     `phones` -- never more. Requires CALLE_API_KEY in the environment. Use
@@ -99,7 +100,13 @@ async def mobilize_real(
     pattern is the equivalent safeguard.
 
     Real calls run under governance by default: do-not-call, cooldowns,
-    contact fatigue, and calling-hour windows are enforced, not optional."""
+    contact fatigue, and calling-hour windows are enforced, not optional.
+
+    `mobilization_id` defaults to a deterministic id derived from need_label
+    + phones, so retrying an identical request after a crash safely resumes
+    it. Pass an explicit mobilization_id to force a genuinely fresh
+    mobilization instead, if you deliberately want to repeat an identical
+    request rather than resume a prior one."""
     invalid = [p for p in phones if not E164_RE.match(p)]
     if invalid:
         return {"error": f"Not valid E.164 phone numbers, refusing to dispatch: {invalid}"}
@@ -133,10 +140,11 @@ async def mobilize_real(
     # tracking silently useless across separate tool invocations.
     governance_state = load_governance_state(GOVERNANCE_STATE_PATH)
     governance_policy = GovernancePolicy()
-    # Derived from the request itself so a retried call after a crash
-    # reuses the same mobilization_id and idempotency keys instead of
-    # starting an indistinguishable parallel run.
-    mobilization_id = derive_mobilization_id(need_label, phones)
+    # Derived from the request itself when not explicitly given, so a
+    # retried call after a crash reuses the same mobilization_id and
+    # idempotency keys instead of starting an indistinguishable parallel
+    # run. Pass mobilization_id explicitly to force a fresh one instead.
+    mobilization_id = mobilization_id or derive_mobilization_id(need_label, phones)
 
     result = await mobilize(need, candidates, transport, ledger=ledger,
                              mobilization_id=mobilization_id,

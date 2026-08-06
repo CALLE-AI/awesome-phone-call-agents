@@ -67,7 +67,7 @@ class CalleTransport:
         self._candidate_by_call_id[call_id] = candidate
         return call_id
 
-    async def poll(self, call_id: str) -> CallResult | None:
+    async def poll(self, call_id: str, *, expected_candidate: Candidate | None = None) -> CallResult | None:
         response = await self._client.get(f"/v1/calls/{call_id}")
         response.raise_for_status()
         call = response.json()
@@ -75,8 +75,14 @@ class CalleTransport:
         if call.get("status") not in TERMINAL_STATUSES:
             return None
 
-        expected_candidate = self._candidate_by_call_id.get(call_id)
-        return _to_call_result(call_id, call, expected_candidate)
+        # Prefer the caller-supplied candidate (the dispatcher knows who
+        # every in-flight call_id belongs to, from the ledger, even after a
+        # restart) over this instance's own in-memory cache, which is empty
+        # on a fresh CalleTransport following a crash. Falling back to the
+        # cache keeps binding validation working for direct callers of this
+        # transport that don't pass expected_candidate explicitly.
+        candidate = expected_candidate or self._candidate_by_call_id.get(call_id)
+        return _to_call_result(call_id, call, candidate)
 
     async def aclose(self) -> None:
         await self._client.aclose()

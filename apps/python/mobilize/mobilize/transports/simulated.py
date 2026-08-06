@@ -46,7 +46,10 @@ class SimulatedTransport:
         self.calls_placed += 1
         return call_id
 
-    async def poll(self, call_id: str) -> CallResult | None:
+    async def poll(self, call_id: str, *, expected_candidate: Candidate | None = None) -> CallResult | None:
+        # expected_candidate is accepted for interface parity with the real
+        # transport but unused: this simulator already resolves the
+        # candidate itself via its own in-memory _pending map.
         entry = self._pending.get(call_id)
         if entry is None:
             return None

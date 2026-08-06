@@ -36,7 +36,7 @@ class SlowSequentialCheckTransport:
         await asyncio.sleep(DISPATCH_DELAY_S)
         return f"call_{candidate.id}"
 
-    async def poll(self, call_id):
+    async def poll(self, call_id, *, expected_candidate=None):
         return CallResult(
             call_id=call_id, candidate_id=call_id.removeprefix("call_"),
             outcome=CallOutcome.NO, commitment_score=0.0, stated_yes=False, evidence="",

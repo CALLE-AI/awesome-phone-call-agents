@@ -72,7 +72,7 @@ async def run_simulated(pool_size: int, need_count: int, max_calls: int, seed: i
           f"3-donor need (see README for the cited literature).{RESET}")
 
 
-async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
+async def run_real(phones: list[str], need_count: int, need_label: str, mobilization_id: str | None = None) -> None:
     from mobilize.transports.calle import CalleTransport
 
     if "CALLE_API_KEY" not in os.environ:
@@ -104,11 +104,14 @@ async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
     governance_state = load_governance_state(GOVERNANCE_STATE_PATH)
     governance_policy = GovernancePolicy()
 
-    # Derived from the request itself, not a timestamp or random UUID, so
+    # Derived from the request itself when not explicitly given, so
     # retrying the exact same mobilization after a crash reuses the same
     # idempotency keys instead of silently starting an indistinguishable
-    # parallel run that can redial everyone.
-    mobilization_id = derive_mobilization_id(need_label, phones)
+    # parallel run that can redial everyone. This does mean two genuinely
+    # separate requests with identical need_label + phones collide into the
+    # same mobilization_id by default -- pass --mobilization-id explicitly
+    # to force a fresh one for a deliberate repeat.
+    mobilization_id = mobilization_id or derive_mobilization_id(need_label, phones)
 
     print(f"⚠️  REAL CALL-E CALLS to {len(phones)} number(s). This spends real call credits.")
     confirm = input("Type 'yes' to proceed: ")
@@ -133,6 +136,9 @@ def main() -> None:
     parser.add_argument("--need-count", type=int, default=3)
     parser.add_argument("--max-calls", type=int, default=40)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--mobilization-id", type=str, default=None,
+                         help="override the default deterministic id (derived from --need-label + --phones), "
+                              "to force a fresh mobilization instead of resuming an identical prior request")
     args = parser.parse_args()
 
     if args.real:
@@ -140,7 +146,7 @@ def main() -> None:
         if not phones:
             print("--real requires --phones a,b,c (E.164 numbers you own or are authorized to call)", file=sys.stderr)
             sys.exit(1)
-        asyncio.run(run_real(phones, min(args.need_count, len(phones)), args.need_label))
+        asyncio.run(run_real(phones, min(args.need_count, len(phones)), args.need_label, args.mobilization_id))
     else:
         asyncio.run(run_simulated(args.pool_size, args.need_count, args.max_calls, args.seed))
 

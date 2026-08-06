@@ -150,8 +150,20 @@ ledger file — the same methodology used to crash-test a from-scratch LSM-tree
 key-value store in an earlier project. `mobilize/tests/test_recovery_polling.py`
 and `mobilize/tests/test_resume_reconstruction.py` separately prove a
 recovered in-flight call is polled and counted, and that a resumed run with
-already-confirmed results neither forgets nor re-dispatches them. 52 tests
-pass, including all three.
+already-confirmed results neither forgets nor re-dispatches them.
+
+A self-review pass after two rounds of external review caught two more:
+`calls_used` was computed against the current, possibly governance-filtered
+candidate pool rather than ledger history, which could under-count a prior
+dispatch if that candidate was later added to the do-not-call list; and
+`CalleTransport.poll()`'s result-binding check (see below) only worked
+against its own in-memory dispatch-time cache, which is empty on a fresh
+instance after a real crash — silently disabling that validation during
+exactly the recovery path it exists for. Both fixed: `calls_used` now comes
+directly from ledger-recorded dispatches, and the dispatcher passes each
+recovered call's original candidate into `poll()` explicitly so binding
+validation survives a restart. See
+`mobilize/tests/test_governance_accounting_and_binding.py`. 55 tests pass.
 
 ### 5. Governance — consent is enforced in code, not just policy
 
@@ -314,7 +326,7 @@ mobilize/
 ├── mcp/            # MCP server
 ├── app/            # CLI demo runner
 ├── artifacts/       # committed real-call transcripts and results
-└── tests/          # 52 tests incl. property-based, real-subprocess crash, and
+└── tests/          # 55 tests incl. property-based, real-subprocess crash, and
                     #   concurrency/validation/resume tests added after
                     #   two rounds of external review
 skills/mobilize/    # Agent Skill (SKILL.md) wrapping mobilize() for reuse

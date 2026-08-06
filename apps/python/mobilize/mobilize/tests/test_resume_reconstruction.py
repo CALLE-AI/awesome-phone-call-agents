@@ -24,7 +24,7 @@ class RefusesToDispatchTransport:
     async def dispatch(self, candidate, need_label, location, *, idempotency_key):
         raise AssertionError(f"should not dispatch to {candidate.id} -- need was already met")
 
-    async def poll(self, call_id):
+    async def poll(self, call_id, *, expected_candidate=None):
         return None
 
 

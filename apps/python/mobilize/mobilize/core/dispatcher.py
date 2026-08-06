@@ -66,6 +66,16 @@ async def mobilize(
     wall_start = ledger.get_started_at(mobilization_id) or datetime.now(timezone.utc)
     deadline_at = wall_start + timedelta(minutes=need.deadline_minutes)
 
+    # Built from the pool BEFORE governance filtering, and never narrowed
+    # afterward. Two things depend on having every originally-passed-in
+    # candidate available regardless of current governance state: counting
+    # calls_used against ledger history (a candidate dispatched in a prior
+    # run must still be counted even if they're now on the do-not-call list)
+    # and binding validation on poll() for recovered in-flight calls (same
+    # reasoning -- governance changing since dispatch must not disable the
+    # check that a result actually belongs to who we called).
+    by_id_all = {c.id: c for c in pool}
+
     if governance_state is not None:
         policy = governance_policy or GovernancePolicy()
         original_pool_size = len(pool)
@@ -76,8 +86,7 @@ async def mobilize(
                 "remaining": len(pool),
             })
 
-    by_id = {c.id: c for c in pool}
-    remaining = dict(by_id)
+    remaining = {c.id: c for c in pool}
     all_results: list[CallResult] = []
     waves: list[Wave] = []
     confirmed: list[CallResult] = []
@@ -117,12 +126,20 @@ async def mobilize(
 
     # 2. Every candidate already dispatched for this mobilization_id must
     #    never be dispatched again -- this guarantee comes from the ledger
-    #    record alone and holds regardless of what follows.
+    #    record alone and holds regardless of what follows. calls_used is
+    #    counted from the ledger directly (all "dispatched" entries), not by
+    #    intersecting with the current, possibly governance-filtered
+    #    `remaining` -- a candidate dispatched in a prior run and since
+    #    added to the do-not-call list would otherwise vanish from this
+    #    count entirely, silently under-reporting calls_used and letting a
+    #    resumed run exceed max_calls.
     in_flight = ledger.in_flight(mobilization_id)
-    for candidate_id in list(remaining):
-        if ledger.already_dispatched(mobilization_id, candidate_id):
-            remaining.pop(candidate_id, None)
-            calls_used += 1
+    dispatched_candidate_ids = {
+        entry.candidate_id for entry in ledger.replay(mobilization_id) if entry.kind == "dispatched"
+    }
+    calls_used = len(dispatched_candidate_ids)
+    for candidate_id in dispatched_candidate_ids:
+        remaining.pop(candidate_id, None)
 
     # 3. For anyone still in flight (dispatched, no result yet), attempt to
     #    actually recover their outcome by polling. Works against the real
@@ -137,7 +154,7 @@ async def mobilize(
         pending_recovery = dict(in_flight)
         while pending_recovery and time.monotonic() < recovery_deadline:
             for candidate_id, call_id in list(pending_recovery.items()):
-                result = await transport.poll(call_id)
+                result = await transport.poll(call_id, expected_candidate=by_id_all.get(candidate_id))
                 if result is None:
                     continue
                 pending_recovery.pop(candidate_id)
@@ -201,7 +218,7 @@ async def mobilize(
         poll_deadline = time.monotonic() + min(poll_timeout_s, seconds_left_on_deadline)
         while pending and time.monotonic() < poll_deadline:
             for candidate_id, call_id in list(pending.items()):
-                result = await transport.poll(call_id)
+                result = await transport.poll(call_id, expected_candidate=by_id_all.get(candidate_id))
                 if result is None:
                     continue
                 pending.pop(candidate_id)

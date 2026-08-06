@@ -27,7 +27,7 @@ class NeverConfirmsSlowTransport:
         self.dispatch_count += 1
         return f"call_{candidate.id}_{self.dispatch_count}"
 
-    async def poll(self, call_id):
+    async def poll(self, call_id, *, expected_candidate=None):
         await asyncio.sleep(self._delay_s)
         return CallResult(
             call_id=call_id, candidate_id=call_id.split("_")[1],
