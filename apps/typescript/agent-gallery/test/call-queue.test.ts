@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { handleCancelCareCallJob, handleEnqueueCareCall, handleQueueWorker, processQueueMessage, queueOperationalSnapshot, type CareCallJob, type QueueWakeMessage } from "../api/_lib/call-queue";
+import { handleCancelCareCallJob, handleEnqueueCareCall, handleListCareCallJobs, handleQueueWorker, processQueueMessage, queueOperationalSnapshot, type CareCallJob, type QueueWakeMessage } from "../api/_lib/call-queue";
 import { MemoryDurableStore } from "../api/_lib/durable-store";
 import { issueOperatorSession } from "../api/_lib/operator-auth";
 import type { CareCallRequest } from "../src/workflows/carecall";
@@ -42,6 +42,12 @@ async function authorizedRequest(body: CareCallRequest, env: ReturnType<typeof e
   const token = await issueOperatorSession("mei-chen", ACCESS_CODE, env);
   assert.ok(token);
   return new Request("https://example.test/api/carecall/jobs", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+}
+
+async function authorizedListRequest(env: ReturnType<typeof environment>["env"], query = ""): Promise<Request> {
+  const token = await issueOperatorSession("mei-chen", ACCESS_CODE, env);
+  assert.ok(token);
+  return new Request(`https://example.test/api/carecall/jobs${query}`, { headers: { authorization: `Bearer ${token}` } });
 }
 
 async function withFakeCalle<T>(run: () => Promise<T>, fake = createFakeCalle({ statusSequence: ["COMPLETED"], terminalResult: { summary: "CARECALL_OUTCOME=self_reported_ate", call_id: "call-1" } })): Promise<T> {
@@ -91,6 +97,89 @@ test("a queued manual call can be cancelled before it starts", async () => {
   const job = await env.durableStore.get<CareCallJob>("carecall:job:job-cancel-me");
   assert.equal(job?.state, "cancelled");
   assert.equal(job?.phone_ciphertext, "");
+});
+
+test("the operator call list is scoped, paginated, and excludes protected call inputs", async () => {
+  const { env } = environment();
+  await handleEnqueueCareCall(await authorizedRequest(request("list-first"), env), env);
+  await handleEnqueueCareCall(await authorizedRequest(request("list-second"), env), env);
+  const visible = await env.durableStore.get<CareCallJob>("carecall:job:job-list-first");
+  assert.ok(visible);
+  const inaccessible: CareCallJob = {
+    ...visible,
+    id: "job-out-of-scope",
+    request: { ...visible.request, senior: { ...visible.request.senior, id: "another-senior", preferred_name: "Another Senior" } },
+    created_at: new Date(Date.now() + 1000).toISOString(),
+    updated_at: new Date(Date.now() + 1000).toISOString(),
+  };
+  await env.durableStore.set("carecall:job:job-out-of-scope", inaccessible);
+  await env.durableStore.addToIndex("carecall:jobs:index", Date.parse(inaccessible.created_at), inaccessible.id);
+
+  const response = await handleListCareCallJobs(await authorizedListRequest(env, "?view=queue&limit=1"), env);
+  assert.equal(response.status, 200);
+  const body = await response.json() as { jobs: Array<{ senior: { id: string }; queue_position?: number }>; next_cursor: string | null; total_matching: number };
+  assert.equal(body.jobs.length, 1);
+  assert.equal(body.total_matching, 2);
+  assert.equal(body.next_cursor, "1");
+  assert.equal(body.jobs[0].senior.id, "mdm-lim");
+  assert.ok(body.jobs[0].queue_position);
+  const serialized = JSON.stringify(body);
+  assert.doesNotMatch(serialized, /6580000000|phone_ciphertext|caregiver_instruction|access_code|operator/);
+
+  const secondPage = await handleListCareCallJobs(await authorizedListRequest(env, `?view=queue&limit=1&cursor=${body.next_cursor}`), env);
+  assert.equal(secondPage.status, 200);
+  assert.equal(((await secondPage.json()) as { jobs: unknown[] }).jobs.length, 1);
+});
+
+test("the call list requires an operator session", async () => {
+  const { env } = environment();
+  const response = await handleListCareCallJobs(new Request("https://example.test/api/carecall/jobs"), env);
+  assert.equal(response.status, 401);
+});
+
+test("the call list rejects invalid filters and pagination", async () => {
+  const { env } = environment();
+  for (const query of ["?view=unknown", "?source=unknown", "?limit=0", "?cursor=-1"]) {
+    const response = await handleListCareCallJobs(await authorizedListRequest(env, query), env);
+    assert.equal(response.status, 400);
+  }
+  const denied = await handleListCareCallJobs(await authorizedListRequest(env, "?senior_id=another-senior"), env);
+  assert.equal(denied.status, 403);
+});
+
+test("completed queue jobs retain provider timing for operational history", async () => {
+  const { env } = environment();
+  await handleEnqueueCareCall(await authorizedRequest(request("timed-call"), env), env);
+  const fake = createFakeCalle({
+    statusSequence: ["COMPLETED"],
+    terminalResult: {
+      summary: "CARECALL_OUTCOME=self_reported_ate",
+      call_id: "call-timed",
+      extracted: {
+        calling: {
+          started_at: "2026-08-06T04:00:00.000Z",
+          ended_at: "2026-08-06T04:01:05.000Z",
+          duration_seconds: 65,
+        },
+      },
+    },
+  });
+  await withFakeCalle(() => processQueueMessage({ type: "dispatch", job_id: "job-timed-call" }, env), fake);
+  const ongoing = await env.durableStore.get<CareCallJob>("carecall:job:job-timed-call");
+  assert.equal(ongoing?.state, "ongoing");
+  await withFakeCalle(() => processQueueMessage({ type: "status", job_id: "job-timed-call", version: ongoing!.status_check_version ?? 0 }, env), fake);
+  const completed = await env.durableStore.get<CareCallJob>("carecall:job:job-timed-call");
+  assert.equal(completed?.state, "completed");
+  assert.equal(completed?.started_at, "2026-08-06T04:00:00.000Z");
+  assert.equal(completed?.completed_at, "2026-08-06T04:01:05.000Z");
+  assert.equal(completed?.duration_seconds, 65);
+  assert.equal(completed?.duration_source, "provider");
+  assert.equal(completed?.provider_status, "COMPLETED");
+
+  const response = await handleListCareCallJobs(await authorizedListRequest(env, "?view=history"), env);
+  const body = await response.json() as { jobs: Array<{ duration_seconds?: number; duration_source?: string }> };
+  assert.equal(body.jobs[0].duration_seconds, 65);
+  assert.equal(body.jobs[0].duration_source, "provider");
 });
 
 test("a retried worker reconciles an uncertain start from the durable request claim", async () => {

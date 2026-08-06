@@ -5,6 +5,7 @@ import { CallPreviewSheet } from "./components/CallPreviewSheet";
 import { CareCallExecutionSheet } from "./components/CareCallExecutionSheet";
 import { Icon, type IconName } from "./components/Icon";
 import { ScheduleActivationSheet } from "./components/ScheduleActivationSheet";
+import { Calls } from "./screens-care/Calls";
 import { CareRoutines } from "./screens-care/CareRoutines";
 import { NeedsAttention } from "./screens-care/NeedsAttention";
 import { Seniors } from "./screens-care/Seniors";
@@ -18,6 +19,7 @@ export type Screen = "landing" | "configure" | "preview" | "authorize" | "live" 
 
 const navigation: { id: NavigationId; label: string; icon: IconName }[] = [
   { id: "today", label: "Today", icon: "home" },
+  { id: "calls", label: "Calls", icon: "phone" },
   { id: "seniors", label: "Seniors", icon: "users" },
   { id: "routines", label: "Care Routines", icon: "routine" },
   { id: "attention", label: "Needs Attention", icon: "attention" },
@@ -176,6 +178,7 @@ export function App() {
 
         <main className="workspace-main" id="main-content" ref={mainRef} tabIndex={-1}>
           {view === "today" && <Today attentionCount={openAttentionCount} attentionCases={allAttentionCases} resolvedIds={resolvedAttentionIds} onNavigate={navigate} onPreview={previewFromTimeline} />}
+          {view === "calls" && <Calls sessionToken={operatorSessionToken} onAuthenticated={setOperatorSessionToken} onNotice={setNotice} />}
           {view === "seniors" && <Seniors selectedId={selectedSeniorId} onSelect={setSelectedSeniorId} onPreview={setPreviewRoutine} />}
           {view === "routines" && <CareRoutines onPreview={setPreviewRoutine} onNotice={setNotice} sessionToken={operatorSessionToken} />}
           {view === "attention" && (

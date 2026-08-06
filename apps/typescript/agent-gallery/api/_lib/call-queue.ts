@@ -4,6 +4,7 @@ import {
   handleCreateCall,
   handleGetCallStatus,
   storeFor,
+  type CareCallTiming,
   type CalleEnv,
 } from "./calls";
 import { issueTrustedOperatorSession, type OperatorSession } from "./operator-auth";
@@ -32,6 +33,12 @@ export interface CareCallJob {
   result?: CareCallResult;
   created_at: string;
   updated_at: string;
+  started_at?: string;
+  completed_at?: string;
+  duration_seconds?: number;
+  duration_source?: "provider" | "observed";
+  provider_status?: string;
+  activity?: Array<{ ts: string; level: string; message: string }>;
   failure_reason?: string;
   status_check_version?: number;
 }
@@ -46,6 +53,9 @@ const ACTIVE_LEASE_TTL = 2 * 60 * 60;
 const ACTIVE_LEASE_KEY = "carecall:queue:active";
 const READY_INDEX = "carecall:queue:ready";
 const REVIEW_INDEX = "carecall:queue:needs-review";
+const JOBS_INDEX = "carecall:jobs:index";
+const JOB_LIST_SCAN_LIMIT = 500;
+const JOB_LIST_READ_BATCH_SIZE = 25;
 const jsonHeaders = { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" };
 const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: jsonHeaders });
 
@@ -127,8 +137,12 @@ async function createJob(
     if (existing?.state === "cancelled" && !existing.run_id) {
       await store.set(jobKey(id), job, JOB_TTL);
       created = true;
-    } else return { job: existing ?? job, created: false };
+    } else {
+      if (existing) await store.addToIndex(JOBS_INDEX, Date.parse(existing.created_at), existing.id);
+      return { job: existing ?? job, created: false };
+    }
   }
+  await store.addToIndex(JOBS_INDEX, Date.parse(job.created_at), id);
   await store.addToIndex(READY_INDEX, scheduledFor.getTime(), id);
   try {
     await publishQueueWake(env, { type: "dispatch", job_id: id }, Math.max(Math.floor(scheduledFor.getTime() / 1000), Math.floor(Date.now() / 1000)));
@@ -136,7 +150,8 @@ async function createJob(
     job.state = "needs_review";
     job.phone_ciphertext = "";
     job.failure_reason = "queue_delivery_failed";
-    job.updated_at = new Date().toISOString();
+    job.completed_at = new Date().toISOString();
+    job.updated_at = job.completed_at;
     await store.set(jobKey(id), job, JOB_TTL);
     await store.removeFromIndex(READY_INDEX, id);
     await store.addToIndex(REVIEW_INDEX, Date.now(), id);
@@ -190,7 +205,8 @@ async function markNeedsReview(job: CareCallJob, env: QueueRuntimeEnv, reason: s
   job.state = "needs_review";
   job.phone_ciphertext = "";
   job.failure_reason = reason;
-  job.updated_at = new Date().toISOString();
+  job.completed_at ??= new Date().toISOString();
+  job.updated_at = job.completed_at;
   await store.set(jobKey(job.id), job, JOB_TTL);
   await store.removeFromIndex(READY_INDEX, job.id);
   await store.addToIndex(REVIEW_INDEX, Date.now(), job.id);
@@ -260,7 +276,8 @@ async function dispatchJob(job: CareCallJob, env: QueueRuntimeEnv): Promise<void
       job.state = "ongoing";
       job.run_id = claim.run_id;
       job.phone_ciphertext = "";
-      job.updated_at = new Date().toISOString();
+      job.started_at ??= new Date().toISOString();
+      job.updated_at = job.started_at;
       await store.set(jobKey(job.id), job, JOB_TTL);
       await scheduleStatusCheck(job, env, 0);
     } else {
@@ -320,7 +337,8 @@ async function dispatchJob(job: CareCallJob, env: QueueRuntimeEnv): Promise<void
   job.state = "ongoing";
   job.run_id = body.call_id;
   job.phone_ciphertext = "";
-  job.updated_at = new Date().toISOString();
+  job.started_at = new Date().toISOString();
+  job.updated_at = job.started_at;
   await store.set(jobKey(job.id), job, JOB_TTL);
   await auditCareCall(store, job.operator.id, "queued_call_started", { job_id: job.id, run_id: job.run_id, source: job.source });
   await scheduleStatusCheck(job, env);
@@ -345,8 +363,17 @@ async function monitorJob(job: CareCallJob, version: number, env: QueueRuntimeEn
   const token = await issueTrustedOperatorSession(job.operator, env);
   if (!token) { await markNeedsReview(job, env, "operator_unavailable"); await wakeNextReady(env); return; }
   const response = await handleGetCallStatus(new Request("https://internal.invalid/api/calls/status", { headers: { authorization: `Bearer ${token}` } }), job.run_id, env);
-  const body = await response.json() as { status?: string; carecall_result?: CareCallResult; error?: string };
+  const body = await response.json() as {
+    status?: string;
+    carecall_result?: CareCallResult;
+    call_timing?: CareCallTiming;
+    activity?: Array<{ ts: string; level: string; message: string }>;
+    error?: string;
+  };
   if (!response.ok) throw new Error(body.error ?? "status_check_failed");
+  job.provider_status = body.status;
+  if (body.activity) job.activity = body.activity.slice(-20);
+  if (body.call_timing?.started_at) job.started_at = body.call_timing.started_at;
   if (!body.status || !isTerminalStatus(body.status)) {
     if (!await store.refreshClaim(ACTIVE_LEASE_KEY, { job_id: job.id }, ACTIVE_LEASE_TTL)) {
       await markNeedsReview(job, env, "active_lease_lost");
@@ -357,7 +384,17 @@ async function monitorJob(job: CareCallJob, version: number, env: QueueRuntimeEn
   }
   job.state = "completed";
   job.result = body.carecall_result;
-  job.updated_at = new Date().toISOString();
+  job.completed_at = body.call_timing?.ended_at ?? new Date().toISOString();
+  job.duration_seconds = body.call_timing?.duration_seconds;
+  job.duration_source = job.duration_seconds !== undefined ? "provider" : undefined;
+  if (job.duration_seconds === undefined && job.started_at) {
+    const observed = Math.round((Date.parse(job.completed_at) - Date.parse(job.started_at)) / 1000);
+    if (Number.isFinite(observed) && observed >= 0) {
+      job.duration_seconds = observed;
+      job.duration_source = "observed";
+    }
+  }
+  job.updated_at = job.completed_at;
   await store.set(jobKey(job.id), job, JOB_TTL);
   await store.removeFromIndex(REVIEW_INDEX, job.id);
   await store.releaseClaim(ACTIVE_LEASE_KEY, { job_id: job.id });
@@ -386,6 +423,131 @@ export async function handleQueueWorker(request: Request, env: QueueRuntimeEnv):
   catch { return json({ error: "queue_processing_failed" }, 500); }
 }
 
+export type CareCallJobListView = "all" | "queue" | "active" | "history" | "needs_review";
+
+export interface CareCallJobListItem {
+  job_id: string;
+  run_id?: string;
+  source: CareCallJob["source"];
+  status: CareCallJobState;
+  provider_status?: string;
+  senior: { id: string; preferred_name: string };
+  routine: { id: string; title: string; kind: CareCallRequest["routine"]["kind"] };
+  scheduled_for: string;
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  completed_at?: string;
+  duration_seconds?: number;
+  duration_source?: CareCallJob["duration_source"];
+  queue_position?: number;
+  failure_reason?: string;
+  result?: CareCallResult;
+}
+
+function singaporeDay(value: string): string | null {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp + 8 * 60 * 60_000).toISOString().slice(0, 10);
+}
+
+function matchesListView(job: CareCallJob, view: CareCallJobListView): boolean {
+  if (view === "queue") return job.state === "queued";
+  if (view === "active") return job.state === "starting" || job.state === "ongoing";
+  if (view === "history") return ["completed", "cancelled", "needs_review"].includes(job.state);
+  if (view === "needs_review") return job.state === "needs_review";
+  return true;
+}
+
+function listItem(job: CareCallJob, queuePosition?: number): CareCallJobListItem {
+  return {
+    job_id: job.id,
+    run_id: job.run_id,
+    source: job.source,
+    status: job.state,
+    provider_status: job.provider_status ?? job.result?.provider_status,
+    senior: { id: job.request.senior.id, preferred_name: job.request.senior.preferred_name },
+    routine: { id: job.request.routine.id, title: job.request.routine.title, kind: job.request.routine.kind },
+    scheduled_for: job.scheduled_for,
+    created_at: job.created_at,
+    updated_at: job.updated_at,
+    started_at: job.started_at,
+    completed_at: job.completed_at,
+    duration_seconds: job.duration_seconds,
+    duration_source: job.duration_source,
+    queue_position: job.state === "queued" ? queuePosition : undefined,
+    failure_reason: job.failure_reason,
+    result: job.result,
+  };
+}
+
+export async function handleListCareCallJobs(request: Request, env: QueueRuntimeEnv): Promise<Response> {
+  const { authenticateOperator, operatorCanAccessSenior } = await import("./operator-auth");
+  const operator = await authenticateOperator(request, env);
+  if (!operator) return json({ error: "invalid_operator_session" }, 401);
+  const store = storeFor(env);
+  if (!store) return json({ error: "queue_not_configured" }, 503);
+
+  const url = new URL(request.url);
+  const requestedView = url.searchParams.get("view") ?? "all";
+  if (!["all", "queue", "active", "history", "needs_review"].includes(requestedView)) return json({ error: "invalid_view" }, 400);
+  const view = requestedView as CareCallJobListView;
+  const requestedSource = url.searchParams.get("source");
+  if (requestedSource && requestedSource !== "manual" && requestedSource !== "schedule") return json({ error: "invalid_source" }, 400);
+  const seniorId = url.searchParams.get("senior_id");
+  if (seniorId && !operatorCanAccessSenior(operator, seniorId)) return json({ error: "senior_scope_denied" }, 403);
+  const cursor = Number(url.searchParams.get("cursor") ?? "0");
+  const requestedLimit = Number(url.searchParams.get("limit") ?? "25");
+  if (!Number.isInteger(cursor) || cursor < 0 || !Number.isInteger(requestedLimit) || requestedLimit < 1) return json({ error: "invalid_pagination" }, 400);
+  const limit = Math.min(requestedLimit, 100);
+
+  const indexedIds = await store.readIndex(JOBS_INDEX, JOB_LIST_SCAN_LIMIT);
+  const readyIds = await store.readDueIndex(READY_INDEX, Number.MAX_SAFE_INTEGER, JOB_LIST_SCAN_LIMIT);
+  const reviewIds = await store.readIndex(REVIEW_INDEX, JOB_LIST_SCAN_LIMIT);
+  const lease = await store.get<{ job_id?: string }>(ACTIVE_LEASE_KEY);
+  const ids = [...new Set([...indexedIds, ...readyIds, ...reviewIds, ...(lease?.job_id ? [lease.job_id] : [])])];
+  const jobs: CareCallJob[] = [];
+  for (let offset = 0; offset < ids.length; offset += JOB_LIST_READ_BATCH_SIZE) {
+    const batch = ids.slice(offset, offset + JOB_LIST_READ_BATCH_SIZE);
+    const records = await Promise.all(batch.map(async (id) => ({ id, job: await store.get<CareCallJob>(jobKey(id)) })));
+    for (const { id, job } of records) {
+      if (!job) {
+        await store.removeFromIndex(JOBS_INDEX, id);
+        continue;
+      }
+      if (!operatorCanAccessSenior(operator, job.request.senior.id)) continue;
+      jobs.push(job);
+    }
+  }
+  jobs.sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
+
+  const today = singaporeDay(new Date().toISOString());
+  const stats = {
+    total: jobs.length,
+    queued: jobs.filter((job) => job.state === "queued").length,
+    active: jobs.filter((job) => job.state === "starting" || job.state === "ongoing").length,
+    needs_review: jobs.filter((job) => job.state === "needs_review").length,
+    completed_today: jobs.filter((job) => job.state === "completed" && job.completed_at && singaporeDay(job.completed_at) === today).length,
+  };
+  const queuePositions = new Map(readyIds.map((id, index) => [id, index + 1]));
+  const filtered = jobs.filter((job) => (
+    matchesListView(job, view)
+    && (!requestedSource || job.source === requestedSource)
+    && (!seniorId || job.request.senior.id === seniorId)
+  ));
+  const page = filtered.slice(cursor, cursor + limit).map((job) => listItem(job, queuePositions.get(job.id)));
+  const nextCursor = cursor + page.length < filtered.length ? String(cursor + page.length) : null;
+
+  return json({
+    jobs: page,
+    stats,
+    next_cursor: nextCursor,
+    total_matching: filtered.length,
+    scan_truncated: indexedIds.length === JOB_LIST_SCAN_LIMIT,
+    generated_at: new Date().toISOString(),
+  });
+}
+
 export async function handleGetCareCallJob(request: Request, id: string, env: QueueRuntimeEnv): Promise<Response> {
   const { authenticateOperator, operatorCanAccessSenior } = await import("./operator-auth");
   const operator = await authenticateOperator(request, env);
@@ -399,7 +561,20 @@ export async function handleGetCareCallJob(request: Request, id: string, env: Qu
     await markNeedsReview(job, env, "manual_authorization_expired");
   }
   const queued = await store.readDueIndex(READY_INDEX, Number.MAX_SAFE_INTEGER, 100);
-  return json({ job_id: job.id, status: job.state, run_id: job.run_id, result: job.result, failure_reason: job.failure_reason, queue_position: job.state === "queued" ? Math.max(1, queued.indexOf(job.id) + 1) : undefined });
+  return json({
+    job_id: job.id,
+    status: job.state,
+    provider_status: job.provider_status,
+    run_id: job.run_id,
+    result: job.result,
+    failure_reason: job.failure_reason,
+    activity: job.activity,
+    started_at: job.started_at,
+    completed_at: job.completed_at,
+    duration_seconds: job.duration_seconds,
+    duration_source: job.duration_source,
+    queue_position: job.state === "queued" ? Math.max(1, queued.indexOf(job.id) + 1) : undefined,
+  });
 }
 
 export async function handleCancelCareCallJob(request: Request, id: string, env: QueueRuntimeEnv): Promise<Response> {
@@ -414,7 +589,8 @@ export async function handleCancelCareCallJob(request: Request, id: string, env:
   if (job.state !== "queued") return json({ error: "job_already_started", message: "An ongoing provider call cannot be recalled." }, 409);
   job.state = "cancelled";
   job.phone_ciphertext = "";
-  job.updated_at = new Date().toISOString();
+  job.completed_at = new Date().toISOString();
+  job.updated_at = job.completed_at;
   await store.set(jobKey(id), job, JOB_TTL);
   await store.removeFromIndex(READY_INDEX, id);
   await store.removeFromIndex(REVIEW_INDEX, id);
@@ -431,7 +607,8 @@ export async function cancelQueuedJobForSchedule(id: string | undefined, env: Qu
   job.state = "cancelled";
   job.phone_ciphertext = "";
   job.failure_reason = reason;
-  job.updated_at = new Date().toISOString();
+  job.completed_at = new Date().toISOString();
+  job.updated_at = job.completed_at;
   await store.set(jobKey(id), job, JOB_TTL);
   await store.removeFromIndex(READY_INDEX, id);
 }

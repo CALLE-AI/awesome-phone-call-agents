@@ -71,6 +71,12 @@ function json(payload: unknown, status = 200): Response {
 const startedCalls = new Map<string, string>();
 
 interface CareCallClaim { state: "pending" | "started" | "failed"; operator_id: string; senior_id: string; run_id?: string; updated_at: string }
+export interface CareCallTiming {
+  started_at?: string;
+  ended_at?: string;
+  duration_seconds?: number;
+}
+
 interface CareCallRunRecord {
   run_id: string;
   request_key: string;
@@ -83,6 +89,20 @@ interface CareCallRunRecord {
   caregiver_name: string;
   created_at: string;
   result?: CareCallResult;
+  timing?: CareCallTiming;
+}
+
+function careCallTiming(run: CalleRun): CareCallTiming | undefined {
+  const calling = run.result?.extracted?.calling;
+  if (!calling || typeof calling !== "object" || Array.isArray(calling)) return undefined;
+  const value = calling as Record<string, unknown>;
+  const startedAt = typeof value.started_at === "string" && Number.isFinite(Date.parse(value.started_at)) ? value.started_at : undefined;
+  const endedAt = typeof value.ended_at === "string" && Number.isFinite(Date.parse(value.ended_at)) ? value.ended_at : undefined;
+  const rawDuration = typeof value.duration_seconds === "number" ? value.duration_seconds : Number(value.duration_seconds);
+  const durationSeconds = Number.isFinite(rawDuration) && rawDuration >= 0 ? Math.round(rawDuration) : undefined;
+  return startedAt || endedAt || durationSeconds !== undefined
+    ? { started_at: startedAt, ended_at: endedAt, duration_seconds: durationSeconds }
+    : undefined;
 }
 
 export function storeFor(env: CalleEnv): DurableStore | null {
@@ -313,7 +333,7 @@ export async function handleGetCallStatus(
     careRecord = await store.get<CareCallRunRecord>(`carecall:run:${runId}`);
     if (!careRecord) return json({ error: "call_record_not_found" }, 404);
     if (!operatorCanAccessSenior(operator, careRecord.senior_id)) return json({ error: "senior_scope_denied" }, 403);
-    if (careRecord.result) return json({ status: careRecord.result.provider_status, activity: [], carecall_result: careRecord.result });
+    if (careRecord.result) return json({ status: careRecord.result.provider_status, activity: [], carecall_result: careRecord.result, call_timing: careRecord.timing });
   } else {
     // A legacy run's activity and transcript remain behind the shared gate.
     const denied = accessFailure(request, env);
@@ -337,9 +357,10 @@ export async function handleGetCallStatus(
     level: entry.level,
     message: entry.message,
   }));
+  const timing = careCallTiming(run);
 
   if (!isTerminalStatus(run.status)) {
-    return json({ status: run.status, activity });
+    return json({ status: run.status, activity, call_timing: timing });
   }
 
   if (operator && store && careRecord) {
@@ -353,6 +374,7 @@ export async function handleGetCallStatus(
     };
     const result = buildCareCallResult({ request: resultRequest, status: run.status, calle: run.result ?? null, runId });
     careRecord.result = result;
+    careRecord.timing = timing;
     await store.set(`carecall:run:${runId}`, careRecord, 365 * 24 * 60 * 60);
     if (result.follow_up_required) {
       const caseRecord = { id: `live-${result.call_id}`, seniorId: careRecord.senior_id, routineId: careRecord.routine_id, priority: result.urgency === "contact-now" ? "contact-now" : result.urgency === "follow-up-today" ? "today" : "review", priorityLabel: result.urgency === "contact-now" ? "Contact now" : result.urgency === "follow-up-today" ? "Follow up today" : "Review when available", title: result.outcome_label, createdAt: new Date().toISOString(), context: result.evidence ?? "No reliable conversational evidence was returned.", nextAction: result.next_action, acknowledged: false };
@@ -360,14 +382,14 @@ export async function handleGetCallStatus(
       await store.addToIndex("carecall:cases:index", Date.now(), caseRecord.id);
     }
     await auditCareCall(store, operator.id, "call_completed", { run_id: runId, senior_id: careRecord.senior_id, outcome: result.outcome, urgency: result.urgency });
-    return json({ status: run.status, activity, carecall_result: result });
+    return json({ status: run.status, activity, carecall_result: result, call_timing: timing });
   }
 
   // The raw CALL-E result is returned rather than a classified one. Reading what
   // a call agreed to needs the offered windows, which live with the request in
   // the browser; classifying here without them would downgrade every successful
   // reschedule to `uncertain`.
-  return json({ status: run.status, activity, calle_result: run.result ?? null });
+  return json({ status: run.status, activity, calle_result: run.result ?? null, call_timing: timing });
 }
 
 /** Read credentials from the process environment without exposing their values. */

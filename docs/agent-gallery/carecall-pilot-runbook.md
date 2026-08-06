@@ -38,18 +38,20 @@ Complete the following with fictional records and a fake or non-dialing provider
 
 | Scenario | Expected evidence |
 | --- | --- |
-| One manual request while idle | One job becomes ongoing and exactly one provider run exists. |
-| Second manual request during a call | Second job remains queued until the active call is terminal. |
-| Scheduled request during a manual call | Scheduled job waits behind the same global lease. |
-| Cancel queued manual request | Job becomes cancelled, its phone ciphertext is cleared, and no provider run exists. |
+| One manual request while idle | Calls shows one job becoming ongoing with exactly one provider run and a live elapsed duration. |
+| Second manual request during a call | Calls shows the second job waiting with a queue position until the active call is terminal. |
+| Scheduled request during a manual call | Calls shows the scheduled job waiting behind the same global lease. |
+| Cancel queued manual request | Calls shows the job as cancelled, its phone ciphertext is cleared, and no provider run exists. |
 | Duplicate QStash delivery | Stable request claim permits no second provider run. |
-| Manual request waits 30 minutes | Job moves to human review and does not dial. |
-| Provider creation is uncertain | Job moves to human review; operators inspect CALL-E before any new authorization. |
-| Active lease is lost | Ongoing job moves to human review without redialing. |
+| Manual request waits 30 minutes | Calls shows the job under Needs review and no provider run is created. |
+| Provider creation is uncertain | Calls shows Needs review; operators inspect CALL-E before any new authorization. |
+| Active lease is lost | Calls shows the ongoing job under Needs review without redialing. |
 | Scheduled occurrence is over 15 minutes late | Reconciliation marks it missed and never dials late. |
 | Review date expires | Schedule stops, queued occurrence is invalidated, and fresh authority is required. |
 
 Record the test time, environment, fictional job label, observed state, and pass/fail result. Do not record phone numbers or transcripts.
+
+For every scenario, confirm the Calls console is limited to the signed-in operator's authorized seniors. Inspect the browser response and rendered details once to verify that neither contains a full phone number, encrypted phone data, caregiver instructions, operator access codes, or transcripts. A completed call should show its provider duration when available; otherwise it must label the duration source as `CareCall observed`.
 
 ## 3. Accessibility and device gate
 
@@ -60,8 +62,9 @@ Verify the deployed interface with keyboard only at desktop and mobile widths:
 3. Confirm Escape closes previews and authorization sheets but cannot dismiss an ongoing call view.
 4. Test at 200% browser zoom and with increased text size; content must reflow without horizontal page scrolling or hidden actions.
 5. Test light, dark, increased-contrast, reduced-motion, and reduced-transparency preferences.
-6. Confirm queue and provider-state changes are announced without moving keyboard focus.
-7. Confirm every action has a visible focus indicator and at least a 44-by-44-pixel target where practical.
+6. Open Calls and verify Queue, Active, History, and Needs review at desktop and mobile widths.
+7. Confirm queue and provider-state changes are announced without moving keyboard focus.
+8. Confirm every action has a visible focus indicator and at least a 44-by-44-pixel target where practical.
 
 ## 4. Controlled live-call gate
 
@@ -72,7 +75,7 @@ Start with one harmless English meal check-in:
 1. Confirm the participant, phone number, exact time window, expected caller identity, and stop procedure immediately before authorization.
 2. Confirm readiness is healthy and queue depth is zero.
 3. Authorize exactly one call from the deployed interface.
-4. Observe that the job moves from queued to ongoing to a terminal result.
+4. Observe in Calls that the job moves from queued to ongoing to a terminal result and records its start, completion, and duration.
 5. Ask the participant whether the trust-first opening, automated-agent disclosure, purpose, anti-scam warning, and human callback option were clear.
 6. Confirm the outcome says `Self-reported` and does not infer that food was eaten from provider completion alone.
 7. Confirm logs, QStash messages, screenshots, and the browser contain no unmasked phone number after provider acceptance.

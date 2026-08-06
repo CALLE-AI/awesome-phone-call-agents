@@ -18,6 +18,11 @@ Live calls placed: none
 | Worker boundary | Unsigned and malformed queue messages are rejected. | Pass |
 | Readiness privacy | Unauthorized reads reveal no configuration detail; authorized output contains no job, senior, operator, phone, or instruction identifiers. | Pass |
 | Future schedules | Future recurring occurrences are excluded from current queue-backlog alerts. | Pass |
+| Operational list access | An unauthenticated job-list request is rejected, and authenticated results are limited to the operator's authorized senior scope. | Pass |
+| Operational list privacy | List records exclude phone ciphertext, phone numbers, access codes, caregiver instructions, and transcripts. | Pass |
+| Operational list controls | State, source, senior, limit, and cursor inputs are validated; matching results are bounded and paginated. | Pass |
+| Call timing | Provider start, end, and duration fields are persisted; an observed duration is used only when the provider omits one. | Pass |
+| Console state semantics | Scheduled and due queue labels, live elapsed duration, and terminal duration formatting are covered by offline tests. | Pass |
 | Modal keyboard behavior | Focus enters each dialog, wraps from the last control to the first, Escape follows the safe close rule, and focus returns to the invoking button. | Pass |
 | Skip navigation | The skip link moves focus to `#main-content`. | Pass |
 | Mobile layout | 390-by-844 viewport has no horizontal page overflow; call preview remains scrollable with all actions available. | Pass |
@@ -35,6 +40,9 @@ Phase 6 is not complete until the following occur in the intended staging deploy
 - Vercel environment variables are configured from the approved secret stores.
 - `npm run preflight` returns `ready: true` and no unexplained operational alerts.
 - The full queue acceptance matrix is repeated against deployed Redis and signed QStash delivery.
+- Queue, active, history, and needs-review transitions are confirmed in the deployed Calls console using only authorized senior records.
+- Provider-reported start, completion, and duration values are compared with the deployed console; the fallback is visibly identified as CareCall-observed.
+- The deployed console is checked to ensure full phone numbers, caregiver instructions, and transcripts never appear in list responses or rendered details.
 - A real screen reader is used for the primary navigation, Needs Attention flow, and all three dialogs.
 - Dark mode, increased contrast, reduced motion, and reduced transparency are activated at operating-system level and visually checked.
 - One consenting team member receives a harmless English meal check-in.

@@ -31,6 +31,7 @@ The CareCall single-call and controlled-recurrence foundation is implemented:
 - caregiver-authorized daily or weekday schedules with an explicit review date
 - encrypted scheduled phone numbers, dated call exceptions, and terminal cancellation that removes the ciphertext
 - one durable queue for manual and scheduled calls, with a single active-call lease and cancellable queued jobs
+- a protected Calls console for queue position, active state, provider timing, duration, history, and review cases
 - signed QStash delivery for exact-time wake-ups and background provider-status monitoring
 - a once-daily host reconciliation cron that repairs state but never initiates late calls
 - stable occurrence keys, no blind call retries, and fail-closed human review
@@ -103,6 +104,8 @@ Manual and recurring authorizations both create encrypted durable call jobs. QSt
 
 The queue permits one ongoing CareCall at a time. If the active lease is occupied, later calls remain queued. Manual authorization expires after 30 minutes rather than waiting indefinitely. When provider status becomes terminal, a delayed status message records the conservative outcome, releases the lease, and wakes the next job. Delivery retries cannot create another phone call because the call request still passes through the durable request claim.
 
+The Calls destination reads a protected, senior-scoped operational list that refreshes every five seconds. It shows waiting, active, completed, cancelled, and needs-review records with provider timing when available. Provider duration is preferred; an observed start-to-completion duration is identified as a fallback. Full phone numbers, encrypted phone data, access codes, caregiver instructions, and transcripts are never returned by the list endpoint or rendered in the console.
+
 Immediately before dialing, the worker rechecks:
 
 1. operator and senior scope
@@ -130,6 +133,7 @@ src/
 ├── App.tsx                    responsive CareCall application shell
 ├── carecall/
 │   ├── fixtures.ts           fictional Singapore care records
+│   ├── call-operations.ts    call-list contracts and state/time presentation
 │   └── types.ts              UI-domain contracts
 ├── components/
 │   ├── CallPreviewSheet.tsx  masked, no-side-effect dry-run preview
@@ -141,6 +145,7 @@ src/
 │   ├── Today.tsx
 │   ├── Seniors.tsx
 │   ├── CareRoutines.tsx
+│   ├── Calls.tsx             protected queue, active-call, and history console
 │   ├── NeedsAttention.tsx
 │   └── Settings.tsx
 └── styles.css                semantic, adaptive utility design system
@@ -150,11 +155,12 @@ The older `screens/` and `workflows/appointment-recovery/` directories remain te
 
 ## Next implementation milestone
 
-Phase 5B queue hardening and Phase 6A automated pilot safeguards are implemented. Credentialed staging and consenting live-call verification remain:
+Phase 5B queue hardening, Phase 6A automated pilot safeguards, and Phase 6A.2 operational visibility are implemented. Credentialed Phase 6B staging and consenting live-call verification remain:
 
-1. Verify one consenting end-to-end English call from the deployed interface with durable operations configured.
-2. Run controlled recurring-call acceptance tests covering pause, cancellation, review expiry, host overlap, and provider failure.
-3. Add organisation-managed operator provisioning, credential rotation, schedule listings, and encryption-key rotation instead of environment JSON.
+1. Repeat the queue acceptance matrix against deployed Redis/QStash and verify each transition in the Calls console.
+2. Verify one consenting end-to-end English call from the deployed interface with durable operations configured.
+3. Run controlled recurring-call acceptance tests covering pause, cancellation, review expiry, host overlap, and provider failure.
+4. Add organisation-managed operator provisioning, credential rotation, schedule listings, and encryption-key rotation instead of environment JSON.
 
 ## Credentials and live-call safety
 

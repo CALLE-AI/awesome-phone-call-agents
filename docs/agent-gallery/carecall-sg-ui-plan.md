@@ -940,6 +940,16 @@ The result must state:
 - Use the Vercel Hobby daily cron for reconciliation, never for late call execution.
 - Route missing jobs, expired leases, missed windows, and uncertain creation to human review without blind redialing.
 
+### Phase 6A.2: Operational Call Console
+
+- Add a protected Calls destination for the durable queue, active calls, completed history, and cases requiring review.
+- Persist a durable call-job index plus provider status, start time, completion time, and provider-reported or observed duration.
+- Auto-refresh operational state without moving keyboard focus or requiring the call authorization sheet to remain open.
+- Allow operators to filter by state, source, and authorized senior, and cancel a queued call before it starts.
+- Enforce operator senior scope in the list API and paginate a bounded operational scan.
+- Exclude full phone numbers, encrypted phone data, operator access codes, caregiver instructions, and transcripts from every list response and screen.
+- Treat provider completion separately from the conservative self-reported care outcome.
+
 ### Phase 6: Accessibility and Verification
 
 - Add a protected, PII-free deployment readiness and queue-operations preflight.
@@ -971,14 +981,16 @@ The result must state:
 - No secrets, real phone numbers, private transcripts, or health records are committed.
 - Default tests require no credentials and place no calls.
 - Product UI meets the accessibility requirements above.
+- Authorized operators can inspect queue position, live state, duration, completion history, and review cases without exposing phone numbers or transcripts.
 - Repository validation passes.
 
 ## Immediate Next Step
 
-Complete Phase 6 against a credentialed staging deployment:
+Phase 6A.2 is implemented locally. Complete Phase 6B against a credentialed staging deployment:
 
 1. Run the protected readiness preflight and resolve every configuration failure or operational alert.
-2. Complete the fictional queue acceptance matrix and accessibility/device gate in the pilot runbook.
-3. Place one harmless English meal check-in to a consenting team member.
-4. Place one fictional-instruction English medication reminder only after the meal scenario passes.
-5. Keep the pull request in draft and the call-volume limit at pilot level until evidence is reviewed.
+2. Confirm each fictional queue transition appears in the Calls console with the expected status, timing, duration, and authorized senior scope.
+3. Complete the fictional queue acceptance matrix and accessibility/device gate in the pilot runbook.
+4. Place one harmless English meal check-in to a consenting team member.
+5. Place one fictional-instruction English medication reminder only after the meal scenario passes.
+6. Keep the pull request in draft and the call-volume limit at pilot level until evidence is reviewed.

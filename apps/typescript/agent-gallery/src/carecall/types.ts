@@ -1,4 +1,4 @@
-export type NavigationId = "today" | "seniors" | "routines" | "attention" | "settings";
+export type NavigationId = "today" | "calls" | "seniors" | "routines" | "attention" | "settings";
 
 export type RoutineKind = "medication" | "meal";
 
