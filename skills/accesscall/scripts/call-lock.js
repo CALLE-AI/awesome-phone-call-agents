@@ -60,9 +60,28 @@
  * exists. Wrapping the *whole* critical section in a separate mutex file
  * protects fresh-acquire, override, and release uniformly: only one process
  * at a time can be inside "read the current lock, decide what to do, write
- * the result" for a given (phone, purpose), so two concurrent overrides
- * cannot both observe "someone else holds it," both decide to proceed, and
- * both write.
+ * the result" for a given (phone, purpose).
+ *
+ * That mutex alone is NOT sufficient for override, though: it only
+ * guarantees writes don't corrupt each other or interleave -- it does not
+ * stop two *legitimate-looking* overrides from both succeeding one after the
+ * other. If run A holds the lock, and a human approves "override A" based on
+ * what they saw at that moment, and a second, unrelated "override" (for a
+ * different plan_id) gets approved based on the *same* stale observation,
+ * the mutex would happily let both proceed in sequence -- each one is a
+ * perfectly well-formed write, just against state that's no longer current
+ * by the time the second one runs. So overriding requires a monotonically
+ * incrementing `generation` number on the lock record (see
+ * getLatestGeneration; durable across release/re-acquire cycles via the
+ * history journal, since the lock file itself is deleted on release) and an
+ * `expectedGeneration` argument that must match the CURRENT on-disk lock's
+ * generation, checked inside the same mutex-protected critical section right
+ * before writing. This is a real compare-and-swap: "only write if what's
+ * there now is still what I was told to override," not "write regardless of
+ * what's there." A fresh acquire (override: false) never needs this -- its
+ * precondition is simply "no lock currently exists," which the mutex+read
+ * already makes atomic on its own, with nothing to compare a generation
+ * against.
  *
  * The lock file stores the phone number *masked* (via phone-utils.js's
  * maskPhone), not raw, so a lock directory listing never itself becomes a
@@ -72,9 +91,14 @@
  *
  * Usage:
  *   node call-lock.js --check --phone <E.164> --purpose <string>
- *   node call-lock.js --acquire --phone <E.164> --purpose <string> --plan-id <id> [--override] [--run-id <id>]
+ *   node call-lock.js --acquire --phone <E.164> --purpose <string> --plan-id <id> [--run-id <id>]
+ *   node call-lock.js --acquire --phone <E.164> --purpose <string> --plan-id <id> --override --expected-generation <n> [--run-id <id>]
  *   node call-lock.js --release --phone <E.164> --purpose <string> --plan-id <id> --terminal-status <STATUS>
  *   node call-lock.js --history-check --phone <E.164> --purpose <string> --plan-id <id>
+ *
+ * Before overriding, always run --check first to see the current owner and
+ * generation, and pass that exact generation as --expected-generation --
+ * never guess it or reuse a generation from an earlier check.
  */
 
 const fs = require("fs");
@@ -173,6 +197,21 @@ function readHistory(phone, purpose) {
   });
 }
 
+// Durable next-generation counter: derived from the append-only history
+// journal, not the lock file, because the lock file is deleted on release --
+// a fresh acquire that follows a release-then-reacquire cycle must still
+// continue the sequence (e.g. 1 -> 2), not reset to 1, so a later override
+// attempt holding a stale "generation 1" can never accidentally match a
+// coincidentally-reused generation number.
+function getLatestGeneration(phone, purpose) {
+  const history = readHistory(phone, purpose);
+  let max = 0;
+  for (const record of history) {
+    if (typeof record.generation === "number" && record.generation > max) max = record.generation;
+  }
+  return max;
+}
+
 function requireFields({ phone, purpose, planId }, { needPlanId = true } = {}) {
   assertE164(phone);
   if (!purpose) throw new Error('A "purpose" string is required.');
@@ -260,25 +299,43 @@ function withMutex(phone, purpose, fn) {
 }
 
 /**
- * Acquires the dispatch lock for `planId`, throwing if one is already held
- * by a *different* `planId` and `override` was not explicitly passed.
- * Refuses unconditionally (even with `override`) if this exact `planId` was
- * already dispatched before, per the durable history journal.
+ * Acquires the dispatch lock for `planId`.
+ *
+ * Fresh acquire (override: false, the default): throws if a lock is already
+ * held by *any* `planId` (own or different) -- there is nothing to override,
+ * so the only precondition is "no lock currently exists," made atomic by the
+ * mutex plus a plain read. No `expectedGeneration` is accepted here; a fresh
+ * acquire never has anything to compare against.
+ *
+ * Override (override: true): REQUIRES `expectedGeneration`. Throws if the
+ * current on-disk lock's generation (0 if currently unlocked) does not
+ * exactly match `expectedGeneration` -- this is the compare-and-swap that
+ * stops two legitimate-looking overrides (each approved by a human looking
+ * at what appeared to be current state) from both succeeding one after the
+ * other against state that changed in between. Always call --check
+ * immediately beforehand, show the human the current owner and generation,
+ * and pass that exact generation -- never a remembered/guessed one.
+ *
+ * Both paths refuse unconditionally (even with `override`) if this exact
+ * `planId` was already dispatched before, per the durable history journal --
+ * a `plan_id` must never be replayed.
  *
  * Call this immediately before `run_call` -- never after, since the whole
  * point is to prevent a duplicate dispatch, including on a retry after a
- * crash between acquiring and actually placing the call.
- *
- * `override` bypasses the active-lock conflict check and replaces the
- * existing lock file -- it is an explicit, human-confirmed bypass for "call
- * this recipient again despite an existing lock," not a way around the
- * dispatch-history replay check. The whole read-decide-write sequence below
- * runs inside the per-(phone,purpose) mutex (see withMutex), so this is safe
- * against concurrent acquireLock calls regardless of whether they're
- * fresh-acquires, overrides, or a mix of both.
+ * crash between acquiring and actually placing the call. The whole
+ * read-decide-write sequence below runs inside the per-(phone,purpose) mutex
+ * (see withMutex), so this is safe against concurrent acquireLock calls
+ * regardless of whether they're fresh-acquires, overrides, or a mix.
  */
-function acquireLock({ phone, purpose, planId, override = false, meta = {} }) {
+function acquireLock({ phone, purpose, planId, override = false, expectedGeneration, meta = {} }) {
   requireFields({ phone, purpose, planId });
+  if (override && !(typeof expectedGeneration === "number" && Number.isFinite(expectedGeneration))) {
+    throw new Error(
+      'acquireLock requires a numeric "expectedGeneration" when override is true -- run checkLock first, show ' +
+        "the current owner and generation to the human, and pass that exact generation. There is no default " +
+        "because there is no safe generation to assume.",
+    );
+  }
 
   return withMutex(phone, purpose, () => {
     if (hasBeenDispatched({ phone, purpose, planId })) {
@@ -293,29 +350,48 @@ function acquireLock({ phone, purpose, planId, override = false, meta = {} }) {
     const lockPath = lockPathFor(phone, purpose);
     const existing = readLockFile(lockPath);
 
-    if (existing !== null && !override) {
-      const when =
-        !existing.corrupted && existing.dispatchedAt
-          ? existing.dispatchedAt
-          : "an unknown time (lock file is corrupted and cannot be dated)";
-      const heldBy = !existing.corrupted && existing.planId ? ` by plan_id ${JSON.stringify(existing.planId)}` : "";
+    if (existing !== null && existing.corrupted) {
       throw new Error(
-        `Refusing duplicate dispatch: a call for ${maskPhone(phone)} (purpose "${purpose}") is still locked` +
-          `${heldBy} (dispatched at ${when}). It has not been released because no confirmed terminal status has ` +
-          "been recorded for it yet -- call releaseLock() once get_call_run returns one, or ask the user to " +
-          "explicitly confirm an override before retrying.",
+        "Lock file is corrupted -- its generation and owner cannot be verified, so neither a fresh acquire " +
+          "(which must confirm nothing is there) nor an override (which must confirm the expected generation " +
+          "is there) can proceed safely. Clear it manually after confirming no call is actually in flight.",
       );
     }
 
+    if (!override) {
+      if (existing !== null) {
+        throw new Error(
+          `Refusing duplicate dispatch: a call for ${maskPhone(phone)} (purpose "${purpose}") is still locked ` +
+            `by plan_id ${JSON.stringify(existing.planId)}, generation ${existing.generation} (dispatched at ` +
+            `${existing.dispatchedAt}). It has not been released because no confirmed terminal status has been ` +
+            "recorded for it yet -- call releaseLock() once get_call_run returns one, or run --check and ask " +
+            "the user to explicitly confirm an override (with that generation) before retrying.",
+        );
+      }
+    } else {
+      const currentGeneration = existing !== null ? existing.generation : 0;
+      if (currentGeneration !== expectedGeneration) {
+        throw new Error(
+          `Refusing to override: expected generation ${expectedGeneration} but the current state for ` +
+            `${maskPhone(phone)} (purpose "${purpose}") is generation ${currentGeneration}` +
+            (existing !== null ? ` (held by plan_id ${JSON.stringify(existing.planId)})` : " (currently unlocked)") +
+            ". The lock state has changed since this override was approved -- re-check current state with " +
+            "--check and decide again; do not retry with the same expected generation.",
+        );
+      }
+    }
+
+    const generation = getLatestGeneration(phone, purpose) + 1;
     const record = {
       planId,
+      generation,
       maskedPhone: maskPhone(phone),
       purpose,
       dispatchedAt: new Date().toISOString(),
       ...meta,
     };
     fs.writeFileSync(lockPath, JSON.stringify(record, null, 2));
-    appendHistory(phone, purpose, { event: "dispatched", planId, at: record.dispatchedAt, ...meta });
+    appendHistory(phone, purpose, { event: "dispatched", planId, generation, at: record.dispatchedAt, ...meta });
     return record;
   });
 }
@@ -374,6 +450,7 @@ module.exports = {
   historyPathFor,
   mutexPathFor,
   hasBeenDispatched,
+  getLatestGeneration,
   checkLock,
   acquireLock,
   releaseLock,
@@ -402,7 +479,7 @@ function main() {
   if (!args.phone || !args.purpose) {
     console.error(
       "Usage: node call-lock.js --check|--acquire|--release|--history-check --phone <E.164> --purpose <string> " +
-        "[--plan-id <id>] [--override] [--run-id <id>] [--terminal-status <STATUS>]",
+        "[--plan-id <id>] [--override --expected-generation <n>] [--run-id <id>] [--terminal-status <STATUS>]",
     );
     process.exitCode = 1;
     return;
@@ -427,6 +504,8 @@ function main() {
         purpose: args.purpose,
         planId: args["plan-id"],
         override: Boolean(args.override),
+        expectedGeneration:
+          args["expected-generation"] !== undefined ? Number(args["expected-generation"]) : undefined,
         meta: args["run-id"] ? { runId: args["run-id"] } : {},
       });
       console.log(JSON.stringify(record, null, 2));
