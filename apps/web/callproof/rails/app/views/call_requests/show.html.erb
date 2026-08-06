@@ -19,7 +19,7 @@
       <dl>
         <dt>Recipient</dt><dd><%= @call_request.provider_profile.name %></dd>
         <dt>Phone</dt><dd><%= @call_request.masked_phone_number %></dd>
-        <dt>Mode</dt><dd>Fake / no call</dd>
+        <dt>Mode</dt><dd><%= @call_request.mode_label %></dd>
       </dl>
     </article>
 

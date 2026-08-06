@@ -98,6 +98,8 @@ class CallProvidersCalleTest < ActiveJob::TestCase
     assert_match(/Idempotency-Key #{request.idempotency_key}/, error.message)
     assert_equal 1, attempts, "must not auto-retry / place a replacement call"
     assert_nil request.reload.phone_call
+    # Ambiguous outcome is not "failed" — it is unresolved, awaiting reconciliation.
+    assert_equal "unresolved", request.status
   ensure
     ENV["CALLPROOF_LIVE_CALLS"] = previous_live
   end

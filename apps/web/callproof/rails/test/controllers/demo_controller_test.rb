@@ -9,6 +9,23 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action='#{demo_calls_path}']"
   end
 
+  test "the public home page never lists operator-initiated requests" do
+    provider, policy = Demo::Setup.call
+    leaked = CallRequest.create!(
+      provider_profile: provider, call_policy: policy,
+      recipient_phone_e164: "+525512345678",
+      objective: "Secret operator objective that must not leak.",
+      simulation_scenario: "compliant",
+      status: "awaiting_confirmation", live_mode: false, operator_initiated: true
+    )
+
+    get root_path
+
+    assert_response :success
+    assert_select "a[href=?]", call_request_path(leaked), count: 0
+    assert_not_includes response.body, "Secret operator objective that must not leak."
+  end
+
   test "creates and displays a no-call simulation" do
     assert_difference "CallRequest.count", 1 do
       post demo_calls_path, params: {

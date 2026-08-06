@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CallRequest < ApplicationRecord
-  STATUSES = %w[awaiting_confirmation pending running waiting_analysis waiting_human verified approved rejected failed canceled].freeze
+  STATUSES = %w[awaiting_confirmation pending running waiting_analysis waiting_human verified approved rejected failed canceled unresolved].freeze
   SCENARIOS = %w[compliant policy_violation].freeze
 
   belongs_to :provider_profile
@@ -31,6 +31,16 @@ class CallRequest < ApplicationRecord
     return "" if recipient_phone_e164.blank?
 
     "#{recipient_phone_e164.first(3)}••••#{recipient_phone_e164.last(2)}"
+  end
+
+  # Honest mode label for the run view: reflect whether a real call was placed rather
+  # than always claiming "Fake / no call".
+  def mode_label
+    provider = phone_call&.provider
+    return "Live · #{provider.upcase}" if provider.present? && provider != "fake"
+    return "Live workflow (no call yet)" if operator_initiated?
+
+    "Fake / no call"
   end
 
   private

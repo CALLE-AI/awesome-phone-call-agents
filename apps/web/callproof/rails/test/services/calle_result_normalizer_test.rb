@@ -60,6 +60,68 @@ class CalleResultNormalizerTest < ActiveSupport::TestCase
     end
   end
 
+  # --- strict result integrity (REST shape) --------------------------------------
+  # A complete, trustworthy REST payload for the requested number.
+  def rest_result(phone:, overrides: {})
+    {
+      "status" => "completed",
+      "task_completed" => true,
+      "completion_confidence" => { "score" => 0.9 },
+      "recipients" => [ {
+        "status" => "completed",
+        "phones" => [ phone ],
+        "result_confidence" => 0.9,
+        "structured_result" => { "completed_count" => 1 },
+        "attempts" => [ { "transcript_turns" => [ { "offset_seconds" => 0, "speaker" => "bot", "text" => "hi" } ] } ]
+      }.merge(overrides) ]
+    }
+  end
+
+  test "accepts a complete REST result" do
+    phone_call = calle_phone_call(recipient: "+525512345678")
+    CallProviders::PersistCalleResult.call(phone_call, rest_result(phone: "+525512345678"))
+    assert_equal "completed", phone_call.reload.status
+  end
+
+  test "fails closed when recipient status is missing" do
+    phone_call = calle_phone_call(recipient: "+525512345678")
+    payload = rest_result(phone: "+525512345678", overrides: { "status" => "" })
+    error = assert_raises(CallProviders::PersistCalleResult::ResultIntegrityError) do
+      CallProviders::PersistCalleResult.call(phone_call, payload)
+    end
+    assert_match(/status is missing/, error.message)
+  end
+
+  test "fails closed when the recipient phone is not bound" do
+    phone_call = calle_phone_call(recipient: "+525512345678")
+    payload = rest_result(phone: "+525512345678", overrides: { "phones" => [] })
+    error = assert_raises(CallProviders::PersistCalleResult::ResultIntegrityError) do
+      CallProviders::PersistCalleResult.call(phone_call, payload)
+    end
+    assert_match(/does not bind a recipient phone/, error.message)
+  end
+
+  test "fails closed when confidence is missing" do
+    phone_call = calle_phone_call(recipient: "+525512345678")
+    payload = rest_result(phone: "+525512345678", overrides: { "result_confidence" => nil })
+    payload.delete("completion_confidence")
+    error = assert_raises(CallProviders::PersistCalleResult::ResultIntegrityError) do
+      CallProviders::PersistCalleResult.call(phone_call, payload)
+    end
+    assert_match(/confidence is missing/, error.message)
+  end
+
+  test "does not infer completion from counts or terminal status" do
+    phone_call = calle_phone_call(recipient: "+525512345678")
+    # completed_count=1 and status=completed present, but task_completed is NOT explicitly true.
+    payload = rest_result(phone: "+525512345678")
+    payload["task_completed"] = nil
+    error = assert_raises(CallProviders::PersistCalleResult::ResultIntegrityError) do
+      CallProviders::PersistCalleResult.call(phone_call, payload)
+    end
+    assert_match(/did not explicitly set task_completed=true/, error.message)
+  end
+
   private
 
   def calle_phone_call(recipient:)

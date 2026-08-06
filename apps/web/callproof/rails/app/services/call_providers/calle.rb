@@ -39,7 +39,15 @@ module CallProviders
       validate_safety!(call_request)
       return call_request.phone_call if call_request.phone_call
 
-      response = create_call(payload(call_request, contract), idempotency_key: call_request.idempotency_key)
+      begin
+        response = create_call(payload(call_request, contract), idempotency_key: call_request.idempotency_key)
+      rescue AmbiguousError
+        # Outcome unknown — the call may have been accepted. Do NOT collapse to "failed".
+        # Mark the request unresolved so it is reconciled (re-attempt reuses the stable
+        # Idempotency-Key, so CALL-E deduplicates rather than dialing twice).
+        call_request.update!(status: "unresolved")
+        raise
+      end
       provider_call_id = response["call_id"] || response.fetch("id")
       call_request.create_phone_call!(
         provider: "calle",

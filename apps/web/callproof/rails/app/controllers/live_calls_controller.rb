@@ -4,7 +4,7 @@ class LiveCallsController < ApplicationController
   include OperatorAuthenticated
 
   before_action :authenticate_operator!
-  before_action :load_call_request, only: %i[show confirm cancel]
+  before_action :load_call_request, only: %i[show confirm cancel reconcile]
 
   def new
     @call_request = CallRequest.new
@@ -22,7 +22,8 @@ class LiveCallsController < ApplicationController
       objective: live_call_params.fetch(:objective),
       status: "awaiting_confirmation",
       simulation_scenario: "compliant",
-      live_mode: false
+      live_mode: false,
+      operator_initiated: true
     )
     CallContracts::Build.call(@call_request)
     redirect_to live_call_path(@call_request), notice: "Preview created. No call has been placed."
@@ -55,11 +56,41 @@ class LiveCallsController < ApplicationController
 
     result = ExecutePhoneCallFlow.call(call_request: @call_request)
     @call_request.update!(agentkit_run_id: result.run.run_id)
+    @call_request.reload
+
+    if @call_request.status == "unresolved"
+      # Ambiguous create (timeout/5xx): the call may have been placed. Never claim it
+      # "failed safely" — send the operator to reconcile.
+      return redirect_to call_request_path(@call_request),
+                         alert: "CALL-E outcome is unknown — the call may have been placed. Reconcile before retrying."
+    end
+
     @call_request.update!(status: "failed") if result.err? && @call_request.phone_call.nil?
     redirect_to call_request_path(@call_request),
                 notice: result.ok? ? "CALL-E accepted the request." : "CALL-E execution failed safely."
   rescue CallProviders::Calle::Error, ActiveRecord::RecordInvalid => error
     redirect_to live_call_path(@call_request), alert: error.message
+  end
+
+  # Reconcile an unresolved live request. Re-attempts the create with the SAME stable
+  # Idempotency-Key, so CALL-E deduplicates — this cannot place a second call. Resolves
+  # to running (call exists), failed (definitive 4xx), or stays unresolved (still ambiguous).
+  def reconcile
+    ensure_live_environment!
+    raise CallProviders::Calle::SafetyError, "call is not awaiting reconciliation" unless
+      @call_request.status == "unresolved"
+
+    contract = @call_request.call_contract || CallContracts::Build.call(@call_request)
+    phone_call = CallProviders.current.call(call_request: @call_request, contract: contract)
+    redirect_to call_request_path(@call_request),
+                notice: "Reconciled — CALL-E has the call (#{phone_call.status})."
+  rescue CallProviders::Calle::AmbiguousError => error
+    redirect_to call_request_path(@call_request),
+                alert: "Still unresolved — outcome remains unknown: #{error.message}"
+  rescue CallProviders::Calle::Error => error
+    @call_request.update!(status: "failed")
+    redirect_to call_request_path(@call_request),
+                alert: "Reconciliation resolved to failed (no call was placed): #{error.message}"
   end
 
   def cancel

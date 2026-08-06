@@ -28,4 +28,43 @@ class CallRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h2", text: "Analysis pending"
     assert_select ".metrics", count: 0
   end
+
+  test "an operator-initiated request requires authentication even when live_mode is false" do
+    request = operator_request
+
+    get call_request_path(request)
+    assert_response :unauthorized
+
+    get call_request_path(request), headers: operator_auth_headers
+    assert_response :success
+  end
+
+  test "a public demo request is viewable without authentication" do
+    provider, policy = Demo::Setup.call
+    request = CallRequest.create!(
+      provider_profile: provider, call_policy: policy,
+      recipient_phone_e164: provider.phone_number_e164,
+      objective: "Fictional delivery.", simulation_scenario: "compliant"
+    )
+    CallContracts::Build.call(request)
+
+    get call_request_path(request)
+    assert_response :success
+    # Honest mode label — not the hardcoded "Fake / no call" for every request.
+    assert_select "dd", text: "Fake / no call"
+  end
+
+  private
+
+  def operator_request
+    provider, policy = Demo::Setup.call
+    request = CallRequest.create!(
+      provider_profile: provider, call_policy: policy,
+      recipient_phone_e164: "+525512345678",
+      objective: "Real operator objective.", simulation_scenario: "compliant",
+      status: "awaiting_confirmation", live_mode: false, operator_initiated: true
+    )
+    CallContracts::Build.call(request)
+    request
+  end
 end

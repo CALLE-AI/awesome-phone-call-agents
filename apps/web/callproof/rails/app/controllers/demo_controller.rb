@@ -2,7 +2,10 @@
 
 class DemoController < ApplicationController
   def index
-    @recent_call_requests = CallRequest.order(created_at: :desc).limit(8)
+    # Only public demo requests belong on the public home page — never operator/live
+    # requests, which carry real objectives and recipient metadata.
+    @recent_call_requests = CallRequest.where(operator_initiated: false)
+                                       .order(created_at: :desc).limit(8)
   end
 
   def create

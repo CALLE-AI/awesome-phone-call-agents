@@ -7,6 +7,7 @@ Rails.application.routes.draw do
     member do
       post :confirm
       post :cancel
+      post :reconcile
     end
   end
   resources :call_requests, only: :show

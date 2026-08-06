@@ -37,9 +37,13 @@ module CallProviders
 
     def validate!
       problems = []
-      problems << "no recipient in CALL-E result" if recipient.nil?
-      problems.concat(recipient_problems) if recipient
-      problems << "call did not report task completion" unless task_completed?
+      if recipient.nil?
+        problems << "no recipient in CALL-E result"
+      else
+        problems.concat(recipient_problems)
+      end
+      # Require EXPLICIT completion evidence — never infer from terminal status or counts.
+      problems << "result did not explicitly set task_completed=true" unless result["task_completed"] == true
 
       raise ResultIntegrityError, problems.join("; ") if problems.any?
     end
@@ -47,32 +51,33 @@ module CallProviders
     def recipient_problems
       problems = []
 
+      # Recipient status: required and must be a completed state.
       status = recipient["status"].to_s.downcase
-      unless status.empty? || COMPLETED_RECIPIENT_STATUSES.include?(status)
+      if status.empty?
+        problems << "recipient status is missing"
+      elsif !COMPLETED_RECIPIENT_STATUSES.include?(status)
         problems << "recipient status '#{recipient['status']}' is not a completed state"
       end
 
-      if expected_phone.present? && reported_phones.present? && !reported_phones.include?(expected_phone)
+      # Phone binding: required and must match the requested number.
+      if expected_phone.blank?
+        problems << "call request has no recipient phone to bind against"
+      elsif reported_phones.blank?
+        problems << "result does not bind a recipient phone"
+      elsif !reported_phones.include?(expected_phone)
         # Never leak the full number into logs/messages.
         problems << "recipient phone does not match the requested number"
       end
 
-      confidence = recipient_confidence
-      if confidence && confidence < MINIMUM_RESULT_CONFIDENCE
-        problems << "recipient result confidence #{confidence} is below #{MINIMUM_RESULT_CONFIDENCE}"
+      # Confidence: required and must clear the minimum.
+      confidence = result_confidence
+      if confidence.nil?
+        problems << "result confidence is missing"
+      elsif confidence < MINIMUM_RESULT_CONFIDENCE
+        problems << "result confidence #{confidence} is below #{MINIMUM_RESULT_CONFIDENCE}"
       end
 
       problems
-    end
-
-    def task_completed?
-      return true if result["task_completed"] == true
-
-      completed_count = result.dig("structured_result", "completed_count") ||
-                        recipient&.dig("structured_result", "completed_count")
-      return true if completed_count.to_i >= 1
-
-      COMPLETED_RECIPIENT_STATUSES.include?(recipient&.fetch("status", "").to_s.downcase)
     end
 
     def expected_phone
@@ -84,8 +89,12 @@ module CallProviders
       Array(phones).map(&:to_s)
     end
 
-    def recipient_confidence
-      raw = recipient["result_confidence"] || recipient.dig("structured_result", "result_confidence")
+    # Confidence lives at the recipient level (MCP-normalized) or at the top level
+    # (REST `completion_confidence.score`); accept either, require one.
+    def result_confidence
+      raw = recipient&.dig("result_confidence") ||
+            recipient&.dig("structured_result", "result_confidence") ||
+            result.dig("completion_confidence", "score")
       raw.nil? ? nil : Float(raw)
     rescue ArgumentError, TypeError
       nil

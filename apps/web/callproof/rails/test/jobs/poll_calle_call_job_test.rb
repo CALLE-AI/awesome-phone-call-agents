@@ -46,7 +46,11 @@ class PollCalleCallJobTest < ActiveJob::TestCase
       "status" => "completed",
       "task_completed" => true,
       "structured_result" => { "completed_count" => 1 },
+      "completion_confidence" => { "score" => 0.93, "label" => "high" },
       "recipients" => [ {
+        "status" => "completed",
+        "phones" => [ Demo::Setup::PROVIDER_PHONE ],
+        "result_confidence" => 0.93,
         "structured_result" => {
           "delivery_changed" => true,
           "delivery_date" => "2026-08-07",
