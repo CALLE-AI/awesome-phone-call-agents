@@ -48,6 +48,7 @@ class Candidate:
     historical_accept_rate: float  # prior: how often they say yes when asked
     historical_showup_rate: float  # prior: how often a stated yes becomes real action
     eligible: bool = True
+    timezone: str = "UTC"  # IANA name, e.g. "Asia/Kolkata" -- governs calling-hour checks
 
     def prior_score(self) -> float:
         """Higher is better: more likely to say yes AND follow through."""

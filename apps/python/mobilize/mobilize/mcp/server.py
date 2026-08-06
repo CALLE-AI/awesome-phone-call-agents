@@ -30,14 +30,16 @@ except ImportError:
     from mcp.server.mcpserver import MCPServer  # mcp>=2.0
 
 from mobilize.core.dispatcher import mobilize
+from mobilize.core.ids import derive_mobilization_id
 from mobilize.core.ledger import Ledger
-from mobilize.core.policy import GovernancePolicy, GovernanceState
+from mobilize.core.policy import GovernancePolicy, load_governance_state
 from mobilize.core.types import Candidate, Need
 from mobilize.sim.population import generate_population
 from mobilize.transports.base import E164_RE
 from mobilize.transports.simulated import SimulatedTransport
 
 mcp = MCPServer("mobilize")
+GOVERNANCE_STATE_PATH = "/tmp/mobilize_mcp_real_governance.json"
 
 
 @mcp.tool()
@@ -126,11 +128,20 @@ async def mobilize_real(
                 location="", max_calls=len(candidates))
     ledger = Ledger("/tmp/mobilize_mcp_real_ledger.jsonl")
     transport = CalleTransport()
-    governance_state = GovernanceState()
+    # Loaded from disk, not constructed fresh -- see cli.py's run_real for
+    # why a fresh GovernanceState() every call makes cooldown/fatigue
+    # tracking silently useless across separate tool invocations.
+    governance_state = load_governance_state(GOVERNANCE_STATE_PATH)
     governance_policy = GovernancePolicy()
+    # Derived from the request itself so a retried call after a crash
+    # reuses the same mobilization_id and idempotency keys instead of
+    # starting an indistinguishable parallel run.
+    mobilization_id = derive_mobilization_id(need_label, phones)
 
     result = await mobilize(need, candidates, transport, ledger=ledger,
-                             governance_state=governance_state, governance_policy=governance_policy)
+                             mobilization_id=mobilization_id,
+                             governance_state=governance_state, governance_policy=governance_policy,
+                             governance_state_path=GOVERNANCE_STATE_PATH)
     await transport.aclose()
     return {
         "filled": result.filled,

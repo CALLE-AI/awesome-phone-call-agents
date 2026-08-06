@@ -16,9 +16,14 @@ from __future__ import annotations
 import json
 import os
 import threading
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass(frozen=True)
@@ -29,6 +34,7 @@ class LedgerEntry:
     idempotency_key: str
     call_id: str | None = None
     payload: dict | None = None
+    at: str = field(default_factory=_utcnow_iso)
 
 
 class Ledger:
@@ -96,6 +102,18 @@ class Ledger:
             for entry in self.replay(mobilization_id)
             if entry.kind == "result" and entry.payload is not None
         ]
+
+    def get_started_at(self, mobilization_id: str) -> datetime | None:
+        """Wall-clock time of the first ledger entry for this mobilization,
+        i.e. when it actually started -- possibly in a prior process. Used to
+        compute correct total elapsed time across a crash and resume, rather
+        than measuring only time-since-this-process-started."""
+        earliest: datetime | None = None
+        for entry in self.replay(mobilization_id):
+            at = datetime.fromisoformat(entry.at)
+            if earliest is None or at < earliest:
+                earliest = at
+        return earliest
 
     def replay(self, mobilization_id: str) -> Iterator[LedgerEntry]:
         if not self._path.exists():

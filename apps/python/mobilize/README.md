@@ -132,14 +132,26 @@ instead of placing a second one. See `mobilize/core/ledger.py` and
 On restart, recovered in-flight candidates are never re-dispatched *and*
 are actively polled for their outcome (bounded by `recovery_timeout_s`) —
 against the real transport this recovers genuine results, since call state
-lives server-side and survives a process restart.
+lives server-side and survives a process restart. Prior confirmations
+already recorded in the ledger are reconstructed from the ledger itself at
+startup, using each entry's own timestamp — a resumed run neither forgets
+what was already confirmed (and over-dispatches past the need) nor reports
+a `time_to_fill` measured only from the moment it happened to restart.
+
+For real calls specifically, `mobilization_id` is **derived deterministically
+from the request itself** (`need_label` + phone numbers), not a timestamp or
+random UUID — a retry after a crash reuses the same idempotency keys instead
+of silently starting an indistinguishable parallel run. See
+`mobilize/core/ids.py`.
 
 **This is proven, not asserted:** `mobilize/tests/test_crash_safety.py`
 `SIGKILL`s a real subprocess mid-dispatch and restarts it against the same
 ledger file — the same methodology used to crash-test a from-scratch LSM-tree
 key-value store in an earlier project. `mobilize/tests/test_recovery_polling.py`
-separately proves a recovered in-flight call is polled and its result counted,
-not silently abandoned. 40 tests pass, including both.
+and `mobilize/tests/test_resume_reconstruction.py` separately prove a
+recovered in-flight call is polled and counted, and that a resumed run with
+already-confirmed results neither forgets nor re-dispatches them. 52 tests
+pass, including all three.
 
 ### 5. Governance — consent is enforced in code, not just policy
 
@@ -147,8 +159,18 @@ not silently abandoned. 40 tests pass, including both.
 limits, and calling-hour windows *before* a candidate is ever handed to a
 transport. **Both real-call entry points (CLI `--real` and the MCP
 `mobilize_real` tool) run under governance by default** — it is not
-something a caller has to remember to opt into. See
-[skills/mobilize/references/safety.md](skills/mobilize/references/safety.md).
+something a caller has to remember to opt into.
+
+Governance state is **persisted to disk and reloaded on every real-call
+invocation**, not reconstructed fresh each time — a fresh in-memory state
+per call would make cooldown and contact-fatigue tracking silently useless
+across separate CLI runs or MCP tool calls, since nothing would ever
+remember a prior call happened. Calling-hour windows are checked against
+**each candidate's own local timezone** (`Candidate.timezone`), not the
+server's — a naive UTC-only comparison could call someone at 3am their
+time while judging it a reasonable hour on the machine running the code.
+See [skills/mobilize/references/safety.md](skills/mobilize/references/safety.md)
+and `mobilize/tests/test_governance_persistence.py`.
 
 ### 6. Result binding — never trust a response you can't verify
 
@@ -292,8 +314,9 @@ mobilize/
 ├── mcp/            # MCP server
 ├── app/            # CLI demo runner
 ├── artifacts/       # committed real-call transcripts and results
-└── tests/          # 40 tests incl. property-based, real-subprocess crash, and
-                    #   concurrency/validation tests added after external review
+└── tests/          # 52 tests incl. property-based, real-subprocess crash, and
+                    #   concurrency/validation/resume tests added after
+                    #   two rounds of external review
 skills/mobilize/    # Agent Skill (SKILL.md) wrapping mobilize() for reuse
 ```
 

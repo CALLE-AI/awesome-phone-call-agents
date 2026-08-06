@@ -20,12 +20,15 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from mobilize.core.dispatcher import mobilize
+from mobilize.core.ids import derive_mobilization_id
 from mobilize.core.ledger import Ledger
-from mobilize.core.policy import GovernancePolicy, GovernanceState
+from mobilize.core.policy import GovernancePolicy, load_governance_state
 from mobilize.core.types import Candidate, Need
 from mobilize.sim.population import generate_population
 from mobilize.transports.base import validate_e164
 from mobilize.transports.simulated import SimulatedTransport
+
+GOVERNANCE_STATE_PATH = "/tmp/mobilize_real_governance.json"
 
 GREEN, YELLOW, RED, DIM, RESET = "\033[92m", "\033[93m", "\033[91m", "\033[2m", "\033[0m"
 
@@ -94,9 +97,18 @@ async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
     transport = CalleTransport()
     # Real calls always run under governance -- do-not-call, cooldowns,
     # contact fatigue, and calling-hour windows -- by default, not as
-    # something the caller has to remember to opt into.
-    governance_state = GovernanceState()
+    # something the caller has to remember to opt into. Loaded from disk so
+    # it actually persists across separate CLI invocations; a fresh
+    # GovernanceState() every run would make cooldown/fatigue tracking
+    # silently useless beyond a single process.
+    governance_state = load_governance_state(GOVERNANCE_STATE_PATH)
     governance_policy = GovernancePolicy()
+
+    # Derived from the request itself, not a timestamp or random UUID, so
+    # retrying the exact same mobilization after a crash reuses the same
+    # idempotency keys instead of silently starting an indistinguishable
+    # parallel run that can redial everyone.
+    mobilization_id = derive_mobilization_id(need_label, phones)
 
     print(f"⚠️  REAL CALL-E CALLS to {len(phones)} number(s). This spends real call credits.")
     confirm = input("Type 'yes' to proceed: ")
@@ -105,8 +117,9 @@ async def run_real(phones: list[str], need_count: int, need_label: str) -> None:
         return
 
     result = await mobilize(need, candidates, transport, ledger=ledger, on_progress=_print_event,
-                             mobilization_id=f"real_{int(time.time())}",
-                             governance_state=governance_state, governance_policy=governance_policy)
+                             mobilization_id=mobilization_id,
+                             governance_state=governance_state, governance_policy=governance_policy,
+                             governance_state_path=GOVERNANCE_STATE_PATH)
     print(f"\nFilled: {result.filled}   Confirmed: {len(result.confirmed)}   Calls used: {result.calls_used}")
     await transport.aclose()
 

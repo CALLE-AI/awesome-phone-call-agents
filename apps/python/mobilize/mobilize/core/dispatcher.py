@@ -7,11 +7,19 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable
 
 from mobilize.core.ledger import Ledger
 from mobilize.core.planner import plan_wave, should_dispatch_next_wave
-from mobilize.core.policy import GovernancePolicy, GovernanceState, filter_callable, record_call
+from mobilize.core.policy import (
+    GovernancePolicy,
+    GovernanceState,
+    filter_callable,
+    record_call,
+    save_governance_state,
+)
 from mobilize.core.types import (
     Candidate,
     CallOutcome,
@@ -41,10 +49,22 @@ async def mobilize(
     on_progress: ProgressCallback | None = None,
     governance_state: GovernanceState | None = None,
     governance_policy: GovernancePolicy | None = None,
+    governance_state_path: str | Path | None = None,
 ) -> MobilizeResult:
     mobilization_id = mobilization_id or f"mob_{uuid.uuid4().hex[:10]}"
-    start = time.monotonic()
-    deadline_at = start + need.deadline_minutes * 60
+
+    # Wall-clock, not time.monotonic(), is the timing reference for anything
+    # that must mean the same thing across a crash and a resume in a new
+    # process: the mobilization's true deadline and its true time-to-fill.
+    # `ledger.get_started_at` returns when THIS mobilization_id first
+    # appeared in the ledger -- possibly in a prior process -- so a resumed
+    # run doesn't get a freshly-extended deadline or under-report how long
+    # filling the need actually took. time.monotonic() is still used for the
+    # short in-process poll loops below, where sub-second precision and
+    # immunity to wall-clock adjustments matter more than cross-process
+    # continuity.
+    wall_start = ledger.get_started_at(mobilization_id) or datetime.now(timezone.utc)
+    deadline_at = wall_start + timedelta(minutes=need.deadline_minutes)
 
     if governance_state is not None:
         policy = governance_policy or GovernancePolicy()
@@ -68,29 +88,49 @@ async def mobilize(
         if on_progress:
             on_progress(event, data)
 
-    def _record_confirmation_if_applicable(result: CallResult) -> None:
+    def _record_confirmation_if_applicable(result: CallResult, *, at: datetime | None = None) -> None:
         nonlocal time_to_fill
         if result.outcome in CONFIRMED_OUTCOMES and result.commitment_score >= COMMITMENT_THRESHOLD:
             confirmed.append(result)
             if len(confirmed) == need.count and time_to_fill is None:
-                time_to_fill = time.monotonic() - start
+                timestamp = at or datetime.now(timezone.utc)
+                time_to_fill = (timestamp - wall_start).total_seconds()
                 emit("need_met", {"time_to_fill_seconds": time_to_fill, "confirmed": len(confirmed)})
 
-    # Recover from a prior crash. Every candidate already dispatched for this
-    # mobilization_id must never be dispatched again -- that guarantee comes
-    # from the ledger record alone and holds regardless of what follows. What
-    # follows is an attempt to actually recover their outcome: poll each
-    # recovered call_id (works against the real transport, since call state
-    # lives server-side and survives a process restart; SimulatedTransport
-    # holds state in memory, so a fresh instance has no way to resolve a
-    # pre-crash simulated call_id and will simply time out here -- a property
-    # of the simulator, not of this recovery logic).
+    def _maybe_persist_governance() -> None:
+        if governance_state is not None and governance_state_path is not None:
+            save_governance_state(governance_state, governance_state_path)
+
+    # Recover from a prior crash, in three parts:
+    #
+    # 1. Reconstruct already-completed confirmations from the ledger. Without
+    #    this, a resumed run forgets every confirmation recorded before the
+    #    crash and can dispatch to more candidates than the need actually
+    #    still requires -- filled needs would keep growing past `need.count`.
+    #    Timestamps come from the ledger entry itself, not "now", so
+    #    time_to_fill reflects when the confirmation actually happened.
+    for entry in ledger.replay(mobilization_id):
+        if entry.kind == "result" and entry.payload is not None:
+            result = _deserialize(entry.payload)
+            all_results.append(result)
+            _record_confirmation_if_applicable(result, at=datetime.fromisoformat(entry.at))
+
+    # 2. Every candidate already dispatched for this mobilization_id must
+    #    never be dispatched again -- this guarantee comes from the ledger
+    #    record alone and holds regardless of what follows.
     in_flight = ledger.in_flight(mobilization_id)
     for candidate_id in list(remaining):
         if ledger.already_dispatched(mobilization_id, candidate_id):
             remaining.pop(candidate_id, None)
             calls_used += 1
 
+    # 3. For anyone still in flight (dispatched, no result yet), attempt to
+    #    actually recover their outcome by polling. Works against the real
+    #    transport, since call state lives server-side and survives a
+    #    process restart; SimulatedTransport holds state in memory, so a
+    #    fresh instance has no way to resolve a pre-crash simulated call_id
+    #    and will simply time out here -- a property of the simulator, not
+    #    of this recovery logic.
     if in_flight:
         emit("recovering_in_flight", {"count": len(in_flight)})
         recovery_deadline = time.monotonic() + recovery_timeout_s
@@ -112,7 +152,7 @@ async def mobilize(
 
     wave_index = 0
     while (
-        time.monotonic() < deadline_at
+        datetime.now(timezone.utc) < deadline_at
         and should_dispatch_next_wave(
             confirmed_count=len(confirmed),
             need_count=need.count,
@@ -136,6 +176,14 @@ async def mobilize(
             ledger.record_dispatch(mobilization_id, candidate.id, call_id)
             if governance_state is not None:
                 record_call(candidate, state=governance_state)
+                # Persisted immediately, not just at the end of mobilize(),
+                # so a crash right after this dispatch still leaves the
+                # do-not-call/cooldown/fatigue state consistent with what
+                # was actually dialed. Concurrent saves from other candidates
+                # in this same wave are harmless -- each captures the full,
+                # already-mutated shared state at the moment it runs, and
+                # save is a single synchronous write with no await inside it.
+                _maybe_persist_governance()
             return candidate.id, call_id
 
         # Fire every dispatch in this wave concurrently -- this is the
@@ -149,7 +197,8 @@ async def mobilize(
             remaining.pop(candidate_id, None)
 
         pending = dict(call_ids)
-        poll_deadline = min(time.monotonic() + poll_timeout_s, deadline_at)
+        seconds_left_on_deadline = max(0.0, (deadline_at - datetime.now(timezone.utc)).total_seconds())
+        poll_deadline = time.monotonic() + min(poll_timeout_s, seconds_left_on_deadline)
         while pending and time.monotonic() < poll_deadline:
             for candidate_id, call_id in list(pending.items()):
                 result = await transport.poll(call_id)
@@ -198,3 +247,14 @@ def _serialize(result: CallResult) -> dict:
         "stated_yes": result.stated_yes,
         "evidence": result.evidence,
     }
+
+
+def _deserialize(payload: dict) -> CallResult:
+    return CallResult(
+        call_id=payload["call_id"],
+        candidate_id=payload["candidate_id"],
+        outcome=CallOutcome(payload["outcome"]),
+        commitment_score=payload["commitment_score"],
+        stated_yes=payload["stated_yes"],
+        evidence=payload["evidence"],
+    )
