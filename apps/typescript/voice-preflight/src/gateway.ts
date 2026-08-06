@@ -5,10 +5,15 @@
  * auth header, the body template and where the audio sits in the response, so
  * adding a provider is a JSON file rather than a code change.
  *
+ * A descriptor is operator input, so it is checked against the credential
+ * contract before anything else happens here, whether it arrived through
+ * `loadDescriptor` or was built in code. See `assertNoInlineSecret`.
+ *
  * Two things a descriptor cannot be trusted about, because a provider answers
- * at runtime: where a redirect points and where an audio URL points. Both go
- * through the same policy as the endpoint before any request is built. See
- * `sendChecked` for the redirect rule and `audioBytes` for the URL one.
+ * at runtime: where a redirect points and where an audio URL points. Both are
+ * checked before any request is built, with the check that fits what the request
+ * carries. See `sendChecked` for the redirect rule and `audioBytes` for the URL
+ * one.
  *
  * Renders are cached under a digest of provider, voice and text. An unchanged
  * script is never paid for twice. An edited one is always re-read, which is
@@ -18,7 +23,8 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { assertTrustedEndpoint, assertTrustedUrl } from "./hosts.js";
+import { assertNoInlineSecret } from "./config.js";
+import { assertCredentialTarget, assertFetchable, assertTrustedEndpoint } from "./hosts.js";
 import { ProviderError, type ProviderDescriptor, type Render } from "./types.js";
 
 /** Redirects this app follows itself. A provider normalises a host, not four. */
@@ -61,17 +67,21 @@ export interface RenderOptions {
 }
 
 /**
- * Everything one render is allowed to reach. Built once from the endpoint, so
- * the endpoint rule and the audio URL rule cannot drift apart.
+ * Every host one render may fetch from. This is the fetch allowlist and nothing
+ * else: where the credential may go is decided by the endpoint origin, which
+ * `sendChecked` carries per request rather than reading from here.
  */
 interface Trust {
   providerName: string;
-  /** Materialised once, because it is now read for every hop. */
+  /** Materialised once, because it is read for every credential-free hop. */
   allowedHosts: readonly string[];
   authEnv: string;
 }
 
-/** One request, with headers rebuilt per hop rather than carried across one. */
+/**
+ * One request. Headers are rebuilt per hop rather than carried across one. Which
+ * policy a hop is checked against is decided by `carriesCredential`.
+ */
 interface Send {
   url: URL;
   method: "GET" | "POST";
@@ -96,21 +106,28 @@ async function release(response: Response): Promise<void> {
 /**
  * Send a request and follow redirects by hand, checking every hop.
  *
- * Two approaches were open here. Refusing redirects outright with
- * `redirect: "manual"` and no follow is safe, but it breaks a provider that
- * normalises a host or moves a path, which an operator cannot fix from a
- * descriptor. So this takes the second one the review named: manual redirects
- * plus an explicit hop policy. Each `Location` goes through the same
- * `assertTrustedUrl` as the endpoint. The headers are rebuilt for the hop only
- * after it passes, so the credential reaches allowed hosts only. A hop that
- * stays on the origin this request started from is the same destination, so it
- * passes. A hop anywhere else has to be https on an allowed host, which means a
- * loopback fake cannot redirect the key to a second local port either.
+ * Which check a hop gets depends on what the request carries, because "may this
+ * app fetch it" and "may the credential go there" are two questions.
  *
- * What it must not do is leave `redirect: "follow"` in place. Node strips
- * `Authorization` on a cross-origin hop but keeps every other header. This app
- * lets a descriptor name the header its credential travels in (`xi-api-key`
- * for one shipped example), so the default hands that key to whatever host a
+ * The credentialed request may only be redirected inside the origin the operator
+ * wrote in the descriptor. `assertCredentialTarget` enforces that. Round 2 of
+ * this review ran every hop through the fetch allowlist instead, which meant a
+ * CDN host named so `urlField` audio could be fetched also authorized the key:
+ * the provider answers 302 to that host and the key follows. The allowlist says
+ * where this app may talk. It never said where a key may go.
+ *
+ * A hop that leaves the approved origin is refused rather than retried without
+ * the credential. Continuing would send the script body to a host the provider
+ * chose. A silent unauthenticated retry also reads as a provider outage rather
+ * than as the policy decision it is.
+ *
+ * A credential-free request, which is the audio link, still gets the fetch
+ * allowlist, so a CDN moving a link across hosts you named keeps working.
+ *
+ * What neither path may do is leave `redirect: "follow"` in place. Node strips
+ * `Authorization` on a cross-origin hop and keeps every other header. This app
+ * lets a descriptor name the header its credential travels in (`xi-api-key` for
+ * one shipped example), so the default hands that key to whatever host a
  * `Location` names.
  */
 async function sendChecked(send: Send, trust: Trust, doFetch: typeof fetch): Promise<Response> {
@@ -145,15 +162,22 @@ async function sendChecked(send: Send, trust: Trust, doFetch: typeof fetch): Pro
         `${trust.providerName} answered ${response.status} with a Location this app cannot parse.`,
       );
     }
-    url = assertTrustedUrl(next.href, {
-      allowedHosts: trust.allowedHosts,
-      allowLoopback: false,
-      sameOriginAs: origin,
-      authEnv: trust.authEnv,
-      what: `${send.what} redirected to hop ${hop + 1}`,
-      carriesCredential: send.carriesCredential,
-      note: send.note,
-    });
+    const what = `${send.what} redirected to hop ${hop + 1}`;
+    url = send.carriesCredential
+      ? assertCredentialTarget(next.href, {
+          origin,
+          authEnv: trust.authEnv,
+          what,
+          note: send.note,
+        })
+      : assertFetchable(next.href, {
+          allowedHosts: trust.allowedHosts,
+          allowLoopback: false,
+          authEnv: trust.authEnv,
+          what,
+          carriesCredential: false,
+          note: send.note,
+        });
     // What fetch itself does with a body on these three, kept so a provider sees
     // the request it expects.
     if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === "POST")) {
@@ -166,14 +190,19 @@ async function sendChecked(send: Send, trust: Trust, doFetch: typeof fetch): Pro
 /**
  * Render text to an audio file and return what was measured about it.
  *
- * Order matters. The character limit and the endpoint check both run before the
- * credential is read, so a script that cannot be sent never reads a secret and
- * a bad endpoint never receives one.
+ * Order matters. The descriptor contract, the character limit and the endpoint
+ * check all run before the credential is read, so a descriptor that may not be
+ * sent never reads a secret and a bad endpoint never receives one.
  */
 export async function render(options: RenderOptions): Promise<Render> {
   const { descriptor, voiceId, text, cacheDir } = options;
   const env = options.env ?? process.env;
   const doFetch = options.fetchImpl ?? fetch;
+
+  // Also enforced by `loadDescriptor`. Repeated here because a descriptor built
+  // in code reaches this function without passing the loader. An inline
+  // credential has to be refused wherever the descriptor came from.
+  assertNoInlineSecret(descriptor as unknown as Record<string, unknown>);
 
   if (text.length > descriptor.maxChars) {
     throw new ProviderError(
@@ -183,6 +212,8 @@ export async function render(options: RenderOptions): Promise<Render> {
 
   const endpoint = fill(descriptor.endpoint, text, voiceId, false);
   const allowedHosts = [...options.allowedHosts];
+  // This is both the first request and the one origin the credential may reach.
+  // `sendChecked` pins every credentialed hop to it.
   const url = assertTrustedEndpoint(endpoint, allowedHosts, descriptor.authEnv);
 
   const digest = renderDigest(descriptor, voiceId, text);
@@ -210,8 +241,8 @@ export async function render(options: RenderOptions): Promise<Render> {
     allowedHosts,
     authEnv: descriptor.authEnv,
   };
-  // Rebuilt for every hop, so a header is only ever attached to a URL that has
-  // just passed the policy.
+  // Rebuilt for every hop, so the credential is only ever attached to a URL that
+  // has just been confirmed to be the approved origin.
   const headers = (): Record<string, string> => {
     const built: Record<string, string> = { ...(descriptor.headers ?? {}) };
     built[descriptor.authHeader] = `${descriptor.authPrefix ?? ""}${secret}`;
@@ -273,11 +304,12 @@ export async function render(options: RenderOptions): Promise<Render> {
  *
  * `urlField` is the one that leaves this app's own trust boundary, because the
  * URL comes out of a provider response rather than from the operator. It gets
- * the strictest form of the same policy: https, a host on the allowlist, no
+ * the strictest form of the fetch policy: https, a host on the allowlist, no
  * literal address in private or link-local space and no loopback at all. That
  * last one is stricter than the endpoint rule on purpose. The operator may point
  * the endpoint at a local fake, a provider may not point this app at anything on
- * the machine it runs on. The fetch carries no credential either.
+ * the machine it runs on. No credential is attached, here or on any hop this
+ * link takes, because the key belongs to the endpoint origin and to nothing else.
  */
 async function audioBytes(
   descriptor: ProviderDescriptor,
@@ -302,7 +334,7 @@ async function audioBytes(
 
   const what = `The audio URL ${descriptor.name} returned`;
   const note = `${trust.authEnv} was not sent to that host and no audio was written.`;
-  const url = assertTrustedUrl(found, {
+  const url = assertFetchable(found, {
     allowedHosts: trust.allowedHosts,
     allowLoopback: false,
     authEnv: trust.authEnv,

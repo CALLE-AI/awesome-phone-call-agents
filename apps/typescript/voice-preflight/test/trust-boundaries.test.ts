@@ -6,14 +6,18 @@
  * The credentialed request followed a cross-origin redirect and the descriptor's
  * own auth header arrived at hop two, because Node strips `Authorization` there
  * and strips nothing else. The `urlField` path fetched whatever URL a provider
- * named, including a service listening on this machine. Ten of the twelve cases
- * here fail without the policy in `src/hosts.ts` and the manual hop handling in
- * `src/gateway.ts`. The other two are the working paths the fix had to leave
- * alone: a provider that moves a path on its own origin, plus an audio link on a
- * host the operator allowed. Both are marked.
+ * named, including a service listening on this machine.
+ *
+ * The first version of this file then got the credential rule wrong. It asserted
+ * that a hop to any allowed host rebuilds the credential there, which authorizes
+ * a CDN host named for `urlField` audio to receive the TTS key. Two questions
+ * were being answered by one allowlist. `refuses a hop to a host that was only
+ * allowed for audio` is that case corrected: the credential goes to the origin
+ * the operator wrote and nowhere else, while the allowlist still governs what
+ * this app may fetch.
  *
  * Every case asserts what the far side saw before it asserts the refusal. Run
- * against the unfixed code the failure then prints the request that should never
+ * against unfixed code the failure then prints the request that should never
  * have been made, rather than a bare missing-rejection message.
  */
 
@@ -230,18 +234,39 @@ describe("a redirect on the request that carries the credential", () => {
     );
     const outcome = await outcomeOf(renderRemote(descriptorFor(REMOTE), stub.impl));
     assert.deepEqual(urlsOf(stub.calls), [REMOTE], "only the endpoint was requested");
-    assertRefused(outcome, /relay\.evil\.example is not an allowed host/);
+    assertRefused(outcome, /https:\/\/relay\.evil\.example is not the origin the operator approved/);
   });
-  it("follows a hop to an allowed host and rebuilds the credential there", async () => {
-    const moved = "https://alt.acme.example/v1/tts";
+
+  // This case replaces one that asserted the opposite. `cdn.acme.example` is on
+  // the allowlist because that is where this provider's audio sits. The earlier
+  // version of this file expected the credential to be rebuilt for any allowed
+  // host, so a host added for credential-free audio could be handed the key by a
+  // `Location` header. The allowlist answers "may this app fetch it". It never
+  // answered "may the key go there".
+  it("refuses a hop to a host that was only allowed for audio", async () => {
+    const moved = `https://${CDN}/v1/tts`;
     const stub = stubFetch((url) =>
       url === REMOTE ? movedTo(moved, 307) : bytesResponse(wavOfSeconds(1)),
     );
-    const out = await renderRemote(descriptorFor(REMOTE), stub.impl);
-    assert.deepEqual(urlsOf(stub.calls), [REMOTE, moved]);
-    assert.equal(stub.calls.at(-1)?.method, "POST", "a 307 keeps the method");
-    assert.equal(stub.calls.at(-1)?.headers[AUTH_HEADER], KEY, "rebuilt for the approved host");
-    assert.ok(out.bytes > 44);
+    const outcome = await outcomeOf(renderRemote(descriptorFor(REMOTE), stub.impl));
+    assert.deepEqual(urlsOf(stub.calls), [REMOTE], "the CDN host was never contacted");
+    assert.equal(
+      stub.calls.every((call) => call.headers[AUTH_HEADER] === KEY && call.url === REMOTE),
+      true,
+      "the credential only ever went to the endpoint",
+    );
+    assertRefused(outcome, new RegExp(`https://${CDN} is not the origin the operator approved`));
+    assertRefused(outcome, /LOCAL_FAKE_KEY travels to https:\/\/api\.acme\.example only/);
+  });
+
+  it("refuses a hop to the endpoint host on another port, because a port is part of an origin", async () => {
+    const moved = "https://api.acme.example:8443/v1/tts";
+    const stub = stubFetch((url) =>
+      url === REMOTE ? movedTo(moved, 307) : bytesResponse(wavOfSeconds(1)),
+    );
+    const outcome = await outcomeOf(renderRemote(descriptorFor(REMOTE), stub.impl));
+    assert.deepEqual(urlsOf(stub.calls), [REMOTE], "the other port was never contacted");
+    assertRefused(outcome, /https:\/\/api\.acme\.example:8443 is not the origin/);
   });
 
   it("stops at the hop cap rather than following a loop", async () => {
@@ -369,5 +394,25 @@ describe("the audio URL a provider returns", () => {
     const outcome = await outcomeOf(renderRemote(urlFieldDescriptor(REMOTE), stub.impl));
     assert.deepEqual(urlsOf(stub.calls), [REMOTE, link], "the hop was never requested");
     assertRefused(outcome, /is on this machine/);
+  });
+
+  // The other side of the split. Nothing on this path carries the credential, so
+  // the allowlist is the whole policy and a CDN moving a link between two hosts
+  // the operator named still works. Tightening the credential rule was not
+  // allowed to turn into refusing every hop.
+  it("follows an audio link across two hosts the operator named, with no credential", async () => {
+    const link = `https://${CDN}/render.wav`;
+    const moved = "https://alt.acme.example/blob/render.wav";
+    const wav = wavOfSeconds(2);
+    const stub = stubFetch((url) => {
+      if (url === REMOTE) return audioAt(link);
+      if (url === link) return movedTo(moved);
+      return bytesResponse(wav);
+    });
+    const out = await renderRemote(urlFieldDescriptor(REMOTE), stub.impl);
+    assert.deepEqual(urlsOf(stub.calls), [REMOTE, link, moved]);
+    assert.equal(stub.calls.at(1)?.headers[AUTH_HEADER], undefined, "no credential on the link");
+    assert.equal(stub.calls.at(2)?.headers[AUTH_HEADER], undefined, "none on its hop either");
+    assert.equal(out.bytes, wav.length);
   });
 });

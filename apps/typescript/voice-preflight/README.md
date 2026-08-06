@@ -54,7 +54,7 @@ wrote for you.
 cd apps/typescript/voice-preflight
 npm install
 npm run check   # tsc --noEmit
-npm test        # 52 tests, no credentials, no network beyond loopback
+npm test        # 84 tests, no credentials, no network beyond loopback
 npm run demo    # the whole flow against a local fake provider
 ```
 
@@ -127,8 +127,12 @@ credential and the host. The host is the part worth explaining.
 
 **The descriptor never holds a credential.** It names the environment variable
 that does. A descriptor is the file people commit and paste to each other, so the
-loader refuses an `authEnv` that is not shaped like a variable name, plus a
-static header carrying a long opaque value, because that is what a key looks like.
+loader refuses key material in every field, not only in a static header:
+`authPrefix`, the endpoint path and query, a header name as well as a header
+value, the body template, the JSON path and the language list. `authEnv` has to
+be shaped like a variable name and an unknown field is refused rather than
+ignored, so there is no spare field to paste a key into. The same check runs again
+in `render`, because a descriptor built in code never passes the loader.
 
 **The credential only travels where you said.** This app talks to no fixed vendor,
 so there is no default trusted host. Name the host once with `--allow-host` or
@@ -142,12 +146,14 @@ Rendered audio is cached under a digest of provider, voice and text and written
 re-read.
 
 **A provider does not get to redirect that.** Redirects are followed by hand, up to
-three hops. Every hop goes through the same host and protocol check as the endpoint
-before the headers are rebuilt for it. A hop that stays on the origin the request
-started from is the same destination, so a provider can still move a path.
-Anything else has to be https on a host you named. The same check runs on an audio
-URL a `urlField` provider returns, which is fetched without the credential and may
-not point at loopback, link-local or private space.
+three hops. Which check a hop gets depends on what the request carries. The
+request holding the credential may only be redirected inside the origin you wrote
+in the descriptor, so a provider can still move one of its own paths and a
+`Location` pointing anywhere else is refused. That is deliberately narrower than
+the allowlist: the allowlist says where this app may fetch from, so a host you
+added for `urlField` audio is not a host that may receive your key. An audio URL
+carries no credential, so it gets the allowlist plus https, with no loopback,
+link-local or private address.
 
 ## Exit codes
 

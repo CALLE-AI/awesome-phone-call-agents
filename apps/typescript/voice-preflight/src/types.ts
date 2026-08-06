@@ -22,11 +22,11 @@ export interface ProviderDescriptor {
   method: "POST" | "GET";
   /** Header carrying the credential, for example `xi-api-key` or `Authorization`. */
   authHeader: string;
-  /** Optional prefix, for example `Bearer `. Kept separate so the env var holds only the key. */
+  /** One auth scheme name, for example `Bearer `. Kept separate so the env var holds only the key. */
   authPrefix?: string;
   /** Name of the environment variable holding the credential. Never the credential. */
   authEnv: string;
-  /** Extra static headers. A credential here is refused by the loader. */
+  /** Extra static headers. Names and values are both checked for key material. */
   headers?: Readonly<Record<string, string>>;
   /** JSON body template. `{text}` and `{voice}` are substituted. Omit for GET. */
   bodyTemplate?: string;

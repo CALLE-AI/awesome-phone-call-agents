@@ -1,25 +1,31 @@
 /**
- * One trust policy for every URL this app fetches.
+ * Two questions about a URL, two functions, because they are not one policy.
  *
- * Three call sites go through `assertTrustedUrl`: the provider endpoint, every
- * redirect hop on the credentialed request and any audio URL a provider hands
- * back. That is deliberate. A policy living in one function cannot drift
- * between the request that carries the credential and the request that follows
- * a link, which is how a checked endpoint turns into an unchecked fetch.
+ * "May this app fetch it" is `assertFetchable`: https, a host the operator
+ * named, no literal address in loopback, link-local or private space. The
+ * endpoint and any audio URL a provider hands back are checked with it. Plain
+ * http reaches loopback only, for a URL the operator chose, which is what the
+ * local fake and the tests use. A URL that arrived inside a provider response is
+ * checked with `allowLoopback: false`, because a response must not be able to
+ * steer this app at a service on the machine it runs on.
  *
- * The provider descriptor is operator input and the credential rides on the
- * endpoint request, so the check runs before any request is built rather than
- * after a client has already handed the key over. https on its own is not
- * enough: it says the transport is encrypted and nothing about who is on the
- * other end.
+ * "May the credential be attached to it" is `assertCredentialTarget`. The answer
+ * is only ever the origin the operator wrote in the descriptor. These
+ * were one function and one allowlist until review pointed out what that
+ * authorizes: a CDN host named so `urlField` audio could be fetched also
+ * authorized the key, because the provider endpoint can redirect there and the
+ * key follows. The allowlist is the set of hosts this app may talk to. It is not
+ * the set of hosts that may hold a key. An operator adding a host for audio is
+ * answering the first question and should not be widening the second.
  *
- * This app talks to no fixed vendor, so unlike a CALL-E client there is no
- * default trusted host to fall back on. The operator names the host once, with
- * `--allow-host` or `VOICE_ALLOWED_HOSTS`. Anything else is refused. Plain http
- * reaches loopback only, for a URL the operator chose. That is what the local
- * fake provider and the tests use. A URL that arrived inside a
- * provider response is checked with `allowLoopback: false`, because a response
- * must not be able to steer this app at a service on the machine it runs on.
+ * The credential origin needs no descriptor field and no second allowlist. It is
+ * the endpoint the operator already wrote, so it cannot be widened by accident
+ * and there is nothing new to misconfigure. A provider that genuinely serves
+ * from another host is one endpoint edit away, which is a decision the operator
+ * makes rather than one a `Location` header makes for them.
+ *
+ * https on its own is not enough for either question: it says the transport is
+ * encrypted and nothing about who is on the other end.
  */
 
 import { ConfigError } from "./types.js";
@@ -117,8 +123,8 @@ export function reservedRange(host: string): string | null {
   return null;
 }
 
-/** What one call site is allowed to reach, plus what to say when it is not. */
-export interface UrlPolicy {
+/** What one fetch site is allowed to reach, plus what to say when it is not. */
+export interface FetchPolicy {
   /** Exact hostnames the operator named. Loopback needs no entry. */
   allowedHosts: Iterable<string>;
   /**
@@ -126,12 +132,6 @@ export interface UrlPolicy {
    * false for a URL that came out of a provider response.
    */
   allowLoopback: boolean;
-  /**
-   * An origin that has already passed this policy. A URL on exactly that origin
-   * is the same destination, so a provider redirecting itself from one path to
-   * another still works without widening the allowlist.
-   */
-  sameOriginAs?: URL;
   /** Environment variable naming the credential, quoted in a refusal. */
   authEnv: string;
   /** Which URL is being checked, for example "The endpoint". */
@@ -140,6 +140,23 @@ export interface UrlPolicy {
   carriesCredential: boolean;
   /** Sentence saying what did not travel. It has to be true at the call site. */
   note: string;
+}
+
+/** Where the credential may go. One origin, so there is nothing to widen. */
+export interface CredentialPolicy {
+  /** The endpoint origin the operator wrote, already through `assertFetchable`. */
+  origin: URL;
+  /** Environment variable naming the credential, quoted in a refusal. */
+  authEnv: string;
+  /** Which URL is being checked, for example "The endpoint redirected to hop 1". */
+  what: string;
+  /** Sentence saying what did not travel. It has to be true at the call site. */
+  note: string;
+}
+
+/** Scheme and authority, which is what "the same destination" means here. */
+function originOf(url: URL): string {
+  return `${url.protocol}//${url.host}`;
 }
 
 /** Keep a provider-supplied string short and printable inside a refusal. */
@@ -153,12 +170,17 @@ function clip(value: string): string {
 }
 
 /**
- * Return the parsed URL. Throw naming what is wrong with it otherwise.
+ * May this app fetch that URL. Return the parsed URL, throw naming what is
+ * wrong with it otherwise.
+ *
+ * This answers nothing about the credential. A URL that passes here is a URL
+ * this app may talk to, which is a different sentence from a URL that may hold
+ * a key. `assertCredentialTarget` answers that one.
  *
  * The message always states what happened to the credential, because the most
  * useful thing an operator can know after a refusal is what did not leak.
  */
-export function assertTrustedUrl(candidate: string, policy: UrlPolicy): URL {
+export function assertFetchable(candidate: string, policy: FetchPolicy): URL {
   const shown = clip(candidate);
   const refuse = (problem: string): never => {
     const hint = policy.allowLoopback
@@ -180,10 +202,6 @@ export function assertTrustedUrl(candidate: string, policy: UrlPolicy): URL {
   }
   if (url.username !== "" || url.password !== "") {
     return refuse(`${shown} carries credentials in the URL itself, which this app never sends.`);
-  }
-  const base = policy.sameOriginAs;
-  if (base !== undefined && url.protocol === base.protocol && url.host === base.host) {
-    return url;
   }
 
   const host = normalizeHost(url.hostname);
@@ -214,13 +232,50 @@ export function assertTrustedUrl(candidate: string, policy: UrlPolicy): URL {
   return url;
 }
 
+/**
+ * May the credential be attached to that URL. Only on the origin the operator
+ * approved, which is the endpoint they wrote.
+ *
+ * Same scheme, same host, same port. A provider moving one of its own paths
+ * still works, which is the case that has to keep working. A `Location` pointing
+ * anywhere else is refused whether or not that host is on the fetch allowlist.
+ * The allowlist authorizes fetching. It does not authorize holding a key. One
+ * set cannot mean both without a CDN entry for audio quietly becoming an entry
+ * for the credential.
+ *
+ * The origin argument has already been through `assertFetchable`, so a URL that
+ * matches it inherits every property that check established.
+ */
+export function assertCredentialTarget(candidate: string, policy: CredentialPolicy): URL {
+  const shown = clip(candidate);
+  const refuse = (problem: string): never => {
+    throw new ConfigError(
+      `${policy.what}: ${problem} ${policy.authEnv} travels to ${originOf(policy.origin)} only, which is the endpoint you wrote, so a host you allowed for audio never receives it. Point the descriptor endpoint at that origin if the credential belongs there. ${policy.note}`,
+    );
+  };
+
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return refuse(`${shown} is not a URL.`);
+  }
+  if (url.username !== "" || url.password !== "") {
+    return refuse(`${shown} carries credentials in the URL itself, which this app never sends.`);
+  }
+  if (url.protocol !== policy.origin.protocol || url.host !== policy.origin.host) {
+    return refuse(`${originOf(url)} is not the origin the operator approved.`);
+  }
+  return url;
+}
+
 /** The endpoint call site: operator input, so loopback for a local fake is fine. */
 export function assertTrustedEndpoint(
   endpoint: string,
   allowedHosts: Iterable<string> = [],
   authEnv = "the provider credential",
 ): URL {
-  return assertTrustedUrl(endpoint, {
+  return assertFetchable(endpoint, {
     allowedHosts,
     allowLoopback: true,
     authEnv,
