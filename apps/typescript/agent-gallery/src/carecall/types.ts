@@ -42,7 +42,9 @@ export interface SeniorEdit {
   name: string;
   preferredName: string;
   language: string;
-  callWindow: string;
+  /** 24-hour `HH:MM`, composed into the stored display window on save. */
+  callWindowFrom: string;
+  callWindowTo: string;
   caregiver: string;
   caregiverRelationship: string;
 }

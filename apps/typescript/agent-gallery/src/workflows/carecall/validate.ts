@@ -18,9 +18,28 @@ function minutesFromClock(hourText: string, minuteText: string, meridiem: string
   return hour * 60 + Number(minuteText);
 }
 
+/**
+ * Minutes past midnight for each end of a permitted window, or null when the
+ * text does not parse. Anything that renders or builds a window reads it
+ * through here so a second copy of the pattern cannot drift from this one.
+ */
+export function permittedCallWindowMinutes(windowText: string): { start: number; end: number } | null {
+  const match = windowText.trim().match(PERMITTED_CALL_WINDOW);
+  if (!match) return null;
+  return {
+    start: minutesFromClock(match[1], match[2], match[3]),
+    end: minutesFromClock(match[4], match[5], match[6]),
+  };
+}
+
+function coversMinute(windowText: string, current: number): boolean {
+  const window = permittedCallWindowMinutes(windowText);
+  if (!window) return false;
+  const { start, end } = window;
+  return start <= end ? current >= start && current <= end : current >= start || current <= end;
+}
+
 function withinPermittedWindow(windowText: string, instant: Date): boolean {
-  const match = windowText.match(PERMITTED_CALL_WINDOW);
-  if (!match) return false;
   const parts = new Intl.DateTimeFormat("en-SG", {
     timeZone: "Asia/Singapore",
     hour: "numeric",
@@ -29,20 +48,13 @@ function withinPermittedWindow(windowText: string, instant: Date): boolean {
   }).formatToParts(instant);
   const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0) % 24;
   const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
-  const current = hour * 60 + minute;
-  const start = minutesFromClock(match[1], match[2], match[3]);
-  const end = minutesFromClock(match[4], match[5], match[6]);
-  return start <= end ? current >= start && current <= end : current >= start || current <= end;
+  return coversMinute(windowText, hour * 60 + minute);
 }
 
 export function isScheduledTimeWithinPermittedWindow(windowText: string, timeText: string): boolean {
-  const windowMatch = windowText.match(PERMITTED_CALL_WINDOW);
   const timeMatch = timeText.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-  if (!windowMatch || !timeMatch) return false;
-  const current = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
-  const start = minutesFromClock(windowMatch[1], windowMatch[2], windowMatch[3]);
-  const end = minutesFromClock(windowMatch[4], windowMatch[5], windowMatch[6]);
-  return start <= end ? current >= start && current <= end : current >= start || current <= end;
+  if (!timeMatch) return false;
+  return coversMinute(windowText, Number(timeMatch[1]) * 60 + Number(timeMatch[2]));
 }
 
 export function validateCareCallRequest(

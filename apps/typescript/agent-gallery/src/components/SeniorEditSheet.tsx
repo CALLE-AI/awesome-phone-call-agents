@@ -1,8 +1,14 @@
 import { useRef, useState } from "react";
 import {
+  callWindowSpansMidnight,
+  caregiverRelationshipOptions,
+  formatCallWindow,
   hasSeniorEditErrors,
   initialsFor,
+  isKnownOption,
+  languageOptions,
   normalizeSeniorEdit,
+  OTHER_OPTION,
   seniorEditFrom,
   validateSeniorEdit,
   type SeniorEditErrors,
@@ -18,19 +24,41 @@ interface SeniorEditSheetProps {
   onSave: (edit: SeniorEdit) => void;
 }
 
+/** A stored value outside the list is kept as an "Other" remark rather than lost. */
+function choiceFor(options: readonly string[], value: string) {
+  return isKnownOption(options, value) || !value.trim()
+    ? { choice: value.trim(), remark: "" }
+    : { choice: OTHER_OPTION, remark: value.trim() };
+}
+
 export function SeniorEditSheet({ senior, onClose, onSave }: SeniorEditSheetProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const [edit, setEdit] = useState<SeniorEdit>(() => seniorEditFrom(senior));
+  const [language, setLanguage] = useState(() => choiceFor(languageOptions, senior.language));
+  const [relationship, setRelationship] = useState(() => choiceFor(caregiverRelationshipOptions, senior.caregiverRelationship));
   const [errors, setErrors] = useState<SeniorEditErrors>({});
   const [submitted, setSubmitted] = useState(false);
 
   useModalDialog(sheetRef, closeRef, onClose);
 
-  function patch(field: keyof SeniorEdit, value: string) {
-    const next = { ...edit, [field]: value };
+  function revalidate(next: SeniorEdit) {
     setEdit(next);
     if (submitted) setErrors(validateSeniorEdit(next));
+  }
+
+  function patch(field: keyof SeniorEdit, value: string) {
+    revalidate({ ...edit, [field]: value });
+  }
+
+  function patchLanguage(next: { choice: string; remark: string }) {
+    setLanguage(next);
+    revalidate({ ...edit, language: next.choice === OTHER_OPTION ? next.remark : next.choice });
+  }
+
+  function patchRelationship(next: { choice: string; remark: string }) {
+    setRelationship(next);
+    revalidate({ ...edit, caregiverRelationship: next.choice === OTHER_OPTION ? next.remark : next.choice });
   }
 
   function submit() {
@@ -42,12 +70,10 @@ export function SeniorEditSheet({ senior, onClose, onSave }: SeniorEditSheetProp
   }
 
   const preview = normalizeSeniorEdit(edit);
-  const fieldProps = (field: keyof SeniorEdit) => ({
-    "aria-describedby": errors[field] ? `senior-edit-${field}-error` : undefined,
-    "aria-invalid": errors[field] ? true : undefined,
-    onChange: (event: { target: { value: string } }) => patch(field, event.target.value),
-    value: edit[field],
-  });
+  const windowLabel = formatCallWindow(preview.callWindowFrom, preview.callWindowTo);
+  const overnight = callWindowSpansMidnight(preview.callWindowFrom, preview.callWindowTo);
+  const errorId = (field: keyof SeniorEdit) => `senior-edit-${field}-error`;
+  const describe = (field: keyof SeniorEdit) => (errors[field] ? { "aria-describedby": errorId(field), "aria-invalid": true as const } : {});
 
   return (
     <div className="sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -63,7 +89,7 @@ export function SeniorEditSheet({ senior, onClose, onSave }: SeniorEditSheetProp
 
         <div className="call-sheet__content">
           <section className="preview-recipient">
-            <SeniorAvatar initials={initialsFor(preview.name) } tone={senior.avatar} size="large" />
+            <SeniorAvatar initials={initialsFor(preview.name)} tone={senior.avatar} size="large" />
             <div>
               <p>Record</p>
               <h3>{preview.preferredName || senior.preferredName}</h3>
@@ -74,37 +100,90 @@ export function SeniorEditSheet({ senior, onClose, onSave }: SeniorEditSheetProp
           <div className="senior-edit-grid">
             <label className="execution-field">
               <span>Full name</span>
-              <input autoComplete="off" type="text" {...fieldProps("name")} />
-              {errors.name && <small className="field-error" id="senior-edit-name-error" role="alert">{errors.name}</small>}
+              <input autoComplete="off" onChange={(event) => patch("name", event.target.value)} type="text" value={edit.name} {...describe("name")} />
+              {errors.name && <small className="field-error" id={errorId("name")} role="alert">{errors.name}</small>}
             </label>
             <label className="execution-field">
               <span>Preferred name</span>
-              <input autoComplete="off" type="text" {...fieldProps("preferredName")} />
+              <input autoComplete="off" onChange={(event) => patch("preferredName", event.target.value)} type="text" value={edit.preferredName} {...describe("preferredName")} />
               <small>CareCall uses this name on the call.</small>
-              {errors.preferredName && <small className="field-error" id="senior-edit-preferredName-error" role="alert">{errors.preferredName}</small>}
+              {errors.preferredName && <small className="field-error" id={errorId("preferredName")} role="alert">{errors.preferredName}</small>}
             </label>
-            <label className="execution-field">
-              <span>Language</span>
-              <input autoComplete="off" type="text" {...fieldProps("language")} />
+
+            <div className="execution-field senior-edit-grid__wide">
+              <label className="execution-field">
+                <span>Language</span>
+                <select onChange={(event) => patchLanguage({ choice: event.target.value, remark: "" })} value={language.choice} {...describe("language")}>
+                  {languageOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  <option value={OTHER_OPTION}>Other…</option>
+                </select>
+              </label>
+              {language.choice === OTHER_OPTION && (
+                <input
+                  aria-label="Specify the language"
+                  autoComplete="off"
+                  onChange={(event) => patchLanguage({ choice: OTHER_OPTION, remark: event.target.value })}
+                  placeholder="Which language?"
+                  type="text"
+                  value={language.remark}
+                />
+              )}
               <small>Live calling stays blocked for any language other than English until quality is verified.</small>
-              {errors.language && <small className="field-error" id="senior-edit-language-error" role="alert">{errors.language}</small>}
-            </label>
-            <label className="execution-field">
-              <span>Permitted call window</span>
-              <input autoComplete="off" placeholder="8:00 AM–8:00 PM" type="text" {...fieldProps("callWindow")} />
-              <small>Singapore time. Calls outside this window are refused.</small>
-              {errors.callWindow && <small className="field-error" id="senior-edit-callWindow-error" role="alert">{errors.callWindow}</small>}
-            </label>
+              {errors.language && <small className="field-error" id={errorId("language")} role="alert">{errors.language}</small>}
+            </div>
+
+            <fieldset className="senior-edit-grid__wide call-window-field">
+              <legend>Permitted call window</legend>
+              <div className="call-window-range">
+                <label className="execution-field">
+                  <span>From</span>
+                  <input onChange={(event) => patch("callWindowFrom", event.target.value)} step={300} type="time" value={edit.callWindowFrom} {...describe("callWindowFrom")} />
+                </label>
+                <span aria-hidden="true" className="call-window-range__dash">–</span>
+                <label className="execution-field">
+                  <span>To</span>
+                  <input onChange={(event) => patch("callWindowTo", event.target.value)} step={300} type="time" value={edit.callWindowTo} {...describe("callWindowTo")} />
+                </label>
+              </div>
+              <small>
+                Singapore time. Calls outside this window are refused.
+                {windowLabel && <> Stored as <strong>{windowLabel}</strong>.</>}
+              </small>
+              {overnight && (
+                <small className="call-window-warning" role="status">
+                  <Icon name="attention" size={14} /> This window runs past midnight, so CareCall may call overnight.
+                </small>
+              )}
+              {errors.callWindowFrom && <small className="field-error" id={errorId("callWindowFrom")} role="alert">{errors.callWindowFrom}</small>}
+              {errors.callWindowTo && <small className="field-error" id={errorId("callWindowTo")} role="alert">{errors.callWindowTo}</small>}
+            </fieldset>
+
             <label className="execution-field">
               <span>Primary caregiver</span>
-              <input autoComplete="off" type="text" {...fieldProps("caregiver")} />
-              {errors.caregiver && <small className="field-error" id="senior-edit-caregiver-error" role="alert">{errors.caregiver}</small>}
+              <input autoComplete="off" onChange={(event) => patch("caregiver", event.target.value)} type="text" value={edit.caregiver} {...describe("caregiver")} />
+              {errors.caregiver && <small className="field-error" id={errorId("caregiver")} role="alert">{errors.caregiver}</small>}
             </label>
-            <label className="execution-field">
-              <span>Caregiver relationship</span>
-              <input autoComplete="off" type="text" {...fieldProps("caregiverRelationship")} />
-              {errors.caregiverRelationship && <small className="field-error" id="senior-edit-caregiverRelationship-error" role="alert">{errors.caregiverRelationship}</small>}
-            </label>
+
+            <div className="execution-field">
+              <label className="execution-field">
+                <span>Caregiver relationship</span>
+                <select onChange={(event) => patchRelationship({ choice: event.target.value, remark: "" })} value={relationship.choice} {...describe("caregiverRelationship")}>
+                  {caregiverRelationshipOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  <option value={OTHER_OPTION}>Other…</option>
+                </select>
+              </label>
+              {relationship.choice === OTHER_OPTION && (
+                <input
+                  aria-label="Describe the caregiver relationship"
+                  autoComplete="off"
+                  onChange={(event) => patchRelationship({ choice: OTHER_OPTION, remark: event.target.value })}
+                  placeholder="How are they related?"
+                  type="text"
+                  value={relationship.remark}
+                />
+              )}
+              {errors.caregiverRelationship && <small className="field-error" id={errorId("caregiverRelationship")} role="alert">{errors.caregiverRelationship}</small>}
+            </div>
           </div>
 
           <section className="boundary-note">

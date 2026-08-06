@@ -3619,6 +3619,7 @@ p {
 .senior-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 14px;
 }
 
@@ -3647,4 +3648,83 @@ p {
   .senior-edit-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Senior editor time range and option fields */
+
+.senior-edit-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.call-window-field {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: 7px;
+}
+
+.call-window-field legend {
+  padding: 0;
+  color: var(--label);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.call-window-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+}
+
+.call-window-range .execution-field span {
+  font-size: 11px;
+  font-weight: 620;
+  color: var(--secondary-label);
+}
+
+.call-window-range input[type="time"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 12px;
+  color: var(--label);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 520;
+}
+
+.call-window-range__dash {
+  padding-bottom: 13px;
+  color: var(--secondary-label);
+  font-weight: 640;
+}
+
+.call-window-warning {
+  display: flex;
+  color: var(--attention);
+  font-size: 12px;
+  font-weight: 560;
+  align-items: center;
+  gap: 6px;
+}
+
+.call-window-warning .icon {
+  flex: 0 0 auto;
+}
+
+.senior-edit-grid select + input,
+.senior-edit-grid label + input {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 7px;
+  padding: 0 13px;
+  border: 1px solid var(--separator-strong);
+  border-radius: 12px;
+  color: var(--label);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 520;
 }

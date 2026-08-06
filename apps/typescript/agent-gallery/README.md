@@ -131,7 +131,9 @@ An expired review date, revoked operator, invalid encrypted record, missed occur
 
 An operator can edit a senior's name, preferred name, language, permitted call window, and caregiver details from the care directory, and can withdraw a senior from care calls.
 
-The permitted call window is validated against the same pattern the workflow parses. An unreadable window is treated as outside every window, so an unchecked typo would silently stop that senior's reminders instead of failing visibly; the editor rejects it before it is stored.
+The permitted call window is chosen as two times rather than typed. The editor holds 24-hour values, composes the 12-hour window the workflow parses, and shows the stored result while editing. An unreadable window is treated as outside every window, so a typed typo would silently stop that senior's reminders instead of failing visibly; the composed window is checked against the workflow's own parser before it is stored, and a window running past midnight is flagged because it permits overnight calls.
+
+Language and caregiver relationship are chosen from lists covering Singapore's official languages, the dialects seniors commonly prefer, and the usual caregiver relationships. Both offer `Other…` with a remark, and a stored value outside the list reopens as `Other…` with its remark rather than being lost.
 
 The phone number is not editable. The record holds only a masked number, and the E.164 number is supplied by an authorized operator at the moment a call is authorized.
 

@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   applySeniorEdit,
+  callWindowSpansMidnight,
+  callWindowTimes,
+  caregiverRelationshipOptions,
+  formatCallWindow,
+  isKnownOption,
+  languageOptions,
   hasSeniorEditErrors,
   initialsFor,
   normalizeSeniorEdit,
@@ -65,12 +71,14 @@ test("every required field is reported when blank", () => {
     name: "",
     preferredName: "  ",
     language: "",
-    callWindow: "",
+    callWindowFrom: "",
+    callWindowTo: "",
     caregiver: "",
     caregiverRelationship: "",
   });
   assert.deepEqual(Object.keys(errors).sort(), [
-    "callWindow",
+    "callWindowFrom",
+    "callWindowTo",
     "caregiver",
     "caregiverRelationship",
     "language",
@@ -79,17 +87,65 @@ test("every required field is reported when blank", () => {
   ]);
 });
 
-test("an unparsable call window is rejected rather than silently blocking every call", () => {
-  for (const callWindow of ["8am to 8pm", "08:00–20:00", "8:00 AM", "anytime", "8:00 XM–8:00 PM"]) {
-    const errors = validateSeniorEdit(validEdit({ callWindow }));
-    assert.ok(errors.callWindow, `${callWindow} should be rejected`);
+test("an unusable time is rejected rather than silently blocking every call", () => {
+  for (const callWindowFrom of ["", "8am", "25:00", "8:00 AM", "0800"]) {
+    const errors = validateSeniorEdit(validEdit({ callWindowFrom }));
+    assert.ok(errors.callWindowFrom, `${callWindowFrom} should be rejected`);
   }
 });
 
-test("call windows the workflow can parse are accepted, including overnight ranges", () => {
-  for (const callWindow of ["8:00 AM–8:00 PM", "8:00 AM-8:00 PM", "9:30 PM–6:00 AM", "12:00 AM–11:59 PM"]) {
-    const errors = validateSeniorEdit(validEdit({ callWindow }));
-    assert.equal(errors.callWindow, undefined, `${callWindow} should be accepted`);
+test("a window covering a single minute is rejected", () => {
+  const errors = validateSeniorEdit(validEdit({ callWindowFrom: "09:00", callWindowTo: "09:00" }));
+  assert.ok(errors.callWindowTo);
+});
+
+test("windows the workflow can parse are accepted, including overnight ranges", () => {
+  for (const [from, to] of [["08:00", "20:00"], ["21:30", "06:00"], ["00:00", "23:59"]]) {
+    const errors = validateSeniorEdit(validEdit({ callWindowFrom: from, callWindowTo: to }));
+    assert.equal(errors.callWindowFrom, undefined, `${from}-${to} should be accepted`);
+    assert.equal(errors.callWindowTo, undefined, `${from}-${to} should be accepted`);
+  }
+});
+
+test("chosen times compose into the 12-hour window the workflow stores", () => {
+  assert.equal(formatCallWindow("08:00", "20:00"), "8:00 AM–8:00 PM");
+  assert.equal(formatCallWindow("00:00", "12:05"), "12:00 AM–12:05 PM");
+  assert.equal(formatCallWindow("09:30", "19:45"), "9:30 AM–7:45 PM");
+  assert.equal(formatCallWindow("bad", "20:00"), "");
+});
+
+test("a stored window splits back into the times the pickers show", () => {
+  assert.deepEqual(callWindowTimes("8:00 AM–8:00 PM"), { from: "08:00", to: "20:00" });
+  assert.deepEqual(callWindowTimes("12:00 AM–11:59 PM"), { from: "00:00", to: "23:59" });
+  assert.deepEqual(callWindowTimes("not a window"), { from: "", to: "" });
+});
+
+test("every fixture window survives a split and rebuild unchanged", () => {
+  for (const stored of ["8:00 AM–8:00 PM", "8:30 AM–7:30 PM", "9:00 AM–8:00 PM", "8:00 AM–8:30 PM"]) {
+    const times = callWindowTimes(stored);
+    assert.equal(formatCallWindow(times.from, times.to), stored);
+  }
+});
+
+test("a window running past midnight is reported so overnight calling is visible", () => {
+  assert.equal(callWindowSpansMidnight("21:00", "06:00"), true);
+  assert.equal(callWindowSpansMidnight("08:00", "20:00"), false);
+  assert.equal(callWindowSpansMidnight("", "20:00"), false);
+});
+
+test("stored values outside the option lists are recognised as free-text remarks", () => {
+  assert.equal(isKnownOption(languageOptions, "Mandarin"), true);
+  assert.equal(isKnownOption(languageOptions, "Javanese"), false);
+  assert.equal(isKnownOption(caregiverRelationshipOptions, "Care coordinator"), true);
+  assert.equal(isKnownOption(caregiverRelationshipOptions, "Former colleague"), false);
+});
+
+test("every language and relationship already in the fixtures is offered as an option", () => {
+  for (const value of ["English", "Malay", "Mandarin"]) {
+    assert.equal(isKnownOption(languageOptions, value), true, `${value} should be listed`);
+  }
+  for (const value of ["Daughter", "Son", "Care coordinator", "Granddaughter"]) {
+    assert.equal(isKnownOption(caregiverRelationshipOptions, value), true, `${value} should be listed`);
   }
 });
 
@@ -108,7 +164,7 @@ test("applying an edit updates the record and re-derives its initials", () => {
 
 test("an invalid edit leaves the directory unchanged", () => {
   const original = [senior()];
-  const updated = applySeniorEdit(original, "mdm-lim", validEdit({ callWindow: "whenever" }));
+  const updated = applySeniorEdit(original, "mdm-lim", validEdit({ callWindowFrom: "whenever" }));
   assert.deepEqual(updated, original);
 });
 
