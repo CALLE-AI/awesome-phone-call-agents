@@ -1,0 +1,16 @@
+id,name,phone,timezone,last_donation,distance_km,accept_rate,showup_rate,notes
+p001,Asha Rao,+15550101001,Asia/Kolkata,2026-05-02,2.1,0.8,0.85,reliable regular donor
+p002,Karan Mehta,+15550101002,Asia/Kolkata,2026-06-10,4.6,0.6,0.5,
+p003,Priya Nair,+15550101003,Asia/Kolkata,,3.3,0.5,0.5,new to registry
+p004,Ibrahim Khan,+15550101004,Asia/Kolkata,2026-01-15,8.9,0.7,0.75,
+p005,Deepa Iyer,+15550101005,Asia/Kolkata,2026-06-28,1.2,0.4,0.3,tends to cancel
+p006,Rohan Gupta,+15550101006,Asia/Kolkata,,6.5,0.5,0.5,new to registry
+p007,Fatima Sheikh,+15550101007,Asia/Kolkata,2026-03-20,3.8,0.9,0.9,very responsive
+p008,Arjun Reddy,+15550101008,Asia/Kolkata,2026-05-30,12.4,0.5,0.5,
+p009,Meera Pillai,+15550101009,Asia/Kolkata,2026-02-14,2.9,0.65,0.6,
+p010,Vikram Singh,+15550101010,Asia/Kolkata,,5.1,0.5,0.5,new to registry
+p011,Sana Ahmed,+15550101011,Asia/Kolkata,2026-06-01,7.2,0.55,0.5,
+p012,Aditya Kumar,+15550101012,Asia/Kolkata,2026-04-11,1.8,0.75,0.8,
+p013,Neha Joshi,+15550101013,Asia/Kolkata,2026-05-25,9.6,0.45,0.4,
+p014,Farhan Ali,+15550101014,Asia/Kolkata,,4.4,0.5,0.5,new to registry
+p015,Divya Menon,+15550101015,Asia/Kolkata,2026-03-02,3.0,0.85,0.9,very reliable

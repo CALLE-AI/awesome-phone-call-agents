@@ -1,16 +1,46 @@
 # mobilize
 
-**Parallel human dispatch under a deadline, built on [CALL-E](https://www.heycall-e.com/).**
+### A human coordinator can hold one phone conversation. `mobilize` holds forty — and knows which "yes" is real.
 
-When you need three people in the next hour, calling them one at a time is
-the bottleneck — and the only reason anyone ever did it that way is that
-humans have one mouth. `mobilize` dispatches calls to a consented pool of
-people **in parallel waves**, scores how firm each "yes" actually is, and
-stops calling the moment enough people have confirmed.
+**A coordinator's tool for filling an urgent need from a real list of
+people, built on [CALL-E](https://www.heycall-e.com/).**
+
+A hospital needs three O-negative donors within the hour. Today someone
+opens a spreadsheet and starts phoning down it, one number at a time.
+
+```bash
+git clone https://github.com/AshrafAhmed9/mobilize.git && cd mobilize
+./run.sh
+```
+
+That's the whole setup. It opens a browser at `localhost:8731` with a
+sample donor registry already loaded — or paste in your own CSV (just
+`name, phone, timezone`) and it's using your real list instead. Describe
+what you need, click run, and watch it call a wave of people in parallel,
+live — each node on the map lights up as it's dialed, colors by outcome as
+results land, and the list below fills with who actually confirmed.
+
+Every simulated rehearsal run learns from its own outcomes — accept and
+show-up rates update per person, so the ranking gets sharper the more you
+use it on your actual list, at zero cost, before a single real credit is
+spent. When you're ready, the same need, the same registry, one click runs
+it for real through CALL-E.
+
+**The mechanism, in one sentence:** `mobilize` calls several people at
+once, scores how firm each "yes" actually is — because people agree to be
+polite and then don't show up — and **stops dispatching the instant the
+need is met.** Of the people it reports as confirmed, **94.6% would
+actually show up**, versus 87.7% if you trust every stated yes and 80.2% if
+you just call everyone in the registry. Measured across 300 simulated
+mobilizations with known ground truth, reproducible with one command — [see
+Evaluation](#evaluation).
 
 Built for **CALL-E: Your Code Is Calling**, targeting **Most Practical Use
-Case**: this replaces a manual process a real coordinator runs today, and
-the improvement is measured, not asserted.
+Case**: it replaces a manual process a real coordinator runs today, and the
+improvement is measured, not asserted.
+
+<details>
+<summary>Prefer the command line? (developers, CI, scripting)</summary>
 
 ```
 python -m mobilize.app.cli --pool-size 150 --need-count 3 --seed 7
@@ -33,6 +63,11 @@ Need: 3 confirmed donors, budget 40 calls, deadline 60 min.
 Filled: True   Confirmed: 3/3   Calls used: 6   Waves: 1
 Over-recruitment ratio: 2.00x
 ```
+
+The engine (`mobilize/core/`) also ships as a library, an MCP server, and a
+reusable CALL-E Agent Skill — see [Repository layout](#repository-layout).
+
+</details>
 
 ---
 
@@ -163,7 +198,7 @@ exactly the recovery path it exists for. Both fixed: `calls_used` now comes
 directly from ledger-recorded dispatches, and the dispatcher passes each
 recovered call's original candidate into `poll()` explicitly so binding
 validation survives a restart. See
-`mobilize/tests/test_governance_accounting_and_binding.py`. 65 tests pass after this and the subsequent fixes.
+`mobilize/tests/test_governance_accounting_and_binding.py`. 65 tests passed at that point; 82 pass now, including the registry module below.
 
 ### 5. Governance — consent is enforced in code, not just policy
 
@@ -264,6 +299,9 @@ Both calls stayed within the ~30–45 second range the task prompt targets.
 
 ## Setup
 
+**For the coordinator product:** `./run.sh` (see the top of this README).
+Nothing below is required unless you're developing on the engine itself.
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -326,34 +364,53 @@ preview of exactly what would be dialed and places no calls. An MCP tool
 has no interactive prompt, so this two-call pattern is the equivalent of
 the CLI's typed `yes` confirmation.
 
-### Live dashboard
+### The dashboard (this is the product)
 
 ```bash
-python -m mobilize.app.dashboard
-open http://localhost:8731
+./run.sh
+# or: python -m mobilize.app.dashboard   (assumes the venv is already set up)
 ```
 
-Watch a simulated mobilization unfold in real time over a WebSocket: each
-candidate lights up on dispatch, colors by outcome as results stream in,
-and the map shows exactly how many donors in the pool were never called
-once the need was met. Free, simulated, no calls placed — this is the demo
-visualization, not a production service. Port is configurable via
-`MOBILIZE_DASHBOARD_PORT`.
+- **Load your own registry.** Paste a CSV with `name, phone, timezone` (plus
+  optional `last_donation`, `distance_km`, `accept_rate`, `showup_rate`).
+  Persists between sessions — reopen the page and your list, and everything
+  it's learned, is still there.
+- **A working sample registry is bundled** (`mobilize/app/sample_data/sample_registry.csv`),
+  so the tool is immediately usable with zero setup, before you ever load
+  your own data.
+- **Free rehearsal against your real list.** The default run mode simulates
+  outcomes drawn from each person's own learned accept/show-up rate — not a
+  synthetic population — so you can test the tool against your actual
+  registry at zero cost before spending a real credit.
+- **The registry learns.** Every run updates each person's accept and
+  show-up rate from what happened, persisted to disk — the ranking gets
+  sharper the more the tool is used, without anyone maintaining a
+  spreadsheet by hand.
+- **Real calls are a separate, explicit, confirmed action** — never the
+  same button as the free rehearsal, and the browser makes you confirm
+  before it spends a credit.
+
+Live dispatch is shown over a WebSocket: each person lights up on dial,
+colors by outcome as results stream in, and the result panel shows exactly
+who confirmed (name, masked phone, commitment score) and how many people in
+the registry were never called once the need was met. Port is configurable
+via `MOBILIZE_DASHBOARD_PORT`.
 
 ## Repository layout
 
 ```
 mobilize/
-├── core/          # types, ledger, commitment scoring, planner, dispatcher, governance
-├── transports/     # base protocol, real CALL-E transport, simulated transport
-├── sim/            # synthetic population + evaluation harness
-├── mcp/            # MCP server
-├── app/            # CLI demo runner
-├── artifacts/       # committed real-call transcripts and results
-└── tests/          # 65 tests incl. property-based, real-subprocess crash, and
-                    #   concurrency/validation/resume tests added after
-                    #   two rounds of external review
-skills/mobilize/    # Agent Skill (SKILL.md) wrapping mobilize() for reuse
+├── core/            # types, ledger, commitment scoring, planner, dispatcher,
+│                    #   governance, registry (CSV import, learned rates)
+├── transports/      # base protocol, real CALL-E transport, simulated transport
+├── sim/             # synthetic population + evaluation harness
+├── mcp/             # MCP server
+├── app/             # dashboard (the product) + CLI + bundled sample registry
+├── artifacts/       # committed real-call transcripts, results, Devpost copy
+└── tests/           # 82 tests incl. property-based, real-subprocess crash, and
+                    #   concurrency/validation/resume/registry tests
+skills/mobilize/     # Agent Skill (SKILL.md) wrapping mobilize() for reuse
+run.sh               # one-command setup + launch for the dashboard
 ```
 
 ## Generalizes to
