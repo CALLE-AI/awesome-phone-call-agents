@@ -25,6 +25,9 @@ services:
   call_analyzer:
     build: ./call_analyzer
     environment: &analyzer_environment
+      # This stack is a local demo, so the shared development secret is fine here. Set
+      # CALL_ANALYZER_ENV to anything else and CALLPROOF_WEBHOOK_SECRET becomes required.
+      CALL_ANALYZER_ENV: development
       CALL_ANALYZER_DATABASE_PATH: /data/call_analyzer.db
       CALL_ANALYZER_QUEUE_MODE: rq
       CALL_ANALYZER_QUEUE_NAME: callproof
