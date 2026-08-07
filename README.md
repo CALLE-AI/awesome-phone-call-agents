@@ -129,7 +129,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [MedOps Call Commander](https://github.com/whoshotu/all-med) - A HIPAA-compliant multi-agent orchestration dashboard with Human-in-the-Loop consent gates, integrating EHR triggers directly with CALL-E outbound agents.
+- [All Med](https://github.com/whoshotu/all-med) - A HIPAA-compliant multi-agent orchestration dashboard with Human-in-the-Loop consent gates, integrating EHR triggers directly with CALL-E outbound agents.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
