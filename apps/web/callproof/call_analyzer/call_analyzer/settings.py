@@ -42,12 +42,17 @@ class Settings:
         if secret:
             return secret
 
-        environment = os.getenv("CALL_ANALYZER_ENV", "development").lower()
+        # CALL_ANALYZER_ENV has no default on purpose. Defaulting it to development means
+        # a deployment that sets neither variable still signs with the constant below,
+        # which is exactly the case this guard exists to stop. Using the shared secret has
+        # to be something someone typed.
+        environment = os.getenv("CALL_ANALYZER_ENV", "").strip().lower()
         if environment in {"development", "test"}:
             return DEVELOPMENT_ONLY_SECRET
 
         raise MissingWebhookSecret(
-            "CALLPROOF_WEBHOOK_SECRET is required when CALL_ANALYZER_ENV is "
-            f"'{environment}'. Refusing to sign webhooks with the development default, "
-            "which is a public constant in this repository."
+            "Refusing to sign webhooks with the development default, which is a public "
+            "constant in this repository. Set CALLPROOF_WEBHOOK_SECRET, or opt in to the "
+            "shared secret explicitly with CALL_ANALYZER_ENV=development. "
+            f"(CALL_ANALYZER_ENV is currently {environment!r}.)"
         )

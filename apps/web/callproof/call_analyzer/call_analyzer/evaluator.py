@@ -24,9 +24,26 @@ AFFIRMATION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Kept for reporting a result/transcript disagreement. It is NOT what gates completion:
-# depending on a list of negations means every unlisted phrasing ("Friday doesn't work")
-# silently reads as agreement. Completion is gated on the presence of affirmation instead.
+# Negation PARTICLES, not phrasings of refusal. Any of these in a turn disqualifies it
+# from affirming anything, and turns an on-topic turn into an explicit denial.
+#
+# This is the piece the affirmation list cannot do on its own: "That is not correct; the
+# delivery has not changed" contains "correct", so a matcher looking only for agreement
+# reads a denial as consent. Particles are a small closed class of a language — unlike
+# the open-ended ways to phrase a refusal — so relying on them is not another enumeration
+# that the next unseen wording defeats.
+#
+# It is deliberately blunt. "No problem, Friday works" is scored as a denial and lands in
+# human review rather than auto-verifying. That is the direction we want to be wrong in.
+NEGATION_PARTICLE = re.compile(
+    r"(\bnot\b|n'?t\b|\bno\b|\bnever\b|\bcannot\b|\bnothing\b|\bneither\b|\bnor\b|"
+    r"\bnunca\b|\bjam[áa]s\b|\btampoco\b|\bning[úu]n[ao]?\b|\bnada\b)",
+    re.IGNORECASE,
+)
+
+# Explicit statements that the objective could not be done. Narrower than the particles
+# above and used only to report a result/transcript disagreement; nothing about
+# completion depends on this list being complete.
 NEGATION_PATTERN = re.compile(
     r"(no se pudo|no pudimos|no puedo|no podemos|no fue posible|no es posible|"
     r"no se puede|no hay disponibilidad|no tenemos disponibilidad|"
@@ -52,7 +69,21 @@ TERM_SYNONYMS: dict[str, tuple[str, ...]] = {
     "cancel": ("cancel", "cancellation", "cancela", "cancelar", "cancelación"),
 }
 
+# Words that name the SPEECH ACT rather than the content that has to be spoken. A
+# disclosure called `recording_notice` is satisfied by telling the recipient the call is
+# recorded — "notice" is not a word the agent has to utter. Everything left after these
+# are removed is content, and ALL of it must appear in one agent turn. Without that,
+# `confirm_order_number` counts as disclosed because the agent said "confirm" about the
+# delivery date, and no order number was ever read out.
+SPEECH_ACT_TOKENS = frozenset({
+    "notice", "notification", "notify", "disclosure", "disclose", "disclosed",
+    "statement", "advisory", "announce", "announcement", "inform", "informed",
+    "confirm", "confirmation", "aviso", "advertencia", "informar", "declaracion",
+    "declaración", "confirmacion", "confirmación",
+})
+
 # Corroboration levels for one contract term, strongest first.
+DENIED = "denied"       # the counterparty addressed it and negated it
 AFFIRMED = "affirmed"   # the counterparty explicitly agreed, on topic
 TOPICAL = "topical"     # the counterparty touched the topic, but never agreed
 NONE = "none"           # the counterparty never addressed it at all
@@ -95,6 +126,7 @@ class DeterministicEvaluator:
         goal = self._assess_goal(contract, request.provider_result or {}, turns)
         goal_completion = goal["status"]
         unmet, unsupported, weak = goal["unmet"], goal["unsupported"], goal["weak"]
+        denied = goal["denied"]
         contradiction_turn_ids = goal["contradictions"]
         contradicted = bool(contradiction_turn_ids) and not unmet
 
@@ -107,7 +139,7 @@ class DeterministicEvaluator:
         confidence = self._confidence(
             surcharge_source=surcharge_source, evidence_matched=evidence_matched,
             goal_completion=goal_completion, contradicted=contradicted,
-            unsupported=bool(unsupported), weak=bool(weak),
+            unsupported=bool(unsupported), weak=bool(weak), denied=bool(denied),
         )
         weak_evidence = confidence < CONFIDENCE_AUTO_VERIFY
 
@@ -117,14 +149,15 @@ class DeterministicEvaluator:
             or goal_completion != "complete"
             or bool(unsupported)
             or bool(weak)
+            or bool(denied)
         )
 
         finding, summary, explanation = self._narrative(
             surcharge_violation=surcharge_violation, weak_evidence=weak_evidence,
             surcharge=surcharge, maximum=maximum, surcharge_source=surcharge_source,
             goal_completion=goal_completion, unmet=unmet, unsupported=unsupported,
-            weak=weak, contradicted=contradicted, missing_disclosures=missing_disclosures,
-            forbidden_found=forbidden_found,
+            weak=weak, denied=denied, contradicted=contradicted,
+            missing_disclosures=missing_disclosures, forbidden_found=forbidden_found,
         )
         turn_ids = (
             contradiction_turn_ids
@@ -133,7 +166,12 @@ class DeterministicEvaluator:
         )
 
         contradictions: list[str] = []
-        if contradicted:
+        for condition in denied:
+            contradictions.append(
+                f"The structured result reports '{condition}' met, but the recipient "
+                "explicitly denied it on the call."
+            )
+        if contradicted and not denied:
             contradictions.append(
                 "The structured result reports success while the transcript states the "
                 "objective could not be completed."
@@ -218,16 +256,22 @@ class DeterministicEvaluator:
         if not groups:
             return NONE, []
 
+        denied: list[int] = []
         affirmed: list[int] = []
         topical: list[int] = []
         for index, turn in enumerate(turns):
             if turn.speaker not in COUNTERPARTY_SPEAKERS:
                 continue
-            if NEGATION_PATTERN.search(turn.text):
-                continue
 
+            negated = bool(NEGATION_PARTICLE.search(turn.text))
             on_topic = self._is_topical(turn.text, groups)
-            affirms = bool(AFFIRMATION_PATTERN.search(turn.text)) and "?" not in turn.text
+            # A negated turn can never affirm, however agreeable its vocabulary looks:
+            # "that is not correct" contains "correct".
+            affirms = (
+                bool(AFFIRMATION_PATTERN.search(turn.text))
+                and "?" not in turn.text
+                and not negated
+            )
             # A bare "yes" corroborates only what the agent just asked about.
             answers_topical_question = (
                 index > 0
@@ -235,11 +279,17 @@ class DeterministicEvaluator:
                 and self._is_topical(turns[index - 1].text, groups)
             )
 
-            if affirms and (on_topic or answers_topical_question):
+            if negated and (on_topic or answers_topical_question):
+                denied.append(turn.id)
+            elif affirms and (on_topic or answers_topical_question):
                 affirmed.append(turn.id)
             elif on_topic:
                 topical.append(turn.id)
 
+        # A denial outranks an affirmation: if the recipient agreed and then took it back
+        # — or agreed to one reading and denied another — that is not a verified call.
+        if denied:
+            return DENIED, denied
         if affirmed:
             return AFFIRMED, affirmed
         if topical:
@@ -247,21 +297,45 @@ class DeterministicEvaluator:
         return NONE, []
 
     def _agent_mentions(self, term: str, turns: list[TranscriptTurn]) -> list[int]:
-        """Turns where the AGENT itself raised the term — used for its own obligations."""
+        """Turns where the AGENT touched the term at all — a deliberately broad match.
+
+        Used for things the agent must NOT do, where over-matching costs a human review
+        and under-matching lets a violation through.
+        """
         groups = self._terms(term)
         if not groups:
             return []
         return [t.id for t in turns
                 if t.speaker in AUDITED_SPEAKERS and self._is_topical(t.text, groups)]
 
+    def _agent_disclosed(self, term: str, turns: list[TranscriptTurn]) -> list[int]:
+        """Turns where the AGENT verifiably made the disclosure — a strict match.
+
+        The asymmetry with `_agent_mentions` is deliberate, and it is the same principle
+        in both directions: each matcher is tuned so that being wrong sends the call to a
+        human rather than auto-verifying it. An obligation to speak is only satisfied when
+        every content word appears in a single agent turn; touching one shared word is
+        not a disclosure.
+        """
+        groups = self._terms(term)
+        content = [g for g in groups if not SPEECH_ACT_TOKENS.intersection(g)] or groups
+        if not content:
+            return []
+
+        return [
+            t.id for t in turns
+            if t.speaker in AUDITED_SPEAKERS
+            and all(self._is_topical(t.text, [group]) for group in content)
+        ]
+
     # ── goal completion ───────────────────────────────────────────────────────────
 
     def _assess_goal(self, contract: CallContract, result: dict[str, Any],
                      turns: list[TranscriptTurn]) -> dict[str, Any]:
         conditions = list(contract.success_conditions)
-        contradictions = [t.id for t in turns if NEGATION_PATTERN.search(t.text)]
-        base = {"unmet": [], "unsupported": [], "weak": [],
-                "contradictions": contradictions, "evidence_turns": []}
+        stated = [t.id for t in turns if NEGATION_PATTERN.search(t.text)]
+        base = {"unmet": [], "unsupported": [], "weak": [], "denied": [],
+                "contradictions": stated, "evidence_turns": []}
 
         if not conditions:
             return {**base, "status": "unknown"}
@@ -271,10 +345,15 @@ class DeterministicEvaluator:
         unmet = [c for c in conditions if not self._condition_met(c, result)]
         claimed = [c for c in conditions if c not in unmet]
 
-        unsupported, weak, evidence_turns = [], [], []
+        unsupported, weak, denied, evidence_turns = [], [], [], []
+        denial_turns: list[int] = []
         for condition in claimed:
             level, ids = self._corroboration(condition, turns, siblings=conditions)
-            if level == AFFIRMED:
+            if level == DENIED:
+                denied.append(condition)
+                denial_turns.extend(ids)
+                evidence_turns.extend(ids)
+            elif level == AFFIRMED:
                 evidence_turns.extend(ids)
             elif level == TOPICAL:
                 weak.append(condition)
@@ -282,12 +361,16 @@ class DeterministicEvaluator:
             else:
                 unsupported.append(condition)
 
+        # A recipient denying a condition the result claims as met IS the contradiction,
+        # whether or not they phrased it in a way NEGATION_PATTERN happens to list.
+        contradictions = stated + [i for i in denial_turns if i not in stated]
         state = {**base, "unmet": unmet, "unsupported": unsupported, "weak": weak,
+                 "denied": denied, "contradictions": contradictions,
                  "evidence_turns": evidence_turns}
 
         if unmet and len(unmet) == len(conditions):
             return {**state, "status": "failed"}
-        if unmet or unsupported or weak or contradictions:
+        if unmet or unsupported or weak or denied or contradictions:
             return {**state, "status": "partial"}
         return {**state, "status": "complete"}
 
@@ -319,9 +402,10 @@ class DeterministicEvaluator:
         """Declared disclosures the AGENT never made. Never assumed satisfied.
 
         Read from agent turns only: a recipient asking "are you recording this?" is not
-        the agent disclosing that the call is recorded.
+        the agent disclosing that the call is recorded. Matched strictly, so a disclosure
+        that was only half said reports as missing rather than as satisfied.
         """
-        return [d for d in contract.required_disclosures if not self._agent_mentions(d, turns)]
+        return [d for d in contract.required_disclosures if not self._agent_disclosed(d, turns)]
 
     def _forbidden_commitments(self, contract: CallContract,
                                turns: list[TranscriptTurn]) -> list[str]:
@@ -336,7 +420,7 @@ class DeterministicEvaluator:
 
     def _confidence(self, *, surcharge_source: str, evidence_matched: bool,
                     goal_completion: str, contradicted: bool, unsupported: bool,
-                    weak: bool) -> float:
+                    weak: bool, denied: bool = False) -> float:
         score = 0.4
         if surcharge_source == "provider_result":
             score += 0.3
@@ -354,6 +438,10 @@ class DeterministicEvaluator:
         elif goal_completion == "failed":
             score -= 0.2
 
+        if denied:
+            # The recipient said the opposite of what the result claims. Nothing else in
+            # the verdict can outweigh that, so it alone must clear the auto-verify bar.
+            score -= 0.5
         if contradicted:
             score -= 0.25
         if unsupported:
@@ -381,8 +469,16 @@ class DeterministicEvaluator:
     def _narrative(self, *, surcharge_violation: bool, weak_evidence: bool, surcharge: int,
                    maximum: int, surcharge_source: str, goal_completion: str,
                    unmet: list[str], unsupported: list[str], weak: list[str],
-                   contradicted: bool, missing_disclosures: list[str],
+                   denied: list[str], contradicted: bool, missing_disclosures: list[str],
                    forbidden_found: list[str]) -> tuple[str, str, str]:
+        if denied:
+            return (
+                "denied_success_claim",
+                "The recipient denied the outcome the structured result reports as met.",
+                f"The structured result claims {', '.join(denied)}, but the recipient "
+                "negated it in their own words. A result contradicted by the counterparty "
+                "is never auto-verified.",
+            )
         if surcharge_violation:
             return (
                 "unauthorized_surcharge",

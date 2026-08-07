@@ -127,6 +127,44 @@ class CallProvidersCalleTest < ActiveJob::TestCase
     ENV["CALLPROOF_LIVE_CALLS"] = previous_live
   end
 
+  # A reconciliation replays the same Idempotency-Key. Only a rejection of the payload
+  # itself carries information about the ORIGINAL request; an auth or quota failure is
+  # about this attempt, and must not be read as "no call was placed".
+  %w[401 403 404 429].each do |code|
+    test "a #{code} does not prove the original request was rejected" do
+      previous_live = ENV["CALLPROOF_LIVE_CALLS"]
+      ENV["CALLPROOF_LIVE_CALLS"] = "true"
+      request, contract = live_confirmed_request
+      transport = ->(_uri, _req) { Struct.new(:code, :body).new(code, '{"error":"nope"}') }
+
+      error = assert_raises(CallProviders::Calle::AmbiguousError) do
+        CallProviders::Calle.new(
+          api_key: "test-key", webhook_url: "https://rails.test/calle/webhook", transport: transport
+        ).call(call_request: request, contract: contract)
+      end
+
+      assert_not_kind_of CallProviders::Calle::DefinitiveRejectionError, error
+      assert_equal "unresolved", request.reload.status
+    ensure
+      ENV["CALLPROOF_LIVE_CALLS"] = previous_live
+    end
+  end
+
+  test "a rejection of the payload itself is definitive" do
+    previous_live = ENV["CALLPROOF_LIVE_CALLS"]
+    ENV["CALLPROOF_LIVE_CALLS"] = "true"
+    request, contract = live_confirmed_request
+    transport = ->(_uri, _req) { Struct.new(:code, :body).new("422", '{"error":"bad phone"}') }
+
+    assert_raises(CallProviders::Calle::DefinitiveRejectionError) do
+      CallProviders::Calle.new(
+        api_key: "test-key", webhook_url: "https://rails.test/calle/webhook", transport: transport
+      ).call(call_request: request, contract: contract)
+    end
+  ensure
+    ENV["CALLPROOF_LIVE_CALLS"] = previous_live
+  end
+
   test "a definitive 4xx rejection is still a hard error" do
     previous_live = ENV["CALLPROOF_LIVE_CALLS"]
     ENV["CALLPROOF_LIVE_CALLS"] = "true"

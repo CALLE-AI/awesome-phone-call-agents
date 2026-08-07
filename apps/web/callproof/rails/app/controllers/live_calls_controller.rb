@@ -73,10 +73,16 @@ class LiveCallsController < ApplicationController
   end
 
   # Reconcile an unresolved live request. Re-attempts the create with the SAME stable
-  # Idempotency-Key, so CALL-E deduplicates — this cannot place a second call. Resolves
-  # to running (call exists), or failed ONLY on a definitive rejection. Codes that do not
-  # prove rejection (409 idempotency conflict, 408, 5xx) keep the request unresolved:
-  # telling the operator "no call was placed" there could be a lie.
+  # Idempotency-Key, so CALL-E deduplicates — this cannot place a second call.
+  #
+  # An unresolved request is resolved only by an answer that identifies it by that key:
+  # either the provider hands back the call (it exists → running), or it rejects the
+  # payload itself, which an accepted original would have deduplicated past (→ failed).
+  #
+  # Every other failure leaves it unresolved, including ones that look conclusive. A 401
+  # means our credential is bad now and says nothing about whether the original request
+  # was accepted; resolving it to "failed" would tell the operator no call was placed
+  # while a call may be ringing. Staying unresolved is the only honest answer.
   def reconcile
     ensure_live_environment!
     raise CallProviders::Calle::SafetyError, "call is not awaiting reconciliation" unless
@@ -86,13 +92,16 @@ class LiveCallsController < ApplicationController
     phone_call = CallProviders.current.call(call_request: @call_request, contract: contract)
     redirect_to call_request_path(@call_request),
                 notice: "Reconciled — CALL-E has the call (#{phone_call.status})."
-  rescue CallProviders::Calle::AmbiguousError => error
-    redirect_to call_request_path(@call_request),
-                alert: "Still unresolved — outcome remains unknown: #{error.message}"
-  rescue CallProviders::Calle::Error => error
+  rescue CallProviders::Calle::DefinitiveRejectionError => error
     @call_request.update!(status: "failed")
     redirect_to call_request_path(@call_request),
-                alert: "Reconciliation resolved to failed (no call was placed): #{error.message}"
+                alert: "Reconciliation resolved to failed (CALL-E rejected the request " \
+                       "itself under the same idempotency key, so no call was placed): #{error.message}"
+  rescue CallProviders::Calle::Error, ActiveRecord::RecordInvalid => error
+    @call_request.update!(status: "unresolved")
+    redirect_to call_request_path(@call_request),
+                alert: "Still unresolved — this attempt says nothing about the original " \
+                       "request, so the outcome remains unknown: #{error.message}"
   end
 
   def cancel

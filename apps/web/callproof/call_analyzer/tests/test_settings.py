@@ -6,11 +6,20 @@ import pytest
 from call_analyzer.settings import DEVELOPMENT_ONLY_SECRET, MissingWebhookSecret, Settings
 
 
-def test_development_may_use_the_shared_default(monkeypatch):
+def test_the_shared_default_requires_opting_in(monkeypatch):
+    monkeypatch.delenv("CALLPROOF_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("CALL_ANALYZER_ENV", "development")
+
+    assert Settings.from_env().webhook_secret == DEVELOPMENT_ONLY_SECRET
+
+
+def test_neither_variable_set_refuses_to_start(monkeypatch):
+    """The blocker: with no env at all, a default of "development" would sign anyway."""
     monkeypatch.delenv("CALLPROOF_WEBHOOK_SECRET", raising=False)
     monkeypatch.delenv("CALL_ANALYZER_ENV", raising=False)
 
-    assert Settings.from_env().webhook_secret == DEVELOPMENT_ONLY_SECRET
+    with pytest.raises(MissingWebhookSecret, match="Refusing to sign"):
+        Settings.from_env()
 
 
 def test_a_deployment_that_forgets_the_secret_refuses_to_start(monkeypatch):
@@ -18,7 +27,7 @@ def test_a_deployment_that_forgets_the_secret_refuses_to_start(monkeypatch):
     monkeypatch.delenv("CALLPROOF_WEBHOOK_SECRET", raising=False)
     monkeypatch.setenv("CALL_ANALYZER_ENV", "production")
 
-    with pytest.raises(MissingWebhookSecret, match="CALLPROOF_WEBHOOK_SECRET is required"):
+    with pytest.raises(MissingWebhookSecret, match="Refusing to sign"):
         Settings.from_env()
 
 

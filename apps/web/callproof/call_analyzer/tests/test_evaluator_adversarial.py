@@ -219,6 +219,105 @@ def test_one_confirmed_condition_does_not_carry_an_unmentioned_one():
     )
 
 
+# ── an explicit denial outranks agreeable-looking vocabulary ──────────────────────
+
+def test_denial_containing_an_affirmation_word_is_not_agreement():
+    """Reported case: "That is not correct" contains "correct" and verified the call.
+
+    Completion cannot depend on a list of refusal phrasings. It depends on negation
+    particles, which are a closed class, so an unseen way of saying no still lands here.
+    """
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "So the delivery has been moved to Friday."},
+            {"id": 2, "speaker": "recipient",
+             "text": "That is not correct; the delivery has not changed."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+    )
+    assert_not_auto_verified(verdict, "the recipient denied the outcome outright")
+    assert verdict.evidence[0].finding == "denied_success_claim"
+    assert any("explicitly denied" in c for c in verdict.contradictions)
+
+
+@pytest.mark.parametrize("denial", [
+    "No, the delivery has not been changed.",
+    "That's not right, nothing was moved.",
+    "Correct me if I'm wrong, but the delivery never changed.",
+    "Sure, except the delivery was not rescheduled.",
+    "Claro que no, la entrega no se movió.",
+])
+def test_denials_phrased_in_ways_we_never_enumerated(denial):
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "The delivery has been moved to Friday."},
+            {"id": 2, "speaker": "recipient", "text": denial},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+    )
+    assert_not_auto_verified(verdict, f"denial should not verify: {denial!r}")
+
+
+def test_agreement_then_retraction_is_not_agreement():
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
+            {"id": 2, "speaker": "recipient", "text": "Yes, that works for the delivery."},
+            {"id": 3, "speaker": "recipient", "text": "Actually no, the delivery cannot move."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+    )
+    assert_not_auto_verified(verdict, "the recipient took the agreement back")
+
+
+# ── a disclosure is the whole disclosure ──────────────────────────────────────────
+
+def test_a_shared_word_does_not_satisfy_a_required_disclosure():
+    """Reported case: `confirm_order_number` counted as disclosed because the agent
+    said "confirm" about the delivery date. No order number was ever read out."""
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent",
+             "text": "Let me confirm the delivery date and time for Friday."},
+            {"id": 2, "speaker": "recipient", "text": "Yes, the delivery date works."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+        required_disclosures=["confirm_order_number"],
+    )
+    assert verdict.missing_disclosures == ["confirm_order_number"]
+    assert verdict.policy_adherence is False
+    assert verdict.needs_human_review is True
+
+
+def test_a_fully_stated_disclosure_is_satisfied():
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent",
+             "text": "Let me confirm your order number 4417 before we change the delivery."},
+            {"id": 2, "speaker": "recipient", "text": "Yes, that order is right, move the delivery."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+        required_disclosures=["confirm_order_number"],
+    )
+    assert verdict.missing_disclosures == []
+    assert verdict.policy_adherence is True
+
+
+def test_disclosure_spread_across_two_turns_is_not_verifiable():
+    """Half a disclosure here and half there is not evidence that it was made."""
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "I need to confirm your order."},
+            {"id": 2, "speaker": "agent", "text": "What is the number on the delivery slip?"},
+            {"id": 3, "speaker": "recipient", "text": "Yes, go ahead with the delivery."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+        required_disclosures=["confirm_order_number"],
+    )
+    assert verdict.missing_disclosures == ["confirm_order_number"]
+    assert verdict.needs_human_review is True
+
+
 # ── the happy path must still pass, or the gate is useless ────────────────────────
 
 def test_explicit_recipient_confirmation_still_auto_verifies():

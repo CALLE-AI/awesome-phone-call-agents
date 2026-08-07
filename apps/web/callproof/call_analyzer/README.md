@@ -21,7 +21,12 @@ uvicorn call_analyzer.main:app --reload --port 8001
 Environment variables:
 
 - `CALL_ANALYZER_DATABASE_PATH` — SQLite file; defaults to `call_analyzer.db`.
-- `CALLPROOF_WEBHOOK_SECRET` — shared HMAC secret; required outside tests.
+- `CALLPROOF_WEBHOOK_SECRET` — shared HMAC secret. **Required.** The service refuses to
+  start without it unless you opt in to the development default below.
+- `CALL_ANALYZER_ENV` — no default. Set it to `development` or `test` to accept the
+  shared `development-secret` when `CALLPROOF_WEBHOOK_SECRET` is unset. It has no default
+  precisely so that a deployment which sets neither variable fails loudly rather than
+  signing callbacks with a constant published in this repository.
 - `CALL_ANALYZER_DELIVER_WEBHOOKS` — set to `false` for isolated local runs.
 - `CALL_ANALYZER_QUEUE_MODE` — `inline` for deterministic local runs or `rq` for a worker.
 - `REDIS_URL` — required in `rq` mode.

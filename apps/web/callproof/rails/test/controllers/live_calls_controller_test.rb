@@ -59,7 +59,66 @@ class LiveCallsControllerTest < ActionDispatch::IntegrationTest
     assert_nil request.phone_call
   end
 
+  # Reported case: a 401 on the reconciliation attempt was reported to the operator as
+  # "no call was placed". It proves only that the credential is bad now.
+  test "a non-definitive error during reconciliation leaves the request unresolved" do
+    error = CallProviders::Calle::AmbiguousError.new("CALL-E create returned 401")
+
+    request = reconcile_with_provider_raising(error)
+
+    assert_equal "unresolved", request.reload.status
+    assert_no_match(/no call was placed/, flash[:alert].to_s)
+    assert_match(/says nothing about the original request/, flash[:alert].to_s)
+  end
+
+  test "only a rejection of the request itself resolves reconciliation to failed" do
+    error = CallProviders::Calle::DefinitiveRejectionError.new("HTTP 422: bad phone")
+
+    request = reconcile_with_provider_raising(error)
+
+    assert_equal "failed", request.reload.status
+    assert_match(/no call was placed/, flash[:alert].to_s)
+  end
+
   private
+
+  # Drives the reconcile action for an already-unresolved live request, with the provider
+  # failing in the given way. Returns the request so the caller can assert on it.
+  def reconcile_with_provider_raising(error)
+    previous_live = ENV["CALLPROOF_LIVE_CALLS"]
+    previous_provider = ENV["CALLPROOF_CALL_PROVIDER"]
+    previous_key = ENV["CALLE_API_KEY"]
+    ENV["CALLPROOF_LIVE_CALLS"] = "true"
+    # Without these the action's own live-environment guard raises first, the provider is
+    # never reached, and the test would pass without exercising anything.
+    ENV["CALLPROOF_CALL_PROVIDER"] = "calle"
+    ENV["CALLE_API_KEY"] = "test-key-not-a-credential"
+
+    request = create_preview
+    request.update!(status: "unresolved", live_mode: true, confirmed_at: Time.current)
+
+    reached = false
+    provider = Object.new
+    provider.define_singleton_method(:call) { |**| reached = true; raise error }
+    CallProviders.singleton_class.alias_method(:current_without_stub, :current)
+    CallProviders.define_singleton_method(:current) { provider }
+
+    post reconcile_live_call_path(request), headers: operator_auth_headers
+
+    # A guard on the test itself: every precondition in the action raises the same error
+    # class the provider does, so without this an unmet precondition would look like a
+    # passing test that never reached the code under test.
+    assert reached, "the provider was never called: #{flash[:alert]}"
+    request
+  ensure
+    if CallProviders.singleton_class.method_defined?(:current_without_stub)
+      CallProviders.singleton_class.alias_method(:current, :current_without_stub)
+      CallProviders.singleton_class.remove_method(:current_without_stub)
+    end
+    ENV["CALLPROOF_LIVE_CALLS"] = previous_live
+    ENV["CALLPROOF_CALL_PROVIDER"] = previous_provider
+    ENV["CALLE_API_KEY"] = previous_key
+  end
 
   def create_preview
     post live_calls_path, params: preview_params, headers: operator_auth_headers

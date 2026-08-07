@@ -14,6 +14,11 @@ module CallProviders
     # side rather than dialing twice.
     class AmbiguousError < Error; end
 
+    # Raised when the provider's answer proves the call was never accepted. This is the
+    # ONLY thing that may resolve an unresolved request to "failed". See
+    # DEFINITIVE_REJECTION_HTTP_CODES for why the set is so small.
+    class DefinitiveRejectionError < Error; end
+
     AMBIGUOUS_NETWORK_ERRORS = [
       Timeout::Error, Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
       Errno::ETIMEDOUT, EOFError, SocketError, IOError
@@ -25,6 +30,21 @@ module CallProviders
     #         already created a call, i.e. the original call most likely EXISTS.
     #   408 — the server timed out reading the request; it may still have processed it.
     AMBIGUOUS_HTTP_CODES = %w[408 409].freeze
+
+    # Codes that prove the request was rejected on its own merits, and therefore that no
+    # call exists behind our Idempotency-Key.
+    #
+    # The set is an allow-list, not a deny-list, because the question being answered is
+    # "what happened to the ORIGINAL request?" and almost nothing answers it. A 401 says
+    # our credential is bad NOW; the original may well have been accepted before it was
+    # rotated. A 403, 404, 429 or 5xx say as little. Only a rejection of the payload
+    # itself carries over: the reconciliation replays the SAME Idempotency-Key and the
+    # SAME body, so an original that had been accepted would deduplicate (409/200) rather
+    # than be validated again. Getting 400/422 back therefore means it was never accepted.
+    #
+    # Everything not listed here leaves the request unresolved. Telling an operator "no
+    # call was placed" when a call may be ringing is the worst thing this system can do.
+    DEFINITIVE_REJECTION_HTTP_CODES = %w[400 422].freeze
 
     # Canonical CALL-E API host the Bearer credential may be sent to. A custom
     # base URL must be explicitly allow-listed via CALLE_ALLOWED_HOSTS.
@@ -197,16 +217,17 @@ module CallProviders
       code = response.code.to_s
       return JSON.parse(response.body) if %w[200 201 202].include?(code)
 
-      # 5xx, plus the 4xx codes that do not prove rejection (409 idempotency conflict,
-      # 408), are ambiguous: the call may already exist.
-      if code.start_with?("5") || AMBIGUOUS_HTTP_CODES.include?(code)
-        raise AmbiguousError,
-              "CALL-E create returned #{code}; outcome unknown, no replacement will be placed. " \
-              "Reconcile with Idempotency-Key #{idempotency_key} before retrying."
+      if DEFINITIVE_REJECTION_HTTP_CODES.include?(code)
+        raise DefinitiveRejectionError, "CALL-E rejected the request itself — HTTP #{code}: #{response.body}"
       end
 
-      # Any other 4xx is a definitive rejection: the call was not placed.
-      raise Error, "CALL-E HTTP #{code}: #{response.body}"
+      # Everything else — 5xx, 408, 409, and every 4xx we cannot interpret (401, 403,
+      # 404, 429, …) — leaves the outcome unknown. On a first attempt that means "we do
+      # not know whether it dialed"; on a reconciliation it means "this tells us nothing
+      # about the original request", which is the same answer.
+      raise AmbiguousError,
+            "CALL-E create returned #{code}; outcome unknown, no replacement will be placed. " \
+            "Reconcile with Idempotency-Key #{idempotency_key} before retrying. Body: #{response.body}"
     end
 
     def perform_request(uri, request)
