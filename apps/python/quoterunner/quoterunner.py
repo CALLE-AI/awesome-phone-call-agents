@@ -8,8 +8,20 @@ QuoteRunner answers it. Give it a job and an area; it returns candidates that
 exist, publish a number, and are open right now, each with the calling window
 derived from their published opening hours rather than configured by hand.
 
-This edition never dials. There is no live transport and no --live flag. The
-output is a plan other tools execute.
+Then it calls them through CALL-E and puts what they said in one table.
+
+    python quoterunner.py --fixture example-candidates.json
+    python quoterunner.py --fixture example-candidates.json --simulate
+    python quoterunner.py --fixture example-candidates.json --execute \
+        --confirm <token>
+
+Preview is the default and places no calls. `--simulate` runs the whole
+pipeline against canned answers. Only `--execute` dials, and it needs
+CALLE_LIVE_CALLS_ENABLED=true, CALLE_API_KEY, and a confirmation token bound to
+this exact candidate list. See execution.py.
+
+This module has no dependencies and never imports the SDK: screening is
+provider-agnostic and stays testable without credentials.
 """
 
 from __future__ import annotations
@@ -263,10 +275,10 @@ def build_plan(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def render(plan: dict) -> str:
+def render(plan: dict, token: str = "") -> str:
     lines = [
-        "FIXTURE RUN -- NO CALL PLACED",
-        "No transport, no telephone, no credentials. This edition cannot dial.",
+        "PREVIEW -- NO CALL PLACED",
+        "Nothing was dialed. No credentials were read and no request was sent.",
         "",
         f"Job: {plan['job']}",
         f"Callable now: {len(plan['calls'])}    Excluded: {len(plan['excluded'])}",
@@ -280,6 +292,16 @@ def render(plan: dict) -> str:
         lines.append("Not called:")
         for item in plan["excluded"]:
             lines.append(f"   - {item['name']}  {item['phone_masked']}  ->  {item['reason']}")
+    if token:
+        lines += [
+            "",
+            "Read that list. If it is who you meant to call:",
+            "",
+            f"    --simulate                    see the comparison, no calls",
+            f"    --execute --confirm {token}   place the calls",
+            "",
+            "The token covers this exact list. Re-plan later and it changes.",
+        ]
     return "\n".join(lines)
 
 
@@ -292,6 +314,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--requester", help="Name spoken on the call")
     parser.add_argument("--at", help="ISO timestamp to evaluate opening hours against")
     parser.add_argument("--json", action="store_true", help="Emit the plan as JSON")
+
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--simulate", action="store_true",
+                      help="Run the whole pipeline against canned answers. No calls.")
+    mode.add_argument("--execute", action="store_true",
+                      help="Place real calls through CALL-E. Needs --confirm.")
+    parser.add_argument("--confirm", help="Confirmation token printed by the preview")
+    parser.add_argument("--locale", default="en-US", help="Locale spoken on the call")
+    parser.add_argument("--timeout-seconds", type=int, default=900)
+    parser.add_argument("--base-url", help="Override the CALL-E origin (loopback only, for tests)")
     args = parser.parse_args(argv)
 
     payload = json.loads(args.fixture.read_text(encoding="utf-8"))
@@ -300,12 +332,52 @@ def main(argv: list[str] | None = None) -> int:
     moment = datetime.fromisoformat(args.at) if args.at else datetime.now()
 
     try:
-        plan = build_plan(load_fixture(args.fixture), job, requester, moment)
+        candidates = load_fixture(args.fixture)
+        plan = build_plan(candidates, job, requester, moment)
     except PlanError as error:
         print(f"No plan: {error}", file=sys.stderr)
         return 1
 
-    print(json.dumps(plan, indent=2) if args.json else render(plan))
+    # `build_plan` already screened them; re-reading the verdict avoids
+    # screening twice and guarantees the batch we dial is the batch we showed.
+    callable_now = [c for c in candidates if c.verdict == "callable"]
+
+    # Imported here, not at module scope: execution.py imports this module, and
+    # the preview path must never pull in anything the screening layer does not
+    # need.
+    import execution
+
+    token = execution.confirmation_token(callable_now, job)
+
+    if not (args.simulate or args.execute):
+        print(json.dumps(plan, indent=2) if args.json else render(plan, token))
+        return 0
+
+    try:
+        if args.execute:
+            execution.check_confirmation(callable_now, job, args.confirm)
+            calls = execution.build_calls_api(args.base_url)
+        else:
+            calls = execution.SimulatedCalls()
+    except execution.QuoteError as error:
+        print(f"\n{error}\n", file=sys.stderr)
+        return 1
+
+    results = execution.run_batch(
+        callable_now, job, requester, calls,
+        moment=moment if args.at else None,
+        locale=args.locale,
+        timeout_seconds=args.timeout_seconds,
+        on_event=execution.progress,
+    )
+    table = execution.compare(results)
+
+    if args.json:
+        print(json.dumps({"job": job, "simulated": args.simulate, "results": results,
+                          "cheapest": table["cheapest"]}, indent=2))
+    else:
+        print()
+        print(execution.render_comparison(job, table, simulated=args.simulate))
     return 0
 
 
