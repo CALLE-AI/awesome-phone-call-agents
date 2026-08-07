@@ -93,6 +93,15 @@ IDENTITY_DENIALS = (
     r"\byou'?ve reached\b.*\b(?:instead|not)\b",
     r"\bwe'?re not\b.*\b(?:that|them)\b",
 )
+# What an identity question from the agent looks like. Its own script asks
+# "Is this the office of {org}?" first, before any claim question, so a bare
+# affirmative counts as identity only after a construction from this list that
+# also named the listing in the same turn.
+_IDENTITY_QUESTION = re.compile(
+    r"\bis this\b|\bis that\b|\bhave i reached\b|\bdid i reach\b|\bhave we reached\b"
+    r"|\bam i speaking\b|\bconfirm (?:that )?(?:i|we) (?:have )?reached\b"
+    r"|\bconfirm (?:that )?this is\b"
+)
 CLAIM_PATTERNS = {
     "accepting_new_patients": r"accepting new patients",
     # Word-bounded on purpose: "accepting" must NOT trigger this claim, or a
@@ -131,6 +140,68 @@ _CORRECTION = re.compile(
     r"(?:this is|it'?s|you'?ve reached|we'?re|we are)\s+([^.?!;]{1,80})"
 )
 _CLAUSES = re.compile(r"[^.?!;]+[.?!;]?")
+# A question identifies nobody. Exactly two things survive one, and they are
+# the two the fifth review pass asked for: an unambiguous self-identifying
+# greeting, which cannot itself be a question ("Thanks for calling Northside,
+# how can I help you?"), and an actual affirmative response that states the
+# name ("Yes, this is Northside, how can I help you?"). The introducing phrase
+# is the discriminator, never punctuation inside the clause, because a tag
+# question has a comma too and "Example Family Medicine, right?" used to read
+# as a greeting on exactly that basis.
+# Both are anchored to the start of the clause and must run all the way to the
+# name, so the phrase has to be what the respondent is SAYING rather than
+# something quoted or asked about inside it. Unanchored, "Did you say 'thanks
+# for calling Northside'?" confirmed the listing, which is the same defect the
+# comma had: a surface feature standing in for the speech act.
+_COURTESY = r"(?:(?:good (?:morning|afternoon|evening)|hi|hello|hey)[^a-z0-9]{0,3}\s*)?"
+_GREETING_ID = re.compile(
+    r"^\W{0,4}" + _COURTESY + r"(?:thanks? for calling|thank you for calling|welcome to"
+    r"|you'?ve reached|you have reached)\s+(?:the\s+)?$"
+)
+# "This is Example Family Medicine?" is still an echo, so a stated identity
+# survives a question only as the direct continuation of an affirmative.
+_STATED_ID = re.compile(
+    r"^\W*(?:yes|yeah|yep|sure|absolutely|certainly|correct)\b[^a-z0-9]{0,3}\s*"
+    r"(?:this is|it'?s|it is|we'?re|we are|you'?ve reached|you have reached"
+    r"|thanks? for calling|thank you for calling|welcome to)\s+(?:the\s+)?$"
+)
+# Whether a clause is a question cannot rest on the question mark alone. That is
+# the same kind of scope boundary the fourth pass was lost on: a transcript that
+# arrives without punctuation would walk straight past it and every echo would
+# read as a statement. Three independent signals instead.
+_INTERROGATIVE_OPENER = re.compile(
+    r"^\W*(?:is|are|am|was|were|do|does|did|can|could|would|will|should|have|has"
+    r"|who|what|which|where|when|why|how)\b"
+)
+_TAG_QUESTION = re.compile(r"\b(?:right|correct)\W*$")
+
+
+def _is_question(clause: str) -> bool:
+    """Is this clause asking rather than asserting?"""
+    stripped = clause.strip()
+    return (
+        stripped.endswith("?")
+        or _INTERROGATIVE_OPENER.match(stripped) is not None
+        or _TAG_QUESTION.search(stripped) is not None
+    )
+
+
+def _identifies_through_a_question(clause: str, name_start: int) -> bool:
+    """Does this questioning clause still state who answered?
+
+    Only the two forms the fifth review pass named. A greeting that cannot be
+    a question ("Thanks for calling Northside, how can I help you?"), or an
+    actual affirmative that states the name ("Yes, this is Northside, how can
+    I help you?"). Everything else asked or echoed inside a question,
+    including a bare name before a comma, establishes nothing.
+
+    This asks only whether the clause CONFIRMS. A negation next to the name is
+    decided before this is ever called, because the fail-closed direction never
+    needs a punctuation argument: "We're not Northside, right?" is a denial
+    whether or not it is phrased as a question.
+    """
+    lead_in = clause[:name_start]
+    return _GREETING_ID.match(lead_in) is not None or _STATED_ID.match(lead_in) is not None
 
 
 def _org_tokens(org: str) -> set[str]:
@@ -184,8 +255,11 @@ def _name_mentions(lowered: str, tokens: set[str]) -> tuple[bool, bool]:
         deliberately position-independent, because the fourth review pass
         showed the window alone is not: "Example Family Medicine? No, this is
         Buckhead Clinic" opens with the name and nothing precedes it.
-      - A name mention inside a question ("Example Family Medicine?") asserts
-        nothing. The respondent is asking, not identifying.
+      - A name mention inside a question asserts nothing, and the only thing
+        that survives a question is an explicit self-identification
+        ("Thanks for calling Northside, how can I help you?"). The fifth
+        review pass showed why the discriminator cannot be a comma:
+        "Example Family Medicine, right?" has one and is an echo.
       - Otherwise the negation window before the name decides, per clause.
     """
     affirmative = negated = False
@@ -204,22 +278,33 @@ def _name_mentions(lowered: str, tokens: set[str]) -> tuple[bool, bool]:
         consumed.append(cm.span(1))
     for clause_m in _CLAUSES.finditer(lowered):
         clause = clause_m.group(0)
-        is_question = clause.rstrip().endswith("?")
+        is_question = _is_question(clause)
         for tok in tokens:
             for m in re.finditer(rf"\b{re.escape(tok)}\b", clause):
                 if any(a <= clause_m.start() + m.start() < b for a, b in consumed):
                     continue
-                if is_question and "," not in clause[m.end() :]:
-                    # "Example Family Medicine?" is the respondent asking who
-                    # called, not stating who answered. A greeting keeps its
-                    # comma ("Northside, how can I help you?") and still
-                    # counts below.
-                    continue
+                # Negation first, and regardless of whether the clause is a
+                # question. Gating this on the question test made
+                # "We're not Northside Family Medicine, right?" report neither
+                # denial nor confirmation, losing a denial the previous version
+                # caught, and let one greeting outvote an explicit denial later
+                # in the same breath. Denial is the fail-closed direction and
+                # never needs a punctuation argument.
                 prefix = clause[max(0, m.start() - _NEGATION_WINDOW) : m.start()]
                 if re.search(_NEGATION, prefix):
                     negated = True
-                else:
-                    affirmative = True
+                    continue
+                if is_question and not _identifies_through_a_question(clause, m.start()):
+                    # The respondent is asking or echoing, not identifying:
+                    # "Example Family Medicine?", "Example Family Medicine,
+                    # right?", "Example Family Medicine, is that who I
+                    # reached?" and "Example Family Medicine, what do you
+                    # want?" all name the listing and establish nothing about
+                    # who answered. A bare name in a greeting is now
+                    # unconfirmed rather than confirmed, which is the
+                    # fail-closed direction and the one this tool exists for.
+                    continue
+                affirmative = True
     return affirmative, negated
 
 
@@ -268,11 +353,14 @@ def organization_confirmed(turns: list[dict], org: str | None) -> bool:
 
     Confirmation requires one of two things from a USER turn:
       - the organization's own distinctive name, STATED rather than asked and
-        not under negation, which is what "Northside Family Medicine, how can
-        I help you" looks like. An echo question ("Example Family Medicine?")
-        asserts nothing, and a correction ("No, this is Example Family
-        Medicine") counts by what it names, or
-      - an explicit affirmative answering an identity question.
+        not under negation: "Northside, this is the front desk", "Thanks for
+        calling Northside, how can I help you?". Anything the respondent asks
+        or echoes establishes nothing, whether or not it carries a comma
+        ("Example Family Medicine?", "Example Family Medicine, right?"), and a
+        correction ("No, this is Example Family Medicine") counts by what it
+        names, or
+      - an explicit affirmative answering an identity question that the agent
+        actually asked AND that named this listing.
 
     Generic pleasantries deliberately do not count. "Hello", "how can I help
     you", and "sure" are what any human says on any phone.
@@ -304,10 +392,15 @@ def organization_confirmed(turns: list[dict], org: str | None) -> bool:
             # the whole difference between a real check and a decorative one:
             # an earlier version accepted "Yes, we are." as confirmation, which
             # is the ordinary way to answer "are you accepting new patients",
-            # so every cooperative respondent confirmed themselves.
-            asked_identity = bool(
-                re.search(r"\bis this\b|\bhave i reached\b|\bam i speaking\b|confirm", lowered)
-            ) or (any(re.search(rf"\b{re.escape(t)}\b", lowered) for t in tokens) and "?" in text)
+            # so every cooperative respondent confirmed themselves. Both halves
+            # are required for the same reason: a bare "confirm" matched "can
+            # you confirm you are accepting new patients", and naming the
+            # listing anywhere in a turn that happened to hold a question mark
+            # matched the disclosure itself, so either one alone re-opened the
+            # decorative check with extra steps.
+            asked_identity = _IDENTITY_QUESTION.search(lowered) is not None and any(
+                re.search(rf"\b{re.escape(t)}\b", lowered) for t in tokens
+            )
             continue
         # Saying the practice's own distinctive name is confirmation on its own,
         # unprompted, and is how a staffed front desk actually answers. Only an
