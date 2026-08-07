@@ -270,6 +270,91 @@ def test_agreement_then_retraction_is_not_agreement():
     assert_not_auto_verified(verdict, "the recipient took the agreement back")
 
 
+# ── auto-verification needs a form we can read, not the absence of one we listed ──
+
+def test_the_reported_doubt_and_dispute_case():
+    """Reported: an agreement word unlocked verification because the rejection verb
+    was not on any list. This is the app's real delivery_date/delivery_time policy."""
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent",
+             "text": "This call is recorded. I have set the delivery date and time."},
+            {"id": 2, "speaker": "recipient",
+             "text": "I doubt the delivery date is correct; the fee is $0.00"},
+            {"id": 3, "speaker": "recipient",
+             "text": "I dispute that the delivery time is correct."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_date": "2026-08-07",
+                         "delivery_time": "09:00"},
+        success_conditions=["delivery_date_confirmed", "delivery_time_confirmed"],
+    )
+    assert_not_auto_verified(verdict, "both turns reject the outcome outright")
+
+
+@pytest.mark.parametrize("answer", [
+    # The point of this list is that NOTHING in the evaluator enumerates any of it.
+    # Each one contains an agreement word and means the opposite, or means something
+    # conditional we cannot read.
+    "I doubt the delivery date is correct.",
+    "I dispute that the delivery is correct.",
+    "I am unsure whether the delivery is correct.",
+    "It would be correct if the driver actually showed up.",
+    "My lawyer says the delivery date is correct, but I disagree.",
+    "Correct me if I'm wrong about the delivery.",
+    "Whether the delivery is correct depends on my husband.",
+    "Yes, but only if you refund the delivery entirely.",
+    "That's right, and I'm reporting you for the delivery.",
+    "Yes — assuming the delivery actually happens, which I question.",
+    "Es correcto siempre y cuando la entrega llegue completa.",
+    "Sí, pero la entrega me la cambian otra vez y ya me cansé.",
+])
+def test_agreement_words_inside_unreadable_sentences_do_not_verify(answer):
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
+            {"id": 2, "speaker": "recipient", "text": answer},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+    )
+    assert not (verdict.goal_completion == "complete" and not verdict.needs_human_review), (
+        f"auto-verified a sentence it cannot read: {answer!r}"
+    )
+
+
+@pytest.mark.parametrize("answer", [
+    "Yes.", "Correct.", "Confirmed.", "That's right.", "Agreed.",
+    "Sí.", "Está bien.", "De acuerdo.", "Correcto.",
+    "Confirmed, the delivery moves to Friday.",
+    "Yes, with a $120.00 surcharge.",
+    "Sí, está bien.",
+])
+def test_the_supported_forms_still_verify(answer):
+    """A gate that never opens is not a gate — and this is the whole set that opens it."""
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
+            {"id": 2, "speaker": "recipient", "text": answer},
+        ],
+        provider_result={"surcharge_cents": 12000, "delivery_changed": True},
+    )
+    assert verdict.goal_completion == "complete", f"should have verified: {answer!r}"
+    assert verdict.needs_human_review is False, f"should not need review: {answer!r}"
+
+
+def test_an_agreement_buried_mid_sentence_is_not_an_answer():
+    """The agreement has to OPEN the turn. Anywhere else it is a fragment of a larger
+    sentence whose meaning we cannot see."""
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
+            {"id": 2, "speaker": "recipient",
+             "text": "My daughter said yes to the delivery but she does not decide."},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+    )
+    assert_not_auto_verified(verdict, "someone else's yes, reported second-hand")
+
+
 # ── a disclosure is the whole disclosure ──────────────────────────────────────────
 
 def test_a_shared_word_does_not_satisfy_a_required_disclosure():

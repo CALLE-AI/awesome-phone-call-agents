@@ -14,30 +14,76 @@ MONEY_PATTERN = re.compile(r"\$\s?(\d+(?:\.\d{1,2})?)")
 AUDITED_SPEAKERS = {"agent"}
 COUNTERPARTY_SPEAKERS = {"recipient"}
 
-# An explicit agreement from the counterparty. Deliberately a closed list: this is the
-# only thing that unlocks auto-verification, so it must be something we can point at.
-AFFIRMATION_PATTERN = re.compile(
-    r"\b(yes|yeah|yep|sure|of course|correct|that'?s right|agreed|okay|ok|"
-    r"that works|works for me|sounds good|confirmed|done|deal|perfect|absolutely|"
-    r"s[íi]|claro|correcto|de acuerdo|est[áa] bien|perfecto|confirmado|hecho|listo|"
-    r"quedamos|adelante|sale|[óo]rale|[áa]ndale)\b",
+# ── the supported form ────────────────────────────────────────────────────────────
+#
+# A lexical matcher cannot establish what a sentence means. Everything that has gone
+# wrong in this file has been an attempt to pretend otherwise: first by looking for
+# agreement words anywhere in a turn, then by disqualifying turns that also contained a
+# denial word. Both are deny-lists wearing different hats, and a deny-list fails OPEN —
+# the phrasing nobody enumerated ("I doubt the delivery date is correct", "I dispute
+# that the delivery time is correct") sails through, because "correct" is present and
+# "doubt" was not on the list. Adding those two verbs would leave the next two open.
+#
+# So auto-verification is gated on a form we can actually reason about, not on the
+# absence of forms we happened to think of. A turn unlocks auto-verification only when
+# the WHOLE turn is one of the shapes below. Everything else — every sentence with a
+# clause we cannot account for — is routed to a human.
+#
+# The asymmetry is the point: an incomplete ALLOW-list sends real confirmations to
+# review, which costs a person thirty seconds. An incomplete deny-list auto-verifies a
+# refusal, which tells an operator a call succeeded when the customer said no. Only one
+# of those is a defensible way to be wrong.
+
+# Shape 1: the whole turn is an agreement and nothing else.
+BARE_AFFIRMATIONS = frozenset({
+    "yes", "yeah", "yep", "yes please", "sure", "of course", "correct",
+    "that is correct", "that's correct", "that is right", "that's right",
+    "agreed", "ok", "okay", "confirmed", "i confirm", "i agree",
+    "that works", "that works for me", "works for me", "sounds good", "perfect",
+    "si", "sí", "claro", "claro que si", "claro que sí", "correcto", "es correcto",
+    "de acuerdo", "esta bien", "está bien", "perfecto", "confirmado", "confirmo",
+    "listo", "hecho", "adelante", "me parece bien", "asi es", "así es",
+})
+
+# Shape 2: an agreement, then a restatement built ONLY from words we can account for —
+# the contract's own vocabulary, literals, and a closed set of neutral connectives. A
+# single token outside this vocabulary disqualifies the turn, because that token is
+# where the meaning we cannot read would live.
+SAFE_CONNECTIVES = frozenset({
+    "the", "a", "an", "to", "on", "at", "for", "with", "and", "is", "are", "was",
+    "will", "be", "it", "that", "this", "of", "in", "by", "we", "you", "i", "your",
+    "my", "please", "then", "so", "just", "el", "la", "los", "las", "un", "una",
+    "de", "del", "al", "en", "con", "y", "es", "son", "para", "por", "que", "se",
+    "lo", "su", "mi", "queda", "quedamos", "esta", "está", "estan", "están",
+    "sera", "será", "fue", "era", "quedo", "quedó",
+})
+
+# Neutral restatement verbs. A closed list, and one that only ever makes the gate MORE
+# permissive — the safe direction for a list to be incomplete in.
+SAFE_RESTATEMENT_WORDS = frozenset({
+    "moves", "move", "moved", "changes", "change", "changed", "set", "scheduled",
+    "reschedule", "rescheduled", "works", "fine", "good", "right", "correct",
+    "confirmed", "done", "surcharge", "fee", "total", "cambia", "cambio",
+    "movemos", "queda", "programada", "bien", "correcta", "correcto",
+})
+
+# Literals we can read exactly: money, dates, times, and weekday names.
+LITERAL_PATTERN = re.compile(
+    r"^(\$?\d[\d,]*(?:\.\d{1,2})?|\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+    r"lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo|"
+    r"am|pm|a\.m\.|p\.m\.|hrs|horas?|d[íi]as?|days?|weeks?|semanas?)$",
     re.IGNORECASE,
 )
 
-# Negation PARTICLES, not phrasings of refusal. Any of these in a turn disqualifies it
-# from affirming anything, and turns an on-topic turn into an explicit denial.
-#
-# This is the piece the affirmation list cannot do on its own: "That is not correct; the
-# delivery has not changed" contains "correct", so a matcher looking only for agreement
-# reads a denial as consent. Particles are a small closed class of a language — unlike
-# the open-ended ways to phrase a refusal — so relying on them is not another enumeration
-# that the next unseen wording defeats.
-#
-# It is deliberately blunt. "No problem, Friday works" is scored as a denial and lands in
-# human review rather than auto-verifying. That is the direction we want to be wrong in.
+# Kept only for REPORTING a transcript/result disagreement. Nothing about completion
+# depends on it any more, which is exactly the change the reviewer asked for: a missing
+# entry here can no longer unlock anything.
 NEGATION_PARTICLE = re.compile(
     r"(\bnot\b|n'?t\b|\bno\b|\bnever\b|\bcannot\b|\bnothing\b|\bneither\b|\bnor\b|"
-    r"\bnunca\b|\bjam[áa]s\b|\btampoco\b|\bning[úu]n[ao]?\b|\bnada\b)",
+    r"\bdoubt\b|\bdispute\b|\bdisagree\b|\bwrong\b|\bincorrect\b|\bmistaken\b|"
+    r"\bnunca\b|\bjam[áa]s\b|\btampoco\b|\bning[úu]n[ao]?\b|\bnada\b|\bdudo\b|"
+    r"\bequivocad[oa]\b|\bincorrect[oa]\b)",
     re.IGNORECASE,
 )
 
@@ -106,12 +152,20 @@ class DeterministicEvaluator:
     * Only the **counterparty** can corroborate an outcome. The agent is the party being
       audited, so its own question ("Can we move the delivery?") or claim ("I've moved
       it") is never evidence that anything happened.
-    * Corroboration requires an **explicit affirmation** from that counterparty, either
-      on topic or answering the agent's on-topic turn. Topic-only mentions are reported
-      as weak and routed to review rather than counted as success.
+    * Corroboration requires a turn whose **whole shape we can read** — see the
+      supported forms above. Not "an agreement word is present", and not "an agreement
+      word is present and a denial word is not": both of those are deny-lists, and a
+      deny-list fails open on the phrasing nobody enumerated. Anything we cannot account
+      for word by word is routed to a human, including real confirmations.
     * Obligations about what the **agent** must or must not say (disclosures, forbidden
       commitments) are read from the agent's turns only — a recipient asking "are you
       recording this?" is not the agent making a disclosure.
+
+    What this deliberately does NOT do is judge meaning. It cannot; it is string
+    matching. So it recognises a small closed set of utterances and sends everything
+    else to review. That makes it a filter rather than a judge, which is the honest
+    description of what a deterministic matcher can be — and the LLM provider is the
+    path to actual semantic judgement.
     """
 
     def evaluate(self, request: AnalysisRequest) -> Verdict:
@@ -223,6 +277,65 @@ class DeterministicEvaluator:
             groups.append(TERM_SYNONYMS.get(token, (token,)))
         return groups
 
+    # ── the supported form ────────────────────────────────────────────────────────
+
+    def _is_supported_affirmation(self, text: str, groups: list[tuple[str, ...]]) -> bool:
+        """Whether the WHOLE turn is a shape we can read without guessing.
+
+        This is the only thing that unlocks auto-verification. It answers "can we
+        account for every word here?" rather than "did an agreeable word appear?" —
+        which is why "I doubt the delivery date is correct" fails it: the turn does not
+        open with an agreement, and `doubt` is a word we cannot account for.
+        """
+        normalized = self._normalize(text)
+        if not normalized:
+            return False
+        if "?" in text:  # a question is not an answer
+            return False
+
+        if normalized in BARE_AFFIRMATIONS:
+            return True
+
+        opener, remainder = self._split_opener(normalized)
+        if opener is None:
+            return False
+        if not remainder:
+            return True
+
+        return self._accountable(remainder, groups)
+
+    def _normalize(self, text: str) -> str:
+        cleaned = re.sub(r"[.!¡¿]+", " ", text.lower())
+        return re.sub(r"\s+", " ", cleaned).strip(" ,;:")
+
+    def _split_opener(self, normalized: str) -> tuple[str | None, str]:
+        """An agreement has to OPEN the turn. Buried in the middle it is a fragment of
+        some larger sentence whose meaning we cannot see."""
+        for phrase in sorted(BARE_AFFIRMATIONS, key=len, reverse=True):
+            if normalized == phrase:
+                return phrase, ""
+            for separator in (", ", ": ", "; ", " "):
+                prefix = phrase + separator
+                if normalized.startswith(prefix):
+                    return phrase, normalized[len(prefix):].strip(" ,;:")
+        return None, normalized
+
+    def _accountable(self, remainder: str, groups: list[tuple[str, ...]]) -> bool:
+        """Every remaining token has to be one we can read exactly."""
+        vocabulary = {word for group in groups for word in group}
+        for token in re.split(r"[^\w$:.\-áéíóúñü]+", remainder):
+            token = token.strip(" ,;:")
+            if not token:
+                continue
+            if token in SAFE_CONNECTIVES or token in SAFE_RESTATEMENT_WORDS:
+                continue
+            if LITERAL_PATTERN.match(token):
+                continue
+            if any(word in token for word in vocabulary):
+                continue
+            return False
+        return True
+
     def _is_topical(self, text: str, groups: list[tuple[str, ...]]) -> bool:
         low = text.lower()
         return any(any(word in low for word in group) for group in groups)
@@ -265,13 +378,11 @@ class DeterministicEvaluator:
 
             negated = bool(NEGATION_PARTICLE.search(turn.text))
             on_topic = self._is_topical(turn.text, groups)
-            # A negated turn can never affirm, however agreeable its vocabulary looks:
-            # "that is not correct" contains "correct".
-            affirms = (
-                bool(AFFIRMATION_PATTERN.search(turn.text))
-                and "?" not in turn.text
-                and not negated
-            )
+            # The whole turn has to be a shape we can read. Note what this no longer
+            # does: it does not ask whether a denial word is absent. A turn we cannot
+            # account for fails here whether or not anyone thought to enumerate the way
+            # it says no.
+            affirms = self._is_supported_affirmation(turn.text, groups)
             # A bare "yes" corroborates only what the agent just asked about.
             answers_topical_question = (
                 index > 0
