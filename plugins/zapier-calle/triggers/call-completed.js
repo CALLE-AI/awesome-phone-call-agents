@@ -1,7 +1,37 @@
 import { flattenResult } from '../lib/flatten-result.js';
 import { toMinConfidenceScore } from '../lib/result-quality.js';
 import { fetchAuthoritativeCall, syntheticEvent } from '../lib/reconcile.js';
+import { checkNotificationFreshness } from '../lib/notification-freshness.js';
 import { toLeadState } from '../lib/lead-state.js';
+
+// Re-reading the call from CALL-E proves the record is real and belongs to this
+// connection. It cannot prove that the POST which named that call was authorized
+// or new. Anyone who learns this URL and one valid call id can send it again,
+// with a fresh envelope id each time, and every send re-reads the same genuine
+// result - so a Zap acting on this trigger's output would act again, and again,
+// on a call that happened once.
+//
+// Two things follow, and both are enforced below.
+//
+// Freshness *is* checkable server-side, so it is checked: lib/notification-
+// freshness.js dates the outcome by CALL-E's own `completed_at`, which arrives
+// in the authenticated response rather than in the attacker's copy of the body.
+// A replayed old result is therefore reported as needs_human, not as confirmed.
+//
+// At-most-once is not checkable here, so this surface no longer claims it. A
+// duplicate POST landing inside the freshness window is indistinguishable from a
+// legitimate redelivery, and a Zapier trigger has no durable storage to remember
+// an id in - z.cursor belongs to polling triggers, and inventing dedup on an
+// undocumented channel would look like a control while silently being none. So
+// `is_actionable` is never true here. The full authenticated outcome is still
+// reported, for routing, alerting and branching; anything that writes, pays or
+// notifies should re-read the call through `Find Call Result`, which reads from
+// CALL-E directly and has no webhook to distrust.
+const NOT_ACTIONABLE_NOTE =
+  'This outcome arrived on an unauthenticated webhook URL that anyone who learns it can post to ' +
+  'again, so it is reported for routing only and is never marked actionable. Look the call up ' +
+  'with Find Call Result over your own connection before acting on it, and key whatever you ' +
+  'write to `call_id` so a repeated delivery cannot write twice.';
 
 // This trigger deliberately omits performSubscribe/performUnsubscribe. The
 // CALL-E Developer API exposes no webhook subscription endpoint to call
@@ -59,6 +89,7 @@ const perform = async (z, bundle) => {
           `with CALL-E, so nothing in it may be acted on. ${authoritative.reason}`,
         is_actionable: false,
         lead_state: toLeadState('needs_human'),
+        notification_fresh: false,
         verified: false,
       },
     ];
@@ -71,7 +102,35 @@ const perform = async (z, bundle) => {
   // field came back `unknown` or empty, but it cannot know that a field the
   // original caller required is absent.
   const verifiedEvent = syntheticEvent(authoritative.data, { id: event.id, type: event.type });
-  return [{ ...flattenResult(verifiedEvent, classifierOptions(bundle)), verified: true }];
+  const flat = flattenResult(verifiedEvent, classifierOptions(bundle));
+
+  // `verified` stays true either way: the call record was confirmed with CALL-E.
+  // What a stale timestamp impeaches is the notification, not the record, which
+  // is why freshness gets a field of its own rather than overloading that one.
+  const freshness = checkNotificationFreshness(authoritative.data, Date.now());
+  const stale = !freshness.fresh;
+
+  // A stale delivery only *downgrades a success*. `failed`, `review_required`
+  // and the rest are already non-actionable and already say something more
+  // specific than needs_human does, and every legitimate late redelivery would
+  // trip this - so replacing them would cost information and buy nothing. What
+  // must not survive a replay is `confirmed`, because branching on it is
+  // precisely what a Zap is told to do.
+  const downgraded = stale && flat.disposition === 'confirmed';
+
+  return [
+    {
+      ...flat,
+      disposition: downgraded ? 'needs_human' : flat.disposition,
+      disposition_reason: [flat.disposition_reason, stale ? freshness.reason : null, NOT_ACTIONABLE_NOTE]
+        .filter(Boolean)
+        .join(' '),
+      is_actionable: false,
+      lead_state: downgraded ? toLeadState('needs_human') : flat.lead_state,
+      notification_fresh: freshness.fresh,
+      verified: true,
+    },
+  ];
 };
 
 export default {
@@ -83,21 +142,27 @@ export default {
       'Triggers when any CALL-E call reaches a terminal state (completed, failed, or ' +
       'result validation failed) - including calls started outside Zapier, such as from ' +
       "CALL-E's CLI or MCP tools. Requires pasting the webhook URL Zapier provides into " +
-      "your CALL-E project's webhook settings; see the setup directions for this trigger.",
+      "your CALL-E project's webhook settings; see the setup directions for this trigger. " +
+      'Outcomes arrive here for routing and review, never marked actionable: use Find Call ' +
+      'Result before a step that writes, pays or notifies.',
+    // Zapier caps `directions` at 1000 characters, so this is the operational
+    // short form; README.md carries the reasoning behind the last paragraph.
     directions:
-      'Zapier cannot poll CALL-E for new calls, because the CALL-E API has no endpoint ' +
-      'that lists them. Instead, this trigger listens for a webhook that CALL-E sends ' +
-      'directly, so you connect the two manually:\n\n' +
-      "1. Copy the webhook URL Zapier shows below this trigger once it's set up.\n" +
+      'Zapier cannot poll CALL-E: its API has no endpoint that lists calls. This trigger ' +
+      'listens for a webhook CALL-E sends directly, so connect the two by hand:\n\n' +
+      '1. Copy the webhook URL Zapier shows below.\n' +
       "2. In CALL-E, open your project's webhook settings.\n" +
-      "3. Paste the copied URL into the project's webhook URL field and save.\n\n" +
-      'Once connected, every call your CALL-E project places - from a Zap, the CALL-E ' +
-      'CLI, an MCP tool, or anywhere else - sends its terminal outcome to this Zap.\n\n' +
-      'This URL is unauthenticated, so nothing that arrives on it is trusted on its own: ' +
-      'every outcome is re-read from CALL-E over your own connection before this trigger ' +
-      'reports it. A delivery naming a call your connection cannot see is ignored, and one ' +
-      'that cannot be confirmed comes through as needs_human with `verified` false. Branch ' +
-      'on `disposition`.',
+      '3. Paste the URL in and save.\n\n' +
+      'Every terminal call in that project then reaches this Zap.\n\n' +
+      'The URL is unauthenticated, so nothing arriving on it is trusted: each outcome is ' +
+      're-read from CALL-E over your own connection first. A delivery naming a call you ' +
+      'cannot see is ignored; one that cannot be confirmed arrives as needs_human, verified ' +
+      'false.\n\n' +
+      'Re-reading proves the call is real, not that the delivery was authorized or new - ' +
+      'anyone who learns this URL can post a call id again. So an outcome published over 15 ' +
+      'minutes ago arrives as needs_human, notification_fresh false, and nothing here is ' +
+      'ever actionable. Before a step that writes or notifies, look the call up with Find ' +
+      'Call Result and key what you write to call_id.',
   },
   operation: {
     type: 'hook',
@@ -115,9 +180,13 @@ export default {
     perform,
     sample: {
       disposition: 'confirmed',
-      disposition_reason: 'Call completed with a high-confidence validated result.',
-      is_actionable: true,
+      disposition_reason:
+        'Call completed with a high-confidence validated result. This outcome arrived on an ' +
+        'unauthenticated webhook URL, so it is reported for routing only and is never marked ' +
+        'actionable.',
+      is_actionable: false,
       lead_state: 'qualified',
+      notification_fresh: true,
       verified: true,
       opt_out_requested: false,
       event_id: 'evt_123',

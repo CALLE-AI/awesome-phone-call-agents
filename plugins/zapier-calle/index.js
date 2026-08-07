@@ -19,7 +19,7 @@ import callCompleted from './triggers/call-completed.js';
 // which Node only allows via the "exports" field) and "zapier push" fails.
 // Both fields are required together; removing either one breaks production.
 export default {
-  version: '1.3.0',
+  version: '1.4.0',
   platformVersion,
   authentication,
   beforeRequest: [addBearerHeader],

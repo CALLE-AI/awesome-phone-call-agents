@@ -182,6 +182,31 @@ what happens when CALL-E cannot be reached. Static webhook triggers like
 this one are only permitted on private Zapier integrations, which this one
 is.
 
+**Nothing from this trigger is actionable, by design.** Reading the call
+back proves the record is real and yours. It cannot prove the delivery that
+named it was authorized or new: anyone who learns this URL can post a call
+id to it again, with a different envelope id every time, and each post
+re-reads the same genuine result. Two things follow.
+
+An outcome CALL-E published more than 15 minutes ago is reported as
+`needs_human` with `notification_fresh: false`, so a replayed old success
+never arrives as `confirmed`. Freshness is measured from CALL-E's own
+`completed_at`, which comes back in the authenticated read rather than from
+whoever posted - a replay cannot make it recent.
+
+And `is_actionable` is never `true` here, because at-most-once cannot be
+established on this surface at all: a duplicate landing inside that window
+is indistinguishable from a legitimate redelivery, and a Zapier trigger has
+no durable storage to remember a call id in. Use the trigger to route,
+alert, branch and review. Before a step that writes, pays or notifies, look
+the call up with [`Find Call Result`](#find-call-result), which reads from
+CALL-E directly and has no webhook to distrust - and key what you write to
+`call_id` so a repeated delivery cannot write twice.
+
+This is a property of unsigned webhooks, not of CALL-E specifically. If
+CALL-E adds payload signing, the freshness window and this restriction both
+become unnecessary; see [Webhook verification](#webhook-verification).
+
 ### Result schema support
 
 `result_schema` is validated against an allowlist, not a blacklist. Only
@@ -276,9 +301,10 @@ steps.
 | --- | --- |
 | `disposition` | One of the ten values in [Dispositions](#5-dispositions). |
 | `disposition_reason` | Human-readable reason the disposition was chosen. |
-| `is_actionable` | `true` only when `disposition` is `confirmed`. |
+| `is_actionable` | `true` only when `disposition` is `confirmed` - and never on the `Call Completed` trigger, whose deliveries cannot be authenticated. See [Call Completed trigger](#call-completed-trigger). |
 | `lead_state` | Coarse projection for branching: `qualified`, `needs_human`, or `blocked_compliance`. See [Lead state](#lead-state). |
 | `verified` | `true` when the fields above were read back from CALL-E over your own API key rather than taken from a webhook body. See [Webhook verification](#webhook-verification). |
+| `notification_fresh` | `Call Completed` only. `true` when CALL-E published this outcome recently enough for the delivery to be news rather than a repeat. `false` downgrades a `confirmed` call to `needs_human`. |
 | `event_id` | The CALL-E webhook event id, when available. |
 | `event_type` | The CALL-E webhook event type, when available. |
 | `call_id` | The CALL-E call id. |
@@ -348,7 +374,10 @@ output. An unrecognized disposition maps to `needs_human`, never to
 
 Only `confirmed` sets `is_actionable` to `true`. An unrecognized status or
 event type is never treated as a success - it always resolves to
-`needs_human`.
+`needs_human`. The `Call Completed` trigger is stricter still: it reports
+the real disposition but leaves `is_actionable` `false` on every outcome,
+because an unsigned webhook cannot show that a delivery was authorized or
+new (see [Call Completed trigger](#call-completed-trigger)).
 
 ### Usable results
 
@@ -587,6 +616,38 @@ The id checks in `performResume` still run first. They are a cheap filter,
 not authentication - they reject a callback that is not even claiming to be
 about this step's call before spending an API request on it.
 
+#### What re-reading does not prove
+
+The authenticated re-read establishes that the call is real and that it
+belongs to this connection. It says nothing about the delivery that named
+it. An unsigned post to a known URL carrying a known call id produces the
+same authenticated result every time it is sent, so a re-read alone still
+lets someone who has both re-run a Zap against an outcome that happened
+once, hours ago.
+
+The two surfaces are exposed to that very differently.
+
+`Place Call and Wait for Outcome` is structurally protected and needs no
+freshness rule. Its callback URL is minted per waiting step by Zapier,
+belongs to one held run, and resumes that run once; the step also refuses
+any body naming a call other than the one it started. A replay can at most
+resume a run that was already waiting, with whatever CALL-E truthfully
+reports at that moment.
+
+`Call Completed` has neither protection: its URL is long-lived, shared
+across the whole CALL-E project, and every post is a new Zap run. So it
+carries both mitigations described under
+[Call Completed trigger](#call-completed-trigger) - a 15-minute freshness
+window measured from CALL-E's `completed_at`, and `is_actionable` pinned to
+`false`.
+
+Freshness is a bound, not a fix: a replay arriving inside the window still
+reports the true current outcome, and there is no way to tell it from a
+legitimate redelivery. Treat the trigger as at-least-once. The clean fix is
+on CALL-E's side - an HMAC over the raw body plus a timestamp header would
+authenticate the notification itself and retire both mitigations. That is
+question 2 in the support request this integration ships with.
+
 `verified` is on the output of every entry point. `Find Call Result` reports
 `verified: true` unconditionally: it reads the call from CALL-E itself and
 never had a webhook to distrust in the first place.
@@ -661,7 +722,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 323 tests across 23 files against a bundled
+`npm install && npm test` runs 339 tests across 24 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/fixtures/` holds three committed payloads - a clean success, a
 provider-reported success that carries no answer, and a call carrying a

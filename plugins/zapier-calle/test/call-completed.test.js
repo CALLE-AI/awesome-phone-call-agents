@@ -3,6 +3,11 @@ import callCompleted from '../triggers/call-completed.js';
 
 const { perform } = callCompleted.operation;
 
+// Freshness is measured against CALL-E's own `completed_at`, so fixtures are
+// dated relative to the moment the suite runs rather than pinned to a date
+// that would age out.
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();
+
 const completedEvent = {
   id: 'evt_1',
   type: 'call.completed',
@@ -10,6 +15,7 @@ const completedEvent = {
   data: {
     id: 'call_1',
     status: 'completed',
+    completed_at: minutesAgo(0.5),
     task_completed: true,
     completion_confidence: { score: 0.92, label: 'high' },
     structured_result: { acknowledged: 'yes' },
@@ -58,12 +64,60 @@ const zServing = (records = [completedEvent.data, failedEvent.data], { throws = 
 });
 
 describe('call_completed trigger', () => {
-  it('yields exactly one confirmed, actionable result for a terminal completed event', async () => {
+  it('yields exactly one confirmed result for a terminal completed event', async () => {
     const out = await perform(zServing(), bundleFor(completedEvent));
     expect(out).toHaveLength(1);
     expect(out[0].disposition).toBe('confirmed');
-    expect(out[0].is_actionable).toBe(true);
     expect(out[0].verified).toBe(true);
+    expect(out[0].notification_fresh).toBe(true);
+  });
+
+  // The record is authentic and the outcome is genuinely a clean success. The
+  // delivery that announced it still arrived on an unauthenticated URL that
+  // anyone who knows it can POST to again, and a Zapier trigger has nowhere to
+  // remember that it has already seen this call. Nothing from this surface may
+  // gate a side effect.
+  describe('replay of an unsigned notification', () => {
+    it('never marks a webhook-delivered outcome actionable, however clean it is', async () => {
+      const out = await perform(zServing(), bundleFor(completedEvent));
+      expect(out[0].disposition).toBe('confirmed');
+      expect(out[0].is_actionable).toBe(false);
+      expect(out[0].disposition_reason).toMatch(/Find Call Result/);
+    });
+
+    it('refuses to confirm a result CALL-E published hours ago', async () => {
+      const old = { ...completedEvent.data, completed_at: minutesAgo(240) };
+      const replay = { ...completedEvent, id: 'evt_replayed_with_a_fresh_envelope_id' };
+
+      const out = await perform(zServing([old]), bundleFor(replay));
+      expect(out).toHaveLength(1);
+      expect(out[0].disposition).toBe('needs_human');
+      expect(out[0].is_actionable).toBe(false);
+      expect(out[0].notification_fresh).toBe(false);
+      expect(out[0].disposition_reason).toMatch(/replay/);
+    });
+
+    it('gives a repeated POST of the same call id no more authority than the first', async () => {
+      const z = zServing();
+      const first = await perform(z, bundleFor(completedEvent));
+      const second = await perform(z, bundleFor({ ...completedEvent, id: 'evt_1_again' }));
+
+      expect(first[0].is_actionable).toBe(false);
+      expect(second[0].is_actionable).toBe(false);
+    });
+
+    it('refuses to confirm a notification for a call CALL-E has not finished', async () => {
+      const running = { ...completedEvent.data, status: 'in_progress', completed_at: null };
+      const out = await perform(zServing([running]), bundleFor(completedEvent));
+      expect(out).toHaveLength(1);
+      expect(out[0].is_actionable).toBe(false);
+      expect(out[0].notification_fresh).toBe(false);
+    });
+
+    it('reports freshness as false, not absent, when the lookup itself failed', async () => {
+      const out = await perform(zServing([], { throws: 'socket hang up' }), bundleFor(completedEvent));
+      expect(out[0].notification_fresh).toBe(false);
+    });
   });
 
   it('yields a failed, non-actionable result for a call.failed event', async () => {

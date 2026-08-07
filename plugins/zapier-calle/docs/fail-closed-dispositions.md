@@ -417,6 +417,66 @@ Carry that distinction on the output as a field of its own (`verified`), so
 a downstream step can tell "the provider confirmed this" from "nobody could
 check."
 
+### 11a. An authentic record is not an authorized notification
+
+The re-fetch above settles what the call *is*. It settles nothing about the
+post that told you to go look, and the difference matters because the same
+post can be sent again:
+
+> An unsigned notification carrying a known ID re-fetches the same genuine
+> result every time it is delivered. Nothing in that loop distinguishes the
+> tenth delivery from the first.
+
+So an attacker who has the URL and one valid ID does not need to forge a
+result at all. They replay, and the workflow re-runs its downstream steps -
+the CRM write, the invoice, the page to an on-call engineer - against a real
+outcome that happened once, some time ago. Everything is authentic. The
+repetition is the attack.
+
+Two properties would close it, and they are worth separating because one is
+usually reachable and the other usually is not.
+
+**Freshness — often verifiable.** Providers commonly stamp the record with
+the moment the terminal result was published. That timestamp arrives in the
+*authenticated* response, not in the attacker's copy of the body, so a
+replay cannot make it recent. Bound it: a result published outside a short
+window is a repeat, not news, and should be downgraded. Downgrade only what
+would otherwise read as a success — the classifications that are already
+non-actionable are more specific and more useful than a blanket escalation,
+and every legitimate late redelivery would trip the rule too. If the
+timestamp is absent, unparseable, or in the future, freshness has not been
+established: fail closed.
+
+**At-most-once — usually not.** A duplicate arriving inside the freshness
+window is indistinguishable from a legitimate redelivery, so suppressing it
+requires remembering what you have already seen. Many hosted trigger
+environments give you nowhere durable to remember it. Resist the urge to
+improvise storage on a channel that was not meant for it: a dedup check that
+silently no-ops is worse than none, because it reads as a control while
+being decoration.
+
+When you cannot establish at-most-once, say so in the only way that binds:
+
+> Do not let that surface mark anything actionable.
+
+Report the full authenticated outcome — it is genuinely useful for routing,
+alerting and review — but make the field that gates side effects `false`,
+and point users at an authenticated pull for the step that writes. Then tell
+them plainly that the surface is at-least-once and that downstream writes
+should be keyed to the call's own ID.
+
+Note how differently two webhook surfaces in the same integration can sit
+here. A callback URL minted per waiting run, consumed once, and checked
+against the ID that run started is structurally protected and needs none of
+this. A long-lived project-wide URL where every post starts a new run has no
+such protection. Same transport, same absent signature, opposite exposure —
+so evaluate each surface on its own rather than applying one rule to both.
+
+All of this is scaffolding for a missing signature. A provider HMAC over the
+raw body plus a timestamp header authenticates the notification itself, and
+retires the freshness window and the actionability restriction together. Ask
+for it; document that you asked.
+
 ## 12. How to test it
 
 The property worth asserting is not "each disposition returns the right
@@ -439,7 +499,7 @@ unset flag is the state a freshly built workflow is in, and if absence reads
 as "go ahead," the safety of the preview mode depends on everyone
 remembering to turn it on.
 
-Five assertions are worth writing explicitly, because each covers a bug
+Six assertions are worth writing explicitly, because each covers a bug
 that is easy to introduce and invisible until production:
 
 - **`false` and `0` are still confirmed.** The usable-value check in section
@@ -465,6 +525,12 @@ that is easy to introduce and invisible until production:
   Pair it with the inverse, a schema declaring no citation fields at all,
   asserting the verdict is unchanged; without that second test, section 5a
   is free to quietly start failing workflows that never opted in.
+- **The same delivery, sent twice, wins nothing the second time.** Post an
+  authentic notification for an authentic, long-finished call, and assert it
+  is neither actionable nor reported as a success - then post it again with
+  a different envelope id and assert the same. Section 11a is the only rule
+  here whose payload is entirely genuine, so a test that varies the *content*
+  will never reach it; this one has to vary the delivery.
 
 Keep a small set of committed fixture payloads for the cases that are hard
 to describe in prose - a clean success, a provider-reported success that
@@ -477,8 +543,11 @@ See `plugins/zapier-calle/lib/disposition.js` and
 built around these rules, `plugins/zapier-calle/lib/grounding.js` for the
 citation check in section 5a, `plugins/zapier-calle/lib/opt-out.js` for the
 revocation scanner, `plugins/zapier-calle/lib/reconcile.js` for the
-authenticated re-read in section 11, and
+authenticated re-read in section 11,
+`plugins/zapier-calle/lib/notification-freshness.js` for the replay bound in
+section 11a, and
 `plugins/zapier-calle/test/disposition.test.js` plus
 `plugins/zapier-calle/test/fixtures.test.js`,
-`plugins/zapier-calle/test/grounding.test.js` and
+`plugins/zapier-calle/test/grounding.test.js`,
+`plugins/zapier-calle/test/notification-freshness.test.js` and
 `plugins/zapier-calle/test/reconcile.test.js` for the tests described above.
