@@ -1,0 +1,63 @@
+{
+  "job": "Replace the windscreen on a 2019 Honda Civic",
+  "requester": "Sam",
+  "note": "All numbers are from the +1 555-0100..555-0199 range, reserved for fiction and belonging to nobody.",
+  "candidates": [
+    {
+      "name": "Northgate Auto Glass",
+      "phone": "+15550100",
+      "opening_hours": "Mo-Fr 08:00-18:00; Sa 09:00-13:00",
+      "address": "12 Northgate Road",
+      "locality": "Springfield",
+      "source_id": "fixture/1"
+    },
+    {
+      "name": "Riverside Motors",
+      "phone": "+15550101",
+      "opening_hours": "Mo-Sa 07:30-19:00",
+      "address": "88 Riverside Drive",
+      "locality": "Springfield",
+      "source_id": "fixture/2"
+    },
+    {
+      "name": "Halloran & Sons Bodyshop",
+      "phone": "+15550102",
+      "opening_hours": "Mo-Fr 09:00-13:00,15:00-19:00",
+      "address": "3 Mill Lane",
+      "locality": "Springfield",
+      "source_id": "fixture/3"
+    },
+    {
+      "name": "Quickfit Windscreens",
+      "phone": "+15550103",
+      "opening_hours": "24/7",
+      "address": "The Retail Park",
+      "locality": "Springfield",
+      "source_id": "fixture/4"
+    },
+    {
+      "name": "Bellweather Garage",
+      "phone": "+15550104",
+      "opening_hours": "Sa-Su 10:00-16:00",
+      "address": "5 Bell Street",
+      "locality": "Springfield",
+      "source_id": "fixture/5"
+    },
+    {
+      "name": "Corner Tyre & Glass",
+      "phone": "+15550105",
+      "opening_hours": "",
+      "address": "1 Market Square",
+      "locality": "Springfield",
+      "source_id": "fixture/6"
+    },
+    {
+      "name": "Old Forge Repairs",
+      "phone": "555 0106",
+      "opening_hours": "Mo-Fr 09:00-17:00",
+      "address": "Forge Yard",
+      "locality": "Springfield",
+      "source_id": "fixture/7"
+    }
+  ]
+}
