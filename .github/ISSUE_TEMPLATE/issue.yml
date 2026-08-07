@@ -1,0 +1,35 @@
+name: Issue
+description: Report a problem, request an improvement, ask a question, or suggest documentation.
+title: "[Issue]: "
+body:
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      description: Select the category that best describes this issue.
+      options:
+        - Bug
+        - Enhancement
+        - Documentation
+        - Question
+    validations:
+      required: true
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Give a concise description of the issue or request.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Explain the problem, request, or question. Include reproduction steps and expected behavior for bugs.
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Add relevant links, screenshots, logs, or other context.
