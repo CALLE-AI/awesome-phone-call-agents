@@ -31,7 +31,7 @@ const NOT_ACTIONABLE_NOTE =
   'This outcome arrived on an unauthenticated webhook URL that anyone who learns it can post to ' +
   'again, so it is reported for routing only and is never marked actionable. Look the call up ' +
   'with Find Call Result over your own connection before acting on it, and key whatever you ' +
-  'write to `call_id` so a repeated delivery cannot write twice.';
+  'write to call_id so a repeated delivery cannot write twice.';
 
 // This trigger deliberately omits performSubscribe/performUnsubscribe. The
 // CALL-E Developer API exposes no webhook subscription endpoint to call

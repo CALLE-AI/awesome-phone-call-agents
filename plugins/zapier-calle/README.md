@@ -199,9 +199,10 @@ established on this surface at all: a duplicate landing inside that window
 is indistinguishable from a legitimate redelivery, and a Zapier trigger has
 no durable storage to remember a call id in. Use the trigger to route,
 alert, branch and review. Before a step that writes, pays or notifies, look
-the call up with [`Find Call Result`](#find-call-result), which reads from
-CALL-E directly and has no webhook to distrust - and key what you write to
-`call_id` so a repeated delivery cannot write twice.
+the call up with `Find Call Result` (see
+[Actions, search, and trigger](#3-actions-search-and-trigger)), which reads
+from CALL-E directly and has no webhook to distrust - and key what you write
+to `call_id` so a repeated delivery cannot write twice.
 
 This is a property of unsigned webhooks, not of CALL-E specifically. If
 CALL-E adds payload signing, the freshness window and this restriction both
@@ -367,7 +368,7 @@ output. An unrecognized disposition maps to `needs_human`, never to
 | `failed` | `false` | The call failed (status `failed` or a `call.failed` event). |
 | `canceled` | `false` | The call was canceled before completion. |
 | `outcome_unknown` | `false` | The call is still `queued` or `in_progress`, or the webhook payload itself was unreadable. Deliberately distinct from `failed` - treating an ambiguous result as a failure is how a workflow ends up dialing someone twice. |
-| `needs_human` | `false` | Default, fail-closed branch: a malformed event, an unrecognized event type, a missing or unrecognized call status, or a callback that fails id verification (see [Callback verification](#callback-verification)). |
+| `needs_human` | `false` | Default, fail-closed branch: a malformed event, an unrecognized event type, a missing or unrecognized call status, or a callback that fails id verification (see [Webhook verification](#webhook-verification)). |
 | `outside_calling_window` | `false` | The call was refused before dialing because the current time in the recipient's configured timezone fell outside the calling window (see [Calling windows](#calling-windows)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
 | `suppressed` | `false` | The call was refused before dialing because the recipient number matched an entry on the supplied `Do Not Call List` (see [Suppression list](#suppression-list)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
 | `retry_policy_blocked` | `false` | The call was refused before dialing because the supplied attempt history would exceed the per-day cap or the minimum interval between attempts (see [Retry policy](#retry-policy)). Produced only by the create action before a request is sent to CALL-E - the webhook classifier never returns it. |
@@ -603,7 +604,7 @@ succeed:
 | Body does not name the call this step started | `needs_human`, no lookup made | n/a - the trigger has no prior call |
 | CALL-E has no such call on this connection | `needs_human` | Ignored: no Zap run at all |
 | CALL-E unreachable, rate limited, or erroring | `needs_human`, `verified: false` | `needs_human`, `verified: false` |
-| CALL-E returns the call | Classified from CALL-E's record, `verified: true` | Classified from CALL-E's record, `verified: true` |
+| CALL-E returns the call | Classified from CALL-E's record, `verified: true` | Classified from CALL-E's record, `verified: true` - but never `is_actionable`, and downgraded to `needs_human` if CALL-E published the outcome more than 15 minutes ago |
 
 A call the connection cannot see is not the Zap's call - a forged post, a
 stale delivery, or a webhook wired to another CALL-E project - so the
@@ -722,7 +723,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 339 tests across 24 files against a bundled
+`npm install && npm test` runs 341 tests across 24 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/fixtures/` holds three committed payloads - a clean success, a
 provider-reported success that carries no answer, and a call carrying a

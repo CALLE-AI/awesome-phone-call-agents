@@ -114,6 +114,44 @@ describe('call_completed trigger', () => {
       expect(out[0].notification_fresh).toBe(false);
     });
 
+    // Staleness downgrades a success and nothing else. A failed call already
+    // says something more useful than needs_human does, and every legitimate
+    // late redelivery would trip the rule too.
+    it('leaves a failed call classified as failed rather than escalating it', async () => {
+      const old = { ...failedEvent.data, completed_at: minutesAgo(240) };
+      const out = await perform(zServing([old]), bundleFor(failedEvent));
+      expect(out[0].disposition).toBe('failed');
+      expect(out[0].notification_fresh).toBe(false);
+    });
+
+    // The downgrade rewrites lead_state, and a revocation of consent must
+    // survive that: blocked_compliance is the one lead_state that exists to
+    // stop an outreach sequence, and needs_human would quietly release it.
+    it('keeps a revocation of consent blocking, even on a stale delivery', async () => {
+      const revoked = {
+        ...completedEvent.data,
+        completed_at: minutesAgo(240),
+        recipients: [
+          {
+            id: 'rcp_1',
+            status: 'completed',
+            attempts: [
+              {
+                id: 'att_1',
+                transcript_turns: [
+                  { offset_seconds: 4, speaker: 'user', text: 'Please stop calling me.' },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const out = await perform(zServing([revoked]), bundleFor(completedEvent));
+      expect(out[0].opt_out_requested).toBe(true);
+      expect(out[0].lead_state).toBe('blocked_compliance');
+      expect(out[0].is_actionable).toBe(false);
+    });
+
     it('reports freshness as false, not absent, when the lookup itself failed', async () => {
       const out = await perform(zServing([], { throws: 'socket hang up' }), bundleFor(completedEvent));
       expect(out[0].notification_fresh).toBe(false);
