@@ -241,6 +241,20 @@ python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv        # offline
 python3 scripts/pharmacy_search.py --pharmacies pharmacies.csv --live # calls
 ```
 
+## Tests
+
+```bash
+python3 scripts/test_pharmacy_search.py
+```
+
+Standard library only. No network, no credentials, no calls placed.
+
+The suite exists because the same invariant has broken twice in ways that were
+silent — the code planned and submitted a second call to a real person, and
+nothing in the output said so. `test_resume_does_not_redial` asserts on which
+MCP tools were invoked rather than on return values, because whether `run_call`
+was called is the only thing that distinguishes "resumed" from "dialled again".
+
 ## Verifying end to end without a real pharmacy
 
 CALL-E publishes an inbound testing hotline — **+1 276-322-9632** — that answers
@@ -332,10 +346,17 @@ credentials are still bound to the right origin automatically.
 This resolves itself if the provider exposes an account identifier in the
 credential cache or issues a token with a subject claim.
 
-**Verification is manual, not automated.** There is a runnable end-to-end path
-(see the testing hotline above) and the dry run is fully offline, but there is
-no committed test suite. The concurrency, crash and credential behaviours were
-verified with throwaway scripts rather than tests a reviewer can re-run.
+**Test coverage is behavioural, not exhaustive.** `scripts/test_pharmacy_search.py`
+covers the invariants that have actually regressed — crash-and-resume,
+exclusion across configuration changes, budget ceilings, validation — with no
+network, no credentials and no calls placed:
+
+```bash
+python3 scripts/test_pharmacy_search.py
+```
+
+It does not cover the live provider surface. Reaching the real API still means
+the hotline path above.
 
 **The budget ceiling is local.** It counts what this installation has spent. It
 does not know the provider-side balance, so it protects against a runaway loop,

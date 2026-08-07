@@ -923,9 +923,15 @@ class Caller:
 
         async with self._client() as client:
             # Resume an in-flight run rather than planning again.
-            if saved.get("run_id"):
-                log.info("  %s: resuming run %s", mask(phone), saved["run_id"][:12])
-                final = await self._poll(client, saved["run_id"], phone)
+            # Attempt-scoped fields live under entry["attempt"], never at the
+            # top level. Reading them from the top level silently misses a
+            # `running` entry after a restart and dials the recipient again.
+            saved_attempt = saved.get("attempt") or {}
+
+            if saved_attempt.get("run_id"):
+                log.info("  %s: resuming run %s",
+                         mask(phone), saved_attempt["run_id"][:12])
+                final = await self._poll(client, saved_attempt["run_id"], phone)
                 if final is None:
                     return None
                 self.store.mark_done(
@@ -935,13 +941,16 @@ class Caller:
 
             # Reuse a stored plan if its confirm_token is still valid.
             plan = None
-            if saved.get("plan_id") and self._token_live(saved.get("confirm_expires_at")):
+            if saved_attempt.get("plan_id") and self._token_live(
+                saved_attempt.get("confirm_expires_at")
+            ):
                 plan = {
-                    "plan_id": saved["plan_id"],
-                    "confirm_token": saved["confirm_token"],
+                    "plan_id": saved_attempt["plan_id"],
+                    "confirm_token": saved_attempt["confirm_token"],
                     "ready_to_run": True,
                 }
-                log.info("  %s: reusing plan %s", mask(phone), saved["plan_id"])
+                log.info("  %s: reusing plan %s",
+                         mask(phone), saved_attempt["plan_id"])
 
             if plan is None:
                 plan = self._unwrap(await client.call_tool("plan_call", {
