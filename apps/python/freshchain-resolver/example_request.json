@@ -1,0 +1,14 @@
+{
+  "workflow_id": "delay-20260731-001",
+  "shipment_reference": "DEMO-CC-1042",
+  "phone": "+12025550123",
+  "authorized_operational_contact": true,
+  "caller_business_name": "FreshChain Demo Logistics",
+  "receiving_site_name": "North Harbor Distribution Center",
+  "product_category": "refrigerated produce",
+  "predicted_arrival_local": "2026-07-31T18:30",
+  "scheduled_window_end_local": "2026-07-31T17:00",
+  "timezone": "America/New_York",
+  "locale": "en-US",
+  "temperature_status": "within_range"
+}

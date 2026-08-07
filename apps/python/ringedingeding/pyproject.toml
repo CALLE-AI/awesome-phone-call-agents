@@ -1,0 +1,11 @@
+[project]
+name = "calle-multi-recipient-aggregator-app"
+version = "0.1.0"
+description = "Aggregate answers from several phone calls without inventing a majority."
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
