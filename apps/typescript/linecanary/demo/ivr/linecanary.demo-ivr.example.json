@@ -1,0 +1,72 @@
+{
+  "lines": [
+    {
+      "id": "dental-ivr",
+      "phone": "+15550199",
+      "region": "US",
+      "locale": "en-US",
+      "ownership": { "method": "greeting_code", "code": "LC-7391" }
+    }
+  ],
+  "checks": [
+    {
+      "id": "ivr-menu-integrity",
+      "line": "dental-ivr",
+      "task": "Listen to the full greeting and menu without pressing any keys. Report the list of menu options you heard, and which option number is announced for billing questions.",
+      "resultSchema": {
+        "type": "object",
+        "properties": {
+          "menu_options": { "type": "string", "description": "The announced options, in order." },
+          "billing_option": { "type": "string", "description": "The option number announced for billing, e.g. '3'." }
+        },
+        "required": ["billing_option"],
+        "additionalProperties": false
+      },
+      "assert": [
+        { "path": "billing_option", "equals": "3" },
+        { "path": "menu_options", "contains": "appointments" }
+      ],
+      "timing": { "maxSecondsToAnswer": 15 },
+      "minConfidence": 0.6
+    },
+    {
+      "id": "ivr-billing-branch",
+      "line": "dental-ivr",
+      "task": "When the menu is announced, press 3 for billing questions. Listen to the billing message and record it verbatim. If you hear silence or the call drops, report that the branch did not answer.",
+      "resultSchema": {
+        "type": "object",
+        "properties": {
+          "branch_answered": { "type": "boolean", "description": "True when the billing branch played a message." },
+          "billing_message": { "type": "string", "description": "The billing message, verbatim." }
+        },
+        "required": ["branch_answered"],
+        "additionalProperties": false
+      },
+      "assert": [
+        { "path": "branch_answered", "equals": true },
+        { "path": "billing_message", "matches": "monday|billing" }
+      ],
+      "minConfidence": 0.6
+    },
+    {
+      "id": "ivr-hours-branch",
+      "line": "dental-ivr",
+      "task": "When the menu is announced, press 2 for opening hours. Record the hours message verbatim.",
+      "resultSchema": {
+        "type": "object",
+        "properties": {
+          "hours_message": { "type": "string", "description": "The opening-hours message, verbatim." }
+        },
+        "required": ["hours_message"],
+        "additionalProperties": false
+      },
+      "assert": [
+        { "path": "hours_message", "matches": "saturday" },
+        { "path": "hours_message", "contains": "9" }
+      ],
+      "minConfidence": 0.6
+    }
+  ],
+  "baselineDir": "baselines-demo",
+  "$comment": "Replace +15550199 with your Twilio number. The IVR menu checks press keys on OUR OWN test IVR — key navigation is part of what LineCanary exercises."
+}

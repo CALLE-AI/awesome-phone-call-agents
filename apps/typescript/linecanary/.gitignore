@@ -1,0 +1,11 @@
+node_modules/
+.reference/
+baselines/
+dist/
+*.local.*
+.env
+.env.*
+report.json
+demo/ivr/.env.*
+baselines-demo/
+.twiliodeployinfo
