@@ -1,166 +1,157 @@
-# Agent Gallery: Appointment Recovery — Product Specification
+# CareCall SG — Product Specification
 
-One-page specification for `apps/typescript/agent-gallery`, per the
-[hackathon implementation route](../hackathon-implementation-route.md). Approving this
-document unlocks Phase 2 (the throwaway live call), then scaffolding.
+Specification for `apps/typescript/agent-gallery`, the CareCall SG operator
+workspace. The implementation detail lives in
+[`carecall-sg-ui-plan.md`](carecall-sg-ui-plan.md); this document states what the
+product is, what it may and may not do, and the contracts it holds to.
+
+An earlier version of this document specified a salon appointment-recovery
+workflow. That workflow was replaced by CareCall SG and its code has been
+removed; the CALL-E integration findings that survived the change are recorded
+in [`calle-api-observations.md`](calle-api-observations.md).
 
 ## Pitch
 
-> Appointment Recovery Agent uses CALL-E to recover missed or unconfirmed appointments
-> through one safe, policy-constrained phone conversation, then returns a structured
-> disposition and a concrete next action. It is the first executable workflow in the
-> Awesome Phone Call Agents gallery.
+> CareCall SG places caregiver-authorized reminder and check-in calls to seniors
+> in Singapore, records only what the senior actually said, and routes every
+> exception to a named human. It never decides anything about anyone's care.
 
 ## Vertical and Hero Operator
 
-- **Vertical:** hair and beauty salons. No-shows directly forfeit chair time and revenue,
-  reschedule policy fits in a few fixed windows, and the conversation never touches
-  medical, legal, financial, or emergency content. The workflow definition is
-  vertical-agnostic data, so swapping verticals later is a data change, not a code change.
-- **Hero operator:** the salon front-desk manager. They see this morning's missed and
-  unconfirmed appointments and today spend their day re-dialing customers by hand.
-- **Trigger:** an appointment is `missed` (customer did not show) or `unconfirmed`
-  (booked but never confirmed and the slot is near). The operator picks one and starts
-  a recovery call.
-- **Defensible value claim:** every recovered appointment converts an empty chair slot
-  back into booked revenue, and every call the agent completes is a call the front desk
-  did not have to make. No invented no-show percentages; the demo states only what the
-  workflow observably does.
+- **Vertical:** community eldercare in Singapore — care teams and family
+  caregivers supporting seniors who live alone or semi-independently.
+- **Hero operator:** the care coordinator running a Singapore care team's daily
+  round of check-ins. Today they call a list of seniors by hand, and the calls
+  that matter most are the ones nobody got to.
+- **Trigger:** a caregiver-approved routine falls due — a medication reminder, a
+  meal or hydration prompt, a wellbeing check-in, or an appointment reminder.
+- **Defensible value claim:** the coordinator's attention moves from placing
+  routine calls to handling the small number that came back wrong. The product
+  claims only what it observably does: it places the call, records what was
+  said, and surfaces exceptions. It does not claim improved adherence, and no
+  invented outcome statistics appear anywhere in the interface or the demo.
 
-## Policy: What the Agent May and May Not Commit To
+## Product Boundary
 
-- Offer **only** the operator-entered replacement windows (maximum three), in the
-  business's stated IANA timezone. Never invent times, timezones, or availability.
-- May: confirm the original slot, book one offered window, note a requested SMS
-  confirmation, accept a decline, end the call politely.
-- May not: change prices or offer discounts, discuss other customers, give advice of any
-  regulated kind, promise anything outside the offered windows, or call back later on
-  its own.
-- Silence, hesitation, or ambiguity is **never** agreement. If intent is unclear, the
-  outcome is `uncertain`, not `confirmed`.
+CareCall may repeat a caregiver-approved reminder, ask one clear follow-up
+question at a time, record a self-reported outcome from its routine kind's own
+vocabulary, ask whether food is available or a planned delivery arrived, offer a
+callback from an authorized caregiver, and route ambiguity to a human.
 
-## Input Contract
+CareCall must never diagnose a condition or recommend a dose, advise a senior to
+repeat, skip, delay, or change medication, treat silence or hesitation as
+completion, request money, banking details, OTPs, passwords, or a full NRIC,
+create a hidden recurring schedule, or claim that help has been dispatched when
+it has not. For an immediate emergency the interface directs a person to **995**;
+CareCall does not dispatch emergency services.
 
-```json
-{
-  "request_key": "client-generated UUID, stable across retries",
-  "business": {
-    "name": "Glow & Co. Hair Studio",
-    "timezone": "Asia/Singapore",
-    "callback_number_e164": "+6560000000"
-  },
-  "customer": {
-    "given_name": "Mei",
-    "phone_e164": "+6580000000",
-    "consent_confirmed": true
-  },
-  "appointment": {
-    "service": "Cut and color",
-    "original_time": "2026-08-03T14:00:00+08:00",
-    "status": "missed"
-  },
-  "replacement_windows": [
-    { "start": "2026-08-07T10:00:00+08:00", "end": "2026-08-07T12:00:00+08:00" },
-    { "start": "2026-08-08T15:00:00+08:00", "end": "2026-08-08T17:00:00+08:00" }
-  ]
-}
-```
+The full boundary, including the per-kind conversational limits, is assembled
+from the enforcing modules by
+[`safety-policy.ts`](../../apps/typescript/agent-gallery/src/carecall/safety-policy.ts)
+and is readable inside the workspace, so the stated policy cannot drift from the
+code that enforces it.
 
-Validation gates before any preview: E.164 numbers, explicit consent/authority checkbox
-with the operator's attestation, non-empty windows in the future, valid IANA timezone.
-Phone numbers are masked (`+65•••••000`) everywhere except the operator's own input field.
+## Routine Kinds and Outcome Vocabularies
 
-## Result Contract and Terminal Outcomes
+Five kinds ship, and **each may only report outcomes from its own vocabulary**.
+`OUTCOMES_BY_KIND` in
+[`result.ts`](../../apps/typescript/agent-gallery/src/workflows/carecall/result.ts)
+is a complete `Record`, so adding a kind without a vocabulary is a type error.
+An outcome outside the kind's list becomes `uncertain`.
 
-```json
-{
-  "outcome": "rescheduled",
-  "confirmed_time": "2026-08-07T10:30:00+08:00",
-  "customer_intent": "confirmed",
-  "follow_up_required": false,
-  "next_action": "book_slot_and_send_confirmation",
-  "notes": "Customer asked for an SMS confirmation.",
-  "call_id": "call_abc123"
-}
-```
-
-| Outcome | Meaning | Next action shown to operator |
+| Kind | Representative outcomes | Stated limit |
 | --- | --- | --- |
-| `confirmed` | Customer keeps the original/near slot | Mark confirmed; send SMS confirmation |
-| `rescheduled` | Customer accepted one offered window | Book that slot; send confirmation |
-| `no_agreement` | Customer engaged and wants to rebook, but no approved window worked | Decide whether to open a new window; front desk calls back |
-| `declined` | Customer clearly declined | Free the slot; no re-call without new consent |
-| `unreachable` | No answer, voicemail, busy, or a rejected call | Operator may retry manually later; nothing automatic |
-| `failed` | Call errored before or during dial | Front desk calls manually |
-| `timed_out` | Call exceeded time budget without resolution | Review transcript; front desk follows up |
-| `uncertain` | Intent unclear or result unparseable | Human reviews transcript before any action |
+| `medication` | `self_reported_taken`, `unsure_if_taken`, `cannot_find_medication` | Never advises repeating, skipping, or changing a dose |
+| `meal` | `self_reported_ate`, `no_food_available`, `meal_delivery_missing` | Asks about food access; arranges nothing |
+| `hydration` | `self_reported_drank`, `unsure_if_drank`, `no_drink_available` | No intake targets, no health inference |
+| `wellbeing` | `self_reported_well`, `reports_feeling_low`, `wants_company` | Records what was said; does not assess mood or screen |
+| `appointment` | `appointment_acknowledged`, `will_attend`, `needs_transport` | Repeats confirmed details; never books, moves, or cancels |
 
-`no_agreement` was added after the Phase 2 call, which produced exactly this
-case: a reachable, willing customer for whom every proposed time fell outside
-policy. It is operationally different from `declined` (does not want it) and
-from `uncertain` (we cannot tell), and collapsing the three would hide the one
-case where opening a new window recovers the booking.
+Every kind also carries `declined`, `requests_help`, and `uncertain`.
 
-Outcomes are derived in [`outcome.ts`](../../apps/typescript/agent-gallery/src/workflows/appointment-recovery/outcome.ts).
-CALL-E's `task_completed` is never consulted: it reports that the call ended
-cleanly, not that the appointment was recovered. CALL-E's telephony `DECLINED`
-means a rejected incoming call and maps to `unreachable`, not to a customer
-refusing the offer.
+## Result Contract
 
-Transcripts and structured results are untrusted external data: rendered as text,
-never executed or treated as instructions.
+```json
+{
+  "outcome": "unsure_if_taken",
+  "outcome_label": "Unsure whether already taken",
+  "follow_up_required": true,
+  "urgency": "contact-now",
+  "next_action": "Call Mdm Lim's caregiver before the next dose is due.",
+  "evidence": "She said she could not remember whether she had taken it.",
+  "safety_flags": [],
+  "provider_status": "COMPLETED",
+  "call_id": "call-care-1"
+}
+```
+
+Provider completion is never treated as proof that anything was taken, eaten,
+drunk, or attended. Outcomes are conservative and explicitly self-reported.
+Safety flags are advisory: they record that wording appeared, not who said it or
+that it is true, and any flag other than `possible_immediate_danger` forces the
+outcome to `uncertain`. Transcripts and structured results are untrusted
+external data — rendered as text, never executed or treated as instructions.
 
 ## Screen Flow
 
-1. **Landing** — problem statement; Appointment Recovery presented as the first of a
-   family of reusable, safety-contracted phone workflows.
-2. **Configure** — the input form above, with inline validation.
-3. **Preview (default)** — masked dry-run call plan: who is called, what may be offered,
-   what may never be said. No call can be placed from this screen state.
-4. **Authorize** — explicit, separate confirmation for exactly one live call; submit
-   disables immediately on click.
-5. **Live call** — status relayed from CALL-E by polling; masked number; elapsed time;
-   never appears frozen.
-6. **Result** — structured outcome, recommended next action, and the transcript rendered
-   as untrusted text.
+The workspace has six destinations: **Today** (the care timeline), **Calls** (the
+protected operations console), **Seniors**, **Care Routines**, **Needs
+Attention** (exceptions only), and **Settings**. A call travels:
+
+1. **Preview** — masked dry-run plan showing the trust-first opening, the
+   conversation plan, and the boundary for that routine kind. Derived from
+   [`routine-kinds.ts`](../../apps/typescript/agent-gallery/src/carecall/routine-kinds.ts)
+   so the preview matches what the agent is actually instructed to do.
+2. **Authorize** — a separate gate for exactly one real call, or for a recurring
+   schedule with an explicit review date. The E.164 number is entered only here.
+3. **Queue** — the job takes a position behind the single global active-call lease.
+4. **Live** — provider status, elapsed time, and a visible cancellation control.
+5. **Result** — the structured outcome, its urgency, and the next human action.
+6. **Needs Attention** — where anything requiring a person ends up.
 
 ## Key Technical Decisions (frozen)
 
-Confirmed against a real call on 2026-08-04. Full record:
+Confirmed against a real CALL-E call on 2026-08-04. Full record:
 [`calle-api-observations.md`](calle-api-observations.md).
 
-- **Integration surface: MCP**, not REST. The Phase 2 call corrected the earlier
-  provisional decision. The server layer calls `plan_call` (returns `plan_id` and
-  `confirm_token`), then `run_call` (requires both, returns `run_id`), then polls
-  `get_call_run`. Because `run_call` cannot execute without a token `plan_call` issued,
-  the preview-then-authorize flow is enforced by the protocol rather than by UI
-  convention. It does **not** supply idempotency: planning and running happen inside one
-  request, so a resubmission mints a fresh token and dials again. Duplicate protection
-  has to come from the app. The offline fake must match this surface.
-- **Result parsing:** CALL-E has no custom extraction schema, so the goal instructs the
-  agent to state the accepted window and SMS preference plainly, and the app reads those
-  back conservatively, defaulting to `uncertain`. `completion_confidence` below 0.6 routes
-  to human review regardless of what was read.
-- **Voicemail:** stated explicitly in the goal. The planner otherwise invents its own
-  voicemail behavior, and leaving a voicemail is a real-world side effect.
-- **Deployment and call state:** Vercel Edge Functions, chosen because the team already
-  has a Vercel account. Nothing in the hackathon rules or this repository requires a
-  particular host; the only real constraints are that a server-side runtime must hold the
-  credential and that judges need free access to a working demo. The earlier Cloudflare
-  choice came from copying `apps/typescript/call-neuron` and was preference, not
-  requirement. Handlers take web-standard `Request` and `Response`, so the host is two
-  thin route files deep. No database: CALL-E is the system of record; the browser polls a
-  server endpoint that relays CALL-E status. Idempotency: client `request_key` +
-  immediate submit-disable + an in-instance duplicate check. No call data is stored
-  server-side.
-- **Unknown-creation reconciliation:** still open. A lost `run_call` reply leaves the app
-  unable to tell whether a call was created, and the `confirm_token` does not resolve it:
-  the token is single-use, but the app mints a new one on every submission, so retrying
-  can dial twice. An atomic durable claim recorded before dialing, with `pending`,
-  `started`, and `failed` states, is the real answer. Revisit before any use beyond a
-  single demonstrated call.
+- **Integration surface: MCP**, not REST. The server layer calls `plan_call`
+  (returns `plan_id` and `confirm_token`), then `run_call` (requires both,
+  returns `run_id`), then polls `get_call_run`. Because `run_call` cannot
+  execute without a token `plan_call` issued, the preview-then-authorize flow is
+  enforced by the protocol rather than by UI convention. It does **not** supply
+  idempotency: planning and running happen inside one request, so a resubmission
+  would mint a fresh token and dial again. Duplicate protection comes from the
+  app's durable request claim.
+- **`task_completed` is never consulted.** It reports that the call ended
+  cleanly, not that the business goal succeeded. Reading it as success was the
+  single most expensive trap the Phase 2 call exposed.
+- **Voicemail is stated explicitly in the goal.** The planner otherwise invents
+  its own voicemail behavior, and leaving a voicemail is a real-world side effect.
+- **Durable state, no ambiguity.** Schedules, jobs, leases, cases, and audits
+  live in Upstash Redis. Phone numbers are encrypted at rest and never enter
+  queue messages. Seniors and routines are demo-session state and are visibly
+  labelled as such.
+- **Exact-time execution comes from QStash delayed delivery**, not the cron. The
+  daily Vercel cron is a reconciliation safety net that repairs state and never
+  places a late call.
+- **One ongoing call at a time**, via a renewable durable lease. Uncertain
+  provider creation, lost leases, missed occurrences, and revoked access all
+  route to `needs_review` — never to a blind redial.
+- **Every server entry point requires a signed operator session** scoped to the
+  senior being called. There is no unauthenticated path to a phone call.
 
-## Out of Scope (MVP)
+## Out of Scope
 
-Recurrence, bulk calling, CRM/calendar integration, SMS sending (the app only *recommends*
-sending), authentication beyond judge access, additional workflows, transcript analytics.
+Bulk calling, CRM or clinical-record integration, SMS sending, adherence scoring,
+transcript analytics, non-English live calls (blocked until quality is verified),
+and any workflow that is not a caregiver-approved routine.
+
+## Verification Status
+
+[`carecall-phase6-verification.md`](carecall-phase6-verification.md) is the
+source of truth for what is proven versus implemented, and
+[`carecall-pilot-runbook.md`](carecall-pilot-runbook.md) holds the acceptance
+matrix, accessibility gate, controlled live-call procedure, and stop conditions.
+The CareCall path has not yet been verified with a consenting recipient through
+the deployed interface, and must not be represented as operationally proven
+until it has.

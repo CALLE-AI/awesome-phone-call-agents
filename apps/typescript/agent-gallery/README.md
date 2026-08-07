@@ -77,7 +77,7 @@ Default tests are offline, require no credentials, and place no calls.
 
 ## Durable operations configuration
 
-CareCall live calls fail closed unless both operator identity and durable storage are configured. The appointment-recovery migration path continues to use its existing access-code gate.
+CareCall live calls fail closed unless both operator identity and durable storage are configured. Every server entry point that can place a call or reveal what a call said requires a signed operator session scoped to the senior being called; there is no unauthenticated path.
 
 Required CareCall environment variables:
 
@@ -199,7 +199,7 @@ src/
 └── styles.css                semantic, adaptive utility design system
 ```
 
-The older `screens/` and `workflows/appointment-recovery/` directories remain temporarily as a migration reference. The reusable `src/calle/` adapter still imports no workflow-specific code; the layering rule is enforced by `test/layering.test.ts`.
+CareCall is the only workflow. The reusable `src/calle/` adapter imports no workflow-specific code and may not even name a workflow domain concept; the layering rule is enforced by `test/layering.test.ts`.
 
 ## Next implementation milestone
 

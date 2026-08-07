@@ -1,9 +1,11 @@
 # CALL-E API Observations
 
-Record of the Phase 2 de-risking call from the
-[hackathon implementation route](../hackathon-implementation-route.md): one real
-outbound call placed to a consenting team member's own phone to observe how
-CALL-E actually behaves before building against it.
+Record of the de-risking call: one real outbound call placed to a consenting
+team member's own phone to observe how CALL-E actually behaves before building
+against it. It was placed while the app still targeted an appointment-recovery
+workflow, which CareCall SG replaced. The API findings below are surface-level
+and carried over unchanged; see [`product-spec.md`](product-spec.md) for the
+decisions they froze.
 
 Observed on 2026-08-04 through the `calle` CLI against
 `https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth`. Phone numbers are

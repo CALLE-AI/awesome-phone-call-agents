@@ -18,10 +18,6 @@ import { Settings } from "./screens-care/Settings";
 import { Today } from "./screens-care/Today";
 import { careCallSafetyFlagDetails, type CareCallResult } from "./workflows/carecall";
 
-// Retained while the previous appointment-recovery screens remain available as
-// a migration reference. They are no longer mounted by the CareCall shell.
-export type Screen = "landing" | "configure" | "preview" | "authorize" | "live" | "result";
-
 const navigation: { id: NavigationId; label: string; icon: IconName }[] = [
   { id: "today", label: "Today", icon: "home" },
   { id: "calls", label: "Calls", icon: "phone" },

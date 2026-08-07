@@ -91,11 +91,12 @@ Use this order to avoid downtime:
 6. Do not perform a second rotation until all active deployments use the new
    pair.
 
-## Optional legacy variable
+## Removed variable
 
-| Variable | Classification | Purpose and usage | How to obtain it | Renewal and rotation |
-| --- | --- | --- | --- | --- |
-| `OPERATOR_ACCESS_CODE` | Secret | Legacy access-code gate for the appointment-recovery workflow. CareCall operator sessions do not use it. | Generate a long random value in a password manager only if the legacy workflow remains enabled. | **Event-driven.** Rotate after suspected exposure, operator-access changes, or according to the legacy workflow's security policy. Remove it when that workflow is disabled. |
+`OPERATOR_ACCESS_CODE` gated the earlier appointment-recovery workflow, which has
+been removed. Nothing reads it. **Delete it from every environment** — a secret
+no code consults is a secret nobody rotates. Operator identity now comes only
+from `CARECALL_OPERATORS_JSON` and `CARECALL_SESSION_SECRET`.
 
 ## Recreate and reinsert the variables in Vercel
 

@@ -91,7 +91,9 @@ Preflight reads the protected readiness endpoint of a **deployed** environment. 
 
 ## agent-gallery architecture
 
-The app is the CareCall SG operator workspace: caregiver-authorized medication reminders and meal check-ins for seniors in Singapore. It is a Vite + React SPA with Vercel serverless functions, backed by Upstash Redis and QStash.
+The app is the CareCall SG operator workspace: caregiver-authorized reminders and check-ins for seniors in Singapore, across five routine kinds (medication, meal, hydration, wellbeing, appointment). It is a Vite + React SPA with Vercel serverless functions, backed by Upstash Redis and QStash.
+
+`npm run dev` is Vite only — it does **not** serve `/api`, and there are no local CareCall credentials. Anything behind operator sign-in (the Calls console) cannot be exercised by running the dev server; stub `window.fetch` in the page to drive those components, or deploy.
 
 ### Layering rule (enforced by tests)
 
@@ -102,6 +104,22 @@ The app is the CareCall SG operator workspace: caregiver-authorized medication r
 - anything in `src/workflows/` imports `calle/client`, `calle/status`, or `calle/mask` directly instead of the `../../calle` barrel
 
 Workflow-specific logic belongs in `src/workflows/<workflow>/`.
+
+### Client state versus durable state
+
+This split is not obvious from the file tree and is the thing most likely to mislead:
+
+- **Seniors and routines have no server-side store.** They live in demo-session React context — [senior-directory-context.tsx](apps/typescript/agent-gallery/src/carecall/senior-directory-context.tsx) and [routine-directory-context.tsx](apps/typescript/agent-gallery/src/carecall/routine-directory-context.tsx), seeded from `fixtures.ts`. Nothing is persisted or sent to the server. A senior also exists as an ID in `CARECALL_OPERATORS_JSON` (the authorization scope) and as a denormalized snapshot inside each schedule/job.
+- **Schedules, jobs, leases, cases, and audits are durable** in Redis.
+
+Six modules read seniors and five read routines. Always go through the context hooks, never `import { seniors } from "./fixtures"` — a direct fixture import silently ignores edits, withdrawals, and newly created routines. The pure transition logic sits beside each context in `senior-directory.ts` and `routine-directory.ts`, which is what the tests exercise (there is no DOM test setup).
+
+### Derive operator-facing text from the enforcing code
+
+The interface must not describe behaviour the workflow does not implement. Two places already follow this and should not be turned into hand-written prose:
+
+- the conversation plan and per-kind boundary come from [routine-kinds.ts](apps/typescript/agent-gallery/src/carecall/routine-kinds.ts), so the preview matches what the agent is instructed to do
+- the safety policy assembles its per-kind boundaries, permitted outcomes, flag meanings, and urgency levels from the enforcing modules ([safety-policy.ts](apps/typescript/agent-gallery/src/carecall/safety-policy.ts)), with `test/safety-policy.test.ts` failing on drift
 
 ### Server-side modules
 
@@ -128,10 +146,15 @@ The Vercel cron in [vercel.json](apps/typescript/agent-gallery/vercel.json) runs
 
 ### Safety invariants to preserve
 
-- Provider completion is never treated as proof that medication was taken or a meal was eaten; outcomes are conservative and `Self-reported`.
-- The operational list endpoint and the Calls console must never return or render full phone numbers, encrypted phone data, operator access codes, caregiver instructions, or transcripts.
+- **CareCall is the only workflow, and every server entry point requires a signed operator session** scoped to the senior being called. `handleCreateCall` and `handleGetCallStatus` have no unauthenticated branch and no second payload shape. They were previously dual-mode, carrying an appointment-recovery workflow behind a shared `OPERATOR_ACCESS_CODE`; that workflow and its gate are gone. Do not reintroduce a `careCall ? … : …` split here — a handler that serves two request shapes is where an unauthenticated path gets in.
+- Provider completion is never treated as proof that anything was taken, eaten, drunk, or attended; outcomes are conservative and `Self-reported`.
+- **Each routine kind may only report outcomes from its own vocabulary.** `OUTCOMES_BY_KIND` in [result.ts](apps/typescript/agent-gallery/src/workflows/carecall/result.ts) is a complete `Record<CareCallRoutineKind, …>`, so adding a kind without a vocabulary is a type error. It was previously a two-way branch that silently gave any new kind the *meal* outcomes — do not reintroduce a fallback. An outcome outside the kind's list becomes `uncertain`.
+- A wellbeing check-in records only what the senior said. It does not assess mood or screen for anything, and a reported low mood escalates for human contact rather than being interpreted. An appointment reminder repeats only caregiver-confirmed details and never books, moves, or cancels.
+- Safety flags are advisory: they record that wording appeared, not who said it or that it is true. Any flag other than `possible_immediate_danger` forces the outcome to `uncertain`. Every flag needs a label, meaning, and operator response in [safety.ts](apps/typescript/agent-gallery/src/workflows/carecall/safety.ts) — never surface a bare identifier.
+- The operational list endpoint and the Calls console must never return or render full phone numbers, encrypted phone data, operator access codes, caregiver instructions, or transcripts. A senior record stores only a masked number; the E.164 number is supplied at authorization time.
 - The readiness response returns only booleans, counts, states, ages, and grouped reasons — no job, senior, operator, or phone identifiers.
 - Non-English live calls are blocked until quality is verified.
+- The permitted call window is stored in a 12-hour form that a strict regex parses, and an unparsable window fails **closed** — silently blocking every call for that senior. Anything that writes a window must validate it with `isPermittedCallWindowFormat` first.
 
 ### Phase gating
 
