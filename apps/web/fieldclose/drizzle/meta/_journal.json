@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785222874851,
+      "tag": "0000_vengeful_captain_universe",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785223691008,
+      "tag": "0001_woozy_sumo",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785296734632,
+      "tag": "0002_protected_workspace_administration",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785303543076,
+      "tag": "0003_authentication_methods",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785384958088,
+      "tag": "0004_complete_adam_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785738706317,
+      "tag": "0005_tranquil_spiral",
+      "breakpoints": true
+    }
+  ]
+}
