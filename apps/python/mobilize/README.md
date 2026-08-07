@@ -20,6 +20,10 @@ what you need, click run, and watch it call a wave of people in parallel,
 live — each node on the map lights up as it's dialed, colors by outcome as
 results land, and the list below fills with who actually confirmed.
 
+<img src="mobilize/artifacts/screenshots/dashboard-registry.png" alt="mobilize dashboard: sample registry loaded and ranked by likelihood to confirm and follow through, need form below" width="820">
+
+<img src="mobilize/artifacts/screenshots/dashboard-full.png" alt="mobilize dashboard: full page including live dispatch and result panels" width="820">
+
 Every simulated rehearsal run learns from its own outcomes — accept and
 show-up rates update per person, so the ranking gets sharper the more you
 use it on your actual list, at zero cost, before a single real credit is
