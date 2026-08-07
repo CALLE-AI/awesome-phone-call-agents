@@ -32,3 +32,4 @@ Each plugin should document:
 | [`n8n-calle-api`](n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
 | [`@call-e/n8n-nodes-calle`](n8n-nodes-calle/) | n8n | Community node package for creating, waiting on, retrieving, and listing events for CALL-E AI-agent phone-call tasks. |
 | [`hubspot-calle`](hubspot-calle/) | HubSpot | Private static app with a direct-call workflow action and two explicitly confirmed CRM record App Cards; it does not write CALL-E state back to HubSpot. |
+| [`shopify-flow-cod-confirm`](shopify-flow-cod-confirm/) | Shopify | Cash-on-delivery confirmation gate for Shopify Flow and `orders/create`; polls the call to a terminal state, applies an explicit ship-or-hold decision table, and writes tags and a timeline note back onto the order. |

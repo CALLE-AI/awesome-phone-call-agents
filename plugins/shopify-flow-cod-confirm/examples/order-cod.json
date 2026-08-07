@@ -1,0 +1,29 @@
+{
+  "id": 5551234567890,
+  "name": "#1042",
+  "gateway": "Cash on Delivery (COD)",
+  "payment_gateway_names": ["Cash on Delivery (COD)"],
+  "processing_method": "manual",
+  "financial_status": "pending",
+  "total_price": "1290000",
+  "currency": "VND",
+  "tags": "vip-customer",
+  "customer": {
+    "first_name": "Mai",
+    "last_name": "Tran",
+    "phone": "+15005550100"
+  },
+  "shipping_address": {
+    "address1": "128 Nguyen Trai",
+    "address2": "Apartment 5B",
+    "city": "Ha Noi",
+    "province": "Ha Noi",
+    "zip": "100000",
+    "country": "Vietnam",
+    "phone": "+15005550100"
+  },
+  "line_items": [
+    { "title": "Wireless earbuds", "quantity": 1 },
+    { "title": "Charging case", "quantity": 1 }
+  ]
+}

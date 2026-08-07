@@ -1,0 +1,18 @@
+{
+  "name": "shopify-flow-cod-confirm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shopify cash-on-delivery confirmation gate that turns a CALL-E confirmation call into an auditable ship / hold decision written back onto the order.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "gate": "node src/cli.mjs",
+    "serve": "node src/server.mjs",
+    "fake-shopify": "node test/fake-shopify-server.mjs",
+    "fake-calle": "node test/fake-calle-server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
