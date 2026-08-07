@@ -8,6 +8,7 @@ set -u
 if [ ! -f baselines/lines.json ] && [ -d deploy/seed-baselines ]; then
   mkdir -p baselines
   cp deploy/seed-baselines/*.json baselines/ 2>/dev/null || true
+  node deploy/freshen-seeds.mjs baselines
   echo "Seeded baselines from deploy/seed-baselines."
 fi
 

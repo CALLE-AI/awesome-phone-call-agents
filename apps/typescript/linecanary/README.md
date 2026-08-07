@@ -29,10 +29,10 @@ LineCanary live @ 2026-08-03 — ATTENTION
 
 ```bash
 npm install
-npx tsx src/cli.ts init                 # writes linecanary.config.json
-# edit lines + checks, put your verification code in the line's greeting
+npx tsx src/cli.ts init                 # writes linecanary.config.json + prints your next steps
+# edit lines + checks, record each line's code in its own greeting (e.g. "Canary ID, L C 7 3 9 1")
 export CALLE_API_KEY=calle_live_…
-npx tsx src/cli.ts verify main-office --live   # one call, proves you control the line
+npx tsx src/cli.ts verify main-office --live   # one call listens for the code — proves you control the line
 npx tsx src/cli.ts run                  # dry-run: prints the plan, calls nothing
 npx tsx src/cli.ts run --live           # places the calls, writes baselines
 npx tsx src/cli.ts serve                # dashboard at http://127.0.0.1:4477
@@ -40,6 +40,8 @@ npx tsx src/cli.ts status --html status.html --title "Main line"  # public statu
 npx tsx src/cli.ts explain ivr-billing-branch   # AI incident note (needs ANTHROPIC_API_KEY)
 npx tsx src/cli.ts discover main-office --live  # one call maps the line, AI drafts your checks
 ```
+
+A live run where every check is skipped as unverified exits `1` (fail-closed); runs outside the configured `callWindow` stay green, because the next in-window run catches up.
 
 No CALL-E account yet? `npm run demo` runs the whole loop — healthy day, silent IVR breakage, regression alert — against a local fake server with zero network and zero calls.
 

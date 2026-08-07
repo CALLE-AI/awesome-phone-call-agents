@@ -98,9 +98,6 @@
       "name": "Billing menu option"
     }
   ],
-  "alerts": {
-    "slackWebhookUrl": "env:LINECANARY_SLACK_WEBHOOK"
-  },
   "baselineDir": "baselines",
   "callWindow": {
     "timezone": "America/Los_Angeles",

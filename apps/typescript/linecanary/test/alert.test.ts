@@ -57,21 +57,52 @@ test("formatReport names every check, its status and regressions", () => {
   assert.doesNotMatch(text, /\+15550100/, "full phone numbers stay out of alert text");
 });
 
-test("formatReport shows skips and errors distinctly", () => {
+test("formatReport shows skips and errors distinctly, with humanized skip reasons", () => {
   const text = formatReport(
     report({
       ok: false,
       runs: [run({ skipped: "unverified-line", outcome: null }), run({ error: "internal_error: boom", outcome: null })],
     }),
   );
-  assert.match(text, /unverified-line/);
+  assert.match(text, /line not verified — run: linecanary verify main-office --live/);
   assert.match(text, /internal_error/);
+  // One run errored, so something did run: the headline stays ATTENTION.
+  assert.match(text, /ATTENTION/);
 });
 
-test("slack payload masks phones and carries the regression details", () => {
+test("a live report where every check was skipped is headlined NOTHING RAN with the breakdown", () => {
+  const text = formatReport(
+    report({
+      ok: false,
+      runs: [run({ skipped: "unverified-line", outcome: null }), run({ skipped: "unverified-line", outcome: null })],
+    }),
+  );
+  assert.match(text, /NOTHING RAN/);
+  assert.match(text, /2× unverified-line/);
+  assert.doesNotMatch(text, /ATTENTION/);
+});
+
+test("every skip reason is humanized in the report lines", () => {
+  const live = formatReport(
+    report({ runs: [run({ skipped: "outside-call-window", outcome: null }), run({ skipped: "filtered", outcome: null })] }),
+  );
+  assert.match(live, /outside the configured call window/);
+  assert.match(live, /filtered by --only/);
+  const dry = formatReport(report({ live: false, runs: [run({ skipped: "dry-run", outcome: null })] }));
+  assert.match(dry, /dry run \(no call placed\)/);
+  assert.doesNotMatch(dry, /NOTHING RAN/, "a dry run is not a live run that skipped everything");
+});
+
+test("slack payload masks phones and humanizes regression kinds", () => {
   const payload = JSON.stringify(slackPayload(REGRESSED));
-  assert.match(payload, /new_failure/);
+  assert.match(payload, /New failure/);
+  assert.doesNotMatch(payload, /new_failure/, "raw snake_case kinds stay out of Slack");
   assert.doesNotMatch(payload, /\+15550100/);
+});
+
+test("slack headline says nothing ran when a live run skipped everything", () => {
+  const nothing = slackPayload(report({ ok: false, runs: [run({ skipped: "unverified-line", outcome: null })] }));
+  assert.match(String(nothing.text), /nothing ran/);
 });
 
 test("sendSlack posts only for reports that need attention", async () => {
@@ -86,7 +117,7 @@ test("sendSlack posts only for reports that need attention", async () => {
 
   await sendSlack("https://hooks.slack.example/T0/B0", REGRESSED, fetchStub);
   assert.equal(posts.length, 1);
-  assert.match(posts[0].body, /new_failure/);
+  assert.match(posts[0].body, /New failure/);
 });
 
 test("sendSlack surfaces a non-2xx response as an error", async () => {

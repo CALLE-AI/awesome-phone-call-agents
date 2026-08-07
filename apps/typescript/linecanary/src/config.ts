@@ -99,7 +99,10 @@ function resolveEnv(value: string, where: string): string {
   const name = value.slice("env:".length);
   const resolved = process.env[name];
   if (resolved === undefined || resolved.length === 0) {
-    fail(`${where} points at environment variable ${name}, which is not set.`);
+    fail(
+      `${where} points at environment variable ${name}, which is not set. ` +
+        `Export ${name}, or remove the "alerts" block from the config to run without Slack alerts.`,
+    );
   }
   return resolved;
 }

@@ -11,7 +11,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { openStore } from "./baseline.js";
 import { ConfigError, type Config } from "./config.js";
-import { renderCheckLog, renderDashboard, renderStatus } from "./pages.js";
+import { renderCheckLog, renderDashboard, renderNotFound, renderStatus } from "./pages.js";
 import { buildDashboardState } from "./state.js";
 
 export interface DashboardServer {
@@ -53,6 +53,11 @@ export function startDashboard(config: Config, options: DashboardOptions): Promi
         "Set LINECANARY_DASHBOARD_PASSWORD, or bind to 127.0.0.1. The public status pages are the only unauthenticated surface.",
     );
   }
+  // Greeting-code lines show their code in the unverified hint; other
+  // ownership methods get the attestation instruction instead.
+  const ownershipCodes: Record<string, string | null> = Object.fromEntries(
+    config.lines.map((line) => [line.id, line.ownership.method === "greeting_code" ? line.ownership.code : null]),
+  );
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
     const isPublic = url.pathname === "/status" || url.pathname.startsWith("/status/");
@@ -82,8 +87,8 @@ export function startDashboard(config: Config, options: DashboardOptions): Promi
       const line = state.lines.find((candidate) => candidate.id === lineId);
       if (line === undefined) {
         response.statusCode = 404;
-        response.setHeader("content-type", "text/plain");
-        response.end(`No line named ${lineId}.`);
+        response.setHeader("content-type", "text/html; charset=utf-8");
+        response.end(renderNotFound("Line not found", `No line named ${lineId}.`));
         return;
       }
       response.setHeader("content-type", "text/html; charset=utf-8");
@@ -92,7 +97,7 @@ export function startDashboard(config: Config, options: DashboardOptions): Promi
     }
     if (url.pathname === "/") {
       response.setHeader("content-type", "text/html; charset=utf-8");
-      response.end(renderDashboard(state));
+      response.end(renderDashboard(state, ownershipCodes));
       return;
     }
     const checkMatch = /^\/check\/([^/]+)$/.exec(url.pathname);
@@ -102,13 +107,13 @@ export function startDashboard(config: Config, options: DashboardOptions): Promi
         const check = line.checks.find((candidate) => candidate.id === checkId);
         if (check !== undefined) {
           response.setHeader("content-type", "text/html; charset=utf-8");
-          response.end(renderCheckLog(line, check, state.generatedAt));
+          response.end(renderCheckLog(line, check, state.generatedAt, config.historyLimit, state.timezone));
           return;
         }
       }
       response.statusCode = 404;
-      response.setHeader("content-type", "text/plain");
-      response.end(`No check named ${checkId}.`);
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(renderNotFound("Check not found", `No check named ${checkId}.`));
       return;
     }
     response.statusCode = 404;

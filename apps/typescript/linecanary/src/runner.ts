@@ -183,6 +183,12 @@ export async function runChecks(
   // diff against — a first-run failure must page, not establish itself as
   // the baseline of a "healthy" check.
   const failedOutcome = runs.some((run) => run.outcome !== null && run.outcome.status !== "pass");
-  const ok = !hadError && !failedOutcome && !regressions.some((entry) => ALERTING_KINDS.has(entry.kind));
+  // Fail closed on lost verification too: a live run that skipped a check as
+  // unverified is not monitoring it, and a cron whose verification state
+  // vanished must page rather than run green forever. Window skips stay ok —
+  // the scheduler firing off-hours is by design, and the next in-window run
+  // catches up.
+  const unverifiedSkip = options.live && runs.some((run) => run.skipped === "unverified-line");
+  const ok = !hadError && !failedOutcome && !unverifiedSkip && !regressions.some((entry) => ALERTING_KINDS.has(entry.kind));
   return { startedAt: startedAt.toISOString(), live: options.live, runs, regressions, ok };
 }

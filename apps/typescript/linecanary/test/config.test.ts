@@ -137,6 +137,8 @@ test("resolves env: indirection for the Slack webhook and refuses a missing vari
   assert.throws(() => loadConfig(writeConfig(raw)), (error: unknown) => {
     assert.ok(error instanceof ConfigError);
     assert.match(error.message, /LINECANARY_TEST_WEBHOOK/);
+    // The refusal names the fix: export the variable or drop the block.
+    assert.match(error.message, /Export LINECANARY_TEST_WEBHOOK, or remove the "alerts" block/);
     return true;
   });
 });

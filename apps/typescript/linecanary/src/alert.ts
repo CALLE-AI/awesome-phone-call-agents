@@ -5,7 +5,8 @@
  * enough to know which line broke.
  */
 
-import type { RunReport } from "./runner.js";
+import type { Regression } from "./diff.js";
+import type { CheckRun, RunReport } from "./runner.js";
 
 export function maskPhone(phone: string): string {
   // Only the plus sign and the last two digits survive. Country-code
@@ -19,13 +20,59 @@ export function maskPhone(phone: string): string {
   return `+${"•".repeat(middle.length)}${tail}`;
 }
 
-export function formatReport(report: RunReport): string {
+/** Human labels for regression kinds — Slack readers get prose, CI logs keep the raw kind. */
+const KIND_LABELS: Record<Regression["kind"], string> = {
+  new_failure: "New failure",
+  assertion_regressed: "Different answer than expected",
+  still_failing: "Still failing",
+  timing_regressed: "Slower than usual",
+  confidence_dropped: "Answer confidence dropped",
+  recovered: "Recovered",
+};
+
+/** A skip reason phrased for the operator, with the fix where one exists. */
+function describeSkip(reason: NonNullable<CheckRun["skipped"]>, lineId: string): string {
+  switch (reason) {
+    case "unverified-line":
+      return `line not verified — run: linecanary verify ${lineId} --live`;
+    case "outside-call-window":
+      return "outside the configured call window";
+    case "dry-run":
+      return "dry run (no call placed)";
+    case "filtered":
+      return "filtered by --only";
+  }
+}
+
+/** True when a live run skipped every check: no call produced an outcome. */
+function nothingRan(report: RunReport): boolean {
+  return report.live && report.runs.length > 0 && report.runs.every((run) => run.skipped !== null);
+}
+
+export function formatReport(report: RunReport, humanizeKinds = false): string {
   const lines: string[] = [];
-  lines.push(`LineCanary ${report.live ? "live" : "dry-run"} @ ${report.startedAt} — ${report.ok ? "OK" : "ATTENTION"}`);
+  if (nothingRan(report)) {
+    // A live invocation that placed zero calls gets its own headline: a cron
+    // that always skips must read as "not monitoring", never as quiet health.
+    const counts = new Map<string, number>();
+    for (const run of report.runs) {
+      counts.set(run.skipped!, (counts.get(run.skipped!) ?? 0) + 1);
+    }
+    const breakdown = [...counts].map(([reason, count]) => `${count}× ${reason}`).join(", ");
+    // Benign skips (off-hours, dry-run, --only) stay OK; the alarming headline
+    // is reserved for runs that skipped when they should have called.
+    lines.push(
+      report.ok
+        ? `LineCanary live @ ${report.startedAt} — OK (no calls placed: ${breakdown})`
+        : `LineCanary live @ ${report.startedAt} — NOTHING RAN (${breakdown})`,
+    );
+  } else {
+    lines.push(`LineCanary ${report.live ? "live" : "dry-run"} @ ${report.startedAt} — ${report.ok ? "OK" : "ATTENTION"}`);
+  }
   for (const run of report.runs) {
     const where = `${run.planned.checkId} (${run.planned.lineId} ${maskPhone(run.planned.phone)})`;
     if (run.skipped !== null) {
-      lines.push(`  ⏭  ${where}: skipped (${run.skipped})`);
+      lines.push(`  ⏭  ${where}: skipped — ${describeSkip(run.skipped, run.planned.lineId)}`);
       continue;
     }
     if (run.error !== null) {
@@ -49,7 +96,7 @@ export function formatReport(report: RunReport): string {
   if (report.regressions.length > 0) {
     lines.push("  regressions:");
     for (const regression of report.regressions) {
-      lines.push(`    [${regression.kind}] ${regression.checkId}: ${regression.detail}`);
+      lines.push(`    [${humanizeKinds ? KIND_LABELS[regression.kind] : regression.kind}] ${regression.checkId}: ${regression.detail}`);
     }
   }
   return lines.join("\n");
@@ -67,10 +114,12 @@ function needsAttention(report: RunReport): boolean {
 export function slackPayload(report: RunReport): Record<string, unknown> {
   const headline = report.ok
     ? `✅ LineCanary: recovered at ${report.startedAt}`
-    : `🐤 LineCanary: ${report.regressions.length} regression(s) at ${report.startedAt}`;
+    : nothingRan(report)
+      ? `🐤 LineCanary: nothing ran at ${report.startedAt}`
+      : `🐤 LineCanary: ${report.regressions.length} regression(s) at ${report.startedAt}`;
   const blocks: Record<string, unknown>[] = [
     { type: "header", text: { type: "plain_text", text: "LineCanary alert", emoji: true } },
-    { type: "section", text: { type: "mrkdwn", text: "```" + formatReport(report) + "```" } },
+    { type: "section", text: { type: "mrkdwn", text: "```" + formatReport(report, true) + "```" } },
   ];
   // What the canary heard on the failing calls — the last few line-side turns,
   // so the person paged sees the evidence without opening the dashboard.
@@ -108,7 +157,7 @@ export async function sendSlack(webhookUrl: string, report: RunReport, fetchImpl
   }
 }
 
-/** 0 all good · 1 regressions or check failures · 2 the run itself broke. */
+/** 0 all good · 1 regressions, failures or a live run left unverified · 2 the run itself broke. */
 export function exitCode(report: RunReport): 0 | 1 | 2 {
   if (report.runs.some((run) => run.error !== null)) {
     return 2;

@@ -128,8 +128,9 @@ test("unverified lines are skipped without any call", async () => {
     const skipped = report.runs.find((run) => run.planned.checkId === "greeting");
     assert.equal(skipped?.skipped, "unverified-line");
     assert.equal(skipped?.outcome, null);
-    // A refused call is not a monitoring result; the report stays ok.
-    assert.equal(report.ok, true);
+    // Fail closed: a live run that skipped a check as unverified is not
+    // monitoring it, so the report must not be ok.
+    assert.equal(report.ok, false);
   } finally {
     await fake.close();
   }
@@ -146,7 +147,8 @@ test("a verification recorded for a different phone does not cover the line", as
     const skipped = report.runs.find((run) => run.planned.checkId === "hours");
     assert.equal(skipped?.skipped, "unverified-line");
     assert.equal(fake.created.length, 1);
-    assert.equal(report.ok, true);
+    // The stale verification skip fails the report, like any unverified skip.
+    assert.equal(report.ok, false);
   } finally {
     await fake.close();
   }
@@ -180,6 +182,8 @@ test("--only filters checks and marks the rest filtered", async () => {
     assert.equal(fake.created.length, 1);
     assert.equal(report.runs.find((run) => run.planned.checkId === "hours")?.skipped, "filtered");
     assert.equal(report.runs.find((run) => run.planned.checkId === "greeting")?.outcome?.status, "pass");
+    // A filtered skip is the operator's own choice; it never fails the report.
+    assert.equal(report.ok, true);
   });
 });
 

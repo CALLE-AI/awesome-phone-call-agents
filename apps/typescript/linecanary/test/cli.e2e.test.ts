@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -80,16 +80,20 @@ test("init → verify → live run → regression → exit codes", { timeout: 12
     assert.match(dry.stdout, /dry-run/);
     assert.equal(fake.created.length, 0);
 
-    // live run refuses the unverified line and places no call
+    // live run refuses the unverified line, places no call — and fails
+    // closed: a canary that skipped everything must not exit green.
     const unverified = await cli(["run", "--config", configPath, "--live"], env);
-    assert.equal(unverified.code, 0, unverified.stderr);
-    assert.match(unverified.stdout, /unverified-line/);
+    assert.equal(unverified.code, 1, `expected exit 1, got ${unverified.code}: ${unverified.stdout} ${unverified.stderr}`);
+    assert.match(unverified.stdout, /NOTHING RAN/);
+    assert.match(unverified.stdout, /line not verified — run: linecanary verify main-office --live/);
     assert.equal(fake.created.length, 0);
 
-    // verify without --live is a preview, never a call
+    // verify without --live is a preview that explains the prerequisite, never a call
     const dryVerify = await cli(["verify", "main-office", "--config", configPath], env);
     assert.equal(dryVerify.code, 0, dryVerify.stderr);
     assert.match(dryVerify.stdout, /DRY RUN/);
+    assert.match(dryVerify.stdout, /Prerequisite: the line's greeting must announce the code LC-7391/);
+    assert.match(dryVerify.stdout, /L C 7 3 9 1/);
 
     // verify the line via greeting code
     const verify = await cli(["verify", "main-office", "--live", "--config", configPath], env);
@@ -134,16 +138,70 @@ test("run without an API key in live mode exits 2 with guidance", async () => {
   const workspace = mkdtempSync(join(tmpdir(), "linecanary-e2e-"));
   const configPath = join(workspace, "linecanary.config.json");
   await cli(["init", "--config", configPath], {});
-  // The starter config wires Slack through env: indirection; satisfy it so
-  // the failure under test is the missing API key, not the missing webhook.
-  const env = { CALLE_API_KEY: "", LINECANARY_SLACK_WEBHOOK: "https://hooks.slack.example/T0/B0" };
-  const result = await cli(["run", "--config", configPath, "--live"], env);
+  const result = await cli(["run", "--config", configPath, "--live"], { CALLE_API_KEY: "" });
   assert.equal(result.code, 2);
   assert.match(result.stderr, /CALLE_API_KEY/);
 });
 
-test("unknown command exits 2 with usage", async () => {
+test("init prints next steps and leaves a config every command can load", async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "linecanary-e2e-"));
+  const configPath = join(workspace, "linecanary.config.json");
+  const init = await cli(["init", "--config", configPath], {});
+  assert.equal(init.code, 0, init.stderr);
+  assert.match(init.stdout, /Next steps/);
+  assert.match(init.stdout, /L C 7 3 9 1/, "the greeting-code instruction spells out the starter code");
+  assert.match(init.stdout, /linecanary verify main-office --live/);
+  // The starter config must load with no environment prepared (fresh
+  // machine, nothing exported): report immediately after init exits 0.
+  const report = await cli(["report", "--config", configPath], {});
+  assert.equal(report.code, 0, report.stderr);
+  assert.match(report.stdout, /no runs recorded/);
+});
+
+test("--help and friends print usage to stdout and exit 0", async () => {
+  for (const args of [["--help"], ["-h"], ["help"], ["run", "--help"]]) {
+    const result = await cli(args, {});
+    assert.equal(result.code, 0, `${args.join(" ")}: ${result.stderr}`);
+    assert.match(result.stdout, /usage/i);
+  }
+});
+
+test("--version prints the package version and exits 0", async () => {
+  for (const args of [["--version"], ["version"]]) {
+    const result = await cli(args, {});
+    assert.equal(result.code, 0, `${args.join(" ")}: ${result.stderr}`);
+    assert.match(result.stdout.trim(), /^\d+\.\d+\.\d+$/);
+  }
+});
+
+test("unknown command exits 2 naming the command, with usage", async () => {
   const result = await cli(["frobnicate"], {});
   assert.equal(result.code, 2);
+  assert.match(result.stderr, /Unknown command "frobnicate"/);
   assert.match(result.stderr, /usage/i);
+});
+
+test("serve prints the host it actually binds", { timeout: 30_000 }, async () => {
+  const workspace = mkdtempSync(join(tmpdir(), "linecanary-e2e-"));
+  const configPath = join(workspace, "linecanary.config.json");
+  await cli(["init", "--config", configPath], {});
+  const child = spawn(
+    process.execPath,
+    ["--import", "tsx", join(ROOT, "src/cli.ts"), "serve", "--config", configPath],
+    { cwd: ROOT, env: { ...process.env, HOST: "localhost", PORT: "0" } },
+  );
+  try {
+    const banner = await new Promise<string>((resolveBanner, reject) => {
+      let output = "";
+      child.stdout.on("data", (chunk: Buffer) => {
+        output += String(chunk);
+        if (output.includes("dashboard")) resolveBanner(output);
+      });
+      child.on("error", reject);
+      child.on("exit", () => reject(new Error(`serve exited early: ${output}`)));
+    });
+    assert.match(banner, /http:\/\/localhost:\d+\//, "the banner must show the bound host, not a hardcoded loopback");
+  } finally {
+    child.kill();
+  }
 });

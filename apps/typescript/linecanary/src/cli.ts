@@ -9,11 +9,13 @@
  * Dry-run is the default for `run`; `--live` places real calls. Environment:
  * CALLE_API_KEY (required live), CALLE_BASE_URL (guarded, for the local
  * fake), CALLE_ALLOWED_HOSTS, LINECANARY_SLACK_WEBHOOK via config `env:`.
- * Exit codes: 0 ok · 1 regressions or failures · 2 the run itself broke.
+ * Exit codes: 0 ok · 1 regressions, failures or nothing ran · 2 the run
+ * itself broke.
  */
 
-import { copyFileSync, existsSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { exitCode, formatReport, sendSlack } from "./alert.js";
 import { openStore } from "./baseline.js";
 import { createSdkPort, DEFAULT_BASE_URL, type CallePort } from "./calle.js";
@@ -29,12 +31,24 @@ import { verifyLine } from "./verify.js";
 const USAGE = `usage:
   linecanary init   [--config path]
   linecanary verify <line-id> --live [--config path]
-  linecanary run    [--config path] [--live] [--only id,id] [--json path]
+  linecanary run    [--config path] [--live] [--only id,id] [--json path] [--explain]
   linecanary report [--config path]
   linecanary serve  [--config path] [--port n] [--title text]
   linecanary status [--config path] [--html out.html] [--title text] [--line id]
   linecanary explain <check-id> [--config path] [--save]
-  linecanary discover <line-id> --live [--config path] [--out draft.json]`;
+  linecanary discover <line-id> --live [--config path] [--out draft.json]
+
+run --explain (live only) saves an AI incident note for each failing check (needs ANTHROPIC_API_KEY).
+
+exit codes:
+  0 ok · 1 regressions, failures or nothing ran · 2 the run itself broke
+
+environment:
+  CALLE_API_KEY                  CALL-E API key (required for live calls)
+  CALLE_BASE_URL                 API base URL override (guarded; for the local fake)
+  CALLE_ALLOWED_HOSTS            extra hosts CALLE_BASE_URL may point at
+  LINECANARY_DASHBOARD_PASSWORD  password-protects the serve dashboard beyond loopback
+  PORT / HOST                    serve bind port and host (default 4477 on 127.0.0.1)`;
 
 interface Flags {
   config: string;
@@ -100,6 +114,17 @@ async function makePort(): Promise<CallePort> {
 
 const STARTER_CONFIG = join(dirname(new URL(import.meta.url).pathname), "..", "examples", "linecanary.config.example.json");
 
+function readVersion(): string {
+  // Read at runtime so the CLI and package.json can never drift.
+  const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+  return (JSON.parse(readFileSync(packagePath, "utf8")) as { version: string }).version;
+}
+
+/** "LC-7391" → "L C 7 3 9 1": the code as a greeting would speak it. */
+function spellOutCode(code: string): string {
+  return code.toUpperCase().replaceAll(/[^A-Z0-9]/g, "").split("").join(" ");
+}
+
 function commandInit(flags: Flags): number {
   const target = resolve(flags.config);
   if (existsSync(target)) {
@@ -111,7 +136,20 @@ function commandInit(flags: Flags): number {
   } else {
     writeFileSync(target, JSON.stringify({ lines: [], checks: [] }, null, 2));
   }
-  process.stdout.write(`Wrote ${target}. Edit the lines and checks, then run: linecanary verify <line-id>\n`);
+  // Surface the greeting-code contract at the moment it matters, with the
+  // starter config's actual code, so verification is not a surprise later.
+  const written = JSON.parse(readFileSync(target, "utf8")) as {
+    lines?: { id?: string; ownership?: { method?: string; code?: string } }[];
+  };
+  const greeting = (written.lines ?? []).find((line) => line.ownership?.method === "greeting_code");
+  const code = greeting?.ownership?.code;
+  const example = code === undefined ? "" : ` (e.g. 'Canary ID, ${spellOutCode(code)}')`;
+  process.stdout.write(
+    `Wrote ${target}. Next steps:\n` +
+      `  1. Edit ${target} with your real lines and checks.\n` +
+      `  2. For greeting_code lines, record the code into the line's own greeting${example} — verification listens for it.\n` +
+      `  3. Run: linecanary verify ${greeting?.id ?? "<line-id>"} --live\n`,
+  );
   return 0;
 }
 
@@ -130,6 +168,8 @@ async function commandVerify(flags: Flags): Promise<number> {
   if (line.ownership.method === "greeting_code" && !flags.live) {
     process.stdout.write(
       `DRY RUN — no call placed. verify would place one greeting-code verification call to ${line.phone} (${line.id}).\n` +
+        `Prerequisite: the line's greeting must announce the code ${line.ownership.code} (e.g. 'Canary ID, ${spellOutCode(line.ownership.code)}'). ` +
+        `Only someone who controls the line can place it — that is the proof.\n` +
         `Re-run with --live to place it: linecanary verify ${line.id} --live\n`,
     );
     return 0;
@@ -221,9 +261,11 @@ async function commandServe(flags: Flags): Promise<number> {
     statusTitle: flags.title,
     password: process.env.LINECANARY_DASHBOARD_PASSWORD,
   });
-  process.stdout.write(`LineCanary dashboard: http://127.0.0.1:${server.port}/\n`);
-  process.stdout.write(`Public status page:   http://127.0.0.1:${server.port}/status\n`);
-  process.stdout.write(`State as JSON:        http://127.0.0.1:${server.port}/api/state\n`);
+  // Print the host actually bound (startDashboard applies the same default).
+  const host = process.env.HOST ?? "127.0.0.1";
+  process.stdout.write(`LineCanary dashboard: http://${host}:${server.port}/\n`);
+  process.stdout.write(`Public status page:   http://${host}:${server.port}/status\n`);
+  process.stdout.write(`State as JSON:        http://${host}:${server.port}/api/state\n`);
   await new Promise(() => undefined); // runs until interrupted
   return 0;
 }
@@ -333,6 +375,16 @@ async function commandDiscover(flags: Flags): Promise<number> {
 
 async function main(): Promise<number> {
   const [command, ...rest] = process.argv.slice(2);
+  // Conventional help/version: to stdout, exit 0 — including `run --help`,
+  // which must explain rather than trip flag parsing.
+  if (command === "help" || command === "--help" || command === "-h" || rest.includes("--help")) {
+    process.stdout.write(`${USAGE}\n`);
+    return 0;
+  }
+  if (command === "version" || command === "--version") {
+    process.stdout.write(`${readVersion()}\n`);
+    return 0;
+  }
   try {
     const flags = parseFlags(rest);
     if (command === "init") {
@@ -359,7 +411,7 @@ async function main(): Promise<number> {
     if (command === "discover") {
       return await commandDiscover(flags);
     }
-    process.stderr.write(`${USAGE}\n`);
+    process.stderr.write(command === undefined ? `${USAGE}\n` : `Unknown command "${command}".\n${USAGE}\n`);
     return 2;
   } catch (error) {
     if (error instanceof ConfigError) {

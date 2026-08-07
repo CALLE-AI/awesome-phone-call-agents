@@ -10,17 +10,6 @@
         "code": "LC-7391"
       },
       "name": "Sample Dental \u2014 main line"
-    },
-    {
-      "id": "ai-receptionist",
-      "name": "Aurora Dental \u2014 AI receptionist",
-      "phone": "+15550177",
-      "region": "US",
-      "locale": "en-US",
-      "ownership": {
-        "method": "greeting_code",
-        "code": "LC-9022"
-      }
     }
   ],
   "checks": [
@@ -124,69 +113,6 @@
       ],
       "minConfidence": 0.6,
       "name": "Opening hours branch"
-    },
-    {
-      "id": "agent-answers-hours",
-      "name": "Agent answers the hours question",
-      "line": "ai-receptionist",
-      "task": "Ask the receptionist: 'What are your opening hours on Saturday?' Record the answer verbatim, then end the call.",
-      "resultSchema": {
-        "type": "object",
-        "properties": {
-          "answered": {
-            "type": "boolean"
-          },
-          "hours_answer": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "answered"
-        ],
-        "additionalProperties": false
-      },
-      "assert": [
-        {
-          "path": "answered",
-          "equals": true
-        },
-        {
-          "path": "hours_answer",
-          "matches": "saturday|9|nine"
-        }
-      ],
-      "timing": {
-        "maxSecondsToAnswer": 10
-      },
-      "minConfidence": 0.6
-    },
-    {
-      "id": "agent-books-callback",
-      "name": "Agent offers a callback",
-      "line": "ai-receptionist",
-      "task": "Say: 'I would like someone to call me back about a cleaning.' Record whether the agent offers to take your details or a callback, then decline politely and end the call.",
-      "resultSchema": {
-        "type": "object",
-        "properties": {
-          "offered_callback": {
-            "type": "boolean"
-          },
-          "agent_reply": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "offered_callback"
-        ],
-        "additionalProperties": false
-      },
-      "assert": [
-        {
-          "path": "offered_callback",
-          "equals": true
-        }
-      ],
-      "minConfidence": 0.6
     }
   ],
   "baselineDir": "baselines",
