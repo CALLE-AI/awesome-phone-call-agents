@@ -1,0 +1,115 @@
+{
+  "_note": "Fictional data. The numbers are in the +1 555-0100..555-0199 range, which is reserved for fiction and belongs to nobody.",
+  "request": {
+    "subject": "Dinner for two, delivered tonight",
+    "criteria": [
+      {
+        "key": "delivers_tonight",
+        "kind": "must",
+        "label": "Delivers tonight"
+      },
+      {
+        "key": "vegetarian_main",
+        "kind": "must",
+        "label": "At least one vegetarian main"
+      },
+      {
+        "key": "total_price",
+        "kind": "boundary",
+        "label": "Total price",
+        "limit": 45.0
+      },
+      {
+        "key": "well_rated",
+        "kind": "wish",
+        "label": "Rated above four stars"
+      }
+    ],
+    "concessions": [
+      {
+        "key": "pickup_ok",
+        "label": "We can collect it ourselves if delivery is full.",
+        "tier": 1
+      },
+      {
+        "key": "surcharge_ok",
+        "label": "A delivery surcharge of up to five euros is acceptable.",
+        "tier": 2
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "trattoria-verde",
+      "name": "Trattoria Verde",
+      "phone": "+15550100011",
+      "rank_hint": 4.6
+    },
+    {
+      "id": "golden-wok",
+      "name": "Golden Wok",
+      "phone": "+15550100022",
+      "rank_hint": 4.4
+    },
+    {
+      "id": "pizzeria-nord",
+      "name": "Pizzeria Nord",
+      "phone": "+15550100033",
+      "rank_hint": 4.2
+    },
+    {
+      "id": "curry-haus",
+      "name": "Curry Haus",
+      "phone": "+15550100044",
+      "rank_hint": 3.9
+    }
+  ],
+  "responses": [
+    {
+      "candidate_id": "trattoria-verde",
+      "outcome": "declined",
+      "transcript_note": "Kitchen closes early tonight, no deliveries left."
+    },
+    {
+      "candidate_id": "golden-wok",
+      "outcome": "accepted",
+      "values": {
+        "total_price": 52.0
+      },
+      "satisfied": [
+        "delivers_tonight",
+        "vegetarian_main",
+        "well_rated"
+      ],
+      "transcript_note": "Yes to everything, but the total came to 52 euros."
+    },
+    {
+      "candidate_id": "pizzeria-nord",
+      "outcome": "accepted",
+      "values": {
+        "total_price": 41.0
+      },
+      "satisfied": [
+        "delivers_tonight",
+        "vegetarian_main"
+      ],
+      "tiers_used": [
+        "pickup_ok"
+      ],
+      "transcript_note": "Delivery slots were full; collection at 19:30 agreed instead."
+    },
+    {
+      "candidate_id": "curry-haus",
+      "outcome": "accepted",
+      "values": {
+        "total_price": 38.0
+      },
+      "satisfied": [
+        "delivers_tonight",
+        "vegetarian_main",
+        "well_rated"
+      ],
+      "transcript_note": "Never reached: the cascade had already closed."
+    }
+  ]
+}
