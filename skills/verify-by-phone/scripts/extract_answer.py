@@ -92,6 +92,14 @@ IDENTITY_DENIALS = (
     r"\b(?:different|another) (?:office|business|practice|clinic|company)\b",
     r"\byou'?ve reached\b.*\b(?:instead|not)\b",
     r"\bwe'?re not\b.*\b(?:that|them)\b",
+    # A respondent who says what they are gets taken at their word. An
+    # answering service names the practice in a plain declarative sentence,
+    # which the name rule read as the practice identifying itself, and these
+    # are the exact cooperative-but-not-the-listing parties this gate exists
+    # to exclude.
+    r"\banswering service\b",
+    r"\bmessage (?:service|cent(?:er|re))\b",
+    r"\bcall cent(?:er|re)\b",
 )
 # What an identity question from the agent looks like. Its own script asks
 # "Is this the office of {org}?" first, before any claim question, so a bare
