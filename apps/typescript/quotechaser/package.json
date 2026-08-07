@@ -1,0 +1,22 @@
+{
+  "name": "calle-quotechaser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Supplier quote caller that previews an approved buying brief, places one CALL-E call per vendor, and returns comparable structured quote records.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "quotechaser": "node --import tsx src/cli.ts",
+    "preview": "node --import tsx src/cli.ts preview --request examples/request.example.json"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

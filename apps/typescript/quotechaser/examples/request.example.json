@@ -1,0 +1,35 @@
+{
+  "request_id": "bakery-boxes-august",
+  "buyer": {
+    "business_name": "Little River Bakery",
+    "contact_name": "Maya Chen"
+  },
+  "item": {
+    "name": "white cake boxes",
+    "quantity": 500,
+    "must_haves": ["10x10x4 inches", "food-safe", "pickup or delivery this week"]
+  },
+  "vendors": [
+    {
+      "name": "Northside Packaging",
+      "phone": "+14155550100",
+      "source": "published supplier directory listing"
+    },
+    {
+      "name": "Market Street Paper Goods",
+      "phone": "+14155550101",
+      "source": "business website contact page"
+    }
+  ],
+  "max_disclosure": [
+    "business name",
+    "contact first and last name",
+    "item name",
+    "quantity",
+    "must-have requirements"
+  ],
+  "policy": {
+    "locale": "en-US",
+    "allow_voicemail": false
+  }
+}
