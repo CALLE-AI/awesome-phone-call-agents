@@ -19,7 +19,7 @@ yes does not count.
 
 This is the collection edition: fixture-driven, no network, no telephone, no
 credentials, no scheduler. The full application lives at
-https://github.com/lukisch/hungrycall
+https://github.com/ellmos-ai/hungrycall
 """
 
 from __future__ import annotations
