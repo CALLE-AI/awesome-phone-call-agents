@@ -15,6 +15,10 @@ fi
 node --import tsx src/cli.ts serve --config demo.config.json &
 SERVER=$!
 
+# Redeploys stop the container with SIGTERM; exit cleanly so the platform
+# records a shutdown, not a crash.
+trap 'kill $SERVER 2>/dev/null; exit 0' TERM INT
+
 # Two live sweeps per day; the configured callWindow drops any run that
 # lands outside business hours, so the sleep needs no timezone math.
 while true; do

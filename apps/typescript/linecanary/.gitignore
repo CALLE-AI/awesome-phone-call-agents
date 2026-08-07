@@ -9,3 +9,6 @@ report.json
 demo/ivr/.env.*
 baselines-demo/
 .twiliodeployinfo
+RESEARCH.md
+docs/superpowers/
+.claude/

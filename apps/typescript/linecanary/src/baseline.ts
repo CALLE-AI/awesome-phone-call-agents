@@ -96,7 +96,7 @@ export function openStore(dir: string, historyCap: number = DEFAULT_HISTORY_CAP)
       writeFileSync(path, JSON.stringify(history.slice(-historyCap), null, 2));
     },
     verification(lineId) {
-      const verifications = readJson<Record<string, LineVerification>>(linesFile, {});
+      const verifications = Object.assign(Object.create(null) as Record<string, LineVerification>, readJson<Record<string, LineVerification>>(linesFile, {}));
       return verifications[lineId] ?? null;
     },
     note(checkId) {
@@ -106,7 +106,9 @@ export function openStore(dir: string, historyCap: number = DEFAULT_HISTORY_CAP)
       writeFileSync(join(dir, `${note.checkId.replaceAll(/[^A-Za-z0-9_-]/g, "_")}.note.json`), JSON.stringify(note, null, 2));
     },
     recordVerification(verification) {
-      const verifications = readJson<Record<string, LineVerification>>(linesFile, {});
+      // Null-prototype map: a line id of "__proto__" must be an ordinary key,
+      // not a call to the prototype setter that would silently drop the record.
+      const verifications = Object.assign(Object.create(null) as Record<string, LineVerification>, readJson<Record<string, LineVerification>>(linesFile, {}));
       verifications[verification.lineId] = verification;
       writeFileSync(linesFile, JSON.stringify(verifications, null, 2));
     },

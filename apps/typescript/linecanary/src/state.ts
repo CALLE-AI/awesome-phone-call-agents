@@ -36,11 +36,28 @@ export interface CheckState {
   pending: boolean;
 }
 
+/** Verification as exposed to the UI and /api/state — never the raw E.164. */
+export interface PublicVerification {
+  lineId: string;
+  method: string;
+  verifiedAt: string;
+  maskedPhone: string;
+}
+
+function projectVerification(verification: LineVerification | null): PublicVerification | null {
+  // maskPhone, not the raw phone: /api/state serializes this object, and the
+  // documented masking control must hold on the JSON surface too, not only
+  // in the rendered HTML.
+  return verification === null
+    ? null
+    : { lineId: verification.lineId, method: verification.method, verifiedAt: verification.verifiedAt, maskedPhone: maskPhone(verification.phone) };
+}
+
 export interface LineState {
   id: string;
   name: string;
   maskedPhone: string;
-  verification: LineVerification | null;
+  verification: PublicVerification | null;
   checks: CheckState[];
   /**
    * Worst condition across checks: attention (a latest run failed), stale
@@ -92,7 +109,7 @@ export function buildDashboardState(config: Config, store: BaselineStore, now: (
       id: line.id,
       name: line.name ?? line.id,
       maskedPhone: maskPhone(line.phone),
-      verification: store.verification(line.id),
+      verification: projectVerification(store.verification(line.id)),
       checks,
       health,
     };

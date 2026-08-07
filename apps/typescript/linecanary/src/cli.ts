@@ -259,7 +259,10 @@ async function commandServe(flags: Flags): Promise<number> {
     port: envPort !== undefined && Number.isInteger(envPort) ? envPort : flags.port,
     host: process.env.HOST,
     statusTitle: flags.title,
-    password: process.env.LINECANARY_DASHBOARD_PASSWORD,
+    password:
+      process.env.LINECANARY_DASHBOARD_PASSWORD === undefined || process.env.LINECANARY_DASHBOARD_PASSWORD.trim().length === 0
+        ? undefined
+        : process.env.LINECANARY_DASHBOARD_PASSWORD,
   });
   // Print the host actually bound (startDashboard applies the same default).
   const host = process.env.HOST ?? "127.0.0.1";

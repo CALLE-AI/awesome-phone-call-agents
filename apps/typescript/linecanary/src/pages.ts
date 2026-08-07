@@ -420,7 +420,7 @@ function failingCheck(check: CheckState, latest: CheckOutcome, nowMs: number, st
     <span class="pill outline-bad">${escapeHtml(headline)}</span>
     ${sparkline(check, stamp)}
     ${answerBlock(latest, nowMs, stamp)}
-    <span class="status-pill bad">${STATUS_LABEL[latest.status] ?? escapeHtml(latest.status)}</span>
+    <span class="status-pill bad">${Object.hasOwn(STATUS_LABEL, latest.status) ? STATUS_LABEL[latest.status] : escapeHtml(latest.status)}</span>
   </summary>
   <div class="failing-body">
     ${chips}
@@ -602,7 +602,7 @@ function callEntry(check: CheckState, outcome: CheckOutcome, nowMs: number, open
         <div class="m">${escapeHtml(outcome.callId)}${escapeHtml(confidence)}</div>
       </div>
       ${answerBlock(outcome, nowMs, stamp)}
-      <span class="status-pill ${bad ? "bad" : "ok"}">${STATUS_LABEL[outcome.status] ?? escapeHtml(outcome.status)}</span>
+      <span class="status-pill ${bad ? "bad" : "ok"}">${Object.hasOwn(STATUS_LABEL, outcome.status) ? STATUS_LABEL[outcome.status] : escapeHtml(outcome.status)}</span>
     </summary>
     <div class="call-body">
       ${chips}
@@ -624,7 +624,7 @@ export function renderCheckLog(line: LineState, check: CheckState, generatedAt: 
   const statusPill =
     latest === null
       ? `<span class="pill warn">Never checked</span>`
-      : `<span class="status-pill ${latest.status === "pass" ? "ok" : "bad"}">${STATUS_LABEL[latest.status] ?? escapeHtml(latest.status)}</span>`;
+      : `<span class="status-pill ${latest.status === "pass" ? "ok" : "bad"}">${Object.hasOwn(STATUS_LABEL, latest.status) ? STATUS_LABEL[latest.status] : escapeHtml(latest.status)}</span>`;
   const entries =
     calls.length === 0
       ? `<div class="call"><div class="call-body" style="border-top:none">No calls recorded yet.</div></div>`

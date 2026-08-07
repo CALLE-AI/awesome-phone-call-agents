@@ -283,3 +283,12 @@ test("a poll timeout is recovered on the next run by its call id, without dialin
     },
   );
 });
+
+test("a live run whose --only matches no check fails closed rather than reporting OK", async () => {
+  await withLiveRun(PASSING_SCENARIOS, async (fake, store) => {
+    const port = await createSdkPort({ apiKey: "calle_test_key", baseUrl: fake.baseUrl });
+    const report = await runChecks(config(), port, store, { live: true, only: ["does-not-exist"], timeoutMs: 5_000, intervalMs: 10 });
+    assert.equal(fake.created.length, 0, "no calls should be placed");
+    assert.equal(report.ok, false, "a live run that placed zero calls must not be green");
+  });
+});

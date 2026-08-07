@@ -28,7 +28,7 @@ LineCanary live @ 2026-08-03 — ATTENTION
 ## Quickstart
 
 ```bash
-npm install
+npm ci                                  # installs the pinned, integrity-checked dependency tree
 npx tsx src/cli.ts init                 # writes linecanary.config.json + prints your next steps
 # edit lines + checks, record each line's code in its own greeting (e.g. "Canary ID, L C 7 3 9 1")
 export CALLE_API_KEY=calle_live_…

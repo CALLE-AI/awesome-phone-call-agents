@@ -43,7 +43,7 @@ const MISSING = Symbol("missing");
 function getPath(value: unknown, path: string): unknown {
   let current: unknown = value;
   for (const segment of path.split(".")) {
-    if (typeof current !== "object" || current === null || !(segment in (current as Record<string, unknown>))) {
+    if (typeof current !== "object" || current === null || !Object.prototype.hasOwnProperty.call(current, segment)) {
       return MISSING;
     }
     current = (current as Record<string, unknown>)[segment];
@@ -78,7 +78,10 @@ function evaluateAssertion(assertion: Assertion, result: Record<string, unknown>
     const pass = actual.toLowerCase().includes(assertion.contains.toLowerCase());
     return { assertion, pass, actual, detail: pass ? "ok" : `"${actual}" does not contain "${assertion.contains}"` };
   }
-  const pass = new RegExp(assertion.matches, "i").test(actual);
+  // Cap the subject: transcript fields have no legitimate need to be huge, and
+  // an unbounded subject widens the blast radius of any pathological pattern.
+  const subject = actual.slice(0, 4096);
+  const pass = new RegExp(assertion.matches, "i").test(subject);
   return { assertion, pass, actual, detail: pass ? "ok" : `"${actual}" does not match /${assertion.matches}/i` };
 }
 

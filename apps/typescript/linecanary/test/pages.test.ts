@@ -334,3 +334,24 @@ test("basic auth guards operator surfaces but never the public status pages", as
 test("binding the dashboard beyond loopback without a password is refused", () => {
   assert.throws(() => startDashboard(config(), { port: 0, host: "0.0.0.0" }), /password/);
 });
+
+test("dashboard state never carries a full phone number (masking holds on /api/state)", () => {
+  const state = buildDashboardState(config(), storeWith([{ checkId: "hours" }]), FRESH);
+  const json = JSON.stringify(state);
+  // The verification object used to leak the raw E.164 alongside the mask.
+  assert.ok(!/\+\d{7,15}/.test(json), `serialized state must not contain a full number: ${json.match(/\+\d{7,15}/)?.[0] ?? ""}`);
+  assert.equal(state.lines[0].verification?.maskedPhone, "+••••••00");
+});
+
+test("a status field that is a prototype member is escaped, not treated as a label", () => {
+  const state = buildDashboardState(config(), storeWith([{ checkId: "hours", status: "constructor" as never }]), FRESH);
+  const dash = renderDashboard(state);
+  // Must not emit a raw prototype value (e.g. "function Object() { [native code] }").
+  assert.ok(!/\[native code\]/.test(dash), "prototype-chain status lookup must not reach the page");
+});
+
+test("an empty-string dashboard password is treated as absent (fails closed on external bind)", () => {
+  // Empty password must not both (a) satisfy the auth compare and (b) pass the
+  // non-loopback bind guard. It is treated as "no password", so the guard fires.
+  assert.throws(() => startDashboard(config(), { port: 0, host: "0.0.0.0", password: "" }), /password/);
+});

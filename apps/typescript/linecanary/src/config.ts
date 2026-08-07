@@ -72,6 +72,7 @@ export interface Config {
   historyLimit: number;
 }
 
+const ID_SHAPE = /^[A-Za-z0-9_-]+$/;
 const E164 = /^\+[1-9]\d{6,14}$/;
 
 function fail(message: string): never {
@@ -97,6 +98,12 @@ function resolveEnv(value: string, where: string): string {
     return value;
   }
   const name = value.slice("env:".length);
+  if (!/^LINECANARY_[A-Z0-9_]+$/.test(name)) {
+    // A config may only name its own LINECANARY_* variables. Without this a
+    // config could point an alert URL at CALLE_API_KEY and leak the key value
+    // through the fetch error path.
+    fail(`${where} may only reference LINECANARY_* environment variables, not ${name}.`);
+  }
   const resolved = process.env[name];
   if (resolved === undefined || resolved.length === 0) {
     fail(
@@ -105,6 +112,39 @@ function resolveEnv(value: string, where: string): string {
     );
   }
   return resolved;
+}
+
+const WEBHOOK_ALLOWED_HOSTS = new Set(["hooks.slack.com"]);
+
+/**
+ * Guard the alert webhook the same way calle.ts guards the API base URL: the
+ * payload carries call-transcript excerpts and masked numbers, so an
+ * unvalidated destination is an exfiltration channel and a blind-SSRF probe.
+ * https only, no IP literals or private hosts, host on the allowlist (extended
+ * by LINECANARY_ALLOWED_WEBHOOK_HOSTS).
+ */
+function assertWebhookUrl(value: string, where: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    fail(`${where} is not a valid URL.`);
+  }
+  if (url.protocol !== "https:") {
+    fail(`${where} must be an https URL.`);
+  }
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const allowed = new Set(WEBHOOK_ALLOWED_HOSTS);
+  for (const extra of (process.env.LINECANARY_ALLOWED_WEBHOOK_HOSTS ?? "").split(/[\s,]+/).filter((entry) => entry.length > 0)) {
+    allowed.add(extra.toLowerCase());
+  }
+  if (/^\d+(\.\d+){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".local")) {
+    fail(`${where} must not point at an IP literal or a local address.`);
+  }
+  if (!allowed.has(host)) {
+    fail(`${where} host ${host} is not allowed. Allow it via LINECANARY_ALLOWED_WEBHOOK_HOSTS, or use a hooks.slack.com URL.`);
+  }
+  return value;
 }
 
 function parseOwnership(value: unknown, where: string): Ownership {
@@ -122,6 +162,9 @@ function parseLine(value: unknown, index: number): LineConfig {
   const where = `lines[${index}]`;
   const record = asRecord(value, where);
   const id = asString(record.id, `${where}.id`);
+  if (!ID_SHAPE.test(id)) {
+    fail(`${where}.id must be alphanumeric with dashes or underscores (it also names on-disk files and store keys).`);
+  }
   const phone = asString(record.phone, `${where}.phone`);
   if (!E164.test(phone)) {
     fail(`${where} phone ${phone} is not E.164 (+15550100 style).`);
@@ -152,6 +195,16 @@ function parseAssertion(value: unknown, where: string): Assertion {
   }
   if (kind === "matches") {
     const source = asString(record.matches, `${where}.matches`);
+    if (source.length > 200) {
+      fail(`${where}.matches is too long (max 200 chars).`);
+    }
+    if (/\([^)]*[*+][^)]*\)\s*[*+]/.test(source)) {
+      // Reject a quantifier applied to a group that already contains one
+      // ((a+)+ and friends): the pattern runs against attacker-controlled
+      // transcript text and V8 has no backtracking budget, so a catastrophic
+      // pattern would hang the sweep forever.
+      fail(`${where}.matches has nested quantifiers, which can hang the runner on hostile input. Simplify the pattern.`);
+    }
     try {
       // Compiled case-insensitively: transcript-derived text has no stable case.
       void new RegExp(source, "i");
@@ -192,10 +245,13 @@ function parseTiming(value: unknown, where: string): TimingBounds {
   return bounds;
 }
 
-function parseCheck(value: unknown, index: number, lineIds: Set<string>): CheckConfig {
+export function parseCheck(value: unknown, index: number, lineIds: Set<string>): CheckConfig {
   const where = `checks[${index}]`;
   const record = asRecord(value, where);
   const id = asString(record.id, `${where}.id`);
+  if (!ID_SHAPE.test(id)) {
+    fail(`${where}.id must be alphanumeric with dashes or underscores (it also names on-disk files).`);
+  }
   const line = asString(record.line, `${where}.line`);
   if (!lineIds.has(line)) {
     fail(`${where} (${id}) references unknown line ${line}.`);
@@ -272,8 +328,11 @@ export function loadConfig(path: string): Config {
     const alertsRecord = asRecord(record.alerts, "config.alerts");
     alerts = {};
     if (alertsRecord.slackWebhookUrl !== undefined) {
-      alerts.slackWebhookUrl = resolveEnv(
-        asString(alertsRecord.slackWebhookUrl, "config.alerts.slackWebhookUrl"),
+      alerts.slackWebhookUrl = assertWebhookUrl(
+        resolveEnv(
+          asString(alertsRecord.slackWebhookUrl, "config.alerts.slackWebhookUrl"),
+          "config.alerts.slackWebhookUrl",
+        ),
         "config.alerts.slackWebhookUrl",
       );
     }

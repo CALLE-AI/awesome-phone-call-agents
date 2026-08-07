@@ -127,10 +127,10 @@ test("rejects a line without ownership", () => {
 test("resolves env: indirection for the Slack webhook and refuses a missing variable", () => {
   const raw = validConfig();
   raw.alerts = { slackWebhookUrl: "env:LINECANARY_TEST_WEBHOOK" };
-  process.env.LINECANARY_TEST_WEBHOOK = "https://hooks.slack.example/T000/B000";
+  process.env.LINECANARY_TEST_WEBHOOK = "https://hooks.slack.com/services/T000/B000/xyz";
   try {
     const config = loadConfig(writeConfig(raw));
-    assert.equal(config.alerts?.slackWebhookUrl, "https://hooks.slack.example/T000/B000");
+    assert.equal(config.alerts?.slackWebhookUrl, "https://hooks.slack.com/services/T000/B000/xyz");
   } finally {
     delete process.env.LINECANARY_TEST_WEBHOOK;
   }
@@ -142,3 +142,42 @@ test("resolves env: indirection for the Slack webhook and refuses a missing vari
     return true;
   });
 });
+
+test("env: indirection refuses to name a non-LINECANARY variable (API-key leak guard)", () => {
+  const raw = validConfig();
+  raw.alerts = { slackWebhookUrl: "env:CALLE_API_KEY" };
+  assert.throws(() => loadConfig(writeConfig(raw)), (error: unknown) => {
+    assert.ok(error instanceof ConfigError);
+    assert.match(error.message, /only reference LINECANARY_\* environment variables/);
+    return true;
+  });
+});
+
+test("Slack webhook must be https and on the allowed host", () => {
+  for (const bad of ["http://hooks.slack.com/x", "https://evil.example/x", "https://127.0.0.1/x"]) {
+    const raw = validConfig();
+    raw.alerts = { slackWebhookUrl: bad };
+    assert.throws(() => loadConfig(writeConfig(raw)), ConfigError, `should reject ${bad}`);
+  }
+  const ok = validConfig();
+  ok.alerts = { slackWebhookUrl: "https://hooks.slack.com/services/T/B/x" };
+  assert.equal(loadConfig(writeConfig(ok)).alerts?.slackWebhookUrl, "https://hooks.slack.com/services/T/B/x");
+});
+
+test("a matches assertion with nested quantifiers is refused (ReDoS guard)", () => {
+  const raw = validConfig();
+  (raw.checks as Array<Record<string, unknown>>)[0].assert = [{ path: "billing_message", matches: "(a+)+$" }];
+  assert.throws(() => loadConfig(writeConfig(raw)), (error: unknown) => {
+    assert.ok(error instanceof ConfigError);
+    assert.match(error.message, /nested quantifiers/);
+    return true;
+  });
+});
+
+test("line and check ids must be filesystem-safe (no path/prototype tricks)", () => {
+  for (const badId of ["../escape", "__proto__", "a/b"]) {
+    const raw = validConfig();
+    (raw.lines as Array<Record<string, unknown>>)[0].id = badId;
+    assert.throws(() => loadConfig(writeConfig(raw)), ConfigError, `line id ${badId} should be rejected`);
+  }
+})

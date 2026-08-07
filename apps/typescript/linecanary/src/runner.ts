@@ -189,6 +189,12 @@ export async function runChecks(
   // the scheduler firing off-hours is by design, and the next in-window run
   // catches up.
   const unverifiedSkip = options.live && runs.some((run) => run.skipped === "unverified-line");
-  const ok = !hadError && !failedOutcome && !unverifiedSkip && !regressions.some((entry) => ALERTING_KINDS.has(entry.kind));
+  // A live run that placed no calls at all is not monitoring anything — most
+  // often an --only that matched no check id. Off-hours window skips are the
+  // one benign all-skip (the next in-window run catches up), so they stay ok.
+  const placedNothing =
+    options.live && runs.length > 0 && runs.every((run) => run.skipped !== null && run.skipped !== "outside-call-window");
+  const ok =
+    !hadError && !failedOutcome && !unverifiedSkip && !placedNothing && !regressions.some((entry) => ALERTING_KINDS.has(entry.kind));
   return { startedAt: startedAt.toISOString(), live: options.live, runs, regressions, ok };
 }

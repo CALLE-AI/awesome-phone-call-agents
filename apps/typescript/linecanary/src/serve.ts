@@ -45,7 +45,10 @@ const LOOPBACK = new Set(["127.0.0.1", "::1", "localhost"]);
 
 export function startDashboard(config: Config, options: DashboardOptions): Promise<DashboardServer> {
   const host = options.host ?? "127.0.0.1";
-  if (!LOOPBACK.has(host) && options.password === undefined) {
+  // A blank password is not a password: treat it as absent so the bind guard
+  // below fires and the auth comparison can never succeed on empty credentials.
+  const password = options.password === undefined || options.password.length === 0 ? undefined : options.password;
+  if (!LOOPBACK.has(host) && password === undefined) {
     // Operator surfaces carry full transcripts. Binding them beyond loopback
     // without a password would publish them; refuse rather than expose.
     throw new ConfigError(
@@ -61,7 +64,7 @@ export function startDashboard(config: Config, options: DashboardOptions): Promi
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
     const isPublic = url.pathname === "/status" || url.pathname.startsWith("/status/");
-    if (options.password !== undefined && !isPublic && !authorized(request.headers.authorization, options.password)) {
+    if (password !== undefined && !isPublic && !authorized(request.headers.authorization, password)) {
       response.statusCode = 401;
       response.setHeader("WWW-Authenticate", 'Basic realm="LineCanary operator"');
       response.setHeader("content-type", "text/plain");
