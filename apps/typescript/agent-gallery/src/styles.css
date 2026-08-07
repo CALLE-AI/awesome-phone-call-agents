@@ -3511,8 +3511,15 @@ p {
   background: var(--attention-soft);
 }
 
-.senior-actions {
+/*
+ * Scoped past `.senior-profile-head > div`, which gives every direct div child
+ * `flex: 1`. The menu wrapper must hug its button instead of sharing the row
+ * with the name block, or the button drifts into the middle of the header.
+ */
+.senior-profile-head .senior-actions {
   position: relative;
+  align-self: flex-start;
+  flex: 0 0 auto;
 }
 
 .action-menu {
