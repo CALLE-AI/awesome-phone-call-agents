@@ -72,6 +72,7 @@ class CallResult:
     commitment_score: float  # 0..1, calibrated probability of actually showing up
     stated_yes: bool
     evidence: str
+    stop_requested: bool = False  # recipient explicitly asked never to be contacted again
     transcript: list[dict] = field(default_factory=list)
     started_at: datetime = field(default_factory=utcnow)
     completed_at: datetime | None = None

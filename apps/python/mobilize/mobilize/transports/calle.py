@@ -134,6 +134,9 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
     can_come = structured.get("can_come", "unknown")
     evidence = structured.get("evidence_summary", "") or (call.get("summary") or "")
     prior_showup_rate = expected_candidate.historical_showup_rate if expected_candidate is not None else 0.5
+    # Only "yes" counts as an opt-out request -- "unknown" (e.g. the call
+    # didn't connect clearly) must never be treated as a do-not-call signal.
+    stop_requested = structured.get("wants_no_further_contact") == "yes"
 
     if call.get("status") == "failed" or recipient.get("status") == "failed":
         outcome, commitment = CallOutcome.NO_ANSWER, 0.0
@@ -151,6 +154,7 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
         outcome=outcome,
         commitment_score=commitment,
         stated_yes=(can_come == "yes"),
+        stop_requested=stop_requested,
         evidence=evidence,
         transcript=transcript,
         completed_at=utcnow(),

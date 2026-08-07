@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Protocol
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mobilize.core.types import Candidate, CallResult
 
@@ -24,6 +25,17 @@ TRUSTED_CALLE_HOSTS = {"api.heycall-e.com"}
 def validate_e164(phone: str) -> None:
     if not E164_RE.match(phone):
         raise ValueError(f"Phone number is not valid E.164: {phone!r}")
+
+
+def validate_timezone(tz: str) -> None:
+    """Real calls must carry an explicit, real recipient timezone -- without
+    this, Candidate.timezone silently defaults to "UTC" and the governance
+    module's calling-hours check evaluates every recipient against the
+    wrong clock, exactly as if the check didn't exist."""
+    try:
+        ZoneInfo(tz)
+    except ZoneInfoNotFoundError:
+        raise ValueError(f"Not a recognized IANA timezone name: {tz!r}") from None
 
 
 def validate_trusted_base_url(base_url: str) -> None:
@@ -66,6 +78,19 @@ MOBILIZE_RESULT_SCHEMA = {
                 "('I'll try', 'maybe') and firm language ('leaving now') exactly."
             ),
         },
+        "wants_no_further_contact": {
+            "type": "string",
+            "enum": ["yes", "no", "unknown"],
+            "description": (
+                "Use yes ONLY if the recipient explicitly asked not to be contacted "
+                "again, to be removed from the list, to stop calling them, or similar "
+                "unambiguous opt-out language -- not merely declining this one request. "
+                "Use no if they did not say anything like this. Use unknown if the call "
+                "did not reach them clearly enough to tell. This is treated as a "
+                "permanent do-not-call request and acted on immediately, so only use "
+                "yes when the recipient's own words genuinely support it."
+            ),
+        },
     },
     "additionalProperties": False,
 }
@@ -77,7 +102,10 @@ def build_task_prompt(need_label: str, location: str) -> str:
         "Briefly and politely explain the request, ask whether the recipient can help "
         "right now, and if so ask when they can arrive. Identify yourself as an AI "
         "assistant at the start of the call. Keep the call under 60 seconds. If they "
-        "decline or are unable to help, thank them and end the call."
+        "decline or are unable to help, thank them and end the call. If the recipient "
+        "explicitly asks not to be contacted again or to be removed from the list, "
+        "acknowledge that clearly and make sure it is captured -- this request will be "
+        "honored permanently and immediately."
     )
 
 

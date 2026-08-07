@@ -163,7 +163,7 @@ exactly the recovery path it exists for. Both fixed: `calls_used` now comes
 directly from ledger-recorded dispatches, and the dispatcher passes each
 recovered call's original candidate into `poll()` explicitly so binding
 validation survives a restart. See
-`mobilize/tests/test_governance_accounting_and_binding.py`. 55 tests pass.
+`mobilize/tests/test_governance_accounting_and_binding.py`. 65 tests pass after this and the subsequent fixes.
 
 ### 5. Governance — consent is enforced in code, not just policy
 
@@ -181,8 +181,24 @@ remember a prior call happened. Calling-hour windows are checked against
 **each candidate's own local timezone** (`Candidate.timezone`), not the
 server's — a naive UTC-only comparison could call someone at 3am their
 time while judging it a reasonable hour on the machine running the code.
-See [skills/mobilize/references/safety.md](skills/mobilize/references/safety.md)
-and `mobilize/tests/test_governance_persistence.py`.
+
+Two more gaps a reviewer found after the timezone mechanism itself landed:
+neither real entry point actually **passed** a timezone into `Candidate`,
+so every real recipient silently defaulted to UTC regardless — the
+mechanism existed but nothing used it. **Both `--real` and `mobilize_real`
+now require an explicit IANA timezone per phone number** (`--timezones` /
+`timezones`, validated against `zoneinfo`, one-to-one with the phone list)
+— there is no default, on purpose, because a wrong default is worse than
+an error message. Separately, a mid-call opt-out ("don't contact me
+again") was detectable in principle but **no live code path ever called
+`add_do_not_call`** — the safety promise existed only in documentation and
+tests. The result schema now captures an explicit `wants_no_further_contact`
+signal, and the dispatcher checks every result — live, recovered, and
+reconstructed from the ledger on resume — persisting a permanent
+do-not-call entry immediately, before any further dispatch decision. See
+[skills/mobilize/references/safety.md](skills/mobilize/references/safety.md),
+`mobilize/tests/test_governance_persistence.py`,
+`mobilize/tests/test_required_timezone.py`, and `mobilize/tests/test_opt_out.py`.
 
 ### 6. Result binding — never trust a response you can't verify
 
@@ -275,18 +291,26 @@ python -m mobilize.sim.harness
 ### Placing real calls (spends CALL-E credits)
 
 ```bash
-python -m mobilize.app.cli --real --phones +1XXXXXXXXXX --need-label "your test message"
+python -m mobilize.app.cli --real \
+  --phones +1XXXXXXXXXX \
+  --timezones America/New_York \
+  --need-label "your test message"
 ```
 
 This calls **only** the exact numbers you pass — never a larger pool — and
 requires an explicit `yes` confirmation before dispatching. Every number is
 validated as E.164 before anything is sent; malformed input is rejected
-with no network call made. Real calls run under governance by default
-(do-not-call, cooldowns, contact fatigue, calling-hour windows) and
-`CalleTransport` refuses to send its bearer token to any host outside
-CALL-E's own API — both closed off, not just documented, after external
-review (see `mobilize/transports/base.py::validate_trusted_base_url`).
-Use a number you own or are authorized to call.
+with no network call made. `--timezones` is **required**, one IANA name
+per phone number in the same order — there is no UTC default, because a
+wrong default is worse than an error message, and it's what governance's
+calling-hour check actually evaluates against. Real calls run under
+governance by default (do-not-call, cooldowns, contact fatigue,
+calling-hour windows), a mid-call opt-out is detected and persisted as a
+permanent do-not-call entry immediately, and `CalleTransport` refuses to
+send its bearer token to any host outside CALL-E's own API — all closed
+off, not just documented, after external review (see
+`mobilize/transports/base.py::validate_trusted_base_url`). Use a number
+you own or are authorized to call.
 
 ### MCP server
 
@@ -326,7 +350,7 @@ mobilize/
 ├── mcp/            # MCP server
 ├── app/            # CLI demo runner
 ├── artifacts/       # committed real-call transcripts and results
-└── tests/          # 55 tests incl. property-based, real-subprocess crash, and
+└── tests/          # 65 tests incl. property-based, real-subprocess crash, and
                     #   concurrency/validation/resume tests added after
                     #   two rounds of external review
 skills/mobilize/    # Agent Skill (SKILL.md) wrapping mobilize() for reuse

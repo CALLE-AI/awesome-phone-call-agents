@@ -25,7 +25,7 @@ from mobilize.core.ledger import Ledger
 from mobilize.core.policy import GovernancePolicy, load_governance_state
 from mobilize.core.types import Candidate, Need
 from mobilize.sim.population import generate_population
-from mobilize.transports.base import validate_e164
+from mobilize.transports.base import validate_e164, validate_timezone
 from mobilize.transports.simulated import SimulatedTransport
 
 GOVERNANCE_STATE_PATH = "/tmp/mobilize_real_governance.json"
@@ -72,7 +72,7 @@ async def run_simulated(pool_size: int, need_count: int, max_calls: int, seed: i
           f"3-donor need (see README for the cited literature).{RESET}")
 
 
-async def run_real(phones: list[str], need_count: int, need_label: str, mobilization_id: str | None = None) -> None:
+async def run_real(phones: list[str], timezones: list[str], need_count: int, need_label: str, mobilization_id: str | None = None) -> None:
     from mobilize.transports.calle import CalleTransport
 
     if "CALLE_API_KEY" not in os.environ:
@@ -86,10 +86,25 @@ async def run_real(phones: list[str], need_count: int, need_label: str, mobiliza
             print(f"Refusing to dispatch: {exc}", file=sys.stderr)
             sys.exit(1)
 
+    if len(timezones) != len(phones):
+        print(f"--timezones must list exactly one IANA timezone per --phones entry "
+              f"({len(phones)} phones, {len(timezones)} timezones given). Real calls "
+              f"require an explicit recipient timezone -- without it, calling-hour "
+              f"governance silently evaluates against UTC instead of where the "
+              f"recipient actually is.", file=sys.stderr)
+        sys.exit(1)
+    for tz in timezones:
+        try:
+            validate_timezone(tz)
+        except ValueError as exc:
+            print(f"Refusing to dispatch: {exc}", file=sys.stderr)
+            sys.exit(1)
+
     candidates = [
         Candidate(id=f"real_{i}", phone=p, name=f"Recipient {i}", days_since_last_action=90,
-                   distance_km=5, historical_accept_rate=0.5, historical_showup_rate=0.5)
-        for i, p in enumerate(phones)
+                   distance_km=5, historical_accept_rate=0.5, historical_showup_rate=0.5,
+                   timezone=tz)
+        for i, (p, tz) in enumerate(zip(phones, timezones))
     ]
     need = Need(label=need_label, count=need_count, deadline_minutes=60,
                 location="City Hospital", max_calls=len(candidates))
@@ -131,6 +146,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="mobilize() demo runner")
     parser.add_argument("--real", action="store_true", help="place real CALL-E calls (spends credits)")
     parser.add_argument("--phones", type=str, default="", help="comma-separated E.164 phone numbers, --real only")
+    parser.add_argument("--timezones", type=str, default="",
+                         help="comma-separated IANA timezone names, one per --phones entry, e.g. "
+                              "Asia/Kolkata,America/New_York -- required with --real")
     parser.add_argument("--need-label", type=str, default="Can you help with an urgent request right now?")
     parser.add_argument("--pool-size", type=int, default=200)
     parser.add_argument("--need-count", type=int, default=3)
@@ -143,10 +161,16 @@ def main() -> None:
 
     if args.real:
         phones = [p.strip() for p in args.phones.split(",") if p.strip()]
+        timezones = [t.strip() for t in args.timezones.split(",") if t.strip()]
         if not phones:
             print("--real requires --phones a,b,c (E.164 numbers you own or are authorized to call)", file=sys.stderr)
             sys.exit(1)
-        asyncio.run(run_real(phones, min(args.need_count, len(phones)), args.need_label, args.mobilization_id))
+        if not timezones:
+            print("--real requires --timezones matching --phones, e.g. --timezones Asia/Kolkata,America/New_York "
+                  "(one IANA timezone per phone -- required so calling-hour governance evaluates each "
+                  "recipient against their own local time, not the server's)", file=sys.stderr)
+            sys.exit(1)
+        asyncio.run(run_real(phones, timezones, min(args.need_count, len(phones)), args.need_label, args.mobilization_id))
     else:
         asyncio.run(run_simulated(args.pool_size, args.need_count, args.max_calls, args.seed))
 

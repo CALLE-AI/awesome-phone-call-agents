@@ -16,6 +16,7 @@ from mobilize.core.planner import plan_wave, should_dispatch_next_wave
 from mobilize.core.policy import (
     GovernancePolicy,
     GovernanceState,
+    add_do_not_call,
     filter_callable,
     record_call,
     save_governance_state,
@@ -110,6 +111,18 @@ async def mobilize(
         if governance_state is not None and governance_state_path is not None:
             save_governance_state(governance_state, governance_state_path)
 
+    def _apply_opt_out_if_requested(result: CallResult) -> None:
+        # A mid-call "don't contact me again" is honored permanently and
+        # immediately -- persisted before any further dispatch decision, not
+        # just noted for later. This must fire wherever a result can
+        # surface: live wave polling, in-flight recovery after a crash, and
+        # reconstruction from the ledger on resume (idempotent either way,
+        # since add_do_not_call is a set add).
+        if result.stop_requested and governance_state is not None:
+            add_do_not_call(result.candidate_id, state=governance_state)
+            emit("opted_out", {"candidate_id": result.candidate_id})
+            _maybe_persist_governance()
+
     # Recover from a prior crash, in three parts:
     #
     # 1. Reconstruct already-completed confirmations from the ledger. Without
@@ -123,6 +136,7 @@ async def mobilize(
             result = _deserialize(entry.payload)
             all_results.append(result)
             _record_confirmation_if_applicable(result, at=datetime.fromisoformat(entry.at))
+            _apply_opt_out_if_requested(result)
 
     # 2. Every candidate already dispatched for this mobilization_id must
     #    never be dispatched again -- this guarantee comes from the ledger
@@ -162,6 +176,7 @@ async def mobilize(
                 ledger.record_result(mobilization_id, candidate_id, call_id, _serialize(result))
                 emit("call_result", {"candidate_id": candidate_id, "outcome": result.outcome.value, "commitment": result.commitment_score})
                 _record_confirmation_if_applicable(result)
+                _apply_opt_out_if_requested(result)
             if pending_recovery:
                 await asyncio.sleep(poll_interval_s)
         for candidate_id in pending_recovery:
@@ -227,6 +242,7 @@ async def mobilize(
                 ledger.record_result(mobilization_id, candidate_id, call_id, _serialize(result))
                 emit("call_result", {"candidate_id": candidate_id, "outcome": result.outcome.value, "commitment": result.commitment_score})
                 _record_confirmation_if_applicable(result)
+                _apply_opt_out_if_requested(result)
 
             if pending:
                 await asyncio.sleep(poll_interval_s)
@@ -262,6 +278,7 @@ def _serialize(result: CallResult) -> dict:
         "outcome": result.outcome.value,
         "commitment_score": result.commitment_score,
         "stated_yes": result.stated_yes,
+        "stop_requested": result.stop_requested,
         "evidence": result.evidence,
     }
 
@@ -273,5 +290,8 @@ def _deserialize(payload: dict) -> CallResult:
         outcome=CallOutcome(payload["outcome"]),
         commitment_score=payload["commitment_score"],
         stated_yes=payload["stated_yes"],
+        # .get() with a default: ledger entries written before this field
+        # existed won't have it, and that must not be an error on replay.
+        stop_requested=payload.get("stop_requested", False),
         evidence=payload["evidence"],
     )
