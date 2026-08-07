@@ -184,7 +184,8 @@ def test_success_claim_without_transcript_support_is_not_auto_verified():
     assert verdict.risk_score > 0.08
     assert verdict.evidence[0].finding == "unsupported_success_claim"
     assert verdict.negotiated_terms["unsupported_success_conditions"] == ["delivery_changed"]
-    assert any("corroborates" in c for c in verdict.contradictions)
+    assert any("delivery_changed" in c and "never addressed it" in c
+               for c in verdict.contradictions)
 
 
 def test_missing_required_disclosure_breaks_policy_adherence():
