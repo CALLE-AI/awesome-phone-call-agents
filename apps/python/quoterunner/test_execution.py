@@ -422,3 +422,57 @@ class TestSimulatedEndToEnd(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ------------------------------------------------- contrato real del SDK --
+class TestContratoSDK(unittest.TestCase):
+    """Comprueba que lo que enviamos encaja con el SDK publicado de verdad.
+
+    Sin esto, un cambio de firma en `calle-ai` no se nota hasta que la llamada
+    falla en vivo. Y la unica vez que esta app se ejecuta en vivo es delante de
+    una camara o delante de un negocio real, que son los dos peores momentos.
+
+    No se coloca ninguna llamada: solo se comparan firmas.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import calle  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("calle-ai no instalado (pip install calle-ai)")
+
+    def test_el_cliente_acepta_api_key_y_base_url(self):
+        import inspect
+        from calle import CalleClient
+        p = inspect.signature(CalleClient.__init__).parameters
+        self.assertIn("api_key", p)
+        self.assertIn("base_url", p)
+
+    def test_create_acepta_todos_los_campos_que_enviamos(self):
+        import inspect
+        from calle.calls import CalleCalls
+        acepta = set(inspect.signature(CalleCalls.create).parameters)
+        enviamos = set(call_arguments(candidate(), "job", "Ivan"))
+        faltan = enviamos - acepta
+        self.assertFalse(faltan, "el SDK no acepta: %s" % sorted(faltan))
+
+    def test_recipients_es_plural_y_lista(self):
+        """`create` admite `recipient` y `recipients`. Usamos la lista."""
+        import inspect
+        from calle.calls import CalleCalls
+        self.assertIn("recipients", inspect.signature(CalleCalls.create).parameters)
+        self.assertIsInstance(call_arguments(candidate(), "job", "Ivan")["recipients"], list)
+
+    def test_wait_for_result_acepta_nuestras_keywords(self):
+        import inspect
+        from calle.calls import CalleCalls
+        p = inspect.signature(CalleCalls.wait_for_result).parameters
+        self.assertIn("timeout_seconds", p)
+        self.assertIn("interval_seconds", p)
+
+    def test_el_base_url_por_defecto_es_el_que_fijamos(self):
+        import inspect
+        from calle import CalleClient
+        d = inspect.signature(CalleClient.__init__).parameters["base_url"].default
+        self.assertEqual(d, execution.DEFAULT_BASE_URL)

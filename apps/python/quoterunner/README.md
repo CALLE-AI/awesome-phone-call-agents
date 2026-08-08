@@ -223,7 +223,7 @@ python -m unittest discover -p "test_*.py"
 ```
 
 ```text
-Ran 91 tests in 0.011s
+Ran 96 tests in 0.116s
 OK
 ```
 
@@ -237,9 +237,16 @@ missing `opening_hours` value, a local number that must not be reformatted into
 a different country, the per-run cap, every candidate landing in exactly one
 bucket, and no full number reaching the report, the JSON or an error string.
 
-`test_execution.py` covers the calling layer — each of the four gates
+`test_execution.py` covers the calling layer and the SDK contract — each of the four gates
 independently, a base URL pointing at somebody else's host, a shop that closed
 between planning and dialling, a create that raises, a create with no id, a lost
 result, a no-answer that must not be redialled, a result that does not match the
 schema, a phone number smuggled into a date field, and a price range ranked on
 its low end.
+
+It also checks our payload against the **real published SDK**: that `calls.create`
+still accepts every field we send, that `recipients` is still the plural list
+form, and that `wait_for_result` still takes the keywords we pass. A signature
+change in `calle-ai` would otherwise stay invisible until a call fails live —
+and the only times this app runs live are in front of a camera or in front of a
+real business.
