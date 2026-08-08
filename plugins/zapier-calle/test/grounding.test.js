@@ -156,3 +156,84 @@ describe('describeUngrounded', () => {
     expect(describeUngrounded(many)).toContain('and 2 more fields');
   });
 });
+
+// The check above walks the keys the model *returned*. A model that simply
+// omits the quote therefore produces no `_quote` key, nothing is examined,
+// and an unsupported answer passes - the check disables itself exactly when
+// it is being evaded. The schema is the caller's statement of what evidence
+// they demanded, so when one is supplied it, not the result, decides what
+// must be grounded.
+describe('checkGrounding against the declared schema', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      budget: { type: 'string' },
+      budget_quote: { type: 'string' },
+    },
+  };
+
+  it('demands a quote the schema declared but the result omitted', () => {
+    const result = checkGrounding({ budget: 'sixty thousand' }, conversation(), schema);
+    expect(result.enforced).toBe(true);
+    expect(whys(result)).toEqual(['no_quote']);
+    expect(paths(result)).toEqual(['budget']);
+  });
+
+  it('still accepts a declared quote the recipient actually spoke', () => {
+    const result = checkGrounding(
+      { budget: 'sixty thousand', budget_quote: "we've got about sixty thousand set aside" },
+      conversation(),
+      schema,
+    );
+    expect(result.ungrounded).toEqual([]);
+    expect(result.checked).toBe(1);
+  });
+
+  it('does not demand evidence for a field the call could not establish', () => {
+    const result = checkGrounding({ budget: 'unknown' }, conversation(), schema);
+    expect(result.ungrounded).toEqual([]);
+  });
+
+  it('does not demand evidence for a field the result never claimed at all', () => {
+    const result = checkGrounding({}, conversation(), schema);
+    expect(result.ungrounded).toEqual([]);
+  });
+
+  it('reports an omitted quote only once, not twice', () => {
+    const result = checkGrounding({ budget: 'sixty thousand' }, conversation(), schema);
+    expect(result.ungrounded).toHaveLength(1);
+  });
+
+  it('demands a quote declared on a nested object', () => {
+    const nested = {
+      type: 'object',
+      properties: {
+        lead: {
+          type: 'object',
+          properties: { budget: { type: 'string' }, budget_quote: { type: 'string' } },
+        },
+      },
+    };
+    const result = checkGrounding({ lead: { budget: 'sixty thousand' } }, conversation(), nested);
+    expect(whys(result)).toEqual(['no_quote']);
+    expect(paths(result)).toEqual(['lead.budget']);
+  });
+
+  it('enforces nothing when the schema declares no quote fields', () => {
+    const plain = { type: 'object', properties: { budget: { type: 'string' } } };
+    const result = checkGrounding({ budget: 'sixty thousand' }, conversation(), plain);
+    expect(result.enforced).toBe(false);
+    expect(result.ungrounded).toEqual([]);
+  });
+
+  it('falls back to the result alone when the schema is unusable', () => {
+    for (const bad of [null, undefined, 'nope', [], { properties: 'nope' }]) {
+      const result = checkGrounding(
+        { budget: 'sixty thousand', budget_quote: 'never spoken aloud' },
+        conversation(),
+        bad,
+      );
+      expect(whys(result)).toEqual(['not_found']);
+    }
+  });
+});

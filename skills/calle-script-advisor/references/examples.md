@@ -16,12 +16,16 @@ Result schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["confirmation_status"],
+  "required": ["confirmation_status", "confirmation_status_quote"],
   "properties": {
     "confirmation_status": {
       "type": "string",
       "description": "Use confirmed when the patient confirms Tuesday at 2pm, use reschedule_requested when they ask for a new time, and use unknown when the call did not reach a clear answer.",
       "enum": ["confirmed", "reschedule_requested", "unknown"]
+    },
+    "confirmation_status_quote": {
+      "type": "string",
+      "description": "The patient's exact words that establish the answer above, as a full spoken sentence."
     }
   }
 }
@@ -41,12 +45,16 @@ Result schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["acknowledgement_status"],
+  "required": ["acknowledgement_status", "acknowledgement_status_quote"],
   "properties": {
     "acknowledgement_status": {
       "type": "string",
       "description": "Use acknowledged when the engineer confirms they will begin investigating within 10 minutes, use declined when they say they cannot respond, and use unknown when the call did not reach a clear answer.",
       "enum": ["acknowledged", "declined", "unknown"]
+    },
+    "acknowledgement_status_quote": {
+      "type": "string",
+      "description": "The engineer's exact words that establish the answer above, as a full spoken sentence."
     }
   }
 }
@@ -66,12 +74,16 @@ Result schema:
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["qualification_status"],
+  "required": ["qualification_status", "qualification_status_quote"],
   "properties": {
     "qualification_status": {
       "type": "string",
       "description": "Use qualified when the contact confirms they are the homeowner or decision-maker and plans to move forward within three months, use not_qualified when they are not the decision-maker or not interested, and use unknown when the call did not establish a clear answer.",
       "enum": ["qualified", "not_qualified", "unknown"]
+    },
+    "qualification_status_quote": {
+      "type": "string",
+      "description": "The contact's exact words that establish the answer above, as a full spoken sentence."
     }
   }
 }
@@ -85,4 +97,13 @@ Each example above was checked directly:
 node scripts/check-call-script.mjs --task "<task text>" --schema '<schema json>'
 ```
 
-All three print `SUMMARY: 0 error(s), 0 warning(s), 0 info finding(s), score 100/100`. Re-run the linter after copying an example into a real call, since a phone number, name, or timeframe swapped in can change whether a check still passes - for example, dropping the voicemail sentence would immediately reintroduce `TASK_NO_VOICEMAIL_GUIDANCE`.
+All three print `SUMMARY: 0 error(s), 0 warning(s), 0 info finding(s), score 100/100`.
+
+Each schema asks for its answer **and** the words that establish it, and lists
+both in `required`. That pairing is the point: a `<field>_quote` the model is
+free to omit is a check that switches itself off on exactly the call that had
+no evidence to offer, because a missing key is nothing for a verifier to
+examine. Requiring it means an extraction that cannot cite the line fails
+loudly instead of quietly. The sibling `plugins/zapier-calle` then checks the
+quote against the transcript and refuses the call when the recipient never
+said it. Re-run the linter after copying an example into a real call, since a phone number, name, or timeframe swapped in can change whether a check still passes - for example, dropping the voicemail sentence would immediately reintroduce `TASK_NO_VOICEMAIL_GUIDANCE`.

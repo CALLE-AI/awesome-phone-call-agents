@@ -468,10 +468,25 @@ it as the verbatim line that establishes the answer.
 }
 ```
 
+**Put the `_quote` field in `required`, as the example does.** That is not
+style. A quote the model is free to omit is a check that switches itself off
+on exactly the call that had no evidence to offer: no key comes back, and a
+verifier reading the result has nothing to examine. When you supply a
+`result_schema`, the schema - written before the call, and out of reach of
+whatever came back from it - is what says evidence was owed, so a declared
+quote missing from the result is reported the same as a blank one. Requiring
+it also makes CALL-E itself reject the extraction, which is a second net
+under the first.
+
+The two surfaces that classify a call placed somewhere else have no schema to
+read: `Call Completed` and `Find Call Result` can only check the quotes that
+are present. A call placed through this integration's own actions gets both
+halves.
+
 The quote is then verified against the transcript rather than trusted. If it
 does not appear in what the **recipient** said, the call is
 `review_required` and never actionable, whatever the confidence score says.
-Four ways that happens, each named in `disposition_reason`:
+Five ways that happens, each named in `disposition_reason`:
 
 | What happened | Why it is reported |
 | --- | --- |
@@ -479,6 +494,7 @@ Four ways that happens, each named in `disposition_reason`:
 | The quote matches only a line the *agent* said | The model cited the question as evidence for the answer. |
 | The field was answered but the quote is blank or `unknown` | An answer with no evidence behind it. |
 | The quote is cited but the call produced no transcript | Nothing exists to check it against. |
+| The schema declared the quote and the result omitted it | The evidence the call was asked for was never produced. |
 
 A field whose answer is itself `unknown` or empty is not asked for evidence
 - there is no claim to support, and [Usable results](#usable-results)
@@ -741,7 +757,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 341 tests across 24 files against a bundled
+`npm install && npm test` runs 352 tests across 24 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/fixtures/` holds three committed payloads - a clean success, a
 provider-reported success that carries no answer, and a call carrying a

@@ -132,8 +132,10 @@ function classify(event, options) {
   // model's conclusions. Every check above asks whether the extraction says
   // something usable; this one asks whether the recipient ever said it. Runs
   // only when the caller's result_schema opted in by declaring `_quote`
-  // fields - see lib/grounding.js.
-  const grounding = checkGrounding(data.structured_result, data.recipients);
+  // fields - see lib/grounding.js. The schema is passed in as well as the
+  // result, so a quote the schema demanded and the model omitted is caught;
+  // otherwise the check would go quiet exactly when nothing was cited.
+  const grounding = checkGrounding(data.structured_result, data.recipients, options.resultSchema);
   if (grounding.ungrounded.length > 0) {
     return result(
       'review_required',

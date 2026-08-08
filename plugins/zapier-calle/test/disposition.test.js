@@ -295,3 +295,68 @@ describe('deriveDisposition', () => {
     });
   });
 });
+
+// The gap this closes: a schema can declare `<field>_quote` without making it
+// required, and a model that omits it produced no key for the grounding check
+// to examine - so the answer passed ungrounded. The schema, written before
+// the call, is what says evidence was owed.
+describe('grounding against the declared schema', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      confirmed: { type: 'string', enum: ['yes', 'no', 'unknown'] },
+      confirmed_quote: { type: 'string' },
+    },
+    required: ['confirmed'],
+  };
+
+  const eventWith = (structured) => ({
+    id: 'evt_1',
+    type: 'call.completed',
+    data: {
+      id: 'call_1',
+      status: 'completed',
+      task_completed: true,
+      completion_confidence: { score: 0.95, label: 'high' },
+      structured_result: structured,
+      recipients: [
+        {
+          attempts: [
+            {
+              transcript_turns: [
+                { offset_seconds: 0, speaker: 'bot', text: 'Can you make Friday?' },
+                { offset_seconds: 4, speaker: 'user', text: 'Yes, Friday works for me.' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  it('refuses an answer whose declared quote the model never returned', () => {
+    const derived = deriveDisposition(eventWith({ confirmed: 'yes' }), { resultSchema: schema });
+    expect(derived.disposition).toBe('review_required');
+    expect(derived.is_actionable).toBe(false);
+    expect(derived.reason).toMatch(/without the supporting quote/);
+  });
+
+  it('confirms the same call once the quote is returned and was spoken', () => {
+    const derived = deriveDisposition(
+      eventWith({ confirmed: 'yes', confirmed_quote: 'Yes, Friday works for me.' }),
+      { resultSchema: schema },
+    );
+    expect(derived.disposition).toBe('confirmed');
+    expect(derived.is_actionable).toBe(true);
+  });
+
+  it('leaves a schema that asked for no quotes classified as before', () => {
+    const plain = {
+      type: 'object',
+      properties: { confirmed: { type: 'string' } },
+      required: ['confirmed'],
+    };
+    const derived = deriveDisposition(eventWith({ confirmed: 'yes' }), { resultSchema: plain });
+    expect(derived.disposition).toBe('confirmed');
+  });
+});
