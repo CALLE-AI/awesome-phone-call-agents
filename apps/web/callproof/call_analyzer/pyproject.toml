@@ -4,6 +4,12 @@ version = "0.1.0"
 description = "Asynchronous transcript verification service for CallProof"
 requires-python = ">=3.11"
 dependencies = [
+    # Lemmatiser: pure Python, deterministic, and verified to work with sockets
+    # blocked — it ships its language data rather than downloading a model. That data
+    # is ~68 MB in the image, which is the real cost of the dependency and the number
+    # to weigh if the container size ever matters.
+    # It normalises inflection WITHOUT collapsing polarity — see evaluator.py.
+    "simplemma>=1.2",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
   "pydantic>=2.10,<3",

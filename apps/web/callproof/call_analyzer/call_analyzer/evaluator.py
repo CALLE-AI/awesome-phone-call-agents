@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable
 
+import simplemma
+
 from .schemas import AnalysisRequest, CallContract, Evidence, TranscriptTurn, Verdict
 
 
@@ -65,6 +67,10 @@ SAFE_RESTATEMENT_WORDS = frozenset({
     "reschedule", "rescheduled", "works", "fine", "good", "right", "correct",
     "confirmed", "done", "surcharge", "fee", "total", "cambia", "cambio",
     "movemos", "queda", "programada", "bien", "correcta", "correcto",
+    # Lemma forms of the above. simplemma resolves "programadas" to "programar" and
+    # "quedan" to "quedar", so the dictionary form has to be here too or an ordinary
+    # Spanish confirmation is refused for no reason.
+    "quedar", "programar", "cambiar", "mover", "confirmar", "reprogramar",
 })
 
 # Literals we can read exactly: money, dates, times, and weekday names.
@@ -115,12 +121,38 @@ TERM_SYNONYMS: dict[str, tuple[str, ...]] = {
     "cancel": ("cancel", "cancellation", "cancela", "cancelar", "cancelación"),
 }
 
+# Languages we will lemmatise for. A transcript in anything else is read as raw tokens
+# only, which means more turns go to review — the safe direction.
+LEMMATISED_LANGUAGES = ("en", "es")
+
 # Every word the domain vocabulary knows, as WHOLE tokens. Accountability asks "do we
 # know this word", which is a different question from "is this word discriminating for
 # this condition" — so it reads the full vocabulary rather than one term's groups.
 DOMAIN_VOCABULARY = frozenset(
     word for group in TERM_SYNONYMS.values() for word in group
 )
+
+
+def lemma(token: str, language: str) -> str | None:
+    """The dictionary form of a token, or None when we have no business guessing.
+
+    A LEMMATISER, deliberately, and never a stemmer. Stemming crushes words toward a
+    shared root — Snowball takes both "changed" and, near enough, "unchanged" toward the
+    same place — which would rebuild the exact hole this file just closed. Lemmatising
+    keeps polarity: `unchanged -> unchanged`, `incorrecta -> incorrecto`. It only ever
+    resolves inflection: `deliveries -> delivery`, `entregas -> entrega`.
+
+    So this widens what we can READ without widening what we accept as agreement: a
+    turn still has to be a supported form, and an unknown lemma is still unknown.
+    """
+    code = (language or "").split("-")[0].lower()
+    if code not in LEMMATISED_LANGUAGES:
+        return None
+
+    try:
+        return simplemma.lemmatize(token, lang=code).lower()
+    except (ValueError, KeyError):  # unknown language data; stay silent and refuse
+        return None
 
 # Words that name the SPEECH ACT rather than the content that has to be spoken. A
 # disclosure called `recording_notice` is satisfied by telling the recipient the call is
@@ -184,7 +216,8 @@ class DeterministicEvaluator:
         surcharge_turn_ids, evidence_matched = self._evidence_turns(request, surcharge)
         surcharge_violation = surcharge > maximum
 
-        goal = self._assess_goal(contract, request.provider_result or {}, turns)
+        goal = self._assess_goal(contract, request.provider_result or {}, turns,
+                                 language=request.transcript.language)
         goal_completion = goal["status"]
         unmet, unsupported, weak = goal["unmet"], goal["unsupported"], goal["weak"]
         denied = goal["denied"]
@@ -286,7 +319,7 @@ class DeterministicEvaluator:
 
     # ── the supported form ────────────────────────────────────────────────────────
 
-    def _is_supported_affirmation(self, text: str) -> bool:
+    def _is_supported_affirmation(self, text: str, language: str) -> bool:
         """Whether the WHOLE turn is a shape we can read without guessing.
 
         This is the only thing that unlocks auto-verification. It answers "can we
@@ -309,7 +342,7 @@ class DeterministicEvaluator:
         if not remainder:
             return True
 
-        return self._accountable(remainder)
+        return self._accountable(remainder, language)
 
     def _normalize(self, text: str) -> str:
         cleaned = re.sub(r"[.!¡¿]+", " ", text.lower())
@@ -327,7 +360,7 @@ class DeterministicEvaluator:
                     return phrase, normalized[len(prefix):].strip(" ,;:")
         return None, normalized
 
-    def _accountable(self, remainder: str) -> bool:
+    def _accountable(self, remainder: str, language: str) -> bool:
         """Every remaining token has to BE a word we know — not merely contain one.
 
         Substring matching was the hole here: "unchanged" contains "changed", so
@@ -351,6 +384,14 @@ class DeterministicEvaluator:
             if token in DOMAIN_VOCABULARY:
                 continue
             if LITERAL_PATTERN.match(token):
+                continue
+            # Last resort: the dictionary form of an inflected word we do know.
+            # "deliveries" resolves to "delivery"; "unchanged" resolves to itself and
+            # is still refused.
+            resolved = lemma(token, language)
+            if resolved and (resolved in DOMAIN_VOCABULARY
+                             or resolved in SAFE_RESTATEMENT_WORDS
+                             or resolved in SAFE_CONNECTIVES):
                 continue
             return False
         return True
@@ -378,7 +419,8 @@ class DeterministicEvaluator:
         return distinct or groups
 
     def _corroboration(self, term: str, turns: list[TranscriptTurn],
-                       siblings: Iterable[str] = ()) -> tuple[str, list[int]]:
+                       siblings: Iterable[str] = (),
+                       language: str = "en") -> tuple[str, list[int]]:
         """How well the COUNTERPARTY backs `term`: affirmed, topical, or none.
 
         The agent's turns are read only to establish what a following "yes" is answering.
@@ -401,7 +443,7 @@ class DeterministicEvaluator:
             # does: it does not ask whether a denial word is absent. A turn we cannot
             # account for fails here whether or not anyone thought to enumerate the way
             # it says no.
-            affirms = self._is_supported_affirmation(turn.text)
+            affirms = self._is_supported_affirmation(turn.text, language)
             # A bare "yes" corroborates only what the agent just asked about.
             answers_topical_question = (
                 index > 0
@@ -461,7 +503,7 @@ class DeterministicEvaluator:
     # ── goal completion ───────────────────────────────────────────────────────────
 
     def _assess_goal(self, contract: CallContract, result: dict[str, Any],
-                     turns: list[TranscriptTurn]) -> dict[str, Any]:
+                     turns: list[TranscriptTurn], language: str = "en") -> dict[str, Any]:
         conditions = list(contract.success_conditions)
         stated = [t.id for t in turns if NEGATION_PATTERN.search(t.text)]
         base = {"unmet": [], "unsupported": [], "weak": [], "denied": [],
@@ -478,7 +520,8 @@ class DeterministicEvaluator:
         unsupported, weak, denied, evidence_turns = [], [], [], []
         denial_turns: list[int] = []
         for condition in claimed:
-            level, ids = self._corroboration(condition, turns, siblings=conditions)
+            level, ids = self._corroboration(condition, turns, siblings=conditions,
+                                             language=language)
             if level == DENIED:
                 denied.append(condition)
                 denial_turns.extend(ids)

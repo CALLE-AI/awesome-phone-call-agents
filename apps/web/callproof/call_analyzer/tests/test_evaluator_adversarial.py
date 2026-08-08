@@ -19,7 +19,12 @@ from uuid import uuid4
 
 import pytest
 
-from call_analyzer.evaluator import DeterministicEvaluator
+from call_analyzer.evaluator import (
+    DOMAIN_VOCABULARY,
+    SAFE_RESTATEMENT_WORDS,
+    DeterministicEvaluator,
+    lemma,
+)
 from call_analyzer.schemas import AnalysisRequest
 
 
@@ -375,9 +380,46 @@ def test_a_word_must_be_a_known_word_not_merely_contain_one():
     """The unit-level statement of the same rule, so a refactor cannot lose it."""
     evaluator = DeterministicEvaluator()
 
-    assert evaluator._is_supported_affirmation("Yes, the delivery moves to Friday.")
-    assert not evaluator._is_supported_affirmation("Yes, the delivery is unchanged.")
-    assert not evaluator._is_supported_affirmation("Yes, the deliverything is fine.")
+    assert evaluator._is_supported_affirmation("Yes, the delivery moves to Friday.", "en")
+    assert not evaluator._is_supported_affirmation("Yes, the delivery is unchanged.", "en")
+    assert not evaluator._is_supported_affirmation("Yes, the deliverything is fine.", "en")
+
+
+# ── the lemmatiser widens what we can read, not what we accept ────────────────────
+
+def test_lemmatising_resolves_inflection():
+    """An inflected form of a word we know is a word we know."""
+    evaluator = DeterministicEvaluator()
+
+    assert evaluator._is_supported_affirmation("Yes, the deliveries are rescheduled.", "en")
+    assert evaluator._is_supported_affirmation("Sí, las entregas quedan programadas.", "es")
+
+
+@pytest.mark.parametrize("token,language", [
+    ("unchanged", "en"), ("undelivered", "en"), ("unconfirmed", "en"),
+    ("incorrecta", "es"), ("incompleta", "es"), ("incorrecto", "es"),
+])
+def test_lemmatising_never_collapses_a_negated_word_into_its_positive(token, language):
+    """The property the whole decision rests on.
+
+    A STEMMER would crush "unchanged" and "changed" toward one root and hand back the
+    hole this file just closed. A lemmatiser resolves inflection and leaves polarity
+    alone. If this ever fails, the lemmatiser has been swapped for a stemmer and the
+    gate is no longer safe.
+    """
+    resolved = lemma(token, language)
+
+    assert resolved not in DOMAIN_VOCABULARY, (
+        f"{token!r} lemmatised to {resolved!r}, which we treat as agreement vocabulary"
+    )
+    assert resolved not in SAFE_RESTATEMENT_WORDS, (
+        f"{token!r} lemmatised to {resolved!r}, a word that would unlock verification"
+    )
+
+
+def test_an_unknown_language_is_read_raw_rather_than_guessed():
+    assert lemma("entregas", "de") is None
+    assert lemma("entregas", "") is None
 
 
 def test_an_agreement_buried_mid_sentence_is_not_an_answer():
