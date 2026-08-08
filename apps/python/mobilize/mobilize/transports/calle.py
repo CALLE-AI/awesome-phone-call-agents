@@ -48,9 +48,17 @@ class CalleTransport:
 
     async def dispatch(self, candidate: Candidate, need_label: str, location: str, *, idempotency_key: str) -> str:
         validate_e164(candidate.phone)
+        # Per-candidate region/locale override the transport's own default
+        # -- a registry with recipients in more than one country cannot be
+        # correctly represented by a single fixed region on the transport
+        # instance. CALL-E uses this field for routing and compliance
+        # checks, so getting it wrong is a real correctness issue, not
+        # cosmetic.
+        region = candidate.region or self._region
+        locale = candidate.locale or self._locale
         body = {
             "task": build_task_prompt(need_label, location),
-            "recipients": [{"phones": [candidate.phone], "region": self._region, "locale": self._locale}],
+            "recipients": [{"phones": [candidate.phone], "region": region, "locale": locale}],
             "result_schema": MOBILIZE_RESULT_SCHEMA,
             "metadata": {"candidate_id": candidate.id},
         }

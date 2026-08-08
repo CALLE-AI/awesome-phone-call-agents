@@ -103,12 +103,24 @@ async def upload_registry(payload: dict) -> dict:
     command line required. This is the actual product surface: a
     coordinator's own spreadsheet becomes a working registry in one step."""
     csv_text = payload.get("csv", "")
-    tmp_path = Path("/tmp/mobilize_uploaded_registry.csv")
-    tmp_path.write_text(csv_text)
+    # A unique file per request, not a fixed shared path -- two uploads
+    # landing close together (two tabs, a double-click) would otherwise
+    # race: request A writes its CSV, before A reads it back request B
+    # overwrites the same path with different data, and A silently loads
+    # B's registry instead of its own.
+    import tempfile
+
+    fd, tmp_name = tempfile.mkstemp(suffix=".csv", prefix="mobilize_upload_")
+    tmp_path = Path(tmp_name)
     try:
-        registry = load_registry_csv(tmp_path)
-    except RegistryError as exc:
-        return {"error": str(exc)}
+        with os.fdopen(fd, "w") as f:
+            f.write(csv_text)
+        try:
+            registry = load_registry_csv(tmp_path)
+        except RegistryError as exc:
+            return {"error": str(exc)}
+    finally:
+        tmp_path.unlink(missing_ok=True)
     save_registry_json(registry, REGISTRY_STATE_PATH)
     REGISTRY_SOURCE_MARKER_PATH.write_text("uploaded")
     return {"count": len(registry), "message": f"Loaded {len(registry)} people."}

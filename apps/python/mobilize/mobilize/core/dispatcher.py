@@ -36,6 +36,30 @@ COMMITMENT_THRESHOLD = 0.55  # commitment_score at/above this counts toward "con
 
 ProgressCallback = Callable[[str, dict], None]
 
+# Serializes concurrent mobilize() calls for the SAME mobilization_id within
+# one process -- e.g. two browser tabs, or a double-clicked "run" button,
+# submitting the identical need+registry at nearly the same instant. Without
+# this, both calls can read the ledger's "not yet dispatched" state before
+# either has written anything, and both independently decide to dispatch to
+# the same candidates. CALL-E's idempotency key would likely deduplicate the
+# actual downstream call, but our own ledger would still end up with two
+# separate "dispatched" entries for the same (mobilization_id, candidate_id)
+# pair -- a violation of the ledger's own invariant even if it doesn't cause
+# a real double-dial. Different mobilization_ids use different locks and
+# run fully concurrently; only same-ID collisions are serialized. Locks are
+# never removed from this dict, which is an acceptable, bounded trade-off
+# for a single-operator local tool with a small number of distinct
+# mobilizations per session, not something meant to run unbounded forever.
+_mobilization_locks: dict[str, asyncio.Lock] = {}
+_mobilization_locks_guard = asyncio.Lock()
+
+
+async def _get_mobilization_lock(mobilization_id: str) -> asyncio.Lock:
+    async with _mobilization_locks_guard:
+        if mobilization_id not in _mobilization_locks:
+            _mobilization_locks[mobilization_id] = asyncio.Lock()
+        return _mobilization_locks[mobilization_id]
+
 
 async def mobilize(
     need: Need,
@@ -53,6 +77,32 @@ async def mobilize(
     governance_state_path: str | Path | None = None,
 ) -> MobilizeResult:
     mobilization_id = mobilization_id or f"mob_{uuid.uuid4().hex[:10]}"
+    lock = await _get_mobilization_lock(mobilization_id)
+    async with lock:
+        return await _mobilize_locked(
+            need, pool, transport, ledger=ledger, mobilization_id=mobilization_id,
+            poll_interval_s=poll_interval_s, poll_timeout_s=poll_timeout_s,
+            recovery_timeout_s=recovery_timeout_s, on_progress=on_progress,
+            governance_state=governance_state, governance_policy=governance_policy,
+            governance_state_path=governance_state_path,
+        )
+
+
+async def _mobilize_locked(
+    need: Need,
+    pool: list[Candidate],
+    transport: Transport,
+    *,
+    ledger: Ledger,
+    mobilization_id: str,
+    poll_interval_s: float,
+    poll_timeout_s: float,
+    recovery_timeout_s: float,
+    on_progress: ProgressCallback | None,
+    governance_state: GovernanceState | None,
+    governance_policy: GovernancePolicy | None,
+    governance_state_path: str | Path | None,
+) -> MobilizeResult:
 
     # Wall-clock, not time.monotonic(), is the timing reference for anything
     # that must mean the same thing across a crash and a resume in a new
@@ -202,9 +252,24 @@ async def mobilize(
         wave = Wave(index=wave_index, candidate_ids=[c.id for c in plan.candidates])
         emit("wave_dispatch", {"wave": wave_index, "candidates": [c.id for c in plan.candidates]})
 
-        async def _dispatch_one(candidate: Candidate) -> tuple[str, str]:
-            idem_key = ledger.idempotency_key(mobilization_id, candidate.id)
-            call_id = await transport.dispatch(candidate, need.label, need.location, idempotency_key=idem_key)
+        async def _dispatch_one(candidate: Candidate) -> tuple[str, str | None]:
+            # Errors are caught HERE, per candidate, rather than left to
+            # propagate out of asyncio.gather(). A bad phone number,
+            # transient rate limit, or 5xx for ONE candidate must never
+            # cancel SIBLING tasks in this wave -- gather's default
+            # behavior on an unhandled exception is to cancel every other
+            # pending task, which can tear down another candidate's dispatch
+            # coroutine while its real HTTP request to CALL-E is already in
+            # flight. That is a genuine call-placed-but-never-ledgered gap:
+            # a real call goes out, gets cancelled client-side before
+            # ledger.record_dispatch() ever runs, and the crash-safety
+            # guarantee this whole module exists for is silently broken.
+            try:
+                idem_key = ledger.idempotency_key(mobilization_id, candidate.id)
+                call_id = await transport.dispatch(candidate, need.label, need.location, idempotency_key=idem_key)
+            except Exception as exc:
+                emit("dispatch_failed", {"candidate_id": candidate.id, "error": str(exc)})
+                return candidate.id, None
             ledger.record_dispatch(mobilization_id, candidate.id, call_id)
             if governance_state is not None:
                 record_call(candidate, state=governance_state)
@@ -223,9 +288,22 @@ async def mobilize(
         # would await each network round trip in turn, silently serializing
         # what the README, the skill, and the demo all describe as parallel.
         dispatched = await asyncio.gather(*(_dispatch_one(c) for c in plan.candidates))
-        call_ids: dict[str, str] = dict(dispatched)
+        call_ids: dict[str, str] = {cid: call_id for cid, call_id in dispatched if call_id is not None}
+        failed_ids = [cid for cid, call_id in dispatched if call_id is None]
+        # Only successful dispatches count toward the real-world calls_used
+        # budget -- a candidate whose dispatch raised before CALL-E ever
+        # accepted it was never actually called.
         calls_used += len(call_ids)
         for candidate_id in call_ids:
+            remaining.pop(candidate_id, None)
+        # A candidate whose dispatch failed synchronously (bad phone, a
+        # provider error) is not retried within this same run -- that would
+        # risk an infinite loop for a permanently invalid number. They stay
+        # visible via the dispatch_failed event for the caller to act on; a
+        # later, separate mobilize() call for this mobilization_id can still
+        # pick them up since they were never marked as dispatched in the
+        # ledger.
+        for candidate_id in failed_ids:
             remaining.pop(candidate_id, None)
 
         pending = dict(call_ids)

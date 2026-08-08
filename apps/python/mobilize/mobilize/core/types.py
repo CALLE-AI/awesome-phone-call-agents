@@ -49,6 +49,14 @@ class Candidate:
     historical_showup_rate: float  # prior: how often a stated yes becomes real action
     eligible: bool = True
     timezone: str = "UTC"  # IANA name, e.g. "Asia/Kolkata" -- governs calling-hour checks
+    # Per-candidate, not fixed at the transport level: a CalleTransport
+    # instance previously hardcoded one region/locale for every dispatch,
+    # which is wrong the moment a registry has recipients in more than one
+    # country -- exactly the case for this project's own Kolkata-based
+    # sample registry against a transport defaulting to "US". None means
+    # "no override, fall back to the transport's own default."
+    region: str | None = None
+    locale: str | None = None
 
     def prior_score(self) -> float:
         """Higher is better: more likely to say yes AND follow through."""

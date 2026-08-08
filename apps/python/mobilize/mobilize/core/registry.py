@@ -26,6 +26,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from mobilize.core.types import Candidate
+from mobilize.core.validation import validate_e164
 
 # A person with no history is assumed neither promising nor hopeless. These
 # are deliberately middling so that a fresh registry ranks mostly by
@@ -57,6 +58,8 @@ class Person:
     showup_rate: float = DEFAULT_SHOWUP_RATE
     times_called: int = 0
     notes: str = ""
+    region: str | None = None  # optional CSV column; falls back to the transport's default
+    locale: str | None = None
 
     def days_since_last_donation(self, today: date | None = None) -> float:
         if self.last_donation is None:
@@ -80,6 +83,8 @@ class Person:
             historical_showup_rate=self.showup_rate,
             eligible=self.is_eligible(min_days_between_donations, today),
             timezone=self.timezone,
+            region=self.region,
+            locale=self.locale,
         )
 
 
@@ -140,8 +145,28 @@ def load_registry_csv(path: str | Path) -> Registry:
                     f"Row {row_number}: name, phone, and timezone are all required "
                     f"(got name={name!r}, phone={phone!r}, timezone={tz!r})."
                 )
+            # Validated here, not just at dispatch time -- a malformed
+            # number surfacing deep inside a live wave dispatch is both a
+            # worse experience for the coordinator (a cryptic mid-run
+            # failure instead of a clear upload error) and a wider blast
+            # radius (see the dispatcher's per-candidate error isolation:
+            # even with that fix, a bad number is still a candidate that
+            # can never actually be called, so better to catch it now).
+            try:
+                validate_e164(phone)
+            except ValueError:
+                raise RegistryError(
+                    f"Row {row_number}: phone must be E.164 (e.g. +15550101234), got {phone!r}."
+                ) from None
 
             person_id = row.get("id") or f"p{row_number - 1:04d}"
+            if person_id in registry.people:
+                raise RegistryError(
+                    f"Row {row_number}: duplicate id {person_id!r} -- already used by "
+                    f"{registry.people[person_id].name!r} earlier in this file. Without this "
+                    f"check, the earlier row would be silently overwritten and quietly "
+                    f"disappear from the registry."
+                )
             registry.people[person_id] = Person(
                 id=person_id,
                 name=name,
@@ -153,6 +178,8 @@ def load_registry_csv(path: str | Path) -> Registry:
                 showup_rate=_parse_float(row.get("showup_rate"), DEFAULT_SHOWUP_RATE, row_number, "showup_rate"),
                 times_called=int(_parse_float(row.get("times_called"), 0, row_number, "times_called")),
                 notes=row.get("notes", ""),
+                region=row.get("region") or None,
+                locale=row.get("locale") or None,
             )
 
     if not registry.people:
@@ -171,6 +198,7 @@ def save_registry_json(registry: Registry, path: str | Path) -> None:
                 "last_donation": p.last_donation.isoformat() if p.last_donation else None,
                 "distance_km": p.distance_km, "accept_rate": p.accept_rate,
                 "showup_rate": p.showup_rate, "times_called": p.times_called, "notes": p.notes,
+                "region": p.region, "locale": p.locale,
             }
             for p in registry.people.values()
         ]
@@ -193,6 +221,8 @@ def load_registry_json(path: str | Path) -> Registry:
             showup_rate=raw.get("showup_rate", DEFAULT_SHOWUP_RATE),
             times_called=raw.get("times_called", 0),
             notes=raw.get("notes", ""),
+            region=raw.get("region"),
+            locale=raw.get("locale"),
         )
     return registry
 

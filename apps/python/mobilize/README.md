@@ -406,6 +406,34 @@ the CLI's typed `yes` confirmation.
   CSV is untrusted input by design. See
   `mobilize/tests/test_dashboard_security.py`.
 
+A ground-up adversarial self-review (deliberately looking for what a
+reviewer would find, rather than waiting for one) turned up five more:
+`asyncio.gather()` in wave dispatch had no per-candidate error isolation —
+one bad phone number or a transient provider error could cancel a
+*sibling's* in-flight real dispatch before its ledger write ran, a genuine
+call-placed-but-never-recorded gap, not a contrived edge case. Fixed by
+catching exceptions per candidate rather than letting `gather()`'s default
+cancel-on-first-exception behavior tear down the rest of the wave (see
+`mobilize/tests/test_dispatch_error_isolation.py`, which proves a sibling
+dispatch survives a neighbor's failure). Registry CSV loading validated
+neither phone format nor duplicate `id`s, so a malformed number surfaced
+only deep inside a live dispatch and a duplicate row silently overwrote an
+earlier one with no warning — both now rejected at load time with a clear,
+row-numbered error. `CalleTransport` fixed region/locale at the
+transport-instance level regardless of the candidate being dialed — wrong
+the moment a registry spans more than one country, which this project's own
+Kolkata-based sample registry against a `"US"`-default transport
+demonstrated directly; `Candidate` now carries optional per-candidate
+`region`/`locale` that override the transport default. And two narrower
+concurrency gaps: the registry-upload endpoint wrote to a fixed shared temp
+path (two near-simultaneous uploads could cross-contaminate), and two
+concurrent `mobilize()` calls for the identical `mobilization_id` — two
+browser tabs, a double-clicked button — could both read the ledger's
+pre-dispatch state before either had written to it. Fixed with a unique
+temp file per upload and an in-process lock keyed by `mobilization_id`
+(different IDs still run fully concurrently; only same-ID collisions are
+serialized).
+
 Live dispatch is shown over a WebSocket: each person lights up on dial,
 colors by outcome as results stream in, and the result panel shows exactly
 who confirmed (name, masked phone, commitment score) and how many people in
@@ -423,7 +451,7 @@ mobilize/
 ├── mcp/             # MCP server
 ├── app/             # dashboard (the product) + CLI + bundled sample registry
 ├── artifacts/       # committed real-call transcripts, results, Devpost copy
-└── tests/           # 89 tests incl. property-based, real-subprocess crash, and
+└── tests/           # 100 tests incl. property-based, real-subprocess crash, and
                     #   concurrency/validation/resume/registry tests
 skills/mobilize/     # Agent Skill (SKILL.md) wrapping mobilize() for reuse
 run.sh               # one-command setup + launch for the dashboard

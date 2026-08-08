@@ -7,24 +7,21 @@ and the identical code path runs against `CalleTransport` for real calls.
 
 from __future__ import annotations
 
-import re
 from typing import Protocol
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mobilize.core.types import Candidate, CallResult
-
-# Same pattern CALL-E's own OpenAPI spec uses for CallTaskRecipientRequest.phones.
-E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+from mobilize.core.validation import E164_RE, validate_e164
 
 # CALL-E's real API host. Sending the bearer token to any other host would leak
 # it, so CalleTransport refuses to talk to anything outside this allow-list.
 TRUSTED_CALLE_HOSTS = {"api.heycall-e.com"}
 
-
-def validate_e164(phone: str) -> None:
-    if not E164_RE.match(phone):
-        raise ValueError(f"Phone number is not valid E.164: {phone!r}")
+__all__ = [
+    "E164_RE", "validate_e164", "validate_timezone", "validate_trusted_base_url",
+    "MOBILIZE_RESULT_SCHEMA", "build_task_prompt", "Transport",
+]
 
 
 def validate_timezone(tz: str) -> None:
