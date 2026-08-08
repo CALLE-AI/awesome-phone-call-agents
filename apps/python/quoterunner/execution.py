@@ -40,6 +40,7 @@ from quoterunner import (
     PlanError,
     build_script,
     is_open,
+    local_now,
     mask,
     window_text,
 )
@@ -48,8 +49,15 @@ DEFAULT_BASE_URL = "https://api.heycall-e.com"
 
 # What CALL-E reports when a call is over. Nothing is retried automatically:
 # a redial the operator did not ask for is a second call to a real business.
-TERMINAL = {"completed", "failed", "canceled", "cancelled"}
+TERMINAL = {"completed", "failed", "canceled", "cancelled", "succeeded"}
 NO_ANSWER = {"busy", "no_answer", "voicemail"}
+
+# Terminal is not the same as successful. A `failed` or `canceled` call is over,
+# but whatever it returned is the wreckage of a call that did not happen the way
+# it was meant to -- and a partially populated structured_result from one of
+# those can still satisfy the schema. Ranking it next to a real quote puts a
+# price in the table that nobody actually said.
+EXITOSO = {"completed", "succeeded"}
 
 MAX_WAIT_SECONDS = 900
 POLL_SECONDS = 5
@@ -237,14 +245,26 @@ def check_confirmation(candidates: list[Candidate], job: str, token: str | None)
 # ---------------------------------------------------------------------------
 # Call arguments
 # ---------------------------------------------------------------------------
-def idempotency_key(candidate: Candidate, job: str) -> str:
-    """Stable per business and job, so a re-run cannot dial the same shop twice.
+def idempotency_key(
+    candidate: Candidate, job: str, requester: str = "", locale: str = "en-US"
+) -> str:
+    """Stable per business and per *script*, so a re-run cannot dial twice.
 
-    Derived from the number and the job rather than from a timestamp: two runs
-    of the same batch are the same intent and must collapse into one call.
+    Derived from the call content rather than from a timestamp: two runs of the
+    same batch are the same intent and must collapse into one call.
+
+    It covers the whole spoken script, not just the job line. Keying on the job
+    alone meant that changing the requester's name, or the language the call is
+    made in, still produced the same key -- so a genuinely different call would
+    be deduplicated against the earlier one and CALL-E would replay the old
+    result instead of placing the new call.
     """
     seed = json.dumps(
-        {"phone": candidate.phone, "job": job.strip()},
+        {
+            "phone": candidate.phone,
+            "task": build_script(candidate, job, requester),
+            "locale": locale,
+        },
         ensure_ascii=False,
         sort_keys=True,
     )
@@ -264,7 +284,7 @@ def call_arguments(
                 "source_id": candidate.source_id or "",
             }
         },
-        "idempotency_key": idempotency_key(candidate, job),
+        "idempotency_key": idempotency_key(candidate, job, requester, locale),
     }
 
 
@@ -365,14 +385,40 @@ def run_batch(
         # Re-checked here rather than trusted from planning time. A batch of
         # twelve calls takes minutes, and a shop that closes at 18:00 must not
         # be dialled at 18:04 because it was open when the plan was written.
-        now = moment or datetime.now()
-        if not is_open(candidate.opening_hours, now):
+        #
+        # And checked in the shop's own zone, not the host's. This loop is the
+        # last thing that runs before a real telephone rings, so it is the one
+        # place that must not be reading a Texas shop's hours off a clock in
+        # Mexico City.
+        if not candidate.timezone:
+            say(f"[{index}/{len(candidates)}] {candidate.name}: no timezone, skipped")
+            results.append({
+                "name": candidate.name,
+                "phone_masked": candidate.masked,
+                "status": "not_called",
+                "reason": "no timezone published -- cannot tell what time it is there",
+                "quote": None,
+            })
+            continue
+
+        try:
+            here = local_now(candidate, moment)
+        except PlanError as error:
+            say(f"[{index}/{len(candidates)}] {candidate.name}: {error}")
+            results.append({
+                "name": candidate.name, "phone_masked": candidate.masked,
+                "status": "not_called", "reason": str(error), "quote": None,
+            })
+            continue
+
+        if not is_open(candidate.opening_hours, here):
             say(f"[{index}/{len(candidates)}] {candidate.name}: closed now, skipped")
             results.append({
                 "name": candidate.name,
                 "phone_masked": candidate.masked,
                 "status": "not_called",
-                "reason": f"closed at dial time (today {window_text(candidate.opening_hours, now)})",
+                "reason": (f"closed at dial time in {candidate.timezone} "
+                           f"(today {window_text(candidate.opening_hours, here)})"),
                 "quote": None,
             })
             continue
@@ -434,12 +480,23 @@ def run_batch(
             })
             continue
 
-        if status not in TERMINAL or not _valid_result(structured):
+        # `task_completed` is CALL-E saying whether the agent actually finished
+        # what it was sent to do. Absent means the provider did not report it;
+        # an explicit False means it did not, and that is not a quote.
+        completado = (final or {}).get("task_completed")
+
+        if status not in EXITOSO or completado is False or not _valid_result(structured):
+            if status not in EXITOSO:
+                motivo = f"the call ended as {status}, not as a completed call"
+            elif completado is False:
+                motivo = "CALL-E reported the task was not completed"
+            else:
+                motivo = "the call did not return the full quote schema"
             say(f"      {status}, no usable answer")
             results.append({
                 "name": candidate.name, "phone_masked": candidate.masked,
                 "call_id": call_id, "status": status,
-                "reason": "the call did not return the full quote schema",
+                "reason": motivo,
                 "quote": None,
             })
             continue

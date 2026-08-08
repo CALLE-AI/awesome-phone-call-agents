@@ -9,7 +9,8 @@
       "opening_hours": "Mo-Fr 08:00-18:00; Sa 09:00-13:00",
       "address": "12 Northgate Road",
       "locality": "Springfield",
-      "source_id": "fixture/1"
+      "source_id": "fixture/1",
+      "timezone": "America/Chicago"
     },
     {
       "name": "Riverside Motors",
@@ -17,7 +18,8 @@
       "opening_hours": "Mo-Sa 07:30-19:00",
       "address": "88 Riverside Drive",
       "locality": "Springfield",
-      "source_id": "fixture/2"
+      "source_id": "fixture/2",
+      "timezone": "America/Chicago"
     },
     {
       "name": "Halloran & Sons Bodyshop",
@@ -25,7 +27,8 @@
       "opening_hours": "Mo-Fr 09:00-13:00,15:00-19:00",
       "address": "3 Mill Lane",
       "locality": "Springfield",
-      "source_id": "fixture/3"
+      "source_id": "fixture/3",
+      "timezone": "America/Chicago"
     },
     {
       "name": "Quickfit Windscreens",
@@ -33,7 +36,8 @@
       "opening_hours": "24/7",
       "address": "The Retail Park",
       "locality": "Springfield",
-      "source_id": "fixture/4"
+      "source_id": "fixture/4",
+      "timezone": "America/Chicago"
     },
     {
       "name": "Bellweather Garage",
@@ -41,7 +45,8 @@
       "opening_hours": "Sa-Su 10:00-16:00",
       "address": "5 Bell Street",
       "locality": "Springfield",
-      "source_id": "fixture/5"
+      "source_id": "fixture/5",
+      "timezone": "America/Chicago"
     },
     {
       "name": "Corner Tyre & Glass",
@@ -49,7 +54,8 @@
       "opening_hours": "",
       "address": "1 Market Square",
       "locality": "Springfield",
-      "source_id": "fixture/6"
+      "source_id": "fixture/6",
+      "timezone": "America/Chicago"
     },
     {
       "name": "Old Forge Repairs",
@@ -57,7 +63,8 @@
       "opening_hours": "Mo-Fr 09:00-17:00",
       "address": "Forge Yard",
       "locality": "Springfield",
-      "source_id": "fixture/7"
+      "source_id": "fixture/7",
+      "timezone": "America/Chicago"
     }
   ]
 }

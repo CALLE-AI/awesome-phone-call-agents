@@ -50,8 +50,10 @@ GOOD_QUOTE = {
 }
 
 
-def candidate(name="Northgate Auto Glass", phone="+15555550100", hours=OPEN_ALL_DAY):
-    return Candidate(name=name, phone=phone, opening_hours=hours, source_id="osm/1")
+def candidate(name="Northgate Auto Glass", phone="+15555550100", hours=OPEN_ALL_DAY,
+              tz="America/Chicago"):
+    return Candidate(name=name, phone=phone, opening_hours=hours, source_id="osm/1",
+                     timezone=tz)
 
 
 class FakeCalls:
@@ -476,3 +478,120 @@ class TestContratoSDK(unittest.TestCase):
         from calle import CalleClient
         d = inspect.signature(CalleClient.__init__).parameters["base_url"].default
         self.assertEqual(d, execution.DEFAULT_BASE_URL)
+
+
+# ------------------------------- lo que reporto la revision del PR #118 --
+class TestRevisionPR118(unittest.TestCase):
+    """Los tres fallos que Ray-56 encontro revisando el PR, con su caso.
+
+    Los tres eran la misma familia de error: dar por bueno algo que no se
+    habia comprobado. Estan aqui uno por uno para que no vuelvan.
+    """
+
+    # --- 1. Terminal no es lo mismo que exitoso -------------------------
+    def test_una_llamada_fallida_no_produce_presupuesto(self):
+        """`failed` es terminal, pero no es una llamada que haya ido bien.
+
+        Su structured_result puede validar contra el esquema y aun asi ser los
+        restos de una llamada que no ocurrio como debia. Rankearlo junto a un
+        presupuesto real mete en la tabla un precio que nadie dijo.
+        """
+        fake = FakeCalls(status="failed")
+        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+        self.assertIsNone(rows[0]["quote"])
+        self.assertIn("not as a completed call", rows[0]["reason"])
+
+    def test_una_llamada_cancelada_no_produce_presupuesto(self):
+        fake = FakeCalls(status="canceled")
+        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+        self.assertIsNone(rows[0]["quote"])
+
+    def test_task_completed_false_no_produce_presupuesto(self):
+        """CALL-E diciendo que el agente no termino lo que fue a hacer."""
+        class NoCompletada(FakeCalls):
+            def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+                r = super().wait_for_result(
+                    call_id, timeout_seconds=timeout_seconds,
+                    interval_seconds=interval_seconds)
+                r["task_completed"] = False
+                return r
+        rows = run_batch([candidate()], "job", "Ivan", NoCompletada(), moment=MOMENT)
+        self.assertIsNone(rows[0]["quote"])
+        self.assertIn("not completed", rows[0]["reason"])
+
+    def test_completed_si_produce_presupuesto(self):
+        """El arreglo no puede haberse llevado por delante el camino bueno."""
+        rows = run_batch([candidate()], "job", "Ivan", FakeCalls(), moment=MOMENT)
+        self.assertIsNotNone(rows[0]["quote"])
+
+    def test_succeeded_tambien_vale(self):
+        rows = run_batch([candidate()], "job", "Ivan",
+                         FakeCalls(status="succeeded"), moment=MOMENT)
+        self.assertIsNotNone(rows[0]["quote"])
+
+    # --- 2. El horario se lee en la zona del negocio --------------------
+    def test_sin_zona_no_se_marca(self):
+        """Sin zona no se puede saber que hora es alli. No se llama a ciegas."""
+        fake = FakeCalls()
+        rows = run_batch([candidate(tz="")], "job", "Ivan", fake, moment=MOMENT)
+        self.assertEqual(fake.created, [])
+        self.assertEqual(rows[0]["status"], "not_called")
+        self.assertIn("no timezone", rows[0]["reason"])
+
+    def test_la_zona_decide_si_esta_abierto(self):
+        """Mismo instante, dos husos, dos respuestas. Este es el bug entero.
+
+        A las 20:00 en Nueva York son las 17:00 en Los Angeles. Un negocio
+        abierto de 9 a 18 esta cerrado en el primero y abierto en el segundo,
+        y antes se resolvia con el reloj del host para los dos.
+        """
+        from datetime import timezone as tzmod, timedelta
+        instante = datetime(2026, 8, 7, 20, 0, tzinfo=tzmod(timedelta(hours=-4)))
+        horario = "Mo-Su 09:00-18:00"
+        este = FakeCalls()
+        run_batch([candidate(hours=horario, tz="America/New_York")],
+                  "job", "Ivan", este, moment=instante)
+        oeste = FakeCalls()
+        run_batch([candidate(hours=horario, tz="America/Los_Angeles")],
+                  "job", "Ivan", oeste, moment=instante)
+        self.assertEqual(len(este.created), 0, "20:00 en Nueva York: cerrado")
+        self.assertEqual(len(oeste.created), 1, "17:00 en Los Angeles: abierto")
+
+    def test_screen_excluye_sin_zona_en_el_camino_en_vivo(self):
+        _, fuera = quoterunner.screen([candidate(tz="")], MOMENT, require_timezone=True)
+        self.assertIn("no timezone", fuera[0].reason)
+
+    def test_screen_no_lo_exige_en_el_preview(self):
+        """El preview si los enseña: para eso esta, para ver que falta."""
+        dentro, _ = quoterunner.screen([candidate(tz="")], MOMENT)
+        self.assertEqual(len(dentro), 1)
+
+    def test_el_operador_puede_declarar_la_zona_del_lote(self):
+        """Declararla no es adivinarla. Adivinarla es lo que esta prohibido."""
+        dentro, _ = quoterunner.screen([candidate(tz="")], MOMENT,
+                                       default_timezone="America/Chicago")
+        self.assertEqual(dentro[0].timezone, "America/Chicago")
+
+    def test_una_zona_inventada_no_pasa_por_buena(self):
+        _, fuera = quoterunner.screen([candidate(tz="Marte/Olympus")], MOMENT)
+        self.assertIn("Unknown timezone", fuera[0].reason)
+
+    # --- 3. La clave de idempotencia cubre el guion entero --------------
+    def test_cambiar_el_solicitante_cambia_la_clave(self):
+        """Otro nombre en la llamada es otra llamada, no una repeticion."""
+        self.assertNotEqual(idempotency_key(candidate(), "job", "Ivan"),
+                            idempotency_key(candidate(), "job", "Marta"))
+
+    def test_cambiar_el_idioma_cambia_la_clave(self):
+        self.assertNotEqual(idempotency_key(candidate(), "job", "Ivan", "en-US"),
+                            idempotency_key(candidate(), "job", "Ivan", "es-MX"))
+
+    def test_el_mismo_guion_conserva_la_clave(self):
+        """La deduplicacion real tiene que seguir funcionando."""
+        self.assertEqual(idempotency_key(candidate(), "job", "Ivan", "en-US"),
+                         idempotency_key(candidate(), "job", "Ivan", "en-US"))
+
+    def test_la_clave_del_payload_coincide_con_la_funcion(self):
+        args = call_arguments(candidate(), "job", "Ivan", "es-MX")
+        self.assertEqual(args["idempotency_key"],
+                         idempotency_key(candidate(), "job", "Ivan", "es-MX"))

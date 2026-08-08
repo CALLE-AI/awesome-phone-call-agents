@@ -33,6 +33,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, time
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 __version__ = "1.0.0"
 
@@ -145,6 +146,9 @@ class Candidate:
     address: str = ""
     locality: str = ""
     source_id: str = ""
+    # IANA name, e.g. America/Chicago. Never inferred from the phone number,
+    # the country code or the locale: see local_now.
+    timezone: str = ""
 
     verdict: str = ""
     reason: str = ""
@@ -155,16 +159,59 @@ class Candidate:
         return mask(self.phone)
 
 
+def local_now(candidate: Candidate, moment: datetime | None = None) -> datetime:
+    """What time it is *where the business is*.
+
+    Opening hours are published in the shop's own local time. Reading them
+    against the host clock is wrong by however far apart the two are: a machine
+    in Mexico City reading hours for a shop in Austin is an hour out, and one in
+    Europe is seven. That is how you ring a closed shop, or a person asleep.
+
+    The zone has to be published. It is never derived from the phone number,
+    the country code or the locale -- those are guesses, and a guess here calls
+    a stranger at three in the morning.
+    """
+    base = moment or datetime.now()
+    if base.tzinfo is None:
+        base = base.astimezone()  # the host's own offset, made explicit
+
+    if not candidate.timezone:
+        return base
+
+    try:
+        return base.astimezone(ZoneInfo(candidate.timezone))
+    except (ZoneInfoNotFoundError, KeyError, ValueError):
+        # Minimal Windows installs ship no IANA database. Falling back to host
+        # time silently would reintroduce the bug, so the caller is told.
+        raise PlanError(
+            f"Unknown timezone {candidate.timezone!r}. "
+            "On Windows this usually means the IANA database is missing: "
+            "pip install tzdata"
+        ) from None
+
+
 def load_fixture(path: Path) -> list[Candidate]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     return [Candidate(**row) for row in payload["candidates"]]
 
 
-def screen(candidates: list[Candidate], moment: datetime) -> tuple[list[Candidate], list[Candidate]]:
+def screen(
+    candidates: list[Candidate],
+    moment: datetime,
+    *,
+    default_timezone: str = "",
+    require_timezone: bool = False,
+) -> tuple[list[Candidate], list[Candidate]]:
     """Split candidates into callable and excluded, recording why for each.
 
     Exclusions are part of the output, not a silent filter. A run that quietly
     dropped half its candidates looks identical to one that found nothing.
+
+    `default_timezone` is the operator stating the zone for a batch they know is
+    single-region. That is a declaration, not a guess, so it is allowed.
+    `require_timezone` is set on the live path: a candidate whose local time we
+    cannot establish is excluded rather than dialled, for the same reason one
+    with no published hours is.
     """
     callable_now: list[Candidate] = []
     excluded: list[Candidate] = []
@@ -178,18 +225,38 @@ def screen(candidates: list[Candidate], moment: datetime) -> tuple[list[Candidat
             excluded.append(candidate)
             continue
 
+        if not candidate.timezone and default_timezone:
+            candidate.timezone = default_timezone
+
+        try:
+            here = local_now(candidate, moment)
+        except PlanError as error:
+            candidate.verdict = "excluded"
+            candidate.reason = str(error)
+            excluded.append(candidate)
+            continue
+
         if not candidate.opening_hours:
             candidate.verdict = "excluded"
             candidate.reason = "no published opening hours -- we do not call blind"
-        elif not is_open(candidate.opening_hours, moment):
-            today = window_text(candidate.opening_hours, moment)
+        elif require_timezone and not candidate.timezone:
+            candidate.verdict = "excluded"
+            candidate.reason = (
+                "no timezone published -- cannot tell what time it is there. "
+                "Pass --timezone if the whole batch is in one region"
+            )
+        elif not is_open(candidate.opening_hours, here):
+            today = window_text(candidate.opening_hours, here)
             candidate.verdict = "excluded"
             candidate.reason = (
                 "closed today" if today == "closed today" else f"closed now (open today {today})"
             )
         else:
             candidate.verdict = "callable"
-            candidate.reason = f"open now ({window_text(candidate.opening_hours, moment)})"
+            donde = f" {candidate.timezone}" if candidate.timezone else ""
+            candidate.reason = (
+                f"open now ({window_text(candidate.opening_hours, here)}{donde})"
+            )
             callable_now.append(candidate)
             continue
 
@@ -246,9 +313,13 @@ def build_script(candidate: Candidate, job: str, requester: str) -> str:
 
 
 def build_plan(
-    candidates: list[Candidate], job: str, requester: str, moment: datetime
+    candidates: list[Candidate], job: str, requester: str, moment: datetime,
+    *, default_timezone: str = "", require_timezone: bool = False,
 ) -> dict:
-    callable_now, excluded = screen(candidates, moment)
+    callable_now, excluded = screen(
+        candidates, moment,
+        default_timezone=default_timezone, require_timezone=require_timezone,
+    )
     if not callable_now:
         raise PlanError("No candidate is callable right now. Nothing was planned.")
 
@@ -261,7 +332,10 @@ def build_plan(
             {
                 "name": c.name,
                 "phone_masked": c.masked,
-                "calling_window_today": window_text(c.opening_hours, moment),
+                "timezone": c.timezone or "(host local time)",
+                "calling_window_today": window_text(
+                    c.opening_hours, local_now(c, moment)
+                ),
                 "script": build_script(c, job, requester),
             }
             for c in callable_now
@@ -322,6 +396,10 @@ def main(argv: list[str] | None = None) -> int:
                       help="Place real calls through CALL-E. Needs --confirm.")
     parser.add_argument("--confirm", help="Confirmation token printed by the preview")
     parser.add_argument("--locale", default="en-US", help="Locale spoken on the call")
+    parser.add_argument("--timezone", default="",
+                        help="IANA zone for candidates that publish none, e.g. "
+                             "America/Chicago. Only state it for a batch you know "
+                             "is in one region; it is never inferred")
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--base-url", help="Override the CALL-E origin (loopback only, for tests)")
     args = parser.parse_args(argv)
@@ -333,7 +411,12 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         candidates = load_fixture(args.fixture)
-        plan = build_plan(candidates, job, requester, moment)
+        # The live path refuses a candidate whose local time is unknown. The
+        # preview does not, so you can still see the batch and be told what is
+        # missing before you try to dial it.
+        plan = build_plan(candidates, job, requester, moment,
+                          default_timezone=args.timezone,
+                          require_timezone=args.execute)
     except PlanError as error:
         print(f"No plan: {error}", file=sys.stderr)
         return 1

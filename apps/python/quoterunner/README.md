@@ -116,7 +116,8 @@ any one of them alone stops the call:
 1. `CALLE_LIVE_CALLS_ENABLED=true` in the environment
 2. `CALLE_API_KEY` in the environment
 3. `--confirm <token>` — a token bound to this exact candidate list
-4. every candidate is re-checked against its opening hours **at dial time**
+4. every candidate is re-checked against its opening hours **at dial time, in
+   its own timezone**, and one that publishes no timezone is not dialled
 
 ## The confirmation token
 
@@ -140,6 +141,26 @@ form: `call start` has no machine-enforced confirmation, so the only thing
 between an agent and a live call is a sentence in a markdown file that a model
 is free to skip. A hash the operator has to paste back cannot be skipped by a
 model that is feeling confident.
+
+## Timezones
+
+Opening hours are published in the shop's own local time, so they are read on
+the shop's own clock. A host in Mexico City reading hours for a shop in Austin
+is an hour out; one in Europe is seven — which is how you ring a closed shop, or
+a person asleep.
+
+Each candidate carries an IANA `timezone`. It is **never** derived from the
+phone number, the country code or the locale: those are guesses, and a guess
+here calls a stranger at three in the morning. A candidate with no timezone is
+excluded from the live path for the same reason one with no published hours is —
+we cannot tell whether it is open there.
+
+`--timezone America/Chicago` lets the operator state the zone for a batch they
+know is single-region. Stating it is not guessing it.
+
+```bash
+python quoterunner.py --fixture example-candidates.json     --timezone America/Chicago --execute --confirm <token>
+```
 
 ## What comes back
 
@@ -179,9 +200,16 @@ machinery, and is not a substitute for it.
   full number from the fixture appears in any of them.
 - **A local or ambiguous number is rejected, never reformatted.** Guessing a
   country code is how you call a stranger in another country.
-- **One call per business per job.** The idempotency key is derived from the
-  number and the job, not from a timestamp, so re-running the same batch
-  collapses into the same call rather than dialling twice.
+- **One call per business per script.** The idempotency key is derived from the
+  number, the whole spoken script and the locale — not from a timestamp — so
+  re-running the same batch collapses into the same call rather than dialling
+  twice. Keying on the job alone would have made a call in a different language,
+  or on behalf of a different person, replay the earlier result instead of
+  happening.
+- **A finished call is not a successful one.** `failed` and `canceled` are
+  terminal, and their `structured_result` can still satisfy the schema. Only a
+  `completed` call that CALL-E did not flag as unfinished produces a quote; the
+  rest are listed with what actually happened.
 - **Nothing is redialled automatically.** Busy, no answer and voicemail are
   recorded and left alone. A redial the operator did not ask for is a second
   call to a real business.
@@ -223,7 +251,7 @@ python -m unittest discover -p "test_*.py"
 ```
 
 ```text
-Ran 96 tests in 0.116s
+Ran 111 tests in 0.122s
 OK
 ```
 
@@ -242,7 +270,10 @@ independently, a base URL pointing at somebody else's host, a shop that closed
 between planning and dialling, a create that raises, a create with no id, a lost
 result, a no-answer that must not be redialled, a result that does not match the
 schema, a phone number smuggled into a date field, and a price range ranked on
-its low end.
+its low end. Three of them come from the review of this pull request: a failed
+call must not produce a rankable quote, the same instant must give a different
+answer in New York and in Los Angeles, and changing who the call is on behalf of
+must change the idempotency key.
 
 It also checks our payload against the **real published SDK**: that `calls.create`
 still accepts every field we send, that `recipients` is still the plural list
