@@ -85,9 +85,9 @@ businesses or individuals is coincidental.
 | Code | Description |
 |------|-------------|
 | `paid_now` | Client confirms payment was made or will arrive within 24 hours. |
-| `committed_to_date` | Client agrees to a specific payment date or instalment plan; `commitment_date` populated. |
+| `committed_to_date` | Client agrees to a specific date to pay the full amount; `commitment_date` populated. |
 | `disputed` | Client disputes the invoice or claims prior payment; `dispute_reason` populated. |
-| `refused` | Client declines to pay or engage and offers no usable commitment. |
+| `refused` | Client declines to pay or engage, or cannot commit to a single date for the full amount (e.g. proposes a partial payment or instalment plan). |
 | `no_answer` | Call rang to completion; nobody answered. |
 | `voicemail` | Call reached voicemail; brief message left. |
 | `wrong_person` | A third party answered; named client was not reached. |
@@ -149,26 +149,24 @@ went out on the 25th. Let me double-check... yes, 25 July, international wire.
 
 **Phase 4 — Branch A: Client Will Pay Now**
 
-**Agent:** That's great to hear, thank you. Could you let me know the approximate date
-the transfer was sent, so we can watch for it on our end?
+**Agent:** That's great to hear, thank you. We'll keep an eye out for it on our end.
 
-**Client:** It was sent on 25 July. It was a SWIFT transfer, so it might take a couple
-of days to clear.
+**Client:** Sounds good, thanks.
 
-**Agent:** Perfect, thank you. We'll look out for it arriving over the next few business
-days. If anything doesn't match up on our end, the right person will follow up with you
-directly.
+**Agent:** Wonderful. We'll look out for it. If anything doesn't match up on our end,
+the right person will follow up. Thank you for your time.
 
-`[Capture: payment sent 25 July via SWIFT. Expected arrival: approximately 27-29 July.]`
+`[Client volunteered a sent-date and method in Phase 3, but neither is captured — the
+result_schema has no field for expected arrival date or payment method on this
+outcome.]`
 
 ---
 
 **Phase 5 — Closing**
 
 **Agent:** Just to recap — Northgate Digital has confirmed payment for invoice
-INV-2026-041 was sent on 25 July via SWIFT transfer. If you have any questions,
-the team can be reached at accounts@devixus.example. Thank you very much for your time,
-Rachel. Have a good day.
+INV-2026-041 has been sent. If you have any questions, the team can be reached at
+accounts@devixus.example. Thank you very much for your time, Rachel. Have a good day.
 
 **Client:** Thanks, bye.
 
@@ -327,11 +325,10 @@ I was waiting for a revised invoice, not chasing.
 **Agent:** Thank you for explaining that. I don't want to cut across anything that's
 already been discussed with the team. I'll make sure the right person at Devixus Studio
 reviews the correspondence and comes back to you directly with the corrected position.
-Would email be the easiest way for them to reach you on this?
 
-**Client:** Yes, email is fine. Use the accounts address you already have.
+**Client:** Thank you, I appreciate that.
 
-`[Capture objection verbatim: client claims a scope reduction was agreed in May and a revised invoice at below GBP 1,000 was promised. Client is waiting for revised invoice. Follow-up channel: email.]`
+`[Capture objection verbatim: client claims a scope reduction was agreed in May and a revised invoice at below GBP 1,000 was promised, and is waiting for a revised invoice. Preferred follow-up channel is not asked or logged — the result_schema has no field for it.]`
 
 ---
 
@@ -339,7 +336,7 @@ Would email be the easiest way for them to reach you on this?
 
 **Agent:** Just to recap — Meridian Tech Solutions has raised a query about the invoice
 amount, citing a scope reduction agreed in May. The team will review the correspondence
-and come back to you by email. We won't be chasing further by phone until that's
+and come back to you directly. We won't be chasing further by phone until that's
 resolved. If you have any questions in the meantime, please reach us at
 accounts@devixus.example. Thank you for your time, Sandra. Have a good day.
 
@@ -404,34 +401,33 @@ cash flow hard. I haven't forgotten about it.
 
 **Phase 4 — Branch D: Client Cannot Pay**
 
-**Agent:** I appreciate you being upfront about that. Is there a timeframe when you
-expect the situation to change, or a partial amount that might be possible sooner?
+**Agent:** I appreciate you being upfront about that. Is there a date when you expect to
+be able to pay the full amount?
 
 **Client:** Honestly, I'm hoping things will improve by September. I could possibly
 manage half of it then — around USD 1,500 — and the rest by end of October. But I can't
 promise anything right now.
 
-**Agent:** Thank you. I'll pass that to the team at Devixus Studio so they can consider
-whether a payment plan like that works. Just to confirm what I'll be passing on: USD
-1,500 by end of September and the remaining USD 1,600 by end of October. Does that
-sound right?
+**Agent:** I understand. I'm not able to set up a payment plan on this call, but I'll
+make sure the team at Devixus Studio knows you'd like to discuss a partial arrangement,
+and they'll follow up with you directly about the details.
 
-**Client:** Yes, that's what I was thinking. But like I said, it's not certain.
+**Client:** That's fair, thank you.
 
-`[Capture: client offered USD 1,500 by end of September 2026, USD 1,600 by end of October 2026. Client flagged these as estimates, not firm commitments. Log as pending operator review.]`
+`[Client cannot commit to a single date for the full amount and proposes a partial arrangement instead. The result_schema has no field for partial amounts or multiple dates, so none is captured — outcome is refused, with commitment_date left null. The operator follows up manually to discuss a payment plan.]`
 
 ---
 
 **Phase 5 — Closing**
 
 **Agent:** I understand, and I appreciate your honesty, David. We'll pass this back to
-the team and they'll be in touch to discuss whether those terms work for both sides.
-There's no further pressure from me today. If you have any questions, the team can be
-reached at accounts@devixus.example. Thank you for your time. Have a good day.
+the team and they'll be in touch to discuss options, including whether a payment plan is
+possible. There's no further pressure from me today. If you have any questions, the team
+can be reached at accounts@devixus.example. Thank you for your time. Have a good day.
 
 **Client:** Thank you for being understanding. Sorry again about the delay.
 
-`[Call ends. Total duration: approximately 3 minutes 50 seconds. Outcome logged as committed_to_date with low confidence — operator must review before treating as a firm commitment.]`
+`[Call ends. Total duration: approximately 3 minutes 50 seconds.]`
 
 ---
 
@@ -439,17 +435,21 @@ reached at accounts@devixus.example. Thank you for your time. Have a good day.
 
 ```json
 {
-  "outcome": "committed_to_date",
-  "commitment_date": "2026-09-30",
+  "outcome": "refused",
+  "commitment_date": null,
   "dispute_reason": null,
-  "confidence": 0.62
+  "confidence": 0.85
 }
 ```
 
-> **Note on Branch D outcome coding:** When a client offers a partial schedule under
-> duress, the skill codes the first offered date as `committed_to_date` with lowered
-> confidence to signal that operator review is required before treating the terms as
-> agreed. A client who offers nothing usable at all would result in `refused`.
+> **Note on Branch D outcome coding:** A client who cannot commit to a single date to pay
+> the full invoice amount — including one who proposes a partial payment or an
+> instalment schedule — is coded as `refused`, not `committed_to_date`, even though the
+> client is engaging rather than declining. `refused` is overloaded in this version to
+> mean "no single-date, full-amount commitment obtained" (see SKILL.md, "Out of Scope
+> for This Version"). The `result_schema` has no field for partial amounts or multiple
+> dates, so the call does not attempt to capture them; the operator follows up manually
+> if a payment plan is worth pursuing.
 
 ---
 

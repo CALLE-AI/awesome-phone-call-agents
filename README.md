@@ -125,7 +125,8 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
 - [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, TikTok Ads, Notion, Airtable, local CSV files, or custom sources.
-- [calle-invoice-recovery](skills/calle-invoice-recovery/) - Overdue-invoice recovery calls for freelancers and small agencies, with a human approval gate before every call is placed.
+- [`calle-script-advisor`](skills/calle-script-advisor/) - Drafts and lints CALL-E call task text and result schemas for clarity, safety, and extraction quality before a call is placed.
+- [`calle-invoice-recovery`](skills/calle-invoice-recovery/) - Overdue-invoice recovery calls for freelancers and small agencies, with a human approval gate before every call is placed.
 - [`verify-by-phone`](skills/verify-by-phone/) - Single disclosed verification call that checks a directory listing against the published line, grounds every answer in a transcript span, and abstains instead of guessing when the call does not establish one.
 
 ### Apps

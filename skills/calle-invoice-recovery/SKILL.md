@@ -28,9 +28,9 @@ The flow has five sequential phases. Every phase must complete before the call c
 | Code | Meaning | Next action |
 |------|---------|-------------|
 | `paid_now` | Client confirms payment was made or will arrive within 24 hours. | Log and close. Operator verifies receipt; if not received within 24 h, escalate manually. |
-| `committed_to_date` | Client agrees to a specific date or instalment schedule; `commitment_date` is populated. | Log `commitment_date`. Operator schedules a follow-up for that date + 1 business day. |
+| `committed_to_date` | Client agrees to a specific date to pay the full amount; `commitment_date` is populated. | Log `commitment_date`. Operator schedules a follow-up for that date + 1 business day. |
 | `disputed` | Client disputes the amount, claims prior payment, or raises an unresolvable objection; `dispute_reason` is populated. | Log `dispute_reason` verbatim. Contact client by email within 1 business day. No further call until resolved. |
-| `refused` | Client declines to pay or engage; no date offered and no dispute articulated. | No further automated calls. Operator decides: write-off, settlement offer, or collections referral. |
+| `refused` | Covers two distinct situations the four-field schema cannot tell apart: (a) the client declines to pay or engage at all, and (b) the client engages and offers a partial payment or an instalment plan, but no single full-amount date is obtained — the schema has no field to represent a partial/instalment offer, so it is narrowed into `refused` rather than invented as a new field (see "Out of Scope for This Version"). No date is logged either way. | No further automated calls. Operator decides: write-off, settlement offer, or collections referral. |
 | `no_answer` | Phone rang to completion; nobody answered. | Retry after 24 h cooldown. Retire after 3 consecutive `no_answer` results. |
 | `voicemail` | Call reached voicemail; agent left a brief professional message. | No retry for 48 h. Operator may send a written follow-up instead. |
 | `wrong_person` | A third party answered; the named client was not reached. | Retry during business hours after 24 h. Verify contact number before retrying. |
@@ -55,7 +55,7 @@ CALL-E extracts a structured outcome from every call using this schema. The decl
 | `paid_now` | `paid` | Client confirms payment was made or will arrive within 24 hours. |
 | `committed_to_date` | `committed` | Client agreed to pay on a specific date; `commitment_date` must be populated. |
 | `disputed` | `disputed` | Client disputes the amount, claims prior payment, or raises an unresolvable objection; `dispute_reason` must be populated. |
-| `refused` | `refused` | Client declines to pay or engage; no date offered and no dispute articulated. |
+| `refused` | `refused` | Client declines to pay or engage, or engages but no single full-amount date is obtained (including a partial or instalment offer the schema cannot represent — see "Out of Scope for This Version"); no date offered and no dispute articulated. |
 | `no_answer` | `no_answer` | Phone rang to completion; nobody answered. |
 | `voicemail` | `callback` | Call reached voicemail; agent left a brief message. |
 | `wrong_person` | `callback` | A third party answered; the named client was not reached. |
@@ -75,7 +75,7 @@ If the person confirms they are the client, proceed to Phase 2.
 
 **Third party answers** (receptionist, colleague, family member):
 > "Thank you. Could you let [Client Name] know I called? My name is [Agent Name] from [Operator / Business Name]. They can reach us at [Callback Number] at their convenience — no emergency, just a routine matter."
-> → Outcome: `wrong_person`. Log the name of the person who answered if given.
+> → Outcome: `wrong_person`. Do not ask for or log the third party's name or any other identifying detail about them — the `result_schema` has no field for it, and recording a bystander's identity in a debt-collection context is out of scope by design (see "Out of Scope for This Version").
 
 **No answer:**
 > [Call rings to completion without being answered. Do not leave a message.]
@@ -120,15 +120,13 @@ The client's first substantive response determines which branch applies.
 **Signals:** Client says payment has already been sent, or commits to paying the same day or within 24 hours.
 
 **Response:**
-> "That's great to hear, thank you. Could you let me know the approximate date you sent — or plan to send — the payment, so we can watch for it on our end?"
+> "That's great to hear, thank you. We'll keep an eye out for it on our end."
 
-Capture: expected arrival date and general method (bank transfer, cheque, etc. — not payment credentials).
-
-Do not ask for card numbers, account numbers, sort codes, CVVs, or any payment credential over the phone (see Prohibited Behaviours).
+Do not ask for card numbers, account numbers, sort codes, CVVs, or any payment credential over the phone (see Prohibited Behaviours). Do not ask for or log an expected arrival date or payment method — the `result_schema` has no field for either on this outcome (see "Out of Scope for This Version").
 
 **Close:**
 > "Wonderful. We'll look out for it. If anything doesn't match up on our end, the right person will follow up. Thank you for your time."
-> → Outcome: `paid_now`. Log the expected arrival date.
+> → Outcome: `paid_now`.
 
 ---
 
@@ -137,22 +135,22 @@ Do not ask for card numbers, account numbers, sort codes, CVVs, or any payment c
 **Signals:** Client acknowledges the invoice is outstanding and indicates intent to pay but needs more time.
 
 **Initial response:**
-> "Understood. What date works best for you to make the payment?"
+> "Understood. What date works best for you to make the full payment?"
 
 If the client gives a vague timeframe ("next week," "end of the month"):
 > "That's helpful. Could we pin down a specific date? Even a rough target helps us plan on our end."
 
 **Confirm the date:**
-> "So just to make sure I have this right — you're planning to pay [Currency][Amount] on [Date]. Does that sound correct?"
+> "So just to make sure I have this right — you're planning to pay [Currency][Amount] in full on [Date]. Does that sound correct?"
 
-**If the client wants to split the payment:**
-> "Would it work to pay [Amount A] by [Date A] and the remainder by [Date B]? I can pass that proposal to [Operator Name] for their consideration."
+**If the client proposes an instalment or split-payment arrangement** instead of a single date for the full amount, do not negotiate terms on the call — the `result_schema` carries only one `commitment_date` for the full amount, with no field for an instalment schedule:
+> "I'm not able to set up a payment plan on this call, but I'll pass that request to [Operator Name] to follow up with you directly."
 
-Note: the agent offers the arrangement but does not confirm it. All instalment proposals are reviewed by the operator before being logged as agreed (draft-then-approve).
+Close with outcome `refused` in this case. In this version, `refused` covers any call where no single full-amount date is obtained — including an instalment or partial offer the `result_schema` cannot represent (see "Out of Scope for This Version") — not only a flat decline.
 
 **Close:**
 > "Thank you. We'll note that and be in touch if we don't see the payment by then. Is there anything else I can help clarify?"
-> → Outcome: `committed_to_date`. Log the agreed date(s) and any instalment structure, marked pending operator review.
+> → Outcome: `committed_to_date`. Log the single agreed date in `commitment_date`.
 
 ---
 
@@ -168,10 +166,10 @@ Listen and capture the client's stated objection fully without interrupting or a
 Do not attempt to resolve the dispute on the call. The agent's role is to capture the objection, not adjudicate it.
 
 **Close:**
-> "Thank you for explaining that. I'll make sure [Operator Name] reviews their records and comes back to you directly. Would email or a phone call be the easiest way for them to reach you?"
+> "Thank you for explaining that. I'll make sure [Operator Name] reviews their records and comes back to you directly."
 
-Capture: preferred follow-up method and best time if offered.
-> → Outcome: `disputed`. Log the stated objection verbatim in `dispute_reason` and the preferred follow-up channel.
+Do not ask for or log a preferred follow-up channel — the `result_schema` has no field for it (see "Out of Scope for This Version"); the operator decides how to follow up.
+> → Outcome: `disputed`. Log the stated objection verbatim in `dispute_reason`.
 
 ---
 
@@ -180,15 +178,15 @@ Capture: preferred follow-up method and best time if offered.
 **Signals:** Client acknowledges the debt but says they are currently unable to pay (cash-flow difficulty, business problem, waiting on their own receivable).
 
 **Initial response:**
-> "I appreciate you being upfront about that. Is there a timeframe when you expect the situation to change, or a partial amount that might be possible sooner?"
+> "I appreciate you being upfront about that. Is there a date when you expect to be able to pay the full amount?"
 
-**If the client offers a partial amount or a future date:**
-> "Thank you. I'll pass that to [Operator Name] so they can consider whether a payment plan works for both sides. Just to confirm what I'll be passing on: [partial amount] by [date]. Does that sound right?"
-> → Outcome: `committed_to_date`. Log the offered terms and flag them pending operator approval.
+**If the client commits to a specific future date for the full amount:**
+> "Thank you. I'll pass that to [Operator Name] so they can consider whether that works. Just to confirm — you're expecting to pay the full amount on [date]. Does that sound right?"
+> → Outcome: `committed_to_date`. Log the single agreed date in `commitment_date`, flagged pending operator approval.
 
-**If the client gives no usable timeframe and cannot commit to anything:**
-> "I understand. I'll let [Operator Name] know that you're aware of the invoice and working through some difficulty at the moment. They'll be in touch when they've had a chance to consider the options."
-> → Outcome: `refused`. Log that the client acknowledged the debt but could not commit to a date or amount.
+**If the client cannot commit to a single date for the full amount** — including if they propose a partial payment or an instalment schedule instead:
+> "I understand. I'll let [Operator Name] know that you're aware of the invoice and working through some difficulty at the moment. They'll be in touch when they've had a chance to consider the options, including whether a payment plan is possible."
+> → Outcome: `refused`. Log that the client acknowledged the debt but could not commit to a single date for the full amount. In this version, `refused` covers this case too — the client is engaging, not declining, but the `result_schema` has no field for a partial amount or instalment schedule (see "Out of Scope for This Version"), so no such offer is captured.
 
 **If the client becomes distressed or hostile:**
 > "I completely understand — this is not a pleasant call to receive. There's no pressure from me today. I'll pass your situation back to [Operator Name] and they'll be in touch with options."
@@ -308,6 +306,17 @@ Debt-collection law varies significantly by country. This skill is a communicati
 The maintainers of this skill make no legal representations. Use in a regulated context is entirely at the operator's risk.
 
 For the full safety contract including worked examples of masking and E.164 validation, see `references/safety.md`.
+
+## Out of Scope for This Version
+
+The `result_schema` is deliberately narrow (`outcome`, `commitment_date`, `dispute_reason`, `confidence`). The following are not implemented in this version — they are not asked for, not captured, and not logged on any call:
+
+- **Payment method and expected-arrival date for `paid_now`.** The schema has no field for either.
+- **Multiple instalment amounts and dates.** `commitment_date` holds a single ISO 8601 date for the full invoice amount. A client who proposes a partial payment or a multi-date instalment plan is told the operator will follow up directly, and the call is logged as `refused` (see Phase 4, Branches B and D) even though the client engaged rather than declined — `refused` is overloaded in this version to mean "no single-date, full-amount commitment obtained," not only "declined." A future version that needs to distinguish the two requires its own `result_schema` field, not a narrower reading of `refused`.
+- **Preferred follow-up channel for `disputed`.** The operator decides how to follow up; the schema has no field for a client-stated preference.
+- **Identity of a third party reached under `wrong_person`.** Not asked for, not logged — the schema has no field for it, and recording a bystander's identity in a debt-collection context is out of scope by design.
+
+Any of these becoming load-bearing in a future version requires a `result_schema` change (and corresponding CALL-E-side validation update) before the mandated flow can ask the agent to capture them.
 
 ## References
 

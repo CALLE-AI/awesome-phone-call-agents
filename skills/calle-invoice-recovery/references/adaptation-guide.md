@@ -33,10 +33,10 @@ Example:
 
 ## 2. Invoice Data Source
 
-The skill expects invoice data as a structured input object. In the reference
-implementation, invoices come from the `invoices` Supabase table (see the schema in
-`supabase/migrations/`). If you are using a different system, you need to supply the
-same fields.
+The skill expects invoice data as a structured input object. This skill folder does
+not ship a database schema, an ORM, or a datastore — wiring invoice storage to
+Supabase, Postgres, or any other system is a host-implementation decision. Wherever
+your invoices live, you need to supply the fields below.
 
 **Required fields per invoice:**
 
@@ -162,39 +162,42 @@ other supported regions — CALL-E routes by the *recipient's* country, not the 
 
 ## 6. API Keys and Environment Setup
 
-**Required environment variables:**
+**Environment variables the CALL-E integration needs, at minimum:**
 
 | Variable | Where to get it | Notes |
 |----------|----------------|-------|
-| `CALLE_API_KEY` | Your CALL-E dashboard | Never commit; set via your deployment environment (e.g. `vercel env add`). |
-| `SUPABASE_URL` | Your Supabase project settings | |
-| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase project settings — API tab | Server-side only; never expose to browsers. |
+| `CALLE_API_KEY` | Your CALL-E dashboard | Never commit; set via your deployment environment. |
 | `CALLE_MODE` | Set yourself | `mock` for development and dry-run; `live` only when placing real calls with real credits. |
 
-Copy `.env.example` to `.env.local` and fill in your values. The `.env` file is
-git-ignored; never commit real credentials.
+If your host implementation uses Supabase (or any other datastore) to back invoice and
+call records, add the corresponding connection variables (e.g. `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`) to your own environment configuration. This skill folder
+does not ship a datastore or an environment-variable template — how you store and load credentials is
+a host-implementation decision. Whatever mechanism you use, never commit real
+credentials to version control.
 
 ---
 
 ## 7. Dry-Run Before Going Live
 
-Before placing any real call, run the skill in dry-run mode to verify the full
-execution path. Set `CALLE_MODE=mock` and run:
+Before placing any real call, run the standalone dry-run script shipped in this skill
+folder to preview the exact payload and agent script CALL-E would receive:
 
 ```bash
-pnpm verify-skill          # checks the skill folder is structurally valid
-pnpm verify-staging        # checks the staging environment configuration
-tsx scripts/demo-call.ts   # exercises the full call path without placing a real call
+npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts
+npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts --invoice-ref INV-2026-038
 ```
 
-In dry-run mode:
-- No CALL-E API credit is consumed.
-- No real phone number is dialled.
-- All output is labelled `[DRY RUN]`.
-- The full execution path (invoice lookup, script generation, call brief, approval gate, result logging) runs exactly as it would in live mode.
+This script makes no network request and consumes no CALL-E credit. It prints the
+request payload, the generated agent script, and the result-schema shape for one of the
+fictional sample invoices in `references/examples.md`, with all output labelled
+`[DRY RUN]`. It previews the call-generation logic only — it does not exercise your own
+host's invoice lookup, approval gate, or storage layer. Test those separately in your
+own implementation before going live.
 
-Only set `CALLE_MODE=live` when you have confirmed the dry-run output looks correct,
-the approval gate is wired up in your host, and you are ready to spend a real call credit.
+Only set `CALLE_MODE=live` in your host when you have confirmed your integration
+behaves correctly, the approval gate is wired up, and you are ready to spend a real call
+credit.
 
 ---
 

@@ -7,7 +7,6 @@
  * import, and no fetch() call — it is structurally incapable of placing a call.
  *
  * Usage (from the repo root):
- *   pnpm dry-run
  *   npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts
  *   npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts --invoice-ref INV-2026-038
  *
@@ -135,6 +134,13 @@ function maskClientName(name: string): string {
 }
 
 // ── Script generation (mirrors lib/calls/generate-script.ts exactly) ──────────
+//
+// Two safety properties are enforced in the script text itself, per
+// references/safety.md:
+//   1. The automated-call disclosure is the FIRST spoken sentence, before any
+//      invoice, amount, or payment is mentioned.
+//   2. An identity gate sits between the disclosure and any financial detail.
+//      A third party who answers must never learn that a debt exists.
 
 function generateAgentScript(invoice: SampleInvoice): string {
   const formatted = `${invoice.currency} ${invoice.amount.toFixed(2)}`;
@@ -142,16 +148,23 @@ function generateAgentScript(invoice: SampleInvoice): string {
   return [
     'You are a professional accounts recovery specialist calling on behalf of Devixus Finance, a digital agency based in Singapore.',
     '',
+    'REQUIRED DISCLOSURE: your first spoken sentence must identify this as an automated call, before any invoice, amount, or payment is mentioned. Say, near-verbatim: "Hello, this is an automated call from Devixus Finance on behalf of a client."',
+    '',
     `CALL PURPOSE: Follow up on an overdue invoice of ${formatted} from ${invoice.clientName}, now ${invoice.daysOverdue} day(s) past due.`,
     '',
     'CALL FLOW:',
-    `1. Open: "Hello, I am calling from Devixus Finance. Am I speaking with the accounts team at ${invoice.clientName}?"`,
-    `2. Introduce the invoice: "I am following up on an outstanding invoice of ${formatted} that was due ${invoice.daysOverdue} days ago. Could you let me know when payment can be arranged?"`,
+    '1. Disclose, then confirm identity — before any financial detail:',
+    '   a. Open with the disclosure above, verbatim.',
+    `   b. Confirm you reached the right party: "Am I speaking with the accounts team at ${invoice.clientName}?"`,
+    '   c. IDENTITY GATE — do not state the invoice amount, the balance, or that a payment is outstanding until the person confirms they are the named contact or the accounts team at that company.',
+    '      - If a third party answers, or the person cannot confirm: do NOT reveal the amount or that a debt exists. Say only "Thank you — I will follow up in writing instead," close, and report wrong_person.',
+    '      - If asked who is calling before confirming: repeat the disclosure and the company name only.',
+    `2. Only after identity is confirmed, introduce the invoice: "I am following up on an outstanding invoice of ${formatted} that was due ${invoice.daysOverdue} days ago. Could you let me know when payment can be arranged?"`,
     '3. Listen and respond:',
     '   - Payment committed to a specific date: thank them, confirm the date, and close.',
     '   - They need more time: agree on a callback date, confirm it, and close.',
     '   - They dispute the invoice: acknowledge without argument, note the dispute, and close politely.',
-    '   - No answer or voicemail: leave a brief professional message if possible.',
+    '   - No answer or voicemail: leave a brief message naming only the caller and a callback request. Do NOT state the amount or that a payment is overdue on a voicemail.',
     '4. Close: "Thank you for your time. We will send a written follow-up shortly. Have a good day."',
     '',
     'TONE: Professional, calm, firm but polite. Never aggressive or confrontational.',
@@ -174,6 +187,32 @@ function generateProposedTerms(invoice: SampleInvoice): string {
     `Objective: secure a payment commitment or agree a callback date. ` +
     `Language: English. Region: ${invoice.region}.`
   );
+}
+
+// ── Idempotency ───────────────────────────────────────────────────────────────
+
+/**
+ * Idempotency key for a dispatch attempt.
+ *
+ * Derived only from inputs that are stable across retries: the invoice
+ * reference, the destination, and the approved dispatch slot (UTC date + hour).
+ * A retry of the same approved call therefore reuses the same key, so an
+ * ambiguous "accepted" response reconciles against the original call instead of
+ * placing a second one.
+ *
+ * Deliberately NOT derived from the send timestamp — that changes on every
+ * retry, which would defeat the purpose of the key. A genuinely rescheduled
+ * call lands in a later slot and correctly receives a distinct key, because it
+ * is a new authorised dispatch rather than a retry of the previous one.
+ */
+function buildIdempotencyKey(invoice: SampleInvoice, slot: Date = new Date()): string {
+  const utcSlot = [
+    slot.getUTCFullYear(),
+    String(slot.getUTCMonth() + 1).padStart(2, '0'),
+    String(slot.getUTCDate()).padStart(2, '0'),
+    String(slot.getUTCHours()).padStart(2, '0'),
+  ].join('');
+  return `inv-${invoice.invoiceRef}-${invoice.clientPhone}-${utcSlot}`;
 }
 
 // ── Output helpers ─────────────────────────────────────────────────────────────
@@ -213,6 +252,7 @@ function main(): void {
   const maskedName = maskClientName(invoice.clientName);
   const agentScript = generateAgentScript(invoice);
   const proposedTerms = generateProposedTerms(invoice);
+  const idempotencyKey = buildIdempotencyKey(invoice);
 
   // Exact JSON body that would be sent to POST https://api.heycall-e.com/v1/calls
   // Phone and client name are masked here as they would be in any logged output.
@@ -248,7 +288,10 @@ function main(): void {
   console.log('  Method         : POST');
   console.log('  Endpoint       : https://api.heycall-e.com/v1/calls');
   console.log('  Authorization  : Bearer [CALLE_API_KEY — not present in dry-run]');
-  console.log(`  Idempotency-Key: inv-${invoice.invoiceRef}-[timestamp at dispatch]`);
+  console.log(`  Idempotency-Key: ${idempotencyKey}`);
+  console.log('                   (invoice + destination + UTC dispatch slot —');
+  console.log('                    stable across retries, so a retried dispatch');
+  console.log('                    reconciles instead of placing a second call)');
   console.log('  Content-Type   : application/json');
 
   section('REQUEST PAYLOAD (JSON body that would be sent to CALL-E)');

@@ -22,9 +22,10 @@ overseas clients in CALL-E-supported regions.
 - Agent-host developers who want a portable invoice-recovery skill they can drop into
   their own scheduling system.
 
-The reference implementation uses Next.js, Supabase, and the CALL-E TypeScript SDK
-(`@call-e/calle`), but the skill itself is host-agnostic: the conversation flow and
-outcome schema work with any platform that can invoke the CALL-E API.
+A separate reference implementation (Next.js, Supabase, the CALL-E TypeScript SDK) shows
+one way to wire this skill into a host — see "What ships in this folder, and what does
+not" below. The skill itself is host-agnostic: the conversation flow and outcome schema
+work with any platform that can invoke the CALL-E API.
 
 ---
 
@@ -55,8 +56,29 @@ scheduled automatically — that is the host scheduler's responsibility.
   AU, CA, GB, VN, DE, JP, FR, MX, BR, ID, PH, KE, and BD/Bangladesh — English only).
   Calls to a region CALL-E does not support cannot be placed; use a different channel.
 - Node.js 20+ (24 LTS recommended), or the runtime your host uses.
-- If using the reference implementation: a Supabase project with the schema from
-  `supabase/migrations/` applied.
+- `npx` available, to run the dry-run script without installing anything.
+
+---
+
+## What ships in this folder, and what does not
+
+This skill folder is **host-agnostic and self-contained**. It contains the conversation
+flow, the outcome schema, the safety rules, worked examples, and a standalone dry-run
+script. It is not a runnable application and deliberately ships no framework code, no
+database schema, and no package manifest.
+
+| In this folder | Not in this folder |
+|---|---|
+| `SKILL.md` — flow, schema, guardrails | Next.js / Supabase application code |
+| `references/safety.md` — disclosure, E.164, PII, cancellation | Environment-variable template, database migrations, seed data |
+| `references/examples.md` — sample invoices and expected outcomes | A package manifest or `pnpm` scripts |
+| `references/adaptation-guide.md` — porting to another host | A CALL-E SDK dependency |
+| `scripts/dry-run.ts` — standalone preview, no network calls | Any code that can place a call |
+
+A working reference implementation of this workflow — Next.js, Supabase, the CALL-E
+TypeScript SDK, the approval queue UI, and the migrations — lives in a separate
+repository: <https://github.com/minhaz1221/calle-invoice-agent>. Use it as a worked
+example of wiring the skill into a host. Nothing in this folder depends on it.
 
 ---
 
@@ -65,65 +87,69 @@ scheduled automatically — that is the host scheduler's responsibility.
 ### 1. Copy the skill folder
 
 Copy `skills/calle-invoice-recovery/` into your own repository or agent-host project.
-If you are building on top of the full reference implementation, clone the entire repo
-and follow the setup in the project root.
 
-### 2. Verify the skill folder structure
+### 2. Run the dry-run preview
 
-```bash
-pnpm verify-skill
-```
-
-This runs the same rules the target repository's validator enforces on a skill folder:
-required files, SKILL.md frontmatter (`name`/`description`, `name` == folder, lowercase
-slug, description length and phone/call mention), `references/safety.md` +
-`references/examples.md`, no `README.md`, no CJK characters, no old repository-name
-strings, and that every local path SKILL.md references actually exists.
-
-### 3. Set environment variables
-
-Copy `.env.example` to `.env.local` and set:
-
-| Variable | Value |
-|----------|-------|
-| `CALLE_API_KEY` | Your CALL-E API key (from your CALL-E dashboard). |
-| `CALLE_MODE` | `mock` during development; `live` only when placing real calls. |
-| `SUPABASE_URL` | Your Supabase project URL. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service-role key (API tab, project settings). Server-side only — never expose to browser clients. |
-
-Set `CALLE_MODE=mock` (or `CALLE_MODE=dry-run`) during development and testing. Set
-`CALLE_MODE=live` only when you are ready to spend a real call credit. Never commit
-`.env.local` or any file containing your API key.
-
-### 4. Run the dry-run preview
-
-Before placing any real call, verify the full execution path:
+The dry-run script has no dependencies beyond `tsx` and makes no network request. From
+the repository root:
 
 ```bash
-pnpm dry-run
-# or directly:
 npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts
 ```
 
-Pass `--invoice-ref` to preview a specific sample invoice:
+Pass `--invoice-ref` to preview a specific sample invoice from
+`references/examples.md`:
 
 ```bash
 npx tsx skills/calle-invoice-recovery/scripts/dry-run.ts --invoice-ref INV-2026-038
 ```
 
-The dry-run script prints the full API payload and agent script that would be sent to
-CALL-E, but makes no network request and consumes no credit. All output is labelled
-`[DRY RUN]`. PII (phone numbers, client names) is masked in all dry-run output.
+It prints the full API payload and agent script that would be sent to CALL-E, but makes
+no network request and consumes no credit. Phone numbers and client names are masked in
+all output. The script refuses to run at all if `CALLE_MODE=live` or `CALLE_API_KEY` is
+present in the environment — it fails closed rather than assuming the operator meant
+something safe.
+
+### 3. Wire the flow into your host
+
+The skill defines the conversation, the outcome schema, and the guardrails. Your host
+supplies the invoice records, the approval gate, storage, and the CALL-E call. At
+minimum your host must:
+
+- present the generated call brief to a human and record the approval decision before
+  dispatch;
+- pass the agent script and result schema to CALL-E unchanged, including the
+  automated-call disclosure and the identity gate;
+- persist the returned outcome against the invoice, along with the CALL-E call ID and
+  the call duration;
+- expose a cancel control for any queued call, per `references/safety.md`.
+
+`references/adaptation-guide.md` covers porting the flow to a different host, storage
+layer, or region.
+
+### 4. Environment variables for your host
+
+The skill folder ships no environment-variable template because it is not a runnable
+application. Your host will need at least:
+
+| Variable | Value |
+|----------|-------|
+| `CALLE_API_KEY` | Your CALL-E API key, from your CALL-E dashboard. Server-side only. |
+| `CALLE_MODE` | `mock` during development; `live` only when placing real calls. |
+
+Never commit a file containing your API key. Note that the dry-run script in this folder
+refuses to run when `CALLE_API_KEY` is set, so keep it out of the environment you use to
+preview scripts.
 
 ### 5. Place a real call
 
-When you have confirmed the dry-run output looks correct and the approval gate is wired
-up in your host:
+When the dry-run output looks correct and the approval gate is wired up in your host:
 
-1. Set `CALLE_MODE=live`.
+1. Set `CALLE_MODE=live` in the host, not in the shell you run the dry-run from.
 2. Invoke the skill with a real invoice record and a real E.164 recipient number.
 3. Approve the call brief when it surfaces for review.
-4. The skill dispatches the call, logs the result, and stops.
+4. The skill dispatches the call, logs the result, and stops. No retry and no follow-up
+   is scheduled automatically — that is the host scheduler's responsibility.
 
 ---
 
