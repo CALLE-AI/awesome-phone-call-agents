@@ -46,10 +46,15 @@ async def test_opt_out_persists_do_not_call_immediately(tmp_path):
     pool = [make_candidate("c0", accept=0.99, showup=0.99), make_candidate("c1", accept=0.99, showup=0.99)]
     need = Need(label="x", count=1, deadline_minutes=60, location="loc", max_calls=10)
 
+    # emergency_override: this test's assertions are about opt-out
+    # detection, not calling-hour enforcement (covered separately in
+    # test_policy.py) -- without this, the test would only pass when run
+    # between 8am and 9pm UTC, which is exactly the wall-clock-dependent
+    # test bug a reviewer found.
     events = []
     await mobilize(
         need, pool, OptOutTransport(), ledger=ledger, mobilization_id="mob_optout",
-        governance_state=governance_state, governance_policy=GovernancePolicy(),
+        governance_state=governance_state, governance_policy=GovernancePolicy(emergency_override=True),
         governance_state_path=governance_state_path,
         on_progress=lambda event, data: events.append((event, data)),
     )
@@ -74,8 +79,10 @@ async def test_opted_out_candidate_never_dispatched_in_a_future_mobilization(tmp
     # With the default 12h cooldown, c1 (legitimately called and confirmed
     # in the first mobilization) would ALSO be filtered from the second one
     # by cooldown, which is correct governance behavior but would make this
-    # test's assertion about c0-specifically ambiguous.
-    policy = GovernancePolicy(cooldown=timedelta(seconds=0))
+    # test's assertion about c0-specifically ambiguous. emergency_override:
+    # see the comment in the test above -- this test must not depend on
+    # what time it happens to run.
+    policy = GovernancePolicy(cooldown=timedelta(seconds=0), emergency_override=True)
 
     pool = [make_candidate("c0", accept=0.99, showup=0.99), make_candidate("c1", accept=0.99, showup=0.99)]
     need = Need(label="x", count=1, deadline_minutes=60, location="loc", max_calls=10)

@@ -27,7 +27,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 from mobilize.core.dispatcher import mobilize
+from mobilize.core.ids import derive_mobilization_id
 from mobilize.core.ledger import Ledger
+from mobilize.core.policy import GovernancePolicy, load_governance_state
 from mobilize.core.registry import (
     Registry,
     RegistryError,
@@ -48,6 +50,7 @@ REGISTRY_STATE_PATH = Path("/tmp/mobilize_dashboard_registry.json")
 # existence can't distinguish "sample, persisted" from "a coordinator
 # actually uploaded their own list" -- that provenance is tracked here.
 REGISTRY_SOURCE_MARKER_PATH = Path("/tmp/mobilize_dashboard_registry_source.txt")
+GOVERNANCE_STATE_PATH = Path("/tmp/mobilize_dashboard_governance.json")
 
 app = FastAPI(title="mobilize")
 
@@ -121,10 +124,29 @@ async def reset_registry() -> dict:
     return {"count": len(registry), "message": "Reset to the sample registry."}
 
 
+def _origin_is_trusted(ws: WebSocket, expected_host: str, port: int) -> bool:
+    """Reject cross-origin WebSocket connections -- a page from any other
+    origin (e.g. one opened in another tab, or a malicious remote page if
+    this instance is ever reachable over a network) can otherwise drive
+    this endpoint exactly like the app's own JavaScript can, since a
+    WebSocket handshake is not itself same-origin-restricted by the
+    browser. Standard mitigation used by local-first dev servers (Jupyter
+    does the same check)."""
+    origin = ws.headers.get("origin", "")
+    allowed = {f"http://{expected_host}:{port}", f"http://localhost:{port}", f"http://127.0.0.1:{port}"}
+    return origin in allowed
+
+
 @app.websocket("/ws/run")
 async def run_mobilization(ws: WebSocket) -> None:
     await ws.accept()
     try:
+        expected_host = os.environ.get("MOBILIZE_DASHBOARD_HOST", "127.0.0.1")
+        port = int(os.environ.get("MOBILIZE_DASHBOARD_PORT", 8731))
+        if not _origin_is_trusted(ws, expected_host, port):
+            await ws.send_json({"event": "error", "data": {"message": "Rejected: untrusted origin."}})
+            return
+
         params = await ws.receive_json()
         need_label = params.get("need_label", "Urgent help needed")
         need_count = int(params.get("need_count", 3))
@@ -132,24 +154,46 @@ async def run_mobilization(ws: WebSocket) -> None:
         max_calls = int(params.get("max_calls", 40))
         location = params.get("location", "")
         use_simulated_outcomes = bool(params.get("simulate", True))
+        confirmed_real = bool(params.get("confirm", False))
 
         registry = _current_registry()
         candidates = registry.candidates(min_days_between_donations=56)
         need = Need(label=need_label, count=need_count, deadline_minutes=deadline_minutes,
                     location=location, max_calls=max_calls)
-        ledger = Ledger("/tmp/mobilize_dashboard_ledger.jsonl")
 
+        # Real-call governance and durability, wired the same way as the
+        # CLI and MCP entry points: persisted across invocations (a fresh
+        # in-memory GovernanceState() every run would make DNC/cooldown/
+        # fatigue tracking silently useless), and a deterministic
+        # mobilization_id derived from the request itself rather than
+        # id(ws) -- the latter is a NEW value on every reconnect, which
+        # would generate a fresh idempotency key on every retry and defeat
+        # crash-safe resumption exactly like the earlier CLI/MCP bug.
+        phones_key = sorted(c.phone for c in candidates)
         if use_simulated_outcomes:
-            # The registry is real (your actual people, your actual
-            # learned rates); the CALL responses are simulated from each
-            # person's own accept/show-up rate, so a coordinator can
-            # rehearse against their real list at zero cost before
-            # spending real credits. This is not the evaluation harness's
-            # synthetic population -- it's your registry, simulated.
             transport = _RegistryBackedSimulatedTransport(registry)
+            ledger = Ledger("/tmp/mobilize_dashboard_ledger.jsonl")
+            governance_state = governance_policy = governance_state_path = None
+            mobilization_id = f"dash_sim_{id(ws)}"
         else:
+            # The confirmation dialog in the browser is a UX nicety, not a
+            # security boundary -- any client can send confirm:true anyway.
+            # What actually stops an unintended real dispatch is (a) origin
+            # checking above, (b) binding to localhost by default, and (c)
+            # requiring this explicit field so the request is at minimum
+            # unambiguous about intent, matching the MCP tool's confirm
+            # requirement.
+            if not confirmed_real:
+                await ws.send_json({"event": "error", "data": {
+                    "message": "Real dispatch requires confirm:true. No calls were placed."}})
+                return
             from mobilize.transports.calle import CalleTransport
             transport = CalleTransport()
+            ledger = Ledger("/tmp/mobilize_dashboard_real_ledger.jsonl")
+            governance_state = load_governance_state(GOVERNANCE_STATE_PATH)
+            governance_policy = GovernancePolicy()
+            governance_state_path = GOVERNANCE_STATE_PATH
+            mobilization_id = derive_mobilization_id(need_label, phones_key)
 
         loop = asyncio.get_event_loop()
 
@@ -164,7 +208,9 @@ async def run_mobilization(ws: WebSocket) -> None:
             asyncio.run_coroutine_threadsafe(ws.send_json({"event": event, "data": safe_data}), loop)
 
         result = await mobilize(need, candidates, transport, ledger=ledger, on_progress=on_progress,
-                                 mobilization_id=f"dash_{id(ws)}")
+                                 mobilization_id=mobilization_id,
+                                 governance_state=governance_state, governance_policy=governance_policy,
+                                 governance_state_path=governance_state_path)
 
         updated_ids = record_outcomes(registry, result.all_results)
         save_registry_json(registry, REGISTRY_STATE_PATH)
@@ -361,19 +407,30 @@ Asha Rao,+15550101001,Asia/Kolkata"></textarea>
 <script>
 let nodes = {};
 
+// Every value interpolated into innerHTML below is escaped through this --
+// registry names/timezones come from a coordinator's OWN uploaded CSV,
+// which this app must treat as untrusted input. Without this, a name like
+// <img src=x onerror=...> in an uploaded spreadsheet would execute as
+// script in this same-origin page.
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
 async function loadRegistrySummary() {
   const r = await fetch('/api/registry').then(r => r.json());
   document.getElementById('registry-summary').innerHTML =
-    `<b>${r.count}</b> people loaded (${r.source}). Ranked by likelihood to confirm and follow through.`;
+    `<b>${esc(r.count)}</b> people loaded (${esc(r.source)}). Ranked by likelihood to confirm and follow through.`;
   const rows = r.people.slice(0, 30).map(p => `
     <tr>
-      <td>${p.name}</td>
-      <td>${p.phone}</td>
-      <td>${p.timezone}</td>
+      <td>${esc(p.name)}</td>
+      <td>${esc(p.phone)}</td>
+      <td>${esc(p.timezone)}</td>
       <td><span class="badge ${p.eligible ? 'eligible' : 'ineligible'}">${p.eligible ? 'eligible' : 'not yet'}</span></td>
       <td>${(p.accept_rate*100).toFixed(0)}% accept</td>
       <td>${(p.showup_rate*100).toFixed(0)}% show-up</td>
-      <td>${p.times_called}x called</td>
+      <td>${esc(p.times_called)}x called</td>
     </tr>`).join('');
   document.getElementById('registry-table').innerHTML =
     `<table><thead><tr><th>Name</th><th>Phone</th><th>TZ</th><th>Status</th><th>Accept</th><th>Show-up</th><th>History</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -387,9 +444,9 @@ async function uploadRegistry() {
   }).then(r => r.json());
   const msgEl = document.getElementById('upload-msg');
   if (res.error) {
-    msgEl.innerHTML = `<div class="msg error">${res.error}</div>`;
+    msgEl.innerHTML = `<div class="msg error">${esc(res.error)}</div>`;
   } else {
-    msgEl.innerHTML = `<div class="msg ok">${res.message}</div>`;
+    msgEl.innerHTML = `<div class="msg ok">${esc(res.message)}</div>`;
     loadRegistrySummary();
   }
 }
@@ -401,8 +458,10 @@ async function resetRegistry() {
 }
 
 function run(simulate) {
+  let confirmed = false;
   if (!simulate) {
     if (!confirm('This places REAL CALL-E calls and spends real credits. Continue?')) return;
+    confirmed = true;
   }
   document.getElementById('map').innerHTML = '';
   document.getElementById('log').innerHTML = '';
@@ -417,12 +476,13 @@ function run(simulate) {
     deadline_minutes: +document.getElementById('deadline_minutes').value,
     max_calls: +document.getElementById('max_calls').value,
     simulate: simulate,
+    confirm: confirmed,
   }));
   ws.onmessage = (msg) => {
     const {event, data} = JSON.parse(msg.data);
     const log = document.getElementById('log');
     if (event === 'error') {
-      document.getElementById('results').innerHTML = `<div class="msg error">${data.message}</div>`;
+      document.getElementById('results').innerHTML = `<div class="msg error">${esc(data.message)}</div>`;
     } else if (event === 'wave_dispatch') {
       (data.names || data.candidates).forEach((name, i) => {
         const cid = data.candidates[i];
@@ -433,27 +493,27 @@ function run(simulate) {
           nodes[cid] = el;
         } else { nodes[cid].className = 'node dialing'; }
       });
-      log.innerHTML += `<div class="line">— wave ${data.wave}: dialing ${data.candidates.length} in parallel</div>`;
+      log.innerHTML += `<div class="line">— wave ${esc(data.wave)}: dialing ${esc(data.candidates.length)} in parallel</div>`;
     } else if (event === 'call_result') {
       if (nodes[data.candidate_id]) nodes[data.candidate_id].className = 'node ' + data.outcome;
-      log.innerHTML += `<div class="line ${data.outcome}">${data.name || data.candidate_id}  ${data.outcome}  commitment=${data.commitment.toFixed(2)}</div>`;
+      log.innerHTML += `<div class="line ${esc(data.outcome)}">${esc(data.name || data.candidate_id)}  ${esc(data.outcome)}  commitment=${data.commitment.toFixed(2)}</div>`;
     } else if (event === 'need_met') {
       log.innerHTML += `<div class="line firm_yes">✓ need met at ${data.time_to_fill_seconds.toFixed(1)}s — no further wave dispatched</div>`;
     } else if (event === 'opted_out') {
-      log.innerHTML += `<div class="line failed">${data.candidate_id} asked not to be contacted again — added to do-not-call</div>`;
+      log.innerHTML += `<div class="line failed">${esc(data.candidate_id)} asked not to be contacted again — added to do-not-call</div>`;
     } else if (event === 'final') {
       const confirmedRows = data.confirmed.map(c =>
-        `<div class="confirmed-row"><span>${c.name} · ${c.phone}</span><span class="pill">commitment ${c.commitment}</span></div>`
+        `<div class="confirmed-row"><span>${esc(c.name)} · ${esc(c.phone)}</span><span class="pill">commitment ${esc(c.commitment)}</span></div>`
       ).join('') || '<div style="color:#9ca3af">Nobody confirmed.</div>';
       document.getElementById('results').innerHTML = `
         <div class="summary">
-          <div class="stat"><div class="n">${data.confirmed.length}/${data.need_count}</div><div class="l">confirmed</div></div>
-          <div class="stat"><div class="n">${data.calls_used}</div><div class="l">calls used</div></div>
-          <div class="stat"><div class="n">${data.never_called}</div><div class="l">never called</div></div>
+          <div class="stat"><div class="n">${esc(data.confirmed.length)}/${esc(data.need_count)}</div><div class="l">confirmed</div></div>
+          <div class="stat"><div class="n">${esc(data.calls_used)}</div><div class="l">calls used</div></div>
+          <div class="stat"><div class="n">${esc(data.never_called)}</div><div class="l">never called</div></div>
           <div class="stat"><div class="n">${data.time_to_fill_seconds ? data.time_to_fill_seconds.toFixed(1)+'s' : '—'}</div><div class="l">time to fill</div></div>
         </div>
         ${confirmedRows}
-        <div style="margin-top:10px; color:#9ca3af; font-size:11px;">Registry updated from ${data.learned_from_outcomes} outcome(s) — rankings above will reflect this next run.</div>
+        <div style="margin-top:10px; color:#9ca3af; font-size:11px;">Registry updated from ${esc(data.learned_from_outcomes)} outcome(s) — rankings above will reflect this next run.</div>
       `;
       loadRegistrySummary();
     }
@@ -472,4 +532,10 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("MOBILIZE_DASHBOARD_PORT", 8731))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Localhost only by default -- this is a single-operator local tool, not
+    # a deployed service, and there is no authentication on top of it.
+    # Binding to 0.0.0.0 would expose the registry (real names and phone
+    # numbers) and the real-call dispatch path to anyone else on the same
+    # network. Set MOBILIZE_DASHBOARD_HOST=0.0.0.0 explicitly to opt in.
+    host = os.environ.get("MOBILIZE_DASHBOARD_HOST", "127.0.0.1")
+    uvicorn.run(app, host=host, port=port)

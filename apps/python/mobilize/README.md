@@ -392,7 +392,19 @@ the CLI's typed `yes` confirmation.
   spreadsheet by hand.
 - **Real calls are a separate, explicit, confirmed action** — never the
   same button as the free rehearsal, and the browser makes you confirm
-  before it spends a credit.
+  before it spends a credit. That confirmation is enforced server-side, not
+  just as a JavaScript dialog: `/ws/run` refuses `simulate:false` without an
+  explicit `confirm:true` field, rejects any WebSocket connection from an
+  untrusted origin, and — even once confirmed — routes through the same
+  persisted governance (do-not-call, cooldown, contact fatigue,
+  calling-hour windows) as the CLI and MCP paths, not a bypass of it. The
+  server binds to `127.0.0.1` by default (not all interfaces), since this
+  is a single-operator local tool with no authentication layer, not a
+  deployed service — set `MOBILIZE_DASHBOARD_HOST=0.0.0.0` explicitly to
+  opt into network exposure. Uploaded registry data (names, phones) is
+  escaped before it's ever inserted into the page, since a coordinator's
+  CSV is untrusted input by design. See
+  `mobilize/tests/test_dashboard_security.py`.
 
 Live dispatch is shown over a WebSocket: each person lights up on dial,
 colors by outcome as results stream in, and the result panel shows exactly
@@ -411,7 +423,7 @@ mobilize/
 ├── mcp/             # MCP server
 ├── app/             # dashboard (the product) + CLI + bundled sample registry
 ├── artifacts/       # committed real-call transcripts, results, Devpost copy
-└── tests/           # 82 tests incl. property-based, real-subprocess crash, and
+└── tests/           # 89 tests incl. property-based, real-subprocess crash, and
                     #   concurrency/validation/resume/registry tests
 skills/mobilize/     # Agent Skill (SKILL.md) wrapping mobilize() for reuse
 run.sh               # one-command setup + launch for the dashboard
