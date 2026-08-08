@@ -757,7 +757,7 @@ Example dry-run preview payload uses `+15550123456` as the recipient number.
 
 ## 10. Testing
 
-`npm install && npm test` runs 352 tests across 24 files against a bundled
+`npm install && npm test` runs 354 tests across 25 files against a bundled
 fake CALL-E server. No credentials are required and no real calls are
 placed. `test/fixtures/` holds three committed payloads - a clean success, a
 provider-reported success that carries no answer, and a call carrying a
