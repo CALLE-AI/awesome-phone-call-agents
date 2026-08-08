@@ -6,7 +6,10 @@ export const previewInputSchema = z.object({
   mode: z.enum(["deposit", "catchup", "ask"]),
 });
 
-export const confirmInputSchema = z.object({ previewId: z.string().uuid() });
+export const confirmInputSchema = z.object({
+  previewId: z.string().uuid(),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+});
 export const supportedCalleRegions = new Set(["US", "SG", "MY", "IN", "AE", "AU", "CA", "GB", "VN", "DE", "JP", "FR", "MX", "BR", "ID", "PH", "KE"]);
 
 export const modeConfig = {
@@ -24,9 +27,9 @@ export const memoryResultValidator = z.object({
     title: z.string().min(2).max(180), body: z.string().min(2).max(4000),
     status: z.enum(["open", "proposed", "accepted", "answered", "resolved", "dismissed"]),
     confidence: z.enum(["high", "medium", "low", "unknown"]),
-    source_excerpt: z.string().max(800), audience: z.array(z.string().max(80)).max(30),
+    source_excerpt: z.string().trim().min(8).max(800), audience: z.array(z.string().max(80)).max(30),
   })).max(30),
-  unresolved_questions: z.array(z.string().max(500)).max(20),
+  unresolved_questions: z.array(z.string().trim().min(2).max(500)).max(20),
 });
 
 export const recipientResultSchema = {
@@ -38,9 +41,9 @@ export const recipientResultSchema = {
       title: { type: "string" }, body: { type: "string" },
       status: { type: "string", enum: ["open", "proposed", "accepted", "answered", "resolved", "dismissed"] },
       confidence: { type: "string", enum: ["high", "medium", "low", "unknown"] },
-      source_excerpt: { type: "string" }, audience: { type: "array", items: { type: "string" } },
+      source_excerpt: { type: "string", minLength: 8 }, audience: { type: "array", items: { type: "string" } },
     } } },
-    unresolved_questions: { type: "array", items: { type: "string" } },
+    unresolved_questions: { type: "array", items: { type: "string", minLength: 2 } },
   },
 };
 

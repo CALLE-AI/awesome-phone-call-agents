@@ -109,6 +109,9 @@ create table public.call_sessions (
   result jsonb,
   requested_at timestamptz not null default now(),
   confirmed_at timestamptz,
+  dispatch_claimed_at timestamptz,
+  dispatch_attempts integer not null default 0,
+  dispatch_last_error text,
   completed_at timestamptz,
   memory_ingested_at timestamptz,
   unique(company_id, payload_fingerprint)
@@ -237,13 +240,43 @@ on conflict(id) do update set public=false,file_size_limit=10485760;
 create policy "source_blob_read" on storage.objects for select using (bucket_id='company-sources' and public.is_company_member((storage.foldername(name))[1]::uuid));
 create policy "source_blob_insert" on storage.objects for insert with check (bucket_id='company-sources' and public.is_company_member((storage.foldername(name))[1]::uuid));
 
-create or replace function public.ingest_call_memory(target_session uuid, memory_payload jsonb)
+create or replace function public.claim_call_session(target_session uuid, target_user uuid, expected_fingerprint text)
+returns jsonb language plpgsql security definer set search_path = public
+as $$
+declare session_row public.call_sessions%rowtype;
+begin
+  select * into session_row from public.call_sessions where id=target_session for update;
+  if session_row.id is null then raise exception 'Callback preview not found'; end if;
+  if session_row.requested_by <> target_user then raise exception 'Callback requester mismatch'; end if;
+  if session_row.payload_fingerprint <> expected_fingerprint then raise exception 'Callback fingerprint mismatch'; end if;
+  if not exists (
+    select 1 from public.company_members
+    where company_id=session_row.company_id and user_id=target_user and status='active'
+  ) then raise exception 'Requester is no longer an active company member'; end if;
+  if session_row.status='previewed' then
+    update public.call_sessions set status='dispatching',confirmed_at=now(),dispatch_claimed_at=now(),dispatch_attempts=dispatch_attempts+1,dispatch_last_error=null where id=target_session;
+  elsif session_row.status='dispatching' and session_row.provider_call_id is null then
+    update public.call_sessions set dispatch_claimed_at=now(),dispatch_attempts=dispatch_attempts+1,dispatch_last_error=null where id=target_session;
+  else
+    raise exception 'Callback is not claimable';
+  end if;
+  return jsonb_build_object('id',target_session,'status','dispatching');
+end $$;
+revoke all on function public.claim_call_session(uuid,uuid,text) from public, anon, authenticated;
+grant execute on function public.claim_call_session(uuid,uuid,text) to service_role;
+
+create or replace function public.ingest_call_memory(target_session uuid, target_user uuid, memory_payload jsonb)
 returns integer language plpgsql security definer set search_path = public
 as $$
 declare session_row public.call_sessions%rowtype; item jsonb; next_version bigint; inserted_count integer := 0;
 begin
   select * into session_row from public.call_sessions where id=target_session for update;
   if session_row.id is null or session_row.memory_ingested_at is not null then return 0; end if;
+  if session_row.requested_by <> target_user or session_row.provider_call_id is null then raise exception 'Callback is not authorized for memory ingestion'; end if;
+  if not exists (
+    select 1 from public.company_members
+    where company_id=session_row.company_id and user_id=target_user and status='active'
+  ) then raise exception 'Requester is no longer an active company member'; end if;
   for item in select * from jsonb_array_elements(memory_payload)
   loop
     update public.companies set current_version=current_version+1 where id=session_row.company_id returning current_version into next_version;
@@ -254,5 +287,5 @@ begin
   update public.call_sessions set memory_ingested_at=now() where id=target_session;
   return inserted_count;
 end $$;
-revoke all on function public.ingest_call_memory(uuid,jsonb) from public, anon, authenticated;
-grant execute on function public.ingest_call_memory(uuid,jsonb) to service_role;
+revoke all on function public.ingest_call_memory(uuid,uuid,jsonb) from public, anon, authenticated;
+grant execute on function public.ingest_call_memory(uuid,uuid,jsonb) to service_role;

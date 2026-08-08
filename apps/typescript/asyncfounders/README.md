@@ -15,17 +15,18 @@ Live demo: https://asyncfounders.vercel.app/
 - Source ingestion for files, pasted notes and links.
 - Versioned facts, ideas, assumptions, decisions, questions, tasks and conflicts.
 - Private E.164 callback profiles with explicit consent.
-- Exact callback preview, ten-minute expiry and payload-bound idempotency.
+- Exact callback preview bound to the full destination, locale, task, context and company version.
 - Server-only CALL-E integration with strict structured-result validation.
 - Failed, malformed, ambiguous and low-confidence calls fail closed.
 
 ## Safety and side effects
 
 - The committed example configuration is demo-only: `CALLE_LIVE_CALLS_ENABLED=false` and `CALLE_DEMO_MODE=true`. Demo callbacks complete without dialing a phone.
-- A real outbound call is possible only after an authenticated member selects a teammate with explicit callback consent, reviews the exact masked preview, and confirms that unexpired preview.
+- A real outbound call is possible only when an active member calls themselves, has explicit callback consent, reviews the exact masked preview, and confirms that unexpired preview.
 - Callback profiles use E.164 numbers. Client-visible previews mask the phone number, and CALL-E credentials remain server-only.
-- A preview is valid for ten minutes and its fingerprint is bound into the CALL-E idempotency key, preventing ordinary confirmation retries from creating duplicate calls.
-- AsyncFounders does not create recurring call schedules. To stop future calls, revoke the member's callback consent or set `CALLE_LIVE_CALLS_ENABLED=false`. For a call already queued or active, use the CALL-E dashboard and do not reconfirm or create a replacement preview until its outcome is known.
+- Recipient-local quiet hours are enforced at preview and again immediately before dispatch.
+- A preview is valid for ten minutes and its fingerprint is bound into the CALL-E idempotency key. An ambiguous create remains `dispatching`; reconfirm that same preview to reconcile the stable key instead of creating a replacement.
+- AsyncFounders does not create recurring call schedules. To stop future calls, revoke callback consent or set `CALLE_LIVE_CALLS_ENABLED=false`. For a call already queued or active, use the CALL-E dashboard.
 - The call agent may collect team updates and questions only. It is instructed not to make purchases, commitments, schedules, promises, or external actions, and this workflow must not be used for medical, legal, financial, emergency, authentication, or other high-risk decisions.
 
 ## Stack
@@ -43,7 +44,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Run `supabase/migrations/001_production_schema.sql` once in the Supabase SQL editor, then configure:
+For a new database, run `supabase/migrations/001_production_schema.sql` in the Supabase SQL editor. Existing deployments that already ran `001` must also run `supabase/migrations/002_callback_safety.sql`. Then configure:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL
