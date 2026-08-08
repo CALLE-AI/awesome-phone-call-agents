@@ -1,0 +1,19 @@
+{
+  "name": "@parcelbridge/calle-bridge",
+  "version": "0.1.0-public-ref",
+  "private": true,
+  "description": "ParcelBridge public-bridge offline official @call-e/core runtime proof. Imports the official SDK, injects a synthetic fetchImpl, and exercises plan_call without ever contacting a live CALL-E endpoint.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "demo:official-runtime-offline": "node ./scripts/run_official_runtime_offline.mjs",
+    "validate": "node ./scripts/validate_official_runtime.mjs",
+    "test": "node --test tests/official_runtime_offline.test.mjs"
+  },
+  "dependencies": {
+    "@call-e/core": "0.2.3"
+  }
+}
