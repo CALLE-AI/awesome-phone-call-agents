@@ -1,6 +1,17 @@
 require "test_helper"
 
 class CallAnalyzersHttpTest < ActiveSupport::TestCase
+  test "fake analyzer refuses a real provider result" do
+    phone_call, contract = completed_fake_call
+    phone_call.update_column(:provider, "calle")
+
+    error = assert_raises(ArgumentError) do
+      CallAnalyzers::Fake.new.call(phone_call: phone_call, contract: contract)
+    end
+
+    assert_match(/only evaluate fake calls/, error.message)
+  end
+
   test "submits the shared contract and persists a pending remote analysis" do
     phone_call, contract = completed_fake_call
     captured = nil
@@ -28,6 +39,8 @@ class CallAnalyzersHttpTest < ActiveSupport::TestCase
     assert_equal phone_call.provider_call_id, captured.fetch("call_id")
     assert_equal 25_000,
                  captured.dig("call_contract", "allowed_commitments", "maximum_surcharge_cents")
+    assert_equal "2.0", captured.fetch("schema_version")
+    assert_equal contract.verification_claims, captured.dig("call_contract", "verification_claims")
     assert_equal phone_call.transcript, captured.fetch("transcript")
   end
 

@@ -2,298 +2,236 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
+from pydantic import ValidationError
+
 from call_analyzer.evaluator import DeterministicEvaluator
 from call_analyzer.schemas import AnalysisRequest
 
 
-def _request(*, turns, provider_result, maximum_surcharge_cents=25000):
-    return AnalysisRequest.model_validate(
+DATE_STATEMENT = "Please confirm exactly: the delivery date is 2026-08-07. Answer YES or NO."
+SURCHARGE_TEMPLATE = "Please confirm exactly: the surcharge is {amount}. Answer YES or NO."
+DISCLOSURE = "This call is being recorded."
+
+
+def request_with(*, turns, provider_result, maximum=25000, forbidden=False, disclosure=True):
+    verification_claims = [
         {
-            "schema_version": "1.0",
-            "request_id": str(uuid4()),
-            "call_id": "call-123",
-            "submitted_at": "2026-08-01T22:30:00Z",
-            "call_contract": {
-                "objective": "Move delivery to Friday",
-                "success_conditions": ["delivery_changed"],
-                "allowed_commitments": {"maximum_surcharge_cents": maximum_surcharge_cents},
-                "escalation_conditions": ["surcharge_above_limit"],
-            },
-            "transcript": {"language": "en", "turns": turns},
-            "provider_result": provider_result,
-            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
-        }
-    )
-
-
-def test_supported_compliant_result_is_confidently_verified():
-    request = _request(
-        turns=[
-            {"id": 1, "speaker": "agent", "text": "Can we move the delivery?"},
-            {"id": 2, "speaker": "recipient", "text": "Yes, with a $120.00 surcharge."},
-        ],
-        provider_result={"surcharge_cents": 12000, "delivery_changed": True},
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.policy_adherence is True
-    assert verdict.needs_human_review is False
-    assert verdict.result_confidence >= 0.75
-    assert verdict.evidence[0].turn_ids == [2]
-
-
-def test_unsupported_result_is_not_auto_verified():
-    # No surcharge in provider_result and no money anywhere in the transcript:
-    # evidence is unrelated, so the verdict must not auto-verify at high confidence.
-    request = _request(
-        turns=[
-            {"id": 1, "speaker": "agent", "text": "Hello, are you there?"},
-            {"id": 2, "speaker": "recipient", "text": "Yes, who is this?"},
-        ],
-        provider_result={},
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.needs_human_review is True
-    assert verdict.result_confidence < 0.75
-    assert verdict.goal_completion == "unknown"
-    assert verdict.evidence[0].finding == "unsupported_result"
-
-
-def test_over_limit_surcharge_is_flagged_for_human_review():
-    request = _request(
-        turns=[
-            {"id": 1, "speaker": "recipient", "text": "The surcharge is $320.00."},
-            {"id": 2, "speaker": "agent", "text": "I accept the $320.00 surcharge."},
-        ],
-        provider_result={"surcharge_cents": 32000, "delivery_changed": True},
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.unauthorized_commitment is True
-    assert verdict.needs_human_review is True
-    assert verdict.evidence[0].turn_ids == [1, 2]
-
-
-def test_failed_objective_is_never_auto_verified():
-    """The reported blocker: an unrelated truthy field must not promote a FAILED goal.
-
-    delivery_changed=False (the contract's only declared success condition),
-    order_number_confirmed=True, surcharge_cents=0, and a transcript that explicitly
-    says the delivery could not be moved.
-    """
-    request = _request(
-        turns=[
-            {"id": 1, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
-            {"id": 2, "speaker": "recipient", "text": "I am sorry, that could not be done."},
-        ],
-        provider_result={
-            "delivery_changed": False,
-            "order_number_confirmed": True,
-            "surcharge_cents": 0,
+            "kind": "success",
+            "id": "delivery_date_confirmed",
+            "result_field": "delivery_date",
+            "operator": "equals",
+            "expected": "2026-08-07",
         },
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.goal_completion == "failed"
-    assert verdict.needs_human_review is True
-    assert verdict.result_confidence < 0.75
-    assert verdict.evidence[0].finding == "objective_not_met"
-    # It must not claim the goal was achieved.
-    assert "achieved its goal" not in verdict.summary
-    # The unmet declared condition is named, and the denial is cited from the transcript.
-    assert verdict.negotiated_terms["unmet_success_conditions"] == ["delivery_changed"]
-    assert verdict.evidence[0].turn_ids == [2]
-    assert verdict.contradictions == []  # nothing claimed success, so no contradiction
-
-
-def test_structured_success_contradicted_by_transcript_is_not_auto_verified():
-    """All declared conditions met, but the transcript denies it -> no auto-verify."""
-    request = _request(
-        turns=[
-            {"id": 1, "speaker": "recipient", "text": "We cannot move that delivery."},
-            {"id": 2, "speaker": "agent", "text": "Understood, $120.00 then."},
-        ],
-        provider_result={"surcharge_cents": 12000, "delivery_changed": True},
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.goal_completion == "partial"
-    assert verdict.needs_human_review is True
-    assert verdict.contradictions, "a result/transcript disagreement must be recorded"
-
-
-def test_partially_met_conditions_are_not_complete():
-    request = AnalysisRequest.model_validate(
         {
-            "schema_version": "1.0",
-            "request_id": str(uuid4()),
-            "call_id": "call-456",
-            "submitted_at": "2026-08-01T22:30:00Z",
-            "call_contract": {
-                "objective": "Confirm date and time",
-                "success_conditions": ["delivery_date_confirmed", "delivery_time_confirmed"],
-                "allowed_commitments": {"maximum_surcharge_cents": 25000},
-                "escalation_conditions": ["surcharge_above_limit"],
-            },
-            "transcript": {
-                "language": "en",
-                "turns": [{"id": 1, "speaker": "agent", "text": "Friday works, $50.00."}],
-            },
-            "provider_result": {
-                "surcharge_cents": 5000,
-                "delivery_date": "2026-08-07",
-                "delivery_time": None,
-            },
-            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
-        }
+            "kind": "commitment_limit",
+            "id": "surcharge_within_limit",
+            "result_field": "surcharge_cents",
+            "operator": "less_than_or_equal",
+            "maximum": maximum,
+        },
+    ]
+    required_disclosures = []
+    if disclosure:
+        required_disclosures.append("recording_notice")
+        verification_claims.append({
+            "kind": "required_disclosure",
+            "id": "recording_notice",
+        })
+
+    forbidden_commitments = []
+    if forbidden:
+        forbidden_commitments.append("product_substitution")
+        verification_claims.append({
+            "kind": "forbidden_commitment",
+            "id": "product_substitution",
+            "evaluation_mode": "semantic_only",
+        })
+
+    return AnalysisRequest.model_validate({
+        "schema_version": "2.0",
+        "request_id": str(uuid4()),
+        "call_id": "call-123",
+        "submitted_at": "2026-08-01T22:30:00Z",
+        "call_contract": {
+            "objective": "Move delivery to Friday",
+            "protocol_language": "en",
+            "success_conditions": ["delivery_date_confirmed"],
+            "allowed_commitments": {"maximum_surcharge_cents": maximum},
+            "required_disclosures": required_disclosures,
+            "forbidden_commitments": forbidden_commitments,
+            "escalation_conditions": [],
+            "verification_claims": verification_claims,
+        },
+        "transcript": {
+            "language": "en",
+            "turns": [{"id": index + 1, **turn} for index, turn in enumerate(turns)],
+        },
+        "provider_result": provider_result,
+        "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
+    })
+
+
+def canonical_turns(amount="$120.00"):
+    return [
+        {"speaker": "agent", "text": DISCLOSURE},
+        {"speaker": "agent", "text": DATE_STATEMENT},
+        {"speaker": "recipient", "text": "Yes."},
+        {"speaker": "agent", "text": SURCHARGE_TEMPLATE.format(amount=amount)},
+        {"speaker": "recipient", "text": "Yes."},
+    ]
+
+
+def evaluate(**kwargs):
+    return DeterministicEvaluator().evaluate(request_with(**kwargs))
+
+
+def test_exact_protocol_auto_verifies_a_fully_proven_call():
+    verdict = evaluate(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
     )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.goal_completion == "partial"
-    assert verdict.needs_human_review is True
-    assert verdict.negotiated_terms["unmet_success_conditions"] == ["delivery_time_confirmed"]
-
-
-def test_success_claim_without_transcript_support_is_not_auto_verified():
-    """Reviewer repro: delivery_changed=true, but the call only discusses a $1.00 fee.
-
-    The amount coincidentally matches the transcript, which previously produced
-    complete / 0.95 / risk 0.08 / no review. Nothing in the call is about the delivery,
-    so the success claim must not be auto-verified.
-    """
-    request = _request(
-        turns=[
-            {"id": 1, "speaker": "agent", "text": "Hello, checking in about your account."},
-            {"id": 2, "speaker": "recipient", "text": "There is a $1.00 support fee this month."},
-        ],
-        provider_result={"surcharge_cents": 100, "delivery_changed": True},
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.goal_completion != "complete"
-    assert verdict.needs_human_review is True
-    assert verdict.result_confidence < 0.75
-    assert verdict.risk_score > 0.08
-    assert verdict.evidence[0].finding == "unsupported_success_claim"
-    assert verdict.negotiated_terms["unsupported_success_conditions"] == ["delivery_changed"]
-    assert any("delivery_changed" in c and "never addressed it" in c
-               for c in verdict.contradictions)
-
-
-def test_missing_required_disclosure_breaks_policy_adherence():
-    request = AnalysisRequest.model_validate(
-        {
-            "schema_version": "1.0",
-            "request_id": str(uuid4()),
-            "call_id": "call-789",
-            "submitted_at": "2026-08-01T22:30:00Z",
-            "call_contract": {
-                "objective": "Move delivery to Friday",
-                "success_conditions": ["delivery_changed"],
-                "allowed_commitments": {"maximum_surcharge_cents": 25000},
-                "required_disclosures": ["recording_notice"],
-                "escalation_conditions": ["surcharge_above_limit"],
-            },
-            "transcript": {
-                "language": "en",
-                "turns": [
-                    {"id": 1, "speaker": "agent", "text": "Can we move the delivery?"},
-                    {"id": 2, "speaker": "recipient", "text": "Yes, with a $120.00 surcharge."},
-                ],
-            },
-            "provider_result": {"surcharge_cents": 12000, "delivery_changed": True},
-            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
-        }
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    # The disclosure is declared but never made -> not assumed satisfied.
-    assert verdict.missing_disclosures == ["recording_notice"]
-    assert verdict.policy_adherence is False
-    assert verdict.needs_human_review is True
-    assert verdict.evidence[0].finding == "missing_disclosure"
-
-
-def test_forbidden_commitment_discussed_breaks_policy_adherence():
-    request = AnalysisRequest.model_validate(
-        {
-            "schema_version": "1.0",
-            "request_id": str(uuid4()),
-            "call_id": "call-790",
-            "submitted_at": "2026-08-01T22:30:00Z",
-            "call_contract": {
-                "objective": "Move delivery to Friday",
-                "success_conditions": ["delivery_changed"],
-                "allowed_commitments": {"maximum_surcharge_cents": 25000},
-                "forbidden_commitments": ["product_substitution"],
-                "escalation_conditions": ["surcharge_above_limit"],
-            },
-            "transcript": {
-                "language": "en",
-                "turns": [
-                    {"id": 1, "speaker": "agent", "text": "Can we move the delivery?"},
-                    {
-                        "id": 2,
-                        "speaker": "agent",
-                        "text": "I can offer a product substitution instead, $120.00.",
-                    },
-                ],
-            },
-            "provider_result": {"surcharge_cents": 12000, "delivery_changed": True},
-            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
-        }
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
-
-    assert verdict.policy_adherence is False
-    assert verdict.unauthorized_commitment is True
-    assert verdict.needs_human_review is True
-    assert verdict.negotiated_terms["forbidden_commitments_detected"] == ["product_substitution"]
-
-
-def test_fully_supported_call_still_auto_verifies():
-    """The happy path must survive: corroborated condition, disclosure made, no breach."""
-    request = AnalysisRequest.model_validate(
-        {
-            "schema_version": "1.0",
-            "request_id": str(uuid4()),
-            "call_id": "call-791",
-            "submitted_at": "2026-08-01T22:30:00Z",
-            "call_contract": {
-                "objective": "Move delivery to Friday",
-                "success_conditions": ["delivery_changed"],
-                "allowed_commitments": {"maximum_surcharge_cents": 25000},
-                "required_disclosures": ["recording_notice"],
-                "forbidden_commitments": ["product_substitution"],
-                "escalation_conditions": ["surcharge_above_limit"],
-            },
-            "transcript": {
-                "language": "en",
-                "turns": [
-                    {"id": 1, "speaker": "agent", "text": "This call is being recorded."},
-                    {"id": 2, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
-                    {"id": 3, "speaker": "recipient", "text": "Yes, with a $120.00 surcharge."},
-                ],
-            },
-            "provider_result": {"surcharge_cents": 12000, "delivery_changed": True},
-            "callback": {"url": "https://rails.test/webhooks/call_analyzer"},
-        }
-    )
-
-    verdict = DeterministicEvaluator().evaluate(request)
 
     assert verdict.goal_completion == "complete"
+    assert verdict.policy_evaluation == "compliant"
     assert verdict.policy_adherence is True
-    assert verdict.missing_disclosures == []
     assert verdict.needs_human_review is False
-    assert verdict.evidence[0].finding == "policy_compliance"
+    assert verdict.result_confidence == 0.95
+    assert all(item.status == "supported" for item in verdict.claim_results)
+
+
+def test_provider_value_must_equal_the_immutable_expected_value():
+    verdict = evaluate(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-11", "surcharge_cents": 12000},
+    )
+
+    claim = next(item for item in verdict.claim_results if item.claim_id == "delivery_date_confirmed")
+    assert claim.status == "contradicted"
+    assert verdict.goal_completion == "failed"
+    assert verdict.needs_human_review is True
+
+
+def test_free_form_question_and_bare_yes_never_inherit_meaning():
+    turns = canonical_turns()
+    turns[1] = {"speaker": "agent", "text": "Has the delivery remained unchanged?"}
+
+    verdict = evaluate(
+        turns=turns,
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    )
+
+    claim = next(item for item in verdict.claim_results if item.claim_id == "delivery_date_confirmed")
+    assert claim.status == "absent"
+    assert verdict.goal_completion == "unknown"
+    assert verdict.needs_human_review is True
+
+
+def test_wrong_value_in_an_otherwise_readable_statement_is_not_evidence():
+    turns = canonical_turns()
+    turns[1] = {
+        "speaker": "agent",
+        "text": "Please confirm exactly: the delivery date is 2026-08-11. Answer YES or NO.",
+    }
+
+    verdict = evaluate(
+        turns=turns,
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    )
+
+    assert verdict.goal_completion == "unknown"
+    assert verdict.needs_human_review is True
+
+
+@pytest.mark.parametrize("statement", [
+    "This call is not being recorded.",
+    "Is this call being recorded?",
+    "We might record this call.",
+])
+def test_disclosure_requires_the_exact_positive_statement(statement):
+    turns = canonical_turns()
+    turns[0] = {"speaker": "agent", "text": statement}
+
+    verdict = evaluate(
+        turns=turns,
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    )
+
+    assert verdict.missing_disclosures == ["recording_notice"]
+    assert verdict.policy_evaluation == "unknown"
+    assert verdict.needs_human_review is True
+
+
+def test_provider_amount_conflicting_with_any_transcript_amount_never_verifies():
+    turns = canonical_turns(amount="$0.00")
+    turns.insert(3, {"speaker": "agent", "text": "I accept a $500.00 surcharge."})
+
+    verdict = evaluate(
+        turns=turns,
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 0},
+    )
+
+    claim = next(item for item in verdict.claim_results if item.kind == "commitment_limit")
+    assert claim.status == "contradicted"
+    assert verdict.policy_evaluation == "violated"
+    assert verdict.needs_human_review is True
+
+
+def test_over_limit_amount_is_a_policy_violation_even_when_confirmed():
+    verdict = evaluate(
+        turns=canonical_turns(amount="$320.00"),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 32000},
+    )
+
+    assert verdict.unauthorized_commitment is True
+    assert verdict.policy_evaluation == "violated"
+    assert verdict.needs_human_review is True
+
+
+def test_semantic_only_forbidden_rule_is_never_assumed_compliant():
+    verdict = evaluate(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+        forbidden=True,
+    )
+
+    claim = next(item for item in verdict.claim_results if item.kind == "forbidden_commitment")
+    assert claim.status == "unevaluated"
+    assert verdict.policy_evaluation == "unknown"
+    assert verdict.policy_adherence is False
+    assert verdict.needs_human_review is True
+
+
+def test_declared_rules_without_typed_claims_are_rejected_at_the_boundary():
+    document = request_with(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    ).model_dump(mode="json")
+    document["call_contract"]["required_disclosures"].append("order_number_notice")
+
+    with pytest.raises(ValidationError, match="must match exactly"):
+        AnalysisRequest.model_validate(document)
+
+
+def test_contract_cannot_supply_its_own_semantically_different_statement():
+    document = request_with(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    ).model_dump(mode="json")
+    document["call_contract"]["verification_claims"][0]["agent_statement"] = (
+        "Please confirm that the delivery stayed unchanged."
+    )
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        AnalysisRequest.model_validate(document)
+
+
+def test_claim_id_cannot_be_bound_to_the_wrong_provider_field():
+    document = request_with(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    ).model_dump(mode="json")
+    document["call_contract"]["verification_claims"][0]["result_field"] = "delivery_time"
+
+    with pytest.raises(ValidationError, match="must bind delivery_date"):
+        AnalysisRequest.model_validate(document)

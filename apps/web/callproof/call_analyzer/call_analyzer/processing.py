@@ -47,7 +47,7 @@ class Processor:
                 agentkit_run_id=request.agentkit_run_id,
                 completed_at=datetime.now(timezone.utc),
                 verdict=verdict,
-                metrics={"evaluator": "deterministic-v1"},
+                metrics={"evaluator": "exact-protocol-v2"},
             )
             document = json.loads(result.model_dump_json())
             self.repository.complete(analysis_id, document)

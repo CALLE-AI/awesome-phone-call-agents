@@ -14,9 +14,9 @@ module CallProviders
     # side rather than dialing twice.
     class AmbiguousError < Error; end
 
-    # Raised when the provider's answer proves the call was never accepted. This is the
-    # ONLY thing that may resolve an unresolved request to "failed". See
-    # DEFINITIVE_REJECTION_HTTP_CODES for why the set is so small.
+    # Raised when the ORIGINAL create request is rejected on its own merits. A later
+    # reconciliation error never proves what happened to the original request; the
+    # controller therefore keeps an already-unresolved request unresolved.
     class DefinitiveRejectionError < Error; end
 
     AMBIGUOUS_NETWORK_ERRORS = [
@@ -31,19 +31,9 @@ module CallProviders
     #   408 — the server timed out reading the request; it may still have processed it.
     AMBIGUOUS_HTTP_CODES = %w[408 409].freeze
 
-    # Codes that prove the request was rejected on its own merits, and therefore that no
-    # call exists behind our Idempotency-Key.
-    #
-    # The set is an allow-list, not a deny-list, because the question being answered is
-    # "what happened to the ORIGINAL request?" and almost nothing answers it. A 401 says
-    # our credential is bad NOW; the original may well have been accepted before it was
-    # rotated. A 403, 404, 429 or 5xx say as little. Only a rejection of the payload
-    # itself carries over: the reconciliation replays the SAME Idempotency-Key and the
-    # SAME body, so an original that had been accepted would deduplicate (409/200) rather
-    # than be validated again. Getting 400/422 back therefore means it was never accepted.
-    #
-    # Everything not listed here leaves the request unresolved. Telling an operator "no
-    # call was placed" when a call may be ringing is the worst thing this system can do.
+    # On the original create, these codes definitively reject that request. During a later
+    # reconciliation the same codes say nothing reliable about the original timed-out
+    # attempt, so LiveCallsController deliberately keeps the prior unresolved state.
     DEFINITIVE_REJECTION_HTTP_CODES = %w[400 422].freeze
 
     # Canonical CALL-E API host the Bearer credential may be sent to. A custom
@@ -154,7 +144,7 @@ module CallProviders
           required: [ "completed_count" ],
           properties: { completed_count: { type: "integer" } }
         },
-        recipient_result_schema: recipient_result_schema,
+        recipient_result_schema: recipient_result_schema(contract),
         metadata: {
           call_request_id: call_request.id.to_s,
           agentkit_run_id: call_request.agentkit_run_id,
@@ -165,6 +155,10 @@ module CallProviders
     end
 
     def task(contract)
+      protocol_lines = VerificationClaims::DeliveryChange.protocol_lines(
+        claims: contract.verification_claims,
+        language: contract.protocol_language
+      )
       <<~TASK.squish
         #{contract.objective}
         Success conditions: #{contract.success_conditions.join(", ")}.
@@ -172,22 +166,42 @@ module CallProviders
         Forbidden commitments: #{contract.forbidden_commitments.join(", ")}.
         Required disclosures: #{contract.required_disclosures.join(", ")}.
         Escalate instead of committing when: #{contract.escalation_conditions.join(", ")}.
+        Exact verification statements: #{JSON.generate(protocol_lines)}.
+        Say each statement exactly. Render {amount} as a USD amount with two decimals and
+        obtain a bare #{contract.protocol_language == "es" ? "SÍ" : "YES"} in the immediately
+        following recipient turn. Do not paraphrase these verification statements.
       TASK
     end
 
-    def recipient_result_schema
+    def recipient_result_schema(contract)
+      properties = {}
+      required = []
+      contract.verification_claims.each do |claim|
+        field = claim["result_field"]
+        next if field.blank?
+
+        required << field
+        properties[field] = result_field_schema(claim)
+      end
+
       {
         type: "object",
-        required: %w[delivery_changed surcharge_cents],
+        required: required.uniq,
         additionalProperties: false,
-        properties: {
-          delivery_changed: { type: "boolean" },
-          delivery_date: { type: [ "string", "null" ] },
-          delivery_time: { type: [ "string", "null" ] },
-          surcharge_cents: { type: "integer", minimum: 0 },
-          order_number_confirmed: { type: "boolean" }
-        }
+        properties: properties
       }
+    end
+
+    def result_field_schema(claim)
+      return { type: "integer", minimum: 0 } if claim.fetch("kind") == "commitment_limit"
+      return { type: "string", format: "date" } if claim.fetch("id") == "delivery_date_confirmed"
+      return { type: "string", pattern: "^(?:[01]\\d|2[0-3]):[0-5]\\d$" } if claim.fetch("id") == "delivery_time_confirmed"
+
+      case claim["expected"]
+      when true, false then { type: "boolean" }
+      when Integer then { type: "integer" }
+      else { type: "string" }
+      end
     end
 
     def region(call_request)

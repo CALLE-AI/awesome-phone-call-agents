@@ -14,7 +14,7 @@
     "verdict"
   ],
   "properties": {
-    "schema_version": { "const": "1.0" },
+    "schema_version": { "const": "2.0" },
     "analysis_id": { "type": "string", "format": "uuid" },
     "request_id": { "type": "string", "format": "uuid" },
     "call_id": { "type": "string", "minLength": 1, "maxLength": 255 },
@@ -27,15 +27,18 @@
       "required": [
         "goal_completion",
         "policy_adherence",
+        "policy_evaluation",
         "unauthorized_commitment",
         "result_confidence",
         "needs_human_review",
         "summary",
+        "claim_results",
         "evidence"
       ],
       "properties": {
         "goal_completion": { "enum": ["complete", "partial", "failed", "unknown"] },
         "policy_adherence": { "type": "boolean" },
+        "policy_evaluation": { "enum": ["compliant", "violated", "unknown"] },
         "unauthorized_commitment": { "type": "boolean" },
         "result_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
         "risk_score": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -64,6 +67,10 @@
             }
           }
         },
+        "claim_results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/claim_result" }
+        },
         "evidence": {
           "type": "array",
           "items": { "$ref": "#/$defs/evidence" }
@@ -73,6 +80,28 @@
     "metrics": { "type": "object" }
   },
   "$defs": {
+    "claim_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "kind", "status", "explanation"],
+      "properties": {
+        "claim_id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": ["success", "commitment_limit", "required_disclosure", "forbidden_commitment"]
+        },
+        "status": {
+          "enum": ["supported", "contradicted", "violated", "absent", "ambiguous", "unevaluated"]
+        },
+        "expected": {},
+        "actual": {},
+        "turn_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "explanation": { "type": "string", "minLength": 1 }
+      }
+    },
     "evidence": {
       "type": "object",
       "additionalProperties": false,

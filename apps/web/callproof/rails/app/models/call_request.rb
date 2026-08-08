@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class CallRequest < ApplicationRecord
+  attr_accessor :delivery_date, :delivery_time
+
   STATUSES = %w[awaiting_confirmation pending running waiting_analysis waiting_human verified approved rejected failed canceled unresolved].freeze
   SCENARIOS = %w[compliant policy_violation].freeze
 

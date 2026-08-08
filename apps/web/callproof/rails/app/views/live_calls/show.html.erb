@@ -30,6 +30,7 @@
       <h2>$<%= format("%.2f", @call_request.call_policy.maximum_surcharge_cents / 100.0) %> maximum</h2>
       <dl>
         <dt>Success</dt><dd><%= @contract.success_conditions.join(", ") %></dd>
+        <dt>Typed proofs</dt><dd><%= @contract.verification_claims.map { |claim| claim.fetch("id") }.join(", ") %></dd>
         <dt>Forbidden</dt><dd><%= @contract.forbidden_commitments.join(", ") %></dd>
         <dt>Escalate</dt><dd><%= @contract.escalation_conditions.join(", ") %></dd>
         <dt>SHA-256</dt><dd class="mono"><%= @contract.snapshot_hash %></dd>

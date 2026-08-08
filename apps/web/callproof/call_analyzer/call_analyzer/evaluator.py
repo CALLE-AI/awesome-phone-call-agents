@@ -1,754 +1,361 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable
+import unicodedata
+from decimal import Decimal, InvalidOperation
+from typing import Any
 
-import simplemma
-
-from .schemas import AnalysisRequest, CallContract, Evidence, TranscriptTurn, Verdict
-
-
-MONEY_PATTERN = re.compile(r"\$\s?(\d+(?:\.\d{1,2})?)")
-
-# Who is who. The agent is the party UNDER AUDIT, so nothing it says can prove that an
-# outcome happened — its own question or claim is not evidence. Only the counterparty can
-# confirm an outcome. `system` and `unknown` confirm nothing.
-AUDITED_SPEAKERS = {"agent"}
-COUNTERPARTY_SPEAKERS = {"recipient"}
-
-# ── the supported form ────────────────────────────────────────────────────────────
-#
-# A lexical matcher cannot establish what a sentence means. Everything that has gone
-# wrong in this file has been an attempt to pretend otherwise: first by looking for
-# agreement words anywhere in a turn, then by disqualifying turns that also contained a
-# denial word. Both are deny-lists wearing different hats, and a deny-list fails OPEN —
-# the phrasing nobody enumerated ("I doubt the delivery date is correct", "I dispute
-# that the delivery time is correct") sails through, because "correct" is present and
-# "doubt" was not on the list. Adding those two verbs would leave the next two open.
-#
-# So auto-verification is gated on a form we can actually reason about, not on the
-# absence of forms we happened to think of. A turn unlocks auto-verification only when
-# the WHOLE turn is one of the shapes below. Everything else — every sentence with a
-# clause we cannot account for — is routed to a human.
-#
-# The asymmetry is the point: an incomplete ALLOW-list sends real confirmations to
-# review, which costs a person thirty seconds. An incomplete deny-list auto-verifies a
-# refusal, which tells an operator a call succeeded when the customer said no. Only one
-# of those is a defensible way to be wrong.
-
-# Shape 1: the whole turn is an agreement and nothing else.
-BARE_AFFIRMATIONS = frozenset({
-    "yes", "yeah", "yep", "yes please", "sure", "of course", "correct",
-    "that is correct", "that's correct", "that is right", "that's right",
-    "agreed", "ok", "okay", "confirmed", "i confirm", "i agree",
-    "that works", "that works for me", "works for me", "sounds good", "perfect",
-    "si", "sí", "claro", "claro que si", "claro que sí", "correcto", "es correcto",
-    "de acuerdo", "esta bien", "está bien", "perfecto", "confirmado", "confirmo",
-    "listo", "hecho", "adelante", "me parece bien", "asi es", "así es",
-})
-
-# Shape 2: an agreement, then a restatement built ONLY from words we can account for —
-# the contract's own vocabulary, literals, and a closed set of neutral connectives. A
-# single token outside this vocabulary disqualifies the turn, because that token is
-# where the meaning we cannot read would live.
-SAFE_CONNECTIVES = frozenset({
-    "the", "a", "an", "to", "on", "at", "for", "with", "and", "is", "are", "was",
-    "will", "be", "it", "that", "this", "of", "in", "by", "we", "you", "i", "your",
-    "my", "please", "then", "so", "just", "el", "la", "los", "las", "un", "una",
-    "de", "del", "al", "en", "con", "y", "es", "son", "para", "por", "que", "se",
-    "lo", "su", "mi", "queda", "quedamos", "esta", "está", "estan", "están",
-    "sera", "será", "fue", "era", "quedo", "quedó",
-})
-
-# Neutral restatement verbs. A closed list, and one that only ever makes the gate MORE
-# permissive — the safe direction for a list to be incomplete in.
-SAFE_RESTATEMENT_WORDS = frozenset({
-    "moves", "move", "moved", "changes", "change", "changed", "set", "scheduled",
-    "reschedule", "rescheduled", "works", "fine", "good", "right", "correct",
-    "confirmed", "done", "surcharge", "fee", "total", "cambia", "cambio",
-    "movemos", "queda", "programada", "bien", "correcta", "correcto",
-    # Lemma forms of the above. simplemma resolves "programadas" to "programar" and
-    # "quedan" to "quedar", so the dictionary form has to be here too or an ordinary
-    # Spanish confirmation is refused for no reason.
-    "quedar", "programar", "cambiar", "mover", "confirmar", "reprogramar",
-})
-
-# Literals we can read exactly: money, dates, times, and weekday names.
-LITERAL_PATTERN = re.compile(
-    r"^(\$?\d[\d,]*(?:\.\d{1,2})?|\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}|"
-    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
-    r"lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo|"
-    r"am|pm|a\.m\.|p\.m\.|hrs|horas?|d[íi]as?|days?|weeks?|semanas?)$",
-    re.IGNORECASE,
+from .schemas import (
+    AnalysisRequest,
+    ClaimResult,
+    CommitmentLimitClaim,
+    Evidence,
+    ForbiddenCommitmentClaim,
+    RequiredDisclosureClaim,
+    SuccessClaim,
+    TranscriptTurn,
+    Verdict,
 )
 
-# Kept only for REPORTING a transcript/result disagreement. Nothing about completion
-# depends on it any more, which is exactly the change the reviewer asked for: a missing
-# entry here can no longer unlock anything.
-NEGATION_PARTICLE = re.compile(
-    r"(\bnot\b|n'?t\b|\bno\b|\bnever\b|\bcannot\b|\bnothing\b|\bneither\b|\bnor\b|"
-    r"\bdoubt\b|\bdispute\b|\bdisagree\b|\bwrong\b|\bincorrect\b|\bmistaken\b|"
-    r"\bnunca\b|\bjam[áa]s\b|\btampoco\b|\bning[úu]n[ao]?\b|\bnada\b|\bdudo\b|"
-    r"\bequivocad[oa]\b|\bincorrect[oa]\b)",
-    re.IGNORECASE,
-)
 
-# Explicit statements that the objective could not be done. Narrower than the particles
-# above and used only to report a result/transcript disagreement; nothing about
-# completion depends on this list being complete.
-NEGATION_PATTERN = re.compile(
-    r"(no se pudo|no pudimos|no puedo|no podemos|no fue posible|no es posible|"
-    r"no se puede|no hay disponibilidad|no tenemos disponibilidad|"
-    r"cannot|can't|could not|couldn't|unable to|not able to|not possible|"
-    r"no availability|won'?t be able|will not be able)",
-    re.IGNORECASE,
-)
-
-# Domain vocabulary used to tell whether a turn is even on the topic of a contract term.
-TERM_SYNONYMS: dict[str, tuple[str, ...]] = {
-    "delivery": ("delivery", "deliver", "shipment", "ship", "entrega", "entregar", "envio", "envío"),
-    "order": ("order", "pedido", "orden"),
-    "payment": ("payment", "pay", "paid", "pago", "pagar"),
-    "product": ("product", "producto", "item", "articulo", "artículo"),
-    "substitution": ("substitution", "substitute", "sustitucion", "sustitución", "sustituir"),
-    "date": ("date", "fecha", "day", "dia", "día"),
-    "time": ("time", "hora", "horario", "schedule"),
-    "price": ("price", "precio", "cost", "costo"),
-    "surcharge": ("surcharge", "recargo", "fee", "cargo"),
-    "confirm": ("confirm", "confirmed", "confirmation", "confirma", "confirmo", "confirmar"),
-    "identity": ("identity", "identify", "identidad", "identific"),
-    "recording": ("recording", "recorded", "record", "graba", "grabada", "grabación", "grabacion"),
-    "cancel": ("cancel", "cancellation", "cancela", "cancelar", "cancelación"),
+MONEY_PATTERN = re.compile(r"(?<!\w)\$\s*(\d{1,9}(?:,\d{3})*(?:\.\d{1,2})?)(?!\w)")
+NEGATIVE_RESPONSES = frozenset({"no"})
+PROTOCOL = {
+    "en": {
+        "delivery_date_confirmed": "Please confirm exactly: the delivery date is {expected}. Answer YES or NO.",
+        "delivery_time_confirmed": "Please confirm exactly: the delivery time is {expected}. Answer YES or NO.",
+        "surcharge_within_limit": "Please confirm exactly: the surcharge is {amount}. Answer YES or NO.",
+        "recording_notice": "This call is being recorded.",
+        "response": "yes",
+    },
+    "es": {
+        "delivery_date_confirmed": "Confirme exactamente: la fecha de entrega es {expected}. Responda SÍ o NO.",
+        "delivery_time_confirmed": "Confirme exactamente: la hora de entrega es {expected}. Responda SÍ o NO.",
+        "surcharge_within_limit": "Confirme exactamente: el recargo es {amount}. Responda SÍ o NO.",
+        "recording_notice": "Esta llamada está siendo grabada.",
+        "response": "sí",
+    },
 }
-
-# Languages we will lemmatise for. A transcript in anything else is read as raw tokens
-# only, which means more turns go to review — the safe direction.
-LEMMATISED_LANGUAGES = ("en", "es")
-
-# Every word the domain vocabulary knows, as WHOLE tokens. Accountability asks "do we
-# know this word", which is a different question from "is this word discriminating for
-# this condition" — so it reads the full vocabulary rather than one term's groups.
-DOMAIN_VOCABULARY = frozenset(
-    word for group in TERM_SYNONYMS.values() for word in group
-)
-
-
-def lemma(token: str, language: str) -> str | None:
-    """The dictionary form of a token, or None when we have no business guessing.
-
-    A LEMMATISER, deliberately, and never a stemmer. Stemming crushes words toward a
-    shared root — Snowball takes both "changed" and, near enough, "unchanged" toward the
-    same place — which would rebuild the exact hole this file just closed. Lemmatising
-    keeps polarity: `unchanged -> unchanged`, `incorrecta -> incorrecto`. It only ever
-    resolves inflection: `deliveries -> delivery`, `entregas -> entrega`.
-
-    So this widens what we can READ without widening what we accept as agreement: a
-    turn still has to be a supported form, and an unknown lemma is still unknown.
-    """
-    code = (language or "").split("-")[0].lower()
-    if code not in LEMMATISED_LANGUAGES:
-        return None
-
-    try:
-        return simplemma.lemmatize(token, lang=code).lower()
-    except (ValueError, KeyError):  # unknown language data; stay silent and refuse
-        return None
-
-# Words that name the SPEECH ACT rather than the content that has to be spoken. A
-# disclosure called `recording_notice` is satisfied by telling the recipient the call is
-# recorded — "notice" is not a word the agent has to utter. Everything left after these
-# are removed is content, and ALL of it must appear in one agent turn. Without that,
-# `confirm_order_number` counts as disclosed because the agent said "confirm" about the
-# delivery date, and no order number was ever read out.
-SPEECH_ACT_TOKENS = frozenset({
-    "notice", "notification", "notify", "disclosure", "disclose", "disclosed",
-    "statement", "advisory", "announce", "announcement", "inform", "informed",
-    "confirm", "confirmation", "aviso", "advertencia", "informar", "declaracion",
-    "declaración", "confirmacion", "confirmación",
-})
-
-# Corroboration levels for one contract term, strongest first.
-DENIED = "denied"       # the counterparty addressed it and negated it
-AFFIRMED = "affirmed"   # the counterparty explicitly agreed, on topic
-TOPICAL = "topical"     # the counterparty touched the topic, but never agreed
-NONE = "none"           # the counterparty never addressed it at all
-
-CONFIDENCE_AUTO_VERIFY = 0.75
 
 
 class DeterministicEvaluator:
-    """Safe first provider; replace with Altur's LLM factory after the boundary is stable.
+    """A finite proof checker, not a natural-language judge.
 
-    The governing rule is that **nothing is verified unless it was positively proven**.
-    An earlier version worked the other way round — it assumed success and searched for
-    reasons to doubt it — which meant every situation nobody had thought of resolved as
-    "verified". Cases kept slipping through one at a time. Now an unanticipated case
-    lands in human review by construction, because completion requires evidence rather
-    than the absence of a counter-indication.
-
-    Concretely:
-
-    * Only the **counterparty** can corroborate an outcome. The agent is the party being
-      audited, so its own question ("Can we move the delivery?") or claim ("I've moved
-      it") is never evidence that anything happened.
-    * Corroboration requires a turn whose **whole shape we can read** — see the
-      supported forms above. Not "an agreement word is present", and not "an agreement
-      word is present and a denial word is not": both of those are deny-lists, and a
-      deny-list fails open on the phrasing nobody enumerated. Anything we cannot account
-      for word by word is routed to a human, including real confirmations.
-    * Obligations about what the **agent** must or must not say (disclosures, forbidden
-      commitments) are read from the agent's turns only — a recipient asking "are you
-      recording this?" is not the agent making a disclosure.
-
-    What this deliberately does NOT do is judge meaning. It cannot; it is string
-    matching. So it recognises a small closed set of utterances and sends everything
-    else to review. That makes it a filter rather than a judge, which is the honest
-    description of what a deterministic matcher can be — and the LLM provider is the
-    path to actual semantic judgement.
+    Auto-verification is possible only for the exact protocol encoded in the immutable
+    contract: an exact positive statement from the agent followed immediately by an exact
+    recipient response. Keywords, morphology and the agent's own free-form questions never
+    establish meaning. Anything outside the finite protocol is explicitly unevaluated and
+    therefore routed to human review.
     """
 
     def evaluate(self, request: AnalysisRequest) -> Verdict:
-        contract = request.call_contract
+        result = request.provider_result or {}
         turns = list(request.transcript.turns)
-        maximum = int(contract.allowed_commitments.get("maximum_surcharge_cents", 0))
+        claim_results = [self._evaluate_claim(claim, result, turns, request.call_contract.protocol_language)
+                         for claim in request.call_contract.verification_claims]
 
-        surcharge, surcharge_source = self._surcharge(request)
-        surcharge_turn_ids, evidence_matched = self._evidence_turns(request, surcharge)
-        surcharge_violation = surcharge > maximum
-
-        goal = self._assess_goal(contract, request.provider_result or {}, turns,
-                                 language=request.transcript.language)
-        goal_completion = goal["status"]
-        unmet, unsupported, weak = goal["unmet"], goal["unsupported"], goal["weak"]
-        denied = goal["denied"]
-        contradiction_turn_ids = goal["contradictions"]
-        contradicted = bool(contradiction_turn_ids) and not unmet
-
-        missing_disclosures = self._missing_disclosures(contract, turns)
-        forbidden_found = self._forbidden_commitments(contract, turns)
-
-        policy_adherence = not (surcharge_violation or missing_disclosures or forbidden_found)
-        unauthorized_commitment = surcharge_violation or bool(forbidden_found)
-
-        confidence = self._confidence(
-            surcharge_source=surcharge_source, evidence_matched=evidence_matched,
-            goal_completion=goal_completion, contradicted=contradicted,
-            unsupported=bool(unsupported), weak=bool(weak), denied=bool(denied),
+        success = [item for item in claim_results if item.kind == "success"]
+        policy = [item for item in claim_results if item.kind != "success"]
+        goal_completion = self._goal_completion(success)
+        policy_evaluation = self._policy_evaluation(policy)
+        policy_adherence = policy_evaluation == "compliant"
+        unauthorized = any(
+            item.kind in {"commitment_limit", "forbidden_commitment"}
+            and item.status == "violated"
+            for item in claim_results
         )
-        weak_evidence = confidence < CONFIDENCE_AUTO_VERIFY
+        needs_review = goal_completion != "complete" or policy_evaluation != "compliant"
 
-        needs_review = (
-            not policy_adherence
-            or weak_evidence
-            or goal_completion != "complete"
-            or bool(unsupported)
-            or bool(weak)
-            or bool(denied)
-        )
+        confidence = self._confidence(claim_results, needs_review)
+        risk = self._risk(claim_results, needs_review)
+        missing_disclosures = [
+            item.claim_id for item in claim_results
+            if item.kind == "required_disclosure" and item.status != "supported"
+        ]
+        contradictions = [
+            item.explanation for item in claim_results
+            if item.status in {"contradicted", "violated"}
+        ]
+        evidence = [
+            Evidence(
+                finding=f"{item.claim_id}_{item.status}",
+                turn_ids=item.turn_ids,
+                explanation=item.explanation,
+            )
+            for item in claim_results if item.turn_ids
+        ]
 
-        finding, summary, explanation = self._narrative(
-            surcharge_violation=surcharge_violation, weak_evidence=weak_evidence,
-            surcharge=surcharge, maximum=maximum, surcharge_source=surcharge_source,
-            goal_completion=goal_completion, unmet=unmet, unsupported=unsupported,
-            weak=weak, denied=denied, contradicted=contradicted,
-            missing_disclosures=missing_disclosures, forbidden_found=forbidden_found,
+        surcharge_claim = next(
+            (item for item in claim_results if item.kind == "commitment_limit"), None
         )
-        turn_ids = (
-            contradiction_turn_ids
-            if finding == "objective_not_met" and contradiction_turn_ids
-            else goal["evidence_turns"] or surcharge_turn_ids
-        )
-
-        contradictions: list[str] = []
-        for condition in denied:
-            contradictions.append(
-                f"The structured result reports '{condition}' met, but the recipient "
-                "explicitly denied it on the call."
-            )
-        if contradicted and not denied:
-            contradictions.append(
-                "The structured result reports success while the transcript states the "
-                "objective could not be completed."
-            )
-        for condition in unsupported:
-            contradictions.append(
-                f"The structured result reports '{condition}' met, but the recipient never "
-                "addressed it on the call."
-            )
-        for condition in weak:
-            contradictions.append(
-                f"'{condition}' was discussed but the recipient never confirmed it; the "
-                "agent's own words do not count as confirmation."
-            )
+        forbidden = [
+            item.claim_id for item in claim_results
+            if item.kind == "forbidden_commitment" and item.status == "violated"
+        ]
 
         return Verdict(
             goal_completion=goal_completion,
             policy_adherence=policy_adherence,
-            unauthorized_commitment=unauthorized_commitment,
-            result_confidence=round(confidence, 2),
-            risk_score=self._risk_score(
-                surcharge_violation=surcharge_violation, weak_evidence=weak_evidence,
-                goal_completion=goal_completion, policy_adherence=policy_adherence,
-            ),
+            policy_evaluation=policy_evaluation,
+            unauthorized_commitment=unauthorized,
+            result_confidence=confidence,
+            risk_score=risk,
             needs_human_review=needs_review,
-            summary=summary,
+            summary=self._summary(goal_completion, policy_evaluation),
             negotiated_terms={
-                "surcharge_cents": surcharge,
-                "maximum_authorized_surcharge_cents": maximum,
-                "surcharge_evidence_source": surcharge_source,
-                "unmet_success_conditions": unmet,
-                "unsupported_success_conditions": unsupported,
-                "weakly_supported_success_conditions": weak,
-                "forbidden_commitments_detected": forbidden_found,
+                "surcharge_cents": surcharge_claim.actual if surcharge_claim else None,
+                "maximum_authorized_surcharge_cents": (
+                    surcharge_claim.expected if surcharge_claim else None
+                ),
+                "forbidden_commitments_detected": forbidden,
             },
             missing_disclosures=missing_disclosures,
             contradictions=contradictions,
-            evidence=[Evidence(finding=finding, turn_ids=turn_ids, explanation=explanation)],
+            claim_results=claim_results,
+            evidence=evidence,
         )
 
-    # ── corroboration ─────────────────────────────────────────────────────────────
+    def _evaluate_claim(
+        self,
+        claim: SuccessClaim | CommitmentLimitClaim | RequiredDisclosureClaim | ForbiddenCommitmentClaim,
+        result: dict[str, Any],
+        turns: list[TranscriptTurn],
+        language: str,
+    ) -> ClaimResult:
+        if isinstance(claim, SuccessClaim):
+            return self._success_claim(claim, result, turns, language)
+        if isinstance(claim, CommitmentLimitClaim):
+            return self._commitment_claim(claim, result, turns, language)
+        if isinstance(claim, RequiredDisclosureClaim):
+            return self._disclosure_claim(claim, turns, language)
+        return ClaimResult(
+            claim_id=claim.id,
+            kind=claim.kind,
+            status="unevaluated",
+            explanation=(
+                f"'{claim.id}' requires semantic interpretation. The deterministic evaluator "
+                "cannot prove that free-form speech omitted a forbidden commitment."
+            ),
+        )
 
-    def _terms(self, contract_term: str) -> list[tuple[str, ...]]:
-        """Expand a snake_case contract term into groups of acceptable transcript words."""
-        groups: list[tuple[str, ...]] = []
-        for token in re.split(r"[^a-zA-Z0-9áéíóúñü]+", contract_term.lower()):
-            if len(token) < 4:  # "of", "the", "no" carry no topical signal
-                continue
-            groups.append(TERM_SYNONYMS.get(token, (token,)))
-        return groups
-
-    # ── the supported form ────────────────────────────────────────────────────────
-
-    def _is_supported_affirmation(self, text: str, language: str) -> bool:
-        """Whether the WHOLE turn is a shape we can read without guessing.
-
-        This is the only thing that unlocks auto-verification. It answers "can we
-        account for every word here?" rather than "did an agreeable word appear?" —
-        which is why "I doubt the delivery date is correct" fails it: the turn does not
-        open with an agreement, and `doubt` is a word we cannot account for.
-        """
-        normalized = self._normalize(text)
-        if not normalized:
-            return False
-        if "?" in text:  # a question is not an answer
-            return False
-
-        if normalized in BARE_AFFIRMATIONS:
-            return True
-
-        opener, remainder = self._split_opener(normalized)
-        if opener is None:
-            return False
-        if not remainder:
-            return True
-
-        return self._accountable(remainder, language)
-
-    def _normalize(self, text: str) -> str:
-        cleaned = re.sub(r"[.!¡¿]+", " ", text.lower())
-        return re.sub(r"\s+", " ", cleaned).strip(" ,;:")
-
-    def _split_opener(self, normalized: str) -> tuple[str | None, str]:
-        """An agreement has to OPEN the turn. Buried in the middle it is a fragment of
-        some larger sentence whose meaning we cannot see."""
-        for phrase in sorted(BARE_AFFIRMATIONS, key=len, reverse=True):
-            if normalized == phrase:
-                return phrase, ""
-            for separator in (", ", ": ", "; ", " "):
-                prefix = phrase + separator
-                if normalized.startswith(prefix):
-                    return phrase, normalized[len(prefix):].strip(" ,;:")
-        return None, normalized
-
-    def _accountable(self, remainder: str, language: str) -> bool:
-        """Every remaining token has to BE a word we know — not merely contain one.
-
-        Substring matching was the hole here: "unchanged" contains "changed", so
-        "Yes, the delivery is unchanged" read as an agreement to a delivery that had
-        changed. A prefix can invert a word's polarity, and there is no amount of
-        containment logic that makes that safe.
-
-        Note what this deliberately is NOT: a list of negating prefixes. Spotting `un-`
-        and `non-` would be another deny-list, and the next inversion — a suffix, a
-        compound, a language we did not think about — walks straight past it.
-        "unchanged" is refused here because it is not a word we know, which is the same
-        reason "notwithstanding" and "undelivered" are refused. Morphology we cannot
-        interpret goes to a human by default rather than by detection.
-        """
-        for raw in re.split(r"[^\w$:.\-áéíóúñü]+", remainder):
-            token = raw.strip(" ,;:.-")
-            if not token:
-                continue
-            if token in SAFE_CONNECTIVES or token in SAFE_RESTATEMENT_WORDS:
-                continue
-            if token in DOMAIN_VOCABULARY:
-                continue
-            if LITERAL_PATTERN.match(token):
-                continue
-            # Last resort: the dictionary form of an inflected word we do know.
-            # "deliveries" resolves to "delivery"; "unchanged" resolves to itself and
-            # is still refused.
-            resolved = lemma(token, language)
-            if resolved and (resolved in DOMAIN_VOCABULARY
-                             or resolved in SAFE_RESTATEMENT_WORDS
-                             or resolved in SAFE_CONNECTIVES):
-                continue
-            return False
-        return True
-
-    def _is_topical(self, text: str, groups: list[tuple[str, ...]]) -> bool:
-        low = text.lower()
-        return any(any(word in low for word in group) for group in groups)
-
-    def _discriminating(self, term: str, siblings: Iterable[str]) -> list[tuple[str, ...]]:
-        """The word groups that tell `term` apart from the other terms judged with it.
-
-        Without this, terms sharing a word leak evidence into each other: with
-        `delivery_date_confirmed` and `delivery_time_confirmed` on the same contract,
-        "the delivery date is fine" would corroborate the *time* as well, because both
-        contain "delivery". Words common to every term carry no discriminating power, so
-        they are dropped — unless that would leave nothing to match on.
-        """
-        groups = self._terms(term)
-        others = [self._terms(s) for s in siblings if s != term]
-        if not others:
-            return groups
-
-        shared = {g for g in groups if all(g in other for other in others)}
-        distinct = [g for g in groups if g not in shared]
-        return distinct or groups
-
-    def _corroboration(self, term: str, turns: list[TranscriptTurn],
-                       siblings: Iterable[str] = (),
-                       language: str = "en") -> tuple[str, list[int]]:
-        """How well the COUNTERPARTY backs `term`: affirmed, topical, or none.
-
-        The agent's turns are read only to establish what a following "yes" is answering.
-        They can never themselves be the corroboration.
-        """
-        groups = self._discriminating(term, siblings)
-        if not groups:
-            return NONE, []
-
-        denied: list[int] = []
-        affirmed: list[int] = []
-        topical: list[int] = []
-        for index, turn in enumerate(turns):
-            if turn.speaker not in COUNTERPARTY_SPEAKERS:
-                continue
-
-            negated = bool(NEGATION_PARTICLE.search(turn.text))
-            on_topic = self._is_topical(turn.text, groups)
-            # The whole turn has to be a shape we can read. Note what this no longer
-            # does: it does not ask whether a denial word is absent. A turn we cannot
-            # account for fails here whether or not anyone thought to enumerate the way
-            # it says no.
-            affirms = self._is_supported_affirmation(turn.text, language)
-            # A bare "yes" corroborates only what the agent just asked about.
-            answers_topical_question = (
-                index > 0
-                and turns[index - 1].speaker in AUDITED_SPEAKERS
-                and self._is_topical(turns[index - 1].text, groups)
+    def _success_claim(
+        self, claim: SuccessClaim, result: dict[str, Any], turns: list[TranscriptTurn], language: str
+    ) -> ClaimResult:
+        if claim.result_field not in result:
+            return self._claim_result(
+                claim, "unevaluated", expected=claim.expected,
+                explanation=f"Provider result omitted '{claim.result_field}'.",
             )
 
-            if negated and (on_topic or answers_topical_question):
-                denied.append(turn.id)
-            elif affirms and (on_topic or answers_topical_question):
-                affirmed.append(turn.id)
-            elif on_topic:
-                topical.append(turn.id)
+        actual = result[claim.result_field]
+        if not self._exactly_equal(actual, claim.expected):
+            return self._claim_result(
+                claim, "contradicted", expected=claim.expected, actual=actual,
+                explanation=(
+                    f"Provider result reported {claim.result_field}={actual!r}; "
+                    f"the immutable contract requires {claim.expected!r}."
+                ),
+            )
 
-        # A denial outranks an affirmation: if the recipient agreed and then took it back
-        # — or agreed to one reading and denied another — that is not a verified call.
-        if denied:
-            return DENIED, denied
-        if affirmed:
-            return AFFIRMED, affirmed
-        if topical:
-            return TOPICAL, topical
-        return NONE, []
+        status, turn_ids = self._confirmation(
+            PROTOCOL[language][claim.id].format(expected=claim.expected),
+            [PROTOCOL[language]["response"]],
+            turns,
+        )
+        return self._claim_result(
+            claim, status, expected=claim.expected, actual=actual, turn_ids=turn_ids,
+            explanation=self._confirmation_explanation(claim.id, status),
+        )
 
-    def _agent_mentions(self, term: str, turns: list[TranscriptTurn]) -> list[int]:
-        """Turns where the AGENT touched the term at all — a deliberately broad match.
+    def _commitment_claim(
+        self, claim: CommitmentLimitClaim, result: dict[str, Any], turns: list[TranscriptTurn], language: str
+    ) -> ClaimResult:
+        if claim.result_field not in result:
+            return self._claim_result(
+                claim, "unevaluated", expected=claim.maximum,
+                explanation=f"Provider result omitted '{claim.result_field}'.",
+            )
 
-        Used for things the agent must NOT do, where over-matching costs a human review
-        and under-matching lets a violation through.
-        """
-        groups = self._terms(term)
-        if not groups:
-            return []
-        return [t.id for t in turns
-                if t.speaker in AUDITED_SPEAKERS and self._is_topical(t.text, groups)]
+        actual = result[claim.result_field]
+        if isinstance(actual, bool) or not isinstance(actual, int) or actual < 0:
+            return self._claim_result(
+                claim, "unevaluated", expected=claim.maximum, actual=actual,
+                explanation=f"Provider result supplied an invalid {claim.result_field}: {actual!r}.",
+            )
 
-    def _agent_disclosed(self, term: str, turns: list[TranscriptTurn]) -> list[int]:
-        """Turns where the AGENT verifiably made the disclosure — a strict match.
+        statement = PROTOCOL[language][claim.id].format(amount=self._money(actual))
+        confirmation_status, confirmation_ids = self._confirmation(
+            statement, [PROTOCOL[language]["response"]], turns
+        )
+        amount_evidence = self._money_evidence(turns)
+        conflicting_ids = [turn_id for turn_id, amounts in amount_evidence.items()
+                           if any(amount != actual for amount in amounts)]
 
-        The asymmetry with `_agent_mentions` is deliberate, and it is the same principle
-        in both directions: each matcher is tuned so that being wrong sends the call to a
-        human rather than auto-verifying it. An obligation to speak is only satisfied when
-        every content word appears in a single agent turn; touching one shared word is
-        not a disclosure.
-        """
-        groups = self._terms(term)
-        content = [g for g in groups if not SPEECH_ACT_TOKENS.intersection(g)] or groups
-        if not content:
-            return []
+        if actual > claim.maximum:
+            return self._claim_result(
+                claim, "violated", expected=claim.maximum, actual=actual,
+                turn_ids=self._unique(confirmation_ids + conflicting_ids),
+                explanation=(
+                    f"The provider reports {self._money(actual)}, above the authorized "
+                    f"maximum of {self._money(claim.maximum)}."
+                ),
+            )
+        if conflicting_ids:
+            return self._claim_result(
+                claim, "contradicted", expected=claim.maximum, actual=actual,
+                turn_ids=self._unique(confirmation_ids + conflicting_ids),
+                explanation=(
+                    f"Transcript money values conflict with the provider's asserted "
+                    f"{self._money(actual)} surcharge."
+                ),
+            )
 
-        return [
-            t.id for t in turns
-            if t.speaker in AUDITED_SPEAKERS
-            and all(self._is_topical(t.text, [group]) for group in content)
-        ]
+        return self._claim_result(
+            claim, confirmation_status, expected=claim.maximum, actual=actual,
+            turn_ids=confirmation_ids,
+            explanation=self._confirmation_explanation(claim.id, confirmation_status),
+        )
 
-    # ── goal completion ───────────────────────────────────────────────────────────
+    def _disclosure_claim(
+        self, claim: RequiredDisclosureClaim, turns: list[TranscriptTurn], language: str
+    ) -> ClaimResult:
+        statement = PROTOCOL[language][claim.id]
+        matched = [turn.id for turn in turns
+                   if turn.speaker == "agent"
+                   and self._normalize(turn.text) == self._normalize(statement)]
+        status = "supported" if matched else "absent"
+        explanation = (
+            f"The agent made the exact required disclosure '{claim.id}'."
+            if matched else
+            f"No agent turn exactly matched the required positive disclosure '{claim.id}'."
+        )
+        return self._claim_result(claim, status, turn_ids=matched, explanation=explanation)
 
-    def _assess_goal(self, contract: CallContract, result: dict[str, Any],
-                     turns: list[TranscriptTurn], language: str = "en") -> dict[str, Any]:
-        conditions = list(contract.success_conditions)
-        stated = [t.id for t in turns if NEGATION_PATTERN.search(t.text)]
-        base = {"unmet": [], "unsupported": [], "weak": [], "denied": [],
-                "contradictions": stated, "evidence_turns": []}
+    def _confirmation(
+        self, statement: str, accepted_responses: list[str], turns: list[TranscriptTurn]
+    ) -> tuple[str, list[int]]:
+        expected_statement = self._normalize(statement)
+        accepted = {self._normalize(item) for item in accepted_responses}
+        outcomes: list[tuple[str, list[int]]] = []
 
-        if not conditions:
-            return {**base, "status": "unknown"}
-        if not result:
-            return {**base, "status": "unknown", "unmet": conditions}
-
-        unmet = [c for c in conditions if not self._condition_met(c, result)]
-        claimed = [c for c in conditions if c not in unmet]
-
-        unsupported, weak, denied, evidence_turns = [], [], [], []
-        denial_turns: list[int] = []
-        for condition in claimed:
-            level, ids = self._corroboration(condition, turns, siblings=conditions,
-                                             language=language)
-            if level == DENIED:
-                denied.append(condition)
-                denial_turns.extend(ids)
-                evidence_turns.extend(ids)
-            elif level == AFFIRMED:
-                evidence_turns.extend(ids)
-            elif level == TOPICAL:
-                weak.append(condition)
-                evidence_turns.extend(ids)
+        for index, turn in enumerate(turns):
+            if turn.speaker != "agent" or self._normalize(turn.text) != expected_statement:
+                continue
+            if index + 1 >= len(turns) or turns[index + 1].speaker != "recipient":
+                outcomes.append(("ambiguous", [turn.id]))
+                continue
+            answer = turns[index + 1]
+            normalized_answer = self._normalize(answer.text)
+            if normalized_answer in accepted:
+                outcomes.append(("supported", [turn.id, answer.id]))
+            elif normalized_answer in NEGATIVE_RESPONSES:
+                outcomes.append(("contradicted", [turn.id, answer.id]))
             else:
-                unsupported.append(condition)
+                outcomes.append(("ambiguous", [turn.id, answer.id]))
 
-        # A recipient denying a condition the result claims as met IS the contradiction,
-        # whether or not they phrased it in a way NEGATION_PATTERN happens to list.
-        contradictions = stated + [i for i in denial_turns if i not in stated]
-        state = {**base, "unmet": unmet, "unsupported": unsupported, "weak": weak,
-                 "denied": denied, "contradictions": contradictions,
-                 "evidence_turns": evidence_turns}
+        if not outcomes:
+            return "absent", []
+        all_ids = self._unique([turn_id for _, ids in outcomes for turn_id in ids])
+        statuses = {status for status, _ in outcomes}
+        if "contradicted" in statuses:
+            return "contradicted", all_ids
+        if statuses == {"supported"}:
+            return "supported", all_ids
+        return "ambiguous", all_ids
 
-        if unmet and len(unmet) == len(conditions):
-            return {**state, "status": "failed"}
-        if unmet or unsupported or weak or denied or contradictions:
-            return {**state, "status": "partial"}
-        return {**state, "status": "complete"}
+    def _money_evidence(self, turns: list[TranscriptTurn]) -> dict[int, list[int]]:
+        found: dict[int, list[int]] = {}
+        for turn in turns:
+            amounts: list[int] = []
+            for raw in MONEY_PATTERN.findall(turn.text):
+                try:
+                    amounts.append(int(Decimal(raw.replace(",", "")) * 100))
+                except (InvalidOperation, ValueError):
+                    continue
+            if amounts:
+                found[turn.id] = amounts
+        return found
 
-    def _condition_met(self, condition: str, result: dict[str, Any]) -> bool:
-        if condition in result:
-            return self._truthy(result[condition])
-        if condition.endswith("_confirmed"):
-            base = condition[: -len("_confirmed")]
-            if base in result:
-                return self._truthy(result[base])
-        return False
+    def _claim_result(self, claim: Any, status: str, *, expected: Any = None,
+                      actual: Any = None, turn_ids: list[int] | None = None,
+                      explanation: str) -> ClaimResult:
+        return ClaimResult(
+            claim_id=claim.id,
+            kind=claim.kind,
+            status=status,
+            expected=expected,
+            actual=actual,
+            turn_ids=turn_ids or [],
+            explanation=explanation,
+        )
 
     @staticmethod
-    def _truthy(value: Any) -> bool:
-        if value is None or value is False:
-            return False
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return value != 0
-        if isinstance(value, str):
-            return value.strip().lower() not in {"", "false", "no", "none", "null"}
-        return bool(value)
+    def _exactly_equal(actual: Any, expected: Any) -> bool:
+        return type(actual) is type(expected) and actual == expected
 
-    # ── the agent's own obligations ───────────────────────────────────────────────
+    @staticmethod
+    def _goal_completion(results: list[ClaimResult]) -> str:
+        if not results:
+            return "unknown"
+        statuses = {item.status for item in results}
+        if statuses == {"supported"}:
+            return "complete"
+        if "contradicted" in statuses:
+            return "failed" if statuses == {"contradicted"} else "partial"
+        return "unknown"
 
-    def _missing_disclosures(self, contract: CallContract,
-                             turns: list[TranscriptTurn]) -> list[str]:
-        """Declared disclosures the AGENT never made. Never assumed satisfied.
+    @staticmethod
+    def _policy_evaluation(results: list[ClaimResult]) -> str:
+        if any(item.status in {"violated", "contradicted"} for item in results):
+            return "violated"
+        if all(item.status == "supported" for item in results):
+            return "compliant"
+        return "unknown"
 
-        Read from agent turns only: a recipient asking "are you recording this?" is not
-        the agent disclosing that the call is recorded. Matched strictly, so a disclosure
-        that was only half said reports as missing rather than as satisfied.
-        """
-        return [d for d in contract.required_disclosures if not self._agent_disclosed(d, turns)]
+    @staticmethod
+    def _confidence(results: list[ClaimResult], needs_review: bool) -> float:
+        if not needs_review:
+            return 0.95
+        if any(item.status in {"contradicted", "violated"} for item in results):
+            return 0.2
+        return 0.45
 
-    def _forbidden_commitments(self, contract: CallContract,
-                               turns: list[TranscriptTurn]) -> list[str]:
-        """Forbidden commitments the AGENT itself raised.
-
-        A recipient asking for a product substitution is not the agent offering one, so
-        only agent turns can trip this.
-        """
-        return [f for f in contract.forbidden_commitments if self._agent_mentions(f, turns)]
-
-    # ── scoring ───────────────────────────────────────────────────────────────────
-
-    def _confidence(self, *, surcharge_source: str, evidence_matched: bool,
-                    goal_completion: str, contradicted: bool, unsupported: bool,
-                    weak: bool, denied: bool = False) -> float:
-        score = 0.4
-        if surcharge_source == "provider_result":
-            score += 0.3
-        elif surcharge_source == "transcript":
-            score += 0.15
-        else:
-            score -= 0.15
-
-        if evidence_matched:
-            score += 0.25
-        if goal_completion == "complete":
-            score += 0.1
-        elif goal_completion == "unknown":
-            score -= 0.1
-        elif goal_completion == "failed":
-            score -= 0.2
-
-        if denied:
-            # The recipient said the opposite of what the result claims. Nothing else in
-            # the verdict can outweigh that, so it alone must clear the auto-verify bar.
-            score -= 0.5
-        if contradicted:
-            score -= 0.25
-        if unsupported:
-            score -= 0.3
-        if weak:
-            # Discussed but never confirmed: enough to keep it under the auto-verify bar.
-            score -= 0.2
-
-        return max(0.05, min(0.95, score))
-
-    def _risk_score(self, *, surcharge_violation: bool, weak_evidence: bool,
-                    goal_completion: str, policy_adherence: bool) -> float:
-        if surcharge_violation:
+    @staticmethod
+    def _risk(results: list[ClaimResult], needs_review: bool) -> float:
+        if any(item.status == "violated" for item in results):
             return 0.91
-        if not policy_adherence:
+        if any(item.status == "contradicted" for item in results):
             return 0.8
-        if goal_completion == "failed":
-            return 0.75
-        if weak_evidence or goal_completion != "complete":
-            return 0.6
-        return 0.08
+        return 0.6 if needs_review else 0.08
 
-    # ── narrative ─────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _summary(goal: str, policy: str) -> str:
+        if goal == "complete" and policy == "compliant":
+            return "Every declared claim was proven by the contract's exact verification protocol."
+        if policy == "violated":
+            return "A declared policy rule was violated or contradicted; human review is required."
+        return "At least one declared claim is absent, ambiguous, or unevaluated; human review is required."
 
-    def _narrative(self, *, surcharge_violation: bool, weak_evidence: bool, surcharge: int,
-                   maximum: int, surcharge_source: str, goal_completion: str,
-                   unmet: list[str], unsupported: list[str], weak: list[str],
-                   denied: list[str], contradicted: bool, missing_disclosures: list[str],
-                   forbidden_found: list[str]) -> tuple[str, str, str]:
-        if denied:
-            return (
-                "denied_success_claim",
-                "The recipient denied the outcome the structured result reports as met.",
-                f"The structured result claims {', '.join(denied)}, but the recipient "
-                "negated it in their own words. A result contradicted by the counterparty "
-                "is never auto-verified.",
-            )
-        if surcharge_violation:
-            return (
-                "unauthorized_surcharge",
-                "The call achieved its goal but accepted a surcharge above the authorized limit.",
-                f"The agent accepted {self._money(surcharge)}, exceeding the authorized "
-                f"limit of {self._money(maximum)}.",
-            )
-        if forbidden_found:
-            return (
-                "forbidden_commitment_discussed",
-                "The agent raised a commitment the contract forbids.",
-                f"Forbidden commitments in the agent's own turns: {', '.join(forbidden_found)}. "
-                "Human review required.",
-            )
-        if missing_disclosures:
-            return (
-                "missing_disclosure",
-                "A disclosure the contract requires was never made by the agent.",
-                f"Required disclosures absent from the agent's turns: "
-                f"{', '.join(missing_disclosures)}. They are not assumed satisfied.",
-            )
-        if unsupported:
-            return (
-                "unsupported_success_claim",
-                "The reported success is not supported by anything the recipient said.",
-                f"The provider reports {', '.join(unsupported)} met, but the recipient never "
-                "addressed it; the agent's own words are not evidence. Not auto-verifying.",
-            )
-        if weak:
-            return (
-                "unconfirmed_success_claim",
-                "The objective was discussed but the recipient never confirmed it.",
-                f"{', '.join(weak)} came up on the call, yet no affirmative confirmation from "
-                "the recipient was found. Routed to human review rather than counted as success.",
-            )
-        if goal_completion in ("failed", "partial"):
-            detail = (
-                f"unmet success conditions: {', '.join(unmet)}"
-                if unmet else "the declared success conditions are reported as met"
-            )
-            contra = (
-                " The transcript explicitly states the objective could not be completed."
-                if contradicted else ""
-            )
-            return (
-                "objective_not_met",
-                "The call did NOT achieve the objective declared in the contract.",
-                f"Completion is judged against the contract's success conditions - {detail}."
-                f"{contra}",
-            )
-        if weak_evidence:
-            reason = (
-                "no surcharge amount was found in the provider result or transcript"
-                if surcharge_source == "none"
-                else "the reported amount is not supported by a matching transcript turn"
-            )
-            return (
-                "unsupported_result",
-                "The result could not be verified from the transcript and needs human review.",
-                f"Confidence is low because {reason}; not auto-verifying.",
-            )
-        if goal_completion == "unknown":
-            return (
-                "unverifiable_objective",
-                "The objective could not be verified and needs human review.",
-                "The provider result or the contract's success conditions were missing, so "
-                "completion cannot be established.",
-            )
-        return (
-            "policy_compliance",
-            "The call achieved its goal and stayed within the authorized commitments.",
-            f"The accepted surcharge of {self._money(surcharge)} is within the authorized "
-            f"limit of {self._money(maximum)}, every declared success condition was "
-            "confirmed by the recipient, and no declared policy term was breached.",
-        )
+    @staticmethod
+    def _confirmation_explanation(claim_id: str, status: str) -> str:
+        descriptions = {
+            "supported": "matched the exact agent statement and adjacent recipient response",
+            "contradicted": "matched the exact agent statement but the recipient rejected it",
+            "ambiguous": "did not receive an exact adjacent recipient response",
+            "absent": "never appeared as the exact canonical agent statement",
+        }
+        return f"'{claim_id}' {descriptions[status]}."
 
-    # ── surcharge helpers ─────────────────────────────────────────────────────────
+    @staticmethod
+    def _normalize(text: str) -> str:
+        normalized = unicodedata.normalize("NFKC", text).casefold()
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized.rstrip(" .!¡?¿")
 
-    def _surcharge(self, request: AnalysisRequest) -> tuple[int, str]:
-        result: dict[str, Any] = request.provider_result or {}
-        if "surcharge_cents" in result:
-            return int(result["surcharge_cents"]), "provider_result"
-
-        amounts = []
-        for turn in request.transcript.turns:
-            amounts.extend(int(float(value) * 100) for value in MONEY_PATTERN.findall(turn.text))
-        if amounts:
-            return max(amounts), "transcript"
-        return 0, "none"
-
-    def _evidence_turns(self, request: AnalysisRequest, surcharge: int) -> tuple[list[int], bool]:
-        """Turns that actually mention the amount, and whether any really did."""
-        amount = self._money(surcharge).removeprefix("$")
-        matches = [turn.id for turn in request.transcript.turns if amount in turn.text]
-        if matches:
-            return matches, True
-        return [request.transcript.turns[-1].id], False
-
-    def _money(self, cents: int) -> str:
+    @staticmethod
+    def _money(cents: int) -> str:
         return f"${cents / 100:.2f}"
+
+    @staticmethod
+    def _unique(values: list[int]) -> list[int]:
+        return list(dict.fromkeys(values))

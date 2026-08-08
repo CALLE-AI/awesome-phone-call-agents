@@ -25,6 +25,14 @@
 
       <div class="form-grid">
         <label>
+          Required delivery date
+          <%= form.date_field :delivery_date, required: true, value: "2026-08-07" %>
+        </label>
+        <label>
+          Required delivery time
+          <%= form.time_field :delivery_time, required: true, value: "09:00" %>
+        </label>
+        <label>
           Recipient region
           <%= form.select :region, [["Mexico · Spanish", "MX"], ["United States · English", "US"]] %>
         </label>

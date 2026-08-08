@@ -4,6 +4,7 @@ module CallAnalyzers
   class Fake
     def call(phone_call:, contract:)
       return phone_call.call_analysis if phone_call.call_analysis
+      raise ArgumentError, "fake analyzer may only evaluate fake calls" unless phone_call.provider == "fake"
 
       surcharge = phone_call.structured_result.fetch("surcharge_cents")
       maximum = contract.allowed_commitments.fetch("maximum_surcharge_cents")
@@ -12,6 +13,7 @@ module CallAnalyzers
       verdict = {
         "goal_completion" => "complete",
         "policy_adherence" => !violation,
+        "policy_evaluation" => violation ? "violated" : "compliant",
         "unauthorized_commitment" => violation,
         "result_confidence" => 0.98,
         "risk_score" => violation ? 0.91 : 0.08,
@@ -28,6 +30,7 @@ module CallAnalyzers
         "missing_disclosures" => [],
         "contradictions" => [],
         "recommended_memories" => [],
+        "claim_results" => fixture_claim_results(contract, phone_call, violation),
         "evidence" => evidence
       }
 
@@ -52,6 +55,21 @@ module CallAnalyzers
     end
 
     private
+
+    def fixture_claim_results(contract, phone_call, violation)
+      contract.verification_claims.map do |claim|
+        status = claim.fetch("kind") == "commitment_limit" && violation ? "violated" : "supported"
+        {
+          "claim_id" => claim.fetch("id"),
+          "kind" => claim.fetch("kind"),
+          "status" => status,
+          "expected" => claim["expected"] || claim["maximum"],
+          "actual" => phone_call.structured_result[claim["result_field"]],
+          "turn_ids" => [ 3, 4 ],
+          "explanation" => "Deterministic no-call fixture assertion."
+        }
+      end
+    end
 
     def build_evidence(violation, surcharge, maximum)
       return [ {

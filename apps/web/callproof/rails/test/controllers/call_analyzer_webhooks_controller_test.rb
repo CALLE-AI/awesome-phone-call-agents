@@ -77,7 +77,7 @@ class CallAnalyzerWebhooksControllerTest < ActionDispatch::IntegrationTest
 
   def completed_payload
     {
-      "schema_version" => "1.0",
+      "schema_version" => "2.0",
       "analysis_id" => @analysis_id,
       "request_id" => @request_id,
       "call_id" => @analysis.phone_call.provider_call_id,
@@ -87,6 +87,7 @@ class CallAnalyzerWebhooksControllerTest < ActionDispatch::IntegrationTest
       "verdict" => {
         "goal_completion" => "complete",
         "policy_adherence" => false,
+        "policy_evaluation" => "violated",
         "unauthorized_commitment" => true,
         "result_confidence" => 0.98,
         "risk_score" => 0.91,
@@ -99,13 +100,22 @@ class CallAnalyzerWebhooksControllerTest < ActionDispatch::IntegrationTest
         "missing_disclosures" => [],
         "contradictions" => [],
         "recommended_memories" => [],
+        "claim_results" => [ {
+          "claim_id" => "surcharge_within_limit",
+          "kind" => "commitment_limit",
+          "status" => "violated",
+          "expected" => 25_000,
+          "actual" => 32_000,
+          "turn_ids" => [ 3, 4 ],
+          "explanation" => "The surcharge exceeded the authorized limit."
+        } ],
         "evidence" => [ {
           "finding" => "unauthorized_surcharge",
           "turn_ids" => [ 3, 4 ],
           "explanation" => "The agent accepted $320.00 above the $250.00 limit."
         } ]
       },
-      "metrics" => { "evaluator" => "deterministic-v1" }
+      "metrics" => { "evaluator" => "exact-protocol-v2" }
     }
   end
 end

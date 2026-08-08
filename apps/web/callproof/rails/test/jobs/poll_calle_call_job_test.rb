@@ -9,6 +9,28 @@ class PollCalleCallJobTest < ActiveJob::TestCase
 
     job = PollCalleCallJob.new
     job.define_singleton_method(:client) { client }
+    analyzer = Object.new
+    analyzer.define_singleton_method(:call) do |phone_call:, **|
+      phone_call.create_call_analysis!(
+        request_id: SecureRandom.uuid,
+        external_analysis_id: SecureRandom.uuid,
+        status: "completed",
+        verdict: {
+          "policy_adherence" => false,
+          "policy_evaluation" => "violated",
+          "summary" => "The surcharge exceeded the authorized limit.",
+          "negotiated_terms" => {
+            "surcharge_cents" => 32_000,
+            "maximum_authorized_surcharge_cents" => 25_000
+          }
+        },
+        result_confidence: 0.2,
+        needs_human_review: true,
+        analyzed_at: Time.current
+      )
+    end
+    original_current = CallAnalyzers.method(:current)
+    CallAnalyzers.define_singleton_method(:current) { analyzer }
     job.perform(phone_call.id)
 
     assert_equal "completed", phone_call.reload.status
@@ -17,6 +39,8 @@ class PollCalleCallJobTest < ActiveJob::TestCase
     assert_equal 32_000, phone_call.structured_result.fetch("surcharge_cents")
     assert_equal "waiting_human", phone_call.call_request.reload.status
     assert_equal "ReviewCallAnalysisFlow", Agentkit::HITL.pending.last.payload.fetch("flow")
+  ensure
+    CallAnalyzers.define_singleton_method(:current, original_current) if original_current
   end
 
   private

@@ -7,13 +7,15 @@ module CallContracts
 
       policy = call_request.call_policy
       attributes = {
-        schema_version: "1.0",
+        schema_version: "2.0",
         objective: call_request.objective,
+        protocol_language: policy.protocol_language,
         success_conditions: policy.success_conditions,
         allowed_commitments: policy.allowed_commitments,
         forbidden_commitments: policy.forbidden_commitments,
         required_disclosures: policy.required_disclosures,
-        escalation_conditions: policy.escalation_conditions
+        escalation_conditions: policy.escalation_conditions,
+        verification_claims: policy.verification_claims
       }
       canonical = JSON.generate(attributes.deep_stringify_keys)
 

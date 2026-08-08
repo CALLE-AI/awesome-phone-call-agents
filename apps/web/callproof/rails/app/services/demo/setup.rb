@@ -11,17 +11,24 @@ module Demo
         record.metadata = { "fictional" => true }
       end
 
-      policy = provider.call_policies.find_or_create_by!(task_category: "delivery_change", version: 1) do |record|
-        record.maximum_surcharge_cents = 25_000
-        record.success_conditions = %w[delivery_date_confirmed delivery_time_confirmed]
-        record.allowed_commitments = {
-          "maximum_surcharge_cents" => 25_000,
-          "delivery_date_change" => true
-        }
-        record.forbidden_commitments = [ "product_substitution" ]
-        record.required_disclosures = [ "confirm_order_number" ]
-        record.escalation_conditions = %w[surcharge_above_limit product_substitution]
-      end
+      policy = provider.call_policies.find_or_initialize_by(task_category: "delivery_change", version: 2)
+      policy.assign_attributes(
+        maximum_surcharge_cents: 25_000,
+        success_conditions: %w[delivery_date_confirmed delivery_time_confirmed],
+        allowed_commitments: {
+          "maximum_surcharge_cents" => 25_000
+        },
+        forbidden_commitments: [ "product_substitution" ],
+        required_disclosures: [ "recording_notice" ],
+        protocol_language: "en",
+        verification_claims: VerificationClaims::DeliveryChange.build(
+          delivery_date: "2026-08-07",
+          delivery_time: "09:00",
+          maximum_surcharge_cents: 25_000
+        ),
+        escalation_conditions: []
+      )
+      policy.save!
 
       [ provider, policy ]
     end

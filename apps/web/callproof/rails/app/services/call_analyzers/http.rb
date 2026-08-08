@@ -50,18 +50,20 @@ module CallAnalyzers
     def payload(phone_call, contract, request_id)
       call_request = phone_call.call_request
       {
-        schema_version: "1.0",
+        schema_version: "2.0",
         request_id: request_id,
         call_id: phone_call.provider_call_id,
         agentkit_run_id: call_request.agentkit_run_id,
         submitted_at: Time.current.iso8601,
         call_contract: {
           objective: contract.objective,
+          protocol_language: contract.protocol_language,
           success_conditions: contract.success_conditions,
           allowed_commitments: contract.allowed_commitments,
           forbidden_commitments: contract.forbidden_commitments,
           required_disclosures: contract.required_disclosures,
-          escalation_conditions: contract.escalation_conditions
+          escalation_conditions: contract.escalation_conditions,
+          verification_claims: contract.verification_claims
         },
         transcript: phone_call.transcript,
         provider_result: phone_call.structured_result,

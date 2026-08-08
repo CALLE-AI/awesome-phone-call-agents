@@ -9,6 +9,21 @@ useful boundaries from [altur](https://github.com/emezac/altur)—persisted stat
 idempotent processing, evidence, and a replaceable evaluator—without duplicating
 its speech-to-text pipeline.
 
+## Verification boundary
+
+The deterministic evaluator is an exact-protocol checker, not a natural-language
+judge. Contract v2 binds each success claim to an expected structured value and a
+closed protocol identifier that deterministically generates the agent statement.
+Auto-verification requires that exact statement followed
+immediately by an exact permitted recipient response. Required disclosures also use
+exact positive statements; arbitrary questions, paraphrases, word lists, stemming,
+and topical matches cannot open the gate.
+
+Rules that require proving the absence of free-form behavior, such as a forbidden
+commitment, are marked `semantic_only`. The deterministic evaluator reports them as
+`unevaluated` and requires human review. A future semantic evaluator may resolve them
+claim-by-claim, but must preserve the same `unknown`/HITL default.
+
 ## Run locally
 
 ```bash

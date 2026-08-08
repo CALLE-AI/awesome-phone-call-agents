@@ -35,7 +35,10 @@ class CallProvidersCalleTest < ActiveJob::TestCase
     assert_equal call_request.idempotency_key, captured["Idempotency-Key"]
     assert_equal [ provider.phone_number_e164 ], document.dig("recipients", 0, "phones")
     assert_equal 0, document.dig("recipient_result_schema", "properties", "surcharge_cents", "minimum")
+    assert_equal %w[delivery_date delivery_time surcharge_cents].sort,
+                 document.dig("recipient_result_schema", "required").sort
     assert_includes document.fetch("task"), "maximum_surcharge_cents"
+    assert_includes document.fetch("task"), "Exact verification statements"
     assert_equal "call_official_123", phone_call.provider_call_id
     assert_equal "running", call_request.reload.status
   ensure

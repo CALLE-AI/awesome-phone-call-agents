@@ -13,7 +13,9 @@ class LiveCallsController < ApplicationController
   def create
     provider, policy = LiveCalls::Setup.call(
       region: live_call_params.fetch(:region),
-      maximum_surcharge_cents: surcharge_cents
+      maximum_surcharge_cents: surcharge_cents,
+      delivery_date: live_call_params.fetch(:delivery_date),
+      delivery_time: live_call_params.fetch(:delivery_time)
     )
     @call_request = CallRequest.create!(
       provider_profile: provider,
@@ -75,14 +77,10 @@ class LiveCallsController < ApplicationController
   # Reconcile an unresolved live request. Re-attempts the create with the SAME stable
   # Idempotency-Key, so CALL-E deduplicates — this cannot place a second call.
   #
-  # An unresolved request is resolved only by an answer that identifies it by that key:
-  # either the provider hands back the call (it exists → running), or it rejects the
-  # payload itself, which an accepted original would have deduplicated past (→ failed).
-  #
-  # Every other failure leaves it unresolved, including ones that look conclusive. A 401
-  # means our credential is bad now and says nothing about whether the original request
-  # was accepted; resolving it to "failed" would tell the operator no call was placed
-  # while a call may be ringing. Staying unresolved is the only honest answer.
+  # An unresolved request is resolved only when the provider returns the existing call
+  # identity for this key. Every error leaves it unresolved, including 400/422: a later
+  # validation response does not prove what happened to the original timed-out request.
+  # Staying unresolved is the only honest answer without a lookup-by-idempotency endpoint.
   def reconcile
     ensure_live_environment!
     raise CallProviders::Calle::SafetyError, "call is not awaiting reconciliation" unless
@@ -92,11 +90,6 @@ class LiveCallsController < ApplicationController
     phone_call = CallProviders.current.call(call_request: @call_request, contract: contract)
     redirect_to call_request_path(@call_request),
                 notice: "Reconciled — CALL-E has the call (#{phone_call.status})."
-  rescue CallProviders::Calle::DefinitiveRejectionError => error
-    @call_request.update!(status: "failed")
-    redirect_to call_request_path(@call_request),
-                alert: "Reconciliation resolved to failed (CALL-E rejected the request " \
-                       "itself under the same idempotency key, so no call was placed): #{error.message}"
   rescue CallProviders::Calle::Error, ActiveRecord::RecordInvalid => error
     @call_request.update!(status: "unresolved")
     redirect_to call_request_path(@call_request),
@@ -120,7 +113,9 @@ class LiveCallsController < ApplicationController
   end
 
   def live_call_params
-    params.expect(call_request: %i[objective recipient_phone_e164 region maximum_surcharge_dollars])
+    params.expect(call_request: %i[
+      objective recipient_phone_e164 region maximum_surcharge_dollars delivery_date delivery_time
+    ])
   end
 
   def surcharge_cents

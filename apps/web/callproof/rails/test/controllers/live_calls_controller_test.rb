@@ -23,6 +23,8 @@ class LiveCallsControllerTest < ActionDispatch::IntegrationTest
     assert_nil request.confirmed_at
     assert request.call_contract.present?
     assert_equal 25_000, request.call_policy.maximum_surcharge_cents
+    assert_equal "2.0", request.call_contract.schema_version
+    assert_equal "2026-08-07", request.call_contract.verification_claims.first.fetch("expected")
 
     # The confirmation phrase is derived from a random token, not the sequential id,
     # so it cannot be guessed from the request URL.
@@ -71,13 +73,14 @@ class LiveCallsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/says nothing about the original request/, flash[:alert].to_s)
   end
 
-  test "only a rejection of the request itself resolves reconciliation to failed" do
+  test "a later payload rejection still cannot resolve the original ambiguous create" do
     error = CallProviders::Calle::DefinitiveRejectionError.new("HTTP 422: bad phone")
 
     request = reconcile_with_provider_raising(error)
 
-    assert_equal "failed", request.reload.status
-    assert_match(/no call was placed/, flash[:alert].to_s)
+    assert_equal "unresolved", request.reload.status
+    assert_no_match(/no call was placed/, flash[:alert].to_s)
+    assert_match(/outcome remains unknown/, flash[:alert].to_s)
   end
 
   private
@@ -131,7 +134,9 @@ class LiveCallsControllerTest < ActionDispatch::IntegrationTest
         recipient_phone_e164: "+525512345678",
         objective: "Move fictional order C1023 to Friday at 9 AM without exceeding $250.",
         region: "MX",
-        maximum_surcharge_dollars: "250.00"
+        maximum_surcharge_dollars: "250.00",
+        delivery_date: "2026-08-07",
+        delivery_time: "09:00"
       }
     }
   end

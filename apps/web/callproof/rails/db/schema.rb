@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_05_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_08_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -151,6 +151,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_200000) do
     t.datetime "updated_at", null: false
     t.index ["agent_name", "frozen"], name: "index_agentkit_golden_cases_on_agent_name_and_frozen"
   end
+
+# Could not dump table "agentkit_memories" because of following StandardError
+#   Unknown type 'vector(1536)' for column 'embedding'
+
 
   create_table "agentkit_metrics", force: :cascade do |t|
     t.integer "count", default: 0, null: false
@@ -349,11 +353,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_200000) do
     t.jsonb "escalation_conditions", default: [], null: false
     t.jsonb "forbidden_commitments", default: [], null: false
     t.text "objective", null: false
+    t.string "protocol_language", default: "en", null: false
     t.jsonb "required_disclosures", default: [], null: false
-    t.string "schema_version", default: "1.0", null: false
+    t.string "schema_version", default: "2.0", null: false
     t.string "snapshot_hash", null: false
     t.jsonb "success_conditions", default: [], null: false
     t.datetime "updated_at", null: false
+    t.jsonb "verification_claims", default: [], null: false
     t.index ["call_request_id"], name: "index_call_contracts_on_call_request_id", unique: true
     t.index ["snapshot_hash"], name: "index_call_contracts_on_snapshot_hash"
   end
@@ -365,11 +371,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_200000) do
     t.jsonb "escalation_conditions", default: [], null: false
     t.jsonb "forbidden_commitments", default: [], null: false
     t.integer "maximum_surcharge_cents", default: 25000, null: false
+    t.string "protocol_language", default: "en", null: false
     t.bigint "provider_profile_id", null: false
     t.jsonb "required_disclosures", default: [], null: false
     t.jsonb "success_conditions", default: [], null: false
     t.string "task_category", default: "delivery_change", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "verification_claims", default: [], null: false
     t.integer "version", default: 1, null: false
     t.index ["provider_profile_id", "task_category", "version"], name: "idx_on_provider_profile_id_task_category_version_ee20187b22", unique: true
     t.index ["provider_profile_id"], name: "index_call_policies_on_provider_profile_id"
