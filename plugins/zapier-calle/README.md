@@ -204,6 +204,24 @@ the call up with `Find Call Result` (see
 from CALL-E directly and has no webhook to distrust - and key what you write
 to `call_id` so a repeated delivery cannot write twice.
 
+**A replay still starts a Zap run.** Being non-actionable is a property of
+the data, not of the trigger firing: every post that names a call this
+connection owns produces one run, so ten replays produce ten runs and any
+step you wired without a filter runs ten times. The `is_actionable` and
+`disposition` fields are what stop the *write* - put the filter in, and
+nothing further down executes on a repeat.
+
+It is fair to ask why a delivery already known to be stale is reported at
+all, rather than dropped the way a call this connection cannot see is. The
+two differ in what they might be hiding. A call CALL-E has no record of
+carries no information: emitting it would only let anyone with the URL fill
+a human's review queue. A stale delivery names a *real call of yours* whose
+outcome you may genuinely not have seen yet - a webhook that failed for an
+hour and then retried looks exactly like this. Dropping it would silently
+lose a real result, and for a call placed outside Zapier there is no waiting
+Zap step holding the `call_id` to reconcile with later. So it comes through
+visibly, marked as not news, and never actionable.
+
 This is a property of unsigned webhooks, not of CALL-E specifically. If
 CALL-E adds payload signing, the freshness window and this restriction both
 become unnecessary; see [Webhook verification](#webhook-verification).
