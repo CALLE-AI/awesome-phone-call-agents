@@ -341,6 +341,45 @@ def test_the_supported_forms_still_verify(answer):
     assert verdict.needs_human_review is False, f"should not need review: {answer!r}"
 
 
+@pytest.mark.parametrize("answer", [
+    # Reported: substring matching accepted "unchanged" because it contains "changed",
+    # so an explicit contradiction auto-verified at 0.80. A prefix can invert a word's
+    # polarity and no amount of containment logic makes that safe.
+    "Yes, the delivery is unchanged.",
+    "Yes, the delivery is undelivered.",
+    "Correct, the delivery is unconfirmed.",
+    "Confirmed, the order is uncancelled.",
+    "Yes, the delivery is nonexistent.",
+    "Yes, the delivery was misdelivered.",
+    "Yes, the shipment is unshipped.",
+    # Not a prefix at all — the point is that we refuse words we do not know, rather
+    # than detecting the ways a word can be negated.
+    "Yes, the delivery is pending.",
+    "Yes, the delivery is hypothetical.",
+    "Sí, la entrega está incompleta.",
+])
+def test_morphology_we_cannot_read_never_verifies(answer):
+    verdict = verdict_for(
+        turns=[
+            {"id": 1, "speaker": "agent", "text": "Can we move the delivery to Friday?"},
+            {"id": 2, "speaker": "recipient", "text": answer},
+        ],
+        provider_result={"surcharge_cents": 0, "delivery_changed": True},
+    )
+    assert not (verdict.goal_completion == "complete" and not verdict.needs_human_review), (
+        f"auto-verified a word it cannot read: {answer!r}"
+    )
+
+
+def test_a_word_must_be_a_known_word_not_merely_contain_one():
+    """The unit-level statement of the same rule, so a refactor cannot lose it."""
+    evaluator = DeterministicEvaluator()
+
+    assert evaluator._is_supported_affirmation("Yes, the delivery moves to Friday.")
+    assert not evaluator._is_supported_affirmation("Yes, the delivery is unchanged.")
+    assert not evaluator._is_supported_affirmation("Yes, the deliverything is fine.")
+
+
 def test_an_agreement_buried_mid_sentence_is_not_an_answer():
     """The agreement has to OPEN the turn. Anywhere else it is a fragment of a larger
     sentence whose meaning we cannot see."""

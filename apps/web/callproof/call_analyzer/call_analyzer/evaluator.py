@@ -115,6 +115,13 @@ TERM_SYNONYMS: dict[str, tuple[str, ...]] = {
     "cancel": ("cancel", "cancellation", "cancela", "cancelar", "cancelación"),
 }
 
+# Every word the domain vocabulary knows, as WHOLE tokens. Accountability asks "do we
+# know this word", which is a different question from "is this word discriminating for
+# this condition" — so it reads the full vocabulary rather than one term's groups.
+DOMAIN_VOCABULARY = frozenset(
+    word for group in TERM_SYNONYMS.values() for word in group
+)
+
 # Words that name the SPEECH ACT rather than the content that has to be spoken. A
 # disclosure called `recording_notice` is satisfied by telling the recipient the call is
 # recorded — "notice" is not a word the agent has to utter. Everything left after these
@@ -279,7 +286,7 @@ class DeterministicEvaluator:
 
     # ── the supported form ────────────────────────────────────────────────────────
 
-    def _is_supported_affirmation(self, text: str, groups: list[tuple[str, ...]]) -> bool:
+    def _is_supported_affirmation(self, text: str) -> bool:
         """Whether the WHOLE turn is a shape we can read without guessing.
 
         This is the only thing that unlocks auto-verification. It answers "can we
@@ -302,7 +309,7 @@ class DeterministicEvaluator:
         if not remainder:
             return True
 
-        return self._accountable(remainder, groups)
+        return self._accountable(remainder)
 
     def _normalize(self, text: str) -> str:
         cleaned = re.sub(r"[.!¡¿]+", " ", text.lower())
@@ -320,18 +327,30 @@ class DeterministicEvaluator:
                     return phrase, normalized[len(prefix):].strip(" ,;:")
         return None, normalized
 
-    def _accountable(self, remainder: str, groups: list[tuple[str, ...]]) -> bool:
-        """Every remaining token has to be one we can read exactly."""
-        vocabulary = {word for group in groups for word in group}
-        for token in re.split(r"[^\w$:.\-áéíóúñü]+", remainder):
-            token = token.strip(" ,;:")
+    def _accountable(self, remainder: str) -> bool:
+        """Every remaining token has to BE a word we know — not merely contain one.
+
+        Substring matching was the hole here: "unchanged" contains "changed", so
+        "Yes, the delivery is unchanged" read as an agreement to a delivery that had
+        changed. A prefix can invert a word's polarity, and there is no amount of
+        containment logic that makes that safe.
+
+        Note what this deliberately is NOT: a list of negating prefixes. Spotting `un-`
+        and `non-` would be another deny-list, and the next inversion — a suffix, a
+        compound, a language we did not think about — walks straight past it.
+        "unchanged" is refused here because it is not a word we know, which is the same
+        reason "notwithstanding" and "undelivered" are refused. Morphology we cannot
+        interpret goes to a human by default rather than by detection.
+        """
+        for raw in re.split(r"[^\w$:.\-áéíóúñü]+", remainder):
+            token = raw.strip(" ,;:.-")
             if not token:
                 continue
             if token in SAFE_CONNECTIVES or token in SAFE_RESTATEMENT_WORDS:
                 continue
-            if LITERAL_PATTERN.match(token):
+            if token in DOMAIN_VOCABULARY:
                 continue
-            if any(word in token for word in vocabulary):
+            if LITERAL_PATTERN.match(token):
                 continue
             return False
         return True
@@ -382,7 +401,7 @@ class DeterministicEvaluator:
             # does: it does not ask whether a denial word is absent. A turn we cannot
             # account for fails here whether or not anyone thought to enumerate the way
             # it says no.
-            affirms = self._is_supported_affirmation(turn.text, groups)
+            affirms = self._is_supported_affirmation(turn.text)
             # A bare "yes" corroborates only what the agent just asked about.
             answers_topical_question = (
                 index > 0
