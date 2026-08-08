@@ -6,6 +6,8 @@ import {
 } from "../examples/appointment-confirmation.js";
 import { getCallRun, isUnauthorizedMcpError, planCall, resolveCalleMcpConfig, runCall } from "./calle-mcp.js";
 import { DEFAULT_EXTRACTION_SYSTEM_PROMPT, extractStructuredResult } from "./extract-from-transcript.js";
+import { assertE164, maskPhoneNumbersInText, REDACTED_TOKEN_PLACEHOLDER } from "./phone-safety.js";
+import { clearPendingPlan, loadPendingPlan, readConfirmTokenFromStdin, savePendingPlan } from "./pending-plan.js";
 import { BedrockReasoningProvider } from "./reasoning/bedrock.js";
 import { FakeReasoningProvider } from "./reasoning/fake.js";
 import type { ReasoningProvider } from "./reasoning/types.js";
@@ -25,13 +27,19 @@ Commands:
 
   plan --to <E.164 phone> --region <region> --goal <text>
       Plan a call (no dialing, no side effects, safe to run any time).
+      The number is validated locally before anything is sent to CALL-E.
+      The confirm_token this returns is saved to a private, restricted-
+      permission file — it is never printed and never a CLI argument.
 
-  call --plan-id <id> --confirm-token <token> [--live]
-      Place the call planCall produced. Without --live this prints what
-      would be sent and exits — it never dials by accident.
+  call [--live]
+      Place the call the last "plan" produced, reading its confirm_token
+      from that private file (or from stdin, if piped). Without --live
+      this prints what would be sent and exits — it never dials by
+      accident. Phone numbers in the output are masked.
 
   status --run-id <id>
-      Fetch the current status of a call run.
+      Fetch the current status of a call run. Phone numbers in the
+      output are masked.
 
 Every live command requires a prior "calle auth login" (from @call-e/cli).`);
   process.exit(1);
@@ -40,6 +48,11 @@ Every live command requires a prior "calle auth login" (from @call-e/cli).`);
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(`--${name}`);
   return index === -1 ? undefined : args[index + 1];
+}
+
+/** Prints a value as masked, redacted-safe JSON — the only way this CLI writes CALL-E responses to stdout. */
+function printSafe(value: unknown): void {
+  console.log(maskPhoneNumbersInText(JSON.stringify(value, null, 2)));
 }
 
 async function cmdExtract(args: string[]) {
@@ -82,7 +95,10 @@ async function cmdExtract(args: string[]) {
     questionsToResolve: QUESTIONS_TO_RESOLVE,
     schema,
   });
-  console.log(JSON.stringify(result, null, 2));
+  // Extraction results are structured app data (appointment confirmed?,
+  // reschedule date, …), not raw CALL-E responses, but masking is cheap
+  // insurance if a schema ever captures a callback number verbatim.
+  printSafe(result);
 }
 
 async function cmdPlan(args: string[]) {
@@ -90,11 +106,29 @@ async function cmdPlan(args: string[]) {
   const region = flag(args, "region");
   const goal = flag(args, "goal");
   if (!to || !region || !goal) usage();
+  assertE164(to, "--to");
+
   const config = resolveCalleMcpConfig();
   try {
     const plan = await planCall(config, { toPhones: [to], region, goal });
-    console.log(JSON.stringify(plan, null, 2));
-    if (!plan.ready_to_run) {
+    if (plan.ready_to_run && plan.confirm_token) {
+      savePendingPlan({
+        planId: plan.plan_id,
+        confirmToken: plan.confirm_token,
+        toPhones: [to],
+        region,
+        goal,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    // confirm_token authorizes a real call — never print it, CLI arg it, or
+    // let it reach shell history. Everything else about the plan is fine to
+    // show (still passed through the phone mask, since to_phones round-trips
+    // through the server response).
+    printSafe({ ...plan, confirm_token: plan.confirm_token ? REDACTED_TOKEN_PLACEHOLDER : null });
+    if (plan.ready_to_run) {
+      console.error('Plan saved privately. Run "call --live" to place this call, or "call" to preview it.');
+    } else {
       console.error(`Not ready to run: ${plan.next_step}`);
     }
   } catch (error) {
@@ -107,19 +141,39 @@ async function cmdPlan(args: string[]) {
 }
 
 async function cmdCall(args: string[]) {
-  const planId = flag(args, "plan-id");
-  const confirmToken = flag(args, "confirm-token");
-  if (!planId || !confirmToken) usage();
-  if (!args.includes("--live")) {
+  const pending = loadPendingPlan();
+  const isLive = args.includes("--live");
+
+  // Preview never needs the token itself, only proof a plan exists — so it
+  // never touches stdin, which would otherwise risk blocking on it in a
+  // non-interactive environment for a command that has no side effects.
+  if (!isLive) {
+    if (!pending) {
+      console.error('No pending plan found. Run "plan" first.');
+      process.exit(1);
+    }
     console.log(
-      `Preview only (default). Would call run_call with plan_id=${planId}. ` +
+      `Preview only (default). Would call run_call for plan ${pending.planId}. ` +
         "Pass --live to actually place the call — this is a genuine outbound phone call.",
     );
     return;
   }
+
+  const stdinToken = await readConfirmTokenFromStdin();
+  const confirmToken = stdinToken ?? pending?.confirmToken;
+  const planId = pending?.planId;
+  if (!confirmToken || !planId) {
+    console.error(
+      'No pending plan found and no confirm_token piped on stdin. Run "plan" first, ' +
+        "or pipe a token: some-source | node cli.js call --live",
+    );
+    process.exit(1);
+  }
+
   const config = resolveCalleMcpConfig();
   const run = await runCall(config, planId, confirmToken);
-  console.log(JSON.stringify(run, null, 2));
+  clearPendingPlan(); // confirm_token is single-use; don't leave it around for accidental reuse.
+  printSafe(run);
 }
 
 async function cmdStatus(args: string[]) {
@@ -127,7 +181,7 @@ async function cmdStatus(args: string[]) {
   if (!runId) usage();
   const config = resolveCalleMcpConfig();
   const run = await getCallRun(config, runId);
-  console.log(JSON.stringify(run, null, 2));
+  printSafe(run);
 }
 
 async function main() {

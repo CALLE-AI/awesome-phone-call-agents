@@ -62,16 +62,22 @@ needs a flag to make it safe to run:
 npm run cli -- plan --to +12125550123 --region US --goal "Confirm the rescheduled appointment and capture the new date."
 ```
 
-Placing the call is the one command with a real side effect, and it refuses to dial unless you say
-so explicitly:
+`plan_call` returns a `confirm_token` that authorizes the actual call — a secret you should never
+type on a command line (shell history, `ps`, over-the-shoulder) or see printed to a terminal
+(scrollback, screen recordings, copy-pasted logs). `plan` never prints it; instead it saves it to a
+private, owner-only-permission file (`~/.calle-mcp/apps/calle-mcp-result-extractor/pending-plan.json`)
+that `call` reads automatically, so the two-step flow never requires handling the token yourself:
 
 ```bash
-npm run cli -- call --plan-id <id-from-plan> --confirm-token <token-from-plan>
-# → "Preview only (default). Would call run_call with plan_id=... Pass --live to actually place the call."
+npm run cli -- call
+# → "Preview only (default). Would call run_call for plan ... Pass --live to actually place the call."
 
-npm run cli -- call --plan-id <id-from-plan> --confirm-token <token-from-plan> --live
-# → places the real call
+npm run cli -- call --live
+# → places the real call, using the token from the last "plan", then clears it (single-use)
 ```
+
+If you'd rather not touch disk at all, pipe a token on stdin instead and it takes priority over the
+saved plan: `some-vault get token | npm run cli -- call --live`.
 
 ## One live run
 
@@ -123,9 +129,14 @@ validates after retries) and `0` on success. Errors are printed to stderr; resul
 
 - **No CALL-E session.** `plan` and `call` fail with a message pointing you at
   `npx @call-e/cli auth login` rather than a raw MCP error.
+- **Numbers that aren't E.164.** `plan --to` is validated locally (`+`, then 7–15 digits) before
+  anything is sent to CALL-E — a malformed number never reaches the network.
+  `+15555550123` passes; `555-0123` or `(555) 0123` don't.
 - **Plan not ready to run.** `plan_call` can come back with `ready_to_run: false` and clarifying
   questions instead of a `confirm_token` — there is no path to `call` without a valid token from a
   plan that was actually ready.
+- **No pending plan (and nothing piped).** `call` needs either a prior `plan` (which saved its
+  token privately) or a token piped on stdin — it never falls back to an empty or fabricated token.
 - **Missing `--live`.** `call` without `--live` never reaches `run_call`.
 - **Extraction never validates.** `BedrockReasoningProvider` retries once with the validation
   error fed back to the model, then throws a `ReasoningValidationError` naming the task and the
@@ -139,12 +150,19 @@ validates after retries) and `0` on success. Errors are printed to stderr; resul
 - **Cancellation.** CALL-E's MCP surface exposes no cancel-in-flight operation for a call that's
   already dialing. There is nothing recurring here to disable — every call is a single planned,
   confirmed, one-shot run.
-- **Credentials.** CALL-E auth comes entirely from `@call-e/cli`'s token cache; this tool never
-  reads, stores, or logs a token itself. AWS credentials for Bedrock come from the default SDK
-  credential chain — never a hardcoded key. No secrets appear in any file in this directory.
-- **Phone numbers.** The bundled example uses a NANP-reserved fictional number
-  (`+1 212 555 0123`, the `555-01xx` block set aside for fiction). Mask real phone numbers in any
-  transcript or log you share.
+- **Credentials.** CALL-E *session* auth comes entirely from `@call-e/cli`'s token cache; this tool
+  never reads, stores, or logs that token. It does write one thing locally: `plan_call`'s
+  short-lived, single-use `confirm_token`, saved to an owner-only-permission file under
+  `~/.calle-mcp/apps/calle-mcp-result-extractor/` and deleted the moment `call --live` uses it (see
+  [`src/pending-plan.ts`](src/pending-plan.ts)). That token is never a CLI argument and never
+  printed — see "Placing the call" above. AWS credentials for Bedrock come from the default SDK
+  credential chain — never a hardcoded key.
+- **Phone numbers.** `--to` is validated as E.164 locally before anything is sent (see "What blocks
+  a live call"). Every command's printed output — `plan`, `call`, `status`, `extract` — is passed
+  through [`maskPhoneNumbersInText`](src/phone-safety.ts), which masks every E.164-looking
+  substring, not just a known field, because a callback number can show up inside a transcript or
+  call summary that this tool doesn't otherwise parse. The bundled example still uses a
+  NANP-reserved fictional number (`+1 212 555 0123`, the `555-01xx` block set aside for fiction).
 
 ## Reading further
 
@@ -154,3 +172,7 @@ validates after retries) and `0` on success. Errors are printed to stderr; resul
   wrapper over `@call-e/core`.
 - [`src/extract-from-transcript.ts`](src/extract-from-transcript.ts) — the extraction function
   itself, provider-agnostic.
+- [`src/pending-plan.ts`](src/pending-plan.ts) — private, owner-only-permission storage for a
+  plan's `confirm_token` between `plan` and `call`.
+- [`src/phone-safety.ts`](src/phone-safety.ts) — local E.164 validation and the phone-number
+  masking applied to every command's output.
