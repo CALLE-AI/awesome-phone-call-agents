@@ -143,14 +143,13 @@ If the client gives a vague timeframe ("next week," "end of the month"):
 **Confirm the date:**
 > "So just to make sure I have this right — you're planning to pay [Currency][Amount] in full on [Date]. Does that sound correct?"
 
-**If the client proposes an instalment or split-payment arrangement** instead of a single date for the full amount, do not negotiate terms on the call — the `result_schema` carries only one `commitment_date` for the full amount, with no field for an instalment schedule:
-> "I'm not able to set up a payment plan on this call, but I'll pass that request to [Operator Name] to follow up with you directly."
-
-Close with outcome `refused` in this case. In this version, `refused` covers any call where no single full-amount date is obtained — including an instalment or partial offer the `result_schema` cannot represent (see "Out of Scope for This Version") — not only a flat decline.
-
-**Close:**
+**If the client agrees to a single date for the full amount:**
 > "Thank you. We'll note that and be in touch if we don't see the payment by then. Is there anything else I can help clarify?"
 > → Outcome: `committed_to_date`. Log the single agreed date in `commitment_date`.
+
+**If the client proposes an instalment or split-payment arrangement instead** of a single date for the full amount, do not negotiate terms on the call — the `result_schema` carries only one `commitment_date` for the full amount, with no field for an instalment schedule:
+> "I'm not able to set up a payment plan on this call, but I'll let [Operator Name] know you'd like to discuss one, and they'll be in touch with you directly."
+> → Outcome: `refused`. In this version, `refused` covers any call where no single full-amount date is obtained — including an instalment or partial offer the `result_schema` cannot represent (see "Out of Scope for This Version") — not only a flat decline.
 
 ---
 

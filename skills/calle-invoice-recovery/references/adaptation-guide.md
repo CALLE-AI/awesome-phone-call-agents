@@ -209,10 +209,10 @@ to wire up in your host scheduler or notification system:
 
 | Outcome | Operator action to configure |
 |---------|------------------------------|
-| `paid_now` | Trigger a receipt check N days after the expected payment date. |
+| `paid_now` | No date or arrival window is captured (see SKILL.md, "Out of Scope for This Version"), so nothing here can drive an automated trigger. The operator reconciles receipt against the invoice manually. |
 | `committed_to_date` | Schedule a follow-up call or email for `commitment_date + 1 business day`. |
 | `disputed` | Route to the account manager by email within 1 business day. |
-| `refused` | Route to the operator for a write-off or collections decision. |
+| `refused` | Route to the operator for a write-off, settlement offer, or collections referral — this outcome also covers an engaged partial-payment or instalment offer the schema can't capture (see SKILL.md, "Out of Scope for This Version"). |
 | `no_answer` | Schedule a retry after the configured cooldown (default: 24 hours). |
 | `voicemail` | Optional: send a written follow-up. Retry after 48 hours if no response. |
 | `wrong_person` | Verify the contact number before any retry. Do not retry automatically. |
