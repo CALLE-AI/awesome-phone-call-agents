@@ -1,7 +1,7 @@
-import { AsynFoundersConsole } from "./asynfounders-console";
+import { AsyncFoundersConsole } from "./asyncfounders-console";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  return <AsynFoundersConsole />;
+  return <AsyncFoundersConsole />;
 }
