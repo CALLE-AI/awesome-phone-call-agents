@@ -1,0 +1,25 @@
+{
+  "name": "calle-surplus-signal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-first surplus food pickup confirmation with a human-reviewed dispatch manifest.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "surplus-signal": "node --import tsx src/cli.ts",
+    "preview": "node --import tsx src/cli.ts preview --request examples/drive.example.json"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3"
+  }
+}
