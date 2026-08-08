@@ -120,6 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
+- [`confidence-gated-results`](skills/confidence-gated-results/) - Three-tier outcome contract for a phone call that succeeded but returned no usable structured result: commit, one narrowed repair call, or escalate with the evidence trail.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`voice-preflight`](skills/voice-preflight/) - Hear a call task spoken by your own text-to-speech provider before a real person does, then refuse a script whose critical line would not survive being spoken.
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
