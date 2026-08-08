@@ -426,15 +426,15 @@ if __name__ == "__main__":
     unittest.main(verbosity=2)
 
 
-# ------------------------------------------------- contrato real del SDK --
-class TestContratoSDK(unittest.TestCase):
-    """Comprueba que lo que enviamos encaja con el SDK publicado de verdad.
+# --------------------------------------------------- the published SDK --
+class TestSDKContract(unittest.TestCase):
+    """Check that what we send still fits the SDK that is actually published.
 
-    Sin esto, un cambio de firma en `calle-ai` no se nota hasta que la llamada
-    falla en vivo. Y la unica vez que esta app se ejecuta en vivo es delante de
-    una camara o delante de un negocio real, que son los dos peores momentos.
+    Without this, a signature change in `calle-ai` goes unnoticed until a call
+    fails live. The only times this app runs live are in front of a camera or
+    in front of a real business, which are the two worst moments to find out.
 
-    No se coloca ninguna llamada: solo se comparan firmas.
+    No call is placed: signatures only.
     """
 
     @classmethod
@@ -442,156 +442,222 @@ class TestContratoSDK(unittest.TestCase):
         try:
             import calle  # noqa: F401
         except ImportError:
-            raise unittest.SkipTest("calle-ai no instalado (pip install calle-ai)")
+            raise unittest.SkipTest("calle-ai not installed (pip install calle-ai)")
 
-    def test_el_cliente_acepta_api_key_y_base_url(self):
+    def test_client_takes_api_key_and_base_url(self):
         import inspect
         from calle import CalleClient
         p = inspect.signature(CalleClient.__init__).parameters
         self.assertIn("api_key", p)
         self.assertIn("base_url", p)
 
-    def test_create_acepta_todos_los_campos_que_enviamos(self):
+    def test_create_accepts_every_field_we_send(self):
         import inspect
         from calle.calls import CalleCalls
-        acepta = set(inspect.signature(CalleCalls.create).parameters)
-        enviamos = set(call_arguments(candidate(), "job", "Ivan"))
-        faltan = enviamos - acepta
-        self.assertFalse(faltan, "el SDK no acepta: %s" % sorted(faltan))
+        accepted = set(inspect.signature(CalleCalls.create).parameters)
+        sent = set(call_arguments(candidate(), "job", "Ivan"))
+        missing = sent - accepted
+        self.assertFalse(missing, "the SDK does not accept: %s" % sorted(missing))
 
-    def test_recipients_es_plural_y_lista(self):
-        """`create` admite `recipient` y `recipients`. Usamos la lista."""
+    def test_recipients_is_the_plural_list_form(self):
+        """`create` takes both `recipient` and `recipients`. We use the list."""
         import inspect
         from calle.calls import CalleCalls
         self.assertIn("recipients", inspect.signature(CalleCalls.create).parameters)
-        self.assertIsInstance(call_arguments(candidate(), "job", "Ivan")["recipients"], list)
+        self.assertIsInstance(
+            call_arguments(candidate(), "job", "Ivan")["recipients"], list)
 
-    def test_wait_for_result_acepta_nuestras_keywords(self):
+    def test_wait_for_result_takes_our_keywords(self):
         import inspect
         from calle.calls import CalleCalls
         p = inspect.signature(CalleCalls.wait_for_result).parameters
         self.assertIn("timeout_seconds", p)
         self.assertIn("interval_seconds", p)
 
-    def test_el_base_url_por_defecto_es_el_que_fijamos(self):
+    def test_the_sdk_default_origin_is_the_one_we_pin(self):
         import inspect
         from calle import CalleClient
         d = inspect.signature(CalleClient.__init__).parameters["base_url"].default
         self.assertEqual(d, execution.DEFAULT_BASE_URL)
 
 
-# ------------------------------- lo que reporto la revision del PR #118 --
-class TestRevisionPR118(unittest.TestCase):
-    """Los tres fallos que Ray-56 encontro revisando el PR, con su caso.
+# ---------------------------------------------- raised in review of #118 --
+class TestReviewFindings(unittest.TestCase):
+    """One test per finding from the review, named after the finding.
 
-    Los tres eran la misma familia de error: dar por bueno algo que no se
-    habia comprobado. Estan aqui uno por uno para que no vuelvan.
+    They were all the same shape of mistake: treating something unverified as
+    good enough to act on.
     """
 
-    # --- 1. Terminal no es lo mismo que exitoso -------------------------
-    def test_una_llamada_fallida_no_produce_presupuesto(self):
-        """`failed` es terminal, pero no es una llamada que haya ido bien.
+    # --- terminal is not the same as successful ------------------------
+    def test_a_failed_call_produces_no_quote(self):
+        """`failed` is terminal, but it is not a call that went well.
 
-        Su structured_result puede validar contra el esquema y aun asi ser los
-        restos de una llamada que no ocurrio como debia. Rankearlo junto a un
-        presupuesto real mete en la tabla un precio que nadie dijo.
+        Its structured_result can satisfy the schema and still be the wreckage
+        of a call that did not happen as intended. Ranking it beside a real
+        quote puts a price in the table that nobody said out loud.
         """
         fake = FakeCalls(status="failed")
         rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
         self.assertIsNone(rows[0]["quote"])
         self.assertIn("not as a completed call", rows[0]["reason"])
 
-    def test_una_llamada_cancelada_no_produce_presupuesto(self):
-        fake = FakeCalls(status="canceled")
-        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+    def test_a_canceled_call_produces_no_quote(self):
+        rows = run_batch([candidate()], "job", "Ivan",
+                         FakeCalls(status="canceled"), moment=MOMENT)
         self.assertIsNone(rows[0]["quote"])
 
-    def test_task_completed_false_no_produce_presupuesto(self):
-        """CALL-E diciendo que el agente no termino lo que fue a hacer."""
-        class NoCompletada(FakeCalls):
+    def test_task_completed_false_produces_no_quote(self):
+        """CALL-E saying the agent did not finish what it was sent to do."""
+        class Unfinished(FakeCalls):
             def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
                 r = super().wait_for_result(
                     call_id, timeout_seconds=timeout_seconds,
                     interval_seconds=interval_seconds)
                 r["task_completed"] = False
                 return r
-        rows = run_batch([candidate()], "job", "Ivan", NoCompletada(), moment=MOMENT)
+        rows = run_batch([candidate()], "job", "Ivan", Unfinished(), moment=MOMENT)
         self.assertIsNone(rows[0]["quote"])
         self.assertIn("not completed", rows[0]["reason"])
 
-    def test_completed_si_produce_presupuesto(self):
-        """El arreglo no puede haberse llevado por delante el camino bueno."""
+    def test_a_completed_call_still_produces_a_quote(self):
+        """The fix must not have taken the working path down with it."""
         rows = run_batch([candidate()], "job", "Ivan", FakeCalls(), moment=MOMENT)
         self.assertIsNotNone(rows[0]["quote"])
 
-    def test_succeeded_tambien_vale(self):
+    def test_succeeded_counts_as_successful_too(self):
         rows = run_batch([candidate()], "job", "Ivan",
                          FakeCalls(status="succeeded"), moment=MOMENT)
         self.assertIsNotNone(rows[0]["quote"])
 
-    # --- 2. El horario se lee en la zona del negocio --------------------
-    def test_sin_zona_no_se_marca(self):
-        """Sin zona no se puede saber que hora es alli. No se llama a ciegas."""
+    # --- hours are read on the shop's own clock ------------------------
+    def test_a_candidate_with_no_timezone_is_not_dialled(self):
+        """Without a zone we cannot know what time it is there."""
         fake = FakeCalls()
         rows = run_batch([candidate(tz="")], "job", "Ivan", fake, moment=MOMENT)
         self.assertEqual(fake.created, [])
         self.assertEqual(rows[0]["status"], "not_called")
         self.assertIn("no timezone", rows[0]["reason"])
 
-    def test_la_zona_decide_si_esta_abierto(self):
-        """Mismo instante, dos husos, dos respuestas. Este es el bug entero.
+    def test_the_zone_decides_whether_it_is_open(self):
+        """One instant, two zones, two answers. This is the whole bug.
 
-        A las 20:00 en Nueva York son las 17:00 en Los Angeles. Un negocio
-        abierto de 9 a 18 esta cerrado en el primero y abierto en el segundo,
-        y antes se resolvia con el reloj del host para los dos.
+        20:00 in New York is 17:00 in Los Angeles. A shop open 09:00-18:00 is
+        closed in the first and open in the second, and both used to be
+        resolved against the host clock.
         """
         from datetime import timezone as tzmod, timedelta
-        instante = datetime(2026, 8, 7, 20, 0, tzinfo=tzmod(timedelta(hours=-4)))
-        horario = "Mo-Su 09:00-18:00"
-        este = FakeCalls()
-        run_batch([candidate(hours=horario, tz="America/New_York")],
-                  "job", "Ivan", este, moment=instante)
-        oeste = FakeCalls()
-        run_batch([candidate(hours=horario, tz="America/Los_Angeles")],
-                  "job", "Ivan", oeste, moment=instante)
-        self.assertEqual(len(este.created), 0, "20:00 en Nueva York: cerrado")
-        self.assertEqual(len(oeste.created), 1, "17:00 en Los Angeles: abierto")
+        instant = datetime(2026, 8, 7, 20, 0, tzinfo=tzmod(timedelta(hours=-4)))
+        hours = "Mo-Su 09:00-18:00"
+        east = FakeCalls()
+        run_batch([candidate(hours=hours, tz="America/New_York")],
+                  "job", "Ivan", east, moment=instant)
+        west = FakeCalls()
+        run_batch([candidate(hours=hours, tz="America/Los_Angeles")],
+                  "job", "Ivan", west, moment=instant)
+        self.assertEqual(len(east.created), 0, "20:00 in New York: closed")
+        self.assertEqual(len(west.created), 1, "17:00 in Los Angeles: open")
 
-    def test_screen_excluye_sin_zona_en_el_camino_en_vivo(self):
-        _, fuera = quoterunner.screen([candidate(tz="")], MOMENT, require_timezone=True)
-        self.assertIn("no timezone", fuera[0].reason)
+    def test_screen_excludes_zoneless_candidates_on_the_live_path(self):
+        _, out = quoterunner.screen([candidate(tz="")], MOMENT, require_timezone=True)
+        self.assertIn("no timezone", out[0].reason)
 
-    def test_screen_no_lo_exige_en_el_preview(self):
-        """El preview si los enseña: para eso esta, para ver que falta."""
-        dentro, _ = quoterunner.screen([candidate(tz="")], MOMENT)
-        self.assertEqual(len(dentro), 1)
+    def test_preview_does_not_require_a_zone(self):
+        """Preview still shows them: that is what it is for."""
+        keep, _ = quoterunner.screen([candidate(tz="")], MOMENT)
+        self.assertEqual(len(keep), 1)
 
-    def test_el_operador_puede_declarar_la_zona_del_lote(self):
-        """Declararla no es adivinarla. Adivinarla es lo que esta prohibido."""
-        dentro, _ = quoterunner.screen([candidate(tz="")], MOMENT,
-                                       default_timezone="America/Chicago")
-        self.assertEqual(dentro[0].timezone, "America/Chicago")
+    def test_the_operator_may_declare_the_zone_for_a_batch(self):
+        """Declaring it is not inferring it. Inferring is what is forbidden."""
+        keep, _ = quoterunner.screen([candidate(tz="")], MOMENT,
+                                     default_timezone="America/Chicago")
+        self.assertEqual(keep[0].timezone, "America/Chicago")
 
-    def test_una_zona_inventada_no_pasa_por_buena(self):
-        _, fuera = quoterunner.screen([candidate(tz="Marte/Olympus")], MOMENT)
-        self.assertIn("Unknown timezone", fuera[0].reason)
+    def test_an_invented_zone_is_not_taken_on_trust(self):
+        _, out = quoterunner.screen([candidate(tz="Mars/Olympus")], MOMENT)
+        self.assertIn("Unknown timezone", out[0].reason)
 
-    # --- 3. La clave de idempotencia cubre el guion entero --------------
-    def test_cambiar_el_solicitante_cambia_la_clave(self):
-        """Otro nombre en la llamada es otra llamada, no una repeticion."""
+    # --- keys and tokens cover the whole spoken payload ----------------
+    def test_changing_the_requester_changes_the_idempotency_key(self):
+        """A different name on the call is a different call, not a repeat."""
         self.assertNotEqual(idempotency_key(candidate(), "job", "Ivan"),
                             idempotency_key(candidate(), "job", "Marta"))
 
-    def test_cambiar_el_idioma_cambia_la_clave(self):
+    def test_changing_the_locale_changes_the_idempotency_key(self):
         self.assertNotEqual(idempotency_key(candidate(), "job", "Ivan", "en-US"),
                             idempotency_key(candidate(), "job", "Ivan", "es-MX"))
 
-    def test_el_mismo_guion_conserva_la_clave(self):
-        """La deduplicacion real tiene que seguir funcionando."""
+    def test_the_same_script_keeps_the_same_key(self):
+        """Real deduplication still has to work."""
         self.assertEqual(idempotency_key(candidate(), "job", "Ivan", "en-US"),
                          idempotency_key(candidate(), "job", "Ivan", "en-US"))
 
-    def test_la_clave_del_payload_coincide_con_la_funcion(self):
+    def test_the_payload_key_matches_the_function(self):
         args = call_arguments(candidate(), "job", "Ivan", "es-MX")
         self.assertEqual(args["idempotency_key"],
                          idempotency_key(candidate(), "job", "Ivan", "es-MX"))
+
+    def test_changing_the_requester_changes_the_confirmation_token(self):
+        """An approval must not survive a rewritten script.
+
+        Otherwise you review a batch of English calls on behalf of one person
+        and use that same token to place Spanish calls on behalf of another.
+        """
+        batch = [candidate()]
+        self.assertNotEqual(confirmation_token(batch, "job", "Ivan"),
+                            confirmation_token(batch, "job", "Marta"))
+
+    def test_changing_the_locale_changes_the_confirmation_token(self):
+        batch = [candidate()]
+        self.assertNotEqual(confirmation_token(batch, "job", "Ivan", "en-US"),
+                            confirmation_token(batch, "job", "Ivan", "es-MX"))
+
+    def test_a_token_from_another_locale_is_refused(self):
+        batch = [candidate()]
+        stale = confirmation_token(batch, "job", "Ivan", "en-US")
+        with self.assertRaises(QuoteError):
+            check_confirmation(batch, "job", stale, "Ivan", "es-MX")
+
+    # --- a lost answer is not a refusal --------------------------------
+    def test_a_timeout_is_recorded_as_unknown_not_refused(self):
+        """The provider may have accepted it and the phone may be ringing.
+
+        Filing that as "refused" invites a retry, and a retry here is a second
+        call to a real business.
+        """
+        fake = FakeCalls(create_raises=TimeoutError("read timeout"))
+        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+        self.assertEqual(rows[0]["status"], "unknown")
+        self.assertIn("may have been accepted", rows[0]["reason"])
+
+    def test_an_unknown_outcome_carries_its_idempotency_key(self):
+        """That key is what reconciliation has to match on afterwards."""
+        fake = FakeCalls(create_raises=TimeoutError("read timeout"))
+        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+        self.assertEqual(rows[0]["idempotency_key"],
+                         idempotency_key(candidate(), "job", "Ivan", "en-US"))
+
+    def test_a_server_error_is_also_unknown(self):
+        class ServerError(Exception):
+            status_code = 503
+        fake = FakeCalls(create_raises=ServerError("upstream"))
+        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+        self.assertEqual(rows[0]["status"], "unknown")
+
+    def test_a_rejected_request_is_still_a_refusal(self):
+        """A bad key or a malformed payload never rang anybody."""
+        class BadRequest(Exception):
+            status_code = 400
+        fake = FakeCalls(create_raises=BadRequest("invalid"))
+        rows = run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT)
+        self.assertEqual(rows[0]["status"], "error")
+        self.assertIn("refused", rows[0]["reason"])
+
+    def test_outcome_unknown_classifies_by_name_and_code(self):
+        self.assertTrue(execution.outcome_unknown(TimeoutError()))
+        self.assertTrue(execution.outcome_unknown(ConnectionError()))
+        self.assertFalse(execution.outcome_unknown(ValueError()))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

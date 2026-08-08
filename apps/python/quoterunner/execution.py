@@ -57,7 +57,7 @@ NO_ANSWER = {"busy", "no_answer", "voicemail"}
 # it was meant to -- and a partially populated structured_result from one of
 # those can still satisfy the schema. Ranking it next to a real quote puts a
 # price in the table that nobody actually said.
-EXITOSO = {"completed", "succeeded"}
+SUCCESSFUL = {"completed", "succeeded"}
 
 MAX_WAIT_SECONDS = 900
 POLL_SECONDS = 5
@@ -205,8 +205,17 @@ def sanitise_quote(quote: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # The confirmation token
 # ---------------------------------------------------------------------------
-def confirmation_token(candidates: list[Candidate], job: str) -> str:
+def confirmation_token(
+    candidates: list[Candidate], job: str, requester: str = "", locale: str = "en-US"
+) -> str:
     """Fingerprint of this exact batch. One different number, different token.
+
+    It covers everything that changes what will actually be said or dialled:
+    the numbers, the job, who the call is on behalf of, and the language it is
+    made in. Binding it to the numbers and the job alone left an approval valid
+    across a rewritten script -- you could review a batch of English calls on
+    behalf of one person and use that same token to place Spanish calls on
+    behalf of another.
 
     This implements the gap we reported to CALL-E in the Most Valuable Feedback
     submission: `call start` has no machine-enforced confirmation, so the only
@@ -217,6 +226,8 @@ def confirmation_token(candidates: list[Candidate], job: str) -> str:
     payload = json.dumps(
         {
             "job": job.strip(),
+            "requester": requester.strip(),
+            "locale": locale,
             "phones": sorted(c.phone for c in candidates),
         },
         ensure_ascii=False,
@@ -225,8 +236,11 @@ def confirmation_token(candidates: list[Candidate], job: str) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
 
 
-def check_confirmation(candidates: list[Candidate], job: str, token: str | None) -> None:
-    expected = confirmation_token(candidates, job)
+def check_confirmation(
+    candidates: list[Candidate], job: str, token: str | None,
+    requester: str = "", locale: str = "en-US",
+) -> None:
+    expected = confirmation_token(candidates, job, requester, locale)
     if not token:
         raise QuoteError(
             "--execute needs --confirm. Read the plan above, then re-run with:\n"
@@ -348,6 +362,27 @@ def build_calls_api(base_url: str | None = None) -> CallsAPI:
 # ---------------------------------------------------------------------------
 # Running the batch
 # ---------------------------------------------------------------------------
+def outcome_unknown(error: Exception) -> bool:
+    """Did this failure leave a call possibly in flight?
+
+    A rejected request never rang anybody: a bad key, a rate limit, a malformed
+    payload all fail before dialling. A timeout, a dropped connection or a 5xx
+    are different — the provider may have accepted the request and be dialling
+    while we read the exception.
+
+    Matched on the exception name and status code rather than on imported SDK
+    classes, so this module keeps working when `calle-ai` is absent, which is
+    the case for every default test run.
+    """
+    name = type(error).__name__
+    if any(s in name for s in ("Timeout", "Connection", "Unavailable")):
+        return True
+    code = getattr(error, "status_code", None)
+    if code is None:
+        code = getattr(error, "status", None)
+    return isinstance(code, int) and code >= 500
+
+
 def _valid_result(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
@@ -424,17 +459,38 @@ def run_batch(
             continue
 
         say(f"[{index}/{len(candidates)}] {candidate.name}  {candidate.masked}  calling")
+        key = idempotency_key(candidate, job, requester, locale)
         try:
             created = calls.create(**call_arguments(candidate, job, requester, locale))
-        except Exception as error:  # noqa: BLE001 - one refusal must not kill the batch
-            say(f"      create failed: {type(error).__name__}")
-            results.append({
-                "name": candidate.name,
-                "phone_masked": candidate.masked,
-                "status": "error",
-                "reason": f"CALL-E refused the call ({type(error).__name__})",
-                "quote": None,
-            })
+        except Exception as error:  # noqa: BLE001 - one failure must not kill the batch
+            # A refusal and a lost answer are different facts. A rejected
+            # request never rang anybody; a timeout may have been accepted and
+            # the phone may be ringing right now. Filing the second as
+            # "refused" invites a retry, and a retry here is a second call to a
+            # real business.
+            if outcome_unknown(error):
+                say(f"      no answer from CALL-E: {type(error).__name__} -- outcome unknown")
+                results.append({
+                    "name": candidate.name,
+                    "phone_masked": candidate.masked,
+                    "status": "unknown",
+                    "reason": (
+                        f"CALL-E did not answer ({type(error).__name__}); the call "
+                        "may have been accepted. Reconcile before retrying"
+                    ),
+                    "idempotency_key": key,
+                    "quote": None,
+                })
+            else:
+                say(f"      refused: {type(error).__name__}")
+                results.append({
+                    "name": candidate.name,
+                    "phone_masked": candidate.masked,
+                    "status": "error",
+                    "reason": f"CALL-E refused the call ({type(error).__name__})",
+                    "idempotency_key": key,
+                    "quote": None,
+                })
             continue
 
         call_id = created.get("id") if isinstance(created, dict) else None
@@ -483,20 +539,20 @@ def run_batch(
         # `task_completed` is CALL-E saying whether the agent actually finished
         # what it was sent to do. Absent means the provider did not report it;
         # an explicit False means it did not, and that is not a quote.
-        completado = (final or {}).get("task_completed")
+        task_done = (final or {}).get("task_completed")
 
-        if status not in EXITOSO or completado is False or not _valid_result(structured):
-            if status not in EXITOSO:
-                motivo = f"the call ended as {status}, not as a completed call"
-            elif completado is False:
-                motivo = "CALL-E reported the task was not completed"
+        if status not in SUCCESSFUL or task_done is False or not _valid_result(structured):
+            if status not in SUCCESSFUL:
+                reason = f"the call ended as {status}, not as a completed call"
+            elif task_done is False:
+                reason = "CALL-E reported the task was not completed"
             else:
-                motivo = "the call did not return the full quote schema"
+                reason = "the call did not return the full quote schema"
             say(f"      {status}, no usable answer")
             results.append({
                 "name": candidate.name, "phone_masked": candidate.masked,
                 "call_id": call_id, "status": status,
-                "reason": motivo,
+                "reason": reason,
                 "quote": None,
             })
             continue

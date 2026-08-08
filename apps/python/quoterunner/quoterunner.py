@@ -253,9 +253,9 @@ def screen(
             )
         else:
             candidate.verdict = "callable"
-            donde = f" {candidate.timezone}" if candidate.timezone else ""
+            where = f" {candidate.timezone}" if candidate.timezone else ""
             candidate.reason = (
-                f"open now ({window_text(candidate.opening_hours, here)}{donde})"
+                f"open now ({window_text(candidate.opening_hours, here)}{where})"
             )
             callable_now.append(candidate)
             continue
@@ -430,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
     # need.
     import execution
 
-    token = execution.confirmation_token(callable_now, job)
+    token = execution.confirmation_token(callable_now, job, requester, args.locale)
 
     if not (args.simulate or args.execute):
         print(json.dumps(plan, indent=2) if args.json else render(plan, token))
@@ -438,7 +438,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.execute:
-            execution.check_confirmation(callable_now, job, args.confirm)
+            execution.check_confirmation(callable_now, job, args.confirm,
+                                        requester, args.locale)
             calls = execution.build_calls_api(args.base_url)
         else:
             calls = execution.SimulatedCalls()

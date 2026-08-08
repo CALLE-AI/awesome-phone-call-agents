@@ -115,7 +115,8 @@ any one of them alone stops the call:
 
 1. `CALLE_LIVE_CALLS_ENABLED=true` in the environment
 2. `CALLE_API_KEY` in the environment
-3. `--confirm <token>` — a token bound to this exact candidate list
+3. `--confirm <token>` — a token bound to this exact batch: the numbers, the
+   job, who the call is on behalf of, and the language it is made in
 4. every candidate is re-checked against its opening hours **at dial time, in
    its own timezone**, and one that publishes no timezone is not dialled
 
@@ -206,6 +207,10 @@ machinery, and is not a substitute for it.
   twice. Keying on the job alone would have made a call in a different language,
   or on behalf of a different person, replay the earlier result instead of
   happening.
+- **A refusal and a lost answer are different facts.** A rejected request never
+  rang anybody. A timeout or a 5xx may have been accepted, with the phone
+  ringing while we read the exception — so it is recorded as `unknown`, carries
+  its idempotency key for reconciliation, and is never quietly retried.
 - **A finished call is not a successful one.** `failed` and `canceled` are
   terminal, and their `structured_result` can still satisfy the schema. Only a
   `completed` call that CALL-E did not flag as unfinished produces a quote; the
@@ -251,7 +256,7 @@ python -m unittest discover -p "test_*.py"
 ```
 
 ```text
-Ran 111 tests in 0.122s
+Ran 119 tests in 0.138s
 OK
 ```
 
@@ -272,8 +277,9 @@ result, a no-answer that must not be redialled, a result that does not match the
 schema, a phone number smuggled into a date field, and a price range ranked on
 its low end. Three of them come from the review of this pull request: a failed
 call must not produce a rankable quote, the same instant must give a different
-answer in New York and in Los Angeles, and changing who the call is on behalf of
-must change the idempotency key.
+answer in New York and in Los Angeles, changing who the call is on behalf of
+must change both the idempotency key and the confirmation token, and a timeout
+must not be filed as a refusal.
 
 It also checks our payload against the **real published SDK**: that `calls.create`
 still accepts every field we send, that `recipients` is still the plural list
