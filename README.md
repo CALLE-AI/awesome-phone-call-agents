@@ -125,6 +125,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
 - [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, TikTok Ads, Notion, Airtable, local CSV files, or custom sources.
+- [`calle-script-advisor`](skills/calle-script-advisor/) - Drafts and lints CALL-E call task text and result schemas for clarity, safety, and extraction quality before a call is placed.
 - [`verify-by-phone`](skills/verify-by-phone/) - Single disclosed verification call that checks a directory listing against the published line, grounds every answer in a transcript span, and abstains instead of guessing when the call does not establish one.
 
 ### Apps
@@ -169,6 +170,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/) | n8n | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes. |
 | [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
+| [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
 
 ### Safety patterns
 
@@ -178,6 +180,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`Contact-claim limits`](apps/typescript/verify-contact-claim/docs/limits.md) - Why an institution refusing to confirm a contact is the expected outcome, what a confirmed contact still does not prove and what has never been tested live.
 - [`Provider descriptors`](apps/typescript/voice-preflight/docs/providers.md) - How one HTTP client drives any text-to-speech API from a JSON file, where the audio sits in a response, plus the order in which a run refuses so a failure says what has already happened.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
+- [`Fail-closed dispositions`](plugins/zapier-calle/docs/fail-closed-dispositions.md) - Classifying phone-call outcomes so ambiguity, low confidence, and unrecognized statuses route to a human instead of a success branch.
 
 ## Contributing
 
