@@ -35,6 +35,22 @@ npm run demo
 
 The included `+1 202-555-01xx` numbers are reserved fictional examples and the timestamps are intentionally historical. Never execute the sample as a live request.
 
+### Local simulation dashboard
+
+Run the responsive dashboard against the same checked-in fictional fixture:
+
+```bash
+npm run ui:dev
+```
+
+Open the printed local URL, select a donor, and choose `Run local simulation`. The staged disclosure, agreement, structured result, and manifest are entirely local UI state: the dashboard has no CALL-E client, network request, or live-call control. `Reset` cancels the staged sequence and clears every simulated result.
+
+Create the production UI bundle with:
+
+```bash
+npm run ui:build
+```
+
 ## Preview a drive
 
 Create the ignored private directory, copy the sample, and replace every fictional value:

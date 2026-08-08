@@ -1,4 +1,5 @@
 node_modules/
+ui-dist/
 private/
 *.report.json
 *.checkpoint.json
