@@ -1,0 +1,14 @@
+[project]
+name = "quotewake-salesforce"
+version = "0.1.0"
+description = "Read-only Salesforce quote selection for QuoteWake."
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
