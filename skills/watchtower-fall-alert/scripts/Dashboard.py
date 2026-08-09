@@ -99,9 +99,42 @@ def render_status(data: dict) -> None:
     updated_placeholder.caption(f"Last updated: {updated or '-'}")
 
 
-# Simple polling loop - re-fetches /status every 2 seconds and updates
-# the placeholders in place, without a full Streamlit rerun. This keeps
-# the dashboard "live" while the FastAPI backend does the real work.
+def fetch_history(limit: int = 20) -> list:
+    try:
+        resp = requests.get(f"{FASTAPI_URL}/history", params={"limit": limit}, timeout=3)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException:
+        return []
+
+
+st.divider()
+st.subheader("Event history")
+history_placeholder = st.empty()
+
+
+def render_history() -> None:
+    rows = fetch_history()
+    if not rows:
+        history_placeholder.info("No fall events logged yet.")
+        return
+
+    history_placeholder.dataframe(
+        rows,
+        column_order=[
+            "event_timestamp", "room", "confidence",
+            "call_status", "decision", "updated_at",
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# Simple polling loop - re-fetches /status and /history every 2 seconds
+# and updates the placeholders in place, without a full Streamlit rerun.
+# This keeps the dashboard "live" while the FastAPI backend does the
+# real work.
 while True:
     render_status(fetch_status())
+    render_history()
     time.sleep(2)

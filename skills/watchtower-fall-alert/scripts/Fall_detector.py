@@ -1,5 +1,8 @@
+import sqlite3
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from typing import Iterator
 
 import cv2
 from ultralytics import YOLO
@@ -14,6 +17,110 @@ model = YOLO("best.pt")
 tracker = sv.ByteTrack()
 app = FastAPI()
 box_annotator = sv.BoxAnnotator(thickness=2)
+
+# --- Database logging ----------------------------------------------------
+# Lightweight SQLite logging, kept inline here rather than a separate
+# module. Records every fall event and the eventual caregiver decision
+# to watchtower.db (created automatically in the working directory).
+
+DB_PATH = "watchtower.db"
+
+
+@contextmanager
+def _db_connect() -> Iterator[sqlite3.Connection]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def init_db() -> None:
+    """Creates the events table if it doesn't already exist. Safe to
+    call every time the app starts - it's a no-op if the table exists."""
+    with _db_connect() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS fall_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                event_timestamp TEXT NOT NULL,
+                decision TEXT,
+                call_status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+
+def log_event(event: dict) -> int:
+    """Inserts a new fall event row and returns its id, so it can be
+    updated later once CALL-E returns a decision."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _db_connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO fall_events
+                (room, confidence, event_timestamp, call_status, created_at, updated_at)
+            VALUES (?, ?, ?, 'calling', ?, ?)
+            """,
+            (event["room"], event["confidence"], event["timestamp"], now, now),
+        )
+        return cursor.lastrowid
+
+
+def update_event_result(event_id: int, decision: str) -> None:
+    """Call once handle_fall_event() returns, to record the final
+    decision and mark the event as resolved."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _db_connect() as conn:
+        conn.execute(
+            """
+            UPDATE fall_events
+            SET decision = ?, call_status = 'resolved', updated_at = ?
+            WHERE id = ?
+            """,
+            (decision, now, event_id),
+        )
+
+
+def mark_event_failed(event_id: int, reason: str = "unknown") -> None:
+    """Call if handle_fall_event() raises - records that the call
+    attempt failed rather than leaving the row stuck at 'calling'."""
+    now = datetime.now(timezone.utc).isoformat()
+    with _db_connect() as conn:
+        conn.execute(
+            """
+            UPDATE fall_events
+            SET decision = ?, call_status = 'failed', updated_at = ?
+            WHERE id = ?
+            """,
+            (reason, now, event_id),
+        )
+
+
+def get_recent_events(limit: int = 20) -> list[dict]:
+    """Returns the most recent events, newest first - used by the
+    /history endpoint for the dashboard's event log table."""
+    with _db_connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, room, confidence, event_timestamp, decision,
+                   call_status, created_at, updated_at
+            FROM fall_events
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+init_db()
 
 # --- Fall event config -------------------------------------------------
 
@@ -39,6 +146,7 @@ EVENT_COOLDOWN_SECONDS = 60
 
 _consecutive_fall_frames = 0
 _last_event_time = 0.0
+
 
 # --- Shared status state for the dashboard -------------------------------
 # Polled by the "/status" endpoint. Kept as a plain dict for simplicity -
@@ -101,7 +209,7 @@ def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
 
 
 def generate_frame():
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("Make_a_video_of_an_old_person.mp4")
 
     # Lower capture resolution - fewer pixels to process per frame.
     # 640x480 is plenty for fall detection; drop further (e.g. 480x360)
@@ -139,14 +247,17 @@ def generate_frame():
             if event is not None:
                 print("FALL EVENT:", event)
                 _update_status(status="fall_detected", last_event=event)
+                event_id = log_event(event)
 
                 try:
                     _update_status(status="calling")
                     decision = handle_fall_event(event)
                     _update_status(status="resolved", last_decision=decision)
+                    update_event_result(event_id, decision)
                 except Exception as exc:
                     print(f"[Watchtower] handle_fall_event failed: {exc}")
                     _update_status(status="resolved", last_decision="unknown")
+                    mark_event_failed(event_id, reason=str(exc))
         else:
             # Reuse the last frame's detections/boxes for the skipped
             # frames so the video still shows bounding boxes on every
@@ -157,6 +268,15 @@ def generate_frame():
             annotated_frame = box_annotator.annotate(scene=frame, detections=detections)
         else:
             annotated_frame = frame
+
+        # Reset the displayed status back to "monitoring" once we're
+        # well past the last event's cooldown window. Without this, the
+        # dashboard stays stuck on "resolved" (or "calling", if the call
+        # itself failed) forever, even though the CV pipeline is still
+        # actively watching for the next fall in the background.
+        if status_state["status"] != "monitoring" and _last_event_time:
+            if time.time() - _last_event_time >= EVENT_COOLDOWN_SECONDS:
+                _update_status(status="monitoring")
 
         _, buffer = cv2.imencode('.jpg', annotated_frame)
         frame_byte = buffer.tobytes()
@@ -176,6 +296,11 @@ def get_frame():
 @app.get('/status')
 def get_status():
     return status_state
+
+
+@app.get('/history')
+def get_history(limit: int = 20):
+    return get_recent_events(limit=limit)
 
 
 DASHBOARD_HTML = """
