@@ -209,7 +209,7 @@ def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
 
 
 def generate_frame():
-    cap = cv2.VideoCapture("Make_a_video_of_an_old_person.mp4")
+    cap = cv2.VideoCapture(0)
 
     # Lower capture resolution - fewer pixels to process per frame.
     # 640x480 is plenty for fall detection; drop further (e.g. 480x360)
