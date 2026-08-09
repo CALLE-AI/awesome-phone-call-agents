@@ -1,0 +1,172 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { runWatchOnce, stopWatch } from "@/app/actions";
+import { statsFromResults } from "@/core/watch";
+import { provenanceLabel as pl } from "@/core/frame";
+import type { LineCallResult, Watch } from "@/core/types";
+
+const VERDICT_META: Record<
+  string,
+  { label: string; className: string; dot: string }
+> = {
+  open: { label: "Open", className: "text-emerald-400", dot: "bg-emerald-400" },
+  waitlist: { label: "Waitlist", className: "text-amber-400", dot: "bg-amber-400" },
+  not_accepting: { label: "Not accepting", className: "text-orange-400", dot: "bg-orange-400" },
+  ghost: { label: "Ghost listing", className: "text-red-400", dot: "bg-red-400" },
+  unreachable: { label: "Unreachable", className: "text-zinc-500", dot: "bg-zinc-500" },
+  declined: { label: "Declined to answer", className: "text-zinc-400", dot: "bg-zinc-400" },
+  blocked: { label: "Not called", className: "text-zinc-600", dot: "bg-zinc-600" },
+};
+
+export function WatchClient({
+  watch,
+  runCount,
+  results,
+}: {
+  watch: Watch;
+  runCount: number;
+  results: LineCallResult[];
+}) {
+  const [pending, startTransition] = useTransition();
+  const [status, setStatus] = useState(watch.status);
+  const [error, setError] = useState<string | null>(null);
+
+  const stats = statsFromResults(results);
+
+  function runNow() {
+    startTransition(async () => {
+      const res = await runWatchOnce(watch.id);
+      if (!res.ok) {
+        setError(res.error ?? "Run failed.");
+        return;
+      }
+      setError(null);
+      // Refresh the latest results from the server.
+      window.location.reload();
+    });
+  }
+
+  function stop() {
+    startTransition(async () => {
+      await stopWatch(watch.id);
+      setStatus("stopped");
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <section>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Your watch</h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              {watch.spec.need} · {watch.spec.plan} · {watch.spec.location} · target{" "}
+              {watch.targetOpen} open
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-zinc-700 px-3 py-1 text-sm">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  status === "active" ? "bg-emerald-400" : "bg-zinc-500"
+                }`}
+              />
+              {status}
+            </span>
+            {status === "active" && (
+              <button
+                onClick={runNow}
+                disabled={pending}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {pending ? "Calling…" : "Run now"}
+              </button>
+            )}
+            {status === "active" && (
+              <button
+                onClick={stop}
+                disabled={pending}
+                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Called" value={stats.called} />
+        <Stat label="Open" value={stats.open} accent="text-emerald-400" />
+        <Stat label="Ghost listings" value={stats.ghost} accent="text-red-400" />
+        <Stat label="Unreachable" value={stats.unreachable} accent="text-zinc-500" />
+      </section>
+
+      {status === "active" && runCount === 0 && results.length === 0 && (
+        <p className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">
+          Nothing has been called yet. Press <strong>Run now</strong> to dial the listed
+          practices. Each call identifies itself as an automated assistant and asks only about
+          plan acceptance and availability.
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">
+          {error}
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+            Verified listings
+          </h2>
+          <ul className="divide-y divide-zinc-800 rounded-xl border border-zinc-800 bg-zinc-900/40">
+            {results.map((r) => {
+              const candidate = watch.candidates.find((c) => c.id === r.candidateId);
+              const meta = VERDICT_META[r.verdict] ?? VERDICT_META.blocked!;
+              return (
+                <li key={r.candidateId} className="flex items-start gap-3 p-4">
+                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${meta.dot}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="font-medium">{candidate?.name ?? "Listing"}</span>
+                      <span className={`text-sm ${meta.className}`}>{meta.label}</span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-zinc-500">
+                      {candidate?.phoneDisplay ?? candidate?.phoneE164}
+                      {" · "}
+                      {candidate ? pl(candidate.provenance) : ""}
+                      {r.calleCallId ? ` · ${r.calleCallId}` : ""}
+                    </div>
+                    {r.evidence && (
+                      <p className="mt-1 text-sm italic text-zinc-400">&ldquo;{r.evidence}&rdquo;</p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+      <div className={`mt-1 text-2xl font-semibold ${accent ?? "text-zinc-100"}`}>{value}</div>
+    </div>
+  );
+}
