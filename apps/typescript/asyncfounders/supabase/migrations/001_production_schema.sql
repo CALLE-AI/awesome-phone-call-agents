@@ -228,7 +228,7 @@ create policy "source_read" on public.sources for select using (public.is_compan
 create policy "source_create" on public.sources for insert with check (public.is_company_member(company_id) and added_by=auth.uid());
 create policy "chunk_read" on public.source_chunks for select using (public.is_company_member(company_id));
 create policy "chunk_create" on public.source_chunks for insert with check (public.is_company_member(company_id));
-create policy "call_read" on public.call_sessions for select using (public.is_company_member(company_id));
+create policy "call_read" on public.call_sessions for select using (requested_by=auth.uid() and public.is_company_member(company_id));
 create policy "memory_read" on public.memory_items for select using (public.is_company_member(company_id));
 create policy "ack_read" on public.acknowledgements for select using (public.is_company_member((select company_id from public.memory_items where id=memory_item_id)));
 create policy "ack_write" on public.acknowledgements for all using (member_id in (select id from public.company_members where user_id=auth.uid())) with check (member_id in (select id from public.company_members where user_id=auth.uid()));
@@ -239,6 +239,54 @@ values('company-sources','company-sources',false,10485760,array['text/plain','te
 on conflict(id) do update set public=false,file_size_limit=10485760;
 create policy "source_blob_read" on storage.objects for select using (bucket_id='company-sources' and public.is_company_member((storage.foldername(name))[1]::uuid));
 create policy "source_blob_insert" on storage.objects for insert with check (bucket_id='company-sources' and public.is_company_member((storage.foldername(name))[1]::uuid));
+
+create or replace function public.create_call_preview(
+  target_session uuid,
+  target_company uuid,
+  target_member uuid,
+  target_user uuid,
+  target_mode text,
+  target_provider text,
+  target_fingerprint text,
+  target_preview jsonb
+)
+returns jsonb language plpgsql security definer set search_path = public
+as $$
+declare existing_session record;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(target_company::text || ':' || target_member::text || ':' || target_user::text, 0));
+  if not exists (
+    select 1 from public.company_members
+    where id=target_member and company_id=target_company and user_id=target_user and status='active'
+  ) then raise exception 'Requester is not the active callback recipient'; end if;
+  if (target_preview->>'previewId') is distinct from target_session::text
+    or (target_preview->>'companyId') is distinct from target_company::text
+    or (target_preview->>'memberId') is distinct from target_member::text
+    or (target_preview->>'requestedBy') is distinct from target_user::text
+    or (target_preview->>'fingerprint') is distinct from target_fingerprint
+  then raise exception 'Preview payload mismatch'; end if;
+
+  update public.call_sessions
+  set status='expired'
+  where company_id=target_company and member_id=target_member and requested_by=target_user
+    and status='previewed' and (preview->>'expiresAt')::timestamptz < now();
+
+  select id,status,provider_call_id into existing_session
+  from public.call_sessions
+  where company_id=target_company and member_id=target_member and requested_by=target_user
+    and status not in ('completed','failed','cancelled','canceled','no_answer','busy','declined','expired','voicemail')
+  order by requested_at desc limit 1;
+
+  if existing_session.id is not null then
+    return jsonb_build_object('created',false,'previewId',existing_session.id,'status',existing_session.status,'providerCallId',existing_session.provider_call_id);
+  end if;
+
+  insert into public.call_sessions(id,company_id,member_id,requested_by,mode,provider,status,payload_fingerprint,preview)
+  values(target_session,target_company,target_member,target_user,target_mode,target_provider,'previewed',target_fingerprint,target_preview);
+  return jsonb_build_object('created',true,'previewId',target_session,'status','previewed');
+end $$;
+revoke all on function public.create_call_preview(uuid,uuid,uuid,uuid,text,text,text,jsonb) from public, anon, authenticated;
+grant execute on function public.create_call_preview(uuid,uuid,uuid,uuid,text,text,text,jsonb) to service_role;
 
 create or replace function public.claim_call_session(target_session uuid, target_user uuid, expected_fingerprint text)
 returns jsonb language plpgsql security definer set search_path = public

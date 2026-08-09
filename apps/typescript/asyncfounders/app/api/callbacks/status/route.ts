@@ -34,25 +34,28 @@ export async function GET(request: Request) {
       .filter((item): item is string => typeof item === "string" && item.trim().length > 0);
     const update: Record<string, unknown> = {
       status: call.status,
-      result: { summary: call.summary, taskCompleted: call.taskCompleted, confidence: call.completionConfidence, providerEvidence: call.evidence, transcriptEvidence },
+      result: { taskCompleted: call.taskCompleted, confidenceScore: call.completionConfidence?.score ?? null },
     };
     let inserted = 0;
     if (terminal.has(call.status)) {
       update.completed_at = call.completedAt ?? new Date().toISOString();
-      const result = memoryResultValidator.safeParse(call.recipients[0]?.structuredResult);
+      const result = memoryResultValidator.safeParse((call.recipients ?? [])[0]?.structuredResult);
       const score = call.completionConfidence?.score ?? 0;
-      if (call.status === "completed" && call.taskCompleted === true && score >= 0.75 && result.success) {
+      const accepted = call.status === "completed" && call.taskCompleted === true && score >= 0.75 && result.success && result.data.outcome === "complete";
+      if (accepted) {
         const payload = admittedMemoryItems(result.data, transcriptEvidence);
         if (payload.length > 0) {
           const { data, error } = await supabase.rpc("ingest_call_memory", { target_session: session.id, target_user: user.id, memory_payload: payload });
           if (error) throw error;
           inserted = Number(data ?? 0);
-          const preview = storedPreviewSchema.safeParse(session.preview);
-          if (inserted > 0 && preview.success && session.mode === "catchup") {
-            await supabase.from("company_members").update({ last_briefed_version: preview.data.contextVersion }).eq("id", session.member_id).eq("company_id", session.company_id);
-          }
+        }
+        const preview = storedPreviewSchema.safeParse(session.preview);
+        if (preview.success && session.mode === "catchup") {
+          const { error: briefingError } = await supabase.from("company_members").update({ last_briefed_version: preview.data.contextVersion }).eq("id", session.member_id).eq("company_id", session.company_id);
+          if (briefingError) throw briefingError;
         }
       }
+      update.result = { taskCompleted: call.taskCompleted, confidenceScore: score, outcome: result.success ? result.data.outcome : "invalid", memoryItemsCreated: inserted };
     }
     const { error: updateError } = await supabase.from("call_sessions").update(update).eq("id", session.id);
     if (updateError) throw updateError;

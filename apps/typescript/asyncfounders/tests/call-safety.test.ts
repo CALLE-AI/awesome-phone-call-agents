@@ -42,9 +42,31 @@ test("catchup and ask require approved company context", () => {
   assert.ok(approvedCallContext("ask", [], 0).reason);
 });
 
+test("catchup advances only through the oldest thirty included updates", () => {
+  const memories = Array.from({ length: 35 }, (_, index) => ({ version: 35 - index, kind: "fact", title: `Update ${35 - index}`, body: "Company update.", status: "accepted", confidence: 0.9, source_excerpt: null }));
+  const context = approvedCallContext("catchup", memories, 0);
+  assert.equal(context.contextVersion, 30);
+  assert.match(context.briefing ?? "", /\[v1 /);
+  assert.match(context.briefing ?? "", /\[v30 /);
+  assert.doesNotMatch(context.briefing ?? "", /\[v31 /);
+});
+
+test("catchup cursor excludes updates omitted by the briefing byte budget", () => {
+  const memories = Array.from({ length: 4 }, (_, index) => ({ version: index + 1, kind: "fact", title: `Long update ${index + 1}`, body: "x".repeat(5_000), status: "accepted", confidence: 0.9, source_excerpt: null }));
+  const context = approvedCallContext("catchup", memories, 0);
+  assert.equal(context.contextVersion, 2);
+  assert.doesNotMatch(context.briefing ?? "", /\[v3 /);
+});
+
 test("ambiguous or uncorroborated provider memory fails closed", () => {
   const item = { type: "decision", title: "Private beta", body: "Ship to five teams.", status: "accepted", confidence: "high" as const, source_excerpt: "Five teams is the approved private beta.", audience: ["team"] };
   assert.equal(admittedMemoryItems({ outcome: "unknown", memory_items: [item] }, [item.source_excerpt]).length, 0);
   assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [item] }, ["The weather is clear today."]).length, 0);
   assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [item] }, ["Yes, five teams is the approved private beta."]).length, 1);
+});
+
+test("a denial cannot corroborate an affirmative memory claim", () => {
+  const denied = { type: "decision", title: "Private beta approved", body: "The founder approved the private beta.", status: "accepted", confidence: "high" as const, source_excerpt: "We did not approve the private beta.", audience: ["team"] };
+  assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [denied] }, ["Founder: We did not approve the private beta."]).length, 0);
+  assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [{ ...denied, source_excerpt: "We didn’t approve the private beta." }] }, ["Founder: We didn’t approve the private beta."]).length, 0);
 });

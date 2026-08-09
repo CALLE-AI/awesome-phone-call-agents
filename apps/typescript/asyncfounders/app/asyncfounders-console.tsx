@@ -2137,6 +2137,10 @@ function CallModal({
                 </ol>
               )}
             </div>
+            <div className="call-task">
+              <small>EXACT CALL SCRIPT</small>
+              <pre>{String(preview.task)}</pre>
+            </div>
           </div>
           <div className="eligibility yes">
             <ShieldCheck />

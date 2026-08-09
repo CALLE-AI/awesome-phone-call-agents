@@ -89,9 +89,19 @@ function formatMemory(item: MemoryContext) {
 
 export function approvedCallContext(mode: "deposit" | "catchup" | "ask", memories: MemoryContext[], lastBriefedVersion: number) {
   if (mode === "catchup") {
-    const unseen = memories.filter((item) => item.version > lastBriefedVersion);
+    const unseen = memories.filter((item) => item.version > lastBriefedVersion).sort((left, right) => left.version - right.version);
     if (!unseen.length) return { briefing: null, reason: "There are no unseen company updates to brief yet.", contextVersion: lastBriefedVersion };
-    return { briefing: `Approved unseen company memory:\n${unseen.slice(0, 30).map(formatMemory).join("\n")}`.slice(0, 14_000), reason: null, contextVersion: Math.max(...unseen.map((item) => item.version)) };
+    const heading = "Approved unseen company memory:\n";
+    const included: MemoryContext[] = [];
+    let briefing = heading;
+    for (const item of unseen.slice(0, 30)) {
+      const line = `${included.length ? "\n" : ""}${formatMemory(item)}`;
+      if (briefing.length + line.length > 14_000) break;
+      briefing += line;
+      included.push(item);
+    }
+    if (!included.length) return { briefing: null, reason: "The next unseen update is too large for a safe call briefing.", contextVersion: lastBriefedVersion };
+    return { briefing, reason: null, contextVersion: Math.max(...included.map((item) => item.version)) };
   }
   if (mode === "ask") {
     const question = memories.find((item) => item.kind === "question" && !["answered", "resolved", "dismissed", "superseded"].includes(item.status));
@@ -102,21 +112,18 @@ export function approvedCallContext(mode: "deposit" | "catchup" | "ask", memorie
   return { briefing: recent.length ? `Recent company memory for clarification only:\n${recent.map(formatMemory).join("\n")}`.slice(0, 8_000) : undefined, reason: null, contextVersion: memories[0]?.version ?? lastBriefedVersion };
 }
 
-function normalizedTokens(value: string) {
-  return new Set((value.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []).filter((token) => !["that", "this", "with", "from", "have", "were", "will", "would", "there", "their"].includes(token)));
+function normalizedEvidence(value: string) {
+  return value.normalize("NFKC").replace(/[’‘]/g, "'").toLowerCase().replace(/[^\p{L}\p{N}' ]/gu, " ").replace(/\s+/g, " ").trim();
 }
 
-export function excerptIsCorroborated(excerpt: string, evidence: string[]) {
-  const cleanExcerpt = excerpt.trim().toLowerCase();
-  const corpus = evidence.map((item) => item.trim().toLowerCase()).filter(Boolean).join(" ");
-  if (cleanExcerpt.length < 8 || corpus.length < 8) return false;
-  if (corpus.includes(cleanExcerpt) || cleanExcerpt.includes(corpus)) return true;
-  const excerptTokens = normalizedTokens(cleanExcerpt);
-  const corpusTokens = normalizedTokens(corpus);
-  if (excerptTokens.size < 2) return false;
-  let matches = 0;
-  for (const token of excerptTokens) if (corpusTokens.has(token)) matches += 1;
-  return matches >= 2 && matches / excerptTokens.size >= 0.5;
+function hasContradictionSignal(value: string) {
+  return /\b(?:no|not|never|neither|nor|without|cannot|can't|won't|didn't|doesn't|isn't|wasn't|shouldn't|deny|denied|decline|declined|reject|rejected|refuse|refused|oppose|opposed|disagree|disagreed|cancel|cancelled|canceled|pending|undecided|unapproved|uncertain|maybe|might|could|considering|proposed)\b/i.test(value);
+}
+
+export function excerptIsCorroborated(excerpt: string, evidence: string[], claim = excerpt) {
+  const cleanExcerpt = normalizedEvidence(excerpt);
+  if (cleanExcerpt.length < 8 || hasContradictionSignal(cleanExcerpt) !== hasContradictionSignal(normalizedEvidence(claim))) return false;
+  return evidence.some((turn) => normalizedEvidence(turn).includes(cleanExcerpt));
 }
 
 export function admittedMemoryItems(result: {
@@ -125,6 +132,6 @@ export function admittedMemoryItems(result: {
 }, evidence: string[]) {
   if (result.outcome !== "complete" || !evidence.some((item) => item.trim().length >= 8)) return [];
   return result.memory_items
-    .filter((item) => ["high", "medium"].includes(item.confidence) && excerptIsCorroborated(item.source_excerpt, evidence))
+    .filter((item) => ["high", "medium"].includes(item.confidence) && excerptIsCorroborated(item.source_excerpt, evidence, `${item.title} ${item.body}`))
     .map((item) => ({ ...item, confidence: item.confidence === "high" ? 0.9 : 0.7 }));
 }

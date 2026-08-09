@@ -3,8 +3,6 @@ import { authenticatedUser, adminSupabase } from "../../../../lib/supabase";
 import { buildTask, fingerprint, maskPhone, modeConfig, previewInputSchema, supportedCalleRegions } from "../../../../lib/callbacks";
 import { approvedCallContext, fingerprintInput, recipientQuietHours, type PreviewCore } from "../../../../lib/call-safety";
 
-const terminal = new Set(["completed", "failed", "cancelled", "canceled", "no_answer", "busy", "declined", "expired", "voicemail"]);
-
 export async function POST(request: Request) {
   try {
     const user = await authenticatedUser(request);
@@ -22,31 +20,24 @@ export async function POST(request: Request) {
     if (rateError) throw rateError;
     if ((recentRequests ?? 0) >= 12) return NextResponse.json({ message: "Callback limit reached. Try again in an hour." }, { status: 429, headers: { "Retry-After": "3600" } });
 
-    const [companyResult, memberResult, memoryResult, sessionResult] = await Promise.all([
+    const [companyResult, memberResult] = await Promise.all([
       supabase.from("companies").select("id,name,current_version").eq("id", parsed.data.companyId).single(),
       supabase.from("company_members").select("id,display_name,region,locale,timezone,phone_e164,phone_last_four,call_consent,status,quiet_hours_start,quiet_hours_end,last_briefed_version").eq("id", parsed.data.memberId).eq("company_id", parsed.data.companyId).single(),
-      supabase.from("memory_items").select("version,kind,title,body,status,confidence,source_excerpt").eq("company_id", parsed.data.companyId).order("version", { ascending: false }).limit(80),
-      supabase.from("call_sessions").select("id,status,preview,provider_call_id").eq("company_id", parsed.data.companyId).eq("member_id", parsed.data.memberId).eq("requested_by", user.id).order("requested_at", { ascending: false }).limit(12),
     ]);
-    const queryError = [companyResult, memberResult, memoryResult, sessionResult].find((result) => result.error)?.error;
+    const queryError = [companyResult, memberResult].find((result) => result.error)?.error;
     if (queryError) throw queryError;
     const company = companyResult.data;
     const member = memberResult.data;
-    const memories = memoryResult.data;
-    const existingSessions = sessionResult.data;
     if (!company || !member || member.status !== "active") return NextResponse.json({ message: "That founder is not an active company member." }, { status: 404 });
     if (!member.call_consent || !member.phone_e164 || !member.phone_last_four) return NextResponse.json({ message: `${member.display_name} has not enabled AI callbacks.` }, { status: 422 });
     if (!supportedCalleRegions.has(member.region)) return NextResponse.json({ message: `CALL-E does not currently support ${member.region}. Their workspace access is unaffected.` }, { status: 422 });
 
-    for (const previous of existingSessions ?? []) {
-      if (terminal.has(previous.status)) continue;
-      const expiresAt = typeof previous.preview === "object" && previous.preview && "expiresAt" in previous.preview ? String(previous.preview.expiresAt) : null;
-      if (previous.status === "previewed" && expiresAt && new Date(expiresAt).getTime() < Date.now()) {
-        await supabase.from("call_sessions").update({ status: "expired" }).eq("id", previous.id).eq("status", "previewed");
-        continue;
-      }
-      return NextResponse.json({ message: previous.status === "dispatching" && !previous.provider_call_id ? "A previous call dispatch has an ambiguous result. Confirm that same preview again to reconcile it before creating another." : "A callback for this founder is already unresolved. Finish or expire it before creating another preview.", previewId: previous.id, status: previous.status }, { status: 409 });
-    }
+    let memoryQuery = supabase.from("memory_items").select("version,kind,title,body,status,confidence,source_excerpt").eq("company_id", parsed.data.companyId);
+    memoryQuery = parsed.data.mode === "catchup"
+      ? memoryQuery.gt("version", member.last_briefed_version).order("version", { ascending: true }).limit(30)
+      : memoryQuery.order("version", { ascending: false }).limit(80);
+    const { data: memories, error: memoryError } = await memoryQuery;
+    if (memoryError) throw memoryError;
 
     const quiet = recipientQuietHours({ timezone: member.timezone, start: member.quiet_hours_start, end: member.quiet_hours_end });
     if (quiet.quiet) return NextResponse.json({ message: `This founder is in quiet hours${quiet.localTime ? ` (local time ${quiet.localTime})` : ""}. Prepare the call after quiet hours end.` }, { status: 422 });
@@ -73,9 +64,11 @@ export async function POST(request: Request) {
     };
     const payloadFingerprint = await fingerprint(fingerprintInput(core, member.phone_e164));
     const preview = { ...core, fingerprint: payloadFingerprint, maskedPhone: maskPhone(member.phone_e164, member.phone_last_four), purpose: modeConfig[parsed.data.mode].purpose, questions: modeConfig[parsed.data.mode].questions, duration: modeConfig[parsed.data.mode].duration };
-    const { error } = await supabase.from("call_sessions").insert({ id: previewId, company_id: company.id, member_id: member.id, requested_by: user.id, mode: parsed.data.mode, provider, status: "previewed", payload_fingerprint: payloadFingerprint, preview });
+    const { data: creation, error } = await supabase.rpc("create_call_preview", { target_session: previewId, target_company: company.id, target_member: member.id, target_user: user.id, target_mode: parsed.data.mode, target_provider: provider, target_fingerprint: payloadFingerprint, target_preview: preview });
     if (error) throw error;
-    return NextResponse.json({ previewId, companyVersion: core.companyVersion, contextVersion: core.contextVersion, memberId: member.id, mode: parsed.data.mode, provider, requestedBy: user.id, createdAt, expiresAt, fingerprint: payloadFingerprint, recipient: member.display_name, maskedPhone: preview.maskedPhone, purpose: preview.purpose, questions: preview.questions, duration: preview.duration, warning: live ? "This exact task, company version and masked destination will place a real outbound call after confirmation." : "Safe demo mode is active; no phone will be dialled." });
+    const result = creation as { created?: boolean; previewId?: string; status?: string; providerCallId?: string | null } | null;
+    if (!result?.created) return NextResponse.json({ message: result?.status === "dispatching" && !result.providerCallId ? "A previous call dispatch has an ambiguous result. Confirm that same preview again to reconcile it before creating another." : "A callback for you is already unresolved. Finish or expire it before creating another preview.", previewId: result?.previewId, status: result?.status }, { status: 409 });
+    return NextResponse.json({ previewId, companyVersion: core.companyVersion, contextVersion: core.contextVersion, memberId: member.id, mode: parsed.data.mode, provider, requestedBy: user.id, createdAt, expiresAt, fingerprint: payloadFingerprint, recipient: member.display_name, maskedPhone: preview.maskedPhone, purpose: preview.purpose, questions: preview.questions, duration: preview.duration, task, warning: live ? "Review the exact script below. This company version and masked destination will place a real outbound call after confirmation." : "Review the exact script below. Safe demo mode is active; no phone will be dialled." });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Could not prepare the callback." }, { status: 500 });
   }

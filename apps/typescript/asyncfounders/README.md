@@ -25,7 +25,9 @@ Live demo: https://asyncfounders.vercel.app/
 - A real outbound call is possible only when an active member calls themselves, has explicit callback consent, reviews the exact masked preview, and confirms that unexpired preview.
 - Callback profiles use E.164 numbers. Client-visible previews mask the phone number, and CALL-E credentials remain server-only.
 - Recipient-local quiet hours are enforced at preview and again immediately before dispatch.
+- Preview creation is serialized per requester and recipient, and the full generated call script is shown before confirmation.
 - A preview is valid for ten minutes and its fingerprint is bound into the CALL-E idempotency key. An ambiguous create remains `dispatching`; reconfirm that same preview to reconcile the stable key instead of creating a replacement.
+- Raw transcripts and provider evidence are used transiently for validation and are never retained in company-readable call sessions.
 - AsyncFounders does not create recurring call schedules. To stop future calls, revoke callback consent or set `CALLE_LIVE_CALLS_ENABLED=false`. For a call already queued or active, use the CALL-E dashboard.
 - The call agent may collect team updates and questions only. It is instructed not to make purchases, commitments, schedules, promises, or external actions, and this workflow must not be used for medical, legal, financial, emergency, authentication, or other high-risk decisions.
 
@@ -44,7 +46,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-For a new database, run `supabase/migrations/001_production_schema.sql` in the Supabase SQL editor. Existing deployments that already ran `001` must also run `supabase/migrations/002_callback_safety.sql`. Then configure:
+For a new database, run `supabase/migrations/001_production_schema.sql` in the Supabase SQL editor. Existing deployments must run the numbered migrations in order, including `002_callback_safety.sql` and `003_atomic_call_previews.sql`. Then configure:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL

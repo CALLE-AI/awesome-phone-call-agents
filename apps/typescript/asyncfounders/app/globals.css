@@ -5,6 +5,8 @@
 @import "@fontsource/poppins/500.css";
 @import "@fontsource/poppins/600.css";
 
+.call-task pre{margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.65 var(--sans);color:var(--ink);background:var(--off);border:1px solid var(--line);padding:12px;max-height:260px;overflow:auto}
+
 :root{--green:#18e36b;--green-dark:#066f34;--green-soft:#eafff2;--ink:#070b09;--muted:#667069;--line:#dfe7e1;--paper:#fff;--off:#f7faf8;--black:#070a08;--danger:#e5484d;--serif:"Instrument Serif",Georgia,serif;--sans:"Poppins",Arial,sans-serif}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--paper);font-family:var(--sans);font-size:14px;font-weight:400}button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}.button-reset{border:0;background:none}.spin{animation:spin .85s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .wordmark{display:inline-flex;align-items:center;gap:8px;color:var(--ink);text-decoration:none}.wordmark strong{font-size:18px;letter-spacing:-1px}.wordmark b{color:var(--green);font-size:24px}.signal-mark{width:25px;height:22px;display:flex;gap:3px;align-items:flex-end}.signal-mark i{display:block;width:5px;background:var(--ink)}.signal-mark i:nth-child(1){height:9px}.signal-mark i:nth-child(2){height:16px;background:var(--green)}.signal-mark i:nth-child(3){height:22px}

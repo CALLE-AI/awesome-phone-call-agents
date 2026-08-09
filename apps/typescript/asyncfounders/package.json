@@ -35,6 +35,7 @@
     "typescript": "5.9.3"
   },
   "overrides": {
+    "nanoid": "3.3.17",
     "postcss": "8.5.25",
     "sharp": "0.35.3"
   },
