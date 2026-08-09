@@ -1,0 +1,12 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+__pycache__/
+*.py[cod]
+*.egg-info/
+data/
+artifacts/*
+!artifacts/.gitkeep
+!artifacts/example-preview.json
+!artifacts/example-simulation.json

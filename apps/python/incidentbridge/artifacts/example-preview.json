@@ -1,0 +1,130 @@
+{
+  "mode": "preview",
+  "creates_phone_call": false,
+  "input": {
+    "workflow_id": "wf-acme-vendor-outage-001",
+    "incident_id": "INC-2026-0810",
+    "support_phone": "+15******100",
+    "authorized_support_contact": true,
+    "caller_business_name": "Acme Data Operations",
+    "provider_name": "ExampleCloud",
+    "affected_service": "managed ingestion endpoint",
+    "incident_summary": "Requests return elevated 503 responses and the public status page has no incident entry.",
+    "severity": "outage",
+    "observed_at_utc": "2026-08-10T01:20:00Z",
+    "region": "US",
+    "locale": "en-US"
+  },
+  "idempotency_key": "incidentbridge-7ead3f7bb4ccba57f8f87923c712fb0f11b8ad8a4c2fa18acb2430d168ac75c6",
+  "call_arguments": {
+    "task": "Call the authorized business support contact for ExampleCloud on behalf of Acme Data Operations. Identify yourself as an AI calling assistant and ask whether this is the correct support desk and whether they consent to continue. If either answer is not clearly yes, disclose no incident details and end the call. Never request or reveal credentials, authentication codes, customer data, personal data, payment information, or contract terms. After consent, reference incident INC-2026-0810. The affected service is managed ingestion endpoint; severity is outage; it was observed at 2026-08-10T01:20:00Z. Non-sensitive summary: Requests return elevated 503 responses and the public status page has no incident entry. Ask whether the vendor acknowledges the incident, request a support ticket identifier, current status, estimated time in minutes if known, a safe operational workaround if available, and a callback window. Read back the captured facts once. Do not accept new commercial terms, authorize changes, claim the service is restored, close the incident, or schedule another call. If the support contact requests a human, mark human escalation.",
+    "recipients": [
+      {
+        "phones": [
+          "+15******100"
+        ],
+        "region": "US",
+        "locale": "en-US"
+      }
+    ],
+    "result_schema": {
+      "type": "object",
+      "required": [
+        "right_support_desk",
+        "continued_after_ai_disclosure",
+        "incident_acknowledged",
+        "ticket_id",
+        "vendor_status",
+        "eta_minutes",
+        "workaround_available",
+        "workaround_summary",
+        "callback_window",
+        "human_escalation_required",
+        "evidence_summary"
+      ],
+      "properties": {
+        "right_support_desk": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "continued_after_ai_disclosure": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "incident_acknowledged": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "ticket_id": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "vendor_status": {
+          "type": "string",
+          "enum": [
+            "investigating",
+            "identified",
+            "monitoring",
+            "resolved",
+            "unknown"
+          ]
+        },
+        "eta_minutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 10080
+        },
+        "workaround_available": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "workaround_summary": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "callback_window": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "human_escalation_required": {
+          "type": "string",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "evidence_summary": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "workflow_id": "wf-acme-vendor-outage-001",
+      "workflow_type": "vendor_incident_support",
+      "incident_id": "INC-2026-0810"
+    }
+  },
+  "decision_authority": "A human verifies recovery and closes the incident."
+}
