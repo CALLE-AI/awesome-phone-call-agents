@@ -103,6 +103,13 @@ asserts the observed `POST /v1/calls`, bearer authentication, idempotency header
 `GET /v1/calls/{id}` poll. It proves CALL-E is imported and called at runtime without placing a real
 phone call during tests.
 
+## Verified live boundary
+
+An authorized live CALL-E run reached an unavailable voicemail, returned `task_completed: false`
+with 0.85 confidence, and produced a real provider call ID. IncidentBridge treats that result as
+`needs_human`, keeps `incident_closed: "false"`, and does not auto-retry. The redacted evidence is in
+[`artifacts/calle-live-no-answer.json`](artifacts/calle-live-no-answer.json).
+
 ## Scope
 
 IncidentBridge coordinates a single business support conversation. It is not emergency response,

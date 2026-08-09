@@ -68,7 +68,8 @@ def result_schema() -> dict[str, Any]:
 def build_task(request: IncidentRequest) -> str:
     return (
         f"Call the authorized business support contact for {request.provider_name} on behalf "
-        f"of {request.caller_business_name}. Identify yourself as an AI calling assistant and "
+        f"of {request.caller_business_name}. Conduct the call in locale {request.locale}. "
+        "Identify yourself as an AI calling assistant and "
         "ask whether this is the correct support desk and whether they consent to continue. If "
         "either answer is not clearly yes, disclose no incident details and end the call. Never "
         "request or reveal credentials, authentication codes, customer data, personal data, "

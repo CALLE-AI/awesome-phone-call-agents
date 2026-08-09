@@ -1,0 +1,27 @@
+{
+  "evidence_type": "live_call_fail_closed",
+  "provider": "CALL-E",
+  "transport": "official OAuth CLI",
+  "run_id": "sqZiNyPhRVQJKGZRD1a7MA",
+  "call_id": "a642b7ef522d45569b9d3e8e491693ce",
+  "status": "COMPLETED",
+  "started_at": "2026-08-09T18:34:13.995644Z",
+  "ended_at": "2026-08-09T18:34:22.795062Z",
+  "duration_seconds": 8,
+  "recipient": "redacted authorized test number",
+  "task_completed": false,
+  "completion_confidence": {
+    "score": 0.85,
+    "label": "high"
+  },
+  "decision": {
+    "route": "needs_human",
+    "incident_closed": "false",
+    "automatic_retry": false
+  },
+  "evidence": [
+    "The call reached an automated voicemail-unavailable message rather than the recipient.",
+    "No consent or role-play support details were obtained.",
+    "No voicemail could be left because the mailbox was not set up."
+  ]
+}

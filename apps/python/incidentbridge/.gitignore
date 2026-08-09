@@ -10,3 +10,4 @@ artifacts/*
 !artifacts/.gitkeep
 !artifacts/example-preview.json
 !artifacts/example-simulation.json
+!artifacts/calle-live-no-answer.json
