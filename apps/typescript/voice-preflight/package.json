@@ -1,0 +1,19 @@
+{
+  "name": "calle-voice-preflight",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hear a CALL-E task script through your own text-to-speech provider before a real person does, and refuse to dial when a line you declared critical would not survive being spoken.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "node --import tsx demo/run-local.ts",
+    "voice": "node --import tsx src/cli.ts",
+    "preview": "node --import tsx src/cli.ts preview --script examples/script.example.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
