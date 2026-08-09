@@ -36,6 +36,7 @@ from mobilize.core.ids import derive_mobilization_id
 from mobilize.core.ledger import Ledger
 from mobilize.core.policy import GovernancePolicy, load_governance_state
 from mobilize.core.types import Candidate, Need
+from mobilize.core.validation import mask_phone, stable_id_from_phone
 from mobilize.sim.population import generate_population
 from mobilize.transports.base import E164_RE, validate_timezone
 from mobilize.transports.simulated import SimulatedTransport
@@ -120,7 +121,14 @@ async def mobilize_real(
     request rather than resume a prior one."""
     invalid = [p for p in phones if not E164_RE.match(p)]
     if invalid:
-        return {"error": f"Not valid E.164 phone numbers, refusing to dispatch: {invalid}"}
+        # Masked even in the invalid list -- an MCP tool response can end
+        # up logged, relayed through an agent's context, or otherwise
+        # persisted somewhere the operator doesn't fully control, unlike a
+        # CLI error printed only to the operator's own terminal.
+        return {"error": f"Not valid E.164 phone numbers, refusing to dispatch: {[mask_phone(p) for p in invalid]}"}
+
+    if len(phones) != len(set(phones)):
+        return {"error": "phones contains a duplicate number -- each phone should appear once."}
 
     if len(timezones) != len(phones):
         return {"error": f"timezones must have exactly one entry per phones entry "
@@ -134,7 +142,7 @@ async def mobilize_real(
     if not confirm:
         return {
             "preview": True,
-            "would_call": list(zip(phones, timezones)),
+            "would_call": [(mask_phone(p), tz) for p, tz in zip(phones, timezones)],
             "need_label": need_label,
             "count_needed": count or len(phones),
             "deadline_minutes": deadline_minutes,
@@ -147,10 +155,12 @@ async def mobilize_real(
         return {"error": "CALLE_API_KEY not set in environment"}
 
     candidates = [
-        Candidate(id=f"real_{i}", phone=p, name=f"Recipient {i}", days_since_last_action=90,
+        # id derived from the phone number, not list position -- see
+        # cli.py's run_real for why a positional id is unsafe here.
+        Candidate(id=stable_id_from_phone(p), phone=p, name=f"Recipient {mask_phone(p)}", days_since_last_action=90,
                    distance_km=5, historical_accept_rate=0.5, historical_showup_rate=0.5,
                    timezone=tz)
-        for i, (p, tz) in enumerate(zip(phones, timezones))
+        for p, tz in zip(phones, timezones)
     ]
     need = Need(label=need_label, count=count or len(candidates), deadline_minutes=deadline_minutes,
                 location="", max_calls=len(candidates))

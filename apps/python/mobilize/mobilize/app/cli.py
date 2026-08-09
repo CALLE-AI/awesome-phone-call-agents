@@ -25,6 +25,7 @@ from mobilize.core.ledger import Ledger
 from mobilize.core.policy import GovernancePolicy, load_governance_state
 from mobilize.core.types import Candidate, Need
 from mobilize.sim.population import generate_population
+from mobilize.core.validation import stable_id_from_phone
 from mobilize.transports.base import validate_e164, validate_timezone
 from mobilize.transports.simulated import SimulatedTransport
 
@@ -86,6 +87,17 @@ async def run_real(phones: list[str], timezones: list[str], need_count: int, nee
             print(f"Refusing to dispatch: {exc}", file=sys.stderr)
             sys.exit(1)
 
+    if len(phones) != len(set(phones)):
+        # Two entries for the same phone would get two independent
+        # candidate ids under a positional scheme -- with stable,
+        # phone-derived ids (see below) they'd collide on the same id
+        # instead, which is correct but still means the SAME idempotency
+        # key gets used twice in one wave. Simplest, clearest fix: refuse
+        # up front rather than silently deduping or silently double-keying.
+        print("Refusing to dispatch: --phones contains a duplicate number. "
+              "Each phone should appear once.", file=sys.stderr)
+        sys.exit(1)
+
     if len(timezones) != len(phones):
         print(f"--timezones must list exactly one IANA timezone per --phones entry "
               f"({len(phones)} phones, {len(timezones)} timezones given). Real calls "
@@ -101,10 +113,16 @@ async def run_real(phones: list[str], timezones: list[str], need_count: int, nee
             sys.exit(1)
 
     candidates = [
-        Candidate(id=f"real_{i}", phone=p, name=f"Recipient {i}", days_since_last_action=90,
+        # id derived from the phone number, not list position -- a
+        # positional id (f"real_{i}") means reordering --phones on a later
+        # invocation silently reassigns one person's do-not-call/cooldown
+        # history and ledger idempotency to whoever now occupies that
+        # index. Stable across reordering, and naturally collides (caught
+        # above) rather than silently double-keying a duplicate phone.
+        Candidate(id=stable_id_from_phone(p), phone=p, name=f"Recipient {p}", days_since_last_action=90,
                    distance_km=5, historical_accept_rate=0.5, historical_showup_rate=0.5,
                    timezone=tz)
-        for i, (p, tz) in enumerate(zip(phones, timezones))
+        for p, tz in zip(phones, timezones)
     ]
     need = Need(label=need_label, count=need_count, deadline_minutes=60,
                 location="City Hospital", max_calls=len(candidates))

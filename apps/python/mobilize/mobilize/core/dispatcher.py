@@ -141,6 +141,7 @@ async def _mobilize_locked(
     all_results: list[CallResult] = []
     waves: list[Wave] = []
     confirmed: list[CallResult] = []
+    ambiguous_candidate_ids: list[str] = []
     calls_used = 0
     time_to_fill: float | None = None
 
@@ -205,6 +206,16 @@ async def _mobilize_locked(
     for candidate_id in dispatched_candidate_ids:
         remaining.pop(candidate_id, None)
 
+    # Candidates with a logged dispatch attempt that never resolved to
+    # either a confirmed call_id or a result -- an ambiguous prior failure
+    # (ValueError included) that must never be silently retried on a
+    # resume. This is deliberately conservative: even a "known safe"
+    # pre-flight validation failure stays excluded, which is also simply
+    # correct -- retrying the exact same invalid phone number again
+    # automatically was never going to succeed anyway.
+    for candidate_id in ledger.unresolved(mobilization_id):
+        remaining.pop(candidate_id, None)
+
     # 3. For anyone still in flight (dispatched, no result yet), attempt to
     #    actually recover their outcome by polling. Works against the real
     #    transport, since call state lives server-side and survives a
@@ -251,6 +262,7 @@ async def _mobilize_locked(
 
         wave = Wave(index=wave_index, candidate_ids=[c.id for c in plan.candidates])
         emit("wave_dispatch", {"wave": wave_index, "candidates": [c.id for c in plan.candidates]})
+        wave_ambiguous_ids: list[str] = []
 
         async def _dispatch_one(candidate: Candidate) -> tuple[str, str | None]:
             # Errors are caught HERE, per candidate, rather than left to
@@ -264,11 +276,31 @@ async def _mobilize_locked(
             # a real call goes out, gets cancelled client-side before
             # ledger.record_dispatch() ever runs, and the crash-safety
             # guarantee this whole module exists for is silently broken.
+            idem_key = ledger.idempotency_key(mobilization_id, candidate.id)
+            # Written BEFORE the network call, unconditionally: a durable
+            # breadcrumb that an attempt was made, so a failure that occurs
+            # AFTER CALL-E may have already accepted the request (a
+            # timeout, a connection reset) still leaves a trace for
+            # reconciliation instead of vanishing as if nothing happened.
+            ledger.record_dispatch_intent(mobilization_id, candidate.id)
             try:
-                idem_key = ledger.idempotency_key(mobilization_id, candidate.id)
                 call_id = await transport.dispatch(candidate, need.label, need.location, idempotency_key=idem_key)
-            except Exception as exc:
+            except ValueError as exc:
+                # Raised by our own pre-flight validation (e.g.
+                # validate_e164) before any network I/O -- definitely safe,
+                # not ambiguous. The intent entry stays orphaned in the
+                # ledger, which correctly means this exact candidate is
+                # never auto-retried (retrying the identical invalid phone
+                # number was never going to succeed).
                 emit("dispatch_failed", {"candidate_id": candidate.id, "error": str(exc)})
+                return candidate.id, None
+            except Exception as exc:
+                # Anything else -- a timeout, a connection reset, an HTTP
+                # error -- could mean CALL-E accepted the request before
+                # this exception surfaced. Genuinely unknown, not treated
+                # as "never happened."
+                emit("dispatch_failed", {"candidate_id": candidate.id, "error": str(exc), "ambiguous": True})
+                wave_ambiguous_ids.append(candidate.id)
                 return candidate.id, None
             ledger.record_dispatch(mobilization_id, candidate.id, call_id)
             if governance_state is not None:
@@ -290,19 +322,21 @@ async def _mobilize_locked(
         dispatched = await asyncio.gather(*(_dispatch_one(c) for c in plan.candidates))
         call_ids: dict[str, str] = {cid: call_id for cid, call_id in dispatched if call_id is not None}
         failed_ids = [cid for cid, call_id in dispatched if call_id is None]
+        ambiguous_candidate_ids.extend(wave_ambiguous_ids)
         # Only successful dispatches count toward the real-world calls_used
         # budget -- a candidate whose dispatch raised before CALL-E ever
         # accepted it was never actually called.
         calls_used += len(call_ids)
         for candidate_id in call_ids:
             remaining.pop(candidate_id, None)
-        # A candidate whose dispatch failed synchronously (bad phone, a
-        # provider error) is not retried within this same run -- that would
-        # risk an infinite loop for a permanently invalid number. They stay
-        # visible via the dispatch_failed event for the caller to act on; a
-        # later, separate mobilize() call for this mobilization_id can still
-        # pick them up since they were never marked as dispatched in the
-        # ledger.
+        # A candidate whose dispatch failed (bad phone, a provider error,
+        # or an ambiguous network failure) is not retried within this same
+        # run -- that would risk an infinite loop for a permanently invalid
+        # number. They stay visible via the dispatch_failed event, and the
+        # orphaned dispatch_intent ledger entry means a LATER, separate
+        # mobilize() call for this mobilization_id won't silently retry
+        # them either (see ledger.unresolved()) -- reconciliation is a
+        # deliberate, visible step, not an automatic retry.
         for candidate_id in failed_ids:
             remaining.pop(candidate_id, None)
 
@@ -346,6 +380,7 @@ async def _mobilize_locked(
         time_to_fill_seconds=time_to_fill,
         filled=filled,
         over_recruitment_ratio=over_recruitment,
+        ambiguous_candidate_ids=ambiguous_candidate_ids,
     )
 
 

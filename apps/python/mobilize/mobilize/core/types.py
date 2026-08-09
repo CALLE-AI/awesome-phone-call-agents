@@ -107,3 +107,9 @@ class MobilizeResult:
     time_to_fill_seconds: float | None
     filled: bool
     over_recruitment_ratio: float
+    # Candidates whose dispatch attempt raised an error that COULD mean
+    # CALL-E already accepted the request before the exception surfaced
+    # (a timeout, a connection reset) -- not confirmed as ever having been
+    # called, but not safely known to have never been called either.
+    # Never auto-retried; surfaced here for a human to check manually.
+    ambiguous_candidate_ids: list[str] = field(default_factory=list)

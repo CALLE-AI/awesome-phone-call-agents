@@ -26,7 +26,10 @@ def test_load_registry_csv_minimal(tmp_path):
     path = _write_csv(tmp_path, "name,phone,timezone\nAsha Rao,+15550101001,Asia/Kolkata\n")
     registry = load_registry_csv(path)
     assert len(registry) == 1
-    person = registry.get("p0001")
+    # Auto-generated ids are now phone-derived, not row-number-based (see
+    # test_registry_validation.py for why), so look the person up by
+    # content rather than assuming a specific id string.
+    person = registry.all()[0]
     assert person.name == "Asha Rao"
     assert person.timezone == "Asia/Kolkata"
     # No history -> defaults, not zero and not crashing.

@@ -28,7 +28,7 @@ def _utcnow_iso() -> str:
 
 @dataclass(frozen=True)
 class LedgerEntry:
-    kind: str  # "dispatched" | "result"
+    kind: str  # "dispatch_intent" | "dispatched" | "result"
     mobilization_id: str
     candidate_id: str
     idempotency_key: str
@@ -55,6 +55,41 @@ class Ledger:
 
     def idempotency_key(self, mobilization_id: str, candidate_id: str) -> str:
         return f"{mobilization_id}:{candidate_id}"
+
+    def record_dispatch_intent(self, mobilization_id: str, candidate_id: str) -> None:
+        """Written BEFORE the network call, with no call_id yet (there isn't
+        one). This is the durable answer to "did we possibly already call
+        this person" when transport.dispatch() raises an ambiguous error
+        (a timeout, a connection reset) that could mean CALL-E accepted the
+        request before our client ever saw a response. Without this, such a
+        candidate leaves literally no trace in the ledger -- indistinguishable
+        from having never been attempted at all -- and a resumed run could
+        freely re-dispatch them, risking a real double-dial. An intent entry
+        with no matching "dispatched" or "result" entry is surfaced via
+        `unresolved()` for manual reconciliation rather than silently
+        retried.
+        """
+        entry = LedgerEntry(
+            kind="dispatch_intent",
+            mobilization_id=mobilization_id,
+            candidate_id=candidate_id,
+            idempotency_key=self.idempotency_key(mobilization_id, candidate_id),
+        )
+        self._append(entry)
+
+    def unresolved(self, mobilization_id: str) -> set[str]:
+        """Candidates with a logged dispatch_intent but no confirmed
+        "dispatched" (a call_id was actually returned) or "result" entry --
+        an attempt was made, but we don't know whether it actually reached
+        CALL-E. These must never be silently retried."""
+        intended: set[str] = set()
+        resolved: set[str] = set()
+        for entry in self.replay(mobilization_id):
+            if entry.kind == "dispatch_intent":
+                intended.add(entry.candidate_id)
+            elif entry.kind in ("dispatched", "result"):
+                resolved.add(entry.candidate_id)
+        return intended - resolved
 
     def record_dispatch(self, mobilization_id: str, candidate_id: str, call_id: str) -> None:
         entry = LedgerEntry(

@@ -9,10 +9,9 @@ from __future__ import annotations
 
 from typing import Protocol
 from urllib.parse import urlparse
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from mobilize.core.types import Candidate, CallResult
-from mobilize.core.validation import E164_RE, validate_e164
+from mobilize.core.validation import E164_RE, validate_e164, validate_timezone
 
 # CALL-E's real API host. Sending the bearer token to any other host would leak
 # it, so CalleTransport refuses to talk to anything outside this allow-list.
@@ -22,17 +21,6 @@ __all__ = [
     "E164_RE", "validate_e164", "validate_timezone", "validate_trusted_base_url",
     "MOBILIZE_RESULT_SCHEMA", "build_task_prompt", "Transport",
 ]
-
-
-def validate_timezone(tz: str) -> None:
-    """Real calls must carry an explicit, real recipient timezone -- without
-    this, Candidate.timezone silently defaults to "UTC" and the governance
-    module's calling-hours check evaluates every recipient against the
-    wrong clock, exactly as if the check didn't exist."""
-    try:
-        ZoneInfo(tz)
-    except ZoneInfoNotFoundError:
-        raise ValueError(f"Not a recognized IANA timezone name: {tz!r}") from None
 
 
 def validate_trusted_base_url(base_url: str) -> None:

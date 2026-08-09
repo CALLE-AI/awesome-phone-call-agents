@@ -87,4 +87,7 @@ async def test_mcp_mobilize_real_preview_includes_timezones():
         need_label="test", phones=["+15550101234"], timezones=["Asia/Kolkata"],
     )
     assert result["preview"] is True
-    assert result["would_call"] == [("+15550101234", "Asia/Kolkata")]
+    # Phone is masked in the preview -- an MCP tool response can end up
+    # logged or relayed through an agent's context, unlike CLI stderr seen
+    # only by the operator who typed the number themselves.
+    assert result["would_call"] == [("+15******234", "Asia/Kolkata")]

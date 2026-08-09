@@ -434,6 +434,38 @@ temp file per upload and an in-process lock keyed by `mobilization_id`
 (different IDs still run fully concurrently; only same-ID collisions are
 serialized).
 
+A subsequent review round found four more, all in the same trust-boundary
+territory. A canceled or otherwise incomplete call could still become a
+firm confirmation — `_to_call_result` only checked `status == "failed"`
+explicitly, so a `"canceled"` status with stray structured-result data
+could fall through to the `can_come == "yes"` branch uncontested. Now
+`canceled`, `task_completed is False`, and a stated "yes" with an empty
+transcript are all rejected before anything trusts `can_come` — a
+confirmation now requires the call to have genuinely completed *and* have
+real evidence behind it. Governance and idempotency were keyed by
+**positional** candidate ids (`f"real_{i}"`): reordering the same phone
+list on a later run silently reassigned one person's do-not-call/cooldown
+history to whoever now occupied that index, and two entries for the same
+phone number got two independent ids and could be dialed twice. Every
+candidate id is now derived from the phone number itself
+(`stable_id_from_phone`), stable across reordering, and duplicate phones
+are rejected outright rather than silently double-keyed. A dispatch
+failure was always treated as "CALL-E never saw this request" — but a
+timeout or connection error can happen *after* the provider accepted the
+call, and treating that identically to a request that never left the
+client risked a live, unrecorded call. A write-ahead `dispatch_intent`
+ledger entry, logged before every network attempt, now makes that
+ambiguity durable: an unresolved intent is never auto-retried on a resume,
+and surfaces in the result as `ambiguous_candidate_ids` for a human to
+check rather than silently vanishing. And phone numbers were validated at
+the CLI/MCP boundary but not in the registry CSV loader (an invalid
+timezone there silently fell back to UTC, the exact governance-defeating
+default closed for the CLI/MCP paths three rounds earlier), and full,
+unmasked phone numbers were echoed back in MCP tool previews and error
+messages. Both closed: `validate_timezone` now runs at registry load time,
+and every MCP-facing phone number is masked through a shared `mask_phone`
+helper — the same masking the dashboard already applied to its own UI.
+
 Live dispatch is shown over a WebSocket: each person lights up on dial,
 colors by outcome as results stream in, and the result panel shows exactly
 who confirmed (name, masked phone, commitment score) and how many people in
@@ -451,7 +483,7 @@ mobilize/
 ├── mcp/             # MCP server
 ├── app/             # dashboard (the product) + CLI + bundled sample registry
 ├── artifacts/       # committed real-call transcripts, results, Devpost copy
-└── tests/           # 100 tests incl. property-based, real-subprocess crash, and
+└── tests/           # 111 tests incl. property-based, real-subprocess crash, and
                     #   concurrency/validation/resume/registry tests
 skills/mobilize/     # Agent Skill (SKILL.md) wrapping mobilize() for reuse
 run.sh               # one-command setup + launch for the dashboard

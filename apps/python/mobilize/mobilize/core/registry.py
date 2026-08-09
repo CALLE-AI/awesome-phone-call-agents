@@ -26,7 +26,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from mobilize.core.types import Candidate
-from mobilize.core.validation import validate_e164
+from mobilize.core.validation import stable_id_from_phone, validate_e164, validate_timezone
 
 # A person with no history is assumed neither promising nor hopeless. These
 # are deliberately middling so that a fresh registry ranks mostly by
@@ -118,6 +118,7 @@ def load_registry_csv(path: str | Path) -> Registry:
         raise RegistryError(f"No such file: {path}")
 
     registry = Registry()
+    seen_phones: dict[str, int] = {}  # phone -> first row_number seen
     with path.open(newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
@@ -158,8 +159,35 @@ def load_registry_csv(path: str | Path) -> Registry:
                 raise RegistryError(
                     f"Row {row_number}: phone must be E.164 (e.g. +15550101234), got {phone!r}."
                 ) from None
+            try:
+                validate_timezone(tz)
+            except ValueError:
+                raise RegistryError(
+                    f"Row {row_number}: timezone must be a real IANA name (e.g. Asia/Kolkata, "
+                    f"America/New_York), got {tz!r}. An invalid value would otherwise silently "
+                    f"fall back to UTC, and calling-hour governance would evaluate this person "
+                    f"against the wrong clock without any error."
+                ) from None
 
-            person_id = row.get("id") or f"p{row_number - 1:04d}"
+            # Checked independently of the id check below: two rows can
+            # have different explicit ids (or different auto-generated
+            # ones) and still be the same real phone number -- a copy-paste
+            # duplicate, most often. Without this, both get dialed.
+            if phone in seen_phones:
+                raise RegistryError(
+                    f"Row {row_number}: phone {phone!r} was already used in row "
+                    f"{seen_phones[phone]}. Duplicate phone numbers get dispatched to "
+                    f"independently and would dial the same person twice."
+                )
+            seen_phones[phone] = row_number
+
+            # The auto-generated fallback id is derived from the phone
+            # number, not row position -- a positional id like "p0003"
+            # would silently point at a DIFFERENT person if this CSV is
+            # ever re-uploaded with rows in a different order, and
+            # everything keyed by candidate.id (do-not-call, cooldown,
+            # ledger idempotency) would misattribute that person's history.
+            person_id = row.get("id") or stable_id_from_phone(phone)
             if person_id in registry.people:
                 raise RegistryError(
                     f"Row {row_number}: duplicate id {person_id!r} -- already used by "

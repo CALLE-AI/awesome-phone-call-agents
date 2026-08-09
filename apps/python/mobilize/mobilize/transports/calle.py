@@ -146,13 +146,40 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
     # didn't connect clearly) must never be treated as a do-not-call signal.
     stop_requested = structured.get("wants_no_further_contact") == "yes"
 
-    if call.get("status") == "failed" or recipient.get("status") == "failed":
+    call_status = call.get("status")
+    task_completed = call.get("task_completed")
+
+    # A call that never actually completed must never become a
+    # confirmation, no matter what structured_result claims. "canceled" was
+    # already treated as terminal (poll() returns instead of waiting
+    # forever), but outcome determination previously checked only for
+    # "failed" explicitly -- a canceled call with some stray/partial
+    # structured_result data could fall through to the can_come=="yes"
+    # branch and be counted as a real, firm confirmation. Checked first,
+    # before anything else looks at can_come.
+    if call_status in ("failed", "canceled") or recipient.get("status") in ("failed", "canceled"):
+        outcome, commitment = CallOutcome.NO_ANSWER, 0.0
+    # CALL-E's own task_completed is a second, independent signal from the
+    # structured extraction. If CALL-E itself says the call didn't
+    # accomplish its task, a "yes" in structured_result is extraction noise
+    # (or a stale/partial value), not a real confirmation -- don't trust it
+    # over CALL-E's own completion judgment. task_completed absent (None)
+    # is treated as "no contradiction" rather than a false rejection, since
+    # not every response shape is guaranteed to include it.
+    elif task_completed is False:
         outcome, commitment = CallOutcome.NO_ANSWER, 0.0
     elif can_come == "no":
         outcome, commitment = CallOutcome.NO, 0.0
     elif can_come == "yes":
-        commitment = calibrated_commitment(evidence=evidence, candidate_prior_showup_rate=prior_showup_rate)
-        outcome = CallOutcome.FIRM_YES if commitment >= 0.6 else CallOutcome.SOFT_YES
+        # A "yes" with literally no transcript evidence behind it is
+        # inherently suspicious -- either the call never really connected
+        # (contradicting can_come) or the response is malformed. Refuse to
+        # count it as a confirmation rather than trust an unsupported claim.
+        if not transcript:
+            outcome, commitment = CallOutcome.NO_ANSWER, 0.0
+        else:
+            commitment = calibrated_commitment(evidence=evidence, candidate_prior_showup_rate=prior_showup_rate)
+            outcome = CallOutcome.FIRM_YES if commitment >= 0.6 else CallOutcome.SOFT_YES
     else:
         outcome, commitment = CallOutcome.NO_ANSWER, 0.0
 
