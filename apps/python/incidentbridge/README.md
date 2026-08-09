@@ -5,6 +5,9 @@
 **A consent-first CALL-E agent that turns a vendor-support phone call into structured incident
 evidence without pretending the service recovered.**
 
+[Open the live evidence console](https://yangyangnovelist-hub.github.io/incidentbridge-calle/) ·
+[View the standalone source and release history](https://github.com/yangyangnovelist-hub/incidentbridge-calle)
+
 When a critical SaaS or data dependency fails, operators often lose time waiting on a support line,
 repeating context, and manually copying a ticket number and ETA into an incident channel.
 IncidentBridge places one explicitly authorized phone call, discloses that it is AI, gathers a strict
