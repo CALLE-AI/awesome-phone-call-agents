@@ -4,7 +4,7 @@ Supplier clarification calls are real-world side effects. Default to a dry run a
 
 ## Authorization And Consent
 
-Require an outreach basis for the exact recipient and RFQ. Acceptable evidence may be an existing supplier relationship, an inbound request that asked for follow-up, or explicit recipient consent. A generic contact list is not sufficient.
+Require a structured outreach basis for the exact recipient and RFQ. Accepted types are explicit recipient consent, an existing supplier relationship, or an inbound request that asked for follow-up, each with a recipient-specific reference. A generic contact list or public website is not sufficient.
 
 Do not call a third party based only on the user's possession of a phone number. Do not infer consent from a company website, caller ID, country code, locale, or previous unrelated contact.
 
@@ -38,10 +38,11 @@ Before a real call, verify:
 4. The question count is between one and eight.
 5. Every question is factual and within scope.
 6. The allowed context is sufficient and contains no prohibited data.
-7. The idempotency key is not active or completed.
-8. The CALL-E route is authenticated and compatible tools are available.
-9. The provider plan matches the approved preview.
-10. A durable structured result target is writable.
+7. A human or authorized agent reviewed the exact free text and supplied the matching content hash.
+8. The idempotency key, which binds every safety-relevant field, is not active or completed.
+9. The CALL-E route is authenticated and compatible tools are available.
+10. The provider plan matches the approved preview.
+11. The durable structured result target is a writable, new local CSV path.
 
 Any failed gate blocks the call.
 
@@ -49,7 +50,7 @@ Any failed gate blocks the call.
 
 Place at most one call for an approved task. Do not schedule recurring calls. Do not retry automatically. Do not silently write to an unapproved system.
 
-The dry-run validator never performs network requests, writes results, or calls a provider.
+The dry-run validator never performs network requests, writes results, or calls a provider. Unreviewed free text returns `pending-safety-review`, not `dry-run`; any edit to a reviewed field invalidates the content-bound approval.
 
 ## Recipient Control
 

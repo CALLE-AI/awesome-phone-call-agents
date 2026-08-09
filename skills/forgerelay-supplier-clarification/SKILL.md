@@ -51,7 +51,7 @@ Require all of these fields before preparing a call:
 - `requestId`: stable RFQ or task identifier
 - `supplierLabel`: non-sensitive recipient or organization label
 - `phoneNumber`: authorized E.164 destination
-- `outreachBasis`: documented reason this recipient may be contacted
+- `outreachBasis`: structured, recipient-specific contact basis with `type` and `reference`
 - `callerIdentity`: business identity CALL-E should state
 - `questions`: one to eight bounded clarification questions
 - `allowedContext`: facts CALL-E may disclose during the call
@@ -60,10 +60,25 @@ Require all of these fields before preparing a call:
 Each question must have:
 
 - `id`: stable lowercase identifier
+- `category`: one allowed factual category
 - `prompt`: one factual question
 - `required`: boolean
 
-Optional fields are `language`, `region`, `deadline`, and `notes`. Do not infer them.
+Allowed outreach types are `explicit-recipient-consent`, `existing-supplier-relationship`, and `inbound-follow-up-request`. A public listing is not an outreach basis.
+
+Optional fields are `language`, `region`, `deadline`, and `notes`. Do not infer them. Because prompts, context, and basis references contain free text, the first successful validation returns `pending-safety-review` and a SHA-256 `safetyReviewHash`. After a human or authorized agent reviews the exact preview, add:
+
+```json
+{
+  "safetyReview": {
+    "status": "approved",
+    "reviewedBy": "reviewer identity",
+    "contentHash": "exact safetyReviewHash"
+  }
+}
+```
+
+Any safety-relevant edit invalidates that approval and changes both the review hash and idempotency key.
 
 Use `scripts/validate-clarification-input.mjs <input.json>` when a JSON request is available. The script validates and prints a masked dry-run preview. It never places a call.
 
@@ -126,20 +141,21 @@ Every runtime gate must pass before a real call. A failed source, consent, dedup
 1. Read `references/safety.md`.
 2. Validate the required input contract.
 3. Check that the outreach basis applies to this exact recipient and request.
-4. Check the durable result target and the idempotency key:
+4. Check that the result target is a writable, new local CSV path and compute the content-bound idempotency key from the full safety contract:
 
    ```text
-   requestId + phoneNumber + ordered question ids
+   request + recipient + basis + caller + full questions + allowed context + result path + locale fields
    ```
 
-5. Reject a duplicate completed or active task with the same idempotency key.
-6. Produce a dry-run preview containing the caller identity, masked destination, allowed context, ordered questions, forbidden actions, and result schema.
-7. Ask the user to approve the exact call preview unless a previously approved runtime contract explicitly covers this exact task.
-8. Discover the authenticated CALL-E tools exposed by the host. Do not invent tool names or parameters.
-9. Prepare one call plan. Inspect it before execution.
-10. Run the plan only when it targets the approved E.164 number and preserves every boundary in the preview.
-11. Check status until the provider reports a terminal result. Reconcile the full available history before finalizing a negative result.
-12. Write the structured result to the approved durable target. Report the masked destination, status, answered question ids, unresolved question ids, and provider run id when safe.
+5. Require a matching `safetyReviewHash` before reporting the request as dry-run ready.
+6. Reject a duplicate completed or active task with the same idempotency key.
+7. Produce a dry-run preview containing the exact basis, caller identity, masked destination, allowed context, ordered question prompts and categories, forbidden actions, and result path.
+8. Ask the user to approve the exact call preview unless a previously approved runtime contract explicitly covers this exact task.
+9. Discover the authenticated CALL-E tools exposed by the host. Do not invent tool names or parameters.
+10. Prepare one call plan. Inspect it before execution.
+11. Run the plan only when it targets the approved E.164 number and preserves every boundary in the preview.
+12. Check status until the provider reports a terminal result. Reconcile the full available history before finalizing a negative result.
+13. Write the structured result to the approved durable target. Report the masked destination, status, answered question ids, unresolved question ids, and provider run id when safe.
 
 Use this execution shape:
 
@@ -260,8 +276,9 @@ From the repository root, run:
 
 ```bash
 node skills/forgerelay-supplier-clarification/scripts/validate-clarification-input.mjs skills/forgerelay-supplier-clarification/assets/example-request.json
+node skills/forgerelay-supplier-clarification/scripts/check-trust-boundaries.mjs
 node skills/outbound-call-skill-creator/scripts/check-generated-skill.mjs --skill-dir skills/forgerelay-supplier-clarification
-python ../../scripts/validate_repository.py
+python3 "$PWD/scripts/validate_repository.py"
 ```
 
 ## Examples
