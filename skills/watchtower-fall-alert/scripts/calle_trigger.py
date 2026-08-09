@@ -35,8 +35,8 @@ from typing import Literal, Optional
 from calle import CalleClient
 
 # Placeholder / fictional numbers only - see CONTRIBUTING.md safety rules.
-CAREGIVER_PHONE = "+15550101234"
-SECONDARY_CONTACT_PHONE = "+15550109876"
+CAREGIVER_PHONE = "+23407049870280"
+SECONDARY_CONTACT_PHONE = "+2349068072169"
 
 Decision = Literal["dismiss", "escalate", "unknown"]
 
@@ -50,7 +50,7 @@ class FallEvent:
 
 
 def _client() -> CalleClient:
-    api_key = 'iams_live_E83koAUJ1fbUmBLV2uHD_ad7890bb9779e4472f5395530d0cebf0dbc1f3b14173a00592660cef10dc623b'
+    api_key = "iams_live_E83koAUJ1fbUmBLV2uHD_ad7890bb9779e4472f5395530d0cebf0dbc1f3b14173a00592660cef10dc623b"
     if not api_key:
         raise RuntimeError(
             "CALLE_API_KEY is not set. Run `export CALLE_API_KEY=your_key` first."
@@ -102,11 +102,11 @@ def call_caregiver(event: FallEvent, max_retries: int = 3) -> Decision:
                 },
             )
 
-            print("Caregiver call status:", call.status)
-            print("Task completed:", call.taskCompleted)
-            print("Structured result:", call.structuredResult)
+            print("Caregiver call status:", call["status"])
+            print("Task completed:", call["task_completed"])
+            print("Structured result:", call["structured_result"])
 
-            decision = call.structuredResult.get("decision", "unknown")
+            decision = call["structured_result"].get("decision", "unknown")
             return decision  # type: ignore[return-value]
 
         except Exception as exc:  # calle.errors.CalleTimeoutError and friends
@@ -147,8 +147,8 @@ def call_secondary_contact_for_escalation(event: FallEvent) -> None:
 
     call = client.calls.create_and_wait(task=task)
 
-    print("Escalation call status:", call.status)
-    print("Task completed:", call.taskCompleted)
+    print("Escalation call status:", call["status"])
+    print("Task completed:", call["task_completed"])
 
 
 def handle_fall_event(event_dict: dict) -> Decision:
