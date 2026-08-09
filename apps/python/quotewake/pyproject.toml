@@ -1,9 +1,12 @@
 [project]
 name = "quotewake-salesforce"
 version = "0.1.0"
-description = "Read-only Salesforce quote selection for QuoteWake."
+description = "Salesforce quote selection and CALL-E planning-only dry-run for QuoteWake."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+  "Babel>=2.14",
+  "tzdata>=2024.1",
+]
 
 [dependency-groups]
 dev = [

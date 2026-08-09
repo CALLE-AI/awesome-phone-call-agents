@@ -12,12 +12,19 @@ from quotewake_salesforce.domain.models import (
     SelectionDecision,
     SelectionReason,
 )
-from quotewake_salesforce.domain.policy import SelectionPolicy
+from quotewake_salesforce.domain.policy import InitialFollowUpTiming, SelectionPolicy
 from quotewake_salesforce.domain.selection import evaluate_quote, validate_callable_contact
 
 
 NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
-POLICY = SelectionPolicy(allowed_quote_statuses=frozenset({"Presented"}))
+POLICY = SelectionPolicy(
+    initial_follow_up_timing=InitialFollowUpTiming(
+        minimum_delay=timedelta(hours=4),
+        standard_delay=timedelta(hours=48),
+        due_soon_window=timedelta(days=3),
+    ),
+    allowed_quote_statuses=frozenset({"Presented"}),
+)
 
 
 def quote(**overrides: object) -> QuoteCandidate:
@@ -28,12 +35,14 @@ def quote(**overrides: object) -> QuoteCandidate:
         "amount": Decimal("4250"),
         "currency_code": "EUR",
         "expiration_date": date(2026, 8, 31),
+        "last_modified_at": NOW - timedelta(hours=48),
         "opportunity_id": "006TEST00000001",
         "opportunity_name": "Demo opportunity",
+        "account_name": "Demo electrical company",
         "opportunity_is_closed": False,
         "enabled": True,
-        "follow_up_status": "Pending",
-        "next_follow_up_at": NOW,
+        "follow_up_status": None,
+        "next_follow_up_at": None,
         "attempt_count": 0,
         "last_follow_up_at": None,
         "last_follow_up_result": None,
@@ -58,25 +67,97 @@ class TestQuoteSelection(unittest.TestCase):
         result = evaluate_quote(quote(enabled=False), NOW, POLICY)
         self.assertEqual(result.reason, SelectionReason.DISABLED)
 
-    def test_pending_quote_due_now(self) -> None:
+    def test_initial_quote_is_ready(self) -> None:
         result = evaluate_quote(quote(), NOW, POLICY)
         self.assertEqual(result.decision, SelectionDecision.READY)
 
+    def test_initial_quote_waits_for_standard_delay(self) -> None:
+        result = evaluate_quote(
+            quote(last_modified_at=NOW - timedelta(hours=24)), NOW, POLICY
+        )
+        self.assertEqual(result.reason, SelectionReason.NOT_DUE)
+
+    def test_due_soon_quote_is_ready_after_minimum_delay(self) -> None:
+        result = evaluate_quote(
+            quote(
+                last_modified_at=NOW - timedelta(hours=4),
+                expiration_date=NOW.date() + timedelta(days=3),
+            ),
+            NOW,
+            POLICY,
+        )
+        self.assertEqual(result.decision, SelectionDecision.READY)
+
+    def test_due_soon_quote_still_respects_minimum_delay(self) -> None:
+        result = evaluate_quote(
+            quote(
+                last_modified_at=NOW - timedelta(hours=3, minutes=59),
+                expiration_date=NOW.date() + timedelta(days=1),
+            ),
+            NOW,
+            POLICY,
+        )
+        self.assertEqual(result.reason, SelectionReason.NOT_DUE)
+
+    def test_initial_quote_without_expiration_uses_standard_delay(self) -> None:
+        waiting = evaluate_quote(
+            quote(
+                last_modified_at=NOW - timedelta(hours=24),
+                expiration_date=None,
+            ),
+            NOW,
+            POLICY,
+        )
+        ready = evaluate_quote(
+            quote(last_modified_at=NOW - timedelta(hours=48), expiration_date=None),
+            NOW,
+            POLICY,
+        )
+        self.assertEqual(waiting.reason, SelectionReason.NOT_DUE)
+        self.assertEqual(ready.decision, SelectionDecision.READY)
+
+    def test_initial_quote_ignores_next_follow_up_date(self) -> None:
+        result = evaluate_quote(
+            quote(next_follow_up_at=NOW + timedelta(days=1)), NOW, POLICY
+        )
+        self.assertEqual(result.decision, SelectionDecision.READY)
+
     def test_retry_quote_due_now(self) -> None:
-        result = evaluate_quote(quote(follow_up_status="Retry", attempt_count=1), NOW, POLICY)
+        result = evaluate_quote(
+            quote(
+                follow_up_status="Retry",
+                next_follow_up_at=NOW,
+                last_modified_at=NOW,
+                attempt_count=1,
+            ),
+            NOW,
+            POLICY,
+        )
         self.assertEqual(result.decision, SelectionDecision.READY)
 
-    def test_blank_follow_up_status_is_ready_for_initial_follow_up(self) -> None:
-        result = evaluate_quote(quote(follow_up_status=None), NOW, POLICY)
-        self.assertEqual(result.decision, SelectionDecision.READY)
+    def test_retry_without_next_follow_up_date_is_not_due(self) -> None:
+        result = evaluate_quote(quote(follow_up_status="Retry"), NOW, POLICY)
+        self.assertEqual(result.reason, SelectionReason.NOT_DUE)
 
-    def test_invalid_follow_up_status(self) -> None:
-        result = evaluate_quote(quote(follow_up_status="Scheduled"), NOW, POLICY)
-        self.assertEqual(result.reason, SelectionReason.INVALID_FOLLOW_UP_STATUS)
+    def test_non_actionable_follow_up_statuses_are_skipped(self) -> None:
+        for status in ("In Progress", "Completed", "Stopped"):
+            with self.subTest(status=status):
+                result = evaluate_quote(quote(follow_up_status=status), NOW, POLICY)
+                self.assertEqual(
+                    result.reason, SelectionReason.NON_ACTIONABLE_FOLLOW_UP_STATUS
+                )
+
+    def test_removed_follow_up_statuses_are_not_accepted(self) -> None:
+        for status in ("Pending", "Scheduled", ""):
+            with self.subTest(status=status):
+                result = evaluate_quote(quote(follow_up_status=status), NOW, POLICY)
+                self.assertEqual(result.reason, SelectionReason.INVALID_FOLLOW_UP_STATUS)
 
     def test_quote_not_due(self) -> None:
         result = evaluate_quote(
-            quote(next_follow_up_at=NOW + timedelta(minutes=1)), NOW, POLICY
+            quote(follow_up_status="Retry", next_follow_up_at=NOW + timedelta(minutes=1)),
+            NOW,
+            POLICY,
         )
         self.assertEqual(result.reason, SelectionReason.NOT_DUE)
 

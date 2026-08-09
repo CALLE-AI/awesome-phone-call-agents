@@ -1,0 +1,8 @@
+[regional]
+business_timezone = "Europe/Madrid"
+locale = "es_ES"
+
+[selection.initial_follow_up]
+minimum_delay_hours = 0
+standard_delay_hours = 0
+due_soon_window_days = 0

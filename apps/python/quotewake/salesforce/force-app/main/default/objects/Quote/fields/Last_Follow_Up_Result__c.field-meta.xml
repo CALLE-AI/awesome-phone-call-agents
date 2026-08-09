@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Last_Follow_Up_Result__c</fullName>
-    <description>Result of the most recent QuoteWake call attempt.</description>
+    <description>Result of the most recent QuoteWake call attempt or explicit demo simulation.</description>
     <label>Last Follow Up Result</label>
     <type>Picklist</type>
     <valueSet>

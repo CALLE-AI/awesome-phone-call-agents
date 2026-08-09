@@ -3,13 +3,25 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from quotewake_salesforce.domain.models import ContactTarget, QuoteCandidate
+from quotewake_salesforce.domain.models import ContactTarget, Money, QuoteCandidate, QuoteLine
 
 from .client import SalesforceClient, SalesforceResponseError, SalesforceSchemaError
+from .codecs import (
+    boolean,
+    decimal,
+    metadata_integer,
+    non_negative_integer,
+    nullable_date,
+    nullable_datetime,
+    nullable_decimal,
+    nullable_text,
+    picklist,
+    required,
+    required_datetime,
+    salesforce_id,
+)
 
 
 REQUIRED_QUOTE_FIELDS = {
@@ -18,6 +30,7 @@ REQUIRED_QUOTE_FIELDS = {
     "OpportunityId",
     "Status",
     "ExpirationDate",
+    "LastModifiedDate",
     "QuoteWake_Enabled__c",
     "Follow_Up_Status__c",
     "Next_Follow_Up_At__c",
@@ -30,63 +43,74 @@ ID_PATTERN = re.compile(r"^[A-Za-z0-9]{15,18}$")
 
 
 def _field_map(description: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    if not isinstance(description, dict):
+        raise SalesforceSchemaError("Salesforce object describe was not a JSON object.")
     fields = description.get("fields")
     if not isinstance(fields, list):
         raise SalesforceSchemaError("Salesforce object describe did not contain fields.")
-    result = {field.get("name"): field for field in fields if isinstance(field, dict)}
-    return {name: field for name, field in result.items() if isinstance(name, str)}
+    result: dict[str, dict[str, Any]] = {}
+    for field in fields:
+        if not isinstance(field, dict) or not isinstance(field.get("name"), str):
+            raise SalesforceSchemaError("Salesforce object describe contained a malformed field.")
+        name = field["name"]
+        if name in result:
+            raise SalesforceSchemaError(f"Salesforce object describe repeated field {name}.")
+        result[name] = field
+    return result
 
 
-def _parse_datetime(value: Any, field_name: str) -> datetime | None:
-    if value in (None, ""):
+_EXPECTED_FIELD_TYPES: dict[str, frozenset[str]] = {
+    "Id": frozenset({"id"}),
+    "Name": frozenset({"string"}),
+    "OpportunityId": frozenset({"reference"}),
+    "Status": frozenset({"picklist"}),
+    "ExpirationDate": frozenset({"date"}),
+    "LastModifiedDate": frozenset({"datetime"}),
+    "QuoteWake_Enabled__c": frozenset({"boolean"}),
+    "Follow_Up_Status__c": frozenset({"picklist", "string"}),
+    "Next_Follow_Up_At__c": frozenset({"datetime"}),
+    "Attempt_Count__c": frozenset({"int", "double", "currency"}),
+    "Last_Follow_Up_At__c": frozenset({"datetime"}),
+    "Last_Follow_Up_Result__c": frozenset({"string", "textarea"}),
+}
+
+
+def _validate_field_metadata(
+    fields: dict[str, dict[str, Any]],
+    names: set[str],
+    *,
+    object_name: str,
+) -> None:
+    """Validate describe metadata when present, retaining simple test doubles."""
+
+    for name in names:
+        field = fields[name]
+        field_type = field.get("type")
+        expected = _EXPECTED_FIELD_TYPES.get(name)
+        if field_type is not None and expected and field_type not in expected:
+            raise SalesforceSchemaError(
+                f"Salesforce {object_name}.{name} has type {field_type!r}; "
+                f"expected one of {sorted(expected)}."
+            )
+        if field_type in {"currency", "double"}:
+            for metadata_name in ("precision", "scale"):
+                if metadata_name in field:
+                    metadata_integer(field[metadata_name], f"{object_name}.{name}.{metadata_name}")
+
+
+def _active_picklist_values(field: dict[str, Any]) -> set[str] | None:
+    values = field.get("picklistValues")
+    if values is None:
         return None
-    if not isinstance(value, str):
-        raise SalesforceResponseError(f"Salesforce field {field_name} is not a string.")
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise SalesforceResponseError(
-            f"Salesforce field {field_name} contains an invalid DateTime."
-        ) from exc
-    if parsed.tzinfo is None:
-        raise SalesforceResponseError(f"Salesforce field {field_name} is timezone-naive.")
-    return parsed
-
-
-def _parse_date(value: Any, field_name: str) -> date | None:
-    if value in (None, ""):
-        return None
-    if not isinstance(value, str):
-        raise SalesforceResponseError(f"Salesforce field {field_name} is not a string.")
-    try:
-        return date.fromisoformat(value)
-    except ValueError as exc:
-        raise SalesforceResponseError(
-            f"Salesforce field {field_name} contains an invalid Date."
-        ) from exc
-
-
-def _parse_decimal(value: Any, field_name: str) -> Decimal | None:
-    if value in (None, ""):
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError) as exc:
-        raise SalesforceResponseError(
-            f"Salesforce field {field_name} contains an invalid amount."
-        ) from exc
-
-
-def _parse_attempt_count(value: Any) -> int:
-    if value in (None, ""):
-        return 0
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise SalesforceResponseError(
-            "Salesforce field Attempt_Count__c contains an invalid number."
-        ) from exc
-    return parsed
+    if not isinstance(values, list):
+        raise SalesforceSchemaError("Salesforce picklist metadata is malformed.")
+    active: set[str] = set()
+    for item in values:
+        if not isinstance(item, dict) or not isinstance(item.get("value"), str):
+            raise SalesforceSchemaError("Salesforce picklist metadata contains a malformed value.")
+        if item.get("active", True) is True:
+            active.add(item["value"])
+    return active
 
 
 class QuoteRepository:
@@ -114,6 +138,9 @@ class QuoteRepository:
             raise SalesforceSchemaError(
                 "QuoteWake Quote fields are missing: " + ", ".join(missing_quotes)
             )
+        _validate_field_metadata(quote_fields, REQUIRED_QUOTE_FIELDS, object_name="Quote")
+        for picklist_name in ("Status", "Follow_Up_Status__c"):
+            _active_picklist_values(quote_fields[picklist_name])
 
         try:
             contact_fields = _field_map(self.client.describe("Contact"))
@@ -127,6 +154,20 @@ class QuoteRepository:
                 "Contact fields required for callable-contact selection are missing: "
                 + ", ".join(missing_contacts)
             )
+        # Contact describe metadata is optional in small fake clients, but a
+        # real describe response must not silently change the types consumed by
+        # the callable-contact boundary.
+        for name, expected in {
+            "Id": {"id"},
+            "Name": {"string"},
+            "Phone": {"phone", "string"},
+            "MobilePhone": {"phone", "string"},
+        }.items():
+            field_type = contact_fields[name].get("type")
+            if field_type is not None and field_type not in expected:
+                raise SalesforceSchemaError(
+                    f"Salesforce Contact.{name} has unexpected type {field_type!r}."
+                )
         if self.do_not_call_field is not None:
             if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", self.do_not_call_field):
                 raise SalesforceSchemaError(
@@ -147,14 +188,41 @@ class QuoteRepository:
             (field for field in ("GrandTotal", "TotalPrice", "Subtotal") if field in quote_fields),
             None,
         )
+        if amount_field is not None:
+            amount_metadata = quote_fields[amount_field]
+            amount_type = amount_metadata.get("type")
+            if amount_type is not None and amount_type not in {"currency", "double"}:
+                raise SalesforceSchemaError(
+                    f"Salesforce Quote.{amount_field} is not a numeric/currency field."
+                )
+            # A real describe response must include these values for exact
+            # money reporting.  Name-only test doubles are still supported.
+            if "type" in amount_metadata:
+                for metadata_name in ("precision", "scale"):
+                    if metadata_name not in amount_metadata:
+                        raise SalesforceSchemaError(
+                            f"Salesforce Quote.{amount_field} is missing {metadata_name} metadata."
+                        )
+                    metadata_integer(
+                        amount_metadata[metadata_name],
+                        f"Quote.{amount_field}.{metadata_name}",
+                    )
         currency_field = "CurrencyIsoCode" if "CurrencyIsoCode" in quote_fields else None
+        if currency_field is not None:
+            currency_type = quote_fields[currency_field].get("type")
+            if currency_type is not None and currency_type not in {"picklist", "string"}:
+                raise SalesforceSchemaError(
+                    "Salesforce Quote.CurrencyIsoCode is not a text/picklist field."
+                )
         selected_fields = [
             "Id",
             "Name",
             "Status",
             "ExpirationDate",
+            "LastModifiedDate",
             "OpportunityId",
             "Opportunity.Name",
+            "Opportunity.Account.Name",
             "Opportunity.IsClosed",
             *(
                 [amount_field]
@@ -175,45 +243,182 @@ class QuoteRepository:
             + " FROM Quote WHERE OpportunityId != null ORDER BY CreatedDate ASC"
         )
         records = self.client.query(soql)
-        quotes = [self._quote_from_record(record, amount_field, currency_field) for record in records]
+        corporate_currency = self._corporate_currency() if currency_field is None else None
+        quotes = [
+            self._quote_from_record(record, amount_field, currency_field, corporate_currency, quote_fields)
+            for record in records
+        ]
         opportunity_ids = sorted({quote.opportunity_id for quote in quotes})
         contacts = self._load_primary_contacts(opportunity_ids)
         return quotes, contacts
 
+    def _corporate_currency(self) -> str:
+        """Return the org default currency when Quotes are single-currency."""
+
+        records = self.client.query(
+            "SELECT DefaultCurrencyIsoCode FROM Organization LIMIT 1"
+        )
+        if len(records) != 1:
+            raise SalesforceResponseError(
+                "Salesforce Organization query did not return exactly one currency."
+            )
+        value = nullable_text(
+            required(records[0], "DefaultCurrencyIsoCode"),
+            "Organization.DefaultCurrencyIsoCode",
+            maximum=3,
+        )
+        if value is None or not re.fullmatch(r"[A-Z]{3}", value):
+            raise SalesforceResponseError(
+                "Salesforce Organization returned an invalid default currency code."
+            )
+        return value
+
     def _quote_from_record(
-        self, record: dict[str, Any], amount_field: str | None, currency_field: str | None
+        self,
+        record: dict[str, Any],
+        amount_field: str | None,
+        currency_field: str | None,
+        corporate_currency: str | None = None,
+        field_metadata: dict[str, dict[str, Any]] | None = None,
     ) -> QuoteCandidate:
-        try:
-            quote_id = record["Id"]
-            quote_name = record["Name"]
-            opportunity_id = record["OpportunityId"]
-            opportunity = record["Opportunity"]
-        except KeyError as exc:
-            raise SalesforceResponseError(f"Quote response is missing {exc.args[0]}.") from exc
-        if not all(isinstance(value, str) and value for value in (quote_id, quote_name, opportunity_id)):
+        quote_id = salesforce_id(required(record, "Id"), "Id", prefix="0Q")
+        quote_name = nullable_text(required(record, "Name"), "Name", maximum=255)
+        opportunity_id = salesforce_id(required(record, "OpportunityId"), "OpportunityId", prefix="006")
+        opportunity = required(record, "Opportunity")
+        if not quote_name:
             raise SalesforceResponseError("Quote response contains an invalid identity field.")
         if not isinstance(opportunity, dict):
             raise SalesforceResponseError(f"Quote {quote_id} has no Opportunity relationship data.")
-        opportunity_name = opportunity.get("Name")
-        if opportunity_name is not None and not isinstance(opportunity_name, str):
-            raise SalesforceResponseError(f"Quote {quote_id} has an invalid Opportunity name.")
+        # Decode the required timing field before the remaining optional
+        # commercial values so malformed Salesforce records fail at the exact
+        # missing boundary field rather than being silently defaulted.
+        last_modified_at = required_datetime(
+            required(record, "LastModifiedDate"), "LastModifiedDate"
+        )
+        opportunity_name = nullable_text(required(opportunity, "Name"), "Opportunity.Name", maximum=120)
+        account = required(opportunity, "Account")
+        if account is not None and not isinstance(account, dict):
+            raise SalesforceResponseError(f"Quote {quote_id} has invalid Account data.")
+        account_name = (
+            nullable_text(required(account, "Name"), "Opportunity.Account.Name", maximum=255)
+            if isinstance(account, dict)
+            else None
+        )
+        raw_metadata = field_metadata.get(amount_field, {}) if field_metadata and amount_field else {}
+        scale = metadata_integer(raw_metadata.get("scale"), f"Quote.{amount_field}.scale") if amount_field and "scale" in raw_metadata else None
+        precision = metadata_integer(raw_metadata.get("precision"), f"Quote.{amount_field}.precision") if amount_field and "precision" in raw_metadata else None
+        amount = decimal(required(record, amount_field), amount_field, precision=precision, scale=scale) if amount_field else None
+        currency_values = (
+            _active_picklist_values(field_metadata[currency_field])
+            if field_metadata and currency_field and currency_field in field_metadata
+            else None
+        )
+        currency = (
+            picklist(required(record, currency_field), currency_field, currency_values)
+            if currency_field
+            else corporate_currency
+        )
+        if currency_field and currency is None:
+            raise SalesforceResponseError(
+                f"Salesforce field {currency_field} is unexpectedly empty."
+            )
+        if currency is not None and not re.fullmatch(r"[A-Z]{3}", currency):
+            raise SalesforceResponseError("Salesforce returned an invalid ISO currency code.")
+        status_values = (
+            _active_picklist_values(field_metadata["Status"])
+            if field_metadata and "Status" in field_metadata
+            else None
+        )
+        follow_up_values = (
+            _active_picklist_values(field_metadata["Follow_Up_Status__c"])
+            if field_metadata and "Follow_Up_Status__c" in field_metadata
+            else None
+        )
+        status = picklist(required(record, "Status"), "Status", status_values)
+        if not status:
+            raise SalesforceResponseError("Salesforce field Status is unexpectedly empty.")
+        follow_up_status = picklist(
+            required(record, "Follow_Up_Status__c"),
+            "Follow_Up_Status__c",
+            follow_up_values,
+        )
+        money = None
+        if amount is not None and currency is not None and amount_field is not None:
+            effective_scale = scale
+            if effective_scale is None:
+                effective_scale = max(0, -amount.as_tuple().exponent)
+            money = Money(amount, currency, amount_field, effective_scale)
         return QuoteCandidate(
             quote_id=quote_id,
             quote_name=quote_name,
-            quote_status=record.get("Status"),
-            amount=_parse_decimal(record.get(amount_field) if amount_field else None, amount_field or "amount"),
-            currency_code=record.get(currency_field) if currency_field else None,
-            expiration_date=_parse_date(record.get("ExpirationDate"), "ExpirationDate"),
+            quote_status=status,
+            amount=amount,
+            currency_code=currency,
+            expiration_date=nullable_date(required(record, "ExpirationDate"), "ExpirationDate"),
+            last_modified_at=last_modified_at,
             opportunity_id=opportunity_id,
             opportunity_name=opportunity_name,
-            opportunity_is_closed=bool(opportunity.get("IsClosed", False)),
-            enabled=record.get("QuoteWake_Enabled__c") is True,
-            follow_up_status=record.get("Follow_Up_Status__c"),
-            next_follow_up_at=_parse_datetime(record.get("Next_Follow_Up_At__c"), "Next_Follow_Up_At__c"),
-            attempt_count=_parse_attempt_count(record.get("Attempt_Count__c")),
-            last_follow_up_at=_parse_datetime(record.get("Last_Follow_Up_At__c"), "Last_Follow_Up_At__c"),
-            last_follow_up_result=record.get("Last_Follow_Up_Result__c"),
+            account_name=account_name,
+            opportunity_is_closed=boolean(required(opportunity, "IsClosed"), "Opportunity.IsClosed"),
+            enabled=boolean(required(record, "QuoteWake_Enabled__c"), "QuoteWake_Enabled__c"),
+            follow_up_status=follow_up_status,
+            next_follow_up_at=nullable_datetime(required(record, "Next_Follow_Up_At__c"), "Next_Follow_Up_At__c"),
+            attempt_count=non_negative_integer(required(record, "Attempt_Count__c"), "Attempt_Count__c", precision=(field_metadata or {}).get("Attempt_Count__c", {}).get("precision")),
+            last_follow_up_at=nullable_datetime(required(record, "Last_Follow_Up_At__c"), "Last_Follow_Up_At__c"),
+            last_follow_up_result=nullable_text(required(record, "Last_Follow_Up_Result__c"), "Last_Follow_Up_Result__c", maximum=255),
+            money=money,
         )
+
+    def load_quote_lines(
+        self,
+        quote_ids: list[str],
+        *,
+        currency_by_quote: dict[str, str] | None = None,
+    ) -> dict[str, list[QuoteLine]]:
+        """Load concise line-item context for selected Quotes in batched SOQL."""
+
+        if not quote_ids:
+            return {}
+        if not all(ID_PATTERN.fullmatch(value) for value in quote_ids):
+            raise SalesforceResponseError("QuoteWake received an invalid Quote ID.")
+
+        line_map: dict[str, list[QuoteLine]] = {}
+        for start in range(0, len(quote_ids), 200):
+            chunk = quote_ids[start : start + 200]
+            quoted_ids = ", ".join(f"'{value}'" for value in chunk)
+            soql = (
+                "SELECT QuoteId, Product2.Name, Product2.QuantityUnitOfMeasure, "
+                "Quantity, UnitPrice, TotalPrice "
+                f"FROM QuoteLineItem WHERE QuoteId IN ({quoted_ids}) "
+                "ORDER BY QuoteId, SortOrder ASC"
+            )
+            for record in self.client.query(soql):
+                quote_id = salesforce_id(required(record, "QuoteId"), "QuoteLineItem.QuoteId", prefix="0Q")
+                product = required(record, "Product2")
+                if not isinstance(product, dict):
+                    raise SalesforceResponseError(
+                        "QuoteLineItem response has malformed Quote or Product data."
+                    )
+                product_name = nullable_text(required(product, "Name"), "QuoteLineItem.Product2.Name", maximum=255)
+                if not product_name:
+                    raise SalesforceResponseError(
+                        f"QuoteLineItem for {quote_id} has no Product name."
+                    )
+                line_map.setdefault(quote_id, []).append(
+                    QuoteLine(
+                        product_name=product_name,
+                        quantity=nullable_decimal(required(record, "Quantity"), "QuoteLineItem.Quantity"),
+                        unit_price=nullable_decimal(required(record, "UnitPrice"), "QuoteLineItem.UnitPrice"),
+                        total_price=nullable_decimal(required(record, "TotalPrice"), "QuoteLineItem.TotalPrice"),
+                        currency_code=(currency_by_quote or {}).get(quote_id),
+                        quantity_unit=nullable_text(
+                            product.get("QuantityUnitOfMeasure"),
+                            "QuoteLineItem.Product2.QuantityUnitOfMeasure",
+                            maximum=40,
+                        ),
+                    )
+                )
+        return line_map
 
     def _load_primary_contacts(
         self, opportunity_ids: list[str]
@@ -240,18 +445,44 @@ class QuoteRepository:
                 f"FROM OpportunityContactRole WHERE OpportunityId IN ({quoted_ids})"
             )
             for record in self.client.query(soql):
-                if record.get("IsPrimary") is not True:
+                is_primary = record.get("IsPrimary")
+                if not isinstance(is_primary, bool):
+                    raise SalesforceResponseError("OpportunityContactRole.IsPrimary is not a JSON boolean.")
+                if not is_primary:
                     continue
-                opportunity_id = record.get("OpportunityId")
-                contact_id = record.get("ContactId")
-                contact = record.get("Contact")
-                if not isinstance(opportunity_id, str) or not isinstance(contact_id, str):
-                    raise SalesforceResponseError("OpportunityContactRole has invalid IDs.")
-                if not isinstance(contact, dict) or not isinstance(contact.get("Name"), str):
+                opportunity_id = salesforce_id(
+                    required(record, "OpportunityId"),
+                    "OpportunityContactRole.OpportunityId",
+                    prefix="006",
+                )
+                contact_id = salesforce_id(
+                    required(record, "ContactId"),
+                    "OpportunityContactRole.ContactId",
+                    prefix="003",
+                )
+                contact = required(record, "Contact")
+                if not isinstance(contact, dict):
                     raise SalesforceResponseError(
                         f"OpportunityContactRole for {opportunity_id} has malformed Contact data."
                     )
-                selected_phone = contact.get("MobilePhone") or contact.get("Phone")
+                contact_name = nullable_text(required(contact, "Name"), "Contact.Name", maximum=255)
+                if not contact_name:
+                    raise SalesforceResponseError(
+                        f"OpportunityContactRole for {opportunity_id} has malformed Contact data."
+                    )
+                mobile_phone = nullable_text(
+                    required(contact, "MobilePhone"), "Contact.MobilePhone", maximum=40
+                )
+                phone = nullable_text(
+                    required(contact, "Phone"), "Contact.Phone", maximum=40
+                )
+                selected_phone = mobile_phone or phone
+                if self.do_not_call_field is not None:
+                    opt_out = required(contact, self.do_not_call_field)
+                    if opt_out is not None and not isinstance(opt_out, bool):
+                        raise SalesforceResponseError(
+                            f"Contact {contact_id} opt-out field is not a JSON boolean."
+                        )
                 if selected_phone is not None and not isinstance(selected_phone, str):
                     raise SalesforceResponseError(
                         f"Contact {contact_id} has a malformed phone field."
@@ -259,7 +490,7 @@ class QuoteRepository:
                 contact_map.setdefault(opportunity_id, []).append(
                     ContactTarget(
                         contact_id=contact_id,
-                        name=contact["Name"],
+                        name=contact_name,
                         phone=selected_phone,
                         do_not_call=(
                             self.do_not_call_field is not None

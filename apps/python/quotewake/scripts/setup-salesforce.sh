@@ -7,8 +7,10 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 SALESFORCE_DIR="$APP_DIR/salesforce"
 TARGET_ORG=""
 SEED_DATA=false
+RESET_DATA=false
 ASSIGN_PERMISSIONS=false
 CHANGES_APPLIED=false
+DEMO_QUOTE_PREFIX='QuoteWake Demo - '
 
 info() { printf '[INFO] %s\n' "$1"; }
 ok() { printf '[OK] %s\n' "$1"; }
@@ -32,7 +34,8 @@ Usage: ./scripts/setup-salesforce.sh [options]
 
 Options:
   --target-org ALIAS       Salesforce CLI alias or username to modify.
-  --seed-data              Create or update the four QuoteWake demo scenarios.
+  --seed-data              Create or update 10 Quotes, 10 Opportunities and 9 Accounts.
+  --reset-data             Seed the demo hierarchy, delete its Tasks, and reset QuoteWake state.
   --assign-permissions     Assign QuoteWake_User to the current target-org user.
   -h, --help               Show this help.
 EOF
@@ -49,6 +52,10 @@ while (($#)); do
             SEED_DATA=true
             shift
             ;;
+        --reset-data)
+            RESET_DATA=true
+            shift
+            ;;
         --assign-permissions)
             ASSIGN_PERMISSIONS=true
             shift
@@ -63,9 +70,34 @@ while (($#)); do
     esac
 done
 
+if [[ "$RESET_DATA" == true ]]; then
+    # Reset always seeds first so the hierarchy and its stable Quote identifiers exist.
+    SEED_DATA=true
+fi
+
 command -v sf >/dev/null 2>&1 || fail "Salesforce CLI (sf) is not installed or is not on PATH."
 command -v jq >/dev/null 2>&1 || fail "jq is required to inspect Salesforce CLI JSON responses."
+command -v python3 >/dev/null 2>&1 || fail "Python 3 is required to load quotewake.toml."
 [[ -d "$SALESFORCE_DIR" ]] || fail "Salesforce project directory not found: $SALESFORCE_DIR"
+
+TIMING_JSON="$(
+    PYTHONPATH="$APP_DIR" python3 -c '
+import json
+import sys
+from pathlib import Path
+from quotewake_salesforce.config import load_initial_follow_up_timing
+
+timing = load_initial_follow_up_timing(Path(sys.argv[1]))
+print(json.dumps({
+    "minimum_seconds": timing.minimum_delay.total_seconds(),
+    "standard_seconds": timing.standard_delay.total_seconds(),
+    "due_soon_seconds": timing.due_soon_window.total_seconds(),
+}))
+' "$APP_DIR/quotewake.toml"
+)"
+MINIMUM_DELAY_SECONDS="$(jq -r '.minimum_seconds' <<<"$TIMING_JSON")"
+STANDARD_DELAY_SECONDS="$(jq -r '.standard_seconds' <<<"$TIMING_JSON")"
+DUE_SOON_SECONDS="$(jq -r '.due_soon_seconds' <<<"$TIMING_JSON")"
 
 ORG_ARGS=()
 if [[ -n "$TARGET_ORG" ]]; then
@@ -240,11 +272,65 @@ ensure_contact() {
     fi
 }
 
+ensure_primary_contact_role() {
+    local opportunity_id="$1" contact_id="$2" existing_id
+    existing_id="$(query_id "SELECT Id FROM OpportunityContactRole WHERE OpportunityId = '$opportunity_id' AND ContactId = '$contact_id' LIMIT 1")"
+    if [[ -n "$existing_id" ]]; then
+        sf data update record "${ORG_ARGS[@]}" --sobject OpportunityContactRole --record-id "$existing_id" --values "IsPrimary=true Role='Decision Maker'" >/dev/null
+    else
+        create_msg "OpportunityContactRole: $opportunity_id -> $contact_id"
+        sf data create record "${ORG_ARGS[@]}" --sobject OpportunityContactRole --values "OpportunityId=$opportunity_id ContactId=$contact_id IsPrimary=true Role='Decision Maker'" >/dev/null
+    fi
+}
+
+demo_quote_ids() {
+    sf data query "${ORG_ARGS[@]}" \
+        --query "SELECT Id FROM Quote WHERE Name LIKE '${DEMO_QUOTE_PREFIX}%'" \
+        --json | jq -r '.result.records[]?.Id // empty'
+}
+
+reset_demo_data() {
+    local quote_ids quote_id task_id quote_task_ids deleted_tasks reset_quotes
+    quote_ids="$(demo_quote_ids)"
+    [[ -n "$quote_ids" ]] || fail "No demo Quotes were found after seeding; reset stopped without deleting Tasks."
+
+    info "Deleting Tasks linked to QuoteWake demo Quotes only..."
+    deleted_tasks=0
+    while IFS= read -r quote_id; do
+        [[ -z "$quote_id" ]] && continue
+        # Query each Quote explicitly because WhatId is polymorphic; this keeps
+        # the delete scope limited to Tasks whose WhatId is a demo Quote.
+        quote_task_ids="$(sf data query "${ORG_ARGS[@]}" \
+            --query "SELECT Id FROM Task WHERE WhatId = '$quote_id'" \
+            --json | jq -r '.result.records[]?.Id // empty')"
+        while IFS= read -r task_id; do
+            [[ -z "$task_id" ]] && continue
+            sf data delete record "${ORG_ARGS[@]}" --sobject Task --record-id "$task_id" >/dev/null
+            deleted_tasks=$((deleted_tasks + 1))
+        done <<<"$quote_task_ids"
+    done <<<"$quote_ids"
+    ok "Deleted $deleted_tasks Task(s) linked to demo Quotes"
+
+    info "Resetting QuoteWake state on demo Quotes..."
+    reset_quotes=0
+    while IFS= read -r quote_id; do
+        [[ -z "$quote_id" ]] && continue
+        sf data update record "${ORG_ARGS[@]}" \
+            --sobject Quote \
+            --record-id "$quote_id" \
+            --values "QuoteWake_Enabled__c=true Follow_Up_Status__c= Next_Follow_Up_At__c= Attempt_Count__c=0 Last_Follow_Up_At__c= Last_Follow_Up_Result__c=" \
+            >/dev/null
+        reset_quotes=$((reset_quotes + 1))
+    done <<<"$quote_ids"
+    ok "Reset QuoteWake state on $reset_quotes demo Quote(s)"
+}
+
 if [[ "$SEED_DATA" == true ]]; then
     info "Inspecting required standard fields before seeding demo data..."
-    check_required_fields Account "Name"
+    check_required_fields Account "Name Phone"
     check_required_fields Contact "FirstName LastName AccountId Email Phone"
     check_required_fields Opportunity "Name AccountId StageName CloseDate Amount"
+    check_required_fields OpportunityContactRole "OpportunityId ContactId IsPrimary Role"
     check_required_fields Quote "Name OpportunityId Pricebook2Id ExpirationDate"
     check_required_fields Product2 "Name"
     check_required_fields PricebookEntry "Pricebook2Id Product2Id UnitPrice"
@@ -270,48 +356,82 @@ if [[ "$SEED_DATA" == true ]]; then
     PBE_CABLING="$(ensure_pricebook_entry "$PRODUCT_CABLING" 120)"
     PBE_SOLAR="$(ensure_pricebook_entry "$PRODUCT_SOLAR" 2000)"
 
-    NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    FUTURE="$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)"
     TODAY="$(date -u +%Y-%m-%d)"
 
     info "Creating or updating QuoteWake demo hierarchy..."
-    ACCOUNT_1="$(ensure_record Account 'QuoteWake Demo - Instalaciones Sol y Mar S.L.' "Name='QuoteWake Demo - Instalaciones Sol y Mar S.L.'")"
-    ACCOUNT_2="$(ensure_record Account 'QuoteWake Demo - Cargas Eléctricas del Norte S.L.' "Name='QuoteWake Demo - Cargas Eléctricas del Norte S.L.'")"
-    ACCOUNT_3="$(ensure_record Account 'QuoteWake Demo - Oficinas Iberia S.L.' "Name='QuoteWake Demo - Oficinas Iberia S.L.'")"
-    ACCOUNT_4="$(ensure_record Account 'QuoteWake Demo - Energía Clara S.L.' "Name='QuoteWake Demo - Energía Clara S.L.'")"
+    ACCOUNT_1="$(ensure_record Account 'QuoteWake Demo - Instalaciones Sol y Mar S.L.' "Name='QuoteWake Demo - Instalaciones Sol y Mar S.L.' Phone=+14155550101")"
+    ACCOUNT_2="$(ensure_record Account 'QuoteWake Demo - Cargas Eléctricas del Norte S.L.' "Name='QuoteWake Demo - Cargas Eléctricas del Norte S.L.' Phone=+14155550102")"
+    ACCOUNT_3="$(ensure_record Account 'QuoteWake Demo - Oficinas Iberia S.L.' "Name='QuoteWake Demo - Oficinas Iberia S.L.' Phone=+14155550103")"
+    ACCOUNT_4="$(ensure_record Account 'QuoteWake Demo - Energía Clara S.L.' "Name='QuoteWake Demo - Energía Clara S.L.' Phone=+14155550104")"
+    ACCOUNT_5="$(ensure_record Account 'QuoteWake Demo - Alba Domótica S.L.' "Name='QuoteWake Demo - Alba Domótica S.L.' Phone=+14155550105")"
+    ACCOUNT_6="$(ensure_record Account 'QuoteWake Demo - Clima y Luz Levante S.L.' "Name='QuoteWake Demo - Clima y Luz Levante S.L.' Phone=+14155550106")"
+    ACCOUNT_7="$(ensure_record Account 'QuoteWake Demo - Talleres Costa Verde S.L.' "Name='QuoteWake Demo - Talleres Costa Verde S.L.' Phone=+14155550107")"
+    ACCOUNT_8="$(ensure_record Account 'QuoteWake Demo - Servicios Norte Claro S.L.' "Name='QuoteWake Demo - Servicios Norte Claro S.L.' Phone=+14155550108")"
+    ACCOUNT_9="$(ensure_record Account 'QuoteWake Demo - Construcciones Lumen S.L.' "Name='QuoteWake Demo - Construcciones Lumen S.L.' Phone=+14155550109")"
 
     CONTACT_1="$(ensure_contact "$ACCOUNT_1" Marta García marta.garcia.quotewake@example.invalid +14155550101)"
     CONTACT_2="$(ensure_contact "$ACCOUNT_2" Javier López javier.lopez.quotewake@example.invalid +14155550102)"
     CONTACT_3="$(ensure_contact "$ACCOUNT_3" Lucía Martín lucia.martin.quotewake@example.invalid +14155550103)"
     CONTACT_4="$(ensure_contact "$ACCOUNT_4" Diego Navarro diego.navarro.quotewake@example.invalid +14155550104)"
-    : "$CONTACT_1" "$CONTACT_2" "$CONTACT_3" "$CONTACT_4"
+    CONTACT_5="$(ensure_contact "$ACCOUNT_5" Ana Romero ana.romero.quotewake@example.invalid +14155550105)"
+    CONTACT_6="$(ensure_contact "$ACCOUNT_6" Pablo Sanz pablo.sanz.quotewake@example.invalid +14155550106)"
+    CONTACT_7="$(ensure_contact "$ACCOUNT_7" Elena Vidal elena.vidal.quotewake@example.invalid +14155550107)"
+    CONTACT_8="$(ensure_contact "$ACCOUNT_8" Sergio Moya sergio.moya.quotewake@example.invalid +14155550108)"
+    CONTACT_9="$(ensure_contact "$ACCOUNT_9" Nora Gil nora.gil.quotewake@example.invalid +14155550109)"
+    # The second opportunity under ACCOUNT_1 deliberately has its own contact
+    # so both primary OpportunityContactRole records are independently testable.
+    CONTACT_10="$(ensure_contact "$ACCOUNT_1" Tomás Ríos tomas.rios.quotewake@example.invalid +14155550110)"
+    : "$CONTACT_1" "$CONTACT_2" "$CONTACT_3" "$CONTACT_4" "$CONTACT_5" "$CONTACT_6" "$CONTACT_7" "$CONTACT_8" "$CONTACT_9" "$CONTACT_10"
 
     OPPORTUNITY_1="$(ensure_record Opportunity 'QuoteWake Demo - Reforma eléctrica cocina' "Name='QuoteWake Demo - Reforma eléctrica cocina' AccountId=$ACCOUNT_1 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=4250")"
     OPPORTUNITY_2="$(ensure_record Opportunity 'QuoteWake Demo - Instalación cargador EV' "Name='QuoteWake Demo - Instalación cargador EV' AccountId=$ACCOUNT_2 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=1650")"
     OPPORTUNITY_3="$(ensure_record Opportunity 'QuoteWake Demo - Mejora eléctrica oficina' "Name='QuoteWake Demo - Mejora eléctrica oficina' AccountId=$ACCOUNT_3 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=8900")"
     OPPORTUNITY_4="$(ensure_record Opportunity 'QuoteWake Demo - Cableado paneles solares' "Name='QuoteWake Demo - Cableado paneles solares' AccountId=$ACCOUNT_4 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=3200")"
+    OPPORTUNITY_5="$(ensure_record Opportunity 'QuoteWake Demo - Reforma iluminación inteligente' "Name='QuoteWake Demo - Reforma iluminación inteligente' AccountId=$ACCOUNT_5 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=4700")"
+    OPPORTUNITY_6="$(ensure_record Opportunity 'QuoteWake Demo - Auditoría energética edificio' "Name='QuoteWake Demo - Auditoría energética edificio' AccountId=$ACCOUNT_6 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=2800")"
+    OPPORTUNITY_7="$(ensure_record Opportunity 'QuoteWake Demo - Mejora seguridad taller' "Name='QuoteWake Demo - Mejora seguridad taller' AccountId=$ACCOUNT_7 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=6150")"
+    OPPORTUNITY_8="$(ensure_record Opportunity 'QuoteWake Demo - Cuadro eléctrico comercio' "Name='QuoteWake Demo - Cuadro eléctrico comercio' AccountId=$ACCOUNT_8 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=7350")"
+    OPPORTUNITY_9="$(ensure_record Opportunity 'QuoteWake Demo - Monitorización solar vivienda' "Name='QuoteWake Demo - Monitorización solar vivienda' AccountId=$ACCOUNT_9 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=5200")"
+    OPPORTUNITY_10="$(ensure_record Opportunity 'QuoteWake Demo - Mantenimiento eléctrico cocina' "Name='QuoteWake Demo - Mantenimiento eléctrico cocina' AccountId=$ACCOUNT_1 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=1800")"
+
+    ensure_primary_contact_role "$OPPORTUNITY_1" "$CONTACT_1"
+    ensure_primary_contact_role "$OPPORTUNITY_2" "$CONTACT_2"
+    ensure_primary_contact_role "$OPPORTUNITY_3" "$CONTACT_3"
+    ensure_primary_contact_role "$OPPORTUNITY_4" "$CONTACT_4"
+    ensure_primary_contact_role "$OPPORTUNITY_5" "$CONTACT_5"
+    ensure_primary_contact_role "$OPPORTUNITY_6" "$CONTACT_6"
+    ensure_primary_contact_role "$OPPORTUNITY_7" "$CONTACT_7"
+    ensure_primary_contact_role "$OPPORTUNITY_8" "$CONTACT_8"
+    ensure_primary_contact_role "$OPPORTUNITY_9" "$CONTACT_9"
+    ensure_primary_contact_role "$OPPORTUNITY_10" "$CONTACT_10"
 
     ensure_quote() {
-        local name="$1" opportunity_id="$2" next_at="$3" follow_up_status="$4" attempts="$5" quote_status="$6"
-        local result="${7:-}" last_at="${8:-}" existing_id values
+        local name="$1" opportunity_id="$2" quote_status="$3"
+        local existing_id structural_values create_values
         existing_id="$(query_id "SELECT Id FROM Quote WHERE Name = '$name' LIMIT 1")"
-        values="Name='$name' OpportunityId=$opportunity_id Pricebook2Id=$PRICEBOOK_ID ExpirationDate=$(date -u -d '+30 days' +%Y-%m-%d) Status='$quote_status' QuoteWake_Enabled__c=true Follow_Up_Status__c='$follow_up_status' Attempt_Count__c=$attempts"
-        [[ -n "$next_at" ]] && values+=" Next_Follow_Up_At__c=$next_at"
-        [[ -n "$result" ]] && values+=" Last_Follow_Up_Result__c='$result'"
-        [[ -n "$last_at" ]] && values+=" Last_Follow_Up_At__c=$last_at"
+        structural_values="Name='$name' OpportunityId=$opportunity_id Pricebook2Id=$PRICEBOOK_ID ExpirationDate=$(date -u -d '+30 days' +%Y-%m-%d) Status='$quote_status'"
+        create_values="$structural_values QuoteWake_Enabled__c=true Attempt_Count__c=0"
         if [[ -n "$existing_id" ]]; then
-            sf data update record "${ORG_ARGS[@]}" --sobject Quote --record-id "$existing_id" --values "$values" >/dev/null
+            # A normal seed repairs the demo hierarchy without erasing call
+            # progress. Use --reset-data when a clean QuoteWake state is wanted.
+            sf data update record "${ORG_ARGS[@]}" --sobject Quote --record-id "$existing_id" --values "$structural_values" >/dev/null
             printf '%s\n' "$existing_id"
         else
             create_msg "Quote: $name"
-            sf data create record "${ORG_ARGS[@]}" --sobject Quote --values "$values" --json | jq -r '.result.id'
+            sf data create record "${ORG_ARGS[@]}" --sobject Quote --values "$create_values" --json | jq -r '.result.id'
         fi
     }
 
-    QUOTE_1="$(ensure_quote 'QuoteWake Demo - Kitchen Electrical Renovation' "$OPPORTUNITY_1" "$NOW" Pending 0 Presented)"
-    QUOTE_2="$(ensure_quote 'QuoteWake Demo - EV Charger Installation' "$OPPORTUNITY_2" "$NOW" Retry 1 Presented)"
-    QUOTE_3="$(ensure_quote 'QuoteWake Demo - Office Electrical Upgrade' "$OPPORTUNITY_3" "$FUTURE" Scheduled 0 Draft)"
-    QUOTE_4="$(ensure_quote 'QuoteWake Demo - Solar Panel Wiring' "$OPPORTUNITY_4" "" Completed 1 Accepted Interested "$NOW")"
+    QUOTE_1="$(ensure_quote 'QuoteWake Demo - Kitchen Electrical Renovation' "$OPPORTUNITY_1" Presented)"
+    QUOTE_2="$(ensure_quote 'QuoteWake Demo - EV Charger Installation' "$OPPORTUNITY_2" Presented)"
+    QUOTE_3="$(ensure_quote 'QuoteWake Demo - Office Electrical Upgrade' "$OPPORTUNITY_3" Presented)"
+    QUOTE_4="$(ensure_quote 'QuoteWake Demo - Solar Panel Wiring' "$OPPORTUNITY_4" Presented)"
+    QUOTE_5="$(ensure_quote 'QuoteWake Demo - Smart Lighting Retrofit' "$OPPORTUNITY_5" Presented)"
+    QUOTE_6="$(ensure_quote 'QuoteWake Demo - Building Energy Audit' "$OPPORTUNITY_6" Presented)"
+    QUOTE_7="$(ensure_quote 'QuoteWake Demo - Workshop Safety Upgrade' "$OPPORTUNITY_7" Presented)"
+    QUOTE_8="$(ensure_quote 'QuoteWake Demo - Retail Panel Upgrade' "$OPPORTUNITY_8" Presented)"
+    QUOTE_9="$(ensure_quote 'QuoteWake Demo - Villa Solar Monitoring' "$OPPORTUNITY_9" Presented)"
+    QUOTE_10="$(ensure_quote 'QuoteWake Demo - Kitchen Maintenance Contract' "$OPPORTUNITY_10" Presented)"
 
     ensure_quote_line "$QUOTE_1" "$PRODUCT_LABOR" "$PBE_LABOR" 18 150 "Electrical installation labor (18 hours)"
     ensure_quote_line "$QUOTE_1" "$PRODUCT_MATERIALS" "$PBE_MATERIALS" 1 1550 "Kitchen renovation materials and fittings"
@@ -321,15 +441,38 @@ if [[ "$SEED_DATA" == true ]]; then
     ensure_quote_line "$QUOTE_3" "$PRODUCT_LABOR" "$PBE_LABOR" 40 147.5 "Office electrical upgrade labor (40 hours)"
     ensure_quote_line "$QUOTE_4" "$PRODUCT_SOLAR" "$PBE_SOLAR" 1 2000 "Solar panel wiring materials"
     ensure_quote_line "$QUOTE_4" "$PRODUCT_LABOR" "$PBE_LABOR" 1 1200 "Solar wiring installation labor"
-    ok "Demo Account, Contact, Opportunity and Quote hierarchy is ready"
+    ensure_quote_line "$QUOTE_5" "$PRODUCT_LABOR" "$PBE_LABOR" 12 150 "Smart lighting installation labor (12 hours)"
+    ensure_quote_line "$QUOTE_5" "$PRODUCT_MATERIALS" "$PBE_MATERIALS" 1 2900 "Smart lighting controls and fittings"
+    ensure_quote_line "$QUOTE_6" "$PRODUCT_SOLAR" "$PBE_SOLAR" 1 2000 "Building energy audit instrumentation"
+    ensure_quote_line "$QUOTE_6" "$PRODUCT_LABOR" "$PBE_LABOR" 4 200 "Energy audit engineering work (4 hours)"
+    ensure_quote_line "$QUOTE_7" "$PRODUCT_LABOR" "$PBE_LABOR" 24 150 "Workshop safety upgrade labor (24 hours)"
+    ensure_quote_line "$QUOTE_7" "$PRODUCT_MATERIALS" "$PBE_MATERIALS" 1 2550 "Workshop protection and safety materials"
+    ensure_quote_line "$QUOTE_8" "$PRODUCT_MATERIALS" "$PBE_MATERIALS" 2 1550 "Retail distribution panel materials"
+    ensure_quote_line "$QUOTE_8" "$PRODUCT_LABOR" "$PBE_LABOR" 20 137.5 "Retail panel installation labor (20 hours)"
+    ensure_quote_line "$QUOTE_9" "$PRODUCT_SOLAR" "$PBE_SOLAR" 1 2000 "Solar monitoring equipment"
+    ensure_quote_line "$QUOTE_9" "$PRODUCT_LABOR" "$PBE_LABOR" 16 200 "Solar monitoring installation labor (16 hours)"
+    ensure_quote_line "$QUOTE_10" "$PRODUCT_LABOR" "$PBE_LABOR" 8 150 "Kitchen maintenance labor (8 hours)"
+    ok "Demo hierarchy is ready: 9 Accounts, 10 Opportunities and 10 Quotes"
+fi
+
+if [[ "$RESET_DATA" == true ]]; then
+    reset_demo_data
 fi
 
 info "Verifying QuoteWake fields and querying Quotes..."
-sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, OpportunityId, Status, Subtotal, GrandTotal, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote ORDER BY CreatedDate DESC" --result-format human
+sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, OpportunityId, Status, Subtotal, GrandTotal, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote ORDER BY CreatedDate DESC" --result-format human
 if [[ "$SEED_DATA" == true ]]; then
+    sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, Phone FROM Account WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Name" --result-format human
+    sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, Account.Name FROM Opportunity WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Account.Name, Name" --result-format human
+    sf data query "${ORG_ARGS[@]}" --query "SELECT Opportunity.Name, Contact.Name, Contact.Phone, IsPrimary FROM OpportunityContactRole WHERE Opportunity.Name LIKE 'QuoteWake Demo - %' ORDER BY Opportunity.Name" --result-format human
     sf data query "${ORG_ARGS[@]}" --query "SELECT Quote.Name, Product2.Name, Description, Quantity, UnitPrice, TotalPrice FROM QuoteLineItem WHERE Quote.Name LIKE 'QuoteWake Demo - %' ORDER BY Quote.Name, Product2.Name" --result-format human
 fi
 printf '\n[VERIFY] Actionable QuoteWake SOQL (MAX_ATTEMPTS remains application configuration at 3):\n'
-printf '%s\n' "SELECT Id, Name, OpportunityId, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote WHERE QuoteWake_Enabled__c = true AND Follow_Up_Status__c IN ('Pending', 'Scheduled', 'Retry') AND Next_Follow_Up_At__c <= TODAY AND Attempt_Count__c < 3 ORDER BY Next_Follow_Up_At__c ASC"
+QUERY_NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+INITIAL_STANDARD_CUTOFF="$(date -u -d "-$STANDARD_DELAY_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)"
+INITIAL_MINIMUM_CUTOFF="$(date -u -d "-$MINIMUM_DELAY_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)"
+DUE_SOON_DATE="$(date -u -d "+$DUE_SOON_SECONDS seconds" +%Y-%m-%d)"
+TODAY="$(date -u +%Y-%m-%d)"
+printf '%s\n' "SELECT Id, Name, OpportunityId, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote WHERE QuoteWake_Enabled__c = true AND Status = 'Presented' AND Opportunity.IsClosed = false AND (ExpirationDate = null OR ExpirationDate >= $TODAY) AND (Attempt_Count__c = null OR Attempt_Count__c < 3) AND ((Follow_Up_Status__c = null AND (LastModifiedDate <= $INITIAL_STANDARD_CUTOFF OR (LastModifiedDate <= $INITIAL_MINIMUM_CUTOFF AND ExpirationDate != null AND ExpirationDate <= $DUE_SOON_DATE))) OR (Follow_Up_Status__c = 'Retry' AND Next_Follow_Up_At__c != null AND Next_Follow_Up_At__c <= $QUERY_NOW)) ORDER BY Next_Follow_Up_At__c ASC NULLS FIRST, LastModifiedDate ASC"
 
 ok "QuoteWake Salesforce MVP setup finished"

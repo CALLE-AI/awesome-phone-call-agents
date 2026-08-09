@@ -97,6 +97,24 @@ class TestQuoteWake(unittest.TestCase):
             self.assertEqual(data["mode"], "dry_run / simulated")
             self.assertEqual(data["total_invoices"], 3)
 
+    def test_main_help_lists_all_workflow_modes_and_options(self) -> None:
+        with patch("sys.stdout", new=io.StringIO()) as fake_out:
+            exit_code = main(["--help"])
+
+        self.assertEqual(exit_code, 0)
+        captured = fake_out.getvalue()
+        for option in (
+            "--plan-calls",
+            "--simulate-call",
+            "--quote-id",
+            "--simulation-outcome",
+            "--next-follow-up-at",
+            "--confirm-demo-write",
+            "--config",
+        ):
+            with self.subTest(option=option):
+                self.assertIn(option, captured)
+
 
 if __name__ == "__main__":
     unittest.main()

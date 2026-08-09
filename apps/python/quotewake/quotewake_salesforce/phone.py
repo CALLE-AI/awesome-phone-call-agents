@@ -22,3 +22,10 @@ def normalize_phone(value: str) -> str | None:
         cleaned = re.sub(r"[^0-9]", "", cleaned)
     return cleaned if E164_PATTERN.fullmatch(cleaned) else None
 
+
+def mask_phone(value: str) -> str:
+    """Mask an already normalized phone number for local reports and logs."""
+
+    if len(value) <= 6:
+        return "*" * len(value)
+    return f"{value[:3]}{'*' * (len(value) - 6)}{value[-3:]}"

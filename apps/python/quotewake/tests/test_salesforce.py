@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import unittest
 from unittest.mock import Mock
 
@@ -12,7 +13,10 @@ from quotewake_salesforce.domain.models import (
     SelectionResult,
 )
 from quotewake_salesforce.domain.selection import validate_callable_contact
-from quotewake_salesforce.salesforce.client import SalesforceSchemaError
+from quotewake_salesforce.salesforce.client import (
+    SalesforceResponseError,
+    SalesforceSchemaError,
+)
 from quotewake_salesforce.salesforce.quotes import REQUIRED_QUOTE_FIELDS, QuoteRepository
 
 
@@ -58,11 +62,13 @@ def _ready_result() -> SelectionResult:
         amount=None,
         currency_code=None,
         expiration_date=None,
+        last_modified_at=datetime(2026, 8, 7, 12, tzinfo=timezone.utc),
         opportunity_id=OPPORTUNITY_ID,
         opportunity_name="Acme",
+        account_name="Acme",
         opportunity_is_closed=False,
         enabled=True,
-        follow_up_status="Pending",
+        follow_up_status=None,
         next_follow_up_at=None,
         attempt_count=0,
         last_follow_up_at=None,
@@ -136,6 +142,81 @@ class TestContactOptOutConfiguration(unittest.TestCase):
             rf"Configured Contact opt-out field does not exist on Contact: {OPT_OUT_FIELD}",
         ):
             repository.validate_schema()
+
+
+class TestQuoteLineLoading(unittest.TestCase):
+    def test_quote_lines_are_loaded_in_one_batched_query(self) -> None:
+        client = Mock()
+        client.query.return_value = [
+            {
+                "QuoteId": "0Q0000000000001",
+                "Product2": {"Name": "Electrical labor"},
+                "Quantity": 18,
+                "UnitPrice": 150,
+                "TotalPrice": 2700,
+            }
+        ]
+        repository = QuoteRepository(client)
+
+        result = repository.load_quote_lines(["0Q0000000000001"])
+
+        self.assertEqual(result["0Q0000000000001"][0].product_name, "Electrical labor")
+        self.assertEqual(str(result["0Q0000000000001"][0].total_price), "2700")
+        soql = client.query.call_args.args[0]
+        self.assertIn("FROM QuoteLineItem", soql)
+        self.assertIn("'0Q0000000000001'", soql)
+
+    def test_quote_line_loading_rejects_invalid_ids(self) -> None:
+        repository = QuoteRepository(Mock())
+
+        with self.assertRaisesRegex(SalesforceResponseError, "invalid Quote ID"):
+            repository.load_quote_lines(["not-an-id"])
+
+
+class TestQuoteMapping(unittest.TestCase):
+    def test_maps_last_modified_date_as_initial_timing_reference(self) -> None:
+        repository = QuoteRepository(Mock())
+        record = {
+            "Id": "0Q0000000000001",
+            "Name": "Q-001",
+            "Status": "Presented",
+            "ExpirationDate": "2026-08-31",
+            "LastModifiedDate": "2026-08-07T12:00:00.000+0000",
+            "OpportunityId": OPPORTUNITY_ID,
+            "Opportunity": {
+                "Name": "Demo opportunity",
+                "Account": {"Name": "Demo account"},
+                "IsClosed": False,
+            },
+            "QuoteWake_Enabled__c": True,
+            "Follow_Up_Status__c": None,
+            "Next_Follow_Up_At__c": None,
+            "Attempt_Count__c": 0,
+            "Last_Follow_Up_At__c": None,
+            "Last_Follow_Up_Result__c": None,
+        }
+
+        quote = repository._quote_from_record(record, None, None)
+
+        self.assertEqual(
+            quote.last_modified_at,
+            datetime(2026, 8, 7, 12, tzinfo=timezone.utc),
+        )
+
+    def test_rejects_missing_last_modified_date(self) -> None:
+        repository = QuoteRepository(Mock())
+        record = {
+            "Id": "0Q0000000000001",
+            "Name": "Q-001",
+            "LastModifiedDate": None,
+            "OpportunityId": OPPORTUNITY_ID,
+            "Opportunity": {"Name": "Demo", "Account": None, "IsClosed": False},
+        }
+
+        with self.assertRaisesRegex(
+            SalesforceResponseError, "LastModifiedDate is unexpectedly empty"
+        ):
+            repository._quote_from_record(record, None, None)
 
 
 if __name__ == "__main__":
