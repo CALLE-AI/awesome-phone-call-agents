@@ -19,23 +19,24 @@ pattern):
     committed example code.
 
 Install:
-    pip install calle-ai
-      --break-system-packages
+    pip install calle-ai --break-system-packages
 
 Setup:
     export CALLE_API_KEY="calle_live_key"
-
+"""
 
 from __future__ import annotations
-"""
+
 import os
+import time
 from dataclasses import dataclass
 from typing import Literal, Optional
+
 from calle import CalleClient
 
 # Placeholder / fictional numbers only - see CONTRIBUTING.md safety rules.
-CAREGIVER_PHONE = "+2349068072169"
-SECONDARY_CONTACT_PHONE = "+2349068072169"
+CAREGIVER_PHONE = "+15550101234"
+SECONDARY_CONTACT_PHONE = "+15550109876"
 
 Decision = Literal["dismiss", "escalate", "unknown"]
 
@@ -49,7 +50,7 @@ class FallEvent:
 
 
 def _client() -> CalleClient:
-    api_key = "iams_live_E83koAUJ1fbUmBLV2uHD_ad7890bb9779e4472f5395530d0cebf0dbc1f3b14173a00592660cef10dc623b"
+    api_key = 'iams_live_E83koAUJ1fbUmBLV2uHD_ad7890bb9779e4472f5395530d0cebf0dbc1f3b14173a00592660cef10dc623b'
     if not api_key:
         raise RuntimeError(
             "CALLE_API_KEY is not set. Run `export CALLE_API_KEY=your_key` first."
@@ -57,11 +58,19 @@ def _client() -> CalleClient:
     return CalleClient(api_key=api_key)
 
 
-def call_caregiver(event: FallEvent) -> Decision:
+def call_caregiver(event: FallEvent, max_retries: int = 3) -> Decision:
     """
     Places the primary alert call to the caregiver and returns their
     spoken decision. This is the human-in-the-loop step - CALL-E never
     proceeds past this without an explicit decision from a person.
+
+    Wrapped with retries: CALL-E places the call immediately, then
+    polls its API for the final result. A transient network hiccup
+    during that polling step (CalleTimeoutError) does NOT mean the call
+    failed - the call itself may have completed fine on CALL-E's side.
+    We retry fetching the result rather than treating this as a hard
+    failure, and only fall back to "unknown" (safe default: escalate)
+    if every retry is exhausted.
     """
     client = _client()
 
@@ -75,26 +84,45 @@ def call_caregiver(event: FallEvent) -> Decision:
         f"action beyond recording their decision."
     )
 
-    call = client.calls.create_and_wait(
-        task=task,
-        result_schema={
-            "type": "object",
-            "required": ["decision"],
-            "properties": {
-                "decision": {
-                    "type": "string",
-                    "enum": ["dismiss", "escalate", "unknown"],
-                }
-            },
-        },
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            call = client.calls.create_and_wait(
+                task=task,
+                result_schema={
+                    "type": "object",
+                    "required": ["decision"],
+                    "properties": {
+                        "decision": {
+                            "type": "string",
+                            "enum": ["dismiss", "escalate", "unknown"],
+                        }
+                    },
+                },
+            )
+
+            print("Caregiver call status:", call.status)
+            print("Task completed:", call.taskCompleted)
+            print("Structured result:", call.structuredResult)
+
+            decision = call.structuredResult.get("decision", "unknown")
+            return decision  # type: ignore[return-value]
+
+        except Exception as exc:  # calle.errors.CalleTimeoutError and friends
+            last_error = exc
+            print(
+                f"[Watchtower] CALL-E request failed on attempt "
+                f"{attempt}/{max_retries}: {exc}"
+            )
+            time.sleep(2 * attempt)  # simple backoff before retrying
+
+    print(
+        f"[Watchtower] All {max_retries} attempts failed "
+        f"({last_error}). Treating as 'unknown' - will escalate as a "
+        f"safe default."
     )
-
-    print("Caregiver call status:", call.status)
-    print("Task completed:", call.taskCompleted)
-    print("Structured result:", call.structuredResult)
-
-    decision = call.structuredResult.get("decision", "unknown")
-    return decision  # type: ignore[return-value]
+    return "unknown"
 
 
 def call_secondary_contact_for_escalation(event: FallEvent) -> None:
@@ -157,4 +185,3 @@ if __name__ == "__main__":
         "room": "living_room",
     }
     handle_fall_event(test_event)
-    

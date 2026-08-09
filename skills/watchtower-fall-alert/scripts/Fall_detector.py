@@ -5,7 +5,7 @@ import cv2
 from ultralytics import YOLO
 import supervision as sv
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 import uvicorn
 
 from calle_trigger import handle_fall_event
@@ -24,7 +24,7 @@ ROOM = "living_room"
 FALL_CLASS_NAME = "fall"
 
 # Minimum confidence to trust a fall detection.
-FALL_CONFIDENCE_THRESHOLD = 0.3
+FALL_CONFIDENCE_THRESHOLD = 0.6
 
 # How many consecutive frames the fall class must appear in before we
 # trust it - cuts down one-frame false positives from motion blur etc.
@@ -39,6 +39,23 @@ EVENT_COOLDOWN_SECONDS = 60
 
 _consecutive_fall_frames = 0
 _last_event_time = 0.0
+
+# --- Shared status state for the dashboard -------------------------------
+# Polled by the "/status" endpoint. Kept as a plain dict for simplicity -
+# fine for a single-camera hackathon demo; a real multi-room deployment
+# would want a proper state store instead of a module-level global.
+
+status_state = {
+    "status": "monitoring",       # monitoring | fall_detected | calling | resolved
+    "last_event": None,             # last fall_detected event dict, or None
+    "last_decision": None,          # "dismiss" | "escalate" | "unknown" | None
+    "last_updated": datetime.now(timezone.utc).isoformat(),
+}
+
+
+def _update_status(**kwargs):
+    status_state.update(kwargs)
+    status_state["last_updated"] = datetime.now(timezone.utc).isoformat()
 
 
 def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
@@ -55,7 +72,6 @@ def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
 
     for class_id, confidence in zip(detections.class_id, detections.confidence):
         name = class_names.get(int(class_id), "")
-        print(f"DEBUG fall confidence: {confidence:.2f}")
         if name == FALL_CLASS_NAME and confidence >= FALL_CONFIDENCE_THRESHOLD:
             fall_seen_this_frame = True
             fall_confidence = max(fall_confidence, float(confidence))
@@ -85,26 +101,62 @@ def check_for_fall(detections: sv.Detections, class_names: dict) -> dict | None:
 
 
 def generate_frame():
-    cap = cv2.VideoCapture("awesome-phone-call-agents/skills/watchtower-fall-alert/assets/Make_a_video_of_an_old_person.mp4")
+    cap = cv2.VideoCapture(0)
+
+    # Lower capture resolution - fewer pixels to process per frame.
+    # 640x480 is plenty for fall detection; drop further (e.g. 480x360)
+    # if still slow.
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    # Only run YOLO on every Nth frame. A fall unfolds over multiple
+    # seconds, not milliseconds, so we don't need to inspect every
+    # single frame - this is the single biggest speed win on CPU.
+    FRAME_SKIP = 3
+    frame_count = 0
+
+    last_detections = None
+    last_result_names = {}
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        result = model(frame)[0]
-        detections = sv.Detections.from_ultralytics(result)
-        detections = tracker.update_with_detections(detections)
+        frame_count += 1
 
-        event = check_for_fall(detections, result.names)
-        if event is not None:
-            print("FALL EVENT:", event)
-            # Blocking call - fine for a hackathon demo since a real
-            # fall is rare and worth waiting on. For production you'd
-            # run this in a background thread/task instead so the video
-            # stream doesn't stall while CALL-E is on the phone.
-            handle_fall_event(event)
+        if frame_count % FRAME_SKIP == 0:
+            # imgsz=320 trades some accuracy for a large speed gain vs
+            # the default 640. Raise it back up (e.g. 480) if fall
+            # detection starts missing things at this size.
+            result = model(frame, imgsz=320, verbose=False)[0]
+            detections = sv.Detections.from_ultralytics(result)
+            detections = tracker.update_with_detections(detections)
+            last_detections = detections
+            last_result_names = result.names
 
-        annotated_frame = box_annotator.annotate(scene=frame, detections=detections)
+            event = check_for_fall(detections, result.names)
+            if event is not None:
+                print("FALL EVENT:", event)
+                _update_status(status="fall_detected", last_event=event)
+
+                try:
+                    _update_status(status="calling")
+                    decision = handle_fall_event(event)
+                    _update_status(status="resolved", last_decision=decision)
+                except Exception as exc:
+                    print(f"[Watchtower] handle_fall_event failed: {exc}")
+                    _update_status(status="resolved", last_decision="unknown")
+        else:
+            # Reuse the last frame's detections/boxes for the skipped
+            # frames so the video still shows bounding boxes on every
+            # frame, just not re-computed every time.
+            detections = last_detections
+
+        if detections is not None:
+            annotated_frame = box_annotator.annotate(scene=frame, detections=detections)
+        else:
+            annotated_frame = frame
 
         _, buffer = cv2.imencode('.jpg', annotated_frame)
         frame_byte = buffer.tobytes()
@@ -119,6 +171,152 @@ def generate_frame():
 def get_frame():
     return StreamingResponse(generate_frame(),
                               media_type='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.get('/status')
+def get_status():
+    return status_state
+
+
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Watchtower</title>
+    <style>
+        body {
+            background: #0e1116;
+            color: #e6e6e6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .layout {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        .video-panel img {
+            border-radius: 8px;
+            border: 1px solid #2a2f3a;
+            max-width: 640px;
+            width: 100%;
+        }
+        .status-panel {
+            background: #161a22;
+            border: 1px solid #2a2f3a;
+            border-radius: 8px;
+            padding: 1.25rem;
+            min-width: 280px;
+            flex: 1;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .badge.monitoring { background: #16331f; color: #4ade80; }
+        .badge.fall_detected { background: #3a1f16; color: #fb923c; }
+        .badge.calling { background: #33270f; color: #facc15; }
+        .badge.resolved { background: #16233a; color: #60a5fa; }
+
+        .row { margin-top: 1rem; }
+        .label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #8a93a6;
+            margin-bottom: 0.2rem;
+        }
+        .value { font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+    <h1>🛡️ Watchtower <span id="status-badge" class="badge monitoring">Monitoring</span></h1>
+
+    <div class="layout">
+        <div class="video-panel">
+            <img src="/detect" alt="Live camera feed" />
+        </div>
+
+        <div class="status-panel">
+            <div class="row">
+                <div class="label">Last event</div>
+                <div class="value" id="last-event">None yet</div>
+            </div>
+            <div class="row">
+                <div class="label">Confidence</div>
+                <div class="value" id="last-confidence">-</div>
+            </div>
+            <div class="row">
+                <div class="label">Caregiver decision</div>
+                <div class="value" id="last-decision">-</div>
+            </div>
+            <div class="row">
+                <div class="label">Last updated</div>
+                <div class="value" id="last-updated">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusLabels = {
+            monitoring: "Monitoring",
+            fall_detected: "Fall Detected",
+            calling: "Calling Caregiver",
+            resolved: "Resolved",
+        };
+
+        async function pollStatus() {
+            try {
+                const res = await fetch("/status");
+                const data = await res.json();
+
+                const badge = document.getElementById("status-badge");
+                badge.textContent = statusLabels[data.status] || data.status;
+                badge.className = "badge " + data.status;
+
+                document.getElementById("last-event").textContent =
+                    data.last_event ? `Fall in ${data.last_event.room} at ${data.last_event.timestamp}` : "None yet";
+
+                document.getElementById("last-confidence").textContent =
+                    data.last_event ? data.last_event.confidence : "-";
+
+                document.getElementById("last-decision").textContent =
+                    data.last_decision || "-";
+
+                document.getElementById("last-updated").textContent =
+                    new Date(data.last_updated).toLocaleTimeString();
+            } catch (err) {
+                console.error("Status poll failed:", err);
+            }
+        }
+
+        setInterval(pollStatus, 2000);
+        pollStatus();
+    </script>
+</body>
+</html>
+"""
+
+
+@app.get('/', response_class=HTMLResponse)
+def dashboard():
+    return DASHBOARD_HTML
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host='0.0.0.0', port=5000)
