@@ -35,8 +35,8 @@ from typing import Literal, Optional
 from calle import CalleClient
 
 # Placeholder / fictional numbers only - see CONTRIBUTING.md safety rules.
-CAREGIVER_PHONE = "+23407049870280"
-SECONDARY_CONTACT_PHONE = "+2349068072169"
+CAREGIVER_PHONE = os.environ.get("CAREGIVER_PHONE", "+2349068072169")
+SECONDARY_CONTACT_PHONE = os.environ.get("SECONDARY_CONTACT_PHONE", "+2349068072169")
 
 Decision = Literal["dismiss", "escalate", "unknown"]
 
@@ -50,7 +50,7 @@ class FallEvent:
 
 
 def _client() -> CalleClient:
-    api_key = "REDACTED"
+    api_key = os.environ.get("CALLE_API_KEY")
     if not api_key:
         raise RuntimeError(
             "CALLE_API_KEY is not set. Run `export CALLE_API_KEY=your_key` first."
