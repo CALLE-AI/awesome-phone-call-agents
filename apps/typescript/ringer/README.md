@@ -83,9 +83,12 @@ pnpm dlx vercel dev
 
 ## Credential handling
 
-- **BYOK:** the user's CALL-E API key is stored only in their browser
-  (localStorage) and forwarded per-request to the app's own serverless proxy;
-  it is never persisted server-side and never sent to any third party.
+- **BYOK:** the user's CALL-E API key (and any shared-key access secret) is kept
+  only in the browser's **`sessionStorage`** — isolated from the durable,
+  cross-tab settings in `localStorage`, and cleared when the tab/session closes —
+  and forwarded per-request to the app's own serverless proxy. A **"Forget key"**
+  control wipes it on demand. It is never persisted server-side and never sent to
+  any third party.
 - Alternatively an operator sets `CALLE_API_KEY` as a server environment
   variable; the browser never sees it. `/api/health` only reports whether a
   server key exists.
@@ -95,7 +98,10 @@ pnpm dlx vercel dev
   the operator's account on a public deployment. It **fails closed**: if
   `CALLE_API_KEY` is set without `CALLE_APP_SECRET`, the shared key is locked and
   callers must use their own key (BYOK). BYOK requests need no secret — they
-  spend the caller's own key. (The cron is separately protected by `CRON_SECRET`.)
+  spend the caller's own key. The scheduler cron dials with the server key, so
+  when the scheduler is armed (KV + server key) it **requires `CRON_SECRET`** and
+  a matching Bearer token and **fails closed** if the secret is unset — the
+  dialer is never publicly triggerable.
 - Optional `CALLE_WEBHOOK_SECRET` enables signed-webhook verification via the
   SDK's HMAC check on the raw request body.
 - A caller-supplied API base URL is honored only for the official
@@ -121,7 +127,11 @@ pnpm dlx vercel dev
 - **When the operator enables the durable scheduler** (Vercel KV + server key),
   a scheduled or recurring call is placed **automatically at its due time** by a
   cron using the server key. Each such job is listed and **cancelable from the
-  drawer up until it fires** (see Cancellation).
+  drawer up until it fires** (see Cancellation). A transient failure (network,
+  timeout, 5xx, throttle) is **not** recorded as a definitive `failed` — the job
+  stays pending and is retried (bounded) under the **same job-id idempotency
+  key**, so a lost response after the provider accepted the call never yields a
+  second dial; only a definitive 4xx rejection marks it failed.
 - Every create-call request carries a **content-bound idempotency key** derived
   from the phone, task, and result schema, so an accidental retry dedups and an
   edited request can never alias a prior call under the same key.
@@ -131,7 +141,11 @@ pnpm dlx vercel dev
 - Scheduled follow-up calls and rate watches can be cancelled or removed at
   any time from the in-app drawer (single tap), before anything is placed —
   including durable server-scheduled jobs, which are deleted from the store
-  (`DELETE /api/schedule`) so the cron never fires them.
+  (`DELETE /api/schedule`) so the cron never fires them. Cancellation and the
+  cron's dispatch take a **per-job atomic lock** (`SET … NX`) and re-read the
+  job's status inside it, so the two can't race: if a call is already being
+  placed the cancel is refused with `409` rather than tearing down a live dial;
+  otherwise the job is removed before the cron can claim it.
 - The in-progress view offers Cancel, which stops the app's polling and
   discards the workflow client-side. Note: once a live CALL-E call task has
   been accepted by the provider, the call itself runs to completion on the

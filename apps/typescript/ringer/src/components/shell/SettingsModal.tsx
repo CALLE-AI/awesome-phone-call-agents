@@ -23,11 +23,14 @@ export function SettingsModal({
   onClose,
   settings,
   onSave,
+  onForget,
 }: {
   open: boolean
   onClose: () => void
   settings: AppSettings
   onSave: (next: AppSettings) => void
+  /** Wipe the stored credentials (key + access secret) immediately. */
+  onForget?: () => void
 }) {
   const [draft, setDraft] = useState<AppSettings>(settings)
   const [showKey, setShowKey] = useState(false)
@@ -76,7 +79,7 @@ export function SettingsModal({
             <Field
               label="CALL-E API key"
               htmlFor="apikey"
-              help="Stored only in this browser and sent per-request. Never saved on our servers."
+              help="Kept only in this browser tab for the session — never in permanent storage or on our servers — and sent per-request. Closing the tab clears it."
             >
               <div className="relative">
                 <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
@@ -107,7 +110,7 @@ export function SettingsModal({
             <Field
               label="Access secret (shared key)"
               htmlFor="appsecret"
-              help="Only needed if this deployment shares a CALL-E key and you're not using your own. Sent per-request; never stored server-side."
+              help="Only needed if this deployment shares a CALL-E key and you're not using your own. Kept only in this session and sent per-request; never stored server-side."
             >
               <div className="relative">
                 <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
@@ -130,14 +133,28 @@ export function SettingsModal({
                 onChange={(e) => set({ baseUrl: e.target.value })}
               />
             </Field>
-            <a
-              href={`${DASHBOARD}/account/api-keys`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              Get a CALL-E API key →
-            </a>
+            <div className="flex items-center justify-between gap-3">
+              <a
+                href={`${DASHBOARD}/account/api-keys`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Get a CALL-E API key →
+              </a>
+              {onForget && (draft.apiKey || draft.appSecret || settings.apiKey || settings.appSecret) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    set({ apiKey: '', appSecret: '' })
+                    onForget()
+                  }}
+                  className="cursor-pointer text-xs font-semibold text-danger hover:underline"
+                >
+                  Forget key on this device
+                </button>
+              )}
+            </div>
           </div>
 
           {/* First-live-call onboarding: real outbound needs KYC + a number */}

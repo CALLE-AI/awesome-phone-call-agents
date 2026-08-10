@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useTheme } from '@/hooks/useTheme'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useAppSettings } from '@/hooks/useAppSettings'
 import { useCallRunner } from '@/hooks/useCallRunner'
-import { DEFAULT_SETTINGS, type AppSettings, type HistoryEntry, type ImpactKind } from '@/lib/app'
+import { type AppSettings, type HistoryEntry, type ImpactKind } from '@/lib/app'
 import { getTemplate } from '@/lib/tasks/templates'
 import { buildCall, escalatePayload, type RecipientInput } from '@/lib/tasks/buildCall'
 import {
@@ -34,7 +35,7 @@ type View = 'home' | 'compose' | 'call'
 
 export default function App() {
   const { theme, toggle } = useTheme()
-  const [settings, setSettings] = useLocalStorage<AppSettings>('ringer.settings', DEFAULT_SETTINGS)
+  const [settings, setSettings, forgetCredentials] = useAppSettings()
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>('ringer.history', [])
 
   const [view, setView] = useState<View>('home')
@@ -389,7 +390,13 @@ export default function App() {
         )}
       </main>
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onSave={setSettings} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onSave={setSettings}
+        onForget={forgetCredentials}
+      />
       <HistoryDrawer
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}

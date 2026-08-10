@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { allowCors, authorizeServerUse, sendError, serverCreds, type RawCreateBody } from './_lib/calle.js'
 import {
-  deleteJob,
+  cancelJob,
   kvConfigured,
   listJobs,
   putJob,
@@ -45,8 +45,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'DELETE') {
       const id = String(req.query.id ?? '')
       if (!id) return sendError(res, 400, 'invalid_request', 'A job `id` is required.')
-      await deleteJob(id)
-      return res.status(200).json({ ok: true })
+      // Atomic w.r.t. the cron: if the call is being placed right now, refuse
+      // rather than race a live dial. `missing` is treated as an idempotent no-op.
+      const outcome = await cancelJob(id)
+      if (outcome === 'busy') {
+        return sendError(res, 409, 'job_dispatching', 'This call is being placed right now and can no longer be canceled.')
+      }
+      return res.status(200).json({ ok: true, outcome })
     }
 
     if (req.method === 'POST') {

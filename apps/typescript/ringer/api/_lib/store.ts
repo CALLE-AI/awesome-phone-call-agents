@@ -36,6 +36,8 @@ export interface ScheduledJob {
   callId?: string
   placedAt?: string
   error?: string
+  /** Dispatch attempts so far — bounds retries after ambiguous failures. */
+  attempts?: number
 }
 
 const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || ''
@@ -43,6 +45,10 @@ const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST
 
 const INDEX = 'ringer:jobs'
 const jobKey = (id: string) => `ringer:job:${id}`
+const lockKey = (id: string) => `ringer:lock:${id}`
+
+/** How long a single dispatch/cancel critical section may hold a job's lock. */
+export const LOCK_TTL_SEC = 120
 
 export function kvConfigured(): boolean {
   return Boolean(KV_URL && KV_TOKEN)
@@ -124,4 +130,42 @@ export async function dueJobs(nowMs: number): Promise<ScheduledJob[]> {
   const ids = await redis<string[]>(['ZRANGEBYSCORE', INDEX, 0, nowMs])
   const jobs = await jobsByIds(ids)
   return jobs.filter((j) => j.status === 'pending')
+}
+
+/**
+ * Atomic per-job mutex used to serialize dispatch and cancellation.
+ *
+ * `SET … NX` is atomic in Redis, so only one of {cron dispatch, user cancel}
+ * can hold a given job's lock at a time. The holder then re-reads the job's
+ * status inside the lock and acts on a consistent view — closing the race where
+ * the cron read a `pending` job just before a `DELETE` and dialed it anyway.
+ * A short TTL guarantees the lock can't wedge a job if a worker dies mid-flight.
+ */
+export async function acquireLock(id: string, ttlSec = LOCK_TTL_SEC): Promise<boolean> {
+  const r = await redis<string | null>(['SET', lockKey(id), '1', 'NX', 'EX', ttlSec])
+  return r === 'OK'
+}
+
+export async function releaseLock(id: string): Promise<void> {
+  await redis(['DEL', lockKey(id)])
+}
+
+/**
+ * Cancel a scheduled job atomically with respect to the dispatcher.
+ *
+ *  - `'busy'`     — the cron holds the lock (the call is being placed right
+ *                   now); cancellation is refused so we never race a live dial.
+ *  - `'missing'`  — no such (still-schedulable) job; cancel is a no-op.
+ *  - `'canceled'` — removed from the schedulable index and deleted.
+ */
+export async function cancelJob(id: string): Promise<'busy' | 'missing' | 'canceled'> {
+  if (!(await acquireLock(id))) return 'busy'
+  try {
+    const job = await getJob(id)
+    if (!job) return 'missing'
+    await deleteJob(id)
+    return 'canceled'
+  } finally {
+    await releaseLock(id)
+  }
 }
