@@ -141,7 +141,7 @@ CONSECUTIVE_FRAMES_REQUIRED = 5
 # spamming CALL-E with repeat calls while the person is still on the
 # ground in frame.
 EVENT_COOLDOWN_SECONDS = 60
-
+STATUS_COOL_DOWN_SECONDS = 10
 # --- State used by the fall-tracking logic ------------------------------
 
 _consecutive_fall_frames = 0
@@ -275,7 +275,7 @@ def generate_frame():
         # itself failed) forever, even though the CV pipeline is still
         # actively watching for the next fall in the background.
         if status_state["status"] != "monitoring" and _last_event_time:
-            if time.time() - _last_event_time >= EVENT_COOLDOWN_SECONDS:
+            if time.time() - _last_event_time >= STATUS_COOL_DOWN_SECONDS:
                 _update_status(status="monitoring")
 
         _, buffer = cv2.imencode('.jpg', annotated_frame)
