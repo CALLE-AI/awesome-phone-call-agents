@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { buildCallTask } from "./call-task.js";
+import { MemoryCallCheckpointStore, type CallCheckpointStore } from "./checkpoints.js";
 import { extractPublishedUsPhone, maskPhone, normalizeUsPhone, stableFingerprint } from "./privacy.js";
 import type { CallPreview, CallResult, CpscRecall, PendingPreview, PreviewInput } from "./types.js";
 import type { CallProvider } from "./providers.js";
@@ -8,6 +9,8 @@ const PREVIEW_TTL_MS = 15 * 60 * 1000;
 
 export class RecallWorkflow {
   readonly pending = new Map<string, PendingPreview>();
+
+  constructor(private readonly checkpoints: CallCheckpointStore = new MemoryCallCheckpointStore()) {}
 
   createPreview(recall: CpscRecall, input: PreviewInput, liveCallsEnabled: boolean): CallPreview {
     const modelNumber = input.modelNumber.trim().slice(0, 60);
@@ -61,13 +64,19 @@ export class RecallWorkflow {
     }
     if (approvalPhrase !== "CALL NOW") throw new Error('Type "CALL NOW" to approve this one call.');
 
-    pending.consumed = true;
     const fingerprint = stableFingerprint(
+      "recallready-call-v1",
       String(pending.recall.id),
       pending.preview.modelNumber,
+      pending.preview.dateCode ?? "",
       pending.phone,
-      pending.preview.expiresAt,
     );
-    return provider.run(pending.phone, pending.task, fingerprint);
+    pending.consumed = true;
+    if (!(await this.checkpoints.claim(fingerprint))) {
+      throw new Error("This call has a durable checkpoint and will not be redialed automatically. Review the prior CALL-E call before any new attempt.");
+    }
+    const result = await provider.run(pending.phone, pending.task, fingerprint);
+    await this.checkpoints.complete(fingerprint, result.callId);
+    return result;
   }
 }

@@ -9,7 +9,7 @@ RecallReady needs only:
 - an optional non-sensitive date or batch code; and
 - a destination phone number drawn from the official record or supplied for an explicitly authorized demo.
 
-The browser receives only the final four digits of the destination. The server keeps the full number in volatile memory for the preview lifetime. RecallReady does not persist phone numbers or transcripts.
+The browser receives only the final four digits of the destination. The server keeps the full number in volatile memory for the preview lifetime. RecallReady does not persist phone numbers or transcripts. Its durable redial checkpoint stores only a one-way request fingerprint, state, timestamps, and the CALL-E call ID.
 
 ## Call boundaries
 
@@ -39,6 +39,8 @@ Demo numbers require an attestation that the operator owns the number or has exp
 - Wrong approval phrase → refuse.
 - Live call without server opt-in or API key → refuse.
 - Ambiguous conversation → `unknown` or `needs_more_information`, never “safe.”
+- Existing started or completed durable checkpoint → refuse an automatic redial and require manual reconciliation.
+- Non-completed call/task/recipient, recipient mismatch, missing evidence, invalid enums, or invalid confidence → refuse to present a remedy.
 
 ## Threats explicitly not solved
 

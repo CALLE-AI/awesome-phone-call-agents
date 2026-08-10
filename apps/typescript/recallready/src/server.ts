@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FileCallCheckpointStore } from "./checkpoints.js";
 import { getRecallById, searchRecalls } from "./cpsc.js";
 import { CalleCallProvider, MockCallProvider } from "./providers.js";
 import { cleanShortText } from "./privacy.js";
@@ -10,7 +11,9 @@ import { RecallWorkflow } from "./workflow.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const publicRoot = normalize(join(here, "..", "..", "public"));
-const workflow = new RecallWorkflow();
+const workflow = new RecallWorkflow(new FileCallCheckpointStore(
+  process.env.CALL_CHECKPOINT_PATH ?? "data/call-checkpoints.json",
+));
 const liveCallsEnabled = process.env.LIVE_CALLS_ENABLED === "true";
 
 function json(res: ServerResponse, status: number, value: unknown): void {

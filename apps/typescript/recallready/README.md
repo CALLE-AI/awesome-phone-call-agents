@@ -75,7 +75,8 @@ Important files:
 
 - `src/cpsc.ts` — official recall API adapter.
 - `src/call-task.ts` — constrained call task and JSON result schema.
-- `src/workflow.ts` — consent, preview, expiry, idempotency, and one-call gate.
+- `src/workflow.ts` — consent, preview, expiry, stable idempotency, and one-call gate.
+- `src/checkpoints.ts` — hash-only durable checkpoint that blocks ambiguous restart redials without storing a phone number or transcript.
 - `src/providers.ts` — deterministic mock and actual `CalleClient` runtime.
 - `public/` — complete user-facing workflow.
 - `test/` — unit, integration, safety, and privacy checks.
@@ -86,7 +87,7 @@ Important files:
 pnpm check
 ```
 
-Tests cover official-data parsing, phone extraction/masking, demo consent, single-use previews, expiry, exact approval, structured mock results, task boundaries, and private-data markers.
+Tests cover official-data parsing, phone extraction/masking, demo consent, single-use previews, expiry, exact approval, SDK recipient/idempotency binding, strict terminal-result validation, durable restart protection, structured mock results, task boundaries, and private-data markers.
 
 No test places a real phone call.
 
