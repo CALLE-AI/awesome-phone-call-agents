@@ -59,13 +59,15 @@ _RECIPIENT_AFFIRMATION_RE = re.compile(
 )
 
 
+def _recipient_text(transcript: list[dict]) -> str:
+    return " ".join(turn.get("text", "") for turn in transcript if turn.get("speaker") == "user")
+
+
 def _recipient_corroborates_commitment(transcript: list[dict]) -> bool:
-    recipient_text = " ".join(
-        turn.get("text", "") for turn in transcript if turn.get("speaker") == "user"
-    )
-    if _RECIPIENT_DENIAL_RE.search(recipient_text):
+    text = _recipient_text(transcript)
+    if _RECIPIENT_DENIAL_RE.search(text):
         return False
-    return bool(_RECIPIENT_AFFIRMATION_RE.search(recipient_text))
+    return bool(_RECIPIENT_AFFIRMATION_RE.search(text))
 
 
 class CalleTransport:
@@ -201,9 +203,10 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
     # structured extraction. If CALL-E itself says the call didn't
     # accomplish its task, a "yes" in structured_result is extraction noise
     # (or a stale/partial value), not a real confirmation -- don't trust it
-    # over CALL-E's own completion judgment. task_completed absent (None)
-    # is treated as "no contradiction" rather than a false rejection, since
-    # not every response shape is guaranteed to include it.
+    # over CALL-E's own completion judgment. (An explicit False is rejected
+    # unconditionally here; the yes-branch below additionally requires an
+    # explicit True rather than treating an absent/None value as "no
+    # contradiction" -- see that branch for why.)
     elif task_completed is False:
         outcome, commitment = CallOutcome.NO_ANSWER, 0.0
     elif can_come == "no":
@@ -232,7 +235,19 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
         elif not _recipient_corroborates_commitment(transcript):
             outcome, commitment = CallOutcome.NO_ANSWER, 0.0
         else:
-            commitment = calibrated_commitment(evidence=evidence, candidate_prior_showup_rate=prior_showup_rate)
+            # Score firmness from the recipient's OWN words (already
+            # verified above to contain a real affirmation), not from
+            # structured_result's evidence_summary -- that field is a
+            # provider-authored paraphrase and can drift from what was
+            # actually said. Gating the yes/no decision on the transcript
+            # while still scoring confidence off an unverified paraphrase
+            # would let fabricated firm language ("definitely, leaving
+            # right now!") inflate a weak, only-just-corroborated response
+            # into a firm_yes. `evidence` (evidence_summary) is kept on the
+            # result purely for human-readable display, not for scoring.
+            commitment = calibrated_commitment(
+                evidence=_recipient_text(transcript), candidate_prior_showup_rate=prior_showup_rate
+            )
             outcome = CallOutcome.FIRM_YES if commitment >= 0.6 else CallOutcome.SOFT_YES
     else:
         outcome, commitment = CallOutcome.NO_ANSWER, 0.0

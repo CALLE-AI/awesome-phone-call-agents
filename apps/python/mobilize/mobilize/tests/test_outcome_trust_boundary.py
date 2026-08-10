@@ -110,6 +110,28 @@ def test_recipient_declining_without_denial_words_does_not_corroborate_a_structu
     assert result.commitment_score == 0.0
 
 
+def test_commitment_score_is_derived_from_recipient_words_not_structured_evidence_summary():
+    """Gating the yes/no decision on the transcript while still scoring
+    CONFIDENCE off structured_result's evidence_summary would let a
+    fabricated/mismatched provider paraphrase inflate a weak, only-just-
+    corroborated response into a firm_yes. Here the recipient's actual word
+    is a bare, neutral "okay" (passes corroboration, but is not firm
+    language), while evidence_summary independently claims strong firm
+    language it never said -- if evidence_summary drove the score, this
+    would be firm_yes; scored from the real transcript, it must not be."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                 evidence="absolutely, definitely, for sure, leaving right now",
+                 transcript_turns=[
+                     {"speaker": "bot", "text": "can you come donate right now?"},
+                     {"speaker": "user", "text": "okay"},
+                 ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome != CallOutcome.FIRM_YES
+    # evidence_summary is still carried on the result for human display.
+    assert result.evidence == "absolutely, definitely, for sure, leaving right now"
+
+
 def test_recipient_denial_overrides_a_contradicting_structured_yes():
     """structured_result is a provider-authored extraction and can be
     wrong -- a recipient explicitly declining in the transcript must never
