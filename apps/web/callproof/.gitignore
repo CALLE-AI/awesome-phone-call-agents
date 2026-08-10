@@ -1,0 +1,20 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Ruby runtime files
+rails/.bundle/
+rails/config/master.key
+rails/coverage/
+rails/log/
+rails/storage/
+rails/tmp/
+rails/vendor/bundle/
+
+# Python runtime files
+call_analyzer/.pytest_cache/
+call_analyzer/.venv/
+call_analyzer/**/__pycache__/
+call_analyzer/*.db
+call_analyzer/*.db-*

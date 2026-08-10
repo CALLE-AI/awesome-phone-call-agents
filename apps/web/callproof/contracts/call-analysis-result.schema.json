@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://callproof.dev/contracts/call-analysis-result.schema.json",
+  "title": "CallProof call analysis result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "request_id",
+    "call_id",
+    "status",
+    "completed_at",
+    "verdict"
+  ],
+  "properties": {
+    "schema_version": { "const": "2.0" },
+    "analysis_id": { "type": "string", "format": "uuid" },
+    "request_id": { "type": "string", "format": "uuid" },
+    "call_id": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "agentkit_run_id": { "type": ["string", "null"], "maxLength": 255 },
+    "status": { "const": "completed" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal_completion",
+        "policy_adherence",
+        "policy_evaluation",
+        "unauthorized_commitment",
+        "result_confidence",
+        "needs_human_review",
+        "summary",
+        "claim_results",
+        "evidence"
+      ],
+      "properties": {
+        "goal_completion": { "enum": ["complete", "partial", "failed", "unknown"] },
+        "policy_adherence": { "type": "boolean" },
+        "policy_evaluation": { "enum": ["compliant", "violated", "unknown"] },
+        "unauthorized_commitment": { "type": "boolean" },
+        "result_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "risk_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "needs_human_review": { "type": "boolean" },
+        "summary": { "type": "string", "minLength": 1 },
+        "negotiated_terms": { "type": "object" },
+        "missing_disclosures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "contradictions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "recommended_memories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["content", "confidence"],
+            "properties": {
+              "content": { "type": "string", "minLength": 1 },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "scope": { "enum": ["operator", "provider", "task_category"] }
+            }
+          }
+        },
+        "claim_results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/claim_result" }
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        }
+      }
+    },
+    "metrics": { "type": "object" }
+  },
+  "$defs": {
+    "claim_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "kind", "status", "explanation"],
+      "properties": {
+        "claim_id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "enum": ["success", "commitment_limit", "required_disclosure", "forbidden_commitment"]
+        },
+        "status": {
+          "enum": ["supported", "contradicted", "violated", "absent", "ambiguous", "unevaluated"]
+        },
+        "expected": {},
+        "actual": {},
+        "turn_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "explanation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding", "turn_ids", "explanation"],
+      "properties": {
+        "finding": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "turn_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "explanation": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
