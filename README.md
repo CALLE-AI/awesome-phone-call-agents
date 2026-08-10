@@ -123,6 +123,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`voice-preflight`](skills/voice-preflight/) - Hear a call task spoken by your own text-to-speech provider before a real person does, then refuse a script whose critical line would not survive being spoken.
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
+- [`forgerelay-supplier-clarification`](skills/forgerelay-supplier-clarification/) - Safe, approval-gated CALL-E workflow for collecting missing manufacturing RFQ details from authorized supplier contacts.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
 - [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, TikTok Ads, Notion, Airtable, local CSV files, or custom sources.
 - [`service-dispatch-call`](skills/service-dispatch-call/) - Service dispatch workflow that asks a vendor about availability, ETA, and cost, returns a schema-validated result, and routes any commitment to human approval.
