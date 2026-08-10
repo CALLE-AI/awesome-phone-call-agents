@@ -12,8 +12,14 @@ export function isE164(value: string): boolean {
 
 export function assertE164(value: string, label: string): void {
   if (!isE164(value)) {
+    // Deliberately does not echo `value` back: a rejected value might still
+    // be a real phone number in the wrong format (missing "+", spaces,
+    // parens, a typo'd digit), and it wouldn't reliably match
+    // maskPhoneNumbersInText's E.164 pattern precisely because it's
+    // malformed — so it can't be masked, only omitted.
     throw new Error(
-      `${label} must be an E.164 phone number (e.g. +15555550123), got "${value}". ` +
+      `${label} must be an E.164 phone number (e.g. +15555550123): "+" followed by 7–15 digits, ` +
+        "no spaces, dashes, or parentheses. The value you passed is not shown here for that reason. " +
         "This is checked locally before anything is sent to CALL-E.",
     );
   }

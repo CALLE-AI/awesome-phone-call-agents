@@ -9,7 +9,9 @@ import { afterEach, beforeEach, test } from "node:test";
 const stateDir = mkdtempSync(join(tmpdir(), "calle-mcp-result-extractor-test-"));
 process.env.CALLE_MCP_APP_STATE_DIR = stateDir;
 
-const { clearPendingPlan, loadPendingPlan, savePendingPlan } = await import("../src/pending-plan.js");
+const { clearPendingPlan, formatPendingPlanSummary, loadPendingPlan, savePendingPlan } = await import(
+  "../src/pending-plan.js"
+);
 
 const SAMPLE = {
   planId: "plan_abc123",
@@ -51,6 +53,21 @@ test("the state file is written with owner-only permissions, never world- or gro
   savePendingPlan(SAMPLE);
   const mode = statSync(join(stateDir, "pending-plan.json")).mode & 0o777;
   assert.equal(mode & 0o077, 0, `expected no group/other permissions, got ${mode.toString(8)}`);
+});
+
+test("formatPendingPlanSummary shows the plan id, region, and goal, with the phone number masked", () => {
+  const summary = formatPendingPlanSummary(SAMPLE);
+
+  assert.match(summary, /plan_abc123/);
+  assert.match(summary, /US/);
+  assert.match(summary, /Confirm the appointment\./);
+  assert.doesNotMatch(summary, /\+15555550123/);
+  assert.match(summary, /\+155•+23/); // start and end digits still visible
+});
+
+test("formatPendingPlanSummary never leaks the confirm_token", () => {
+  const summary = formatPendingPlanSummary(SAMPLE);
+  assert.doesNotMatch(summary, /super-secret-confirm-token/);
 });
 
 process.on("exit", () => {

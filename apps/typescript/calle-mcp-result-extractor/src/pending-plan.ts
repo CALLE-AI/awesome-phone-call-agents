@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ensurePrivateDir, readJson, removeFile, writePrivateJson } from "@call-e/core/cache";
+import { maskPhoneNumbersInText } from "./phone-safety.js";
 
 /**
  * `plan_call`'s `confirm_token` authorizes an actual outbound phone call —
@@ -39,6 +40,23 @@ export function loadPendingPlan(): PendingPlan | null {
 
 export function clearPendingPlan(): void {
   removeFile(pendingPlanPath());
+}
+
+/**
+ * A human-readable, phone-masked summary of exactly what a live call would
+ * do — the destination, region, and goal actually on file, not just a plan
+ * id. Shown before both the dry-run preview and the real `--live` dial, so
+ * what gets confirmed is always the plan that's actually stored, not
+ * whatever the operator assumes is still pending.
+ */
+export function formatPendingPlanSummary(pending: PendingPlan): string {
+  const lines = [
+    `plan:   ${pending.planId}`,
+    `to:     ${pending.toPhones.join(", ")}`,
+    `region: ${pending.region}`,
+    `goal:   ${pending.goal}`,
+  ];
+  return maskPhoneNumbersInText(lines.map((line) => `  ${line}`).join("\n"));
 }
 
 /**

@@ -4,10 +4,11 @@ import {
   AppointmentConfirmationResult,
   QUESTIONS_TO_RESOLVE,
 } from "../examples/appointment-confirmation.js";
-import { getCallRun, isUnauthorizedMcpError, planCall, resolveCalleMcpConfig, runCall } from "./calle-mcp.js";
+import { getCallRun, isUnauthorizedMcpError, resolveCalleMcpConfig, runCall } from "./calle-mcp.js";
 import { DEFAULT_EXTRACTION_SYSTEM_PROMPT, extractStructuredResult } from "./extract-from-transcript.js";
-import { assertE164, maskPhoneNumbersInText, REDACTED_TOKEN_PLACEHOLDER } from "./phone-safety.js";
-import { clearPendingPlan, loadPendingPlan, readConfirmTokenFromStdin, savePendingPlan } from "./pending-plan.js";
+import { maskPhoneNumbersInText, REDACTED_TOKEN_PLACEHOLDER } from "./phone-safety.js";
+import { clearPendingPlan, formatPendingPlanSummary, loadPendingPlan, readConfirmTokenFromStdin } from "./pending-plan.js";
+import { planAndSave } from "./plan-workflow.js";
 import { BedrockReasoningProvider } from "./reasoning/bedrock.js";
 import { FakeReasoningProvider } from "./reasoning/fake.js";
 import type { ReasoningProvider } from "./reasoning/types.js";
@@ -106,21 +107,13 @@ async function cmdPlan(args: string[]) {
   const region = flag(args, "region");
   const goal = flag(args, "goal");
   if (!to || !region || !goal) usage();
-  assertE164(to, "--to");
 
   const config = resolveCalleMcpConfig();
   try {
-    const plan = await planCall(config, { toPhones: [to], region, goal });
-    if (plan.ready_to_run && plan.confirm_token) {
-      savePendingPlan({
-        planId: plan.plan_id,
-        confirmToken: plan.confirm_token,
-        toPhones: [to],
-        region,
-        goal,
-        createdAt: new Date().toISOString(),
-      });
-    }
+    // planAndSave clears any previously pending plan first, unconditionally
+    // — see its doc comment for why that has to happen before validation or
+    // the network call, not just on success.
+    const plan = await planAndSave(config, { to, region, goal });
     // confirm_token authorizes a real call — never print it, CLI arg it, or
     // let it reach shell history. Everything else about the plan is fine to
     // show (still passed through the phone mask, since to_phones round-trips
@@ -142,36 +135,35 @@ async function cmdPlan(args: string[]) {
 
 async function cmdCall(args: string[]) {
   const pending = loadPendingPlan();
+  if (!pending) {
+    console.error('No pending plan found. Run "plan" first.');
+    process.exit(1);
+  }
   const isLive = args.includes("--live");
 
-  // Preview never needs the token itself, only proof a plan exists — so it
-  // never touches stdin, which would otherwise risk blocking on it in a
-  // non-interactive environment for a command that has no side effects.
+  // Preview never needs the token itself, only the plan that's actually
+  // stored — so it never touches stdin, which would otherwise risk blocking
+  // on it in a non-interactive environment for a command that has no side
+  // effects. The summary always reflects what's on file, not a plan id
+  // alone, so there's no way to confirm a call you can't actually see.
   if (!isLive) {
-    if (!pending) {
-      console.error('No pending plan found. Run "plan" first.');
-      process.exit(1);
-    }
     console.log(
-      `Preview only (default). Would call run_call for plan ${pending.planId}. ` +
+      `Preview only (default). Would call run_call for:\n${formatPendingPlanSummary(pending)}\n` +
         "Pass --live to actually place the call — this is a genuine outbound phone call.",
     );
     return;
   }
 
   const stdinToken = await readConfirmTokenFromStdin();
-  const confirmToken = stdinToken ?? pending?.confirmToken;
-  const planId = pending?.planId;
-  if (!confirmToken || !planId) {
-    console.error(
-      'No pending plan found and no confirm_token piped on stdin. Run "plan" first, ' +
-        "or pipe a token: some-source | node cli.js call --live",
-    );
-    process.exit(1);
-  }
+  const confirmToken = stdinToken ?? pending.confirmToken;
 
+  // The same faithful, masked summary is shown immediately before the real
+  // dial too — the last checkpoint before an irreversible action, and it can
+  // be a while since "plan" ran, in a different terminal, so this is not
+  // redundant with the preview above.
+  console.error(`About to place a genuine outbound call for:\n${formatPendingPlanSummary(pending)}`);
   const config = resolveCalleMcpConfig();
-  const run = await runCall(config, planId, confirmToken);
+  const run = await runCall(config, pending.planId, confirmToken);
   clearPendingPlan(); // confirm_token is single-use; don't leave it around for accidental reuse.
   printSafe(run);
 }
@@ -201,6 +193,10 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(error);
+  // Every other path in this file prints through the phone mask; this
+  // catch-all must too, since any thrown error (including ones this file
+  // didn't anticipate) can end up here and still be printed to the user.
+  const rendered = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  console.error(maskPhoneNumbersInText(rendered));
   process.exitCode = 1;
 });

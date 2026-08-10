@@ -70,14 +70,28 @@ that `call` reads automatically, so the two-step flow never requires handling th
 
 ```bash
 npm run cli -- call
-# → "Preview only (default). Would call run_call for plan ... Pass --live to actually place the call."
+# → Preview only (default). Would call run_call for:
+#     plan:   plan_abc123
+#     to:     +155•••••23
+#     region: US
+#     goal:   Confirm the rescheduled appointment and capture the new date.
+#   Pass --live to actually place the call.
 
 npm run cli -- call --live
-# → places the real call, using the token from the last "plan", then clears it (single-use)
+# → prints the same masked summary, places the real call using the token from the last
+#   "plan", then clears it (single-use)
 ```
 
+Every `plan` clears whatever was pending before it, unconditionally — before validation, before the
+network call, no matter how the new attempt turns out. Re-planning with a bad number, a plan that
+comes back `ready_to_run: false`, or a network error never leaves an older, already-superseded plan
+sitting there fully authorized for a later `call --live` to execute by mistake. And because the
+preview and the live run both show the *actual stored* destination, region, and goal — not just a
+plan id — confirming a call means seeing what it will really do.
+
 If you'd rather not touch disk at all, pipe a token on stdin instead and it takes priority over the
-saved plan: `some-vault get token | npm run cli -- call --live`.
+saved plan's token (the plan's other details still come from the saved plan):
+`some-vault get token | npm run cli -- call --live`.
 
 ## One live run
 
@@ -135,8 +149,12 @@ validates after retries) and `0` on success. Errors are printed to stderr; resul
 - **Plan not ready to run.** `plan_call` can come back with `ready_to_run: false` and clarifying
   questions instead of a `confirm_token` — there is no path to `call` without a valid token from a
   plan that was actually ready.
-- **No pending plan (and nothing piped).** `call` needs either a prior `plan` (which saved its
-  token privately) or a token piped on stdin — it never falls back to an empty or fabricated token.
+- **No pending plan.** `call` needs a prior `plan` that saved its details privately — it never
+  falls back to an empty or fabricated plan, and a token piped on stdin only substitutes the token
+  itself, not the destination/region/goal, which still come from the saved plan.
+- **A stale plan from before the last `plan` attempt.** Every `plan` call clears the previously
+  saved plan first, regardless of how the new attempt turns out — see "Preview, which is the
+  default" above.
 - **Missing `--live`.** `call` without `--live` never reaches `run_call`.
 - **Extraction never validates.** `BedrockReasoningProvider` retries once with the validation
   error fed back to the model, then throws a `ReasoningValidationError` naming the task and the
@@ -158,11 +176,13 @@ validates after retries) and `0` on success. Errors are printed to stderr; resul
   printed — see "Placing the call" above. AWS credentials for Bedrock come from the default SDK
   credential chain — never a hardcoded key.
 - **Phone numbers.** `--to` is validated as E.164 locally before anything is sent (see "What blocks
-  a live call"). Every command's printed output — `plan`, `call`, `status`, `extract` — is passed
-  through [`maskPhoneNumbersInText`](src/phone-safety.ts), which masks every E.164-looking
-  substring, not just a known field, because a callback number can show up inside a transcript or
-  call summary that this tool doesn't otherwise parse. The bundled example still uses a
-  NANP-reserved fictional number (`+1 212 555 0123`, the `555-01xx` block set aside for fiction).
+  a live call"). Every command's printed output — `plan`, `call`, `status`, `extract`, *and any
+  uncaught error* — is passed through [`maskPhoneNumbersInText`](src/phone-safety.ts), which masks
+  every E.164-looking substring, not just a known field, because a callback number can show up
+  inside a transcript, call summary, or error message that this tool doesn't otherwise parse. A
+  rejected `--to` value is never echoed back at all (masking only works on validly-shaped numbers,
+  and a rejected value is by definition not one). The bundled example uses a NANP-reserved fictional
+  number (`+1 212 555 0123`, the `555-01xx` block set aside for fiction).
 
 ## Reading further
 
@@ -173,6 +193,9 @@ validates after retries) and `0` on success. Errors are printed to stderr; resul
 - [`src/extract-from-transcript.ts`](src/extract-from-transcript.ts) — the extraction function
   itself, provider-agnostic.
 - [`src/pending-plan.ts`](src/pending-plan.ts) — private, owner-only-permission storage for a
-  plan's `confirm_token` between `plan` and `call`.
+  plan's `confirm_token` between `plan` and `call`, and the faithful masked summary shown before
+  both the preview and the live dial.
+- [`src/plan-workflow.ts`](src/plan-workflow.ts) — plans and saves a call, always clearing the
+  previous pending plan first regardless of how the new attempt turns out.
 - [`src/phone-safety.ts`](src/phone-safety.ts) — local E.164 validation and the phone-number
-  masking applied to every command's output.
+  masking applied to every command's output, including errors.

@@ -18,6 +18,22 @@ test("assertE164 throws with a clear, local-only message on a bad number", () =>
   assert.throws(() => assertE164("555-0123", "--to"), /--to must be an E\.164 phone number/);
 });
 
+test("assertE164's error message never echoes the rejected value back", () => {
+  const distinctiveBadValue = "555-0199-not-e164";
+  try {
+    assertE164(distinctiveBadValue, "--to");
+    assert.fail("expected assertE164 to throw");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    assert.doesNotMatch(
+      message,
+      new RegExp(distinctiveBadValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      "the invalid input must never be echoed back, even partially — it may still be a real, " +
+        "just malformed, phone number, and it wouldn't reliably match the phone mask either",
+    );
+  }
+});
+
 test("assertE164 does not throw on a valid number", () => {
   assert.doesNotThrow(() => assertE164("+15555550123", "--to"));
 });
