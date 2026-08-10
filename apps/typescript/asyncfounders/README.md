@@ -28,6 +28,8 @@ Live demo: https://asyncfounders.vercel.app/
 - Preview creation is serialized per requester and recipient, and the full generated call script is shown before confirmation.
 - A preview is valid for ten minutes and its fingerprint is bound into the CALL-E idempotency key. An ambiguous create remains `dispatching`; reconfirm that same preview to reconcile the stable key instead of creating a replacement.
 - Raw transcripts and provider evidence are used transiently for validation and are never retained in company-readable call sessions.
+- Only recipient-authored transcript turns can corroborate memory; full-turn contradiction signals block affirmative claims extracted from denials.
+- Terminal provider results must match the reviewed call id, task, metadata, region, locale and payload-bound recipient before ingestion.
 - AsyncFounders does not create recurring call schedules. To stop future calls, revoke callback consent or set `CALLE_LIVE_CALLS_ENABLED=false`. For a call already queued or active, use the CALL-E dashboard.
 - The call agent may collect team updates and questions only. It is instructed not to make purchases, commitments, schedules, promises, or external actions, and this workflow must not be used for medical, legal, financial, emergency, authentication, or other high-risk decisions.
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fingerprint } from "../lib/callbacks.ts";
-import { admittedMemoryItems, approvedCallContext, fingerprintInput, recipientQuietHours, type PreviewCore } from "../lib/call-safety.ts";
+import { admittedMemoryItems, approvedCallContext, fingerprintInput, providerMetadataMatches, providerSessionMatches, recipientQuietHours, recipientTranscriptEvidence, reviewedProviderPhone, type PreviewCore, type StoredPreview } from "../lib/call-safety.ts";
 
 const core: PreviewCore = {
   previewId: "11111111-1111-4111-8111-111111111111",
@@ -69,4 +69,31 @@ test("a denial cannot corroborate an affirmative memory claim", () => {
   const denied = { type: "decision", title: "Private beta approved", body: "The founder approved the private beta.", status: "accepted", confidence: "high" as const, source_excerpt: "We did not approve the private beta.", audience: ["team"] };
   assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [denied] }, ["Founder: We did not approve the private beta."]).length, 0);
   assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [{ ...denied, source_excerpt: "We didn’t approve the private beta." }] }, ["Founder: We didn’t approve the private beta."]).length, 0);
+});
+
+test("only recipient-authored turns can corroborate memory", () => {
+  const evidence = recipientTranscriptEvidence([{ attempts: [{ transcriptTurns: [
+    { speaker: "bot", text: "The private beta was approved." },
+    { speaker: "user", text: "I did not approve the private beta." },
+  ] }] }]);
+  const affirmative = { type: "decision", title: "Private beta approved", body: "The founder approved the private beta.", status: "accepted", confidence: "high" as const, source_excerpt: "approved the private beta", audience: ["team"] };
+  assert.deepEqual(evidence, ["I did not approve the private beta."]);
+  assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [affirmative] }, evidence).length, 0);
+});
+
+test("provider metadata and recipient must match the reviewed envelope", () => {
+  assert.equal(providerMetadataMatches(core.metadata, { ...core.metadata }), true);
+  assert.equal(providerMetadataMatches(core.metadata, { ...core.metadata, session_id: "55555555-5555-4555-8555-555555555555" }), false);
+  const recipient = { phones: ["+919876543210"], region: "IN", locale: "en-IN", attempts: [{ phone: "+919876543210" }] };
+  assert.equal(reviewedProviderPhone(core.recipient, recipient), "+919876543210");
+  assert.equal(reviewedProviderPhone(core.recipient, { ...recipient, locale: "hi-IN" }), null);
+  assert.equal(reviewedProviderPhone(core.recipient, { ...recipient, attempts: [{ phone: "+919876543211" }] }), null);
+});
+
+test("provider call identity must match the reviewed session", () => {
+  const preview: StoredPreview = { ...core, fingerprint: "a".repeat(64), maskedPhone: "+91 •••••• 3210", purpose: "Brief the founder", questions: [], duration: "About 3 minutes" };
+  const session = { id: core.previewId, company_id: core.companyId, member_id: core.memberId, requested_by: core.requestedBy, mode: core.mode, provider: core.provider, provider_call_id: "call_123", payload_fingerprint: preview.fingerprint };
+  assert.equal(providerSessionMatches(preview, session, { id: "call_123", task: core.task }), true);
+  assert.equal(providerSessionMatches(preview, session, { id: "call_other", task: core.task }), false);
+  assert.equal(providerSessionMatches(preview, session, { id: "call_123", task: "A changed task" }), false);
 });

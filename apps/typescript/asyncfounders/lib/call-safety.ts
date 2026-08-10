@@ -38,6 +38,25 @@ export const storedPreviewSchema = z.object({
 export type StoredPreview = z.infer<typeof storedPreviewSchema>;
 export type PreviewCore = Omit<StoredPreview, "fingerprint" | "maskedPhone" | "purpose" | "questions" | "duration">;
 
+export function storedPreviewCore(preview: StoredPreview): PreviewCore {
+  return {
+    previewId: preview.previewId,
+    companyId: preview.companyId,
+    companyVersion: preview.companyVersion,
+    companyName: preview.companyName,
+    memberId: preview.memberId,
+    mode: preview.mode,
+    provider: preview.provider,
+    requestedBy: preview.requestedBy,
+    createdAt: preview.createdAt,
+    expiresAt: preview.expiresAt,
+    task: preview.task,
+    contextVersion: preview.contextVersion,
+    recipient: preview.recipient,
+    metadata: preview.metadata,
+  };
+}
+
 export function fingerprintInput(preview: PreviewCore, phone: string) {
   return {
     schemaVersion: "async-call-preview-v3",
@@ -116,14 +135,49 @@ function normalizedEvidence(value: string) {
   return value.normalize("NFKC").replace(/[’‘]/g, "'").toLowerCase().replace(/[^\p{L}\p{N}' ]/gu, " ").replace(/\s+/g, " ").trim();
 }
 
+export function recipientTranscriptEvidence(recipients: Array<{ attempts?: Array<{ transcriptTurns?: Array<{ speaker?: string; text?: string }> }> }>) {
+  return recipients.flatMap((recipient) => (recipient.attempts ?? []).flatMap((attempt) => (attempt.transcriptTurns ?? [])
+    .filter((turn) => turn.speaker === "user" && typeof turn.text === "string" && turn.text.trim().length >= 8)
+    .map((turn) => turn.text!.trim())));
+}
+
+export function providerMetadataMatches(expected: Record<string, unknown>, actual: Record<string, unknown>) {
+  return Object.keys(actual).length === Object.keys(expected).length
+    && Object.entries(expected).every(([key, value]) => actual[key] === value);
+}
+
+export function providerSessionMatches(
+  preview: StoredPreview,
+  session: { id: string; company_id: string; member_id: string; requested_by: string; mode: string; provider: string; provider_call_id: string | null; payload_fingerprint: string },
+  call: { id: string; task: string },
+) {
+  return call.id === session.provider_call_id && call.task === preview.task && preview.previewId === session.id
+    && preview.companyId === session.company_id && preview.memberId === session.member_id && preview.requestedBy === session.requested_by
+    && preview.mode === session.mode && preview.provider === session.provider && preview.fingerprint === session.payload_fingerprint;
+}
+
+export function reviewedProviderPhone(
+  expected: { region: string; locale: string },
+  recipient: { phones?: string[]; region?: string | null; locale?: string | null; attempts?: Array<{ phone?: string }> },
+) {
+  if (recipient.phones?.length !== 1 || recipient.region !== expected.region || recipient.locale !== expected.locale) return null;
+  const phone = recipient.phones[0];
+  if (!phone || (recipient.attempts ?? []).some((attempt) => attempt.phone !== phone)) return null;
+  return phone;
+}
+
 function hasContradictionSignal(value: string) {
   return /\b(?:no|not|never|neither|nor|without|cannot|can't|won't|didn't|doesn't|isn't|wasn't|shouldn't|deny|denied|decline|declined|reject|rejected|refuse|refused|oppose|opposed|disagree|disagreed|cancel|cancelled|canceled|pending|undecided|unapproved|uncertain|maybe|might|could|considering|proposed)\b/i.test(value);
 }
 
 export function excerptIsCorroborated(excerpt: string, evidence: string[], claim = excerpt) {
   const cleanExcerpt = normalizedEvidence(excerpt);
-  if (cleanExcerpt.length < 8 || hasContradictionSignal(cleanExcerpt) !== hasContradictionSignal(normalizedEvidence(claim))) return false;
-  return evidence.some((turn) => normalizedEvidence(turn).includes(cleanExcerpt));
+  const contradictionSignal = hasContradictionSignal(cleanExcerpt);
+  if (cleanExcerpt.length < 8 || contradictionSignal !== hasContradictionSignal(normalizedEvidence(claim))) return false;
+  return evidence.some((turn) => {
+    const cleanTurn = normalizedEvidence(turn);
+    return cleanTurn.includes(cleanExcerpt) && hasContradictionSignal(cleanTurn) === contradictionSignal;
+  });
 }
 
 export function admittedMemoryItems(result: {

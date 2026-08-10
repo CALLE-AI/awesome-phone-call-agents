@@ -1,8 +1,8 @@
 import { CalleClient } from "@call-e/calle";
 import { NextResponse } from "next/server";
 import { authenticatedUser, adminSupabase } from "../../../../lib/supabase";
-import { memoryResultValidator } from "../../../../lib/callbacks";
-import { admittedMemoryItems, storedPreviewSchema } from "../../../../lib/call-safety";
+import { fingerprint, memoryResultValidator } from "../../../../lib/callbacks";
+import { admittedMemoryItems, fingerprintInput, providerMetadataMatches, providerSessionMatches, recipientTranscriptEvidence, reviewedProviderPhone, storedPreviewCore, storedPreviewSchema } from "../../../../lib/call-safety";
 
 const terminal = new Set(["completed", "failed", "cancelled", "canceled", "no_answer", "busy", "declined", "expired", "voicemail"]);
 
@@ -29,9 +29,21 @@ export async function GET(request: Request) {
 
     const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY, baseUrl: "https://api.heycall-e.com" });
     const call = await client.calls.get(session.provider_call_id);
-    const transcriptEvidence = (call.recipients ?? [])
-      .flatMap((recipient) => (recipient.attempts ?? []).flatMap((attempt) => (attempt.transcriptTurns ?? []).map((turn) => JSON.stringify(turn))))
-      .filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    const parsedPreview = storedPreviewSchema.safeParse(session.preview);
+    const providerRecipient = call.recipients?.[0];
+    if (!parsedPreview.success || !providerRecipient || call.recipients.length !== 1) {
+      return NextResponse.json({ message: "CALL-E returned a result that does not match the reviewed callback." }, { status: 409 });
+    }
+    const preview = parsedPreview.data;
+    const metadataMatches = providerMetadataMatches(preview.metadata, call.metadata ?? {});
+    const sessionMatches = providerSessionMatches(preview, session, call);
+    const providerPhone = reviewedProviderPhone(preview.recipient, providerRecipient);
+    if (!providerPhone) return NextResponse.json({ message: "CALL-E returned a recipient that differs from the approved preview. Memory ingestion was blocked." }, { status: 409 });
+    const providerFingerprint = await fingerprint(fingerprintInput(storedPreviewCore(preview), providerPhone));
+    if (!metadataMatches || !sessionMatches || providerFingerprint !== session.payload_fingerprint) {
+      return NextResponse.json({ message: "CALL-E returned a session, task, metadata, or recipient that differs from the approved preview. Memory ingestion was blocked." }, { status: 409 });
+    }
+    const transcriptEvidence = recipientTranscriptEvidence(call.recipients);
     const update: Record<string, unknown> = {
       status: call.status,
       result: { taskCompleted: call.taskCompleted, confidenceScore: call.completionConfidence?.score ?? null },
@@ -49,9 +61,8 @@ export async function GET(request: Request) {
           if (error) throw error;
           inserted = Number(data ?? 0);
         }
-        const preview = storedPreviewSchema.safeParse(session.preview);
-        if (preview.success && session.mode === "catchup") {
-          const { error: briefingError } = await supabase.from("company_members").update({ last_briefed_version: preview.data.contextVersion }).eq("id", session.member_id).eq("company_id", session.company_id);
+        if (session.mode === "catchup") {
+          const { error: briefingError } = await supabase.from("company_members").update({ last_briefed_version: preview.contextVersion }).eq("id", session.member_id).eq("company_id", session.company_id);
           if (briefingError) throw briefingError;
         }
       }
