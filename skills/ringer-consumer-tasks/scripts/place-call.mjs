@@ -19,12 +19,46 @@
  *   node place-call.mjs --body plan.json --to-phone +1... --to-phone +1... --execute --poll   # batch + wait
  *
  * --body is the JSON emitted by build-task.mjs ({ task, result_schema, recipient_result_schema? }).
- * Env: CALLE_API_KEY (required for --execute), CALLE_BASE_URL (default https://api.heycall-e.com).
+ * Env: CALLE_API_KEY (required for --execute), CALLE_BASE_URL (default
+ *   https://api.heycall-e.com — must be CALL-E's official host or localhost;
+ *   an arbitrary origin is refused so the bearer key is never sent off-host).
  */
 
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 
 const TERMINAL = new Set(['completed', 'failed', 'canceled'])
+
+/**
+ * Trust a base URL only for CALL-E's official host (or loopback for local
+ * testing). Mirrors the server's allowlist so this script never ships the
+ * bearer key to an arbitrary origin picked up from the shell/.env.
+ */
+function isAllowedBaseUrl(u) {
+  try {
+    const url = new URL(u)
+    const host = url.hostname
+    if (host === 'localhost' || host === '127.0.0.1') return true
+    return url.protocol === 'https:' && (host === 'api.heycall-e.com' || host.endsWith('.heycall-e.com'))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Content-bound idempotency key: a hash of who is called and what is asked. A
+ * lost response + rerun of --execute dedups against the same key instead of
+ * placing a second call; editing the task/recipients/schema yields a new key.
+ */
+function contentIdempotencyKey(body) {
+  const canonical = JSON.stringify({
+    task: body.task ?? '',
+    recipients: body.recipients ?? [],
+    result_schema: body.result_schema ?? null,
+    recipient_result_schema: body.recipient_result_schema ?? null,
+  })
+  return 'ringer_' + createHash('sha256').update(canonical).digest('hex').slice(0, 40)
+}
 
 function parseArgs(argv) {
   const out = { toPhones: [] }
@@ -113,6 +147,8 @@ async function main() {
         '',
         'This will POST to CALL-E:',
         JSON.stringify({ ...requestBody, recipients: requestBody.recipients.map((r) => ({ ...r, phones: r.phones.map(maskPhone) })) }, null, 2),
+        '',
+        `Idempotency-Key: ${contentIdempotencyKey(requestBody)}  (a rerun of --execute with this same body dedups)`,
       ].join('\n') + '\n',
     )
     return
@@ -121,12 +157,25 @@ async function main() {
   // ---- Execute --------------------------------------------------------
   const apiKey = process.env.CALLE_API_KEY
   if (!apiKey) die('--execute requires CALLE_API_KEY in the environment.')
-  const baseUrl = (process.env.CALLE_BASE_URL || 'https://api.heycall-e.com').replace(/\/$/, '')
+  const rawBase = process.env.CALLE_BASE_URL || 'https://api.heycall-e.com'
+  if (!isAllowedBaseUrl(rawBase)) {
+    die(
+      `Refusing to send your API key to "${rawBase}". CALLE_BASE_URL must be ` +
+        `CALL-E's official host (api.heycall-e.com) or localhost — not an arbitrary origin.`,
+    )
+  }
+  const baseUrl = rawBase.replace(/\/$/, '')
 
+  // Bind the create to the content so a lost response + rerun never double-dials.
+  const idempotencyKey = contentIdempotencyKey(requestBody)
   process.stderr.write(`Placing ${batch ? `${args.toPhones.length} calls` : 'call'} → ${args.toPhones.map(maskPhone).join(', ')}\n`)
   const r = await fetch(`${baseUrl}/v1/calls`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    },
     body: JSON.stringify(requestBody),
   })
   const created = await r.json()

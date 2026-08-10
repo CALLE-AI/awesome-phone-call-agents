@@ -170,7 +170,13 @@ Read `references/safety.md` for the full contract. Always:
 - Never invent account numbers, PINs, card numbers, or personal details; if asked
   for something not provided, the agent says it does not have it on hand.
 - Do not make a binding commitment unless the user granted decision authority.
-- Mask phone numbers in summaries; do not expose API keys or full numbers.
+- Mask phone numbers in summaries; do not expose API keys or full numbers. The
+  key is sent only to CALL-E's official host: `place-call.mjs` **allowlists**
+  `CALLE_BASE_URL` (official `*.heycall-e.com` or localhost) and refuses to send
+  the bearer token to any other origin.
+- A live create carries a content-bound **`Idempotency-Key`** (a hash of the
+  recipients + task + schema), so a lost response + rerun of `--execute` dedups
+  instead of placing a second call.
 - Do not claim a call happened or a result was achieved unless CALL-E returned it.
 - Do not give medical, legal, financial, or emergency advice on the call.
 
