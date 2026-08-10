@@ -77,6 +77,39 @@ def test_task_completed_absent_blocks_a_stated_yes():
     assert result.commitment_score == 0.0
 
 
+def test_hedged_recipient_language_does_not_corroborate_a_structured_yes():
+    """A denial-word blocklist alone fails open: 'Maybe, I am not sure.'
+    contains no denial token, so a denial-only check would let a
+    provider-authored can_come='yes' through uncorroborated. Hedge
+    language is not an affirmation, firm or soft."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Maybe, I am not sure."},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_recipient_declining_without_denial_words_does_not_corroborate_a_structured_yes():
+    """'I will stay home.' contains no denial token either (no 'no',
+    'can't', etc.) but is plainly not agreement -- affirmative corroboration
+    must be required, not merely the absence of a denial word."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "I will stay home."},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
 def test_recipient_denial_overrides_a_contradicting_structured_yes():
     """structured_result is a provider-authored extraction and can be
     wrong -- a recipient explicitly declining in the transcript must never

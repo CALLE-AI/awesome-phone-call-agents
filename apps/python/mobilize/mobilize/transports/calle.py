@@ -33,21 +33,39 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 # structured_result is a provider-authored extraction and can be wrong or
 # stale, especially on a call that didn't cleanly complete -- can_come=="yes"
 # is not itself proof the recipient agreed. This cross-checks against the
-# recipient's OWN spoken words in the transcript (speaker == "user"), so an
-# explicit denial there ("No, I cannot come") overrides a contradicting
-# structured claim instead of trusting extraction over the actual
-# conversation.
+# recipient's OWN spoken words in the transcript (speaker == "user").
+#
+# A denial-word blocklist alone fails open: "Maybe, I am not sure." and "I
+# will stay home." contain none of the denial tokens below, so a
+# denial-only check would let provider-authored can_come="yes" through
+# uncorroborated for both. Corroboration instead requires the recipient's
+# own words to contain some AFFIRMATIVE commitment language -- absence of a
+# denial is not the same as presence of an agreement. Hedge language
+# ("maybe", "i think", "we'll see" -- mirroring commitment.py's own
+# HEDGE_MARKERS) deliberately does NOT count as affirmation: a hedge is not
+# a commitment, firm or soft, in the recipient's own words.
 _RECIPIENT_DENIAL_RE = re.compile(
     r"\b(no|nope|nah|can'?t|cannot|won'?t|unable|not able|not going to make it)\b",
     re.IGNORECASE,
 )
+_RECIPIENT_AFFIRMATION_RE = re.compile(
+    # "sure" deliberately excluded on its own -- "not sure" is a hedge, not
+    # an affirmation, and a bare word-boundary match can't tell them apart.
+    # "for sure" is kept since that phrase itself only occurs as agreement.
+    r"\b(yes|yeah|yep|yup|absolutely|definitely|for sure|okay|ok|"
+    r"i can (come|make it|help)|i'?ll (come|be there|help)|"
+    r"coming|on my way|leaving(\s+now)?|be there|right now)\b",
+    re.IGNORECASE,
+)
 
 
-def _recipient_spoke_denial(transcript: list[dict]) -> bool:
+def _recipient_corroborates_commitment(transcript: list[dict]) -> bool:
     recipient_text = " ".join(
         turn.get("text", "") for turn in transcript if turn.get("speaker") == "user"
     )
-    return bool(_RECIPIENT_DENIAL_RE.search(recipient_text))
+    if _RECIPIENT_DENIAL_RE.search(recipient_text):
+        return False
+    return bool(_RECIPIENT_AFFIRMATION_RE.search(recipient_text))
 
 
 class CalleTransport:
@@ -209,9 +227,9 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
         # Cross-check the structured "yes" against what the recipient
         # actually said. structured_result/evidence_summary are
         # provider-authored extractions and can misread or fabricate a
-        # commitment -- a recipient-corroborated transcript is required,
-        # not just any transcript existing at all.
-        elif _recipient_spoke_denial(transcript):
+        # commitment -- the recipient's own words must affirmatively
+        # corroborate it, not merely fail to contradict it.
+        elif not _recipient_corroborates_commitment(transcript):
             outcome, commitment = CallOutcome.NO_ANSWER, 0.0
         else:
             commitment = calibrated_commitment(evidence=evidence, candidate_prior_showup_rate=prior_showup_rate)
