@@ -281,8 +281,10 @@ def _update_event(
 
 
 def _finalize_result(
-    ledger: DurableLedger, reservation_id: str, result: dict
+    ledger: DurableLedger, reservation_id: str, result: object
 ) -> dict:
+    if not isinstance(result, dict):
+        raise PolicyError("provider result must be a JSON object")
     outcome = _verified_outcome(result)
     _update_event(
         ledger,
@@ -396,6 +398,7 @@ def _execute(
             provider_call_id=call_id,
         )
         result = client.calls.wait_for_result(call_id)
+        return _finalize_result(ledger, reservation["reservation_id"], result)
     except Exception:
         # Keep an ambiguous dispatch reserved. A human must reconcile it with
         # the provider before another attempt; automatic redial is unsafe.
@@ -405,7 +408,6 @@ def _execute(
             state="reconciliation_required",
         )
         raise
-    return _finalize_result(ledger, reservation["reservation_id"], result)
 
 
 def _reconcile(
@@ -479,10 +481,10 @@ def _reconcile(
                 provider_call_id=call_id,
             )
         result = client.calls.wait_for_result(call_id)
+        return _finalize_result(ledger, reservation_id, result)
     except Exception:
         _update_event(ledger, reservation_id, state="reconciliation_required")
         raise
-    return _finalize_result(ledger, reservation_id, result)
 
 
 def _simulate(plan: dict, history: list[dict]) -> dict:
