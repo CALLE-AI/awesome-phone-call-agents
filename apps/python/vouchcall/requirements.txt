@@ -1,0 +1,5 @@
+calle-ai
+google-genai
+streamlit
+plotly
+python-dotenv
