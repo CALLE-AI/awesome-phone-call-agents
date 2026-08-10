@@ -44,8 +44,9 @@ class DeterministicEvaluator:
     Auto-verification is possible only for the exact protocol encoded in the immutable
     contract: an exact positive statement from the agent followed immediately by an exact
     recipient response. Keywords, morphology and the agent's own free-form questions never
-    establish meaning. Anything outside the finite protocol is explicitly unevaluated and
-    therefore routed to human review.
+    establish meaning. A supported confirmation also remains valid only while every later
+    turn belongs to the finite protocol; free-form speech after it can retract the agreement
+    and therefore routes the call to human review.
     """
 
     def evaluate(self, request: AnalysisRequest) -> Verdict:
@@ -53,6 +54,13 @@ class DeterministicEvaluator:
         turns = list(request.transcript.turns)
         claim_results = [self._evaluate_claim(claim, result, turns, request.call_contract.protocol_language)
                          for claim in request.call_contract.verification_claims]
+        claim_results = self._enforce_protocol_closure(
+            claim_results,
+            request.call_contract.verification_claims,
+            result,
+            turns,
+            request.call_contract.protocol_language,
+        )
 
         success = [item for item in claim_results if item.kind == "success"]
         policy = [item for item in claim_results if item.kind != "success"]
@@ -262,6 +270,116 @@ class DeterministicEvaluator:
         if statuses == {"supported"}:
             return "supported", all_ids
         return "ambiguous", all_ids
+
+    def _enforce_protocol_closure(
+        self,
+        results: list[ClaimResult],
+        claims: list[
+            SuccessClaim | CommitmentLimitClaim | RequiredDisclosureClaim | ForbiddenCommitmentClaim
+        ],
+        provider_result: dict[str, Any],
+        turns: list[TranscriptTurn],
+        language: str,
+    ) -> list[ClaimResult]:
+        """Fail closed when unstructured speech follows a proven confirmation.
+
+        The finite evaluator cannot decide whether a later free-form turn retracts a prior
+        agreement. It therefore keeps only confirmations after which the remaining transcript
+        consists entirely of canonical protocol statements and their exact responses.
+        """
+        protocol_indices = self._protocol_indices(claims, provider_result, turns, language)
+        result_turn_ids = {turn_id for result in results for turn_id in result.turn_ids}
+        turn_positions = {
+            turn.id: index for index, turn in enumerate(turns) if turn.id in result_turn_ids
+        }
+        revised: list[ClaimResult] = []
+
+        for result in results:
+            if result.status != "supported" or result.kind not in {"success", "commitment_limit"}:
+                revised.append(result)
+                continue
+
+            confirmation_positions = [
+                turn_positions[turn_id]
+                for turn_id in result.turn_ids
+                if turn_id in turn_positions
+            ]
+            if not confirmation_positions:
+                revised.append(result)
+                continue
+
+            confirmed_at = max(confirmation_positions)
+            later_unstructured = [
+                turn.id
+                for index, turn in enumerate(turns)
+                if index > confirmed_at and index not in protocol_indices
+            ]
+            if not later_unstructured:
+                revised.append(result)
+                continue
+
+            revised.append(result.model_copy(update={
+                "status": "ambiguous",
+                "turn_ids": self._unique(result.turn_ids + later_unstructured),
+                "explanation": (
+                    f"'{result.claim_id}' matched the exact confirmation protocol, but later "
+                    f"turns {later_unstructured} are outside that protocol and may retract it. "
+                    "The deterministic evaluator cannot interpret those turns; human review "
+                    "is required."
+                ),
+            }))
+
+        return revised
+
+    def _protocol_indices(
+        self,
+        claims: list[
+            SuccessClaim | CommitmentLimitClaim | RequiredDisclosureClaim | ForbiddenCommitmentClaim
+        ],
+        provider_result: dict[str, Any],
+        turns: list[TranscriptTurn],
+        language: str,
+    ) -> set[int]:
+        confirmation_statements: set[str] = set()
+        disclosure_statements: set[str] = set()
+
+        for claim in claims:
+            if isinstance(claim, SuccessClaim):
+                confirmation_statements.add(self._normalize(
+                    PROTOCOL[language][claim.id].format(expected=claim.expected)
+                ))
+            elif isinstance(claim, CommitmentLimitClaim):
+                actual = provider_result.get(claim.result_field)
+                if isinstance(actual, int) and not isinstance(actual, bool) and actual >= 0:
+                    confirmation_statements.add(self._normalize(
+                        PROTOCOL[language][claim.id].format(amount=self._money(actual))
+                    ))
+            elif isinstance(claim, RequiredDisclosureClaim):
+                disclosure_statements.add(self._normalize(PROTOCOL[language][claim.id]))
+
+        exact_responses = {
+            self._normalize(PROTOCOL[language]["response"]),
+            *NEGATIVE_RESPONSES,
+        }
+        protocol_indices: set[int] = set()
+        for index, turn in enumerate(turns):
+            if turn.speaker != "agent":
+                continue
+
+            statement = self._normalize(turn.text)
+            if statement in disclosure_statements:
+                protocol_indices.add(index)
+            if statement not in confirmation_statements:
+                continue
+
+            protocol_indices.add(index)
+            if index + 1 >= len(turns):
+                continue
+            answer = turns[index + 1]
+            if answer.speaker == "recipient" and self._normalize(answer.text) in exact_responses:
+                protocol_indices.add(index + 1)
+
+        return protocol_indices
 
     def _money_evidence(self, turns: list[TranscriptTurn]) -> dict[int, list[int]]:
         found: dict[int, list[int]] = {}

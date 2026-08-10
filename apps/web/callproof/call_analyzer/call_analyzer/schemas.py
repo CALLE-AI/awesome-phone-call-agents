@@ -24,6 +24,13 @@ class Transcript(StrictModel):
     language: str = Field(pattern=r"^[a-z]{2,3}(-[A-Z]{2})?$")
     turns: list[TranscriptTurn] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def require_unique_turn_ids(self) -> "Transcript":
+        ids = [turn.id for turn in self.turns]
+        if len(ids) != len(set(ids)):
+            raise ValueError("transcript turn ids must be unique")
+        return self
+
 
 class SuccessClaim(StrictModel):
     kind: Literal["success"]

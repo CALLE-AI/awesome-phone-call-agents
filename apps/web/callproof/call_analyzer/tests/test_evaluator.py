@@ -226,6 +226,17 @@ def test_contract_cannot_supply_its_own_semantically_different_statement():
         AnalysisRequest.model_validate(document)
 
 
+def test_transcript_turn_ids_must_be_unique():
+    document = request_with(
+        turns=canonical_turns(),
+        provider_result={"delivery_date": "2026-08-07", "surcharge_cents": 12000},
+    ).model_dump(mode="json")
+    document["transcript"]["turns"][1]["id"] = document["transcript"]["turns"][0]["id"]
+
+    with pytest.raises(ValidationError, match="turn ids must be unique"):
+        AnalysisRequest.model_validate(document)
+
+
 def test_claim_id_cannot_be_bound_to_the_wrong_provider_field():
     document = request_with(
         turns=canonical_turns(),
