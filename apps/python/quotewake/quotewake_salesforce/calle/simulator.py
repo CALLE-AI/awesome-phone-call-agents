@@ -12,12 +12,10 @@ from datetime import datetime, timezone
 
 from quotewake_salesforce.domain.models import (
     CallPlanRequest,
+    CallOutcomeKind,
     CallResult,
     SimulationOutcome,
 )
-
-# Backwards-compatible name for callers that imported the first simulator API.
-SimulatedCallResult = CallResult
 
 
 _OUTCOME_DETAILS: dict[SimulationOutcome, tuple[str, str, str, str]] = {
@@ -70,7 +68,6 @@ RETRY_OUTCOMES = frozenset(
         SimulationOutcome.CALL_BACK_LATER,
         SimulationOutcome.NO_ANSWER,
         SimulationOutcome.BUSY,
-        SimulationOutcome.ERROR,
     }
 )
 
@@ -115,13 +112,15 @@ def simulate_call(
         raise CallSimulationError("The local simulator currently supports region ES only.")
 
     selected = _parse_outcome(outcome)
-    if selected in RETRY_OUTCOMES:
-        if normalized_next is None:
-            raise CallSimulationError(
-                f"Outcome {selected.value} requires a timezone-aware --next-follow-up-at."
-            )
-        if normalized_next <= normalized_now:
+    if selected is SimulationOutcome.CALL_BACK_LATER:
+        if normalized_next is not None and normalized_next <= normalized_now:
             raise CallSimulationError("--next-follow-up-at must be in the future.")
+    elif selected in RETRY_OUTCOMES:
+        if normalized_next is not None:
+            raise CallSimulationError(
+                f"Outcome {selected.value} is scheduled by the configured retry policy; "
+                "do not provide --next-follow-up-at."
+            )
     elif normalized_next is not None:
         raise CallSimulationError(
             f"Outcome {selected.value} is terminal and cannot include --next-follow-up-at."
@@ -136,12 +135,21 @@ def simulate_call(
     return CallResult(
         quote_id=request.quote_id,
         simulation_id=simulation_id,
-        provider_status="SIMULATED_COMPLETED",
+        provider_status=(
+            "SIMULATED_TECHNICAL_FAILURE"
+            if selected is SimulationOutcome.ERROR
+            else "SIMULATED_COMPLETED"
+        ),
         outcome=result_outcome,
         interest_level=interest,
         preferred_date=None,
         summary=summary,
         next_action=next_action,
         next_follow_up_at=normalized_next,
+        outcome_kind=(
+            CallOutcomeKind.TECHNICAL_FAILURE
+            if selected is SimulationOutcome.ERROR
+            else CallOutcomeKind.BUSINESS
+        ),
         simulation_timestamp=normalized_now,
     )

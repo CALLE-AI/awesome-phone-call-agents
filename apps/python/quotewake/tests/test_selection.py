@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 import unittest
 
@@ -12,7 +12,13 @@ from quotewake_salesforce.domain.models import (
     SelectionDecision,
     SelectionReason,
 )
-from quotewake_salesforce.domain.policy import InitialFollowUpTiming, SelectionPolicy
+from quotewake_salesforce.domain.policy import (
+    CallingHoursPolicy,
+    CooldownPolicy,
+    InitialFollowUpTiming,
+    RetryPolicy,
+    SelectionPolicy,
+)
 from quotewake_salesforce.domain.selection import evaluate_quote, validate_callable_contact
 
 
@@ -22,6 +28,17 @@ POLICY = SelectionPolicy(
         minimum_delay=timedelta(hours=4),
         standard_delay=timedelta(hours=48),
         due_soon_window=timedelta(days=3),
+    ),
+    retry_policy=RetryPolicy(
+        max_attempts=3,
+        retry_delays=(timedelta(days=2), timedelta(days=4)),
+        retry_outcomes=frozenset({"no_answer", "busy", "call_back_later"}),
+        technical_failure_retry_delay=timedelta(minutes=30),
+        completed_outcomes=frozenset({"interested"}),
+    ),
+    cooldown_policy=CooldownPolicy(False, timedelta(0)),
+    calling_hours_policy=CallingHoursPolicy(
+        False, frozenset(range(7)), time(0), time(23, 59), timezone.utc
     ),
     allowed_quote_statuses=frozenset({"Presented"}),
 )
@@ -163,6 +180,20 @@ class TestQuoteSelection(unittest.TestCase):
 
     def test_attempt_count_at_limit(self) -> None:
         result = evaluate_quote(quote(attempt_count=3), NOW, POLICY)
+        self.assertEqual(result.reason, SelectionReason.MAX_ATTEMPTS)
+
+    def test_max_attempts_blocks_before_a_technical_failure_can_be_retried(self) -> None:
+        result = evaluate_quote(
+            quote(
+                attempt_count=POLICY.max_attempts,
+                follow_up_status="Retry",
+                next_follow_up_at=NOW,
+                last_follow_up_result="Error",
+            ),
+            NOW,
+            POLICY,
+        )
+
         self.assertEqual(result.reason, SelectionReason.MAX_ATTEMPTS)
 
     def test_expired_quote(self) -> None:

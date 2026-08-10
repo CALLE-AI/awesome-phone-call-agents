@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 import unittest
 from unittest.mock import Mock
 
@@ -17,7 +18,11 @@ from quotewake_salesforce.salesforce.client import (
     SalesforceResponseError,
     SalesforceSchemaError,
 )
-from quotewake_salesforce.salesforce.quotes import REQUIRED_QUOTE_FIELDS, QuoteRepository
+from quotewake_salesforce.salesforce.quotes import (
+    FOLLOW_UP_RESULT_VALUES,
+    REQUIRED_QUOTE_FIELDS,
+    QuoteRepository,
+)
 
 
 OPPORTUNITY_ID = "006000000000001"
@@ -27,6 +32,21 @@ OPT_OUT_FIELD = "QuoteWake_Do_Not_Call__c"
 
 def _description(field_names: set[str]) -> dict[str, list[dict[str, str]]]:
     return {"fields": [{"name": name} for name in sorted(field_names)]}
+
+
+def _quote_description(
+    *,
+    result_type: str = "picklist",
+    result_values: list[dict[str, object]] | None = None,
+) -> dict[str, list[dict[str, object]]]:
+    fields = [{"name": name} for name in sorted(REQUIRED_QUOTE_FIELDS)]
+    result_field = next(
+        field for field in fields if field["name"] == "Last_Follow_Up_Result__c"
+    )
+    result_field["type"] = result_type
+    if result_values is not None:
+        result_field["picklistValues"] = result_values
+    return {"fields": fields}
 
 
 def _client(contact_fields: set[str], contact_record: dict[str, object]) -> Mock:
@@ -142,6 +162,223 @@ class TestContactOptOutConfiguration(unittest.TestCase):
             rf"Configured Contact opt-out field does not exist on Contact: {OPT_OUT_FIELD}",
         ):
             repository.validate_schema()
+
+
+class TestQuoteResultPicklistSchema(unittest.TestCase):
+    """Verify metadata for the constrained Salesforce result picklist."""
+
+    def _client(self, result_field: dict[str, object]) -> Mock:
+        client = Mock()
+        client.describe.side_effect = [
+            _quote_description(**result_field),
+            _description({"Id", "Name", "Phone", "MobilePhone"}),
+        ]
+        return client
+
+    def test_accepts_picklist_with_all_simulator_outcomes_active(self) -> None:
+        client = self._client(
+            {
+                "result_type": "picklist",
+                "result_values": [
+                    {"value": value, "active": True}
+                    for value in sorted(FOLLOW_UP_RESULT_VALUES)
+                ],
+            }
+        )
+
+        quote_fields, _ = QuoteRepository(client).validate_schema()
+
+        self.assertEqual(quote_fields["Last_Follow_Up_Result__c"]["type"], "picklist")
+
+    def test_rejects_picklist_missing_an_active_simulator_outcome(self) -> None:
+        values = [
+            {"value": value, "active": value != "Error"}
+            for value in sorted(FOLLOW_UP_RESULT_VALUES)
+        ]
+        client = self._client({"result_type": "picklist", "result_values": values})
+
+        with self.assertRaisesRegex(
+            SalesforceSchemaError,
+            r"Last_Follow_Up_Result__c is missing active picklist values: Error",
+        ):
+            QuoteRepository(client).validate_schema()
+
+    def test_rejects_picklist_without_values_metadata(self) -> None:
+        client = self._client({"result_type": "picklist"})
+
+        with self.assertRaisesRegex(
+            SalesforceSchemaError,
+            r"Last_Follow_Up_Result__c is a picklist without picklist values metadata",
+        ):
+            QuoteRepository(client).validate_schema()
+
+
+class TestQuoteLoading(unittest.TestCase):
+    def test_single_currency_quote_resolves_org_default_currency(self) -> None:
+        quote_fields = _quote_description(
+            result_values=[
+                {"value": value, "active": True}
+                for value in sorted(FOLLOW_UP_RESULT_VALUES)
+            ]
+        )["fields"]
+        quote_fields.append(
+            {"name": "GrandTotal", "type": "currency", "precision": 18, "scale": 2}
+        )
+        quote_record = {
+            "Id": "0Q0000000000001",
+            "Name": "Q-001",
+            "Status": "Presented",
+            "ExpirationDate": None,
+            "LastModifiedDate": "2026-08-07T12:00:00.000+0000",
+            "OpportunityId": OPPORTUNITY_ID,
+            "Opportunity": {
+                "Name": "Demo opportunity",
+                "Account": {"Name": "Demo account"},
+                "IsClosed": False,
+            },
+            "GrandTotal": Decimal("1234.50"),
+            "QuoteWake_Enabled__c": True,
+            "Follow_Up_Status__c": None,
+            "Next_Follow_Up_At__c": None,
+            "Attempt_Count__c": 0,
+            "Last_Follow_Up_At__c": None,
+            "Last_Follow_Up_Result__c": None,
+        }
+        client = Mock()
+        client.describe.side_effect = [
+            {"fields": quote_fields},
+            _description({"Id", "Name", "Phone", "MobilePhone"}),
+        ]
+        client.query.side_effect = [
+            [quote_record],
+            [{"DefaultCurrencyIsoCode": "EUR"}],
+            [_contact_record()],
+        ]
+
+        quotes, contacts = QuoteRepository(client).load()
+
+        self.assertEqual(quotes[0].amount, Decimal("1234.50"))
+        self.assertEqual(quotes[0].currency_code, "EUR")
+        self.assertIsNotNone(quotes[0].money)
+        assert quotes[0].money is not None
+        self.assertEqual(quotes[0].money.currency, "EUR")
+        self.assertIn(OPPORTUNITY_ID, contacts)
+        self.assertEqual(client.query.call_count, 3)
+        self.assertNotIn("CurrencyIsoCode", client.query.call_args_list[0].args[0])
+        self.assertIn("DefaultCurrencyIsoCode", client.query.call_args_list[1].args[0])
+
+    def test_single_currency_quote_rejects_missing_org_default_currency(self) -> None:
+        quote_fields = _quote_description(
+            result_values=[
+                {"value": value, "active": True}
+                for value in sorted(FOLLOW_UP_RESULT_VALUES)
+            ]
+        )["fields"]
+        quote_fields.append(
+            {"name": "GrandTotal", "type": "currency", "precision": 18, "scale": 2}
+        )
+        quote_record = {
+            "Id": "0Q0000000000001",
+            "Name": "Q-001",
+            "Status": "Presented",
+            "ExpirationDate": None,
+            "LastModifiedDate": "2026-08-07T12:00:00.000+0000",
+            "OpportunityId": OPPORTUNITY_ID,
+            "Opportunity": {
+                "Name": "Demo opportunity",
+                "Account": {"Name": "Demo account"},
+                "IsClosed": False,
+            },
+            "GrandTotal": Decimal("1234.50"),
+            "QuoteWake_Enabled__c": True,
+            "Follow_Up_Status__c": None,
+            "Next_Follow_Up_At__c": None,
+            "Attempt_Count__c": 0,
+            "Last_Follow_Up_At__c": None,
+            "Last_Follow_Up_Result__c": None,
+        }
+        client = Mock()
+        client.describe.side_effect = [
+            {"fields": quote_fields},
+            _description({"Id", "Name", "Phone", "MobilePhone"}),
+        ]
+        client.query.side_effect = [[quote_record], [{}]]
+
+        with self.assertRaisesRegex(
+            SalesforceResponseError,
+            "missing DefaultCurrencyIsoCode",
+        ):
+            QuoteRepository(client).load()
+
+    def test_single_currency_quote_rejects_invalid_org_default_currency(self) -> None:
+        quote_fields = _quote_description(
+            result_values=[
+                {"value": value, "active": True}
+                for value in sorted(FOLLOW_UP_RESULT_VALUES)
+            ]
+        )["fields"]
+        quote_fields.append(
+            {"name": "GrandTotal", "type": "currency", "precision": 18, "scale": 2}
+        )
+        quote_record = {
+            "Id": "0Q0000000000001",
+            "Name": "Q-001",
+            "Status": "Presented",
+            "ExpirationDate": None,
+            "LastModifiedDate": "2026-08-07T12:00:00.000+0000",
+            "OpportunityId": OPPORTUNITY_ID,
+            "Opportunity": {
+                "Name": "Demo opportunity",
+                "Account": {"Name": "Demo account"},
+                "IsClosed": False,
+            },
+            "GrandTotal": Decimal("1234.50"),
+            "QuoteWake_Enabled__c": True,
+            "Follow_Up_Status__c": None,
+            "Next_Follow_Up_At__c": None,
+            "Attempt_Count__c": 0,
+            "Last_Follow_Up_At__c": None,
+            "Last_Follow_Up_Result__c": None,
+        }
+        client = Mock()
+        client.describe.side_effect = [
+            {"fields": quote_fields},
+            _description({"Id", "Name", "Phone", "MobilePhone"}),
+        ]
+        client.query.side_effect = [[quote_record], [{"DefaultCurrencyIsoCode": "EURO"}]]
+
+        with self.assertRaisesRegex(
+            SalesforceResponseError,
+            "(?:exceeds 3 characters|invalid default currency code)",
+        ):
+            QuoteRepository(client).load()
+
+
+class TestQuoteLoadingFilter(unittest.TestCase):
+    def test_quote_id_filter_is_validated_and_constrains_soql(self) -> None:
+        quote_id = "0Q0000000000001"
+        client = Mock()
+        client.describe.side_effect = [
+            _description(REQUIRED_QUOTE_FIELDS),
+            _description({"Id", "Name", "Phone", "MobilePhone"}),
+        ]
+        client.query.return_value = []
+
+        QuoteRepository(client).load(quote_id=quote_id)
+
+        self.assertEqual(client.query.call_count, 1)
+        soql = client.query.call_args.args[0]
+        self.assertIn(f"WHERE Id = '{quote_id}' AND OpportunityId != null", soql)
+        self.assertNotIn("FROM Organization", soql)
+
+    def test_quote_id_filter_rejects_invalid_ids_before_schema_queries(self) -> None:
+        client = Mock()
+
+        with self.assertRaisesRegex(SalesforceResponseError, "invalid ID"):
+            QuoteRepository(client).load(quote_id="not-a-salesforce-id")
+
+        client.describe.assert_not_called()
+        client.query.assert_not_called()
 
 
 class TestQuoteLineLoading(unittest.TestCase):

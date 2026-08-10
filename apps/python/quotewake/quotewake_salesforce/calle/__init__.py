@@ -4,7 +4,6 @@ from .client import CallEPlanningClient, CallEPlanningError
 from .simulator import (
     CallSimulationError,
     RETRY_OUTCOMES,
-    SimulatedCallResult,
     SimulationOutcome,
     simulate_call,
 )
@@ -16,7 +15,6 @@ __all__ = [
     "CallSimulationError",
     "CallResult",
     "RETRY_OUTCOMES",
-    "SimulatedCallResult",
     "SimulationOutcome",
     "simulate_call",
 ]

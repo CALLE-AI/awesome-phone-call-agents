@@ -14,6 +14,7 @@ from quotewake_salesforce.domain.models import (
     CallPlanRequest,
     CallPlanResult,
 )
+from quotewake_salesforce.structured_logging import log_event
 
 
 class CallEPlanningError(RuntimeError):
@@ -54,8 +55,21 @@ class CallEPlanningClient:
         )
         return environment
 
-    def _run(self, arguments: Sequence[str], *, expect_json: bool) -> dict[str, Any]:
+    def _run(
+        self,
+        arguments: Sequence[str],
+        *,
+        expect_json: bool,
+        quote_id: str | None = None,
+    ) -> dict[str, Any]:
         command = [*self.command, *arguments]
+        operation = " ".join(arguments[:3])
+        log_event(
+            "call_e_cli_command_started",
+            quote_id=quote_id,
+            operation=operation,
+            expect_json=expect_json,
+        )
         try:
             completed = subprocess.run(
                 command,
@@ -95,11 +109,18 @@ class CallEPlanningClient:
                 )
             suffix = f" ({code})" if isinstance(code, str) and code else ""
             raise CallEPlanningError(f"CALL-E CLI command failed{suffix}.")
+        log_event(
+            "call_e_cli_command_completed",
+            quote_id=quote_id,
+            operation=operation,
+            expect_json=expect_json,
+        )
         return payload
 
     def verify_ready(self) -> None:
         """Verify CLI availability and an already usable login without interactive auth."""
 
+        log_event("call_e_readiness_check_started")
         self._run(("--help",), expect_json=False)
         status = self._run(("auth", "status", "--json"), expect_json=True)
         if status.get("usable") is not True:
@@ -120,10 +141,17 @@ class CallEPlanningClient:
         )
         if "plan_call" not in names:
             raise CallEPlanningError("CALL-E does not expose the required plan_call tool.")
+        log_event("call_e_readiness_check_completed", plan_call_available=True)
 
     def plan(self, request: CallPlanRequest) -> CallPlanResult:
         """Create one remote CALL-E plan without invoking run_call."""
 
+        log_event(
+            "call_e_plan_request_started",
+            quote_id=request.quote_id,
+            language=request.language,
+            region=request.region,
+        )
         arguments = {
             "to_phones": [request.phone],
             "goal": request.goal,
@@ -141,6 +169,7 @@ class CallEPlanningClient:
                 "--json",
             ),
             expect_json=True,
+            quote_id=request.quote_id,
         )
         result = payload.get("result")
         if not isinstance(result, dict):
@@ -170,7 +199,7 @@ class CallEPlanningClient:
             if isinstance(raw_questions, list)
             else ()
         )
-        return CallPlanResult(
+        plan_result = CallPlanResult(
             quote_id=request.quote_id,
             decision=(
                 CallPlanDecision.PLAN_READY
@@ -182,3 +211,11 @@ class CallEPlanningClient:
             confirm_summary=summary,
             clarifying_questions=questions,
         )
+        log_event(
+            "call_e_plan_request_completed",
+            quote_id=request.quote_id,
+            decision=plan_result.decision.value,
+            ready_to_run=plan_result.ready_to_run,
+            plan_id=plan_result.plan_id,
+        )
+        return plan_result

@@ -8,8 +8,10 @@ import tempfile
 import unittest
 
 from quotewake_salesforce.config import (
+    LoggingSettings,
     RegionalSettings,
     load_initial_follow_up_timing,
+    load_logging_settings,
 )
 
 
@@ -54,6 +56,47 @@ due_soon_window_days = 3
 
         with self.assertRaisesRegex(ValueError, "selection.initial_follow_up"):
             load_initial_follow_up_timing(path)
+
+    def test_loads_logging_settings(self) -> None:
+        settings = load_logging_settings(
+            self._config(
+                """
+[logging]
+directory = "var/logs"
+format = "text"
+level = "DEBUG"
+max_bytes = 1024
+backup_count = 2
+"""
+            )
+        )
+
+        self.assertEqual(
+            settings,
+            LoggingSettings("var/logs", "text", "DEBUG", 1024, 2),
+        )
+
+    def test_logging_defaults_are_production_safe(self) -> None:
+        settings = load_logging_settings(self._config("[regional]\n"))
+
+        self.assertEqual(settings.directory, "logs")
+        self.assertEqual(settings.format, "text")
+        self.assertEqual(settings.level, "INFO")
+        self.assertGreater(settings.max_bytes, 0)
+        self.assertGreaterEqual(settings.backup_count, 0)
+
+    def test_rejects_invalid_logging_values(self) -> None:
+        invalid_documents = (
+            '[logging]\nmax_bytes = 0\n',
+            '[logging]\nbackup_count = -1\n',
+            '[logging]\nformat = "json"\n',
+            '[logging]\nlevel = "TRACE"\n',
+            '[logging]\nmax_bytes = "1024"\n',
+        )
+        for document in invalid_documents:
+            with self.subTest(document=document):
+                with self.assertRaises(ValueError):
+                    load_logging_settings(self._config(document))
 
     def test_accepts_alternate_iana_timezone_and_bcp47_locale(self) -> None:
         settings = RegionalSettings.from_values("America/Los_Angeles", "en-US")

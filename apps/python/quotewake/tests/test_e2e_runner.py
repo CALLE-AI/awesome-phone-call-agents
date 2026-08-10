@@ -6,10 +6,12 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import tomllib
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
+from quotewake_salesforce.config import load_follow_up_policies, load_regional_settings
 
 RUNNER_PATH = Path(__file__).parents[1] / "test_e2e_salesforce.py"
 _SPEC = importlib.util.spec_from_file_location("quotewake_e2e_runner", RUNNER_PATH)
@@ -53,6 +55,7 @@ class FakeSalesforce:
         self.task_number = 0
         self.fail_outcome: str | None = None
         self.bad_timestamp = False
+        self.crosses_midnight_utc = False
 
     def _json(self, value: object) -> object:
         return type("Completed", (), {
@@ -67,7 +70,6 @@ class FakeSalesforce:
         if "-m" in command and "quotewake_salesforce" in command:
             quote_id = command[command.index("--quote-id") + 1]
             outcome = command[command.index("--simulation-outcome") + 1]
-            report_path = Path(command[command.index("--simulation-output") + 1])
             quote = next(item for item in self.quotes.values() if item["Id"] == quote_id)
             if outcome == self.fail_outcome:
                 return type("Completed", (), {
@@ -81,6 +83,11 @@ class FakeSalesforce:
                 "invalid_number": ("Invalid Number", "Stopped"),
             }
             result, status = labels[outcome]
+            simulation_at = (
+                "2026-08-10T23:30:00+00:00"
+                if self.crosses_midnight_utc
+                else "2026-08-10T12:00:00+00:00"
+            )
             next_at = (
                 command[command.index("--next-follow-up-at") + 1]
                 if "--next-follow-up-at" in command
@@ -91,7 +98,7 @@ class FakeSalesforce:
                     "Attempt_Count__c": 1,
                     "Follow_Up_Status__c": status,
                     "Next_Follow_Up_At__c": next_at,
-                    "Last_Follow_Up_At__c": "2026-08-10T12:00:00Z",
+                    "Last_Follow_Up_At__c": simulation_at.replace("+00:00", "Z"),
                     "Last_Follow_Up_Result__c": result,
                 }
             )
@@ -106,31 +113,17 @@ class FakeSalesforce:
                 "Status": "Completed",
                 "Priority": "Normal",
                 "Subject": f"[SIMULATED] QuoteWake follow-up: {result}",
-                "ActivityDate": "2026-08-10",
+                "ActivityDate": "2026-08-11" if self.crosses_midnight_utc else "2026-08-10",
                 "Description": f"Simulation ID: {simulation_id}\nOutcome: {result}",
             }
-            report_path.write_text(
-                json.dumps(
-                    {
-                        "quote_id": quote_id,
-                        "contact_id": contact["ContactId"],
-                        "phone": runner.mask_phone(contact["Contact"]["Phone"]),
-                        "simulation_id": simulation_id,
-                        "simulation_at": (
-                            "2026-08-10T13:00:00+00:00"
-                            if self.bad_timestamp
-                            else "2026-08-10T12:00:00+00:00"
-                        ),
-                        "outcome": result,
-                        "task_id": task_id,
-                        "simulated": True,
-                        "salesforce_write_applied": True,
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            return self._json({})
+            return type("Completed", (), {
+                "returncode": 0,
+                "stdout": (
+                    f"[OK] Simulated outcome: {result}\n"
+                    f"[OK] Salesforce Quote updated and Task created: {task_id}\n"
+                ),
+                "stderr": "",
+            })()
 
         if command[1:4] == ["data", "update", "record"]:
             quote_id = command[command.index("--record-id") + 1]
@@ -168,6 +161,22 @@ class FakeSalesforce:
 
 
 class TestE2ERunner(unittest.TestCase):
+    def test_temporary_config_contains_all_required_follow_up_policies(self) -> None:
+        with runner._temporary_config() as config:
+            config_path = Path(config.name)
+            document = tomllib.loads(config_path.read_text(encoding="utf-8"))
+            self.assertIn("retry", document["follow_up"])
+            self.assertIn("cooldown", document["follow_up"])
+            self.assertIn("calling_hours", document["follow_up"])
+            policies = load_follow_up_policies(
+                config_path,
+                load_regional_settings(config_path),
+            )
+
+        self.assertEqual(policies.retry.max_attempts, 3)
+        self.assertFalse(policies.cooldown.enabled)
+        self.assertFalse(policies.calling_hours.enabled)
+
     def test_timestamp_parser_accepts_salesforce_and_iso_spellings(self) -> None:
         expected = runner._parse_timestamp(
             "2026-08-10T12:34:56.123Z", field="expected"
@@ -180,17 +189,35 @@ class TestE2ERunner(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(runner._parse_timestamp(value, field="actual"), expected)
 
-    def test_timestamp_mismatch_is_rejected_and_recorded(self) -> None:
+    def test_missing_simulation_task_id_is_rejected_and_recorded(self) -> None:
         fake = FakeSalesforce()
-        fake.bad_timestamp = True
+        original_run = fake.run
+
+        def missing_task_output(command, **kwargs):
+            result = original_run(command, **kwargs)
+            if "quotewake_salesforce" in command and "-m" in command:
+                result.stdout = "[OK] Simulated outcome: Interested\n"
+            return result
+
         output = Path(tempfile.mkdtemp()) / "failed.json"
-        with patch.object(runner.subprocess, "run", side_effect=fake.run):
+        with patch.object(runner.subprocess, "run", side_effect=missing_task_output):
             with self.assertRaises(runner.E2EError):
                 runner.run_e2e("demo", confirm_demo_write=True, output=output)
         summary = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual(summary["status"], "failed")
         self.assertEqual(summary["failed_scenario"], "kitchen")
         self.assertEqual(summary["scenarios"], [])
+
+    def test_task_activity_date_uses_business_timezone_across_utc_midnight(self) -> None:
+        fake = FakeSalesforce()
+        fake.crosses_midnight_utc = True
+        output = Path(tempfile.mkdtemp()) / "midnight.json"
+        with patch.object(runner.subprocess, "run", side_effect=fake.run):
+            self.assertEqual(runner.run_e2e("demo", confirm_demo_write=True, output=output), 0)
+
+        summary = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(summary["status"], "completed")
+        self.assertEqual(len(summary["scenarios"]), 3)
 
     def test_second_scenario_failure_persists_partial_redacted_summary(self) -> None:
         fake = FakeSalesforce()

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from quotewake_salesforce.domain.models import ContactTarget, Money, QuoteCandidate, QuoteLine
+from quotewake_salesforce.structured_logging import log_event
 
 from .client import SalesforceClient, SalesforceResponseError, SalesforceSchemaError
 from .codecs import (
@@ -40,6 +41,17 @@ REQUIRED_QUOTE_FIELDS = {
 }
 REQUIRED_CONTACT_FIELDS = {"Id", "Name", "Phone", "MobilePhone"}
 ID_PATTERN = re.compile(r"^[A-Za-z0-9]{15,18}$")
+FOLLOW_UP_RESULT_VALUES = frozenset(
+    {
+        "Interested",
+        "Not Interested",
+        "Call Back Later",
+        "No Answer",
+        "Busy",
+        "Invalid Number",
+        "Error",
+    }
+)
 
 
 def _field_map(description: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -71,7 +83,7 @@ _EXPECTED_FIELD_TYPES: dict[str, frozenset[str]] = {
     "Next_Follow_Up_At__c": frozenset({"datetime"}),
     "Attempt_Count__c": frozenset({"int", "double", "currency"}),
     "Last_Follow_Up_At__c": frozenset({"datetime"}),
-    "Last_Follow_Up_Result__c": frozenset({"string", "textarea"}),
+    "Last_Follow_Up_Result__c": frozenset({"picklist", "string", "textarea"}),
 }
 
 
@@ -125,6 +137,10 @@ class QuoteRepository:
     def validate_schema(self) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
         """Validate required objects/fields and return their field maps."""
 
+        log_event(
+            "salesforce_schema_validation_started",
+            do_not_call_field_configured=bool(self.do_not_call_field),
+        )
         try:
             quote_fields = _field_map(self.client.describe("Quote"))
         except Exception as exc:
@@ -141,6 +157,21 @@ class QuoteRepository:
         _validate_field_metadata(quote_fields, REQUIRED_QUOTE_FIELDS, object_name="Quote")
         for picklist_name in ("Status", "Follow_Up_Status__c"):
             _active_picklist_values(quote_fields[picklist_name])
+        result_field = quote_fields["Last_Follow_Up_Result__c"]
+        if result_field.get("type") == "picklist":
+            result_values = _active_picklist_values(result_field)
+            if result_values is None:
+                raise SalesforceSchemaError(
+                    "Salesforce Quote.Last_Follow_Up_Result__c is a picklist "
+                    "without picklist values metadata."
+                )
+            missing_results = sorted(FOLLOW_UP_RESULT_VALUES - result_values)
+            if missing_results:
+                raise SalesforceSchemaError(
+                    "Salesforce Quote.Last_Follow_Up_Result__c is missing active "
+                    "picklist values: "
+                    + ", ".join(missing_results)
+                )
 
         try:
             contact_fields = _field_map(self.client.describe("Contact"))
@@ -178,10 +209,26 @@ class QuoteRepository:
                     "Configured Contact opt-out field does not exist on Contact: "
                     f"{self.do_not_call_field}"
                 )
+        log_event(
+            "salesforce_schema_validation_completed",
+            quote_field_count=len(quote_fields),
+            contact_field_count=len(contact_fields),
+            do_not_call_field_configured=bool(self.do_not_call_field),
+        )
         return quote_fields, contact_fields
 
-    def load(self) -> tuple[list[QuoteCandidate], dict[str, list[ContactTarget]]]:
+    def load(
+        self, *, quote_id: str | None = None
+    ) -> tuple[list[QuoteCandidate], dict[str, list[ContactTarget]]]:
         """Load quote candidates and primary contacts with read-only SOQL."""
+
+        log_event(
+            "salesforce_quote_repository_load_started",
+            quote_id=quote_id,
+            filtered_to_quote=quote_id is not None,
+        )
+        if quote_id is not None:
+            quote_id = salesforce_id(quote_id, "Quote ID", prefix="0Q")
 
         quote_fields, _ = self.validate_schema()
         amount_field = next(
@@ -237,23 +284,39 @@ class QuoteRepository:
             "Last_Follow_Up_At__c",
             "Last_Follow_Up_Result__c",
         ]
+        where_clause = "OpportunityId != null"
+        if quote_id is not None:
+            where_clause = f"Id = '{quote_id}' AND {where_clause}"
         soql = (
             "SELECT "
             + ", ".join(selected_fields)
-            + " FROM Quote WHERE OpportunityId != null ORDER BY CreatedDate ASC"
+            + f" FROM Quote WHERE {where_clause} ORDER BY CreatedDate ASC"
         )
         records = self.client.query(soql)
-        corporate_currency = self._corporate_currency() if currency_field is None else None
+        # Single-currency orgs do not expose CurrencyIsoCode on Quote. Resolve
+        # the org default so commercial amounts retain their denomination in
+        # human output and CALL-E context.
+        corporate_currency = (
+            self._corporate_currency()
+            if records and currency_field is None
+            else None
+        )
         quotes = [
             self._quote_from_record(record, amount_field, currency_field, corporate_currency, quote_fields)
             for record in records
         ]
         opportunity_ids = sorted({quote.opportunity_id for quote in quotes})
         contacts = self._load_primary_contacts(opportunity_ids)
+        log_event(
+            "salesforce_quote_repository_load_completed",
+            quote_count=len(quotes),
+            opportunity_count=len(opportunity_ids),
+            contact_group_count=len(contacts),
+        )
         return quotes, contacts
 
     def _corporate_currency(self) -> str:
-        """Return the org default currency when Quotes are single-currency."""
+        """Return the Salesforce org default currency for single-currency Quotes."""
 
         records = self.client.query(
             "SELECT DefaultCurrencyIsoCode FROM Organization LIMIT 1"
@@ -334,6 +397,11 @@ class QuoteRepository:
             if field_metadata and "Follow_Up_Status__c" in field_metadata
             else None
         )
+        follow_up_result_values = (
+            _active_picklist_values(field_metadata["Last_Follow_Up_Result__c"])
+            if field_metadata and "Last_Follow_Up_Result__c" in field_metadata
+            else None
+        )
         status = picklist(required(record, "Status"), "Status", status_values)
         if not status:
             raise SalesforceResponseError("Salesforce field Status is unexpectedly empty.")
@@ -365,7 +433,15 @@ class QuoteRepository:
             next_follow_up_at=nullable_datetime(required(record, "Next_Follow_Up_At__c"), "Next_Follow_Up_At__c"),
             attempt_count=non_negative_integer(required(record, "Attempt_Count__c"), "Attempt_Count__c", precision=(field_metadata or {}).get("Attempt_Count__c", {}).get("precision")),
             last_follow_up_at=nullable_datetime(required(record, "Last_Follow_Up_At__c"), "Last_Follow_Up_At__c"),
-            last_follow_up_result=nullable_text(required(record, "Last_Follow_Up_Result__c"), "Last_Follow_Up_Result__c", maximum=255),
+            last_follow_up_result=picklist(
+                nullable_text(
+                    required(record, "Last_Follow_Up_Result__c"),
+                    "Last_Follow_Up_Result__c",
+                    maximum=255,
+                ),
+                "Last_Follow_Up_Result__c",
+                follow_up_result_values,
+            ),
             money=money,
         )
 
@@ -379,6 +455,10 @@ class QuoteRepository:
 
         if not quote_ids:
             return {}
+        log_event(
+            "salesforce_quote_lines_load_started",
+            quote_count=len(quote_ids),
+        )
         if not all(ID_PATTERN.fullmatch(value) for value in quote_ids):
             raise SalesforceResponseError("QuoteWake received an invalid Quote ID.")
 
@@ -418,6 +498,11 @@ class QuoteRepository:
                         ),
                     )
                 )
+        log_event(
+            "salesforce_quote_lines_load_completed",
+            quote_count=len(quote_ids),
+            line_count=sum(len(lines) for lines in line_map.values()),
+        )
         return line_map
 
     def _load_primary_contacts(

@@ -1,13 +1,13 @@
-"""QuoteWake CLI and backwards-compatible local scaffold helpers."""
+"""QuoteWake Salesforce selection, CALL-E planning, and simulation CLI."""
 
 from __future__ import annotations
 
 import argparse
-import json
+import logging
 import re
 import shlex
 import sys
-from dataclasses import dataclass
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -21,25 +21,28 @@ from quotewake_salesforce.calle import (
 from quotewake_salesforce.config import (
     DEFAULT_CONFIG_PATH,
     load_initial_follow_up_timing,
+    load_follow_up_policies,
+    load_logging_settings,
     load_regional_settings,
 )
 from quotewake_salesforce.domain.call_planning import build_call_plan_request
 from quotewake_salesforce.domain.models import (
     CallPlanDecision,
     CallPlanResult,
-    CallResult,
-    Money,
     SelectionDecision,
     SelectionResult,
     SimulationOutcome,
 )
-from quotewake_salesforce.domain.policy import SelectionPolicy, configured_quote_statuses
+from quotewake_salesforce.domain.policy import (
+    SelectionPolicy,
+    calculate_next_follow_up,
+    configured_quote_statuses,
+)
 from quotewake_salesforce.domain.selection import evaluate_quote, validate_callable_contact
 from quotewake_salesforce.phone import mask_phone
 from quotewake_salesforce.presentation import (
     format_business_datetime,
     format_money,
-    money_record,
 )
 from quotewake_salesforce.salesforce.client import (
     SalesforceClient,
@@ -47,289 +50,35 @@ from quotewake_salesforce.salesforce.client import (
     SalesforceSchemaError,
 )
 from quotewake_salesforce.salesforce.quotes import QuoteRepository, _active_picklist_values
+from quotewake_salesforce.structured_logging import (
+    configure_logging,
+    log_event,
+    log_exception,
+    log_context,
+)
 
-# Standard E.164 phone number pattern (7 to 15 digits starting with +)
-E164_REGEX = re.compile(r"^\+[1-9]\d{6,14}$")
+def _new_run_id() -> str:
+    """Create a short, non-secret identifier for one CLI processing attempt."""
 
-
-class NumberValidationError(ValueError):
-    """Raised when a phone number does not conform to the E.164 format."""
-
-
-def validate_e164_phone(phone: str) -> str:
-    """Validate that a phone number string matches canonical E.164 format.
-
-    Args:
-        phone: The input phone number string.
-
-    Returns:
-        The validated E.164 phone string.
-
-    Raises:
-        NumberValidationError: If the phone number is invalid or empty.
-    """
-    cleaned = phone.strip()
-    if not cleaned or not E164_REGEX.match(cleaned):
-        raise NumberValidationError(
-            f"Invalid E.164 phone number format: '{phone}'. Must start with '+' followed by 7-15 digits."
-        )
-    return cleaned
+    return uuid.uuid4().hex
 
 
-def mask_phone_number(phone: str) -> str:
-    """Mask an E.164 phone number to protect customer privacy in logs and reports.
+def _configure_logging_from_config(config_path: str):
+    """Load TOML logging settings and configure the application logger."""
 
-    Example:
-        '+14155550131' -> '+15*******11'
-
-    Args:
-        phone: The E.164 formatted phone number.
-
-    Returns:
-        The masked phone string.
-    """
-    validated = validate_e164_phone(phone)
-    prefix = validated[:3]
-    suffix = validated[-2:]
-    masked_middle = "*" * (len(validated) - 5)
-    return f"{prefix}{masked_middle}{suffix}"
-
-
-@dataclass
-class Invoice:
-    """Represents a customer invoice needing potential follow-up."""
-
-    invoice_id: str
-    customer_name: str
-    phone_number: str
-    amount_due: float
-    due_date: str
-    status: str = "pending"
-    currency: str = "USD"
-
-    def __post_init__(self) -> None:
-        """Validate fields upon initialization."""
-        self.phone_number = validate_e164_phone(self.phone_number)
-        if self.amount_due < 0:
-            raise ValueError(f"Invoice amount_due cannot be negative: {self.amount_due}")
-
-
-def should_follow_up(invoice: Invoice) -> bool:
-    """Determine whether an invoice requires a follow-up call.
-
-    Args:
-        invoice: The invoice instance to evaluate.
-
-    Returns:
-        True if the invoice status is pending or overdue and has an amount due > 0;
-        False otherwise.
-    """
-    normalized_status = invoice.status.strip().lower()
-    return normalized_status in {"pending", "overdue"} and invoice.amount_due > 0.0
-
-
-def build_call_context(invoice: Invoice) -> dict[str, str]:
-    """Construct a structured call context payload for CALL-E agent follow-up.
-
-    Args:
-        invoice: The target invoice.
-
-    Returns:
-        A dictionary containing safe task parameters and masked phone references.
-    """
-    masked_phone = mask_phone_number(invoice.phone_number)
-    task_prompt = (
-        f"Call {invoice.customer_name} regarding outstanding Invoice #{invoice.invoice_id} "
-        f"for {invoice.currency} {invoice.amount_due:.2f} due on {invoice.due_date}. "
-        "Inquire about payment status, offer assistance with payment options, "
-        "and record any promised payment date."
-    )
-    return {
-        "invoice_id": invoice.invoice_id,
-        "customer_name": invoice.customer_name,
-        "masked_phone": masked_phone,
-        "amount_due": f"{invoice.currency} {invoice.amount_due:.2f}",
-        "due_date": invoice.due_date,
-        "task_prompt": task_prompt,
-    }
-
-
-def sample_invoices() -> list[Invoice]:
-    """Provide sample invoice data for demonstration and dry-run execution."""
-    return [
-        Invoice(
-            invoice_id="INV-1001",
-            customer_name="Acme Corp",
-            phone_number="+14155550131",
-            amount_due=450.00,
-            due_date="2026-08-01",
-            status="overdue",
-        ),
-        Invoice(
-            invoice_id="INV-1002",
-            customer_name="Beta Logistics",
-            phone_number="+14155550142",
-            amount_due=1250.50,
-            due_date="2026-08-15",
-            status="pending",
-        ),
-        Invoice(
-            invoice_id="INV-1003",
-            customer_name="Gamma Services",
-            phone_number="+14155550153",
-            amount_due=0.00,
-            due_date="2026-07-20",
-            status="paid",
-        ),
-    ]
-
-
-def run_quotewake(invoices: Sequence[Invoice], dry_run: bool = True) -> dict[str, object]:
-    """Execute the QuoteWake follow-up pipeline across given invoices.
-
-    Args:
-        invoices: Sequence of Invoice instances.
-        dry_run: If True, simulates the calls without invoking external services.
-
-    Returns:
-        Structured result summary of the run.
-    """
-    evaluated: list[dict[str, object]] = []
-    follow_up_count = 0
-
-    for inv in invoices:
-        needs_call = should_follow_up(inv)
-        entry: dict[str, object] = {
-            "invoice_id": inv.invoice_id,
-            "customer_name": inv.customer_name,
-            "masked_phone": mask_phone_number(inv.phone_number),
-            "status": inv.status,
-            "amount_due": inv.amount_due,
-            "should_follow_up": needs_call,
-        }
-
-        if needs_call:
-            follow_up_count += 1
-            entry["call_context"] = build_call_context(inv)
-            entry["action"] = "simulated_call_scheduled" if dry_run else "live_call_triggered"
-        else:
-            entry["action"] = "skipped"
-
-        evaluated.append(entry)
-
-    return {
-        "mode": "dry_run / simulated" if dry_run else "live",
-        "total_invoices": len(invoices),
-        "follow_ups_required": follow_up_count,
-        "results": evaluated,
-    }
-
-
-def legacy_main(argv: Sequence[str] | None = None) -> int:
-    """Run the original local scaffold demonstration."""
-    parser = argparse.ArgumentParser(
-        description="QuoteWake - Outbound Payment Follow-up Agent for Small Businesses"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=True,
-        help="Simulate evaluation and output without placing live calls (default: True).",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Emit output in JSON format.",
-    )
-    args = parser.parse_args(argv)
-
-    invoices = sample_invoices()
-    summary = run_quotewake(invoices, dry_run=args.dry_run)
-
-    if args.json:
-        print(json.dumps(summary, indent=2))
-    else:
-        print("=" * 60)
-        print("QUOTEWAKE PAYMENT FOLLOW-UP AGENT (DRY RUN / SIMULATION)")
-        print("=" * 60)
-        print(f"Total Invoices Evaluated: {summary['total_invoices']}")
-        print(f"Follow-ups Required:     {summary['follow_ups_required']}")
-        print("-" * 60)
-        results = summary.get("results", [])
-        if isinstance(results, list):
-            for item in results:
-                if isinstance(item, dict):
-                    status_symbol = "[CALL]" if item.get("should_follow_up") else "[SKIP]"
-                    print(
-                        f"{status_symbol} Invoice #{item.get('invoice_id')} | "
-                        f"{item.get('customer_name')} ({item.get('masked_phone')}) | "
-                        f"Status: {item.get('status')} | Action: {item.get('action')}"
-                    )
-        print("=" * 60)
-
-    return 0
-
-
-def _json_amount(value: object) -> int | float | None:
-    """Serialize Decimal amounts as useful JSON numbers."""
-
-    if value is None:
+    try:
+        logging_settings = load_logging_settings(Path(config_path))
+    except ValueError as exc:
+        print(f"[ERROR] Invalid QuoteWake configuration: {exc}", file=sys.stderr)
         return None
-    decimal_value = value
-    if hasattr(decimal_value, "as_tuple") and decimal_value == decimal_value.to_integral_value():
-        return int(decimal_value)
-    return float(decimal_value)
-
-
-def _json_datetime(value: datetime | None) -> str | None:
-    """Serialize an aware DateTime as canonical UTC RFC3339 with ``Z``."""
-
-    if value is None:
-        return None
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("JSON report DateTime values must be timezone-aware.")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _result_record(result: SelectionResult) -> dict[str, object]:
-    """Create a concise, secret-free JSONL record."""
-
-    quote = result.quote
-    exact_money = quote.money
-    if exact_money is None and quote.amount is not None and quote.currency_code:
-        exact_money = Money(
-            quote.amount,
-            quote.currency_code,
-            "legacy_amount",
-            max(0, -quote.amount.as_tuple().exponent),
-        )
-    record: dict[str, object] = {
-        "schema_version": 2,
-        "report_schema_version": 2,
-        "quote_id": quote.quote_id,
-        "quote_name": quote.quote_name,
-        "decision": result.decision.value,
-        "reason": result.reason.value,
-        "quote_status": quote.quote_status,
-        "amount": _json_amount(quote.amount),
-        "currency_code": quote.currency_code,
-        "money": money_record(exact_money),
-        "expiration_date": (
-            quote.expiration_date.isoformat() if quote.expiration_date else None
-        ),
-        "last_modified_at": _json_datetime(quote.last_modified_at),
-        "attempt_count": quote.attempt_count,
-        "next_follow_up_at": (
-            _json_datetime(quote.next_follow_up_at)
-        ),
-    }
-    if result.contact is not None:
-        record["contact"] = {
-            "contact_id": result.contact.contact_id,
-            "name": result.contact.name,
-            "phone": mask_phone(result.contact.phone) if result.contact.phone else None,
-        }
-    return record
+    configure_logging(
+        level=logging_settings.level,
+        log_format=logging_settings.format,
+        log_directory=logging_settings.directory,
+        max_bytes=logging_settings.max_bytes,
+        backup_count=logging_settings.backup_count,
+    )
+    return logging_settings
 
 
 def _display_amount(
@@ -374,35 +123,6 @@ def _print_selection(result: SelectionResult, *, regional_settings=None) -> None
         print(f"Attempts: {quote.attempt_count} | Next follow-up: {next_at}")
 
 
-def _plan_record(result: CallPlanResult, selection: SelectionResult) -> dict[str, object]:
-    """Create a token-free local record for one CALL-E planning attempt."""
-
-    contact = selection.contact
-    return {
-        "report_schema_version": 2,
-        "schema_version": 2,
-        "quote_id": selection.quote.quote_id,
-        "quote_name": selection.quote.quote_name,
-        "opportunity_id": selection.quote.opportunity_id,
-        "contact_id": contact.contact_id if contact else None,
-        "phone": mask_phone(contact.phone) if contact and contact.phone else None,
-        "decision": result.decision.value,
-        "ready_to_run": result.ready_to_run,
-        "plan_id": result.plan_id,
-        "confirm_summary": result.confirm_summary,
-        "clarifying_questions": list(result.clarifying_questions),
-        "error": result.error,
-    }
-
-
-def _write_jsonl(path: Path, records: list[dict[str, object]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records),
-        encoding="utf-8",
-    )
-
-
 def salesforce_dry_run_main(argv: Sequence[str]) -> int:
     """Evaluate Salesforce Quotes and optionally create non-executing CALL-E plans."""
 
@@ -439,11 +159,6 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
         help="Optional Contact opt-out field API name; when true, the Contact is not called.",
     )
     parser.add_argument(
-        "--output",
-        default="results/quotewake_salesforce_dry_run.jsonl",
-        help="Local JSONL report path.",
-    )
-    parser.add_argument(
         "--plan-calls",
         action="store_true",
         help="Create CALL-E plans for READY Quotes without running any calls.",
@@ -461,12 +176,23 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
         default="calle",
         help="Official CALL-E CLI command or path. Default: calle.",
     )
-    parser.add_argument(
-        "--plan-output",
-        default="results/quotewake_salesforce_call_plans.jsonl",
-        help="Local redacted CALL-E plan JSONL path.",
-    )
     args = parser.parse_args(list(argv))
+    run_id = _new_run_id()
+    logging_settings = _configure_logging_from_config(args.config)
+    if logging_settings is None:
+        return 1
+    log_scope = log_context(run_id=run_id)
+    log_scope.__enter__()
+    log_event(
+        "run_started",
+        mode="salesforce_dry_run",
+        target_org_configured=bool(args.target_org),
+        config_path=args.config,
+        plan_calls=args.plan_calls,
+        call_language=args.call_language if args.plan_calls else None,
+        call_region=args.call_region if args.plan_calls else None,
+        do_not_call_filter_configured=bool(args.do_not_call_field),
+    )
 
     try:
         if args.plan_calls and (not args.call_language or not args.call_region):
@@ -475,8 +201,23 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
             )
         initial_follow_up_timing = load_initial_follow_up_timing(Path(args.config))
         regional_settings = load_regional_settings(Path(args.config))
+        follow_up_policies = load_follow_up_policies(Path(args.config), regional_settings)
+        log_event(
+            "configuration_loaded",
+            mode="salesforce_dry_run",
+            business_timezone=str(regional_settings.business_timezone),
+            configured_follow_up_statuses=sorted(
+                configured_quote_statuses(args.allowed_quote_status)
+            ),
+        )
         client = SalesforceClient(target_org=args.target_org)
         org = client.org_info()
+        log_event(
+            "salesforce_connection_verified",
+            org_id=org.org_id,
+            org_alias=org.alias,
+            api_version=org.api_version,
+        )
         print("QuoteWake Salesforce dry-run")
         print(f"Target org: {args.target_org or org.alias or 'current default'}")
         print(f"Org username: {org.username}")
@@ -485,12 +226,23 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
 
         repository = QuoteRepository(client, do_not_call_field=args.do_not_call_field)
         quote_fields, _ = repository.validate_schema()
+        log_event(
+            "salesforce_schema_verified",
+            quote_field_count=len(quote_fields),
+            contact_opt_out_field_configured=bool(args.do_not_call_field),
+        )
         print("[OK] Quote and Contact schema verified")
         if args.do_not_call_field is None:
-            print(
-                "[WARN] Contact opt-out filtering is disabled (no field configured).",
-                file=sys.stderr,
+            log_event(
+                "contact_opt_out_filter_disabled",
+                level=logging.WARNING,
+                reason="no_contact_opt_out_field_configured",
             )
+            if logging_settings.format == "text":
+                print(
+                    "[WARN] Contact opt-out filtering is disabled (no field configured).",
+                    file=sys.stderr,
+                )
         status_values = _active_picklist_values(quote_fields["Status"]) or set()
         allowed_statuses = configured_quote_statuses(args.allowed_quote_status)
         unknown_statuses = sorted(allowed_statuses - status_values)
@@ -502,30 +254,58 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
             )
         policy = SelectionPolicy(
             initial_follow_up_timing=initial_follow_up_timing,
+            retry_policy=follow_up_policies.retry,
+            cooldown_policy=follow_up_policies.cooldown,
+            calling_hours_policy=follow_up_policies.calling_hours,
             allowed_quote_statuses=allowed_statuses,
             business_timezone=regional_settings.business_timezone,
         )
+        log_event(
+            "salesforce_quote_load_started",
+            allowed_quote_statuses=sorted(allowed_statuses),
+        )
         quotes, contacts_by_opportunity = repository.load()
+        log_event(
+            "salesforce_quotes_loaded",
+            quote_count=len(quotes),
+            opportunity_contact_group_count=len(contacts_by_opportunity),
+        )
         now = datetime.now(timezone.utc)
-        results: list[dict[str, object]] = []
         selections: list[SelectionResult] = []
         ready_count = 0
         for quote in quotes:
             result = evaluate_quote(quote, now, policy)
+            log_event(
+                "quote_selection_evaluated",
+                quote_id=quote.quote_id,
+                decision=result.decision.value,
+                reason=result.reason.value,
+                quote_status=quote.quote_status,
+                attempt_count=quote.attempt_count,
+            )
             if result.decision is SelectionDecision.READY:
                 result = validate_callable_contact(
                     result, contacts_by_opportunity.get(quote.opportunity_id, [])
+                )
+                log_event(
+                    "quote_contact_validation_evaluated",
+                    quote_id=quote.quote_id,
+                    decision=result.decision.value,
+                    reason=result.reason.value,
+                    contact_count=len(contacts_by_opportunity.get(quote.opportunity_id, [])),
+                    contact_id=result.contact.contact_id if result.contact else None,
                 )
             if result.decision is SelectionDecision.READY:
                 ready_count += 1
             _print_selection(result, regional_settings=regional_settings)
             selections.append(result)
-            results.append(_result_record(result))
 
-        output_path = Path(args.output)
-        _write_jsonl(output_path, results)
-        print(f"\n[OK] Evaluated {len(results)} Quotes; READY: {ready_count}")
-        print(f"[OK] Local JSONL report: {output_path}")
+        print(f"\n[OK] Evaluated {len(selections)} Quotes; READY: {ready_count}")
+        log_event(
+            "quote_selection_report_completed",
+            quote_count=len(selections),
+            ready_count=ready_count,
+        )
 
         plan_failures = 0
         if args.plan_calls:
@@ -534,14 +314,21 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                 for result in selections
                 if result.decision is SelectionDecision.READY
             ]
-            plan_records: list[dict[str, object]] = []
             if ready_selections:
                 planner = CallEPlanningClient(command=shlex.split(args.calle_command))
+                log_event("call_e_planner_verification_started")
                 planner.verify_ready()
+                log_event("call_e_planner_verified")
                 quote_lines = repository.load_quote_lines(
                     [result.quote.quote_id for result in ready_selections]
                 )
                 for selection in ready_selections:
+                    log_event(
+                        "call_e_plan_attempt_started",
+                        quote_id=selection.quote.quote_id,
+                        language=args.call_language,
+                        region=args.call_region,
+                    )
                     request = build_call_plan_request(
                         selection,
                         quote_lines.get(selection.quote.quote_id, []),
@@ -553,38 +340,58 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                         plan_result = planner.plan(request)
                     except CallEPlanningError as exc:
                         plan_failures += 1
+                        log_exception(
+                            "call_e_plan_attempt_failed",
+                            exc,
+                            quote_id=selection.quote.quote_id,
+                        )
                         plan_result = CallPlanResult(
                             quote_id=selection.quote.quote_id,
                             decision=CallPlanDecision.PLAN_ERROR,
                             ready_to_run=False,
                             error=str(exc),
                         )
+                    else:
+                        log_event(
+                            "call_e_plan_attempt_completed",
+                            quote_id=selection.quote.quote_id,
+                            decision=plan_result.decision.value,
+                            ready_to_run=plan_result.ready_to_run,
+                            plan_id=plan_result.plan_id,
+                        )
                     print(
                         f"[CALL-E] {selection.quote.quote_name}: "
                         f"{plan_result.decision.value}"
                     )
-                    plan_records.append(_plan_record(plan_result, selection))
-
-            plan_output_path = Path(args.plan_output)
-            _write_jsonl(plan_output_path, plan_records)
             print(
-                f"[OK] Planned {len(plan_records)} READY Quotes; "
+                f"[OK] Planned {len(ready_selections)} READY Quotes; "
                 f"errors: {plan_failures}"
             )
-            print(f"[OK] Redacted CALL-E plan report: {plan_output_path}")
             print("[OK] plan_call only; run_call was not invoked")
 
         print("[OK] No Salesforce records were modified and no outbound calls were made")
+        log_event(
+            "run_completed",
+            mode="salesforce_dry_run",
+            status="failed" if plan_failures else "succeeded",
+            quote_count=len(selections),
+            ready_count=ready_count,
+            plan_failures=plan_failures,
+        )
         return 1 if plan_failures else 0
     except (SalesforceError, CallEPlanningError, ValueError) as exc:
-        print(f"[ERROR] {exc}", file=sys.stderr)
-        print(
-            "[ERROR] No Salesforce records were modified and QuoteWake did not invoke "
-            "an outbound call. Fix the authentication/schema/configuration issue and "
-            "retry safely.",
-            file=sys.stderr,
-        )
+        log_exception("run_failed", exc, mode="salesforce_dry_run")
+        if logging_settings.format == "text":
+            print(f"[ERROR] {type(exc).__name__}", file=sys.stderr)
+            print(
+                "[ERROR] No Salesforce records were modified and QuoteWake did not invoke "
+                "an outbound call. Fix the authentication/schema/configuration issue and "
+                "retry safely.",
+                file=sys.stderr,
+            )
         return 1
+    finally:
+        log_scope.__exit__(None, None, None)
 
 
 def _parse_cli_datetime(value: str) -> datetime:
@@ -599,74 +406,6 @@ def _parse_cli_datetime(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("DateTime values must include a timezone, such as Z or +00:00.")
     return parsed
-
-
-def _simulation_record(
-    selection: SelectionResult,
-    simulation: CallResult,
-    task_id: str,
-) -> dict[str, object]:
-    """Build the local simulation report without customer secrets."""
-
-    # Keep this explicit instead of serializing the dataclass wholesale so a
-    # future provider field cannot accidentally leak into the report.
-    quote = selection.quote
-    contact = selection.contact
-    return {
-        "schema_version": 2,
-        "report_schema_version": 2,
-        "quote_id": quote.quote_id,
-        "opportunity_id": quote.opportunity_id,
-        "contact_id": contact.contact_id if contact else None,
-        "phone": mask_phone(contact.phone) if contact and contact.phone else None,
-        "simulation_id": simulation.simulation_id,
-        "provider_status": simulation.provider_status,
-        "outcome": simulation.outcome,
-        "interest_level": simulation.interest_level,
-        "preferred_date": (
-            simulation.preferred_date.isoformat() if simulation.preferred_date else None
-        ),
-        "summary": simulation.summary,
-        "next_action": simulation.next_action,
-        "next_follow_up_at": (
-            _json_datetime(simulation.next_follow_up_at)
-        ),
-        "simulation_at": (
-            _json_datetime(simulation.simulation_timestamp)
-        ),
-        "result": {
-            "provider_status": simulation.provider_status,
-            "outcome": simulation.outcome,
-            "interest_level": simulation.interest_level,
-            "preferred_date": (
-                simulation.preferred_date.isoformat() if simulation.preferred_date else None
-            ),
-            "summary": simulation.summary,
-            "next_action": simulation.next_action,
-        },
-        "quote_status_written": (
-            "Retry"
-            if simulation.next_follow_up_at
-            else "Completed"
-            if simulation.outcome == "Interested"
-            else "Stopped"
-            if simulation.outcome in {"Not Interested", "Invalid Number"}
-            else "Retry"
-        ),
-        "quote_result_written": simulation.outcome,
-        "quote_follow_up_status": (
-            "Retry"
-            if simulation.next_follow_up_at
-            else "Completed"
-            if simulation.outcome == "Interested"
-            else "Stopped"
-            if simulation.outcome in {"Not Interested", "Invalid Number"}
-            else "Retry"
-        ),
-        "task_id": task_id,
-        "simulated": True,
-        "salesforce_write_applied": True,
-    }
 
 
 def salesforce_simulation_main(argv: Sequence[str]) -> int:
@@ -693,19 +432,32 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
     parser.add_argument("--call-region", required=True)
     parser.add_argument(
         "--next-follow-up-at",
-        help="Required for retry outcomes; timezone-aware ISO-8601 DateTime.",
+        help="Optional customer-requested callback time for call_back_later; timezone-aware ISO-8601 DateTime.",
     )
     parser.add_argument(
         "--confirm-demo-write",
         action="store_true",
         help="Required acknowledgement before writing the seeded demo Quote and Task.",
     )
-    parser.add_argument(
-        "--simulation-output",
-        default="results/quotewake_salesforce_simulations.jsonl",
-        help="Redacted local JSONL simulation report path.",
-    )
     args = parser.parse_args(list(argv))
+    run_id = _new_run_id()
+    logging_settings = _configure_logging_from_config(args.config)
+    if logging_settings is None:
+        return 1
+    log_scope = log_context(run_id=run_id)
+    log_scope.__enter__()
+    log_event(
+        "run_started",
+        mode="salesforce_simulation",
+        target_org_configured=bool(args.target_org),
+        config_path=args.config,
+        quote_id=args.quote_id,
+        simulation_outcome=args.simulation_outcome,
+        call_language=args.call_language,
+        call_region=args.call_region,
+        confirm_demo_write=args.confirm_demo_write,
+        do_not_call_filter_configured=bool(args.do_not_call_field),
+    )
 
     try:
         if not args.target_org:
@@ -721,8 +473,21 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
         next_at = _parse_cli_datetime(args.next_follow_up_at) if args.next_follow_up_at else None
         initial_follow_up_timing = load_initial_follow_up_timing(Path(args.config))
         regional_settings = load_regional_settings(Path(args.config))
+        follow_up_policies = load_follow_up_policies(Path(args.config), regional_settings)
+        log_event(
+            "configuration_loaded",
+            mode="salesforce_simulation",
+            business_timezone=str(regional_settings.business_timezone),
+        )
         client = SalesforceClient(target_org=args.target_org)
         org = client.org_info()
+        log_event(
+            "salesforce_connection_verified",
+            quote_id=args.quote_id,
+            org_id=org.org_id,
+            org_alias=org.alias,
+            api_version=org.api_version,
+        )
         print("QuoteWake Salesforce CALL-E simulation")
         print(f"Target org: {args.target_org}")
         print(f"Org username: {org.username}")
@@ -731,6 +496,12 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
 
         repository = QuoteRepository(client, do_not_call_field=args.do_not_call_field)
         quote_fields, _ = repository.validate_schema()
+        log_event(
+            "salesforce_schema_verified",
+            quote_id=args.quote_id,
+            quote_field_count=len(quote_fields),
+            contact_opt_out_field_configured=bool(args.do_not_call_field),
+        )
         status_values = _active_picklist_values(quote_fields["Status"]) or set()
         allowed_statuses = configured_quote_statuses(args.allowed_quote_status)
         unknown_statuses = sorted(allowed_statuses - status_values)
@@ -741,10 +512,24 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
             )
         policy = SelectionPolicy(
             initial_follow_up_timing=initial_follow_up_timing,
+            retry_policy=follow_up_policies.retry,
+            cooldown_policy=follow_up_policies.cooldown,
+            calling_hours_policy=follow_up_policies.calling_hours,
             allowed_quote_statuses=allowed_statuses,
             business_timezone=regional_settings.business_timezone,
         )
-        quotes, contacts_by_opportunity = repository.load()
+        log_event(
+            "salesforce_quote_load_started",
+            quote_id=args.quote_id,
+            allowed_quote_statuses=sorted(allowed_statuses),
+        )
+        quotes, contacts_by_opportunity = repository.load(quote_id=args.quote_id)
+        log_event(
+            "salesforce_quotes_loaded",
+            quote_id=args.quote_id,
+            quote_count=len(quotes),
+            opportunity_contact_group_count=len(contacts_by_opportunity),
+        )
         selected_quote = next((item for item in quotes if item.quote_id == args.quote_id), None)
         if selected_quote is None:
             raise ValueError(f"Quote {args.quote_id} was not returned by Salesforce.")
@@ -754,9 +539,25 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
             )
         now = datetime.now(timezone.utc)
         selection = evaluate_quote(selected_quote, now, policy)
+        log_event(
+            "quote_selection_evaluated",
+            quote_id=selected_quote.quote_id,
+            decision=selection.decision.value,
+            reason=selection.reason.value,
+            quote_status=selected_quote.quote_status,
+            attempt_count=selected_quote.attempt_count,
+        )
         if selection.decision is SelectionDecision.READY:
             selection = validate_callable_contact(
                 selection, contacts_by_opportunity.get(selected_quote.opportunity_id, [])
+            )
+            log_event(
+                "quote_contact_validation_evaluated",
+                quote_id=selected_quote.quote_id,
+                decision=selection.decision.value,
+                reason=selection.reason.value,
+                contact_count=len(contacts_by_opportunity.get(selected_quote.opportunity_id, [])),
+                contact_id=selection.contact.contact_id if selection.contact else None,
             )
         if selection.decision is not SelectionDecision.READY:
             raise ValueError(
@@ -779,6 +580,19 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
             now=now,
             next_follow_up_at=next_at,
         )
+        follow_up_update = calculate_next_follow_up(
+            selected_quote,
+            simulation,
+            follow_up_policies,
+            occurred_at=simulation.simulation_timestamp,
+        )
+        log_event(
+            "call_e_simulation_completed",
+            quote_id=selected_quote.quote_id,
+            simulation_id=simulation.simulation_id,
+            outcome=simulation.outcome,
+            provider_status=simulation.provider_status,
+        )
         description = (
             "QuoteWake simulated call; no outbound call was placed.\n"
             f"Simulation ID: {simulation.simulation_id}\n"
@@ -790,21 +604,42 @@ def salesforce_simulation_main(argv: Sequence[str]) -> int:
             selected_quote,
             selection.contact,
             simulation,
+            follow_up_update=follow_up_update,
             task_description=description,
             business_timezone=regional_settings.business_timezone,
         )
-        record = _simulation_record(selection, simulation, write_result.task_id)
-        output_path = Path(args.simulation_output)
-        _write_jsonl(output_path, [record])
+        log_event(
+            "salesforce_persistence_completed",
+            quote_id=selected_quote.quote_id,
+            task_id=write_result.task_id,
+            write_type="quote_and_task_composite",
+            outcome=simulation.outcome,
+        )
         print(f"[OK] Simulated outcome: {simulation.outcome}")
         print(f"[OK] Salesforce Quote updated and Task created: {write_result.task_id}")
-        print(f"[OK] Redacted simulation report: {output_path}")
         print("[OK] No CALL-E command or outbound call was invoked")
+        log_event(
+            "run_completed",
+            mode="salesforce_simulation",
+            status="succeeded",
+            quote_id=selected_quote.quote_id,
+            simulation_id=simulation.simulation_id,
+            task_id=write_result.task_id,
+        )
         return 0
     except (SalesforceError, CallSimulationError, ValueError) as exc:
-        print(f"[ERROR] {exc}", file=sys.stderr)
-        print("[ERROR] No simulation write was applied.", file=sys.stderr)
+        log_exception(
+            "run_failed",
+            exc,
+            mode="salesforce_simulation",
+            quote_id=args.quote_id,
+        )
+        if logging_settings.format == "text":
+            print(f"[ERROR] {type(exc).__name__}", file=sys.stderr)
+            print("[ERROR] No simulation write was applied.", file=sys.stderr)
         return 1
+    finally:
+        log_scope.__exit__(None, None, None)
 
 
 def _top_level_help_parser() -> argparse.ArgumentParser:
@@ -816,7 +651,7 @@ def _top_level_help_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Modes:\n"
-            "  No Salesforce flags       Run the backwards-compatible local invoice demo.\n"
+            "  No Salesforce flags       Show this Salesforce-oriented workflow help.\n"
             "  --dry-run                 Read Salesforce and report READY/SKIP Quotes.\n"
             "  --plan-calls              Create remote CALL-E plans only; never place calls.\n"
             "  --simulate-call           Simulate one seeded ES Quote and write Quote + Task.\n\n"
@@ -835,7 +670,6 @@ def _top_level_help_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Read and evaluate Salesforce without writes or calls.",
     )
-    parser.add_argument("--json", action="store_true", help="Format the legacy demo as JSON.")
     parser.add_argument("--target-org", help="Salesforce CLI alias or username.")
     parser.add_argument(
         "--config",
@@ -853,7 +687,6 @@ def _top_level_help_parser() -> argparse.ArgumentParser:
         metavar="FIELD",
         help="Optional Contact opt-out field API name.",
     )
-    parser.add_argument("--output", metavar="PATH", help="Selection JSONL report path.")
     parser.add_argument(
         "--plan-calls",
         action="store_true",
@@ -862,7 +695,6 @@ def _top_level_help_parser() -> argparse.ArgumentParser:
     parser.add_argument("--call-language", metavar="LANGUAGE", help="Explicit call language.")
     parser.add_argument("--call-region", metavar="REGION", help="Explicit call region.")
     parser.add_argument("--calle-command", metavar="COMMAND", help="CALL-E CLI command path.")
-    parser.add_argument("--plan-output", metavar="PATH", help="CALL-E plan JSONL report path.")
     parser.add_argument(
         "--simulate-call",
         action="store_true",
@@ -877,23 +709,18 @@ def _top_level_help_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--next-follow-up-at",
         metavar="DATETIME",
-        help="Future timezone-aware ISO-8601 DateTime for Retry outcomes.",
+        help="Optional future timezone-aware ISO-8601 DateTime for call_back_later.",
     )
     parser.add_argument(
         "--confirm-demo-write",
         action="store_true",
         help="Acknowledge the simulator's seeded Quote + Task write.",
     )
-    parser.add_argument(
-        "--simulation-output",
-        metavar="PATH",
-        help="Redacted simulation JSONL report path.",
-    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Dispatch the Salesforce dry-run CLI while preserving the old scaffold demo."""
+    """Dispatch the Salesforce selection, planning, and simulation workflows."""
 
     selected = list(argv) if argv is not None else sys.argv[1:]
     if "--help" in selected or "-h" in selected:
@@ -907,24 +734,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             "--config",
             "--allowed-quote-status",
             "--do-not-call-field",
-            "--output",
             "--plan-calls",
             "--call-language",
             "--call-region",
             "--calle-command",
-            "--plan-output",
             "--simulate-call",
             "--quote-id",
             "--simulation-outcome",
             "--next-follow-up-at",
             "--confirm-demo-write",
-            "--simulation-output",
         )
     ):
         if "--simulate-call" in selected:
             if "--plan-calls" in selected:
-                print("[ERROR] --simulate-call and --plan-calls are mutually exclusive.", file=sys.stderr)
+                message = "--simulate-call and --plan-calls are mutually exclusive."
+                run_id = _new_run_id()
+                configure_logging()
+                with log_context(run_id=run_id):
+                    log_exception("run_failed", ValueError(message), mode="cli")
+                    print(f"[ERROR] {message}", file=sys.stderr)
                 return 1
             return salesforce_simulation_main(selected)
         return salesforce_dry_run_main(selected)
-    return legacy_main(selected)
+    _top_level_help_parser().print_help()
+    return 0

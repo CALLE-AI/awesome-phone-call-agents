@@ -53,6 +53,9 @@ def evaluate_quote(
             return _skip(quote, SelectionReason.NOT_DUE)
     if quote.attempt_count >= policy.max_attempts:
         return _skip(quote, SelectionReason.MAX_ATTEMPTS)
+    cooldown_at = policy.cooldown.next_allowed_at(quote.last_follow_up_at)
+    if cooldown_at is not None and cooldown_at > now:
+        return _skip(quote, SelectionReason.COOLDOWN_ACTIVE)
     business_now = now.astimezone(policy.business_timezone)
     if quote.expiration_date is not None and quote.expiration_date < business_now.date():
         return _skip(quote, SelectionReason.QUOTE_EXPIRED)
@@ -77,6 +80,8 @@ def evaluate_quote(
         )
         if not past_minimum_delay or not (past_standard_delay or due_soon):
             return _skip(quote, SelectionReason.NOT_DUE)
+    if not policy.calling_hours.is_allowed_now(now):
+        return _skip(quote, SelectionReason.OUTSIDE_CALLING_HOURS)
     return SelectionResult(SelectionDecision.READY, SelectionReason.READY, quote)
 
 

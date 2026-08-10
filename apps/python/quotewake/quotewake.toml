@@ -6,3 +6,28 @@ locale = "es_ES"
 minimum_delay_hours = 0
 standard_delay_hours = 0
 due_soon_window_days = 0
+
+[follow_up.retry]
+max_attempts = 3
+retry_delays_days = [2, 4]
+retry_outcomes = ["call_back_later", "no_answer", "busy"]
+technical_failure_retry_delay_minutes = 30
+completed_outcomes = ["interested"]
+
+[follow_up.cooldown]
+enabled = true
+minimum_delay_hours = 24
+
+[follow_up.calling_hours]
+enabled = false
+days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+start = "09:00"
+end = "18:00"
+
+[logging]
+# Relative directories are resolved from the QuoteWake application directory.
+directory = "logs"
+format = "text"
+level = "INFO"
+max_bytes = 5242880
+backup_count = 5

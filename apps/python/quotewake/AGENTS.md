@@ -4,7 +4,7 @@
 
 These instructions apply to all files under `apps/python/quotewake/`.
 
-QuoteWake is a Python application developed for the CALL-E hackathon. Its goal is to automate outbound payment follow-up calls for small businesses.
+QuoteWake is a Python application developed for the CALL-E hackathon. Its goal is to automate outbound follow-up calls for commercial Salesforce Quotes for small businesses.
 
 ## Repository Instructions
 
@@ -103,7 +103,7 @@ For substantial implementation tasks, briefly state which existing components, e
 
 Keep business logic separate from external integrations when practical.
 
-In particular, avoid tightly coupling invoice follow-up logic to:
+In particular, avoid tightly coupling Quote follow-up logic to:
 
 * CALL-E APIs
 * Salesforce REST and SOQL APIs
@@ -143,6 +143,12 @@ Provide safe example values when documentation requires configuration examples.
 ## Documentation
 
 Keep documentation concise and practical.
+
+The README must remain current as capabilities evolve and must communicate
+QuoteWake's business and product value clearly for external hackathon
+reviewers. Describe the Salesforce-first workflow, user-visible outcomes, and
+current boundaries truthfully. Do not mention private project goals or internal
+competitive objectives.
 
 The README should explain at minimum:
 

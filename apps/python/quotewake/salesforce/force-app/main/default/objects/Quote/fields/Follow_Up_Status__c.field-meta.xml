@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Follow_Up_Status__c</fullName>
-    <description>State of an active or finished QuoteWake follow-up. A blank value means the enabled quote is waiting for its first call.</description>
+    <description>State of an active or finished QuoteWake follow-up. Retry is used when the configured policy schedules another call; Completed and Stopped are terminal. A blank value means the enabled quote is waiting for its first call.</description>
     <label>Follow Up Status</label>
     <type>Picklist</type>
     <valueSet>

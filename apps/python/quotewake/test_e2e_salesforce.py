@@ -18,12 +18,15 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Sequence
+from zoneinfo import ZoneInfo
 
 from quotewake_salesforce.phone import mask_phone
 
 
 APP_DIR = Path(__file__).resolve().parent
-DEFAULT_OUTPUT = APP_DIR / "results/quotewake_salesforce_e2e.json"
+DEFAULT_OUTPUT = Path(tempfile.gettempdir()) / "quotewake_salesforce_e2e.json"
+E2E_BUSINESS_TIMEZONE_NAME = "Europe/Madrid"
+E2E_BUSINESS_TIMEZONE = ZoneInfo(E2E_BUSINESS_TIMEZONE_NAME)
 DEMO_NAMES = {
     "kitchen": "QuoteWake Demo - Kitchen Electrical Renovation",
     "ev": "QuoteWake Demo - EV Charger Installation",
@@ -207,12 +210,29 @@ def _temporary_config() -> tempfile.NamedTemporaryFile[str]:
     )
     config.write(
         "[regional]\n"
-        "business_timezone = \"Europe/Madrid\"\n"
+        f"business_timezone = \"{E2E_BUSINESS_TIMEZONE_NAME}\"\n"
         "locale = \"es_ES\"\n\n"
         "[selection.initial_follow_up]\n"
         "minimum_delay_hours = 0\n"
         "standard_delay_hours = 0\n"
         "due_soon_window_days = 0\n"
+        "\n"
+        "[follow_up.retry]\n"
+        "max_attempts = 3\n"
+        "retry_delays_days = [2, 4]\n"
+        "retry_outcomes = [\"call_back_later\", \"no_answer\", \"busy\"]\n"
+        "technical_failure_retry_delay_minutes = 30\n"
+        "completed_outcomes = [\"interested\"]\n"
+        "\n"
+        "[follow_up.cooldown]\n"
+        "enabled = false\n"
+        "minimum_delay_hours = 0\n"
+        "\n"
+        "[follow_up.calling_hours]\n"
+        "enabled = false\n"
+        "days = [\"monday\", \"tuesday\", \"wednesday\", \"thursday\", \"friday\"]\n"
+        "start = \"09:00\"\n"
+        "end = \"18:00\"\n"
     )
     config.flush()
     return config
@@ -224,8 +244,7 @@ def _invoke_simulation(
     outcome: str,
     next_follow_up_at: datetime | None,
     config_path: str,
-    report_path: Path,
-) -> None:
+) -> str:
     environment = os.environ.copy()
     existing_pythonpath = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = (
@@ -251,8 +270,6 @@ def _invoke_simulation(
         "--confirm-demo-write",
         "--config",
         config_path,
-        "--simulation-output",
-        str(report_path),
     ]
     if next_follow_up_at is not None:
         command.extend(["--next-follow-up-at", next_follow_up_at.isoformat().replace("+00:00", "Z")])
@@ -273,6 +290,7 @@ def _invoke_simulation(
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip().replace("\n", " ")
         raise E2EError(f"Simulation failed for {fixture['quote']['Name']}: {detail[:600]}")
+    return completed.stdout
 
 
 def _latest_quote(target_org: str, quote_id: str) -> dict[str, Any]:
@@ -350,7 +368,10 @@ def _assert_scenario(
         raise E2EError("Task status or priority is incorrect.")
     if not str(task.get("Subject", "")).startswith("[SIMULATED] QuoteWake"):
         raise E2EError("Task is not marked as simulated.")
-    if task.get("ActivityDate") != str(report.get("simulation_at", ""))[:10]:
+    expected_activity_date = (
+        report_simulation_at.astimezone(E2E_BUSINESS_TIMEZONE).date().isoformat()
+    )
+    if task.get("ActivityDate") != expected_activity_date:
         raise E2EError("Task ActivityDate does not match the simulation date.")
     description = str(task.get("Description", ""))
     if report.get("simulation_id") not in description or report.get("outcome") not in description:
@@ -451,61 +472,65 @@ def run_e2e(target_org: str, *, confirm_demo_write: bool, output: Path = DEFAULT
                     if expected_status == "Retry"
                     else None
                 )
-                with tempfile.TemporaryDirectory(prefix=f"quotewake-e2e-{key}-") as temp_dir:
-                    report_path = Path(temp_dir) / "simulation.jsonl"
-                    _invoke_simulation(
-                        target_org,
-                        fixture,
-                        outcome,
-                        next_follow_up_at,
-                        config_path or "",
-                        report_path,
-                    )
-                    try:
-                        records = [
-                            json.loads(line)
-                            for line in report_path.read_text(encoding="utf-8").splitlines()
-                            if line.strip()
-                        ]
-                    except (FileNotFoundError, json.JSONDecodeError) as exc:
-                        raise E2EError(f"Simulation report is missing or malformed for {key}.") from exc
-                    if len(records) != 1 or not isinstance(records[0], dict):
-                        raise E2EError(f"Expected exactly one simulation report record for {key}.")
-                    report = records[0]
-                    final_quote = _latest_quote(target_org, fixture["quote_id"])
-                    task_id = report.get("task_id")
-                    if not isinstance(task_id, str) or not task_id:
-                        raise E2EError(f"Simulation report has no Task ID for {key}.")
-                    task = _task(target_org, task_id)
-                    _assert_scenario(
-                        fixture,
-                        final_quote,
-                        task,
-                        report,
-                        {
-                            "interested": "Interested",
-                            "call_back_later": "Call Back Later",
-                            "invalid_number": "Invalid Number",
-                        }[outcome],
-                        expected_status,
-                        next_follow_up_at,
-                    )
-                    summary.append(
-                        {
-                            "scenario": key,
-                            "quote_id": fixture["quote_id"],
-                            "quote_name": fixture["quote"]["Name"],
-                            "contact_id": fixture["contact_id"],
-                            "phone": report["phone"],
-                            "simulation_id": report["simulation_id"],
-                            "simulation_at": report["simulation_at"],
-                            "outcome": report["outcome"],
-                            "follow_up_status": final_quote["Follow_Up_Status__c"],
-                            "task_id": task_id,
-                            "simulated": True,
-                        }
-                    )
-                    _write_summary(output, target_org, summary, status="running")
+                simulation_stdout = _invoke_simulation(
+                    target_org,
+                    fixture,
+                    outcome,
+                    next_follow_up_at,
+                    config_path or "",
+                )
+                task_match = re.search(
+                    r"Salesforce Quote updated and Task created:\s*(\w+)",
+                    simulation_stdout,
+                )
+                if task_match is None:
+                    raise E2EError(f"Simulation output has no Task ID for {key}.")
+                task_id = task_match.group(1)
+                final_quote = _latest_quote(target_org, fixture["quote_id"])
+                task = _task(target_org, task_id)
+                simulation_id_match = re.search(
+                    r"Simulation ID:\s*([^\n]+)", str(task.get("Description", ""))
+                )
+                simulation_at = final_quote.get("Last_Follow_Up_At__c")
+                report = {
+                    "phone": mask_phone(fixture["phone"]),
+                    "simulation_id": simulation_id_match.group(1).strip()
+                    if simulation_id_match
+                    else None,
+                    "simulation_at": simulation_at,
+                    "outcome": final_quote.get("Last_Follow_Up_Result__c"),
+                    "task_id": task_id,
+                    "simulated": True,
+                }
+                _assert_scenario(
+                    fixture,
+                    final_quote,
+                    task,
+                    report,
+                    {
+                        "interested": "Interested",
+                        "call_back_later": "Call Back Later",
+                        "invalid_number": "Invalid Number",
+                    }[outcome],
+                    expected_status,
+                    next_follow_up_at,
+                )
+                summary.append(
+                    {
+                        "scenario": key,
+                        "quote_id": fixture["quote_id"],
+                        "quote_name": fixture["quote"]["Name"],
+                        "contact_id": fixture["contact_id"],
+                        "phone": report["phone"],
+                        "simulation_id": report["simulation_id"],
+                        "simulation_at": report["simulation_at"],
+                        "outcome": report["outcome"],
+                        "follow_up_status": final_quote["Follow_Up_Status__c"],
+                        "task_id": task_id,
+                        "simulated": True,
+                    }
+                )
+                _write_summary(output, target_org, summary, status="running")
             except E2EError as exc:
                 _write_summary(
                     output,
@@ -538,13 +563,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target-org", required=True)
     parser.add_argument("--confirm-demo-write", action="store_true")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args(argv)
     try:
         return run_e2e(
             args.target_org,
             confirm_demo_write=args.confirm_demo_write,
-            output=args.output,
         )
     except E2EError as exc:
         print(f"[ERROR] {_safe_error(exc)}", file=sys.stderr)

@@ -32,7 +32,7 @@ class TestCallEPlanningClient(unittest.TestCase):
     ) -> tuple[Path, Path]:
         temp_dir = Path(tempfile.mkdtemp(prefix="quotewake-calle-test-"))
         script = temp_dir / "fake_calle.py"
-        log = temp_dir / "commands.jsonl"
+        log = temp_dir / "commands.log"
         script.write_text(
             f"""#!{sys.executable}
 import json

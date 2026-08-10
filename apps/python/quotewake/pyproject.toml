@@ -5,6 +5,8 @@ description = "Salesforce quote selection and CALL-E planning-only dry-run for Q
 requires-python = ">=3.11"
 dependencies = [
   "Babel>=2.14",
+  "calle-ai>=0.6.0",
+  "python-dotenv>=1.0.1",
   "tzdata>=2024.1",
 ]
 

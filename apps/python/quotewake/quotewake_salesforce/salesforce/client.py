@@ -10,11 +10,17 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone, tzinfo
+from datetime import timezone, tzinfo
 from decimal import Decimal
 from typing import Any
 
-from quotewake_salesforce.domain.models import CallResult, ContactTarget, QuoteCandidate
+from quotewake_salesforce.domain.models import (
+    CallResult,
+    ContactTarget,
+    FollowUpUpdate,
+    QuoteCandidate,
+)
+from quotewake_salesforce.structured_logging import log_event
 
 
 class SalesforceError(RuntimeError):
@@ -70,6 +76,12 @@ class SalesforceClient:
 
     def _run_json(self, *args: str) -> dict[str, Any]:
         command = self._base_command(*args)
+        operation = ".".join(args[:2]) if args else "unknown"
+        log_event(
+            "salesforce_cli_command_started",
+            operation=operation,
+            target_org_configured=bool(self.target_org),
+        )
         try:
             completed = subprocess.run(
                 command,
@@ -110,6 +122,11 @@ class SalesforceClient:
             raise SalesforceQueryError(
                 f"Salesforce CLI command failed ({command_text}): {message.strip()[:600]}"
             )
+        log_event(
+            "salesforce_cli_command_completed",
+            operation=operation,
+            target_org_configured=bool(self.target_org),
+        )
         return payload
 
     def org_info(self) -> OrgInfo:
@@ -164,8 +181,17 @@ class SalesforceClient:
             raise SalesforceResponseError("SOQL response contained a malformed record.")
         return records
 
-    def _run_api_json(self, command: list[str]) -> dict[str, Any]:
+    def _run_api_json(
+        self, command: list[str], *, quote_id: str | None = None
+    ) -> dict[str, Any]:
         """Run ``sf api request rest`` and parse its raw JSON response."""
+
+        log_event(
+            "salesforce_rest_request_started",
+            quote_id=quote_id,
+            operation="composite_write" if "/composite" in command else "rest_request",
+            target_org_configured=bool(self.target_org),
+        )
 
         try:
             completed = subprocess.run(
@@ -228,6 +254,12 @@ class SalesforceClient:
                 result = nested
         if "compositeResponse" not in result and isinstance(result.get("body"), dict):
             result = result["body"]
+        log_event(
+            "salesforce_rest_request_completed",
+            quote_id=quote_id,
+            operation="composite_write" if "compositeResponse" in result else "rest_request",
+            target_org_configured=bool(self.target_org),
+        )
         return result
 
     def composite_write(
@@ -236,6 +268,7 @@ class SalesforceClient:
         contact: ContactTarget,
         result: CallResult,
         *,
+        follow_up_update: FollowUpUpdate,
         task_description: str,
         business_timezone: tzinfo | None = None,
         regional_settings: Any | None = None,
@@ -258,21 +291,15 @@ class SalesforceClient:
             raise SalesforceError("composite_write only accepts simulated results.")
         if result.quote_id != quote.quote_id:
             raise SalesforceError("Simulation result does not match the selected Quote.")
+        if follow_up_update.last_follow_up_result != result.outcome:
+            raise SalesforceError("Follow-up update does not match the call result.")
+        if follow_up_update.last_follow_up_at.tzinfo is None:
+            raise SalesforceError("Follow-up update timestamp is timezone-naive.")
         org = self.org_info()
         if not org.api_version:
             raise SalesforceError("Salesforce org display did not provide an API version.")
         version = org.api_version.removeprefix("v")
-        quote_body = {
-            "Attempt_Count__c": quote.attempt_count + 1,
-            "Last_Follow_Up_At__c": _utc_timestamp(result),
-            "Last_Follow_Up_Result__c": result.outcome,
-            "Follow_Up_Status__c": _follow_up_status(result.outcome),
-            "Next_Follow_Up_At__c": (
-                result.next_follow_up_at.isoformat().replace("+00:00", "Z")
-                if result.next_follow_up_at
-                else None
-            ),
-        }
+        quote_body = follow_up_update.as_salesforce_fields()
         task_body = {
             "WhatId": quote.quote_id,
             "WhoId": contact.contact_id,
@@ -280,7 +307,7 @@ class SalesforceClient:
             "Priority": "Normal",
             "Subject": f"[SIMULATED] QuoteWake follow-up: {result.outcome}",
             "Description": task_description,
-            "ActivityDate": _task_activity_date(result, business_timezone),
+            "ActivityDate": _task_activity_date(follow_up_update, business_timezone),
         }
         body = {
             "allOrNone": True,
@@ -312,7 +339,7 @@ class SalesforceClient:
         ]
         if self.target_org:
             command.extend(["--target-org", self.target_org])
-        response = self._run_api_json(command)
+        response = self._run_api_json(command, quote_id=quote.quote_id)
         responses = response.get("compositeResponse")
         if not isinstance(responses, list):
             raise SalesforceResponseError("Salesforce Composite response had no subresponses.")
@@ -337,36 +364,15 @@ class SalesforceClient:
                 task_id = item_body["id"]
         if task_id is None:
             raise SalesforceResponseError("Salesforce Composite response did not return the Task ID.")
+        log_event(
+            "salesforce_composite_write_completed",
+            quote_id=quote.quote_id,
+            task_id=task_id,
+            outcome=result.outcome,
+        )
         return CompositeWriteResult(quote.quote_id, task_id)
-
-
-def _utc_timestamp(result: CallResult) -> str:
-    """Return the simulation timestamp embedded in the result contract."""
-
-    timestamp = result.simulation_timestamp
-    if timestamp is None:
-        timestamp = datetime.now(timezone.utc)
-    elif timestamp.tzinfo is None or timestamp.utcoffset() is None:
-        raise SalesforceResponseError("Call result simulation timestamp is timezone-naive.")
-    return timestamp.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _task_activity_date(result: CallResult, business_timezone: tzinfo) -> str:
-    timestamp = result.simulation_timestamp
-    if timestamp is None:
-        timestamp = datetime.now(timezone.utc)
+def _task_activity_date(update: FollowUpUpdate, business_timezone: tzinfo) -> str:
+    timestamp = update.last_follow_up_at
     if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-        raise SalesforceResponseError("Call result simulation timestamp is timezone-naive.")
+        raise SalesforceResponseError("Follow-up update timestamp is timezone-naive.")
     return timestamp.astimezone(business_timezone).date().isoformat()
-
-
-def _follow_up_status(outcome: str) -> str:
-    return {
-        "Interested": "Completed",
-        "Not Interested": "Stopped",
-        "Invalid Number": "Stopped",
-        "Call Back Later": "Retry",
-        "No Answer": "Retry",
-        "Busy": "Retry",
-        "Error": "Retry",
-    }[outcome]

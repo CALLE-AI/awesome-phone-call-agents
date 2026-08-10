@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 import re
@@ -24,6 +24,8 @@ class SelectionReason(str, Enum):
     INVALID_FOLLOW_UP_STATUS = "INVALID_FOLLOW_UP_STATUS"
     NON_ACTIONABLE_FOLLOW_UP_STATUS = "NON_ACTIONABLE_FOLLOW_UP_STATUS"
     NOT_DUE = "NOT_DUE"
+    COOLDOWN_ACTIVE = "COOLDOWN_ACTIVE"
+    OUTSIDE_CALLING_HOURS = "OUTSIDE_CALLING_HOURS"
     MAX_ATTEMPTS = "MAX_ATTEMPTS"
     QUOTE_EXPIRED = "QUOTE_EXPIRED"
     INVALID_QUOTE_STATUS = "INVALID_QUOTE_STATUS"
@@ -53,6 +55,13 @@ class SimulationOutcome(str, Enum):
     BUSY = "busy"
     INVALID_NUMBER = "invalid_number"
     ERROR = "error"
+
+
+class CallOutcomeKind(str, Enum):
+    """Whether a provider result represents a business attempt."""
+
+    BUSINESS = "business"
+    TECHNICAL_FAILURE = "technical_failure"
 
 
 @dataclass(frozen=True)
@@ -171,5 +180,35 @@ class CallResult:
     summary: str
     next_action: str
     next_follow_up_at: datetime | None
+    outcome_kind: CallOutcomeKind
     simulation_timestamp: datetime | None = None
     simulated: bool = True
+
+
+@dataclass(frozen=True)
+class FollowUpUpdate:
+    """Salesforce fields calculated from one normalized call result."""
+
+    attempt_count: int
+    last_follow_up_at: datetime
+    last_follow_up_result: str
+    follow_up_status: str
+    next_follow_up_at: datetime | None
+
+    def as_salesforce_fields(self) -> dict[str, object]:
+        """Return the Quote field values for the persistence boundary."""
+
+        def timestamp(value: datetime | None) -> str | None:
+            if value is None:
+                return None
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("Follow-up timestamps must be timezone-aware.")
+            return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+        return {
+            "Attempt_Count__c": self.attempt_count,
+            "Last_Follow_Up_At__c": timestamp(self.last_follow_up_at),
+            "Last_Follow_Up_Result__c": self.last_follow_up_result,
+            "Follow_Up_Status__c": self.follow_up_status,
+            "Next_Follow_Up_At__c": timestamp(self.next_follow_up_at),
+        }

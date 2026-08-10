@@ -6,9 +6,6 @@ from dataclasses import replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import io
-import json
-from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -77,15 +74,12 @@ class TestPlanningCli(unittest.TestCase):
     @patch("quotewake_salesforce.cli.CallEPlanningClient")
     @patch("quotewake_salesforce.cli.QuoteRepository")
     @patch("quotewake_salesforce.cli.SalesforceClient")
-    def test_only_ready_quotes_are_planned_and_report_is_redacted(
+    def test_only_ready_quotes_are_planned_without_local_report_export(
         self,
         salesforce_client_class: Mock,
         repository_class: Mock,
         planner_class: Mock,
     ) -> None:
-        temp_dir = Path(tempfile.mkdtemp(prefix="quotewake-cli-plan-test-"))
-        selection_output = temp_dir / "selection.jsonl"
-        plan_output = temp_dir / "plans.jsonl"
         salesforce_client_class.return_value.org_info.return_value = OrgInfo(
             "test-org", "test@example.invalid", "00D000000000001"
         )
@@ -130,10 +124,6 @@ class TestPlanningCli(unittest.TestCase):
                 "Spanish",
                 "--call-region",
                 "ES",
-                "--output",
-                str(selection_output),
-                "--plan-output",
-                str(plan_output),
             ]
         )
 
@@ -141,17 +131,6 @@ class TestPlanningCli(unittest.TestCase):
         planner.verify_ready.assert_called_once_with()
         planner.plan.assert_called_once()
         repository.load_quote_lines.assert_called_once_with([ready_quote.quote_id])
-        records = [json.loads(line) for line in plan_output.read_text().splitlines()]
-        self.assertEqual(len(records), 1)
-        self.assertEqual(records[0]["decision"], "PLAN_READY")
-        self.assertEqual(records[0]["phone"], "+14******101")
-        self.assertNotIn("+14155550101", plan_output.read_text())
-        self.assertNotIn("confirm_token", plan_output.read_text())
-        self.assertNotIn("+14155550101", selection_output.read_text())
-        selection_record = json.loads(selection_output.read_text().splitlines()[0])
-        self.assertEqual(
-            selection_record["last_modified_at"], "2026-08-07T12:00:00Z"
-        )
 
     @patch("quotewake_salesforce.cli.CallEPlanningClient")
     @patch("quotewake_salesforce.cli.QuoteRepository")
@@ -162,7 +141,6 @@ class TestPlanningCli(unittest.TestCase):
         repository_class: Mock,
         planner_class: Mock,
     ) -> None:
-        temp_dir = Path(tempfile.mkdtemp(prefix="quotewake-cli-plan-error-test-"))
         salesforce_client_class.return_value.org_info.return_value = OrgInfo(
             "test-org", "test@example.invalid", "00D000000000001"
         )
@@ -197,8 +175,6 @@ class TestPlanningCli(unittest.TestCase):
                 plan_id="plan-2",
             ),
         ]
-        plan_output = temp_dir / "plans.jsonl"
-
         exit_code = salesforce_dry_run_main(
             [
                 "--dry-run",
@@ -209,20 +185,11 @@ class TestPlanningCli(unittest.TestCase):
                 "Spanish",
                 "--call-region",
                 "ES",
-                "--output",
-                str(temp_dir / "selection.jsonl"),
-                "--plan-output",
-                str(plan_output),
             ]
         )
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(planner_class.return_value.plan.call_count, 2)
-        records = [json.loads(line) for line in plan_output.read_text().splitlines()]
-        self.assertEqual(
-            [record["decision"] for record in records],
-            ["PLAN_ERROR", "PLAN_READY"],
-        )
 
     def test_planning_requires_explicit_language_and_region(self) -> None:
         with patch("sys.stderr"):
@@ -239,8 +206,6 @@ class TestPlanningCli(unittest.TestCase):
         repository_class: Mock,
         planner_class: Mock,
     ) -> None:
-        temp_dir = Path(tempfile.mkdtemp(prefix="quotewake-no-ready-test-"))
-        plan_output = temp_dir / "plans.jsonl"
         salesforce_client_class.return_value.org_info.return_value = OrgInfo(
             "test-org", "test@example.invalid", "00D000000000001"
         )
@@ -259,17 +224,12 @@ class TestPlanningCli(unittest.TestCase):
                 "Spanish",
                 "--call-region",
                 "ES",
-                "--output",
-                str(temp_dir / "selection.jsonl"),
-                "--plan-output",
-                str(plan_output),
             ]
         )
 
         self.assertEqual(exit_code, 0)
         planner_class.assert_not_called()
         repository.load_quote_lines.assert_not_called()
-        self.assertEqual(plan_output.read_text(), "")
 
 
 if __name__ == "__main__":

@@ -3,28 +3,33 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 import json
-from pathlib import Path
-import tempfile
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from quotewake_salesforce.calle import CallSimulationError, simulate_call
 from quotewake_salesforce.domain.call_planning import build_call_plan_request
 from quotewake_salesforce.domain.models import (
+    CallOutcomeKind,
     ContactTarget,
     QuoteCandidate,
     SelectionDecision,
     SelectionReason,
     SelectionResult,
 )
+from quotewake_salesforce.domain.policy import (
+    CallingHoursPolicy,
+    CooldownPolicy,
+    FollowUpPolicies,
+    RetryPolicy,
+    calculate_next_follow_up,
+)
 from quotewake_salesforce.salesforce.client import (
     CompositeWriteResult,
     OrgInfo,
     SalesforceClient,
-    _follow_up_status,
 )
 from quotewake_salesforce.cli import salesforce_simulation_main
 
@@ -58,9 +63,25 @@ def _request():
     return build_call_plan_request(selection, [], language="Spanish", region="ES"), quote, selection.contact
 
 
+def _policies() -> FollowUpPolicies:
+    return FollowUpPolicies(
+        retry=RetryPolicy(
+            max_attempts=3,
+            retry_delays=(timedelta(days=2), timedelta(days=4)),
+            retry_outcomes=frozenset({"call_back_later", "no_answer", "busy"}),
+            technical_failure_retry_delay=timedelta(minutes=30),
+            completed_outcomes=frozenset({"interested"}),
+        ),
+        cooldown=CooldownPolicy(False, timedelta(0)),
+        calling_hours=CallingHoursPolicy(
+            False, frozenset(range(7)), time(0), time(23, 59), timezone.utc
+        ),
+    )
+
+
 class TestCallSimulator(TestCase):
     def test_all_outcomes_map_to_salesforce_result_and_status(self):
-        request, _, _ = _request()
+        request, quote, _ = _request()
         now = datetime(2026, 8, 9, 12, tzinfo=timezone.utc)
         expected = {
             "interested": ("Interested", "Completed"),
@@ -73,11 +94,7 @@ class TestCallSimulator(TestCase):
         }
         for selected, (outcome, status) in expected.items():
             with self.subTest(outcome=selected):
-                next_at = (
-                    datetime(2026, 8, 10, 10, tzinfo=timezone.utc)
-                    if status == "Retry"
-                    else None
-                )
+                next_at = datetime(2026, 8, 10, 10, tzinfo=timezone.utc) if selected == "call_back_later" else None
                 result = simulate_call(
                     request,
                     selected,
@@ -85,7 +102,18 @@ class TestCallSimulator(TestCase):
                     next_follow_up_at=next_at,
                 )
                 self.assertEqual(result.outcome, outcome)
-                self.assertEqual(_follow_up_status(result.outcome), status)
+                self.assertEqual(
+                    result.outcome_kind,
+                    CallOutcomeKind.TECHNICAL_FAILURE
+                    if selected == "error"
+                    else CallOutcomeKind.BUSINESS,
+                )
+                if selected == "error":
+                    self.assertEqual(result.provider_status, "SIMULATED_TECHNICAL_FAILURE")
+                update = calculate_next_follow_up(
+                    quote, result, _policies(), occurred_at=now
+                )
+                self.assertEqual(update.follow_up_status, status)
 
     def test_result_is_deterministic_and_does_not_call_external_services(self):
         request, _, _ = _request()
@@ -97,20 +125,13 @@ class TestCallSimulator(TestCase):
         self.assertEqual(first.provider_status, "SIMULATED_COMPLETED")
         self.assertTrue(first.simulated)
 
-    def test_retry_requires_future_timezone_aware_date(self):
+    def test_no_answer_is_scheduled_by_the_policy(self):
         request, _, _ = _request()
         now = datetime(2026, 8, 9, 12, tzinfo=timezone.utc)
-        with self.assertRaises(CallSimulationError):
-            simulate_call(request, "no_answer", now=now)
+        result = simulate_call(request, "no_answer", now=now)
+        self.assertIsNone(result.next_follow_up_at)
         with self.assertRaises(CallSimulationError):
             simulate_call(request, "no_answer", now=now, next_follow_up_at=now)
-        result = simulate_call(
-            request,
-            "no_answer",
-            now=now,
-            next_follow_up_at=datetime(2026, 8, 10, 10, tzinfo=timezone.utc),
-        )
-        self.assertEqual(result.outcome, "No Answer")
 
     def test_retry_timestamp_is_normalized_before_seed_result_and_persistence(self):
         request, _, _ = _request()
@@ -172,10 +193,14 @@ class TestCompositeWrite(TestCase):
             }), stderr=""),
         ]
         client = SalesforceClient(target_org="quotewake-dev")
+        follow_up_update = calculate_next_follow_up(
+            quote, result, _policies(), occurred_at=result.simulation_timestamp
+        )
         written = client.composite_write(
             quote,
             contact,
             result,
+            follow_up_update=follow_up_update,
             task_description="QuoteWake simulated call.",
         )
         self.assertEqual(written, CompositeWriteResult(quote.quote_id, "00T000000000001"))
@@ -216,8 +241,6 @@ class TestSimulationCli(TestCase):
         repository.load.return_value = ([quote], {quote.opportunity_id: [contact]})
         repository.load_quote_lines.return_value = {quote.quote_id: []}
         client.composite_write.return_value = CompositeWriteResult(quote.quote_id, "00T000000000001")
-        output = Path(tempfile.mkdtemp()) / "simulation.jsonl"
-
         exit_code = salesforce_simulation_main(
             [
                 "--target-org", "demo",
@@ -226,19 +249,13 @@ class TestSimulationCli(TestCase):
                 "--call-language", "Spanish",
                 "--call-region", "ES",
                 "--confirm-demo-write",
-                "--simulation-output", str(output),
             ]
         )
 
         self.assertEqual(exit_code, 0)
         calle_class.assert_not_called()
+        repository.load.assert_called_once_with(quote_id=quote.quote_id)
         client.composite_write.assert_called_once()
-        report = json.loads(output.read_text().splitlines()[0])
-        self.assertTrue(report["simulated"])
-        self.assertTrue(report["salesforce_write_applied"])
-        self.assertIsNotNone(report["simulation_at"])
-        self.assertRegex(report["simulation_at"], r"T\d{2}:\d{2}:\d{2}Z$")
-        self.assertNotIn(contact.phone, output.read_text())
 
 
 if __name__ == "__main__":
