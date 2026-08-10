@@ -1,0 +1,31 @@
+{
+  "name": "callback-coordinator",
+  "title": "Callback Coordinator",
+  "language": "Python",
+  "type": "workflow-plugin",
+  "description": "Consent-first callback triage engine that gates a callback request against quiet hours and do-not-call flags, places one CALL-E call to learn why the person needs a callback, classifies the outcome into a fail-closed disposition, and routes it to a team.",
+  "entrypoints": [
+    {
+      "name": "CLI preview",
+      "path": "client.py"
+    }
+  ],
+  "side_effects": [
+    "Creates exactly one outbound CALL-E phone call per executed intake when the gate passes, the intake records recipient consent, --confirm-consent is passed, and CALLE_API_KEY is set.",
+    "Performs no network access in preview mode (the default)."
+  ],
+  "credentials": [
+    "CALL-E API key read from the CALLE_API_KEY environment variable, used only in execute mode."
+  ],
+  "safety": [
+    "Requires explicit --confirm-consent and a recorded consent in the intake before any live call.",
+    "Requires E.164 phone numbers.",
+    "Skips calls during quiet hours (recipient local time) and for do_not_call=true intakes.",
+    "Uses a stable idempotency key derived from the workflow id to prevent duplicate calls.",
+    "Fail-closed disposition: ambiguous, low-confidence, wrong-person, unconfirmed-consent, unknown-reason, and lookup-error outcomes route to a human instead of a success branch.",
+    "Masks phone numbers in previews and removes phone-like text from evidence output.",
+    "Excludes transcripts and provider evidence that may contain personal data.",
+    "Does not create recurring schedules."
+  ],
+  "template_version": "1.0.0"
+}

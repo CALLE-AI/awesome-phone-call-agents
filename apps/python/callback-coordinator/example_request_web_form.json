@@ -1,0 +1,20 @@
+{
+  "workflow_id": "demo-web-2026-071",
+  "phone": "+12025550123",
+  "source": "web_form",
+  "business_display_name": "Example Service Desk",
+  "request_reason_hint": "Customer submitted a callback request with no reason selected",
+  "timezone": "America/New_York",
+  "locale": "en-US",
+  "do_not_call": false,
+  "quiet_hours": {
+    "start": "20:00",
+    "end": "08:00"
+  },
+  "routing_rules": [
+    { "category": "billing", "team": "Billing Team", "action": "Queue for a billing specialist callback." },
+    { "category": "sales", "team": "Sales Team", "action": "Queue for a sales follow-up callback." },
+    { "category": "technical_support", "team": "Technical Support", "action": "Queue for a technical support callback." },
+    { "category": "service_coordination", "team": "Service Scheduling", "action": "Queue for service scheduling callback." }
+  ]
+}
