@@ -597,6 +597,51 @@ class PolicyTests(unittest.TestCase):
             )
             self.assertEqual(observed["during_wait"]["attempt_number"], 1)
 
+    def test_malformed_provider_result_requires_reconciliation(self):
+        plan = valid_plan()
+        plan["execution_allowed"] = True
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "ledger.json"
+
+            class FakeCalls:
+                def create(self, **_kwargs):
+                    return {"id": "call_malformed"}
+
+                def wait_for_result(self, _call_id):
+                    return ["not", "a", "result", "object"]
+
+            class FakeClient:
+                def __init__(self, **_kwargs):
+                    self.calls = FakeCalls()
+
+            with (
+                patch.dict(
+                    sys.modules,
+                    {"calle": types.SimpleNamespace(CalleClient=FakeClient)},
+                ),
+                patch.dict(
+                    os.environ,
+                    {
+                        "CALLE_API_KEY": "test-only",
+                        "CALLE_IDEMPOTENCY_NAMESPACE": PROVIDER_NAMESPACE,
+                    },
+                ),
+                patch(
+                    "consent_gate.__main__.validate_dispatch_window",
+                    return_value=[],
+                ),
+            ):
+                with self.assertRaisesRegex(PolicyError, "JSON object"):
+                    _execute(
+                        plan,
+                        "I reviewed this call plan",
+                        str(state_path),
+                    )
+
+            event = json.loads(state_path.read_text(encoding="utf-8"))[0]
+            self.assertEqual(event["provider_call_id"], "call_malformed")
+            self.assertEqual(event["state"], "reconciliation_required")
+
     def test_terminal_retry_uses_persisted_second_attempt_identity(self):
         plan = valid_plan()
         plan["execution_allowed"] = True
