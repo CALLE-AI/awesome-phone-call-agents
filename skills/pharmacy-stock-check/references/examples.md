@@ -300,7 +300,46 @@ Refusing to send that credential to a different origin.
 
 ---
 
-## Example 14 — changing configuration neither resumes nor redials
+## Example 14 — the call is not logged, and derived text is scrubbed
+
+A live run. The pharmacist reads out a branch number:
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies p.csv --live
+    calling task created
+    calling task status=calling
+    Call ended; syncing final Calling result.
+
+Pharmacy         Stock  Qty  Price    Rx   Hold  Conf
+Oakhill          yes     40  6.2 GBP  yes  24h   0.90
+    Try the Mill Lane branch on [redacted …0123]
+```
+
+Two things are happening. The realtime speech events — `Callee said: …` — are
+not logged at all; only progress events are. And `pharmacist_notes`, which the
+model lifted out of the conversation, has had the number scrubbed while keeping
+the part that's useful.
+
+Prices and quantities are untouched: redaction applies to runs of eight or more
+digits, so `6.2 GBP`, `40` and `24h` survive.
+
+To watch a call as it happens — useful when debugging a prompt — opt in
+explicitly:
+
+```bash
+$ python3 scripts/pharmacy_search.py --pharmacies p.csv --live --show-conversation
+    Callee said: try the Mill Lane branch on [redacted …0123]
+```
+
+Still redacted. The flag controls whether speech is shown, not whether numbers
+are protected.
+
+The stored run dump keeps the unredacted transcript — it's the evidence behind
+the result — and is written 0600 into an ignored directory.
+
+---
+
+## Example 15 — changing configuration neither resumes nor redials
 
 A call is in flight to `…0100`, placed in region GB. Rerunning with a different
 region:

@@ -96,6 +96,21 @@ instead.
   digits. This includes dry-run and debug output. Terminal text ends up in
   shell scrollback, CI logs and screen recordings, none of which the person
   whose number it is agreed to.
+
+- **The same applies to anything derived from the call.** It is easy to mask the
+  number you dialled and then print the conversation that number produced. A
+  provider's activity feed quotes speech as it happens; extracted fields like
+  "notes" and "alternative suggested" are lifted out of the same conversation.
+  A pharmacist who reads out a branch number has now put it in both.
+
+  Scrub free text on every output path, and withhold realtime speech unless the
+  operator asks for it. The pharmacist agreed to answer a question, not to have
+  their words logged.
+
+- **Redact by shape, not by field.** You cannot enumerate every field that might
+  contain a number, because the model decides what goes in them. Filter runs of
+  eight or more digits out of any free text on its way to a log or a terminal,
+  and leave prices, quantities and durations intact.
 - Transcripts contain a third party's voice. Store them under a retention policy
   and do not publish them.
 

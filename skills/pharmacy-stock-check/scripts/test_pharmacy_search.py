@@ -25,6 +25,8 @@ not on return values — the only thing that actually distinguishes "resumed" fr
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -66,8 +68,9 @@ class FakeToolResult:
 class RecordingClient:
     """Stands in for the MCP client and records which tools were invoked."""
 
-    def __init__(self, calls: list[str]) -> None:
+    def __init__(self, calls: list[str], poll_response: dict | None = None) -> None:
         self.calls = calls
+        self.poll_response = poll_response or dict(TERMINAL_RESPONSE)
 
     async def __aenter__(self):
         return self
@@ -87,7 +90,7 @@ class RecordingClient:
         if name == "run_call":
             return FakeToolResult({"run_id": "rNEW", "status": "PREPARING"})
         if name == "get_call_run":
-            return FakeToolResult(dict(TERMINAL_RESPONSE))
+            return FakeToolResult(dict(self.poll_response))
         raise AssertionError(f"unexpected tool {name}")
 
 
@@ -104,6 +107,7 @@ def make_caller(tmp: Path, calls: list[str]) -> tuple[ps.Caller, ps.RunStore]:
     caller.budget = budget
     caller.store = store
     caller._token = "test-token"
+    caller.show_conversation = False           # the shipped default
     caller._client = lambda: RecordingClient(calls)
     return caller, store
 
@@ -271,6 +275,110 @@ class ExclusionRegression(unittest.TestCase):
         self.path.write_text(json.dumps({"abc": {"state": "running"}}))
         with self.assertRaises(ps.StateCorrupted):
             self._store().get("abc")
+
+
+class RedactionRegression(unittest.TestCase):
+    """Nothing conversation-derived reaches a log or stdout unredacted.
+
+    The provider's activity feed quotes the call as it happens, and
+    `pharmacist_notes` is lifted out of the same conversation. Both used to be
+    printed verbatim, which put a third party's words — and any number they
+    spoke — into terminal scrollback, CI logs and screen recordings.
+    """
+
+    def test_phone_numbers_are_redacted(self):
+        for text, expected_tail in [
+            ("Call them on 0207 946 0123", "0123"),
+            ("Try +44 7700 900123 instead", "0123"),
+            ("Their number is (555) 010-0199", "0199"),
+            ("reach us at 02079460123", "0123"),
+        ]:
+            out = ps.redact(text)
+            self.assertIn("[redacted", out, f"not redacted: {text!r}")
+            self.assertIn(expected_tail, out, "last four digits should survive")
+            self.assertNotIn("946", out.replace(expected_tail, ""))
+
+    def test_prices_and_quantities_survive(self):
+        for text in [
+            "They have 40 units at 6.20 each",
+            "Only 8 left, £4.50 per capsule",
+            "Hold for 48 hours",
+            "amoxicillin 500mg, 21 capsules",
+        ]:
+            self.assertEqual(
+                ps.redact(text), text,
+                f"redaction damaged a non-phone number: {text!r}",
+            )
+
+    def test_speech_activity_is_withheld_by_default(self):
+        self.assertIsNone(
+            ps.redact_activity("callee_realtime", "Callee said: yes we have it"),
+            "a pharmacist's speech must not be logged by default",
+        )
+
+    def test_speech_activity_still_redacted_when_opted_in(self):
+        out = ps.redact_activity(
+            "callee_realtime", "Callee said: ring 0207 946 0123",
+            show_conversation=True,
+        )
+        self.assertIsNotNone(out)
+        self.assertIn("[redacted", out)
+        self.assertNotIn("946 0123", out)
+
+    def test_progress_activity_is_logged(self):
+        self.assertEqual(
+            ps.redact_activity("progress", "calling task status=calling"),
+            "calling task status=calling",
+            "progress events describe the system, not the conversation",
+        )
+
+    def test_rendered_notes_are_redacted(self):
+        record = {
+            "pharmacy": "Oakhill", "in_stock": "yes", "quantity_available": 40,
+            "unit_price": 6.2, "currency": "GBP", "requires_prescription": "yes",
+            "can_hold": "yes", "hold_duration_hours": 24, "confidence": 0.9,
+            "verified": True,
+            "pharmacist_notes": "Try the Mill Lane branch on 0207 946 0123",
+            "alternative_suggested": "co-amoxiclav, call 02079460124",
+        }
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            ps.render([record])
+        printed = buffer.getvalue()
+
+        self.assertNotIn("946 0123", printed)
+        self.assertNotIn("02079460124", printed)
+        self.assertIn("[redacted", printed)
+        self.assertIn("Mill Lane", printed, "the useful part should survive")
+        self.assertIn("6.2", printed, "prices must not be redacted")
+
+    def test_poll_does_not_log_speech(self):
+        """End-to-end: a call whose activity quotes the pharmacist logs none
+        of it."""
+        speech = "Callee said: we have 40, ring 0207 946 0123 for the branch"
+        response = dict(TERMINAL_RESPONSE)
+        response["activity"] = [
+            {"ts": "1", "kind": "progress", "message": "calling task created"},
+            {"ts": "2", "kind": "callee_realtime", "message": speech},
+        ]
+
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            calls: list[str] = []
+            caller, store = make_caller(tmp, calls)
+            caller._client = lambda: RecordingClient(calls, response)
+            ps_run_dir, ps.RUN_DIR = ps.RUN_DIR, tmp / "call_runs"
+            try:
+                with self.assertLogs("pharmacy-stock-check", level="INFO") as logged:
+                    asyncio.run(caller.call(
+                        {"name": "Oakhill", "phone": "+15550101"}, "goal", "GB"))
+            finally:
+                ps.RUN_DIR = ps_run_dir
+
+        joined = "\n".join(logged.output)
+        self.assertNotIn("Callee said", joined, "speech leaked into the log")
+        self.assertNotIn("946 0123", joined, "a spoken number leaked into the log")
+        self.assertIn("calling task created", joined, "progress should still log")
 
 
 class BudgetRegression(unittest.TestCase):

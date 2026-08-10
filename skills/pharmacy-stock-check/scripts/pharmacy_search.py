@@ -109,6 +109,55 @@ def mask(phone: str) -> str:
     return f"…{phone[-4:]}" if len(phone) >= 4 else "…"
 
 
+# A run of digits long enough to be a phone number, however it's punctuated.
+# Deliberately loose: "0207 946 0123", "+44-7700-900123", "(555) 010-0199".
+_PHONE_LIKE = re.compile(r"\+?\d[\d\s\-().]{6,}\d")
+
+# Conversation lines from the provider's activity feed. These carry the actual
+# words a pharmacist said.
+_SPEECH_KINDS = {"callee_realtime"}
+
+
+def redact(text: str | None) -> str:
+    """Strip anything phone-number-shaped out of free text before it is
+    printed or logged.
+
+    Model-extracted fields and provider activity are derived from a live
+    conversation with a third party. A pharmacist reading out a branch number
+    lands in `pharmacist_notes`; a spoken number lands in the transcript. Both
+    then reach the terminal, shell scrollback, CI logs and screen recordings —
+    none of which the person on the phone agreed to.
+
+    Prices and quantities survive: only runs of eight or more digits are
+    treated as a number.
+    """
+    if not text:
+        return ""
+
+    def _scrub(match: re.Match[str]) -> str:
+        digits = re.sub(r"\D", "", match.group())
+        if len(digits) < 8:
+            return match.group()          # a price, a quantity, a year
+        return f"[redacted …{digits[-4:]}]"
+
+    return _PHONE_LIKE.sub(_scrub, text)
+
+
+def redact_activity(kind: str | None, message: str | None,
+                    show_conversation: bool = False) -> str | None:
+    """What may be logged from one provider activity entry.
+
+    Progress events (`stage_start`, `external_call`, `progress`) say what the
+    system is doing and are safe. Realtime speech events quote the call itself
+    and are withheld unless explicitly asked for — and redacted even then.
+
+    Returns None when the entry should not be logged at all.
+    """
+    if (kind or "") in _SPEECH_KINDS and not show_conversation:
+        return None
+    return redact(message)
+
+
 # --------------------------------------------------------------------------
 # Budget
 # --------------------------------------------------------------------------
@@ -820,7 +869,8 @@ class Caller:
     """Live caller. Constructing this loads credentials, so it is only ever
     instantiated under --live."""
 
-    def __init__(self, budget: CallBudget, store: RunStore) -> None:
+    def __init__(self, budget: CallBudget, store: RunStore,
+                 show_conversation: bool = False) -> None:
         from fastmcp import Client
         from fastmcp.client.transports import StreamableHttpTransport
 
@@ -828,6 +878,8 @@ class Caller:
         self._Transport = StreamableHttpTransport
         self.budget = budget
         self.store = store
+        # Off by default: the activity feed quotes a third party's speech.
+        self.show_conversation = show_conversation
         # Resolving the credential also tells us which account we're acting as,
         # which is part of a call's identity.
         self._token, principal = resolve_credential(SERVER_URL)
@@ -876,12 +928,20 @@ class Caller:
             nxt = final.get("next_step")
             nxt = nxt if isinstance(nxt, dict) else {}
 
-            # The activity feed is cumulative on every poll — dedupe.
+            # The activity feed is cumulative on every poll — dedupe. And it
+            # quotes the live call, so speech is withheld and everything else
+            # is scrubbed of anything number-shaped before it reaches a log.
             for entry in final.get("activity", []):
                 key = f"{entry.get('ts')}|{entry.get('message')}"
-                if key not in seen:
-                    seen.add(key)
-                    log.info("    %s", entry.get("message"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                safe = redact_activity(
+                    entry.get("kind"), entry.get("message"),
+                    show_conversation=self.show_conversation,
+                )
+                if safe:
+                    log.info("    %s", safe)
 
             action = nxt.get("action")
             if status in TERMINAL_STATUSES or action in TERMINAL_ACTIONS:
@@ -1048,8 +1108,12 @@ def render(records: list[dict[str, Any]]) -> None:
         print(f"{(r['pharmacy'] or '?')[:24]:<24} {r['in_stock']:<9} "
               f"{r['quantity_available'] or '—':>5} {price:>10} "
               f"{r['requires_prescription']:<8} {hold:>6} {conf:>6}{flag}")
-        if r.get("pharmacist_notes"):
-            print(f"    {r['pharmacist_notes']}")
+        # Free text lifted out of the conversation. Redacted on the way to the
+        # terminal — the stored record keeps the original, under 0600.
+        for note_field in ("pharmacist_notes", "alternative_suggested"):
+            note = r.get(note_field)
+            if note:
+                print(f"    {redact(str(note))}")
     print()
 
 
@@ -1062,6 +1126,11 @@ async def main() -> None:
     parser.add_argument("--region", default="US")
     parser.add_argument("--max-calls", type=int, default=3)
     parser.add_argument("--concurrency", type=int, default=3)
+    parser.add_argument("--show-conversation", action="store_true",
+                        help="Log the live call transcript as it happens. Off "
+                             "by default: it quotes a third party's speech "
+                             "into your terminal and shell history. Numbers "
+                             "are redacted either way.")
     parser.add_argument("--live", action="store_true",
                         help="ACTUALLY PLACE CALLS. Without this the run is "
                              "fully offline: no credentials, no network.")
@@ -1111,7 +1180,7 @@ async def main() -> None:
     store = RunStore()
     budget.check(len(pharmacies))     # fail before dialling, not halfway
 
-    caller = Caller(budget, store)
+    caller = Caller(budget, store, show_conversation=args.show_conversation)
     print(f"\n{args.drug} {args.dosage} — {args.quantity} · "
           f"{len(pharmacies)} pharmacies · LIVE\n")
 

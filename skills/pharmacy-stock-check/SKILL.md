@@ -135,6 +135,21 @@ Mark anything unverified as such, visibly.
 Mask phone numbers in summaries — show the pharmacy name and the last four
 digits.
 
+**Masking covers derived text too, not just the number you dialled.** The
+provider's activity feed quotes the call as it happens, and fields like
+`pharmacist_notes` and `alternative_suggested` are lifted straight out of the
+conversation. A pharmacist reading out a branch number ends up in both. Printing
+either verbatim puts a third party's words into terminal scrollback, CI logs and
+screen recordings.
+
+So: scrub anything number-shaped from free text before it is logged or printed,
+and withhold realtime speech events entirely unless the operator explicitly asks
+for them. Prices, quantities and hold durations must survive — redact runs of
+eight or more digits, not every number.
+
+The stored record keeps the original. It is the evidence, and it is protected by
+being 0600 and out of the working directory.
+
 Offer the transcript. Every claim should be checkable against what was said.
 
 ## Cost and safety controls
