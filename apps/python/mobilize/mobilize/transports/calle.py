@@ -14,6 +14,7 @@ not for coverage's sake.
 from __future__ import annotations
 
 import os
+import re
 
 import httpx
 
@@ -28,6 +29,25 @@ from mobilize.transports.base import (
 
 CALLE_BASE_URL = os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com")
 TERMINAL_STATUSES = {"completed", "failed", "canceled"}
+
+# structured_result is a provider-authored extraction and can be wrong or
+# stale, especially on a call that didn't cleanly complete -- can_come=="yes"
+# is not itself proof the recipient agreed. This cross-checks against the
+# recipient's OWN spoken words in the transcript (speaker == "user"), so an
+# explicit denial there ("No, I cannot come") overrides a contradicting
+# structured claim instead of trusting extraction over the actual
+# conversation.
+_RECIPIENT_DENIAL_RE = re.compile(
+    r"\b(no|nope|nah|can'?t|cannot|won'?t|unable|not able|not going to make it)\b",
+    re.IGNORECASE,
+)
+
+
+def _recipient_spoke_denial(transcript: list[dict]) -> bool:
+    recipient_text = " ".join(
+        turn.get("text", "") for turn in transcript if turn.get("speaker") == "user"
+    )
+    return bool(_RECIPIENT_DENIAL_RE.search(recipient_text))
 
 
 class CalleTransport:
@@ -176,6 +196,22 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
         # (contradicting can_come) or the response is malformed. Refuse to
         # count it as a confirmation rather than trust an unsupported claim.
         if not transcript:
+            outcome, commitment = CallOutcome.NO_ANSWER, 0.0
+        # A confirmation requires CALL-E's OWN affirmative completion
+        # signal -- not merely the absence of an explicit False. At this
+        # point task_completed can only be True or None (False was already
+        # rejected above), and None must not silently pass as "no
+        # contradiction" when what's being decided is whether to count
+        # someone as a real, confirmed commitment. Only an explicit True
+        # is trusted.
+        elif task_completed is not True:
+            outcome, commitment = CallOutcome.NO_ANSWER, 0.0
+        # Cross-check the structured "yes" against what the recipient
+        # actually said. structured_result/evidence_summary are
+        # provider-authored extractions and can misread or fabricate a
+        # commitment -- a recipient-corroborated transcript is required,
+        # not just any transcript existing at all.
+        elif _recipient_spoke_denial(transcript):
             outcome, commitment = CallOutcome.NO_ANSWER, 0.0
         else:
             commitment = calibrated_commitment(evidence=evidence, candidate_prior_showup_rate=prior_showup_rate)

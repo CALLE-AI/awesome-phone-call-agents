@@ -213,8 +213,19 @@ async def _mobilize_locked(
     # pre-flight validation failure stays excluded, which is also simply
     # correct -- retrying the exact same invalid phone number again
     # automatically was never going to succeed anyway.
-    for candidate_id in ledger.unresolved(mobilization_id):
+    #
+    # These must also be surfaced in the RESULT, not just quietly removed
+    # from `remaining` -- a prior process's unresolved dispatch could mean
+    # CALL-E already accepted that call, and a caller who never sees it in
+    # ambiguous_candidate_ids has no way to know a possibly-live call exists
+    # for that person. Also counted toward calls_used: an unresolved intent
+    # might have actually reached CALL-E, and under-counting it would let a
+    # resumed run dispatch more real calls than max_calls actually allows.
+    prior_unresolved = ledger.unresolved(mobilization_id)
+    for candidate_id in prior_unresolved:
         remaining.pop(candidate_id, None)
+    ambiguous_candidate_ids.extend(sorted(prior_unresolved))
+    calls_used += len(prior_unresolved)
 
     # 3. For anyone still in flight (dispatched, no result yet), attempt to
     #    actually recover their outcome by polling. Works against the real
@@ -246,6 +257,13 @@ async def _mobilize_locked(
     wave_index = 0
     while (
         datetime.now(timezone.utc) < deadline_at
+        # An ambiguous dispatch (this run's or a prior run's, from the
+        # recovery step above) means a call may already be live and
+        # unaccounted for. Dispatching a further wave while that's
+        # unresolved risks over-recruiting on top of a confirmation that
+        # hasn't surfaced yet -- so no further wave goes out until a human
+        # reconciles it, even if the need still looks unmet.
+        and not ambiguous_candidate_ids
         and should_dispatch_next_wave(
             confirmed_count=len(confirmed),
             need_count=need.count,
@@ -323,10 +341,15 @@ async def _mobilize_locked(
         call_ids: dict[str, str] = {cid: call_id for cid, call_id in dispatched if call_id is not None}
         failed_ids = [cid for cid, call_id in dispatched if call_id is None]
         ambiguous_candidate_ids.extend(wave_ambiguous_ids)
-        # Only successful dispatches count toward the real-world calls_used
-        # budget -- a candidate whose dispatch raised before CALL-E ever
-        # accepted it was never actually called.
-        calls_used += len(call_ids)
+        # Successful dispatches obviously count toward calls_used. Ambiguous
+        # ones must too: an exception that could mean CALL-E already
+        # accepted the request (a timeout, a connection reset) might have
+        # placed a real call even though no call_id came back -- treating
+        # it as "never happened" would under-count real usage and let a
+        # later wave exceed max_calls. Only our own pre-flight ValueError
+        # failures (in failed_ids, not wave_ambiguous_ids) are true
+        # non-events and stay uncounted.
+        calls_used += len(call_ids) + len(wave_ambiguous_ids)
         for candidate_id in call_ids:
             remaining.pop(candidate_id, None)
         # A candidate whose dispatch failed (bad phone, a provider error,

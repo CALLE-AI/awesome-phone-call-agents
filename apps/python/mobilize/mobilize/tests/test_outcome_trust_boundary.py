@@ -65,14 +65,32 @@ def test_task_completed_true_does_not_block_a_real_yes():
     assert result.outcome in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
 
 
-def test_task_completed_absent_does_not_block_a_real_yes():
-    """task_completed missing entirely (None) must not be treated as a
-    rejection -- only an explicit False should override can_come."""
+def test_task_completed_absent_blocks_a_stated_yes():
+    """A confirmation requires CALL-E's own explicit task_completed=True --
+    task_completed missing entirely (None) is not "no contradiction", it's
+    an absence of the one signal a confirmation is required to have."""
     candidate = _candidate()
     call = _call(status="completed", can_come="yes", task_completed=None,
                   transcript_turns=[{"speaker": "user", "text": "leaving now"}])
     result = _to_call_result("call_1", call, candidate)
-    assert result.outcome in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_recipient_denial_overrides_a_contradicting_structured_yes():
+    """structured_result is a provider-authored extraction and can be
+    wrong -- a recipient explicitly declining in the transcript must never
+    become a firm_yes just because can_come/evidence_summary claim one."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "No, I cannot come"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
 
 
 def test_yes_with_empty_transcript_is_not_trusted():
@@ -85,7 +103,7 @@ def test_yes_with_empty_transcript_is_not_trusted():
 
 def test_yes_with_real_transcript_is_still_honored():
     candidate = _candidate()
-    call = _call(status="completed", can_come="yes",
+    call = _call(status="completed", can_come="yes", task_completed=True,
                   transcript_turns=[{"speaker": "bot", "text": "can you help?"},
                                      {"speaker": "user", "text": "yes, leaving now"}])
     result = _to_call_result("call_1", call, candidate)
