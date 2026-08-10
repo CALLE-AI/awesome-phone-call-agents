@@ -41,6 +41,21 @@ non-`+1` recipients before storage so the explicit phone number cannot disagree
 with the adapter's fixed `US` region and `en-US` locale. The fake provider keeps
 general fictional E.164 support for safe evaluation.
 
+## Creation-error classification
+
+FieldClose treats `failed_before_acceptance` as a strong claim that CALL-E
+rejected the request before creating any external side effect. The adapter makes
+that claim only for an explicit allowlist of request, authentication, endpoint,
+media-type, and validation rejections: HTTP `400`, `401`, `403`, `404`, `405`,
+`413`, `415`, and `422`.
+
+Every other provider API error defaults to
+`ambiguous_requires_reconciliation`. This includes HTTP `408`, `409`, `425`,
+`429`, all `5xx` responses, connection or timeout failures, missing success
+bodies, and unexpected exceptions. These responses do not prove that CALL-E did
+not accept the stable idempotency key. FieldClose freezes the attempt and
+requires human reconciliation instead of treating the request as safe to repeat.
+
 ## Authenticated status refresh
 
 After CALL-E accepts the asynchronous create request, the active workbench refreshes the existing attempt through FieldClose:
@@ -136,8 +151,10 @@ recovery action after the durable 60-second creation-claim lease. While that
 lease is active, concurrent execution returns `in_progress` without invoking
 CALL-E again. Recovery reuses the same attempt and idempotency key so CALL-E
 returns the same logical call; it never creates a new FieldClose attempt or
-changes the approved recipient or brief. Failed-before-acceptance and ambiguous
-creation outcomes remain frozen.
+changes the approved recipient or brief. A lease recovery can issue another HTTP
+request with that same idempotency key, so the guarantee is one logical provider
+creation rather than one HTTP request over the entire recovery lifecycle.
+Failed-before-acceptance and ambiguous creation outcomes remain frozen.
 
 The SDK adapter, live application path, authenticated status refresh, protected
 operator UI, and protected-workspace provisioning boundary are implemented and

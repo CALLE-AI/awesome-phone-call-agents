@@ -173,8 +173,13 @@ Any future voicemail behavior requires:
 - No automatic live retries in the MVP.
 - A new attempt requires new human approval.
 - A refusal or do-not-call result prohibits automated retry.
+- Only explicitly allowlisted pre-acceptance HTTP rejections may be recorded as
+  `failed_before_acceptance`; every non-authoritative status, including `408`,
+  `409`, `425`, `429`, and `5xx`, requires reconciliation.
 - An ambiguous provider-creation outcome prohibits retry until reconciliation.
 - Repeated browser submission returns the existing attempt rather than creating another.
+- Recovery after an expired creation claim may repeat the HTTP request only with
+  the same persisted idempotency key and approved payload.
 - Repeated provider-status reads and terminal-result ingestion must be idempotent.
 
 ## Cancellation and rollback

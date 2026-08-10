@@ -1,9 +1,7 @@
 import {
   CalleAPIError,
-  CalleAuthenticationError,
   CalleClient,
   CalleConnectionError,
-  CalleRateLimitError,
   CalleTimeoutError,
   type Call,
   type CreateCallInput,
@@ -18,6 +16,10 @@ import type {
   ProviderCallSnapshot,
   ProviderCreationOutcome,
 } from "@/providers/types";
+
+const definitiveCreationRejectionStatuses = new Set([
+  400, 401, 403, 404, 405, 413, 415, 422,
+]);
 
 const approvedQuestionText: Record<string, string> = {
   observed_operating_status:
@@ -310,9 +312,8 @@ function inferAttemptOutcome(call: Call): AttemptOutcome {
 
 function classifyCreationError(error: unknown): ProviderCreationOutcome {
   if (
-    error instanceof CalleAuthenticationError ||
-    error instanceof CalleRateLimitError ||
-    (error instanceof CalleAPIError && error.status < 500)
+    error instanceof CalleAPIError &&
+    definitiveCreationRejectionStatuses.has(error.status)
   ) {
     return {
       disposition: "failed_before_acceptance",
@@ -323,7 +324,7 @@ function classifyCreationError(error: unknown): ProviderCreationOutcome {
   if (
     error instanceof CalleConnectionError ||
     error instanceof CalleTimeoutError ||
-    (error instanceof CalleAPIError && error.status >= 500)
+    error instanceof CalleAPIError
   ) {
     return {
       disposition: "ambiguous_requires_reconciliation",

@@ -95,22 +95,104 @@ describe("CALL-E provider adapter", () => {
     });
   });
 
-  it("treats a provider validation rejection as failed before acceptance", async () => {
-    const provider = createProvider(async () =>
-      Response.json(
-        {
-          error: {
-            code: "invalid_request",
-            message: "Request validation failed.",
+  it.each([
+    [400, "invalid_request"],
+    [401, "unauthorized"],
+    [403, "forbidden"],
+    [404, "endpoint_not_found"],
+    [405, "method_not_allowed"],
+    [413, "request_too_large"],
+    [415, "unsupported_media_type"],
+    [422, "unprocessable_request"],
+  ])(
+    "treats authoritative HTTP %i request rejection as failed before acceptance",
+    async (status, code) => {
+      const provider = createProvider(async () =>
+        Response.json(
+          {
+            error: {
+              code,
+              message: "The request was rejected before creation.",
+            },
           },
-        },
-        { status: 400 },
-      ),
-    );
+          { status },
+        ),
+      );
+
+      await expect(provider.createCall(createRequest())).resolves.toEqual({
+        disposition: "failed_before_acceptance",
+        errorCode: `call_e_${code}`,
+      });
+    },
+  );
+
+  it.each([
+    [408, "request_timeout"],
+    [409, "idempotency_conflict"],
+  ])(
+    "treats HTTP %i as ambiguous because the response does not prove that creation was rejected",
+    async (status, code) => {
+      const provider = createProvider(async () =>
+        Response.json(
+          {
+            error: {
+              code,
+              message: "The creation outcome is not authoritative.",
+            },
+          },
+          { status },
+        ),
+      );
+
+      await expect(provider.createCall(createRequest())).resolves.toEqual({
+        disposition: "ambiguous_requires_reconciliation",
+        errorCode: `call_e_${code}`,
+      });
+    },
+  );
+
+  it.each([
+    [425, "too_early"],
+    [429, "rate_limited"],
+  ])(
+    "defaults non-authoritative HTTP %i creation errors to reconciliation",
+    async (status, code) => {
+      const provider = createProvider(async () =>
+        Response.json(
+          {
+            error: {
+              code,
+              message: "The provider did not confirm a pre-acceptance rejection.",
+            },
+          },
+          { status },
+        ),
+      );
+
+      await expect(provider.createCall(createRequest())).resolves.toEqual({
+        disposition: "ambiguous_requires_reconciliation",
+        errorCode: `call_e_${code}`,
+      });
+    },
+  );
+
+  it("treats a transport exception as ambiguous", async () => {
+    const provider = createProvider(async () => {
+      throw new TypeError("The connection closed after the request was sent.");
+    });
 
     await expect(provider.createCall(createRequest())).resolves.toEqual({
-      disposition: "failed_before_acceptance",
-      errorCode: "call_e_invalid_request",
+      disposition: "ambiguous_requires_reconciliation",
+      errorCode: "call_e_unexpected_ambiguous",
+    });
+  });
+
+  it("treats a successful response without a call body as ambiguous", async () => {
+    const provider = createProvider(async () => new Response(null, { status: 204 }));
+
+    await expect(provider.createCall(createRequest())).resolves.toEqual({
+      disposition: "ambiguous_requires_reconciliation",
+      errorCode: "call_e_transport_ambiguous",
     });
   });
 
