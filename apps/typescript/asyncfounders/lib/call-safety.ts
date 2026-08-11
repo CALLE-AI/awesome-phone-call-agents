@@ -132,7 +132,17 @@ export function approvedCallContext(mode: "deposit" | "catchup" | "ask", memorie
 }
 
 function normalizedEvidence(value: string) {
-  return value.normalize("NFKC").replace(/[’‘]/g, "'").toLowerCase().replace(/[^\p{L}\p{N}' ]/gu, " ").replace(/\s+/g, " ").trim();
+  return value
+    .normalize("NFKC")
+    .replace(/[\u2018\u2019\u02bc\uff07`´]/g, "'")
+    .toLowerCase()
+    .replace(/\bwon't\b/g, "will not")
+    .replace(/\bshan't\b/g, "shall not")
+    .replace(/\bcan't\b/g, "cannot")
+    .replace(/\b([\p{L}]+)n't\b/gu, "$1 not")
+    .replace(/[^\p{L}\p{N}' ]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function recipientTranscriptEvidence(recipients: Array<{ attempts?: Array<{ transcriptTurns?: Array<{ speaker?: string; text?: string }> }> }>) {
@@ -167,7 +177,7 @@ export function reviewedProviderPhone(
 }
 
 function hasContradictionSignal(value: string) {
-  return /\b(?:no|not|never|neither|nor|without|cannot|can't|won't|didn't|doesn't|isn't|wasn't|shouldn't|deny|denied|decline|declined|reject|rejected|refuse|refused|oppose|opposed|disagree|disagreed|cancel|cancelled|canceled|pending|undecided|unapproved|uncertain|maybe|might|could|considering|proposed)\b/i.test(value);
+  return /\b(?:no|not|never|neither|nor|without|cannot|deny|denied|decline|declined|reject|rejected|refuse|refused|oppose|opposed|disagree|disagreed|cancel|cancelled|canceled|pending|undecided|unapproved|uncertain|maybe|might|could|considering|proposed)\b/i.test(value);
 }
 
 export function excerptIsCorroborated(excerpt: string, evidence: string[], claim = excerpt) {

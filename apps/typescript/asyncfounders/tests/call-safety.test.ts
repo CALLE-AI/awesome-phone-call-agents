@@ -71,6 +71,19 @@ test("a denial cannot corroborate an affirmative memory claim", () => {
   assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [{ ...denied, source_excerpt: "We didn’t approve the private beta." }] }, ["Founder: We didn’t approve the private beta."]).length, 0);
 });
 
+test("negative contractions cannot corroborate an affirmative memory claim", () => {
+  const affirmative = { type: "decision", title: "Private beta approved", body: "The founder approved the private beta.", status: "accepted", confidence: "high" as const, source_excerpt: "approve the private beta", audience: ["team"] };
+  for (const evidence of [
+    "I don't approve the private beta.",
+    "I don’t approve the private beta.",
+    "I didn't approve the private beta.",
+    "I can’t approve the private beta.",
+    "I won't approve the private beta.",
+  ]) {
+    assert.equal(admittedMemoryItems({ outcome: "complete", memory_items: [affirmative] }, [evidence]).length, 0, evidence);
+  }
+});
+
 test("only recipient-authored turns can corroborate memory", () => {
   const evidence = recipientTranscriptEvidence([{ attempts: [{ transcriptTurns: [
     { speaker: "bot", text: "The private beta was approved." },
