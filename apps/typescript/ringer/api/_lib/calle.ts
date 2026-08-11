@@ -21,6 +21,35 @@ export function contentIdempotencyKey(body: RawCreateBody): string {
 }
 
 /**
+ * Deterministic id for a *scheduled* job, so a retried POST maps to the SAME
+ * job instead of minting a fresh random id (which would schedule — and later
+ * dial — a duplicate call). Prefers a caller-supplied idempotency key; otherwise
+ * derives from the scheduling content, keyed by `dueAt` so distinct occurrences
+ * of a recurring series stay distinct while a replay of one occurrence dedups.
+ * The cron then uses this stable id as the provider idempotency key.
+ */
+export function scheduleJobId(input: {
+  idempotencyKey?: string
+  dueAt: string
+  recurrenceMonths?: number | null
+  body: RawCreateBody
+}): string {
+  const key = input.idempotencyKey?.trim()
+  const basis = key
+    ? `key:${key}`
+    : 'content:' +
+      JSON.stringify({
+        dueAt: input.dueAt,
+        recurrenceMonths: input.recurrenceMonths ?? null,
+        task: input.body.task ?? '',
+        recipients: input.body.recipients ?? [],
+        result_schema: input.body.result_schema ?? null,
+        recipient_result_schema: input.body.recipient_result_schema ?? null,
+      })
+  return 'sched_' + createHash('sha256').update(basis).digest('hex').slice(0, 32)
+}
+
+/**
  * A caller-supplied base URL is trusted only for the official host (or a local
  * test origin). This prevents a request from pointing the API key at an
  * arbitrary host. The operator's own `CALLE_BASE_URL` env is always trusted.

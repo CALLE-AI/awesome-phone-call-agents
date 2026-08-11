@@ -127,11 +127,19 @@ pnpm dlx vercel dev
 - **When the operator enables the durable scheduler** (Vercel KV + server key),
   a scheduled or recurring call is placed **automatically at its due time** by a
   cron using the server key. Each such job is listed and **cancelable from the
-  drawer up until it fires** (see Cancellation). A transient failure (network,
-  timeout, 5xx, throttle) is **not** recorded as a definitive `failed` — the job
-  stays pending and is retried (bounded) under the **same job-id idempotency
-  key**, so a lost response after the provider accepted the call never yields a
-  second dial; only a definitive 4xx rejection marks it failed.
+  drawer up until it fires** (see Cancellation).
+- **Scheduling a call is itself idempotent.** A job's id is derived from a
+  caller-supplied `Idempotency-Key` (or, absent one, the scheduling content keyed
+  by due time), and the store creates it **atomically (`SET … NX`)**. So a lost
+  `POST /api/schedule` response followed by a retry maps to the **same** job
+  instead of scheduling a duplicate — and since the cron uses that stable id as
+  the provider idempotency key, a retried schedule can never dial the call twice.
+- **Ambiguous outcomes are never faked into a verdict.** A transient failure
+  (network, timeout, 5xx, throttle) keeps the job `pending` for a bounded retry
+  under the same idempotency key. If the retry budget is exhausted while the
+  outcome is still unknown, the job is parked as **`unresolved` ("Needs check")
+  for reconciliation** — it is *not* converted into a definitive `failed`. Only a
+  definitive 4xx rejection marks a job `failed`.
 - Every create-call request carries a **content-bound idempotency key** derived
   from the phone, task, and result schema, so an accidental retry dedups and an
   edited request can never alias a prior call under the same key.

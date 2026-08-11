@@ -14,18 +14,24 @@ const JOB_TONE: Record<JobStatus, OutcomeTone> = {
   placed: 'success',
   failed: 'failed',
   canceled: 'neutral',
+  unresolved: 'partial',
 }
 const JOB_LABEL: Record<JobStatus, string> = {
   pending: 'Scheduled',
   placed: 'Placed',
   failed: 'Failed',
   canceled: 'Canceled',
+  unresolved: 'Needs check',
 }
 
 function jobSubline(job: ScheduledJob): string {
   if (job.status === 'placed') return job.placedAt ? `Placed ${relativeTime(job.placedAt)}` : 'Placed'
   if (job.status === 'failed') return job.error ? `Failed — ${job.error}` : 'Failed'
   if (job.status === 'canceled') return 'Canceled'
+  if (job.status === 'unresolved') {
+    // Ambiguous outcome — the call may or may not have gone out; needs a manual check.
+    return job.error ? `Unconfirmed — ${job.error}` : 'Unconfirmed — verify with CALL-E'
+  }
   return `Calls ${formatDue(job.dueAt)}`
 }
 

@@ -15,7 +15,7 @@ import type { RawCreateBody } from './calle.js'
  * The cron reads due ids with ZRANGEBYSCORE; the drawer lists all with ZRANGE.
  */
 
-export type JobStatus = 'pending' | 'placed' | 'failed' | 'canceled'
+export type JobStatus = 'pending' | 'placed' | 'failed' | 'canceled' | 'unresolved'
 
 export interface ScheduledJob {
   id: string
@@ -100,6 +100,24 @@ export async function putJob(job: ScheduledJob): Promise<void> {
     ['SET', jobKey(job.id), JSON.stringify(job)],
     ['ZADD', INDEX, new Date(job.dueAt).getTime(), job.id],
   ])
+}
+
+/**
+ * Create a job only if one with this id doesn't already exist (`SET … NX` is
+ * atomic). A retried scheduling POST that resolves to the same content/request
+ * key thus reuses the existing job instead of scheduling — and later dialing —
+ * a duplicate. Returns whether a new job was created plus the authoritative job.
+ */
+export async function createJobIfAbsent(
+  job: ScheduledJob,
+): Promise<{ created: boolean; job: ScheduledJob }> {
+  const set = await redis<string | null>(['SET', jobKey(job.id), JSON.stringify(job), 'NX'])
+  if (set === 'OK') {
+    await redis(['ZADD', INDEX, new Date(job.dueAt).getTime(), job.id])
+    return { created: true, job }
+  }
+  const existing = await getJob(job.id)
+  return { created: false, job: existing ?? job }
 }
 
 /** Update a job record in place (does not touch the due-time index). */

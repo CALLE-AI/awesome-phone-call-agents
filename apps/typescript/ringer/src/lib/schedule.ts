@@ -10,7 +10,7 @@ import type { CreateCallBody } from './calle/types'
  * local reminders.
  */
 
-export type JobStatus = 'pending' | 'placed' | 'failed' | 'canceled'
+export type JobStatus = 'pending' | 'placed' | 'failed' | 'canceled' | 'unresolved'
 
 export interface ScheduledJob {
   id: string

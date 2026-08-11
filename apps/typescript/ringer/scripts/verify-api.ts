@@ -1,9 +1,10 @@
 /**
  * Runtime verification of the serverless safety helpers (api/_lib/calle.ts):
- * content-bound idempotency, base-URL allowlisting, and shared-key
- * authorization. These defend the exact classes of issue the CALL-E maintainer
- * flags on review (key never sent to an arbitrary host; the operator's shared
- * key is not spendable by strangers; a changed request cannot alias a call).
+ * content-bound idempotency, base-URL allowlisting, shared-key authorization,
+ * and deterministic scheduled-job ids. These defend the exact classes of issue
+ * the CALL-E maintainer flags on review (key never sent to an arbitrary host;
+ * the operator's shared key is not spendable by strangers; a changed request
+ * cannot alias a call; a retried schedule POST cannot dial a duplicate).
  *
  * Run: pnpm exec tsx --tsconfig tsconfig.app.json scripts/verify-api.ts
  */
@@ -11,7 +12,7 @@ import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 const mod: any = await import(pathToFileURL(path.resolve(process.cwd(), 'api/_lib/calle.ts')).href)
-const { contentIdempotencyKey, isAllowedBaseUrl, resolveCreds, requireKey } = mod
+const { contentIdempotencyKey, isAllowedBaseUrl, resolveCreds, requireKey, scheduleJobId } = mod
 
 let pass = 0
 const ok = (name: string, cond: boolean) => {
@@ -111,5 +112,15 @@ if (prevKey === undefined) delete process.env.CALLE_API_KEY
 else process.env.CALLE_API_KEY = prevKey
 if (prevBase !== undefined) process.env.CALLE_BASE_URL = prevBase
 if (prevSecret !== undefined) process.env.CALLE_APP_SECRET = prevSecret
+
+console.log('\n[5] Scheduled-job idempotency (a retried POST cannot schedule a duplicate call)')
+const schedBody = { task: 'Renegotiate the bill.', recipients: [{ phones: ['+14155550111'], region: 'US', locale: 'en-US' }], result_schema: { type: 'object' } }
+const due1 = '2026-09-01T15:00:00.000Z'
+const due2 = '2026-10-01T15:00:00.000Z'
+ok('retried POST (same content + dueAt) → same job id', scheduleJobId({ dueAt: due1, body: schedBody }) === scheduleJobId({ dueAt: due1, body: JSON.parse(JSON.stringify(schedBody)) }))
+ok('different occurrence (dueAt) → different job id', scheduleJobId({ dueAt: due1, body: schedBody }) !== scheduleJobId({ dueAt: due2, body: schedBody }))
+ok('edited task → different job id', scheduleJobId({ dueAt: due1, body: schedBody }) !== scheduleJobId({ dueAt: due1, body: { ...schedBody, task: 'Cancel it.' } }))
+ok('client Idempotency-Key overrides content', scheduleJobId({ idempotencyKey: 'req-123', dueAt: due1, body: schedBody }) === scheduleJobId({ idempotencyKey: 'req-123', dueAt: due2, body: { ...schedBody, task: 'different' } }))
+ok('job id is namespaced', scheduleJobId({ dueAt: due1, body: schedBody }).startsWith('sched_'))
 
 console.log(`\n✅ All ${pass} API-safety checks passed.\n`)

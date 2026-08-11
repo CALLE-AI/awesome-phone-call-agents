@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { CalleAPIError } from '@call-e/calle'
-import { createCalleCall, deriveWebhookUrl, serverCreds } from '../_lib/calle.js'
+import { createCalleCall, deriveWebhookUrl, scheduleJobId, serverCreds } from '../_lib/calle.js'
 import {
   acquireLock,
+  createJobIfAbsent,
   dueJobs,
   getJob,
   kvConfigured,
-  putJob,
   releaseLock,
   updateJob,
   type ScheduledJob,
@@ -54,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let fired = 0
   let failed = 0
   let retried = 0
+  let unresolved = 0
   let skipped = 0
   const results: Array<{ id: string; status: string; callId?: string; error?: string }> = []
 
@@ -84,21 +85,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         results.push({ id: job.id, status: 'placed', callId })
 
         if (job.recurrenceMonths && job.recurrenceMonths > 0) {
-          await putJob(nextOccurrence(job))
+          // Deterministic id (create-if-absent) so a double cron run can't queue
+          // the same next occurrence twice.
+          await createJobIfAbsent(nextOccurrence(job))
         }
       } catch (err) {
         const message = err instanceof CalleAPIError ? `${err.code}: ${err.message}` : (err as Error).message
 
-        // Only a *definitive* client rejection (a 4xx that won't change on
-        // retry) is a real `failed`. Network errors, timeouts, 5xx, and
-        // throttling are ambiguous — the provider may have accepted the call —
-        // so we leave the job `pending` to retry under the SAME idempotency key
-        // (job.id): the provider dedups, so a retry can never double-dial.
-        if (isDefinitive(err) || attempts >= MAX_ATTEMPTS) {
+        if (isDefinitive(err)) {
+          // A definitive client rejection (a 4xx that won't change on retry) is
+          // the only real `failed`.
           await updateJob({ ...job, status: 'failed', error: message, attempts })
           failed += 1
           results.push({ id: job.id, status: 'failed', error: message })
+        } else if (attempts >= MAX_ATTEMPTS) {
+          // Ambiguous AND out of retries: the provider may or may not have placed
+          // the call — its fate is genuinely unknown. Do NOT fabricate a `failed`
+          // verdict; park it as `unresolved` for out-of-band reconciliation. The
+          // stable idempotency key (job.id) means a later manual re-run would
+          // reconcile against the provider rather than double-dial.
+          await updateJob({ ...job, status: 'unresolved', error: message, attempts })
+          unresolved += 1
+          results.push({ id: job.id, status: 'unresolved', error: message })
         } else {
+          // Ambiguous with retries left: keep it pending. Network/timeout/5xx/
+          // throttle may have been accepted upstream, so the next run retries
+          // under the SAME idempotency key — the provider dedups, never double-dials.
           await updateJob({ ...job, status: 'pending', error: message, attempts })
           retried += 1
           results.push({ id: job.id, status: 'retry', error: message })
@@ -109,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  return res.status(200).json({ ok: true, fired, failed, retried, skipped, results })
+  return res.status(200).json({ ok: true, fired, failed, retried, unresolved, skipped, results })
 }
 
 /**
@@ -129,11 +141,14 @@ function isDefinitive(err: unknown): boolean {
 function nextOccurrence(job: ScheduledJob): ScheduledJob {
   const next = new Date(job.dueAt)
   next.setMonth(next.getMonth() + (job.recurrenceMonths ?? 12))
+  const dueAt = next.toISOString()
   return {
     ...job,
-    id: `sched_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    // Deterministic per (content, dueAt): distinct from this occurrence, but
+    // stable, so re-deriving it is idempotent.
+    id: scheduleJobId({ dueAt, recurrenceMonths: job.recurrenceMonths, body: job.body }),
     createdAt: new Date().toISOString(),
-    dueAt: next.toISOString(),
+    dueAt,
     status: 'pending',
     callId: undefined,
     placedAt: undefined,

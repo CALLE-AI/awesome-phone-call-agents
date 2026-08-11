@@ -1,10 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { allowCors, authorizeServerUse, sendError, serverCreds, type RawCreateBody } from './_lib/calle.js'
+import {
+  allowCors,
+  authorizeServerUse,
+  header,
+  scheduleJobId,
+  sendError,
+  serverCreds,
+  type RawCreateBody,
+} from './_lib/calle.js'
 import {
   cancelJob,
+  createJobIfAbsent,
+  getJob,
   kvConfigured,
   listJobs,
-  putJob,
   type ScheduledJob,
 } from './_lib/store.js'
 
@@ -56,16 +65,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'POST') {
       const body = (typeof req.body === 'string' ? safeParse(req.body) : req.body) ?? {}
-      const job = validate(body)
+      // A caller-supplied Idempotency-Key (or, absent one, the scheduling
+      // content) gives the job a deterministic id, so a retried POST maps to the
+      // same job rather than scheduling a duplicate call.
+      const job = validate(body, header(req, 'idempotency-key'))
       if ('invalid' in job) return sendError(res, 400, 'invalid_request', job.invalid)
+
+      // Idempotent replay: same key/content → return the existing job, no new one.
+      const prior = await getJob(job.id)
+      if (prior) return res.status(200).json(prior)
 
       const existing = await listJobs()
       if (existing.filter((j) => j.status === 'pending').length >= MAX_PENDING) {
         return sendError(res, 429, 'too_many_scheduled', `You already have ${MAX_PENDING} pending scheduled calls.`)
       }
 
-      await putJob(job)
-      return res.status(201).json(job)
+      // Atomic create-if-absent closes the race between two concurrent retries.
+      const { created, job: stored } = await createJobIfAbsent(job)
+      return res.status(created ? 201 : 200).json(stored)
     }
 
     return sendError(res, 405, 'invalid_request', 'Use GET, POST, or DELETE.')
@@ -76,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 type ValidationError = { invalid: string }
 
-function validate(input: any): ScheduledJob | ValidationError {
+function validate(input: any, idempotencyKey: string): ScheduledJob | ValidationError {
   const body = input?.body as RawCreateBody | undefined
   if (!body || typeof body.task !== 'string' || !body.task.trim()) {
     return { invalid: 'A call `body` with a `task` string is required.' }
@@ -88,10 +105,12 @@ function validate(input: any): ScheduledJob | ValidationError {
   }
 
   const recurrence = Number(input?.recurrenceMonths)
+  const recurrenceMonths = Number.isFinite(recurrence) && recurrence > 0 ? recurrence : null
+  const dueAt = new Date(dueMs).toISOString()
   return {
-    id: `sched_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    id: scheduleJobId({ idempotencyKey, dueAt, recurrenceMonths, body }),
     createdAt: new Date().toISOString(),
-    dueAt: new Date(dueMs).toISOString(),
+    dueAt,
     status: 'pending',
     title: String(input?.title ?? 'Scheduled call').slice(0, 160),
     templateId: String(input?.templateId ?? 'custom'),
@@ -99,7 +118,7 @@ function validate(input: any): ScheduledJob | ValidationError {
     batch: Boolean(input?.batch),
     escalated: Boolean(input?.escalated),
     body,
-    recurrenceMonths: Number.isFinite(recurrence) && recurrence > 0 ? recurrence : null,
+    recurrenceMonths,
   }
 }
 
