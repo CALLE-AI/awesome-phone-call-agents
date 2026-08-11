@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { dispatchStoryCall, type CallePort } from '../server/calle.js'
-import { isConfirmedStory, type StoryCallRequest } from '../server/call-contract.js'
+import { buildCallInput, dispatchStoryCall, summarizeCallSnapshot, type CallePort } from '../server/calle.js'
+import { idempotencyKey, isConfirmedStory, type StoryCallRequest } from '../server/call-contract.js'
 import { applyCorrection } from '../src/data/storyState.js'
 
 const authorized: StoryCallRequest = {
@@ -36,6 +36,42 @@ test('an invalid phone is rejected before dispatch', async () => {
   const port = fakePort()
   await assert.rejects(dispatchStoryCall({ ...authorized, storytellerPhone: '555-0100' }, port, 'enabled'), /E.164/)
   assert.equal(port.creates, 0)
+})
+
+test('idempotency binds every approved request field and the normalized CALL-E payload', () => {
+  const baseInput = buildCallInput(authorized)
+  const baseKey = idempotencyKey(authorized, baseInput)
+  const mutations: StoryCallRequest[] = [
+    { ...authorized, requestId: 'test-002' },
+    { ...authorized, storytellerPhone: '+15555550124' },
+    { ...authorized, locale: 'es-US' },
+    { ...authorized, region: 'CA' },
+    { ...authorized, familyName: 'Nora' },
+    { ...authorized, question: 'What did the roses smell like?' },
+    { ...authorized, contactPermission: false },
+    { ...authorized, aiDisclosureApproved: false },
+    { ...authorized, confirmIntent: false },
+  ]
+
+  for (const request of mutations) {
+    assert.notEqual(idempotencyKey(request, buildCallInput(request)), baseKey)
+  }
+  assert.notEqual(idempotencyKey(authorized, { ...baseInput, metadata: { app: 'one-more-story-v2' } }), baseKey)
+})
+
+test('live output summary never contains recipient, transcript, or story content', () => {
+  const snapshot = {
+    id: 'call_test',
+    status: 'completed',
+    structuredResult: {
+      recipient: '+15555550123',
+      transcript: 'private transcript',
+      story_answer: 'private story',
+    },
+  }
+  const serialized = JSON.stringify(summarizeCallSnapshot(snapshot))
+  assert.deepEqual(summarizeCallSnapshot(snapshot), { id: 'call_test', status: 'completed', resultReceived: true })
+  assert.doesNotMatch(serialized, /15555550123|private transcript|private story/)
 })
 
 test('a corrected story does not exist until correction and read-back are confirmed', () => {

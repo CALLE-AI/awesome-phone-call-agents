@@ -3,6 +3,12 @@ import { assertLiveCallAuthorized, buildCallTask, idempotencyKey, storyResultSch
 
 export type CallSnapshot = { id: string; status?: string; structuredResult?: unknown }
 
+export type PublicCallSummary = {
+  id: string
+  status: string
+  resultReceived: boolean
+}
+
 export interface CallePort {
   create(input: Record<string, unknown>, options: { idempotencyKey: string }): Promise<CallSnapshot>
   waitForResult(callId: string, options: { timeoutMs: number; intervalMs: number }): Promise<CallSnapshot>
@@ -28,8 +34,17 @@ export async function dispatchStoryCall(
 ): Promise<CallSnapshot> {
   if (liveSwitch !== 'enabled') throw new Error('Live calls are disabled. Set CALLE_LIVE_CALLS=enabled only for an approved call.')
   assertLiveCallAuthorized(request)
-  const call = await port.create(buildCallInput(request), { idempotencyKey: idempotencyKey(request) })
+  const callInput = buildCallInput(request)
+  const call = await port.create(callInput, { idempotencyKey: idempotencyKey(request, callInput) })
   return port.waitForResult(call.id, { timeoutMs: 300_000, intervalMs: 2_000 })
+}
+
+export function summarizeCallSnapshot(snapshot: CallSnapshot): PublicCallSummary {
+  return {
+    id: snapshot.id,
+    status: snapshot.status ?? 'unknown',
+    resultReceived: snapshot.structuredResult !== undefined,
+  }
 }
 
 export async function createSdkPort(): Promise<CallePort> {

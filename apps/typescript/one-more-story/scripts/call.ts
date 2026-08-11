@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { buildCallInput, createSdkPort, dispatchStoryCall } from '../server/calle.js'
+import { buildCallInput, createSdkPort, dispatchStoryCall, summarizeCallSnapshot } from '../server/calle.js'
 import type { StoryCallRequest } from '../server/call-contract.js'
 
 const [command, requestPath] = process.argv.slice(2)
@@ -17,4 +17,4 @@ if (command === 'preview') {
 
 const port = await createSdkPort()
 const result = await dispatchStoryCall(request, port)
-console.log(JSON.stringify(result, null, 2))
+console.log(JSON.stringify(summarizeCallSnapshot(result), null, 2))

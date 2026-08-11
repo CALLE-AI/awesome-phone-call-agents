@@ -70,8 +70,22 @@ export const storyResultSchema = {
   },
 } as const
 
-export function idempotencyKey(request: StoryCallRequest): string {
-  const material = JSON.stringify({ requestId: request.requestId, phone: request.storytellerPhone, question: request.question })
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+    return `{${entries.join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+export function idempotencyKey(request: StoryCallRequest, callInput: Record<string, unknown>): string {
+  const material = canonicalJson({
+    authorization: request,
+    call: callInput,
+  })
   return `one-more-story-${createHash('sha256').update(material).digest('hex').slice(0, 16)}`
 }
 
