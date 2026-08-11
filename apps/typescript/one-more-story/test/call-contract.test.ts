@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { buildCallInput, dispatchStoryCall, summarizeCallSnapshot, type CallePort } from '../server/calle.js'
-import { idempotencyKey, isConfirmedStory, type StoryCallRequest } from '../server/call-contract.js'
+import { idempotencyKey, isConfirmedStory, parseStoryCallRequest, type StoryCallRequest } from '../server/call-contract.js'
 import { applyCorrection } from '../src/data/storyState.js'
 
 const authorized: StoryCallRequest = {
@@ -24,12 +24,25 @@ test('live switch blocks before CALL-E receives anything', async () => {
   assert.equal(port.creates, 0)
 })
 
-test('contact permission and fresh intent are both mandatory', async () => {
-  for (const field of ['contactPermission', 'confirmIntent'] as const) {
+test('every authorization field must be the exact boolean true before dispatch', async () => {
+  for (const field of ['contactPermission', 'aiDisclosureApproved', 'confirmIntent'] as const) {
     const port = fakePort()
     await assert.rejects(dispatchStoryCall({ ...authorized, [field]: false }, port, 'enabled'))
     assert.equal(port.creates, 0)
+
+    const stringFalse = { ...authorized, [field]: 'false' } as unknown as StoryCallRequest
+    await assert.rejects(dispatchStoryCall(stringFalse, port, 'enabled'), /must be a boolean/)
+    assert.equal(port.creates, 0)
   }
+})
+
+test('the JSON trust boundary validates the complete request shape', () => {
+  assert.deepEqual(parseStoryCallRequest({ ...authorized }), authorized)
+  assert.deepEqual(parseStoryCallRequest({ ...authorized, contactPermission: false }).contactPermission, false)
+  assert.throws(() => parseStoryCallRequest({ ...authorized, requestId: 123 }), /requestId must be a string/)
+  assert.throws(() => parseStoryCallRequest({ ...authorized, region: false }), /region must be a string/)
+  assert.throws(() => parseStoryCallRequest({ ...authorized, contactPermission: 'false' }), /contactPermission must be a boolean/)
+  assert.throws(() => parseStoryCallRequest({ ...authorized, unexpected: 'field' }), /Unknown call request field/)
 })
 
 test('an invalid phone is rejected before dispatch', async () => {

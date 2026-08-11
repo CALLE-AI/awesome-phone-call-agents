@@ -23,15 +23,48 @@ export type StoryCallResult = {
 
 const E164 = /^\+[1-9]\d{7,14}$/
 const LOCALE = /^[a-z]{2,3}(?:-[A-Z]{2})?$/
+const REQUEST_FIELDS = new Set([
+  'requestId',
+  'storytellerPhone',
+  'locale',
+  'region',
+  'familyName',
+  'question',
+  'contactPermission',
+  'aiDisclosureApproved',
+  'confirmIntent',
+])
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function parseStoryCallRequest(value: unknown): StoryCallRequest {
+  if (!isRecord(value)) throw new Error('The call request must be a JSON object.')
+
+  const unknownFields = Object.keys(value).filter((field) => !REQUEST_FIELDS.has(field))
+  if (unknownFields.length > 0) throw new Error(`Unknown call request field: ${unknownFields[0]}.`)
+
+  for (const field of ['requestId', 'storytellerPhone', 'locale', 'familyName', 'question'] as const) {
+    if (typeof value[field] !== 'string') throw new Error(`${field} must be a string.`)
+  }
+  if (value.region !== undefined && typeof value.region !== 'string') throw new Error('region must be a string when provided.')
+  for (const field of ['contactPermission', 'aiDisclosureApproved', 'confirmIntent'] as const) {
+    if (typeof value[field] !== 'boolean') throw new Error(`${field} must be a boolean.`)
+  }
+
+  return value as StoryCallRequest
+}
 
 export function assertLiveCallAuthorized(request: StoryCallRequest): void {
+  parseStoryCallRequest(request)
   if (!E164.test(request.storytellerPhone)) throw new Error('The storyteller phone must be an explicit E.164 number.')
   if (!LOCALE.test(request.locale)) throw new Error('The storyteller locale must be an explicit BCP 47 language tag.')
   if (!request.familyName.trim()) throw new Error('The family member placing the call must be named.')
   if (!request.question.trim()) throw new Error('The family must approve one explicit question.')
-  if (!request.contactPermission) throw new Error('Recorded permission to contact this adult is required.')
-  if (!request.aiDisclosureApproved) throw new Error('The family must approve the spoken AI disclosure.')
-  if (!request.confirmIntent) throw new Error('A fresh explicit intent confirmation is required for this call.')
+  for (const field of ['contactPermission', 'aiDisclosureApproved', 'confirmIntent'] as const) {
+    if (request[field] !== true) throw new Error(`${field} must be the exact boolean true.`)
+  }
 }
 
 export function buildCallTask(request: StoryCallRequest): string {
