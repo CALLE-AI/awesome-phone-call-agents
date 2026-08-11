@@ -22,6 +22,7 @@ def valid_intake() -> dict:
         "request_reason_hint": "",
         "timezone": "America/New_York",
         "locale": "en-US",
+        "consent": True,
     }
 
 
@@ -101,6 +102,38 @@ def test_request_rejects_bad_phone(tmp_path):
     assert "E.164" in result.stderr
 
 
+def test_request_rejects_plus_zero(tmp_path):
+    request_path = tmp_path / "request.json"
+    payload = valid_intake()
+    payload["phone"] = "+0123456789"
+    request_path.write_text(json.dumps(payload), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "client.py", "--request", str(request_path)],
+        cwd=APP_ROOT,
+        text=True,
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode == 2
+    assert "E.164" in result.stderr
+
+
+def test_request_requires_consent_field(tmp_path):
+    request_path = tmp_path / "request.json"
+    payload = valid_intake()
+    payload.pop("consent")
+    request_path.write_text(json.dumps(payload), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "client.py", "--request", str(request_path)],
+        cwd=APP_ROOT,
+        text=True,
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode == 2
+    assert "consent" in result.stderr.lower()
+
+
 def test_output_written_to_0600_file(tmp_path):
     request_path = tmp_path / "request.json"
     request_path.write_text(json.dumps(valid_intake()), encoding="utf-8")
@@ -116,3 +149,24 @@ def test_output_written_to_0600_file(tmp_path):
     assert out.exists()
     mode = oct(out.stat().st_mode & 0o777)
     assert mode == "0o600"
+
+
+def test_rejects_untrusted_base_url(tmp_path):
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(valid_intake()), encoding="utf-8")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "client.py",
+            "--request",
+            str(request_path),
+            "--base-url",
+            "https://evil.example.com",
+        ],
+        cwd=APP_ROOT,
+        text=True,
+        capture_output=True,
+        timeout=15,
+    )
+    assert result.returncode == 2
+    assert "api.heycall-e.com" in result.stderr.lower() or "base_url" in result.stderr.lower()

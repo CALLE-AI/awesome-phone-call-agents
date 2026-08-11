@@ -6,6 +6,7 @@
   "request_reason_hint": "Customer submitted a callback request with no reason selected",
   "timezone": "America/New_York",
   "locale": "en-US",
+  "consent": true,
   "do_not_call": false,
   "quiet_hours": {
     "start": "20:00",

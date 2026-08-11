@@ -30,6 +30,7 @@ def intake(**overrides):
         "request_reason_hint": "",
         "timezone": NY,
         "locale": "en-US",
+        "consent": True,
     }
     base.update(overrides)
     return coordinator.parse_intake(base)
@@ -46,6 +47,15 @@ def test_parse_intake_rejects_non_e164():
         assert "E.164" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_parse_intake_rejects_plus_zero():
+    try:
+        intake(phone="+0123456789")
+    except ValueError as exc:
+        assert "E.164" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for +0")
 
 
 def test_parse_intake_rejects_bad_source():
@@ -66,6 +76,34 @@ def test_parse_intake_rejects_do_not_call_non_bool():
         raise AssertionError("expected ValueError")
 
 
+def test_parse_intake_requires_consent():
+    try:
+        base = {
+            "workflow_id": "demo-triage-001",
+            "phone": "+12025550123",
+            "source": "web_form",
+            "business_display_name": "Example Service Desk",
+            "request_reason_hint": "",
+            "timezone": NY,
+            "locale": "en-US",
+            # consent missing
+        }
+        coordinator.parse_intake(base)
+    except ValueError as exc:
+        assert "consent" in str(exc).lower()
+    else:
+        raise AssertionError("expected ValueError for missing consent")
+
+
+def test_parse_intake_rejects_false_consent():
+    try:
+        intake(consent=False)
+    except ValueError as exc:
+        assert "consent" in str(exc).lower()
+    else:
+        raise AssertionError("expected ValueError for consent=false")
+
+
 def test_parse_intake_defaults():
     value = coordinator.parse_intake(
         {
@@ -74,6 +112,7 @@ def test_parse_intake_defaults():
             "source": "missed_call",
             "business_display_name": "ACME",
             "timezone": "Europe/London",
+            "consent": True,
         }
     )
     assert value.locale == "en-US"
@@ -88,6 +127,29 @@ def test_parse_intake_accepts_iana_timezone():
 
 def test_mask_phone():
     assert coordinator.mask_phone("+12025550123") == "+12******123"
+
+
+def test_validate_trusted_base_url_accepts_official():
+    ok = coordinator.validate_trusted_base_url("https://api.heycall-e.com")
+    assert "api.heycall-e.com" in ok
+    ok2 = coordinator.validate_trusted_base_url("https://api.heycall-e.com/")
+    assert "api.heycall-e.com" in ok2
+
+
+def test_validate_trusted_base_url_rejects_evil():
+    try:
+        coordinator.validate_trusted_base_url("https://evil.example.com")
+    except ValueError as exc:
+        assert "api.heycall-e.com" in str(exc)
+    else:
+        raise AssertionError("expected rejection of untrusted host")
+
+    try:
+        coordinator.validate_trusted_base_url("http://api.heycall-e.com")
+    except ValueError as exc:
+        assert "https" in str(exc).lower()
+    else:
+        raise AssertionError("expected rejection of http")
 
 
 # --------------------------------------------------------------------------- #
@@ -155,7 +217,7 @@ def test_classify_scheduled_on_high_confidence_actionable():
 
 
 def test_classify_needs_human_when_missing_result():
-    result = coordinator.classify_disposition({"status": "completed", "structured_result": None})
+    result = coordinator.classify_disposition({"status": "completed", "task_completed": True, "structured_result": None})
     assert result["disposition"] == "needs_human"
     assert result["needs_human"] is True
 
@@ -202,6 +264,49 @@ def test_classify_needs_human_on_urgent():
     )
     assert result["disposition"] == "needs_human"
     assert result["reason"] == "urgent_fast_track"
+
+
+def test_classify_needs_human_when_task_not_completed():
+    result = coordinator.classify_disposition(_completed(task_completed=False))
+    assert result["disposition"] == "needs_human"
+    assert result["reason"] == "task_not_completed"
+
+
+def test_classify_needs_human_when_status_not_completed():
+    result = coordinator.classify_disposition(_completed(status="in_progress"))
+    assert result["disposition"] == "needs_human"
+    assert "not_completed" in result["reason"]
+
+
+def test_classify_needs_human_on_unbound_structured_data():
+    # Invalid enum value should not be scheduled
+    result = coordinator.classify_disposition(
+        _completed(structured_result={**_completed()["structured_result"], "contact_reason": "evil_injection"})
+    )
+    assert result["disposition"] == "needs_human"
+    assert "invalid" in result["reason"]
+
+
+def test_build_task_does_not_offer_callback_time():
+    v = intake()
+    task = coordinator.build_task(v)
+    # Old prompt offered "Offer to book a specific callback time"
+    assert "book a specific callback time" not in task.lower()
+    # Schema cannot return a time, so task must not promise booking
+    assert "confirm the time by repeating" not in task.lower()
+
+
+def test_redact_phone_like_formatted():
+    # Contiguous E.164
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call +12025550123")
+    # US formatted
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call (202) 555-0123")
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call 202-555-0123")
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call 202.555.0123")
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call 202 555 0123")
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call +1 (202) 555-0123")
+    # International
+    assert "[phone-redacted]" in coordinator.redact_phone_like("Call +44 20 7123 4567")
 
 
 # --------------------------------------------------------------------------- #
@@ -311,3 +416,17 @@ def test_execute_fail_closed_when_lookup_raises():
     ticket = coordinator.execute_with_client(value, client, now=_ny(14, 0), timeout_seconds=60)
     assert ticket["disposition"] == "needs_human"
     assert ticket["reason"] == "result_lookup_error"
+
+
+def test_execute_masks_formatted_phone_in_evidence():
+    value = intake()
+    term = _completed(
+        structured_result={
+            **_completed()["structured_result"],
+            "evidence_summary": "Caller left number (202) 555-0123 for callback.",
+        }
+    )
+    client = FakeClient(term)
+    ticket = coordinator.execute_with_client(value, client, now=_ny(14, 0), timeout_seconds=60)
+    assert "[phone-redacted]" in ticket["evidence_summary"]
+    assert "(202)" not in ticket["evidence_summary"]

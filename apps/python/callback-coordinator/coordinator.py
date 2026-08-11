@@ -16,14 +16,28 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, available_timezones
 
-E164_PATTERN = re.compile(r"^\+\d{8,15}$")
+# E.164: + followed by 1-9 then 7-14 more digits = 8-15 digits total,
+# first digit after + must not be 0 (prevents +0...).
+E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
 SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,119}$")
 LOCALE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
 TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+# Legacy contiguous pattern (still used as fallback)
 PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?\d{7,15}(?!\w)")
+
+# Formatted phone patterns – catches (202) 555-0123, 202-555-0123, 202.555.0123,
+# 202 555 0123, +1 (202) 555-0123, +44 20 7123 4567, etc.
+# Candidate regex finds sequences of digits with separators; digit-count validated in code.
+PHONE_CANDIDATE_RE = re.compile(r"\+?\(?\d[\d\s\-\.\(\)]{5,}\d")
+DATE_RE = re.compile(r"^\d{4}[-/]\d{2}[-/]\d{2}$")
+
+TRUSTED_API_HOST = "api.heycall-e.com"
+TRUSTED_BASE_URL = f"https://{TRUSTED_API_HOST}"
 
 VALID_SOURCES = ("web_form", "missed_call")
 VALID_REASONS = (
@@ -47,6 +61,11 @@ DEFAULT_ROUTING_RULES: tuple[dict, ...] = (
     {"category": "service_coordination", "team": "Service Scheduling", "action": "Queue for service scheduling callback."},
 )
 
+VALID_RIGHT_PERSON = {"yes", "no", "unknown"}
+VALID_CONSENT = {"yes", "no", "unknown"}
+VALID_URGENT = {"yes", "no", "unknown"}
+VALID_VOICEMAIL = {"yes", "no", "unknown"}
+
 
 @dataclass(frozen=True)
 class RoutingRule:
@@ -64,11 +83,54 @@ class CallbackIntake:
     request_reason_hint: str
     timezone: str
     locale: str
+    consent: bool = False
     do_not_call: bool = False
     quiet_hours: tuple[str, str] = ("20:00", "08:00")
     routing_rules: tuple[RoutingRule, ...] = field(
         default_factory=lambda: tuple(RoutingRule(**r) for r in DEFAULT_ROUTING_RULES)
     )
+
+
+# --------------------------------------------------------------------------- #
+# Trusted origin validation
+# --------------------------------------------------------------------------- #
+
+def validate_trusted_base_url(url: str) -> str:
+    """Fail-closed validation that credentials stay on the trusted official HTTPS origin.
+
+    Only ``https://api.heycall-e.com`` (with optional trailing slash or path) is allowed.
+    Anything else – http, wrong host, userinfo, non-443 port – is rejected.
+    """
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError(f"base_url must be {TRUSTED_BASE_URL}")
+    raw = url.strip()
+    parsed = urlparse(raw)
+
+    if parsed.scheme.lower() != "https":
+        raise ValueError(f"base_url must use https and be {TRUSTED_BASE_URL}; got {url}")
+
+    # No userinfo allowed
+    if parsed.username or parsed.password:
+        raise ValueError(f"base_url must not contain credentials; only {TRUSTED_BASE_URL} is allowed")
+
+    host = (parsed.hostname or "").lower()
+    if host != TRUSTED_API_HOST:
+        raise ValueError(f"base_url host must be {TRUSTED_API_HOST}; got {host or parsed.netloc}")
+
+    # Only allow default 443 or no port
+    if parsed.port is not None and parsed.port != 443:
+        raise ValueError(f"base_url must not use custom port; only {TRUSTED_BASE_URL} is allowed")
+
+    # Normalize: keep scheme+host+optional path but strip trailing slash for comparison
+    # Return the original trusted URL normalized (strip trailing slash)
+    normalized = raw.rstrip("/")
+    # Ensure it starts with trusted origin
+    if not normalized.lower().startswith(TRUSTED_BASE_URL.lower()):
+        # Allow path beyond origin, e.g. https://api.heycall-e.com/v1
+        # The host check already passed, so this is okay, but enforce origin prefix logic
+        pass
+
+    return normalized
 
 
 # --------------------------------------------------------------------------- #
@@ -94,7 +156,7 @@ def parse_intake(raw: dict) -> CallbackIntake:
 
     phone = _clean_text(raw.get("phone"), "phone", minimum=9, maximum=16)
     if not E164_PATTERN.fullmatch(phone):
-        raise ValueError("phone must use E.164 format, for example +12025550123")
+        raise ValueError("phone must use E.164 format, for example +12025550123 and must not start with +0")
 
     source = raw.get("source")
     if source not in VALID_SOURCES:
@@ -109,6 +171,15 @@ def parse_intake(raw: dict) -> CallbackIntake:
     locale = _clean_text(raw.get("locale", "en-US"), "locale", minimum=2, maximum=16)
     if not LOCALE_PATTERN.fullmatch(locale):
         raise ValueError("locale must look like en-US or ko-KR")
+
+    # Consent is mandatory – intake must record explicit consent for this callback.
+    if "consent" not in raw:
+        raise ValueError("consent is required; intake must record explicit consent for this callback (boolean true)")
+    consent_val = raw.get("consent")
+    if not isinstance(consent_val, bool):
+        raise ValueError("consent must be a boolean true, recording explicit consent for this callback")
+    if consent_val is not True:
+        raise ValueError("consent must be true; intake must record that the recipient explicitly requested this callback")
 
     do_not_call = raw.get("do_not_call", False)
     if not isinstance(do_not_call, bool):
@@ -161,6 +232,7 @@ def parse_intake(raw: dict) -> CallbackIntake:
         ),
         timezone=timezone_name,
         locale=locale,
+        consent=consent_val,
         do_not_call=do_not_call,
         quiet_hours=(start, end),
         routing_rules=routing_rules,
@@ -201,6 +273,9 @@ def _in_quiet_hours(now_minutes: int, start_hhmm: str, end_hhmm: str) -> bool:
 
 def attempt_gate(intake: CallbackIntake, now: datetime) -> tuple[bool, str | None]:
     """Return (should_attempt, reason). Reason is not-None when we must NOT call."""
+    # Consent gate – fail closed if consent not recorded as true
+    if not intake.consent:
+        return False, "consent_not_recorded"
     if intake.do_not_call:
         return False, "do_not_call"
     if now.tzinfo is None:
@@ -232,10 +307,11 @@ def build_task(intake: CallbackIntake) -> str:
         "If either answer is no, do not ask anything else, record the answer and end the call. "
         "If they want to continue, ask in plain language why they are calling back and classify the reason as exactly one of: "
         f"{categories}, declined, or other. "
-        "Ask whether this is urgent. Offer to book a specific callback time now and confirm the time by repeating it once. "
+        "Ask whether this is urgent. "
         "Ask whether a voicemail is acceptable if the human callback is missed. "
         "Do not request sensitive personal, medical, legal, or financial information. "
-        "Do not book, cancel, purchase, promise, or modify any service. Do not state phone numbers or other personal data in your summary."
+        "Do not book, cancel, purchase, promise, or modify any service. Do not attempt to schedule a time now – you are only triaging and routing, not booking. "
+        "Do not state phone numbers or other personal data in your summary."
     )
 
 
@@ -325,22 +401,45 @@ def classify_disposition(completed: dict) -> dict:
 
     Every outcome that does not confidently reach a 'scheduled' or 'declined'
     state is routed to a human (needs_human). Uncertainty is never read as a
-    success.
+    success. This is fail-closed:
+      - status must be exactly 'completed'
+      - task_completed must be True
+      - structured_result must be present and bound to the declared enums
     """
+
     if not isinstance(completed, dict) or not completed:
         return {"disposition": "needs_human", "needs_human": True, "reason": "missing_terminal_result"}
 
     status = completed.get("status")
-    if status in ("failed", "canceled"):
-        return {"disposition": "needs_human", "needs_human": True, "reason": f"call_{status}"}
+    if status != "completed":
+        if status in ("failed", "canceled"):
+            return {"disposition": "needs_human", "needs_human": True, "reason": f"call_{status}"}
+        return {"disposition": "needs_human", "needs_human": True, "reason": f"call_not_completed_status_{status}"}
+
+    if completed.get("task_completed") is not True:
+        return {"disposition": "needs_human", "needs_human": True, "reason": "task_not_completed"}
 
     sr = completed.get("structured_result")
     if not isinstance(sr, dict) or not sr:
         return {"disposition": "needs_human", "needs_human": True, "reason": "missing_structured_result"}
 
+    # Validate binding to declared enums – unbound data must not become scheduled.
     right_person = sr.get("right_person")
     consent = sr.get("consent_after_ai_disclosure")
     reason = sr.get("contact_reason")
+    urgent = sr.get("urgent")
+    voicemail = sr.get("voicemail_allowed")
+
+    if right_person not in VALID_RIGHT_PERSON:
+        return {"disposition": "needs_human", "needs_human": True, "reason": "invalid_right_person"}
+    if consent not in VALID_CONSENT:
+        return {"disposition": "needs_human", "needs_human": True, "reason": "invalid_consent"}
+    if reason not in VALID_REASONS:
+        return {"disposition": "needs_human", "needs_human": True, "reason": "invalid_contact_reason"}
+    if urgent not in VALID_URGENT:
+        return {"disposition": "needs_human", "needs_human": True, "reason": "invalid_urgent"}
+    if voicemail not in VALID_VOICEMAIL:
+        return {"disposition": "needs_human", "needs_human": True, "reason": "invalid_voicemail"}
 
     if right_person == "no":
         return {"disposition": "needs_human", "needs_human": True, "reason": "wrong_person"}
@@ -403,8 +502,34 @@ def preview(intake: CallbackIntake, now: datetime) -> dict:
 
 
 def redact_phone_like(value):
+    """Redact phone numbers – contiguous E.164 and common formatted forms.
+
+    Covers:
+      +12025550123, 2025550123,
+      (202) 555-0123, 202-555-0123, 202.555.0123, 202 555 0123,
+      +1 (202) 555-0123, +44 20 7123 4567, +44-20-7123-4567, etc.
+    Fail-closed: over-redaction preferred over leakage.
+    """
     if isinstance(value, str):
-        return PHONE_LIKE_PATTERN.sub("[phone-redacted]", value)
+        # First handle formatted candidates with separators
+        def _repl_formatted(m):
+            txt = m.group(0)
+            digits = re.sub(r"\D", "", txt)
+            stripped = txt.strip()
+            # Preserve ISO dates and HH:MM times
+            if DATE_RE.fullmatch(stripped):
+                return txt
+            if re.fullmatch(r"\d{1,2}:\d{2}", stripped):
+                return txt
+            if 7 <= len(digits) <= 15:
+                return "[phone-redacted]"
+            return txt
+
+        # This catches formatted numbers like (202) 555-0123 or +44 20 7123 4567
+        value = PHONE_CANDIDATE_RE.sub(_repl_formatted, value)
+        # Contiguous E.164 / 7-15 digit strings
+        value = PHONE_LIKE_PATTERN.sub("[phone-redacted]", value)
+        return value
     if isinstance(value, list):
         return [redact_phone_like(item) for item in value]
     if isinstance(value, dict):

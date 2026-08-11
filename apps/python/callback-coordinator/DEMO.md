@@ -63,8 +63,10 @@ uv run python client.py --request demo_request.json \
 ```
 
 The agent will call your number, disclose it's AI, confirm you're the intended
-recipient, ask why you're calling back, ask if it's urgent, and (if you agree)
-offer to book a callback time. Then it writes a fail-closed ticket.
+recipient, ask why you're calling back, ask if it's urgent, and ask if voicemail
+is okay if the human callback is missed. It **does not** offer to book a specific
+callback time – that is out-of-scope for the triage schema. Then it writes a
+fail-closed ticket.
 
 ## 7. Read the result
 

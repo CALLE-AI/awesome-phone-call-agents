@@ -85,12 +85,15 @@ The intake JSON must contain:
 
 - `workflow_id` — a stable, non-secret identifier (letters, numbers, `.`, `_`,
   `:`, `-`).
-- `phone` — one E.164 number you are authorized to call.
+- `phone` — one E.164 number you are authorized to call (must be `+` followed
+  by 1-9 then 7-14 digits; `+0` prefixes are rejected).
 - `source` — `web_form` or `missed_call`.
 - `business_display_name` — the name disclosed during the call.
 - `request_reason_hint` — optional short note from the web form (may be empty).
 - `timezone` — the recipient's IANA timezone, e.g. `America/New_York`.
 - `locale` — a locale such as `en-US`.
+- `consent` — **required boolean true** – records that the recipient explicitly
+  requested this callback. The parser rejects missing or false consent.
 - `do_not_call` — boolean; `true` prevents any call.
 - `quiet_hours` — `{ "start", "end" }` 24-hour window (in the recipient's
   timezone) during which the engine will not call. Defaults to `20:00`–`08:00`.
@@ -114,16 +117,25 @@ A ticket with `mode`, `workflow_id`, the gate outcome, the CALL-E `status`,
 
 `needs_human` tickets keep the matched team when the reason is confident enough
 to target a specialist, otherwise they land in "General Intake (human review)".
-Phone numbers are masked and phone-like text is removed from evidence.
+Phone numbers are masked and phone-like text (including formatted forms like
+`(202) 555-0123`, `202-555-0123`, `202.555.0123`, `+1 (202) 555-0123`,
+`+44 20 7123 4567`) is removed from evidence via fail-closed redaction.
 
 ## Side effects and safety
 
-- A live run places a real outbound phone call. Use it only when the recipient
-  consented to this callback and you pass `--confirm-consent`.
+- A live run places a real outbound phone call. Use it only when the intake
+  records `consent: true` **and** you pass `--confirm-consent`.
 - The agent discloses it is AI and ends immediately after a wrong-person
-  response or opt-out.
+  response or opt-out. It never offers to book a specific callback time – the
+  schema cannot return a time, so this is explicitly out-of-scope.
 - The engine creates no recurring schedule; it processes one recipient per run.
-- Quiet hours and `do_not_call` are enforced in the recipient's timezone.
+- Quiet hours, `do_not_call`, and missing/false `consent` are enforced in the
+  recipient's timezone and fail-closed (gate blocks the call).
+- `--base-url` and `CALLE_BASE_URL` are locked to `https://api.heycall-e.com`
+  – any other origin is rejected before the bearer token is used.
+- Result classification is fail-closed: `status` must be `completed` and
+  `task_completed` must be `true`; otherwise the ticket becomes `needs_human`.
+  Unbound enum values in `structured_result` also become `needs_human`.
 - See [`docs/fail-closed-dispositions.md`](docs/fail-closed-dispositions.md)
   for the disposition matrix and [`docs/safety.md`](docs/safety.md) for
   credential and boundary guidance.

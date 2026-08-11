@@ -9,31 +9,39 @@ not reach a clear, consented answer is not auto-closed.
 
 | Disposition | Condition (all must hold) | Routing |
 |---|---|---|
-| `scheduled` | `right_person = yes`, `consent = yes`, reason ∈ actionable set, confidence ≥ 0.7 (or label `high`), not urgent | Matched team |
-| `declined` | consent `no`, or reason `declined` | Closed (no callback wanted) |
-| `skipped` | Gate blocked the call (quiet hours or `do_not_call`) | No call made |
-| `needs_human` | Anything else | Human review |
+| `scheduled` | `status=completed`, `task_completed=true`, `right_person=yes`, `consent=yes`, reason ∈ actionable set, confidence ≥ 0.7 (or label `high`), not urgent, all enums bound | Matched team |
+| `declined` | consent `no`, or reason `declined` (with completed true) | Closed (no callback wanted) |
+| `skipped` | Gate blocked the call (quiet hours, `do_not_call`, or `consent_not_recorded`) | No call made |
+| `needs_human` | Anything else – including non-completed status, task_completed=false, unbound enum values | Human review |
 
 ## What lands in `needs_human`
 
 Each case below routes to a human instead of a success branch:
 
-- **Missing result** — CALL-E returned no `structured_result`.
-- **Call failed or canceled** — terminal status `failed` or `canceled`.
+- **Missing terminal result** – CALL-E returned no dict.
+- **Not completed** – `status` is not exactly `completed` (e.g. `in_progress`, `failed`, `canceled`) or missing. `failed`/`canceled` map to `call_failed`/`call_canceled`, others to `call_not_completed_status_*`.
+- **Task not completed** – `task_completed != true` → `task_not_completed`.
+- **Missing structured result** – no `structured_result`.
+- **Invalid / unbound structured data** – any `structured_result` field outside its declared enum (`right_person`, `consent_after_ai_disclosure`, `contact_reason`, `urgent`, `voicemail_allowed`) → `invalid_*`. This prevents arbitrary LLM output from being classified as success.
 - **Wrong person** — `right_person = no`.
 - **Right person unconfirmed** — `right_person = unknown` or not `yes`.
 - **Consent unconfirmed** — `consent_after_ai_disclosure != yes`.
-- **Reason ambiguous** — `contact_reason` is `unknown`, `other`, or not a
-  recognized category.
+- **Reason ambiguous** — `contact_reason` is `unknown`, `other`, or not a recognized category.
 - **Low confidence** — completion confidence below threshold.
 - **Urgent matter** — `urgent = yes`: fast-tracked to a human, not auto-routed.
-- **Create/result error** — the create response had no call id, the lookup
-  timed out or raised, or the outcome of `POST /v1/calls` was indeterminate.
+- **Create/result error** — the create response had no call id, the lookup timed out or raised, or the outcome of `POST /v1/calls` was indeterminate.
 
 For `needs_human`, the engine keeps the matched team when the reason is still
 confident enough to target a specialist (e.g. low confidence but clear
 `billing` → the Billing team reviews). Otherwise it falls back to
 "General Intake (human review)".
+
+## Why the task no longer offers a callback time
+
+The earlier prompt offered "book a specific callback time now" but the result
+schema has no time field. That mismatch meant a promised time could be lost or
+hallucinated. The fixed prompt explicitly says: do **not** attempt to book a
+time; it only triages why the callback is needed and whether voicemail is okay.
 
 ## Idempotency and reconciliation
 
