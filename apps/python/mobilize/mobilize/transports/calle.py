@@ -36,7 +36,7 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 # recipient's OWN spoken words in the transcript (speaker == "user").
 #
 # A denial-word blocklist alone fails open: "Maybe, I am not sure." and "I
-# will stay home." contain none of the denial tokens below, so a
+# will stay home." contain none of the tokens below on their own, so a
 # denial-only check would let provider-authored can_come="yes" through
 # uncorroborated for both. Corroboration instead requires the recipient's
 # own words to contain some AFFIRMATIVE commitment language -- absence of a
@@ -44,8 +44,21 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 # ("maybe", "i think", "we'll see" -- mirroring commitment.py's own
 # HEDGE_MARKERS) deliberately does NOT count as affirmation: a hedge is not
 # a commitment, firm or soft, in the recipient's own words.
+#
+# A single whole-transcript blob has two further failure modes a reviewer
+# found: (1) a negation directly in front of an affirmative phrase --
+# "Not right now" -- matches the affirmation regex on "right now" with no
+# awareness it was negated, and (2) an EARLIER "yes" survives a LATER
+# retraction in the same call ("Yes, I am definitely coming" ... "Actually
+# I need to stay home") because concatenating every turn into one string
+# and searching it loses the order entirely. Both are closed by explicit
+# negated/decline phrases in the denial list, and by evaluating turns in
+# order and keeping only the LATEST turn with a clear signal -- the
+# recipient's current position, not everything they ever said.
 _RECIPIENT_DENIAL_RE = re.compile(
-    r"\b(no|nope|nah|can'?t|cannot|won'?t|unable|not able|not going to make it)\b",
+    r"\b(no|nope|nah|can'?t|cannot|won'?t|unable|not able|not going to make it|"
+    r"not\s+(right\s+now|now|today|coming|going)|"
+    r"stay(ing)?\s+home|stay(ing)?\s+in|change[ds]?\s+my\s+mind)\b",
     re.IGNORECASE,
 )
 _RECIPIENT_AFFIRMATION_RE = re.compile(
@@ -63,11 +76,31 @@ def _recipient_text(transcript: list[dict]) -> str:
     return " ".join(turn.get("text", "") for turn in transcript if turn.get("speaker") == "user")
 
 
+def _recipient_effective_position(transcript: list[dict]) -> str:
+    """"affirm" / "deny" / "neutral" -- the recipient's LATEST clearly-
+    signaled position, not just whether an affirmative phrase appears
+    anywhere in the call. Each recipient turn is checked independently, in
+    order; a turn that matches denial (checked first, so a turn matching
+    both fails closed) sets the running position to "deny", a turn that
+    matches only affirmation sets it to "affirm", and a turn with neither
+    leaves the running position unchanged. The position after the LAST
+    recipient turn is what's returned -- so a later retraction always wins
+    over an earlier "yes", exactly as it would for a human listening to
+    the whole call."""
+    position = "neutral"
+    for turn in transcript:
+        if turn.get("speaker") != "user":
+            continue
+        text = turn.get("text", "")
+        if _RECIPIENT_DENIAL_RE.search(text):
+            position = "deny"
+        elif _RECIPIENT_AFFIRMATION_RE.search(text):
+            position = "affirm"
+    return position
+
+
 def _recipient_corroborates_commitment(transcript: list[dict]) -> bool:
-    text = _recipient_text(transcript)
-    if _RECIPIENT_DENIAL_RE.search(text):
-        return False
-    return bool(_RECIPIENT_AFFIRMATION_RE.search(text))
+    return _recipient_effective_position(transcript) == "affirm"
 
 
 class CalleTransport:

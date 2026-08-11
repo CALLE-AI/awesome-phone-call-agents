@@ -95,9 +95,9 @@ def test_hedged_recipient_language_does_not_corroborate_a_structured_yes():
 
 
 def test_recipient_declining_without_denial_words_does_not_corroborate_a_structured_yes():
-    """'I will stay home.' contains no denial token either (no 'no',
-    'can't', etc.) but is plainly not agreement -- affirmative corroboration
-    must be required, not merely the absence of a denial word."""
+    """'I will stay home.' is plainly not agreement even though it doesn't
+    contain a generic denial token like 'no' or 'can't' -- corroboration
+    requires affirmative language, not merely the absence of a denial."""
     candidate = _candidate()
     call = _call(status="completed", can_come="yes", task_completed=True,
                   evidence="leaving now",
@@ -142,6 +142,40 @@ def test_recipient_denial_overrides_a_contradicting_structured_yes():
                   transcript_turns=[
                       {"speaker": "bot", "text": "can you come donate right now?"},
                       {"speaker": "user", "text": "No, I cannot come"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_a_later_retraction_overrides_an_earlier_stated_yes():
+    """A single whole-transcript blob has no notion of order -- concatenating
+    every recipient turn and searching it lets an EARLIER "yes" survive a
+    LATER retraction in the same call. The recipient's LATEST position must
+    win, exactly as it would for a human listening to the whole call."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I am definitely coming"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "Actually I need to stay home"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_negation_immediately_before_an_affirmative_phrase_is_not_corroboration():
+    """"Not right now" must not match on the "right now" fragment of the
+    affirmation regex with no awareness the phrase was negated."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Not right now"},
                   ])
     result = _to_call_result("call_1", call, candidate)
     assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
