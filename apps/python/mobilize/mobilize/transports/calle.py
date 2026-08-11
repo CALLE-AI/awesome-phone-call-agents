@@ -45,20 +45,35 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 # HEDGE_MARKERS) deliberately does NOT count as affirmation: a hedge is not
 # a commitment, firm or soft, in the recipient's own words.
 #
-# A single whole-transcript blob has two further failure modes a reviewer
-# found: (1) a negation directly in front of an affirmative phrase --
-# "Not right now" -- matches the affirmation regex on "right now" with no
-# awareness it was negated, and (2) an EARLIER "yes" survives a LATER
-# retraction in the same call ("Yes, I am definitely coming" ... "Actually
-# I need to stay home") because concatenating every turn into one string
-# and searching it loses the order entirely. Both are closed by explicit
-# negated/decline phrases in the denial list, and by evaluating turns in
-# order and keeping only the LATEST turn with a clear signal -- the
-# recipient's current position, not everything they ever said.
+# Two further failure modes on top of the denial-phrase list, both about
+# the SAME root cause: an affirmation regex matched an embedded phrase
+# with no regard for what wraps it. "Not right now" matches on "right
+# now"; "I don't think I can make it" matches on "i can make it" -- and a
+# denial-phrase list can only ever catch wordings someone anticipated,
+# never the next unlisted reversal. Listing more phrases forever chases
+# the last repro instead of closing the class of bug.
+#
+# Fixed properly with two mechanisms instead of a longer list:
+#
+# 1. NEGATION SCOPE, not more denial phrases: split each recipient turn
+#    into clauses (on sentence punctuation and contrastive words like
+#    "but"/"actually"/"however"), and if a GENERIC negation cue (no, not,
+#    don't, doesn't, won't, can't, never, unable, ...) appears anywhere in
+#    a clause, the WHOLE clause is treated as a denial -- including any
+#    affirmative-sounding phrase later in that same clause. This fails
+#    closed on any embedded affirmation the cue happens to wrap, not just
+#    the specific phrasings already on a list.
+# 2. LATEST clause wins, not just latest turn: "Yes, I am definitely
+#    coming" ... "Actually I need to stay home" must resolve to the LATER
+#    statement, the same way a human listening to the whole call would.
+_NEGATION_CUE_RE = re.compile(
+    r"\b(no|not|never|don'?t|doesn'?t|didn'?t|won'?t|can'?t|cannot|unable|nope|nah)\b",
+    re.IGNORECASE,
+)
 _RECIPIENT_DENIAL_RE = re.compile(
-    r"\b(no|nope|nah|can'?t|cannot|won'?t|unable|not able|not going to make it|"
-    r"not\s+(right\s+now|now|today|coming|going)|"
-    r"stay(ing)?\s+home|stay(ing)?\s+in|change[ds]?\s+my\s+mind)\b",
+    # Decline phrases that don't contain a generic negation cue word above
+    # and so wouldn't otherwise be caught by _NEGATION_CUE_RE.
+    r"\b(not going to make it|stay(ing)?\s+home|stay(ing)?\s+in|change[ds]?\s+my\s+mind)\b",
     re.IGNORECASE,
 )
 _RECIPIENT_AFFIRMATION_RE = re.compile(
@@ -70,32 +85,46 @@ _RECIPIENT_AFFIRMATION_RE = re.compile(
     r"coming|on my way|leaving(\s+now)?|be there|right now)\b",
     re.IGNORECASE,
 )
+_CLAUSE_SPLIT_RE = re.compile(r"[.,;!?]+|\bbut\b|\bactually\b|\bhowever\b", re.IGNORECASE)
 
 
 def _recipient_text(transcript: list[dict]) -> str:
     return " ".join(turn.get("text", "") for turn in transcript if turn.get("speaker") == "user")
 
 
+def _clause_signal(clause: str) -> str:
+    """"affirm" / "deny" / "neutral" for a single clause. A negation cue OR
+    a listed decline phrase ANYWHERE in the clause fails the whole clause
+    closed as a denial -- checked before affirmation, so an affirmative
+    phrase later in the SAME clause never overrides the negation that
+    wraps it."""
+    if _NEGATION_CUE_RE.search(clause) or _RECIPIENT_DENIAL_RE.search(clause):
+        return "deny"
+    if _RECIPIENT_AFFIRMATION_RE.search(clause):
+        return "affirm"
+    return "neutral"
+
+
 def _recipient_effective_position(transcript: list[dict]) -> str:
     """"affirm" / "deny" / "neutral" -- the recipient's LATEST clearly-
     signaled position, not just whether an affirmative phrase appears
-    anywhere in the call. Each recipient turn is checked independently, in
-    order; a turn that matches denial (checked first, so a turn matching
-    both fails closed) sets the running position to "deny", a turn that
-    matches only affirmation sets it to "affirm", and a turn with neither
-    leaves the running position unchanged. The position after the LAST
-    recipient turn is what's returned -- so a later retraction always wins
-    over an earlier "yes", exactly as it would for a human listening to
-    the whole call."""
+    anywhere in the call. Each recipient turn is split into clauses and
+    each clause classified independently, in order; a clause with a clear
+    signal updates the running position, a clause with neither leaves it
+    unchanged. The position after the LAST signaled clause is returned --
+    so a later retraction always wins over an earlier "yes", exactly as it
+    would for a human listening to the whole call."""
     position = "neutral"
     for turn in transcript:
         if turn.get("speaker") != "user":
             continue
-        text = turn.get("text", "")
-        if _RECIPIENT_DENIAL_RE.search(text):
-            position = "deny"
-        elif _RECIPIENT_AFFIRMATION_RE.search(text):
-            position = "affirm"
+        for clause in _CLAUSE_SPLIT_RE.split(turn.get("text", "")):
+            clause = clause.strip()
+            if not clause:
+                continue
+            signal = _clause_signal(clause)
+            if signal != "neutral":
+                position = signal
     return position
 
 

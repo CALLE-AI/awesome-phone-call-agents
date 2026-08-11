@@ -182,6 +182,26 @@ def test_negation_immediately_before_an_affirmative_phrase_is_not_corroboration(
     assert result.commitment_score == 0.0
 
 
+def test_unlisted_negated_affirmation_phrase_fails_closed():
+    """A denial-phrase list can only ever catch wordings someone
+    anticipated -- "I don't think I can make it" embeds the exact
+    affirmation phrase "i can make it" inside a negation the old list
+    never enumerated. Must fail closed on the negation, not on whether
+    this specific phrasing happens to be listed."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I am definitely coming"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "Actually, I don't think I can make it"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
 def test_yes_with_empty_transcript_is_not_trusted():
     candidate = _candidate()
     call = _call(status="completed", can_come="yes", transcript_turns=[])
