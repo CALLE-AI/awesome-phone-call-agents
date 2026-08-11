@@ -139,7 +139,11 @@ pnpm dlx vercel dev
   under the same idempotency key. If the retry budget is exhausted while the
   outcome is still unknown, the job is parked as **`unresolved` ("Needs check")
   for reconciliation** — it is *not* converted into a definitive `failed`. Only a
-  definitive 4xx rejection marks a job `failed`.
+  definitive 4xx rejection marks a job `failed`. **To reconcile:** the stable
+  idempotency key (the job id) identifies the call in the CALL-E dashboard —
+  confirm whether it was placed, then dismiss the job from the drawer. It stays
+  flagged until an operator resolves it, so an ambiguous result never silently
+  reads as success or failure.
 - Every create-call request carries a **content-bound idempotency key** derived
   from the phone, task, and result schema, so an accidental retry dedups and an
   edited request can never alias a prior call under the same key.

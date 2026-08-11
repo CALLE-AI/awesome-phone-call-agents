@@ -94,30 +94,38 @@ async function jobsByIds(ids: string[]): Promise<ScheduledJob[]> {
   return raws.map(parseJob).filter((j): j is ScheduledJob => j !== null)
 }
 
-/** Create or replace a job and (re)index it by due time. */
-export async function putJob(job: ScheduledJob): Promise<void> {
-  await pipeline([
-    ['SET', jobKey(job.id), JSON.stringify(job)],
-    ['ZADD', INDEX, new Date(job.dueAt).getTime(), job.id],
-  ])
-}
-
 /**
- * Create a job only if one with this id doesn't already exist (`SET … NX` is
- * atomic). A retried scheduling POST that resolves to the same content/request
- * key thus reuses the existing job instead of scheduling — and later dialing —
- * a duplicate. Returns whether a new job was created plus the authoritative job.
+ * Create a job only if one with this id doesn't already exist, and index it —
+ * in ONE atomic step. A retried scheduling POST that resolves to the same
+ * content/request key thus reuses the existing job instead of scheduling (and
+ * later dialing) a duplicate. Doing the `SET NX` and the `ZADD` inside a single
+ * Lua script means two racing retries can't both create, and a crash can't leave
+ * a job that exists but is unindexed (and so would never fire).
+ * Returns whether a new job was created plus the authoritative stored job.
  */
+const CREATE_IF_ABSENT = `
+if redis.call('SET', KEYS[1], ARGV[1], 'NX') then
+  redis.call('ZADD', KEYS[2], ARGV[2], ARGV[3])
+  return 1
+else
+  return 0
+end`
+
 export async function createJobIfAbsent(
   job: ScheduledJob,
 ): Promise<{ created: boolean; job: ScheduledJob }> {
-  const set = await redis<string | null>(['SET', jobKey(job.id), JSON.stringify(job), 'NX'])
-  if (set === 'OK') {
-    await redis(['ZADD', INDEX, new Date(job.dueAt).getTime(), job.id])
-    return { created: true, job }
-  }
-  const existing = await getJob(job.id)
-  return { created: false, job: existing ?? job }
+  const created = await redis<number>([
+    'EVAL',
+    CREATE_IF_ABSENT,
+    2,
+    jobKey(job.id),
+    INDEX,
+    JSON.stringify(job),
+    new Date(job.dueAt).getTime(),
+    job.id,
+  ])
+  if (created === 1) return { created: true, job }
+  return { created: false, job: (await getJob(job.id)) ?? job }
 }
 
 /** Update a job record in place (does not touch the due-time index). */

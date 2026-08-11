@@ -90,10 +90,12 @@ export function HistoryDrawer({
                   </p>
                 </div>
                 <Badge tone={JOB_TONE[j.status]}>{JOB_LABEL[j.status]}</Badge>
-                {j.status === 'pending' && onCancelJob && (
+                {/* Pending → cancel before it fires; unresolved → dismiss once
+                    reconciled against the CALL-E dashboard. */}
+                {(j.status === 'pending' || j.status === 'unresolved') && onCancelJob && (
                   <button
                     onClick={() => onCancelJob(j.id)}
-                    aria-label="Cancel scheduled call"
+                    aria-label={j.status === 'pending' ? 'Cancel scheduled call' : 'Dismiss unresolved call'}
                     className="cursor-pointer rounded-lg p-1.5 text-faint hover:bg-danger/10 hover:text-danger"
                   >
                     <X className="size-4" />

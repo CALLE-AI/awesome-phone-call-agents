@@ -12,7 +12,8 @@ import {
   type ScheduledJob,
 } from '../_lib/store.js'
 
-/** After this many attempts an ambiguous job is given up on as `failed`. */
+/** After this many attempts an ambiguous job is parked as `unresolved` (never
+ *  `failed`) for reconciliation — see the catch block below. */
 const MAX_ATTEMPTS = 5
 
 /**
