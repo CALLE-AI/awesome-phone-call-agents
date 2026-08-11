@@ -1,4 +1,5 @@
 """Seed demo data: 3 candidates with different outcomes."""
+import sys
 import store
 import llm
 
@@ -7,7 +8,9 @@ import llm
 ALEX_TRANSCRIPTS = {
     "Jordan Lee": {
         "relation": "Former Manager",
-        "transcript": """Bot: Hi Jordan Lee, this is VouchCall, an automated reference checking service. I'm calling regarding Alex Morgan, who listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
+        "transcript": """Bot: Hi, this is VouchCall, an automated reference checking service. Am I speaking with Jordan Lee?
+User: Yes, this is Jordan.
+Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
 User: Yes, please go ahead.
 Bot: Thanks. How long did you work with Alex, and in what capacity?
 User: I worked with him for 2 years and I was his manager.
@@ -25,7 +28,9 @@ Bot: Thank you so much for your time, Jordan Lee. Your input is really valuable.
     },
     "Priya Sharma": {
         "relation": "Team Lead / Peer",
-        "transcript": """Bot: Hi Priya Sharma, this is VouchCall, an automated reference checking service. I'm calling regarding Alex Morgan, who listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
+        "transcript": """Bot: Hi, this is VouchCall, an automated reference checking service. Am I speaking with Priya Sharma?
+User: Yes, that's me.
+Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
 User: Sure, go ahead.
 Bot: How long did you work with Alex, and in what capacity?
 User: We were on adjacent teams. I led the platform team and Alex was on the services team. We collaborated on a few cross-team projects over about a year and a half.
@@ -45,7 +50,9 @@ Bot: Thank you so much for your time, Priya. Your input is really valuable. Have
     },
     "Michael Chen": {
         "relation": "Skip-Level Manager",
-        "transcript": """Bot: Hi Michael Chen, this is VouchCall, an automated reference checking service. I'm calling regarding Alex Morgan, who listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
+        "transcript": """Bot: Hi, this is VouchCall, an automated reference checking service. Am I speaking with Michael Chen?
+User: Yes, speaking.
+Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
 User: Sure, I can do that.
 Bot: How long did you work with Alex, and in what capacity?
 User: I was the senior director overseeing Alex's team. So I didn't work with him day-to-day, but I observed his work in project reviews and cross-functional meetings for about a year.
@@ -62,62 +69,6 @@ User: I'd say a 6. Good engineer, but for a senior role specifically, I'd want t
 Bot: Thank you so much for your time, Michael. Your input is really valuable. Have a great day.""",
     },
 }
-
-
-def _seed_candidate_with_gemini(name, role, transcripts):
-    """Seed a candidate by running transcripts through Gemini."""
-    cid = store.add_candidate(name=name, role_title=role)
-    print(f"\nCreated candidate '{name}' (ID: {cid})")
-
-    refs = {}
-    for ref_name, data in transcripts.items():
-        rid = store.add_reference(cid, ref_name, "+10000000000", data["relation"])
-        refs[ref_name] = rid
-
-    for ref_name, data in transcripts.items():
-        print(f"  Analyzing {ref_name}...")
-        call_result = {
-            "status": "completed",
-            "summary": f"Reference check call with {ref_name} completed.",
-            "transcript": data["transcript"],
-        }
-        analysis = llm.analyze_call_result(
-            candidate_name=name, ref_name=ref_name,
-            ref_relation=data["relation"], call_result=call_result,
-        )
-        scores = {
-            "collaboration": analysis.get("collaboration_score", 0),
-            "technical_ability": analysis.get("technical_ability_score", 0),
-            "reliability": analysis.get("reliability_score", 0),
-            "communication": analysis.get("communication_score", 0),
-            "leadership": analysis.get("leadership_score", 0),
-        }
-        store.save_call(
-            ref_id=refs[ref_name], candidate_id=cid,
-            calle_call_id=f"demo_{ref_name.lower().replace(' ', '_')}",
-            status="completed", scores=scores,
-            strengths=analysis.get("strengths", []),
-            growth_areas=analysis.get("growth_areas", []),
-            overall_recommendation=analysis.get("overall_recommendation", "neutral"),
-            key_quotes=analysis.get("key_quotes", []),
-            summary=analysis.get("ref_summary", ""),
-            transcript=data["transcript"],
-        )
-        avg = sum(scores.values()) / len(scores)
-        print(f"    avg: {avg:.1f}/10, rec: {analysis.get('overall_recommendation')}")
-
-    print(f"  Cross-reference analysis...")
-    calls = store.get_calls_for_candidate(cid)
-    cross = llm.cross_reference_analysis(candidate_name=name, role_title=role, calls=calls)
-    store.save_analysis(
-        candidate_id=cid,
-        discrepancies=cross.get("discrepancies", []),
-        overall_summary=cross.get("overall_summary", ""),
-        hire_recommendation=cross.get("hire_recommendation", ""),
-        confidence_score=cross.get("confidence_score", 0),
-    )
-    print(f"    Result: {cross.get('hire_recommendation')} ({cross.get('confidence_score')}% confidence)")
-    return cid
 
 
 def _seed_candidate_hardcoded(name, role, refs_data, analysis_data):
@@ -144,13 +95,115 @@ def _seed_candidate_hardcoded(name, role, refs_data, analysis_data):
     return cid
 
 
+ALEX_HARDCODED = {
+    "refs_data": [
+        {
+            "name": "Jordan Lee",
+            "relation": "Former Manager",
+            "scores": {"collaboration": 9, "technical_ability": 9, "reliability": 9, "communication": 7, "leadership": 7},
+            "strengths": ["Takes ownership of hard problems", "Strong team player who mentors junior devs", "Delivered service migration early"],
+            "growth_areas": ["Could be more vocal in larger meetings"],
+            "recommendation": "strong_yes",
+            "quotes": [
+                "He was one of the best engineers in our team",
+                "I'd hire him again in a heartbeat",
+                "He did code reviews thoroughly, mentored junior devs, and was always the first to offer help",
+            ],
+            "summary": "Jordan gives a glowing review. Describes Alex as one of the best engineers he's managed, highlighting ownership, team collaboration, and reliability. Only growth area is presence in large meetings.",
+            "transcript": ALEX_TRANSCRIPTS["Jordan Lee"]["transcript"],
+        },
+        {
+            "name": "Priya Sharma",
+            "relation": "Team Lead / Peer",
+            "scores": {"collaboration": 7, "technical_ability": 9, "reliability": 6, "communication": 6, "leadership": 6},
+            "strengths": ["Outstanding technical ability", "Creative approach to architecture", "Finds elegant solutions"],
+            "growth_areas": ["Tends to over-engineer", "Deadlines slip on cross-team deliverables", "Goes deep without checking in"],
+            "recommendation": "yes",
+            "quotes": [
+                "Technically, Alex is outstanding. Probably one of the strongest engineers I've worked with",
+                "Sometimes good enough on time is better than perfect and late",
+                "Whoever manages him should be aware of the multitasking thing",
+            ],
+            "summary": "Priya is positive but flags concerns. Rates Alex's technical ability highly but raises reliability issues on cross-team work, tendency to over-engineer, and occasional misalignment with agreed approaches.",
+            "transcript": ALEX_TRANSCRIPTS["Priya Sharma"]["transcript"],
+        },
+        {
+            "name": "Michael Chen",
+            "relation": "Skip-Level Manager",
+            "scores": {"collaboration": 6, "technical_ability": 8, "reliability": 5, "communication": 5, "leadership": 4},
+            "strengths": ["Strong individual contributor", "Consistently good technical output"],
+            "growth_areas": ["Communication with non-technical stakeholders", "Leadership presence", "Proactive status updates"],
+            "recommendation": "neutral",
+            "quotes": [
+                "Alex does solid technical work, no question",
+                "I expect engineers to proactively communicate up, not wait to be asked",
+                "Good engineer, but for a senior role specifically, I'd want to see more leadership maturity",
+            ],
+            "summary": "Michael gives a cautious mixed review. Acknowledges strong technical work but raises concerns about cross-functional communication, leadership presence, and proactive visibility at the senior level.",
+            "transcript": ALEX_TRANSCRIPTS["Michael Chen"]["transcript"],
+        },
+    ],
+    "analysis_data": {
+        "discrepancies": [
+            {
+                "dimension": "reliability",
+                "detail": "Jordan rates reliability 9/10 (never missed a deadline), while Priya rates it 6/10 (deadlines slipped on cross-team work) and Michael rates it 5/10 (had to chase for status updates). The gap suggests Alex is reliable within his own team but struggles with cross-team commitments.",
+                "severity": "major",
+            },
+            {
+                "dimension": "leadership",
+                "detail": "Jordan rates leadership 7/10 (good team contributor), Priya 6/10 (goes off on his own), Michael 4/10 (lacks leadership presence). Clear downward trend as organizational distance increases — Alex's leadership doesn't scale beyond his immediate team.",
+                "severity": "notable",
+            },
+            {
+                "dimension": "communication",
+                "detail": "Jordan notes quietness in large meetings but rates communication 7/10. Priya (6/10) flags misalignment on agreed approaches. Michael (5/10) raises inability to translate technical decisions into business context. Pattern: communication degrades outside comfort zone.",
+                "severity": "notable",
+            },
+        ],
+        "overall_summary": "Alex Morgan is a technically outstanding engineer with strong individual contributor skills, consistently praised for ownership and code quality. However, a clear pattern emerges across references: his strengths are most visible within his immediate team, while cross-functional collaboration, communication, and leadership presence weaken as scope increases. For a senior role, the reliability and communication gaps flagged by the peer and skip-level manager are significant concerns that need addressing.",
+        "hire_recommendation": "lean_hire",
+        "confidence_score": 72,
+    },
+}
+
+
 def seed():
     store.init_db()
 
-    # ── Candidate 1: Alex Morgan — mixed signals (Gemini-analyzed) ────
-    _seed_candidate_with_gemini(
-        "Alex Morgan", "Senior Software Engineer", ALEX_TRANSCRIPTS,
-    )
+    use_gemini = "--gemini" in sys.argv
+
+    # ── Candidate 1: Alex Morgan — mixed signals ────
+    if use_gemini:
+        from config import require_keys
+        require_keys("GEMINI_API_KEY")
+        print("Using Gemini for Alex Morgan analysis (--gemini flag)")
+        cid = store.add_candidate(name="Alex Morgan", role_title="Senior Software Engineer")
+        refs = {}
+        for ref_name, data in ALEX_TRANSCRIPTS.items():
+            refs[ref_name] = store.add_reference(cid, ref_name, "+10000000000", data["relation"])
+        for ref_name, data in ALEX_TRANSCRIPTS.items():
+            print(f"  Analyzing {ref_name}...")
+            call_result = {"status": "completed", "summary": f"Reference check with {ref_name} completed.", "transcript": data["transcript"]}
+            analysis = llm.analyze_call_result(candidate_name="Alex Morgan", ref_name=ref_name, ref_relation=data["relation"], call_result=call_result)
+            scores = {d: analysis.get(f"{d}_score", 0) for d in ("collaboration", "technical_ability", "reliability", "communication", "leadership")}
+            store.save_call(ref_id=refs[ref_name], candidate_id=cid, calle_call_id=f"demo_{ref_name.lower().replace(' ', '_')}",
+                            status="completed", scores=scores, strengths=analysis.get("strengths", []), growth_areas=analysis.get("growth_areas", []),
+                            overall_recommendation=analysis.get("overall_recommendation", "neutral"), key_quotes=analysis.get("key_quotes", []),
+                            summary=analysis.get("ref_summary", ""), transcript=data["transcript"])
+            print(f"    avg: {sum(scores.values()) / len(scores):.1f}/10, rec: {analysis.get('overall_recommendation')}")
+        print("  Cross-reference analysis...")
+        calls = store.get_calls_for_candidate(cid)
+        cross = llm.cross_reference_analysis(candidate_name="Alex Morgan", role_title="Senior Software Engineer", calls=calls)
+        store.save_analysis(candidate_id=cid, discrepancies=cross.get("discrepancies", []), overall_summary=cross.get("overall_summary", ""),
+                            hire_recommendation=cross.get("hire_recommendation", ""), confidence_score=cross.get("confidence_score", 0))
+        print(f"    Result: {cross.get('hire_recommendation')} ({cross.get('confidence_score')}% confidence)")
+    else:
+        _seed_candidate_hardcoded(
+            "Alex Morgan", "Senior Software Engineer",
+            refs_data=ALEX_HARDCODED["refs_data"],
+            analysis_data=ALEX_HARDCODED["analysis_data"],
+        )
 
     # ── Candidate 2: Sarah Patel — strong hire, consistent praise ─────
     _seed_candidate_hardcoded(

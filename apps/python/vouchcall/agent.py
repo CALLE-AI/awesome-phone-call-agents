@@ -1,29 +1,49 @@
 import sys
+import logging
 import store
 import calle_wrapper
 import llm
+from config import require_keys, mask_phone, validate_e164
 from prompts import build_reference_call_goal
 
+log = logging.getLogger("vouchcall")
 
-def run_reference_check(candidate_id: int, dry_run: bool = False):
+
+def run_reference_check(candidate_id: int, live: bool = False):
     candidate = store.get_candidate(candidate_id)
     if not candidate:
-        print(f"Candidate {candidate_id} not found.")
+        log.error("Candidate %d not found.", candidate_id)
         return
 
     refs = store.get_references(candidate_id)
     if not refs:
-        print(f"No references found for {candidate['name']}.")
+        log.warning("No references found for %s.", candidate["name"])
         return
 
-    print(f"\n{'='*60}")
-    print(f"  VouchCall — Reference Check for {candidate['name']}")
-    print(f"  Role: {candidate['role_title']}")
-    print(f"  References: {len(refs)}")
-    print(f"{'='*60}\n")
+    if live:
+        require_keys("CALLE_API_KEY", "GEMINI_API_KEY")
+
+    mode = "LIVE" if live else "DRY RUN"
+    log.info("Reference check for %s | Role: %s | Refs: %d | Mode: %s",
+             candidate["name"], candidate["role_title"], len(refs), mode)
+
+    existing_calls = store.get_calls_for_candidate(candidate_id) if live else []
+    already_called = {c.get("ref_name") for c in existing_calls if c.get("status") == "completed"}
 
     for i, ref in enumerate(refs, 1):
-        print(f"[{i}/{len(refs)}] Calling {ref['name']} ({ref['relation']})...")
+        masked = mask_phone(ref["phone"])
+        log.info("[%d/%d] Calling %s (%s) at %s", i, len(refs), ref["name"], ref["relation"], masked)
+
+        if live and ref["name"] in already_called:
+            log.info("Skipping %s — already have a completed call.", ref["name"])
+            continue
+
+        if live:
+            try:
+                ref["phone"] = validate_e164(ref["phone"])
+            except ValueError:
+                log.warning("Skipping %s — invalid phone number: %s", ref["name"], masked)
+                continue
 
         goal = build_reference_call_goal(
             candidate_name=candidate["name"],
@@ -32,9 +52,8 @@ def run_reference_check(candidate_id: int, dry_run: bool = False):
             role_title=candidate["role_title"],
         )
 
-        if dry_run:
-            print(f"  [DRY RUN] Would call {ref['phone']}")
-            print(f"  Goal preview: {goal[:200]}...")
+        if not live:
+            log.info("[DRY RUN] Would call %s — goal preview: %s...", masked, goal[:200])
             continue
 
         try:
@@ -44,25 +63,35 @@ def run_reference_check(candidate_id: int, dry_run: bool = False):
                 region=ref.get("region", "IN"),
                 locale=ref.get("locale", "en-IN"),
             )
+        except ConnectionError as e:
+            log.error("Network error calling %s: %s", ref["name"], e)
+            continue
+        except TimeoutError as e:
+            log.error("Timeout calling %s: %s", ref["name"], e)
+            continue
         except Exception as e:
-            print(f"  Call failed: {e}")
+            log.error("Unexpected error calling %s: %s: %s", ref["name"], type(e).__name__, e)
             continue
 
         call_id_str = str(call_result.get("id", ""))
         status = call_result.get("status", "unknown")
-        print(f"  Call finished. ID: {call_id_str}, Status: {status}")
+        log.info("Call finished — ID: %s, Status: %s", call_id_str, status)
 
         if status != "completed":
-            print(f"  Call did not complete (status: {status}). Skipping analysis.")
+            log.warning("Call to %s did not complete (status: %s). Skipping analysis.", ref["name"], status)
             continue
 
-        print(f"  Analyzing response...")
-        analysis = llm.analyze_call_result(
-            candidate_name=candidate["name"],
-            ref_name=ref["name"],
-            ref_relation=ref["relation"],
-            call_result=call_result,
-        )
+        log.info("Analyzing response from %s...", ref["name"])
+        try:
+            analysis = llm.analyze_call_result(
+                candidate_name=candidate["name"],
+                ref_name=ref["name"],
+                ref_relation=ref["relation"],
+                call_result=call_result,
+            )
+        except Exception as e:
+            log.error("Gemini analysis failed for %s: %s: %s", ref["name"], type(e).__name__, e)
+            continue
 
         scores = {
             "collaboration": analysis.get("collaboration_score", 0),
@@ -84,30 +113,32 @@ def run_reference_check(candidate_id: int, dry_run: bool = False):
             key_quotes=analysis.get("key_quotes", []),
             summary=analysis.get("ref_summary", analysis.get("summary", "")),
             transcript=llm.extract_transcript(call_result),
-            raw_result=call_result,
         )
 
         avg = sum(scores.values()) / len(scores)
-        print(f"  Result: avg {avg:.1f}/10, recommendation: {analysis.get('overall_recommendation')}")
-        print(f"  Strengths: {', '.join(analysis.get('strengths', []))}")
-        print(f"  Growth areas: {', '.join(analysis.get('growth_areas', []))}")
-        print()
+        log.info("Result: avg %.1f/10, recommendation: %s", avg, analysis.get("overall_recommendation"))
+        log.info("Strengths: %s", ", ".join(analysis.get("strengths", [])))
+        log.info("Growth areas: %s", ", ".join(analysis.get("growth_areas", [])))
 
-    if dry_run:
-        print("\n[DRY RUN] No calls were placed.")
+    if not live:
+        log.info("[DRY RUN] No calls were placed. Use --live to place real calls.")
         return
 
-    print("Running cross-reference analysis...")
+    log.info("Running cross-reference analysis...")
     calls = store.get_calls_for_candidate(candidate_id)
     if len(calls) < 2:
-        print("Need at least 2 completed references for cross-analysis.")
+        log.warning("Need at least 2 completed references for cross-analysis.")
         return
 
-    cross = llm.cross_reference_analysis(
-        candidate_name=candidate["name"],
-        role_title=candidate["role_title"],
-        calls=calls,
-    )
+    try:
+        cross = llm.cross_reference_analysis(
+            candidate_name=candidate["name"],
+            role_title=candidate["role_title"],
+            calls=calls,
+        )
+    except Exception as e:
+        log.error("Cross-reference analysis failed: %s: %s", type(e).__name__, e)
+        return
 
     store.save_analysis(
         candidate_id=candidate_id,
@@ -117,31 +148,33 @@ def run_reference_check(candidate_id: int, dry_run: bool = False):
         confidence_score=cross.get("confidence_score", 0),
     )
 
-    print(f"\n{'='*60}")
-    print(f"  CROSS-REFERENCE ANALYSIS")
-    print(f"{'='*60}")
-    print(f"Recommendation: {cross.get('hire_recommendation')}")
-    print(f"Confidence: {cross.get('confidence_score')}%")
-    print(f"Summary: {cross.get('overall_summary')}")
+    log.info("Recommendation: %s | Confidence: %s%%", cross.get("hire_recommendation"), cross.get("confidence_score"))
+    log.info("Summary: %s", cross.get("overall_summary"))
 
     discs = cross.get("discrepancies", [])
     if discs:
-        print(f"\nDiscrepancies found ({len(discs)}):")
+        log.info("Discrepancies found (%d):", len(discs))
         for d in discs:
-            print(f"  [{d.get('severity', '?').upper()}] {d.get('dimension')}: {d.get('detail')}")
+            log.info("  [%s] %s: %s", d.get("severity", "?").upper(), d.get("dimension"), d.get("detail"))
     else:
-        print("\nNo significant discrepancies found.")
+        log.info("No significant discrepancies found.")
 
-    print(f"\nDone. View the dashboard: streamlit run dashboard.py")
+    log.info("Done. View the dashboard: streamlit run dashboard.py")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
     store.init_db()
 
     if len(sys.argv) < 2:
-        print("Usage: python agent.py <candidate_id> [--dry-run]")
+        print("Usage: python agent.py <candidate_id> [--live]")
+        print("  Default is dry-run. Pass --live to place real CALL-E calls.")
         sys.exit(1)
 
     cid = int(sys.argv[1])
-    dry = "--dry-run" in sys.argv
-    run_reference_check(cid, dry_run=dry)
+    is_live = "--live" in sys.argv
+    run_reference_check(cid, live=is_live)

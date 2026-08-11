@@ -4,7 +4,7 @@ from config import DB_PATH
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
@@ -48,7 +48,6 @@ def init_db():
             key_quotes TEXT,
             summary TEXT,
             transcript TEXT,
-            raw_result TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -62,7 +61,7 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         );
     """)
-    conn.close()
+
 
 
 def add_candidate(name: str, role_title: str) -> int:
@@ -73,21 +72,21 @@ def add_candidate(name: str, role_title: str) -> int:
     )
     conn.commit()
     cid = cursor.lastrowid
-    conn.close()
+
     return cid
 
 
 def get_candidate(candidate_id: int) -> dict:
     conn = _connect()
     row = conn.execute("SELECT * FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
-    conn.close()
+
     return dict(row) if row else None
 
 
 def get_all_candidates() -> list[dict]:
     conn = _connect()
     rows = conn.execute("SELECT * FROM candidates ORDER BY created_at DESC").fetchall()
-    conn.close()
+
     return [dict(r) for r in rows]
 
 
@@ -101,7 +100,7 @@ def add_reference(candidate_id: int, name: str, phone: str, relation: str,
     )
     conn.commit()
     rid = cursor.lastrowid
-    conn.close()
+
     return rid
 
 
@@ -110,32 +109,32 @@ def get_references(candidate_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT * FROM refs WHERE candidate_id = ? ORDER BY id", (candidate_id,)
     ).fetchall()
-    conn.close()
+
     return [dict(r) for r in rows]
 
 
 def save_call(ref_id: int, candidate_id: int, calle_call_id: str,
               status: str, scores: dict, strengths: list, growth_areas: list,
               overall_recommendation: str, key_quotes: list, summary: str,
-              transcript: str = "", raw_result: dict = None) -> int:
+              transcript: str = "") -> int:
     conn = _connect()
     cursor = conn.execute(
         "INSERT INTO calls (ref_id, candidate_id, calle_call_id, status, "
         "collaboration_score, technical_ability_score, reliability_score, "
         "communication_score, leadership_score, strengths, growth_areas, "
-        "overall_recommendation, key_quotes, summary, transcript, raw_result) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "overall_recommendation, key_quotes, summary, transcript) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (ref_id, candidate_id, calle_call_id, status,
          scores.get("collaboration", 0), scores.get("technical_ability", 0),
          scores.get("reliability", 0), scores.get("communication", 0),
          scores.get("leadership", 0),
          json.dumps(strengths), json.dumps(growth_areas),
          overall_recommendation, json.dumps(key_quotes), summary,
-         transcript, json.dumps(raw_result) if raw_result else None),
+         transcript),
     )
     conn.commit()
     call_id = cursor.lastrowid
-    conn.close()
+
     return call_id
 
 
@@ -147,11 +146,11 @@ def get_calls_for_candidate(candidate_id: int) -> list[dict]:
         "WHERE c.candidate_id = ? ORDER BY c.id",
         (candidate_id,),
     ).fetchall()
-    conn.close()
+
     results = []
     for r in rows:
         d = dict(r)
-        for field in ("strengths", "growth_areas", "key_quotes", "raw_result"):
+        for field in ("strengths", "growth_areas", "key_quotes"):
             if d.get(field):
                 try:
                     d[field] = json.loads(d[field])
@@ -172,7 +171,7 @@ def save_analysis(candidate_id: int, discrepancies: list, overall_summary: str,
     )
     conn.commit()
     aid = cursor.lastrowid
-    conn.close()
+
     return aid
 
 
@@ -182,7 +181,7 @@ def get_analysis(candidate_id: int) -> dict:
         "SELECT * FROM analysis WHERE candidate_id = ? ORDER BY created_at DESC LIMIT 1",
         (candidate_id,),
     ).fetchone()
-    conn.close()
+
     if not row:
         return None
     d = dict(row)

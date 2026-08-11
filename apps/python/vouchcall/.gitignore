@@ -5,5 +5,4 @@ __pycache__/
 .idea/
 .venv/
 .qodo/
-tests/
 title_card.html

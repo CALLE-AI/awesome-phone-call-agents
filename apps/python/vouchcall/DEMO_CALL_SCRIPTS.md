@@ -6,11 +6,16 @@ The candidate is **Alex Morgan**, applying for **Senior Software Engineer**.
 Wait for VouchCall to ask each question, then answer naturally using these guides.
 Don't read word-for-word — just use these as talking points. Sound natural.
 
+**Important:** VouchCall will first verify your identity before revealing any candidate details. Confirm who you are when asked.
+
 ---
 
 ## Call 1: Jordan Lee (Former Manager) — GLOWING REVIEW
 
 **Your character:** You were Alex's direct manager for 2 years at a mid-size tech company.
+
+When asked "Am I speaking with Jordan Lee?":
+> "Yes, this is Jordan."
 
 When asked about your relationship:
 > "I managed Alex directly for about two years. They were a senior dev on my team working on our backend services."
@@ -36,6 +41,9 @@ When asked to rate 1-10:
 
 **Your character:** You were a team lead on a parallel team. Worked alongside Alex for about 18 months on shared projects.
 
+When asked "Am I speaking with Priya Sharma?":
+> "Yes, that's me."
+
 When asked about your relationship:
 > "We were on adjacent teams — I led the platform team and Alex was on the services team. We collaborated on a few cross-team projects over about a year and a half."
 
@@ -59,6 +67,9 @@ When asked to rate 1-10:
 ## Call 3: Michael Chen (Skip-Level Manager) — CAUTIOUS / MIXED
 
 **Your character:** You were a senior director — Alex's manager's manager. You observed Alex from a higher level for about a year.
+
+When asked "Am I speaking with Michael Chen?":
+> "Yes, speaking."
 
 When asked about your relationship:
 > "I was the senior director overseeing Alex's team. So I didn't work with them day-to-day, but I observed their work in project reviews and cross-functional meetings for about a year."
