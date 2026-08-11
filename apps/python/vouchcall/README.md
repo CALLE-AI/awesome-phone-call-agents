@@ -63,11 +63,12 @@ Reference 3 ──┘                    │         └── Key Quotes
 ## How It Works
 
 1. **Add a candidate** with their references (name, phone, relationship)
-2. **CALL-E calls each reference** — first verifies recipient identity, then conducts a structured interview asking about strengths, teamwork, reliability, growth areas, and a 1-10 recommendation
-3. **Gemini analyzes each transcript** and extracts scores across 5 dimensions (collaboration, technical ability, reliability, communication, leadership), plus strengths, growth areas, and key quotes
-4. **LLM guardrails validate every output** — scores are clamped to 1-10, key quotes are fuzzy-matched against the actual transcript (fabricated quotes are dropped), score-recommendation coherence is enforced, and confidence is calculated from inter-reference variance rather than trusting the LLM's self-assessment
-5. **Cross-reference analysis** compares all references against each other, flagging discrepancies (e.g., one reference rates reliability 9/10 while another rates it 5/10)
-6. **Dashboard** shows a radar chart comparison, per-reference details, and a final hire recommendation with confidence score
+2. **CALL-E calls each reference** — first verifies recipient identity, then asks for explicit consent to AI analysis before proceeding with a structured interview asking about strengths, teamwork, reliability, growth areas, and a 1-10 recommendation
+3. **Call quality assessment** determines the outcome: `verified` (full interview), `partial` (too few questions answered), `insufficient` (too few turns), `no_consent` (declined AI analysis — permanent, never re-called), or `wrong_person` (retryable on next run)
+4. **Gemini analyzes verified transcripts** and extracts scores across 5 dimensions (collaboration, technical ability, reliability, communication, leadership), plus evidence-grounded strengths, growth areas, and key quotes
+5. **7-layer LLM guardrails validate every output** — scores are clamped to 1-10, key quotes are fuzzy-matched against the actual transcript (threshold 0.65 — fabricated quotes are dropped), evidence per dimension is validated and ungrounded scores are zeroed, score-recommendation coherence is enforced, and confidence is formula-calculated from inter-reference variance
+6. **Cross-reference analysis** compares only verified references, flagging discrepancies (e.g., one reference rates reliability 9/10 while another rates it 5/10)
+7. **Dashboard** shows a radar chart comparison, per-reference details with quality badges, excluded references section, and a final hire recommendation with confidence score
 
 ## Setup
 
@@ -95,7 +96,10 @@ Copy `.env.example` to `.env` and fill in your keys:
 CALLE_API_KEY=your_calle_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 TEST_PHONE=+1234567890
+VOUCHCALL_ENCRYPTION_KEY=your_encryption_key
 ```
+
+Generate an encryption key with: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
 
 ### Credentials
 
@@ -104,6 +108,7 @@ TEST_PHONE=+1234567890
 | `CALLE_API_KEY` | [CALL-E Dashboard](https://dashboard.heycall-e.com) → API Keys | Yes |
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) | Yes |
 | `TEST_PHONE` | Your phone number for testing | For tests only |
+| `VOUCHCALL_ENCRYPTION_KEY` | Generated Fernet key (see above) | Recommended |
 
 ## Usage
 
@@ -134,9 +139,12 @@ Previews the call goals and reference list without placing any calls or using AP
 
 ```bash
 python agent.py <candidate_id> --live
+python agent.py <candidate_id> --live --fail-fast
 ```
 
 Places real CALL-E calls to each reference, analyzes results with Gemini, and stores everything in the database. Requires `CALLE_API_KEY` and `GEMINI_API_KEY`. Each reference uses 1 CALL-E credit.
+
+The `--fail-fast` flag stops on the first error or ambiguous call result.
 
 ### Dashboard
 
@@ -149,15 +157,23 @@ Opens the reference comparison dashboard with radar chart, per-reference details
 ## Safety & Guardrails
 
 - **Safe by default**: `agent.py` runs in dry-run mode. Real calls require the explicit `--live` flag and valid API keys.
-- **Recipient verification**: The AI verifies the recipient's identity before disclosing any candidate or role details.
+- **Consent flow**: The AI asks for explicit consent to AI analysis before proceeding. If the reference declines, the call ends gracefully and the reference is permanently marked `no_consent` (never re-called).
+- **Recipient verification**: The AI verifies the recipient's identity before disclosing any candidate or role details. Wrong-person calls are marked retryable.
+- **5-tier quality assessment**: Every completed call is classified as `verified`, `partial`, `insufficient`, `no_consent`, or `wrong_person`. Only `verified` calls feed into Gemini analysis.
+- **LLM fallback for ambiguity**: When keyword checks for identity/consent are ambiguous, a cheap Gemini call resolves it. Fails closed on API errors (treats ambiguity as "no").
 - **E.164 phone validation**: Phone numbers are validated before any call is placed. Invalid numbers are skipped.
-- **Idempotency**: Re-running `agent.py --live` skips references that already have a completed call on record.
+- **Call-ID idempotency**: Re-running `agent.py --live` skips calls by CALL-E call ID (not reference name), preventing duplicate processing.
+- **Permanent vs retryable statuses**: `no_consent` is permanent (skip on all future runs). `wrong_person` and `insufficient` are retryable on the next run.
+- **Field-level encryption**: Phone numbers and transcripts are encrypted at rest with Fernet (AES-128-CBC) via `VOUCHCALL_ENCRYPTION_KEY`. Without the key, data is stored in plaintext (graceful degradation for demo mode).
+- **Phone separation**: `get_references()` returns masked phones for display/logging. `get_references_for_calling()` returns decrypted phones only when live calls are needed.
+- **Evidence grounding**: Gemini returns a transcript excerpt per dimension score. Each excerpt is fuzzy-matched against the transcript — ungrounded scores are zeroed.
 - **Phone masking**: All console output shows masked phone numbers (e.g., `********1234`).
-- **LLM output validation**: Scores are clamped 1-10, recommendations are enum-constrained, key quotes are verified against the transcript via fuzzy matching, score-recommendation contradictions are auto-corrected, and confidence is formula-calculated (not LLM self-assessed).
+- **LLM output validation**: Scores are clamped 1-10, recommendations are enum-constrained, key quotes are verified against the transcript via fuzzy matching (threshold 0.65), score-recommendation contradictions are auto-corrected, and confidence is formula-calculated (not LLM self-assessed).
 - **Gemini retry**: If Gemini returns unparseable JSON, the request is retried once before failing — handles transient formatting errors.
 - **Input sanitization**: Candidate and reference names are stripped of control characters and truncated to 100 chars before entering LLM prompts.
 - **Structured logging**: All agent operations use Python's `logging` module with categorized error types (network, timeout, analysis failure).
 - **No raw data persistence**: Raw CALL-E API responses are not stored in the database.
+- **Fail-fast mode**: `--fail-fast` flag stops on the first error or ambiguous result, useful for debugging.
 
 ## Tests
 
@@ -165,11 +181,11 @@ Opens the reference comparison dashboard with radar chart, per-reference details
 python -m pytest tests/ -v
 ```
 
-98 credential-free tests across three files — zero API keys needed:
+170 credential-free tests across three files — zero API keys needed:
 
-- **test_guardrails.py** — LLM output validation: score clamping, fuzzy quote matching, coherence checks, confidence calculation, enum enforcement, input sanitization, end-to-end call/cross-reference validation
-- **test_safety.py** — Safety boundaries: store schema (no raw_result column), DB operations, idempotency data, prompt identity verification ordering, transcript parsing, JSON response extraction, dry-run/live key gating, E.164 rejection, phone masking
-- **test_integration.py** — Component integration: CALL-E wrapper payload construction, seed data hardcoded candidates, dashboard display mappings, config constants, radar chart polygon closure
+- **test_guardrails.py** (75 tests) — LLM output validation: score clamping, fuzzy quote matching (0.65 threshold), coherence checks, confidence calculation, enum enforcement, input sanitization, evidence grounding validation, transcript turn counting, question-answer counting, identity/consent keyword checks, quality status constants
+- **test_safety.py** (68 tests) — Safety boundaries: store schema (quality_status column, no raw_result), DB operations, phone encryption at rest, transcript encryption/decryption, masked vs real phone getters, call-ID idempotency, quality-based ref queries, migration idempotency, Fernet encrypt/decrypt roundtrips, wrong-key fail-closed, prompt consent/identity ordering, LLM fallback mocking (yes/no/error), `assess_call_quality` for all 5 quality statuses, permanent vs retryable status constants
+- **test_integration.py** (27 tests) — Component integration: CALL-E wrapper payload construction, seed data with quality_status and no_consent references, Ryan Cooper's Kevin Park excluded, Alex transcript consent verification, dashboard quality display mappings, config constants including encryption and quality thresholds
 
 ## Side Effects
 
@@ -239,3 +255,4 @@ This hackathon prototype proves the pipeline works end-to-end. Here's how VouchC
 - **Streamlit** — Dashboard UI
 - **Plotly** — Radar chart visualization
 - **SQLite** — Local data storage
+- **cryptography (Fernet)** — Field-level encryption for phones and transcripts at rest

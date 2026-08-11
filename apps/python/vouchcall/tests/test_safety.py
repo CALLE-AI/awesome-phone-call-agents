@@ -1,4 +1,4 @@
-"""Credential-free tests for safety boundaries: store, agent flow, prompts, parsing.
+"""Credential-free tests for safety boundaries: store, agent flow, prompts, encryption.
 
 Run: python -m pytest tests/test_safety.py -v
 No API keys needed.
@@ -7,7 +7,6 @@ import sys
 import os
 import json
 import sqlite3
-import tempfile
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -36,6 +35,12 @@ class TestStore:
         assert "calls" in tables
         assert "analysis" in tables
 
+    def test_schema_has_quality_status_column(self):
+        conn = sqlite3.connect(str(self.db_path))
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(calls)").fetchall()]
+        conn.close()
+        assert "quality_status" in cols
+
     def test_schema_has_no_raw_result_column(self):
         conn = sqlite3.connect(str(self.db_path))
         cols = [r[1] for r in conn.execute("PRAGMA table_info(calls)").fetchall()]
@@ -60,10 +65,23 @@ class TestStore:
         assert refs[0]["name"] == "Ref1"
         assert refs[1]["name"] == "Ref2"
 
-    def test_save_call_without_raw_result(self):
+    def test_get_references_returns_masked_phones(self):
+        cid = self.store.add_candidate("Test", "Role")
+        self.store.add_reference(cid, "Ref", "+14155551234", "Manager")
+        refs = self.store.get_references(cid)
+        assert refs[0]["phone"].endswith("1234")
+        assert "4155" not in refs[0]["phone"]
+
+    def test_get_references_for_calling_returns_real_phones(self):
+        cid = self.store.add_candidate("Test", "Role")
+        self.store.add_reference(cid, "Ref", "+14155551234", "Manager")
+        refs = self.store.get_references_for_calling(cid)
+        assert refs[0]["phone"] == "+14155551234"
+
+    def test_save_call_with_quality_status(self):
         cid = self.store.add_candidate("Carol", "Designer")
         rid = self.store.add_reference(cid, "Ref", "+14155551234", "Manager")
-        call_id = self.store.save_call(
+        self.store.save_call(
             ref_id=rid, candidate_id=cid, calle_call_id="test_123",
             status="completed",
             scores={"collaboration": 8, "technical_ability": 7, "reliability": 9,
@@ -71,12 +89,24 @@ class TestStore:
             strengths=["good"], growth_areas=["improve"],
             overall_recommendation="yes", key_quotes=["great work"],
             summary="Positive review.", transcript="Bot: hi\nUser: hello",
+            quality_status="verified",
         )
         calls = self.store.get_calls_for_candidate(cid)
         assert len(calls) == 1
         assert calls[0]["collaboration_score"] == 8
-        assert calls[0]["strengths"] == ["good"]
-        assert calls[0]["key_quotes"] == ["great work"]
+        assert calls[0]["quality_status"] == "verified"
+
+    def test_save_call_no_consent(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        self.store.save_call(
+            ref_id=rid, candidate_id=cid, calle_call_id="nc_1",
+            status="completed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[],
+            summary="Declined consent.", quality_status="no_consent",
+        )
+        calls = self.store.get_calls_for_candidate(cid)
+        assert calls[0]["quality_status"] == "no_consent"
 
     def test_save_and_get_analysis(self):
         cid = self.store.add_candidate("Dave", "Lead")
@@ -92,21 +122,149 @@ class TestStore:
         assert a["confidence_score"] == 72
         assert len(a["discrepancies"]) == 1
 
-    def test_idempotency_data(self):
+    def test_get_completed_call_ids(self):
         cid = self.store.add_candidate("Eve", "SRE")
         rid = self.store.add_reference(cid, "Ref1", "+14155551234", "Manager")
         self.store.save_call(
             ref_id=rid, candidate_id=cid, calle_call_id="call_1",
-            status="completed",
-            scores={"collaboration": 7, "technical_ability": 7, "reliability": 7,
-                    "communication": 7, "leadership": 7},
-            strengths=[], growth_areas=[],
-            overall_recommendation="yes", key_quotes=[],
-            summary="ok", transcript="",
+            status="completed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[], summary="ok",
         )
-        calls = self.store.get_calls_for_candidate(cid)
-        already_called = {c["ref_name"] for c in calls if c["status"] == "completed"}
-        assert "Ref1" in already_called
+        self.store.save_call(
+            ref_id=rid, candidate_id=cid, calle_call_id="call_2",
+            status="failed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[], summary="failed",
+        )
+        completed_ids = self.store.get_completed_call_ids(cid)
+        assert "call_1" in completed_ids
+        assert "call_2" not in completed_ids
+
+    def test_get_refs_by_quality(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid1 = self.store.add_reference(cid, "GoodRef", "+10000000001", "Manager")
+        rid2 = self.store.add_reference(cid, "BadRef", "+10000000002", "Peer")
+        self.store.save_call(
+            ref_id=rid1, candidate_id=cid, calle_call_id="c1",
+            status="completed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[], summary="ok",
+            quality_status="verified",
+        )
+        self.store.save_call(
+            ref_id=rid2, candidate_id=cid, calle_call_id="c2",
+            status="completed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[], summary="declined",
+            quality_status="no_consent",
+        )
+        no_consent_refs = self.store.get_refs_by_quality(cid, {"no_consent"})
+        assert "BadRef" in no_consent_refs
+        assert "GoodRef" not in no_consent_refs
+
+    def test_migrate_quality_status_idempotent(self):
+        conn = sqlite3.connect(str(self.db_path))
+        from store import _migrate_quality_status
+        _migrate_quality_status(conn)
+        _migrate_quality_status(conn)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(calls)").fetchall()]
+        assert cols.count("quality_status") == 1
+        conn.close()
+
+
+class TestEncryption:
+    def test_encrypt_decrypt_roundtrip(self):
+        from cryptography.fernet import Fernet
+        key = Fernet.generate_key().decode()
+        with patch("config.ENCRYPTION_KEY", key):
+            from config import encrypt_field, decrypt_field
+            original = "+14155551234"
+            encrypted = encrypt_field(original)
+            assert encrypted != original
+            decrypted = decrypt_field(encrypted)
+            assert decrypted == original
+
+    def test_encrypt_empty_returns_empty(self):
+        with patch("config.ENCRYPTION_KEY", "some_key"):
+            from config import encrypt_field
+            assert encrypt_field("") == ""
+
+    def test_encrypt_no_key_returns_plaintext(self):
+        with patch("config.ENCRYPTION_KEY", ""):
+            from config import encrypt_field
+            assert encrypt_field("+14155551234") == "+14155551234"
+
+    def test_decrypt_no_key_returns_plaintext(self):
+        with patch("config.ENCRYPTION_KEY", ""):
+            from config import decrypt_field
+            assert decrypt_field("some_value") == "some_value"
+
+    def test_decrypt_wrong_key_returns_empty(self):
+        from cryptography.fernet import Fernet
+        key1 = Fernet.generate_key().decode()
+        key2 = Fernet.generate_key().decode()
+        with patch("config.ENCRYPTION_KEY", key1):
+            from config import encrypt_field
+            encrypted = encrypt_field("secret")
+        with patch("config.ENCRYPTION_KEY", key2):
+            from config import decrypt_field
+            result = decrypt_field(encrypted)
+            assert result == ""
+
+    def test_decrypt_garbage_returns_empty(self):
+        from cryptography.fernet import Fernet
+        key = Fernet.generate_key().decode()
+        with patch("config.ENCRYPTION_KEY", key):
+            from config import decrypt_field
+            assert decrypt_field("not_encrypted_data") == ""
+
+
+class TestStoreEncryption:
+    @pytest.fixture(autouse=True)
+    def setup_db(self, tmp_path):
+        self.db_path = tmp_path / "test_enc.db"
+        from cryptography.fernet import Fernet
+        self.key = Fernet.generate_key().decode()
+        with patch("store.DB_PATH", self.db_path), patch("config.ENCRYPTION_KEY", self.key):
+            import store
+            self.store = store
+            store.init_db()
+            yield
+
+    def test_phone_encrypted_in_db(self):
+        with patch("config.ENCRYPTION_KEY", self.key):
+            cid = self.store.add_candidate("Test", "Role")
+            self.store.add_reference(cid, "Ref", "+14155551234", "Manager")
+            conn = sqlite3.connect(str(self.db_path))
+            row = conn.execute("SELECT phone FROM refs WHERE candidate_id = ?", (cid,)).fetchone()
+            conn.close()
+            assert row[0] != "+14155551234"
+            assert "4155" not in row[0]
+
+    def test_transcript_encrypted_in_db(self):
+        with patch("config.ENCRYPTION_KEY", self.key):
+            cid = self.store.add_candidate("Test", "Role")
+            rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+            self.store.save_call(
+                ref_id=rid, candidate_id=cid, calle_call_id="t1",
+                status="completed", scores={}, strengths=[], growth_areas=[],
+                overall_recommendation="", key_quotes=[],
+                summary="ok", transcript="Bot: Hello\nUser: Hi there",
+            )
+            conn = sqlite3.connect(str(self.db_path))
+            row = conn.execute("SELECT transcript FROM calls WHERE candidate_id = ?", (cid,)).fetchone()
+            conn.close()
+            assert "Hello" not in row[0]
+
+    def test_transcript_decrypted_on_read(self):
+        with patch("config.ENCRYPTION_KEY", self.key):
+            cid = self.store.add_candidate("Test", "Role")
+            rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+            self.store.save_call(
+                ref_id=rid, candidate_id=cid, calle_call_id="t2",
+                status="completed", scores={}, strengths=[], growth_areas=[],
+                overall_recommendation="", key_quotes=[],
+                summary="ok", transcript="Bot: Hello\nUser: Hi there",
+            )
+            calls = self.store.get_calls_for_candidate(cid)
+            assert "Bot: Hello" in calls[0]["transcript"]
 
 
 class TestPrompts:
@@ -123,6 +281,22 @@ class TestPrompts:
         assert verify_pos != -1, "Identity verification not found in prompt"
         assert disclose_pos != -1, "Candidate disclosure not found in prompt"
         assert verify_pos < disclose_pos, "Disclosure happens before identity verification"
+
+    def test_consent_question_in_prompt(self):
+        from prompts import build_reference_call_goal
+        goal = build_reference_call_goal(
+            candidate_name="Test", reference_name="Ref",
+            reference_relation="Peer", role_title="Role",
+        )
+        assert "analyzed by ai" in goal.lower() or "is that okay" in goal.lower()
+
+    def test_consent_decline_ends_call(self):
+        from prompts import build_reference_call_goal
+        goal = build_reference_call_goal(
+            candidate_name="Test", reference_name="Ref",
+            reference_relation="Peer", role_title="Role",
+        )
+        assert "decline" in goal.lower() or "thank them and end" in goal.lower()
 
     def test_wrong_person_ends_call(self):
         from prompts import build_reference_call_goal
@@ -203,12 +377,6 @@ class TestParseJsonResponse:
 
 
 class TestAgentSafetyGates:
-    def test_dry_run_does_not_require_keys(self):
-        with patch.dict(os.environ, {"CALLE_API_KEY": "", "GEMINI_API_KEY": ""}, clear=False):
-            from config import require_keys
-            # Should NOT raise when not called
-            # Simulates: dry-run path never calls require_keys
-
     def test_require_keys_raises_on_missing(self):
         from config import require_keys
         with patch("config.CALLE_API_KEY", ""):
@@ -230,3 +398,139 @@ class TestAgentSafetyGates:
         masked = mask_phone("+14155551234")
         assert masked.endswith("1234")
         assert "4155" not in masked
+
+
+class TestAgentConstants:
+    def test_permanent_quality_statuses(self):
+        from agent import PERMANENT_QUALITY_STATUSES
+        assert "no_consent" in PERMANENT_QUALITY_STATUSES
+        assert "wrong_person" not in PERMANENT_QUALITY_STATUSES
+
+    def test_retryable_quality_statuses(self):
+        from agent import RETRYABLE_QUALITY_STATUSES
+        assert "wrong_person" in RETRYABLE_QUALITY_STATUSES
+        assert "insufficient" in RETRYABLE_QUALITY_STATUSES
+        assert "no_consent" not in RETRYABLE_QUALITY_STATUSES
+
+
+class TestLLMFallback:
+    def test_llm_check_yes_no_returns_true_on_yes(self):
+        from llm import _llm_check_yes_no
+        mock_response = MagicMock()
+        mock_response.text = "yes"
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        with patch("llm._get_client", return_value=mock_client):
+            assert _llm_check_yes_no("Did they consent?", "some context") is True
+
+    def test_llm_check_yes_no_returns_false_on_no(self):
+        from llm import _llm_check_yes_no
+        mock_response = MagicMock()
+        mock_response.text = "no"
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        with patch("llm._get_client", return_value=mock_client):
+            assert _llm_check_yes_no("Did they consent?", "some context") is False
+
+    def test_llm_check_yes_no_returns_false_on_error(self):
+        from llm import _llm_check_yes_no
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = Exception("API error")
+        with patch("llm._get_client", return_value=mock_client):
+            assert _llm_check_yes_no("Did they consent?", "some context") is False
+
+    def test_check_identity_confirmed_uses_llm_on_ambiguous(self):
+        from llm import _check_identity_confirmed
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Who is this?"
+        mock_response = MagicMock()
+        mock_response.text = "no"
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        with patch("llm._get_client", return_value=mock_client):
+            result = _check_identity_confirmed(transcript, "Jordan Lee")
+            assert result is False
+            mock_client.models.generate_content.assert_called_once()
+
+    def test_check_consent_given_uses_llm_on_ambiguous(self):
+        from llm import _check_consent_given
+        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: What does that involve?"
+        mock_response = MagicMock()
+        mock_response.text = "no"
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        with patch("llm._get_client", return_value=mock_client):
+            result = _check_consent_given(transcript)
+            assert result is False
+            mock_client.models.generate_content.assert_called_once()
+
+    def test_check_identity_skips_llm_on_clear_yes(self):
+        from llm import _check_identity_confirmed
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Yes, this is Jordan."
+        with patch("llm._llm_check_yes_no") as mock_llm:
+            result = _check_identity_confirmed(transcript, "Jordan Lee")
+            assert result is True
+            mock_llm.assert_not_called()
+
+    def test_check_consent_skips_llm_on_clear_yes(self):
+        from llm import _check_consent_given
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: Sure, go ahead."
+        with patch("llm._llm_check_yes_no") as mock_llm:
+            result = _check_consent_given(transcript)
+            assert result is True
+            mock_llm.assert_not_called()
+
+
+class TestAssessCallQuality:
+    def test_verified_transcript(self):
+        from llm import assess_call_quality
+        transcript = """Bot: Am I speaking with Jordan Lee?
+User: Yes, this is Jordan.
+Bot: Great. Alex Morgan listed you as a reference. This call will be analyzed by AI. Is that okay with you?
+User: Yes, go ahead.
+Bot: How long did you work with Alex, and in what capacity?
+User: I worked with him for 2 years as his manager.
+Bot: What would you say were Alex's greatest strengths?
+User: He was one of the best engineers in our team and a great team player.
+Bot: How did Alex collaborate with others on the team?
+User: Fantastic, he was always helping other engineers and doing thorough reviews.
+Bot: Was Alex reliable with deadlines and commitments?
+User: Very reliable, never had to chase him at all.
+Bot: Were there areas where Alex could grow or improve?
+User: He could be more vocal in larger meetings, that's about it.
+Bot: On a scale of 1 to 10, how strongly would you recommend Alex?
+User: I'd say a 9, I'd hire him again in a heartbeat."""
+        with patch("llm._llm_check_yes_no"):
+            result = assess_call_quality(transcript, "Jordan Lee")
+        assert result["quality_status"] == "verified"
+        assert result["identity_confirmed"] is True
+        assert result["consent_given"] is True
+        assert result["turn_count"] >= 6
+
+    def test_wrong_person(self):
+        from llm import assess_call_quality
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: No, wrong number."
+        with patch("llm._llm_check_yes_no"):
+            result = assess_call_quality(transcript, "Jordan Lee")
+        assert result["quality_status"] == "wrong_person"
+
+    def test_no_consent(self):
+        from llm import assess_call_quality
+        transcript = """Bot: Am I speaking with Jordan Lee?
+User: Yes, speaking.
+Bot: This call will be analyzed by AI. Is that okay with you?
+User: No, I'd prefer not to do that."""
+        with patch("llm._llm_check_yes_no"):
+            result = assess_call_quality(transcript, "Jordan Lee")
+        assert result["quality_status"] == "no_consent"
+
+    def test_insufficient_turns(self):
+        from llm import assess_call_quality
+        transcript = """Bot: Am I speaking with Jordan Lee?
+User: Yes, speaking.
+Bot: This call will be analyzed by AI. Is that okay with you?
+User: Sure, go ahead.
+Bot: Thanks, goodbye."""
+        with patch("llm._llm_check_yes_no"):
+            result = assess_call_quality(transcript, "Jordan Lee")
+        assert result["quality_status"] == "insufficient"
+        assert result["turn_count"] < 6

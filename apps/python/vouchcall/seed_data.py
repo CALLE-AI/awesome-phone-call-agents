@@ -10,8 +10,8 @@ ALEX_TRANSCRIPTS = {
         "relation": "Former Manager",
         "transcript": """Bot: Hi, this is VouchCall, an automated reference checking service. Am I speaking with Jordan Lee?
 User: Yes, this is Jordan.
-Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
-User: Yes, please go ahead.
+Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Just to let you know, this call will be analyzed by AI to summarize your feedback. Is that okay with you?
+User: Yes, go ahead.
 Bot: Thanks. How long did you work with Alex, and in what capacity?
 User: I worked with him for 2 years and I was his manager.
 Bot: Got it. What would you say were Alex's greatest strengths?
@@ -30,8 +30,8 @@ Bot: Thank you so much for your time, Jordan Lee. Your input is really valuable.
         "relation": "Team Lead / Peer",
         "transcript": """Bot: Hi, this is VouchCall, an automated reference checking service. Am I speaking with Priya Sharma?
 User: Yes, that's me.
-Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
-User: Sure, go ahead.
+Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Just to let you know, this call will be analyzed by AI to summarize your feedback. Is that okay with you?
+User: Sure, no problem.
 Bot: How long did you work with Alex, and in what capacity?
 User: We were on adjacent teams. I led the platform team and Alex was on the services team. We collaborated on a few cross-team projects over about a year and a half.
 Bot: What would you say were Alex's greatest strengths?
@@ -52,8 +52,8 @@ Bot: Thank you so much for your time, Priya. Your input is really valuable. Have
         "relation": "Skip-Level Manager",
         "transcript": """Bot: Hi, this is VouchCall, an automated reference checking service. Am I speaking with Michael Chen?
 User: Yes, speaking.
-Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Do you have about 3 minutes for a few questions?
-User: Sure, I can do that.
+Bot: Great. Alex Morgan listed you as a reference for a Senior Software Engineer position. Just to let you know, this call will be analyzed by AI to summarize your feedback. Is that okay with you?
+User: Sure, that's fine.
 Bot: How long did you work with Alex, and in what capacity?
 User: I was the senior director overseeing Alex's team. So I didn't work with him day-to-day, but I observed his work in project reviews and cross-functional meetings for about a year.
 Bot: What would you say were Alex's greatest strengths?
@@ -86,6 +86,7 @@ def _seed_candidate_hardcoded(name, role, refs_data, analysis_data):
             overall_recommendation=ref["recommendation"],
             key_quotes=ref["quotes"], summary=ref["summary"],
             transcript=ref.get("transcript", ""),
+            quality_status=ref.get("quality_status", "verified"),
         )
         avg = sum(ref["scores"].values()) / len(ref["scores"])
         print(f"  {ref['name']}: avg {avg:.1f}/10, rec: {ref['recommendation']}")
@@ -111,6 +112,7 @@ ALEX_HARDCODED = {
             ],
             "summary": "Jordan gives a glowing review. Describes Alex as one of the best engineers he's managed, highlighting ownership, team collaboration, and reliability. Only growth area is presence in large meetings.",
             "transcript": ALEX_TRANSCRIPTS["Jordan Lee"]["transcript"],
+            "quality_status": "verified",
         },
         {
             "name": "Priya Sharma",
@@ -126,6 +128,7 @@ ALEX_HARDCODED = {
             ],
             "summary": "Priya is positive but flags concerns. Rates Alex's technical ability highly but raises reliability issues on cross-team work, tendency to over-engineer, and occasional misalignment with agreed approaches.",
             "transcript": ALEX_TRANSCRIPTS["Priya Sharma"]["transcript"],
+            "quality_status": "verified",
         },
         {
             "name": "Michael Chen",
@@ -141,6 +144,7 @@ ALEX_HARDCODED = {
             ],
             "summary": "Michael gives a cautious mixed review. Acknowledges strong technical work but raises concerns about cross-functional communication, leadership presence, and proactive visibility at the senior level.",
             "transcript": ALEX_TRANSCRIPTS["Michael Chen"]["transcript"],
+            "quality_status": "verified",
         },
     ],
     "analysis_data": {
@@ -190,7 +194,7 @@ def seed():
             store.save_call(ref_id=refs[ref_name], candidate_id=cid, calle_call_id=f"demo_{ref_name.lower().replace(' ', '_')}",
                             status="completed", scores=scores, strengths=analysis.get("strengths", []), growth_areas=analysis.get("growth_areas", []),
                             overall_recommendation=analysis.get("overall_recommendation", "neutral"), key_quotes=analysis.get("key_quotes", []),
-                            summary=analysis.get("ref_summary", ""), transcript=data["transcript"])
+                            summary=analysis.get("ref_summary", ""), transcript=data["transcript"], quality_status="verified")
             print(f"    avg: {sum(scores.values()) / len(scores):.1f}/10, rec: {analysis.get('overall_recommendation')}")
         print("  Cross-reference analysis...")
         calls = store.get_calls_for_candidate(cid)
@@ -222,6 +226,7 @@ def seed():
                     "I grew more in one year under Sarah than in three years before that.",
                 ],
                 "summary": "David is effusive in his praise. Describes Sarah as the most impactful manager he's worked with, highlighting her ability to grow people and shield the team while still delivering results.",
+                "quality_status": "verified",
             },
             {
                 "name": "Rachel Torres",
@@ -236,6 +241,7 @@ def seed():
                     "The only friction is she'll push back hard if you try to overload her team, but honestly that's a strength.",
                 ],
                 "summary": "Rachel highlights Sarah's reliability and cross-team collaboration. Notes she's protective of her team, which occasionally creates friction but is ultimately seen as effective leadership.",
+                "quality_status": "verified",
             },
             {
                 "name": "James Wright",
@@ -250,6 +256,7 @@ def seed():
                     "Every skip-level I did with her reports confirmed what I already knew — they loved working for her.",
                 ],
                 "summary": "James gives an unqualified strong recommendation. Believes Sarah is already operating above her level and is ready for a director position. Highlights her ability to turn around underperforming teams.",
+                "quality_status": "verified",
             },
         ],
         analysis_data={
@@ -283,6 +290,7 @@ def seed():
                     "There were sprint commitments that slipped multiple times and it eroded trust with the engineering team.",
                 ],
                 "summary": "Lisa gives a measured but hesitant recommendation. Acknowledges Ryan's analytical strengths but raises serious concerns about reliability, stakeholder management, and team dynamics.",
+                "quality_status": "verified",
             },
             {
                 "name": "Tom Hartley",
@@ -297,6 +305,7 @@ def seed():
                     "I had engineers asking to be moved to different teams to avoid working with him.",
                 ],
                 "summary": "Tom gives a clearly negative assessment. Describes a pattern of poor collaboration, incomplete specifications, and mid-sprint priority changes that damaged team morale and trust.",
+                "quality_status": "verified",
             },
             {
                 "name": "Amanda Ross",
@@ -311,6 +320,18 @@ def seed():
                     "He has potential, but he needs a lot of coaching on collaboration before he's ready to lead a product area.",
                 ],
                 "summary": "Amanda's assessment is negative. While she acknowledges Ryan's product instincts, she raises concerning patterns around credit-taking, unreliable agreements, and poor cross-functional collaboration.",
+                "quality_status": "verified",
+            },
+            {
+                "name": "Kevin Park",
+                "relation": "Former Direct Report",
+                "scores": {"collaboration": 0, "technical_ability": 0, "reliability": 0, "communication": 0, "leadership": 0},
+                "strengths": [],
+                "growth_areas": [],
+                "recommendation": "",
+                "quotes": [],
+                "summary": "Reference declined consent for AI analysis.",
+                "quality_status": "no_consent",
             },
         ],
         analysis_data={

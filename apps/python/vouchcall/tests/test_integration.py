@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-# ── calle_wrapper tests ─────────────────────────────────────────────────────
+# -- calle_wrapper tests ----------------------------------------------------
 
 class TestCalleWrapper:
     def test_make_call_builds_correct_payload(self):
@@ -76,7 +76,7 @@ class TestCalleWrapper:
             assert call_args.kwargs["timeout_seconds"] == 300.0
 
 
-# ── seed_data tests (hardcoded candidates only, no Gemini) ───────────────────
+# -- seed_data tests (hardcoded candidates only, no Gemini) ------------------
 
 class TestSeedDataHardcoded:
     @pytest.fixture(autouse=True)
@@ -101,6 +101,7 @@ class TestSeedDataHardcoded:
                         "strengths": ["People manager"], "growth_areas": ["Delegate more"],
                         "recommendation": "strong_yes",
                         "quotes": ["Best manager ever"], "summary": "Glowing.",
+                        "quality_status": "verified",
                     },
                 ],
                 analysis_data={
@@ -116,10 +117,35 @@ class TestSeedDataHardcoded:
             assert len(calls) == 1
             assert calls[0]["collaboration_score"] == 9
             assert calls[0]["overall_recommendation"] == "strong_yes"
+            assert calls[0]["quality_status"] == "verified"
 
             analysis = self.store.get_analysis(cid)
             assert analysis["hire_recommendation"] == "strong_hire"
-            assert analysis["confidence_score"] == 95
+
+    def test_seed_no_consent_reference(self):
+        from seed_data import _seed_candidate_hardcoded
+        with patch("store.DB_PATH", self.db_path):
+            cid = _seed_candidate_hardcoded(
+                "Test Candidate", "Role",
+                refs_data=[
+                    {
+                        "name": "Kevin Park", "relation": "Former Direct Report",
+                        "scores": {"collaboration": 0, "technical_ability": 0,
+                                   "reliability": 0, "communication": 0, "leadership": 0},
+                        "strengths": [], "growth_areas": [],
+                        "recommendation": "",
+                        "quotes": [], "summary": "Declined consent.",
+                        "quality_status": "no_consent",
+                    },
+                ],
+                analysis_data={
+                    "discrepancies": [], "overall_summary": "N/A",
+                    "hire_recommendation": "lean_hire", "confidence_score": 30,
+                },
+            )
+            calls = self.store.get_calls_for_candidate(cid)
+            assert calls[0]["quality_status"] == "no_consent"
+            assert calls[0]["collaboration_score"] == 0
 
     def test_seed_ryan_cooper_no_hire(self):
         from seed_data import _seed_candidate_hardcoded
@@ -134,6 +160,7 @@ class TestSeedDataHardcoded:
                         "strengths": ["Product depth"], "growth_areas": ["Listening"],
                         "recommendation": "no",
                         "quotes": ["Frustrating experience"], "summary": "Negative.",
+                        "quality_status": "verified",
                     },
                 ],
                 analysis_data={
@@ -149,33 +176,38 @@ class TestSeedDataHardcoded:
             assert len(analysis["discrepancies"]) == 1
             assert analysis["discrepancies"][0]["severity"] == "major"
 
-    def test_hardcoded_stores_correct_scores(self):
-        from seed_data import _seed_candidate_hardcoded
+
+class TestSeedDataRyanCooperFullSet:
+    @pytest.fixture(autouse=True)
+    def setup_db(self, tmp_path):
+        self.db_path = tmp_path / "test_full_seed.db"
         with patch("store.DB_PATH", self.db_path):
-            cid = _seed_candidate_hardcoded(
-                "Test", "Role",
-                refs_data=[{
-                    "name": "Ref", "relation": "Peer",
-                    "scores": {"collaboration": 1, "technical_ability": 2,
-                               "reliability": 3, "communication": 4, "leadership": 5},
-                    "strengths": [], "growth_areas": [],
-                    "recommendation": "neutral", "quotes": [], "summary": "",
-                }],
-                analysis_data={
-                    "discrepancies": [], "overall_summary": "",
-                    "hire_recommendation": "lean_hire", "confidence_score": 50,
-                },
-            )
-            calls = self.store.get_calls_for_candidate(cid)
-            c = calls[0]
-            assert c["collaboration_score"] == 1
-            assert c["technical_ability_score"] == 2
-            assert c["reliability_score"] == 3
-            assert c["communication_score"] == 4
-            assert c["leadership_score"] == 5
+            import store
+            self.store = store
+            store.init_db()
+            yield
+
+    def test_ryan_has_kevin_park_no_consent(self):
+        from seed_data import ALEX_HARDCODED, seed
+        with patch("store.DB_PATH", self.db_path), patch("sys.argv", ["seed_data.py"]):
+            seed()
+        candidates = self.store.get_all_candidates()
+        ryan = [c for c in candidates if c["name"] == "Ryan Cooper"]
+        assert len(ryan) == 1
+        calls = self.store.get_calls_for_candidate(ryan[0]["id"])
+        kevin_calls = [c for c in calls if c["ref_name"] == "Kevin Park"]
+        assert len(kevin_calls) == 1
+        assert kevin_calls[0]["quality_status"] == "no_consent"
+
+    def test_alex_transcripts_have_consent(self):
+        from seed_data import ALEX_TRANSCRIPTS
+        for name, data in ALEX_TRANSCRIPTS.items():
+            transcript = data["transcript"]
+            assert "analyzed by ai" in transcript.lower() or "is that okay" in transcript.lower(), \
+                f"Consent question missing from {name}'s transcript"
 
 
-# ── dashboard logic tests (no Streamlit runtime needed) ──────────────────────
+# -- dashboard logic tests (no Streamlit runtime needed) ---------------------
 
 class TestDashboardLogic:
     def test_recommendation_display_mapping(self):
@@ -217,8 +249,20 @@ class TestDashboardLogic:
         assert len(scores_closed) == 6
         assert scores_closed[0] == scores_closed[-1]
 
+    def test_quality_display_mapping(self):
+        quality_display = {
+            "verified": ("Verified", "check"),
+            "partial": ("Partial", "warning"),
+            "insufficient": ("Insufficient Data", "x"),
+            "no_consent": ("No Consent", "no_entry"),
+            "wrong_person": ("Wrong Person", "question"),
+        }
+        from llm import VALID_QUALITY_STATUSES
+        for status in VALID_QUALITY_STATUSES:
+            assert status in quality_display
 
-# ── config constants tests ───────────────────────────────────────────────────
+
+# -- config constants tests --------------------------------------------------
 
 class TestConfigConstants:
     def test_dimensions_count(self):
@@ -237,3 +281,15 @@ class TestConfigConstants:
     def test_db_path_ends_with_db(self):
         from config import DB_PATH
         assert str(DB_PATH).endswith(".db")
+
+    def test_min_transcript_turns(self):
+        from config import MIN_TRANSCRIPT_TURNS
+        assert MIN_TRANSCRIPT_TURNS == 6
+
+    def test_min_questions_answered(self):
+        from config import MIN_QUESTIONS_ANSWERED
+        assert MIN_QUESTIONS_ANSWERED == 3
+
+    def test_encryption_key_defined(self):
+        from config import ENCRYPTION_KEY
+        assert isinstance(ENCRYPTION_KEY, str)

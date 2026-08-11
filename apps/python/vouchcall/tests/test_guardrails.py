@@ -1,4 +1,4 @@
-"""Credential-free unit tests for guardrails, validation, and masking.
+"""Credential-free unit tests for guardrails, validation, masking, and quality assessment.
 
 Run: python -m pytest tests/test_guardrails.py -v
 No API keys needed.
@@ -17,9 +17,20 @@ from llm import (
     _compute_confidence,
     _validate_call_analysis,
     _validate_cross_analysis,
+    _count_transcript_turns,
+    _count_questions_answered,
+    _keyword_check_identity,
+    _keyword_check_consent,
+    _AMBIGUOUS,
     VALID_RECOMMENDATIONS,
     VALID_HIRE_RECOMMENDATIONS,
     VALID_SEVERITIES,
+    VALID_QUALITY_STATUSES,
+    QUESTION_MARKERS,
+    IDENTITY_AFFIRMATIVE,
+    IDENTITY_NEGATIVE,
+    CONSENT_AFFIRMATIVE,
+    CONSENT_NEGATIVE,
 )
 
 
@@ -118,6 +129,12 @@ class TestFuzzyMatch:
 
     def test_empty_quote(self):
         assert not _fuzzy_match("", self.TRANSCRIPT)
+
+    def test_threshold_065_rejects_weak_match(self):
+        assert not _fuzzy_match("some random sentence about teams", self.TRANSCRIPT)
+
+    def test_threshold_065_accepts_strong_match(self):
+        assert _fuzzy_match("he was one of the best engineers in our team", self.TRANSCRIPT)
 
 
 class TestScoreRecommendationCoherence:
@@ -255,6 +272,46 @@ class TestValidateCallAnalysis:
         result = _validate_call_analysis(raw, "")
         assert result["overall_recommendation"] == "yes"
 
+    def test_evidence_validation_zeros_ungrounded_scores(self):
+        transcript = "Bot: How was collaboration? User: Alex was a great team player and helped everyone."
+        raw = {
+            "collaboration_score": 8, "technical_ability_score": 7,
+            "reliability_score": 7, "communication_score": 7,
+            "leadership_score": 7, "overall_recommendation": "yes",
+            "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": "",
+            "evidence": {
+                "collaboration": "great team player and helped everyone",
+                "technical_ability": "completely fabricated evidence not in transcript",
+            },
+        }
+        result = _validate_call_analysis(raw, transcript)
+        assert result["collaboration_score"] == 8
+        assert result["technical_ability_score"] == 0
+        assert "collaboration" in result["evidence"]
+        assert "technical_ability" not in result["evidence"]
+
+    def test_evidence_non_dict_defaults_to_empty(self):
+        raw = {
+            "collaboration_score": 5, "technical_ability_score": 5,
+            "reliability_score": 5, "communication_score": 5,
+            "leadership_score": 5, "overall_recommendation": "neutral",
+            "strengths": [], "growth_areas": [], "key_quotes": [], "ref_summary": "",
+            "evidence": "not a dict",
+        }
+        result = _validate_call_analysis(raw, "some transcript")
+        assert result["evidence"] == {}
+
+    def test_ref_summary_defaults_to_empty_string(self):
+        raw = {
+            "collaboration_score": 5, "technical_ability_score": 5,
+            "reliability_score": 5, "communication_score": 5,
+            "leadership_score": 5, "overall_recommendation": "neutral",
+            "strengths": [], "growth_areas": [], "key_quotes": [],
+            "ref_summary": 42,
+        }
+        result = _validate_call_analysis(raw, "")
+        assert result["ref_summary"] == ""
+
 
 class TestValidateCrossAnalysis:
     def test_invalid_hire_recommendation(self):
@@ -324,3 +381,143 @@ class TestSanitizeName:
 
     def test_unicode_preserved(self):
         assert sanitize_name("Priya Sharma") == "Priya Sharma"
+
+
+class TestCountTranscriptTurns:
+    def test_normal_transcript(self):
+        transcript = "Bot: Hello\nUser: Hi\nBot: How are you?\nUser: Good"
+        assert _count_transcript_turns(transcript) == 4
+
+    def test_empty_transcript(self):
+        assert _count_transcript_turns("") == 0
+
+    def test_none_transcript(self):
+        assert _count_transcript_turns(None) == 0
+
+    def test_no_prefixed_lines(self):
+        assert _count_transcript_turns("just some random text") == 0
+
+    def test_mixed_lines(self):
+        transcript = "Bot: Hi\nsome noise\nUser: Hello\nmore noise"
+        assert _count_transcript_turns(transcript) == 2
+
+
+class TestCountQuestionsAnswered:
+    def test_full_transcript(self):
+        transcript = """Bot: How long did you work with Alex, and in what capacity?
+User: I worked with him for 2 years as his manager.
+Bot: What would you say were Alex's greatest strengths?
+User: He was one of the best engineers in our team.
+Bot: How did Alex work with the team?
+User: Fantastic, he was a complete team player.
+Bot: Was Alex reliable with deadlines and commitments?
+User: Very reliable, never missed a deadline.
+Bot: Were there any areas where Alex could grow or improve?
+User: He could be more vocal in meetings.
+Bot: On a scale of 1 to 10, how strongly would you recommend?
+User: I'd say a 9."""
+        count = _count_questions_answered(transcript)
+        assert count >= 5
+
+    def test_empty_transcript(self):
+        assert _count_questions_answered("") == 0
+
+    def test_none_transcript(self):
+        assert _count_questions_answered(None) == 0
+
+    def test_questions_without_answers(self):
+        transcript = "Bot: What would you say were Alex's greatest strengths?\nBot: Next question."
+        assert _count_questions_answered(transcript) == 0
+
+    def test_short_answer_not_counted(self):
+        transcript = "Bot: What would you say were Alex's greatest strengths?\nUser: Ok."
+        assert _count_questions_answered(transcript) == 0
+
+
+class TestKeywordCheckIdentity:
+    def test_affirmative_yes(self):
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Yes, this is Jordan."
+        assert _keyword_check_identity(transcript, "Jordan Lee") is True
+
+    def test_affirmative_thats_me(self):
+        transcript = "Bot: Am I speaking with Priya Sharma?\nUser: Yeah, that's me."
+        assert _keyword_check_identity(transcript, "Priya Sharma") is True
+
+    def test_affirmative_speaking(self):
+        transcript = "Bot: Am I speaking with Michael Chen?\nUser: Yes, speaking."
+        assert _keyword_check_identity(transcript, "Michael Chen") is True
+
+    def test_negative_wrong_person(self):
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: No, wrong number."
+        assert _keyword_check_identity(transcript, "Jordan Lee") is False
+
+    def test_ambiguous_response(self):
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Who is calling?"
+        result = _keyword_check_identity(transcript, "Jordan Lee")
+        assert result is _AMBIGUOUS
+
+    def test_first_name_match(self):
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Jordan here."
+        assert _keyword_check_identity(transcript, "Jordan Lee") is True
+
+    def test_empty_transcript(self):
+        assert _keyword_check_identity("", "Jordan Lee") is False
+
+    def test_empty_name(self):
+        assert _keyword_check_identity("Bot: Am I speaking with?\nUser: Yes", "") is False
+
+    def test_no_identity_question(self):
+        transcript = "Bot: Hello, how are you?\nUser: Fine thanks."
+        assert _keyword_check_identity(transcript, "Jordan Lee") is False
+
+
+class TestKeywordCheckConsent:
+    def test_affirmative_yes(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: Yes, go ahead."
+        assert _keyword_check_consent(transcript) is True
+
+    def test_affirmative_sure(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: Sure, no problem."
+        assert _keyword_check_consent(transcript) is True
+
+    def test_affirmative_no_problem(self):
+        transcript = "Bot: analyzed by AI. Is that okay?\nUser: No problem at all."
+        assert _keyword_check_consent(transcript) is True
+
+    def test_negative_decline(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: No, I'd rather not."
+        assert _keyword_check_consent(transcript) is False
+
+    def test_negative_not_comfortable(self):
+        transcript = "Bot: analyzed by AI. Is that okay?\nUser: I'm not comfortable with that."
+        assert _keyword_check_consent(transcript) is False
+
+    def test_ambiguous_response(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: What does that mean exactly?"
+        result = _keyword_check_consent(transcript)
+        assert result is _AMBIGUOUS
+
+    def test_empty_transcript(self):
+        assert _keyword_check_consent("") is False
+
+    def test_no_consent_question(self):
+        transcript = "Bot: Hello, how are you?\nUser: Fine thanks."
+        assert _keyword_check_consent(transcript) is False
+
+
+class TestQualityConstants:
+    def test_valid_quality_statuses(self):
+        expected = {"verified", "partial", "insufficient", "no_consent", "wrong_person"}
+        assert VALID_QUALITY_STATUSES == expected
+
+    def test_question_markers_count(self):
+        assert len(QUESTION_MARKERS) == 6
+
+    def test_consent_affirmative_includes_no_problem(self):
+        assert "no problem" in CONSENT_AFFIRMATIVE
+
+    def test_consent_negative_includes_prefer_not(self):
+        assert "prefer not" in CONSENT_NEGATIVE
+
+    def test_identity_affirmative_includes_speaking(self):
+        assert "speaking" in IDENTITY_AFFIRMATIVE

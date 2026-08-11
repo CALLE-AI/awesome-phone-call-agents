@@ -27,9 +27,17 @@ if not calls:
     st.info("No reference calls completed yet.")
     st.stop()
 
+QUALITY_DISPLAY = {
+    "verified": ("Verified", "🟢"),
+    "partial": ("Partial", "🟡"),
+    "insufficient": ("Insufficient", "🔴"),
+    "no_consent": ("Declined Consent", "⚫"),
+    "wrong_person": ("Wrong Person", "🔴"),
+}
+
 col1, col2, col3 = st.columns(3)
-completed = [c for c in calls if c.get("status") == "completed"]
-col1.metric("References Checked", f"{len(completed)}/{len(calls)}")
+verified = [c for c in calls if c.get("quality_status") == "verified"]
+col1.metric("Verified References", f"{len(verified)}/{len(calls)}")
 
 if analysis:
     rec_display = {
@@ -42,13 +50,21 @@ if analysis:
     col2.metric("Recommendation", rec_display.get(analysis.get("hire_recommendation"), "Pending"))
     col3.metric("Confidence", f"{analysis.get('confidence_score', 0)}%")
 
+non_verified = [c for c in calls if c.get("quality_status") and c.get("quality_status") != "verified"]
+if non_verified:
+    with st.expander(f"⚠️ {len(non_verified)} reference(s) excluded from analysis"):
+        for call in non_verified:
+            qs = call.get("quality_status", "unknown")
+            label, icon = QUALITY_DISPLAY.get(qs, (qs, "⚪"))
+            st.markdown(f"{icon} **{call.get('ref_name', '?')}** — {label}: {call.get('summary', '')}")
+
 st.subheader("Score Comparison")
 
 dimensions = DIMENSIONS
 dim_labels = [d.replace("_", " ").title() for d in dimensions]
 
 fig = go.Figure()
-for call in calls:
+for call in verified:
     scores = [call.get(f"{d}_score", 0) for d in dimensions]
     scores_closed = scores + [scores[0]]
     labels_closed = dim_labels + [dim_labels[0]]
@@ -69,11 +85,23 @@ st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Per-Reference Details")
 for call in calls:
-    rec_emoji = {
-        "strong_yes": "🟢", "yes": "🟢", "neutral": "🟡", "hesitant": "🟠", "no": "🔴"
-    }.get(call.get("overall_recommendation", ""), "⚪")
+    qs = call.get("quality_status", "")
+    qs_label, qs_icon = QUALITY_DISPLAY.get(qs, ("", ""))
 
-    with st.expander(f"{rec_emoji} {call.get('ref_name', '?')} — {call.get('ref_relation', '?')} — {call.get('overall_recommendation', 'N/A')}"):
+    if qs == "verified":
+        rec_emoji = {
+            "strong_yes": "🟢", "yes": "🟢", "neutral": "🟡", "hesitant": "🟠", "no": "🔴"
+        }.get(call.get("overall_recommendation", ""), "⚪")
+        header = f"{rec_emoji} {call.get('ref_name', '?')} — {call.get('ref_relation', '?')} — {call.get('overall_recommendation', 'N/A')}"
+    else:
+        header = f"{qs_icon} {call.get('ref_name', '?')} — {call.get('ref_relation', '?')} — {qs_label}"
+
+    with st.expander(header):
+        if qs != "verified":
+            st.warning(f"This reference was not included in the analysis: {qs_label}")
+            st.write(f"**Summary:** {call.get('summary', 'N/A')}")
+            continue
+
         cols = st.columns(5)
         for i, (dim, label) in enumerate(zip(dimensions, dim_labels)):
             score = call.get(f"{dim}_score", 0)
@@ -97,6 +125,8 @@ for call in calls:
 
 if analysis:
     st.subheader("Cross-Reference Analysis")
+    if len(verified) < len(calls):
+        st.info(f"Analysis based on {len(verified)} verified reference(s) out of {len(calls)} total.")
     st.write(analysis.get("overall_summary", ""))
 
     discs = analysis.get("discrepancies", [])

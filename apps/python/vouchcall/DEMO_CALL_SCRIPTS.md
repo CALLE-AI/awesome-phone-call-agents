@@ -6,7 +6,7 @@ The candidate is **Alex Morgan**, applying for **Senior Software Engineer**.
 Wait for VouchCall to ask each question, then answer naturally using these guides.
 Don't read word-for-word — just use these as talking points. Sound natural.
 
-**Important:** VouchCall will first verify your identity before revealing any candidate details. Confirm who you are when asked.
+**Important:** VouchCall will first verify your identity, then ask for consent to AI analysis, before revealing any candidate details. Confirm both when asked.
 
 ---
 
@@ -16,6 +16,9 @@ Don't read word-for-word — just use these as talking points. Sound natural.
 
 When asked "Am I speaking with Jordan Lee?":
 > "Yes, this is Jordan."
+
+When asked about AI analysis consent ("this call will be analyzed by AI... is that okay?"):
+> "Yes, go ahead."
 
 When asked about your relationship:
 > "I managed Alex directly for about two years. They were a senior dev on my team working on our backend services."
@@ -44,6 +47,9 @@ When asked to rate 1-10:
 When asked "Am I speaking with Priya Sharma?":
 > "Yes, that's me."
 
+When asked about AI analysis consent:
+> "Sure, no problem."
+
 When asked about your relationship:
 > "We were on adjacent teams — I led the platform team and Alex was on the services team. We collaborated on a few cross-team projects over about a year and a half."
 
@@ -70,6 +76,9 @@ When asked to rate 1-10:
 
 When asked "Am I speaking with Michael Chen?":
 > "Yes, speaking."
+
+When asked about AI analysis consent:
+> "Sure, that's fine."
 
 When asked about your relationship:
 > "I was the senior director overseeing Alex's team. So I didn't work with them day-to-day, but I observed their work in project reviews and cross-functional meetings for about a year."

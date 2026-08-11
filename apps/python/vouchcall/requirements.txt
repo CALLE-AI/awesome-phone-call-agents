@@ -3,3 +3,4 @@ google-genai
 streamlit
 plotly
 python-dotenv
+cryptography

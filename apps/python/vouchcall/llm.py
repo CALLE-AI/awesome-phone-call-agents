@@ -3,14 +3,27 @@ import re
 import time
 from difflib import SequenceMatcher
 from google import genai
-from config import GEMINI_API_KEY, GEMINI_MODEL, DIMENSIONS, sanitize_name
+from config import (
+    GEMINI_API_KEY, GEMINI_MODEL, DIMENSIONS, sanitize_name,
+    MIN_TRANSCRIPT_TURNS, MIN_QUESTIONS_ANSWERED,
+)
 
 _client = None
 
 VALID_RECOMMENDATIONS = {"strong_yes", "yes", "neutral", "hesitant", "no"}
 VALID_HIRE_RECOMMENDATIONS = {"strong_hire", "hire", "lean_hire", "lean_no", "no_hire"}
 VALID_SEVERITIES = {"minor", "notable", "major"}
+VALID_QUALITY_STATUSES = {"verified", "partial", "insufficient", "no_consent", "wrong_person"}
 SCORE_FIELDS = [f"{d}_score" for d in DIMENSIONS]
+
+QUESTION_MARKERS = [
+    r"how long.*(work|capacity)",
+    r"greatest strengths",
+    r"(team|collaborate|collaboration)",
+    r"(reliable|deadline|commitment)",
+    r"(grow|improve|development)",
+    r"scale of 1 to 10",
+]
 
 
 def _get_client() -> genai.Client:
@@ -50,7 +63,7 @@ def _clamp_score(value, field_name: str) -> int:
     return max(1, min(10, v))
 
 
-def _fuzzy_match(quote: str, transcript: str, threshold: float = 0.45) -> bool:
+def _fuzzy_match(quote: str, transcript: str, threshold: float = 0.65) -> bool:
     quote_lower = quote.lower().strip()
     if not quote_lower:
         return False
@@ -98,6 +111,155 @@ def _compute_confidence(calls: list[dict]) -> int:
     return max(20, min(98, int(base + ref_bonus)))
 
 
+def _count_transcript_turns(transcript: str) -> int:
+    if not transcript:
+        return 0
+    return sum(1 for line in transcript.strip().split("\n")
+               if line.startswith("Bot:") or line.startswith("User:"))
+
+
+IDENTITY_AFFIRMATIVE = (
+    "yes", "yeah", "yep", "that's me", "speaking", "this is",
+)
+IDENTITY_NEGATIVE = (
+    "no", "wrong", "not",
+)
+
+CONSENT_AFFIRMATIVE = (
+    "yes", "yeah", "yep", "sure", "okay", "ok", "go ahead", "fine",
+    "that's fine", "no problem", "absolutely", "of course", "certainly",
+    "no worries", "sounds good", "that works", "all good", "please",
+)
+CONSENT_NEGATIVE = (
+    "no", "don't", "decline", "rather not", "not okay", "prefer not",
+    "i'd rather", "not comfortable", "not interested",
+)
+
+_AMBIGUOUS = "ambiguous"
+
+
+def _keyword_check_identity(transcript: str, reference_name: str):
+    if not transcript or not reference_name:
+        return False
+    lines = transcript.strip().split("\n")
+    first_name = reference_name.split()[0].lower()
+    for i, line in enumerate(lines):
+        if "am i speaking with" in line.lower():
+            for response_line in lines[i + 1:i + 3]:
+                if response_line.startswith("User:"):
+                    text = response_line[5:].lower()
+                    if any(w in text for w in IDENTITY_AFFIRMATIVE) or first_name in text:
+                        return True
+                    if any(w in text for w in IDENTITY_NEGATIVE):
+                        return False
+                    return _AMBIGUOUS
+            break
+    return False
+
+
+def _keyword_check_consent(transcript: str):
+    if not transcript:
+        return False
+    lines = transcript.strip().split("\n")
+    for i, line in enumerate(lines):
+        if "analyzed by ai" in line.lower() or "is that okay" in line.lower():
+            for response_line in lines[i + 1:i + 3]:
+                if response_line.startswith("User:"):
+                    text = response_line[5:].lower()
+                    if any(w in text for w in CONSENT_AFFIRMATIVE):
+                        return True
+                    if any(w in text for w in CONSENT_NEGATIVE):
+                        return False
+                    return _AMBIGUOUS
+            break
+    return False
+
+
+def _llm_check_yes_no(question: str, context: str) -> bool:
+    prompt = f"""{question}
+
+TRANSCRIPT EXCERPT:
+{context[:500]}
+
+Answer with ONLY "yes" or "no". Nothing else."""
+    try:
+        response = _get_client().models.generate_content(
+            model=GEMINI_MODEL, contents=prompt,
+        )
+        return response.text.strip().lower().startswith("yes")
+    except Exception:
+        return False
+
+
+def _check_identity_confirmed(transcript: str, reference_name: str) -> bool:
+    result = _keyword_check_identity(transcript, reference_name)
+    if result is not _AMBIGUOUS:
+        return result
+    lines = transcript.strip().split("\n")[:10]
+    excerpt = "\n".join(lines)
+    return _llm_check_yes_no(
+        f"Did the person who answered confirm they are {reference_name}?",
+        excerpt,
+    )
+
+
+def _check_consent_given(transcript: str) -> bool:
+    result = _keyword_check_consent(transcript)
+    if result is not _AMBIGUOUS:
+        return result
+    lines = transcript.strip().split("\n")[:10]
+    excerpt = "\n".join(lines)
+    return _llm_check_yes_no(
+        "Did the person consent to having this call analyzed by AI?",
+        excerpt,
+    )
+
+
+def _count_questions_answered(transcript: str) -> int:
+    if not transcript:
+        return 0
+    lines = transcript.strip().split("\n")
+    count = 0
+    for marker in QUESTION_MARKERS:
+        found = False
+        for i, line in enumerate(lines):
+            if found:
+                break
+            if line.startswith("Bot:") and re.search(marker, line.lower()):
+                for response in lines[i + 1:i + 3]:
+                    if response.startswith("User:") and len(response) > 10:
+                        count += 1
+                        found = True
+                        break
+    return count
+
+
+def assess_call_quality(transcript: str, reference_name: str) -> dict:
+    turns = _count_transcript_turns(transcript)
+    identity_confirmed = _check_identity_confirmed(transcript, reference_name)
+    consent_given = _check_consent_given(transcript)
+    questions_answered = _count_questions_answered(transcript)
+
+    if not identity_confirmed:
+        quality_status = "wrong_person"
+    elif not consent_given:
+        quality_status = "no_consent"
+    elif turns < MIN_TRANSCRIPT_TURNS:
+        quality_status = "insufficient"
+    elif questions_answered < MIN_QUESTIONS_ANSWERED:
+        quality_status = "partial"
+    else:
+        quality_status = "verified"
+
+    return {
+        "quality_status": quality_status,
+        "turn_count": turns,
+        "identity_confirmed": identity_confirmed,
+        "consent_given": consent_given,
+        "questions_answered": questions_answered,
+    }
+
+
 def _validate_call_analysis(analysis: dict, transcript: str) -> dict:
     for field in SCORE_FIELDS:
         analysis[field] = _clamp_score(analysis.get(field), field)
@@ -123,6 +285,21 @@ def _validate_call_analysis(analysis: dict, transcript: str) -> dict:
                 verified_quotes.append(q)
         analysis["key_quotes"] = verified_quotes
         analysis["_quotes_verified"] = True
+
+    evidence = analysis.get("evidence", {})
+    if isinstance(evidence, dict) and transcript:
+        validated_evidence = {}
+        for dim, excerpt in evidence.items():
+            if isinstance(excerpt, str) and _fuzzy_match(excerpt, transcript):
+                validated_evidence[dim] = excerpt
+            else:
+                dim_key = f"{dim}_score" if not dim.endswith("_score") else dim
+                plain_dim = dim.replace("_score", "")
+                if plain_dim in DIMENSIONS and analysis.get(dim_key, 0) > 0:
+                    analysis[dim_key] = 0
+        analysis["evidence"] = validated_evidence
+    elif not isinstance(evidence, dict):
+        analysis["evidence"] = {}
 
     if not isinstance(analysis.get("ref_summary"), str):
         analysis["ref_summary"] = ""
@@ -196,6 +373,7 @@ Extract and return a JSON object with these exact fields:
 - "reliability_score": integer 1-10
 - "communication_score": integer 1-10
 - "leadership_score": integer 1-10
+- "evidence": object mapping each dimension to a direct quote or close paraphrase from the transcript that justifies the score. Keys: "collaboration", "technical_ability", "reliability", "communication", "leadership". Each value must be text that actually appears in the transcript.
 - "strengths": list of 2-3 key strengths mentioned
 - "growth_areas": list of areas for improvement mentioned
 - "overall_recommendation": one of "strong_yes", "yes", "neutral", "hesitant", "no"
@@ -203,6 +381,7 @@ Extract and return a JSON object with these exact fields:
 - "ref_summary": 3-4 sentence summary of the reference's assessment
 
 Base your analysis on the transcript. Infer scores from the reference's tone, specific examples, and explicit ratings.
+Every evidence value and key_quote MUST be traceable to actual words in the transcript — do not fabricate or paraphrase beyond recognition.
 Return ONLY valid JSON, no markdown formatting."""
 
     raw = _gemini_with_retry(prompt)
