@@ -82,10 +82,11 @@ npm run cli -- call --live
 #   "plan", then clears it (single-use)
 ```
 
-Every `plan` clears whatever was pending before it, unconditionally — before validation, before the
-network call, no matter how the new attempt turns out. Re-planning with a bad number, a plan that
-comes back `ready_to_run: false`, or a network error never leaves an older, already-superseded plan
-sitting there fully authorized for a later `call --live` to execute by mistake. And because the
+Every `plan` clears whatever was pending before it as the very first thing it does — before
+argument parsing, before config resolution, before validation, before the network call, no matter
+how the new attempt turns out. A missing flag, a bad number, a plan that comes back
+`ready_to_run: false`, or any other failure along the way never leaves an older, already-superseded
+plan sitting there fully authorized for a later `call --live` to execute by mistake. And because the
 preview and the live run both show the *actual stored* destination, region, and goal — not just a
 plan id — confirming a call means seeing what it will really do.
 

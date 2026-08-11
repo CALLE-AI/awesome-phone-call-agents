@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   AppointmentConfirmationResult,
   QUESTIONS_TO_RESOLVE,
@@ -8,7 +9,7 @@ import { getCallRun, isUnauthorizedMcpError, resolveCalleMcpConfig, runCall } fr
 import { DEFAULT_EXTRACTION_SYSTEM_PROMPT, extractStructuredResult } from "./extract-from-transcript.js";
 import { maskPhoneNumbersInText, REDACTED_TOKEN_PLACEHOLDER } from "./phone-safety.js";
 import { clearPendingPlan, formatPendingPlanSummary, loadPendingPlan, readConfirmTokenFromStdin } from "./pending-plan.js";
-import { planAndSave } from "./plan-workflow.js";
+import { planAndSave, type PlanCallFn } from "./plan-workflow.js";
 import { BedrockReasoningProvider } from "./reasoning/bedrock.js";
 import { FakeReasoningProvider } from "./reasoning/fake.js";
 import type { ReasoningProvider } from "./reasoning/types.js";
@@ -17,6 +18,17 @@ const KNOWN_SCHEMAS = {
   "appointment-confirmation": AppointmentConfirmationResult,
 } as const;
 type SchemaName = keyof typeof KNOWN_SCHEMAS;
+
+/**
+ * Thrown by usage() instead of calling process.exit directly, so that
+ * argument-parsing failures go through the same throw/catch path as every
+ * other error in a command — in particular so cmdPlan's "clear the pending
+ * plan first, no matter what" guarantee actually holds for this case too,
+ * and so that guarantee is unit-testable without exiting the test runner.
+ * main()'s catch handler is the only place that turns this into a process
+ * exit; the usage text is already printed by the time it's thrown.
+ */
+export class UsageError extends Error {}
 
 function usage(): never {
   console.error(`calle-mcp-result-extractor — demo CLI, not a supported product API
@@ -43,7 +55,7 @@ Commands:
       output are masked.
 
 Every live command requires a prior "calle auth login" (from @call-e/cli).`);
-  process.exit(1);
+  throw new UsageError();
 }
 
 function flag(args: string[], name: string): string | undefined {
@@ -102,18 +114,34 @@ async function cmdExtract(args: string[]) {
   printSafe(result);
 }
 
-async function cmdPlan(args: string[]) {
+export interface CmdPlanDeps {
+  /** Override for tests only — real CLI usage always resolves the real config. */
+  resolveConfig?: typeof resolveCalleMcpConfig;
+  /** Override for tests only — see plan-workflow.ts. */
+  planCallFn?: PlanCallFn;
+}
+
+export async function cmdPlan(args: string[], deps: CmdPlanDeps = {}): Promise<void> {
+  // Must be the very first thing this function does — strictly before
+  // argument parsing (usage() below can throw) and before config resolution
+  // (resolveConfig() below can throw too) — so that *nothing* about a new
+  // plan attempt, however it fails, can skip invalidating whatever was
+  // authorized before it. planAndSave also clears defensively for its own
+  // direct callers, but cmdPlan cannot rely on reaching that call at all.
+  clearPendingPlan();
+
   const to = flag(args, "to");
   const region = flag(args, "region");
   const goal = flag(args, "goal");
   if (!to || !region || !goal) usage();
 
-  const config = resolveCalleMcpConfig();
+  const resolveConfig = deps.resolveConfig ?? resolveCalleMcpConfig;
+  const config = resolveConfig();
   try {
-    // planAndSave clears any previously pending plan first, unconditionally
+    // planAndSave clears any previously pending plan first too, unconditionally
     // — see its doc comment for why that has to happen before validation or
     // the network call, not just on success.
-    const plan = await planAndSave(config, { to, region, goal });
+    const plan = await planAndSave(config, { to, region, goal }, deps.planCallFn);
     // confirm_token authorizes a real call — never print it, CLI arg it, or
     // let it reach shell history. Everything else about the plan is fine to
     // show (still passed through the phone mask, since to_phones round-trips
@@ -192,11 +220,24 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  // Every other path in this file prints through the phone mask; this
-  // catch-all must too, since any thrown error (including ones this file
-  // didn't anticipate) can end up here and still be printed to the user.
-  const rendered = error instanceof Error ? (error.stack ?? error.message) : String(error);
-  console.error(maskPhoneNumbersInText(rendered));
-  process.exitCode = 1;
-});
+// Only run as a real CLI invocation when this file is the actual entry
+// point (`node cli.js ...`) — not when it's imported as a module, which the
+// test suite does to exercise cmdPlan() directly. Without this guard,
+// importing this file for tests would also execute main() for real, against
+// the test runner's own argv, and its failure path would set
+// process.exitCode = 1 regardless of what the tests actually assert.
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error: unknown) => {
+    if (error instanceof UsageError) {
+      // usage() already printed the help text; nothing more to say.
+      process.exitCode = 1;
+      return;
+    }
+    // Every other path in this file prints through the phone mask; this
+    // catch-all must too, since any thrown error (including ones this file
+    // didn't anticipate) can end up here and still be printed to the user.
+    const rendered = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    console.error(maskPhoneNumbersInText(rendered));
+    process.exitCode = 1;
+  });
+}
