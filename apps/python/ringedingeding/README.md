@@ -12,11 +12,11 @@ They do not. This app keeps the groups apart and names the denominator every tim
 | --- | --- |
 | `answered` | said something |
 | `refused` | picked up and declined to take part |
-| `unreached` | nobody answered, or the line was busy |
+| `unreached` | nobody answered, the line was busy, a machine picked up, or the wrong person did |
 | `pending` | not called yet |
 | `unknown` | the call ended in a state nobody can interpret |
 
-Three rules follow, and they are what the regressions defend:
+Four rules follow, and they are what the regressions defend:
 
 - **Every share is reported against those who answered** — never against those who were
   invited — and the report says so in words.
@@ -24,6 +24,15 @@ Three rules follow, and they are what the regressions defend:
   mentioned Thursday has not ruled Thursday out.
 - **A tie stays a tie.** Nothing breaks the draw, because the caller was not asked to decide
   anything.
+- **A stranger's answer is never this participant's answer.** If the wrong person picked up
+  and declined on the participant's behalf, that is `unreached`, not `refused` — the
+  participant was never actually asked.
+
+Set `status` to `voicemail` when the call reached an answering machine, and to
+`wrong_person` when someone other than the invited participant picked up and no handover
+happened. Both land in `unreached` (see `Status.bucket` in `aggregate.py`), both are offered
+another call in a catch-up round, and neither is ever read as this participant's `answered`
+or `refused`.
 
 ## Setup
 
@@ -117,8 +126,9 @@ catch-up, it is pestering. Folding fresh answers in never overwrites an existing
 
 ## Deliberate limits
 
-- **`no_answer`, `busy` and `declined` never collapse into one group.** They mean different
-  things for a follow-up: two are worth another call, one is not.
+- **`no_answer`, `busy`, `voicemail`, `wrong_person` and `declined` never collapse into one
+  group.** They mean different things for a follow-up: four are worth another call, one is
+  not.
 - **An uninterpretable call lands in `unknown`**, not in `unreached`. Not knowing what
   happened is not the same as knowing nobody picked up.
 - **An incomplete result always carries its caveat**, generated from the coverage rather
@@ -133,14 +143,15 @@ python -m pytest -q
 ```
 
 ```text
-.......................                                                  [100%]
-23 passed in 0.08s
+..........................                                               [100%]
+26 passed in 0.28s
 ```
 
 The regressions guard the ways a summary could lie: unreached people counted as
-indifferent, statuses collapsing into one another, silence read as consent, a tie quietly
-broken, conditions or reasons dropped, a catch-up round overwriting an answer, and a full
-number reaching an output.
+indifferent, statuses collapsing into one another, a wrong-person pickup counted as this
+participant's refusal, a voicemail pickup skipped by a catch-up round, silence read as
+consent, a tie quietly broken, conditions or reasons dropped, a catch-up round overwriting
+an answer, and a full number reaching an output.
 
 ## The full application
 
