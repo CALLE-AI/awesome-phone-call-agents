@@ -7,6 +7,7 @@ This script intentionally uses only the Python standard library.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -90,6 +91,28 @@ def validate_skills() -> None:
             fail(f"Skill description is too short: {skill_md.relative_to(ROOT)}")
         if "phone" not in description.lower() and "call" not in description.lower():
             fail(f"Skill description should mention phone/call workflow: {skill_md.relative_to(ROOT)}")
+
+
+def validate_triage_discord_feedback_helper() -> None:
+    test_file = (
+        ROOT
+        / "skills"
+        / "triage-discord-feedback"
+        / "tests"
+        / "test_github_issue.py"
+    )
+    if not test_file.is_file():
+        fail(f"Missing file: {test_file.relative_to(ROOT)}")
+    result = subprocess.run(
+        [sys.executable, str(test_file)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        output = (result.stdout + result.stderr).strip()
+        fail(f"triage-discord-feedback helper tests failed:\n{output}")
 
 
 def validate_expected_files() -> None:
@@ -209,6 +232,7 @@ def main() -> None:
     validate_readme()
     validate_english_only()
     validate_skills()
+    validate_triage_discord_feedback_helper()
     validate_call_reminder_acceptance_rules()
     print("Repository validation passed.")
 
