@@ -64,10 +64,10 @@ Reference 3 ──┘                    │         └── Key Quotes
 
 1. **Add a candidate** with their references (name, phone, relationship)
 2. **CALL-E calls each reference** — first verifies recipient identity, then asks for explicit consent to AI analysis before proceeding with a structured interview asking about strengths, teamwork, reliability, growth areas, and a 1-10 recommendation
-3. **Call quality assessment** determines the outcome: `verified` (full interview), `partial` (too few questions answered), `insufficient` (too few turns), `no_consent` (declined AI analysis — permanent, never re-called), or `wrong_person` (retryable on next run)
+3. **Call quality assessment** determines the outcome: `verified` (full interview), `partial` (too few questions answered), `insufficient` (too few turns), `no_consent` (declined AI analysis — permanent, never re-called), or `wrong_person` (retryable on next run). Identity confirmation and consent detection are handled entirely by Gemini LLM — no keyword matching.
 4. **Gemini analyzes verified transcripts** and extracts scores across 5 dimensions (collaboration, technical ability, reliability, communication, leadership), plus evidence-grounded strengths, growth areas, and key quotes
-5. **7-layer LLM guardrails validate every output** — scores are clamped to 1-10, key quotes are fuzzy-matched against the actual transcript (threshold 0.65 — fabricated quotes are dropped), evidence per dimension is validated and ungrounded scores are zeroed, score-recommendation coherence is enforced, and confidence is formula-calculated from inter-reference variance
-6. **Cross-reference analysis** compares only verified references, flagging discrepancies (e.g., one reference rates reliability 9/10 while another rates it 5/10)
+5. **7-layer LLM guardrails validate every output** — scores are clamped to 1-10, key quotes are fuzzy-matched against the actual transcript (threshold 0.65 — fabricated quotes are dropped), evidence per dimension is validated and ungrounded scores are zeroed, score-recommendation coherence is enforced, and confidence is formula-calculated from weighted inter-reference variance
+6. **Relation-weighted cross-reference analysis** compares only verified references, weighting each by their relationship to the candidate (manager 1.5×, skip-level 1.3×, team lead 1.1×, peer 1.0×) and call completeness. Discrepancies are flagged (e.g., one reference rates reliability 9/10 while another rates it 5/10)
 7. **Dashboard** shows a radar chart comparison, per-reference details with quality badges, excluded references section, and a final hire recommendation with confidence score
 
 ## Setup
@@ -160,9 +160,12 @@ Opens the reference comparison dashboard with radar chart, per-reference details
 - **Consent flow**: The AI asks for explicit consent to AI analysis before proceeding. If the reference declines, the call ends gracefully and the reference is permanently marked `no_consent` (never re-called).
 - **Recipient verification**: The AI verifies the recipient's identity before disclosing any candidate or role details. Wrong-person calls are marked retryable.
 - **5-tier quality assessment**: Every completed call is classified as `verified`, `partial`, `insufficient`, `no_consent`, or `wrong_person`. Only `verified` calls feed into Gemini analysis.
-- **LLM fallback for ambiguity**: When keyword checks for identity/consent are ambiguous, a cheap Gemini call resolves it. Fails closed on API errors (treats ambiguity as "no").
+- **LLM-only identity and consent checking**: Identity confirmation and consent detection are handled entirely by Gemini — no brittle keyword matching. Each check sends the first 10 transcript lines to Gemini with a yes/no question. Fails closed on API errors (returns `False`).
+- **Candidate consent gate**: Live calls require explicit candidate consent (`store.record_candidate_consent()`). Without it, `agent.py --live` refuses to proceed.
 - **E.164 phone validation**: Phone numbers are validated before any call is placed. Invalid numbers are skipped.
-- **Call-ID idempotency**: Re-running `agent.py --live` skips calls by CALL-E call ID (not reference name), preventing duplicate processing.
+- **Deterministic idempotency keys**: Each call gets a key `vouchcall_{candidate_id}_{ref_id}_g{attempt_count}` — same intent produces the same key so CALL-E deduplicates. Retries increment the attempt count.
+- **CALL-E completion confidence**: Logged from CALL-E's `completion_confidence` (score 0-1, label low/medium/high) for observability.
+- **Relation-weighted scoring**: Manager references carry 1.5× weight, skip-level 1.3×, peers 1.0×. Partial calls are discounted by `questions_answered / expected_questions`. Weights feed into both confidence calculation (weighted variance) and the cross-analysis LLM prompt.
 - **Permanent vs retryable statuses**: `no_consent` is permanent (skip on all future runs). `wrong_person` and `insufficient` are retryable on the next run.
 - **Field-level encryption**: Phone numbers and transcripts are encrypted at rest with Fernet (AES-128-CBC) via `VOUCHCALL_ENCRYPTION_KEY`. Without the key, data is stored in plaintext (graceful degradation for demo mode).
 - **Phone separation**: `get_references()` returns masked phones for display/logging. `get_references_for_calling()` returns decrypted phones only when live calls are needed.
@@ -181,11 +184,11 @@ Opens the reference comparison dashboard with radar chart, per-reference details
 python -m pytest tests/ -v
 ```
 
-170 credential-free tests across three files — zero API keys needed:
+183 credential-free tests across three files — zero API keys needed:
 
-- **test_guardrails.py** (75 tests) — LLM output validation: score clamping, fuzzy quote matching (0.65 threshold), coherence checks, confidence calculation, enum enforcement, input sanitization, evidence grounding validation, transcript turn counting, question-answer counting, identity/consent keyword checks, quality status constants
-- **test_safety.py** (68 tests) — Safety boundaries: store schema (quality_status column, no raw_result), DB operations, phone encryption at rest, transcript encryption/decryption, masked vs real phone getters, call-ID idempotency, quality-based ref queries, migration idempotency, Fernet encrypt/decrypt roundtrips, wrong-key fail-closed, prompt consent/identity ordering, LLM fallback mocking (yes/no/error), `assess_call_quality` for all 5 quality statuses, permanent vs retryable status constants
-- **test_integration.py** (27 tests) — Component integration: CALL-E wrapper payload construction, seed data with quality_status and no_consent references, Ryan Cooper's Kevin Park excluded, Alex transcript consent verification, dashboard quality display mappings, config constants including encryption and quality thresholds
+- **test_guardrails.py** (98 tests) — LLM output validation: score clamping, fuzzy quote matching (0.65 threshold), coherence checks, weighted confidence calculation, relation-based weighting (`_ref_weight` for manager/peer/skip-level), enum enforcement, input sanitization, evidence grounding validation, transcript turn counting, question-answer counting, LLM-based identity/consent checks (mocked Gemini), quality status constants
+- **test_safety.py** (61 tests) — Safety boundaries: store schema (quality_status column, no raw_result), DB operations, candidate consent gate (`record_candidate_consent`/`has_candidate_consent`), `count_calls_for_ref` for idempotency keys, phone encryption at rest, transcript encryption/decryption, masked vs real phone getters, quality-based ref queries, migration idempotency, Fernet encrypt/decrypt roundtrips, wrong-key fail-closed, prompt consent/identity ordering, LLM identity/consent mocking (always-calls-LLM, yes/no/error), `assess_call_quality` for all 5 quality statuses, permanent vs retryable status constants
+- **test_integration.py** (24 tests) — Component integration: CALL-E wrapper payload construction with idempotency key passthrough, seed data with quality_status and no_consent references, candidate consent in seed data, Ryan Cooper's Kevin Park excluded, Alex transcript consent verification, dashboard quality display mappings, config constants including encryption and quality thresholds
 
 ## Side Effects
 

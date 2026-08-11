@@ -413,7 +413,7 @@ class TestAgentConstants:
         assert "no_consent" not in RETRYABLE_QUALITY_STATUSES
 
 
-class TestLLMFallback:
+class TestLLMIdentityConsent:
     def test_llm_check_yes_no_returns_true_on_yes(self):
         from llm import _llm_check_yes_no
         mock_response = MagicMock()
@@ -439,7 +439,31 @@ class TestLLMFallback:
         with patch("llm._get_client", return_value=mock_client):
             assert _llm_check_yes_no("Did they consent?", "some context") is False
 
-    def test_check_identity_confirmed_uses_llm_on_ambiguous(self):
+    def test_check_identity_always_calls_llm(self):
+        from llm import _check_identity_confirmed
+        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Yes, this is Jordan."
+        mock_response = MagicMock()
+        mock_response.text = "yes"
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        with patch("llm._get_client", return_value=mock_client):
+            result = _check_identity_confirmed(transcript, "Jordan Lee")
+            assert result is True
+            mock_client.models.generate_content.assert_called_once()
+
+    def test_check_consent_always_calls_llm(self):
+        from llm import _check_consent_given
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: Sure, go ahead."
+        mock_response = MagicMock()
+        mock_response.text = "yes"
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        with patch("llm._get_client", return_value=mock_client):
+            result = _check_consent_given(transcript)
+            assert result is True
+            mock_client.models.generate_content.assert_called_once()
+
+    def test_identity_denied_by_llm(self):
         from llm import _check_identity_confirmed
         transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Who is this?"
         mock_response = MagicMock()
@@ -449,11 +473,10 @@ class TestLLMFallback:
         with patch("llm._get_client", return_value=mock_client):
             result = _check_identity_confirmed(transcript, "Jordan Lee")
             assert result is False
-            mock_client.models.generate_content.assert_called_once()
 
-    def test_check_consent_given_uses_llm_on_ambiguous(self):
+    def test_consent_denied_by_llm(self):
         from llm import _check_consent_given
-        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: What does that involve?"
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: No thanks."
         mock_response = MagicMock()
         mock_response.text = "no"
         mock_client = MagicMock()
@@ -461,26 +484,96 @@ class TestLLMFallback:
         with patch("llm._get_client", return_value=mock_client):
             result = _check_consent_given(transcript)
             assert result is False
-            mock_client.models.generate_content.assert_called_once()
 
-    def test_check_identity_skips_llm_on_clear_yes(self):
-        from llm import _check_identity_confirmed
-        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Yes, this is Jordan."
-        with patch("llm._llm_check_yes_no") as mock_llm:
-            result = _check_identity_confirmed(transcript, "Jordan Lee")
-            assert result is True
-            mock_llm.assert_not_called()
 
-    def test_check_consent_skips_llm_on_clear_yes(self):
-        from llm import _check_consent_given
-        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: Sure, go ahead."
-        with patch("llm._llm_check_yes_no") as mock_llm:
-            result = _check_consent_given(transcript)
-            assert result is True
-            mock_llm.assert_not_called()
+class TestCandidateConsent:
+    @pytest.fixture(autouse=True)
+    def setup_db(self, tmp_path):
+        self.db_path = tmp_path / "test_consent.db"
+        with patch("store.DB_PATH", self.db_path):
+            import store
+            self.store = store
+            store.init_db()
+            yield
+
+    def test_record_and_check_consent(self):
+        cid = self.store.add_candidate("Test", "Role")
+        assert self.store.has_candidate_consent(cid) is False
+        self.store.record_candidate_consent(cid)
+        assert self.store.has_candidate_consent(cid) is True
+
+    def test_consent_nonexistent_candidate(self):
+        assert self.store.has_candidate_consent(9999) is False
+
+    def test_record_consent_nonexistent_returns_false(self):
+        assert self.store.record_candidate_consent(9999) is False
+
+    def test_migrate_contact_consent_idempotent(self):
+        conn = sqlite3.connect(str(self.db_path))
+        from store import _migrate_contact_consent
+        _migrate_contact_consent(conn)
+        _migrate_contact_consent(conn)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(candidates)").fetchall()]
+        assert cols.count("contact_consent") == 1
+        conn.close()
+
+
+class TestCountCallsForRef:
+    @pytest.fixture(autouse=True)
+    def setup_db(self, tmp_path):
+        self.db_path = tmp_path / "test_count.db"
+        with patch("store.DB_PATH", self.db_path):
+            import store
+            self.store = store
+            store.init_db()
+            yield
+
+    def test_zero_calls(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        assert self.store.count_calls_for_ref(rid) == 0
+
+    def test_counts_multiple_calls(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        for i in range(3):
+            self.store.save_call(
+                ref_id=rid, candidate_id=cid, calle_call_id=f"call_{i}",
+                status="completed", scores={}, strengths=[], growth_areas=[],
+                overall_recommendation="", key_quotes=[], summary="ok",
+            )
+        assert self.store.count_calls_for_ref(rid) == 3
+
+    def test_counts_only_matching_ref(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid1 = self.store.add_reference(cid, "Ref1", "+10000000001", "Peer")
+        rid2 = self.store.add_reference(cid, "Ref2", "+10000000002", "Manager")
+        self.store.save_call(
+            ref_id=rid1, candidate_id=cid, calle_call_id="c1",
+            status="completed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[], summary="ok",
+        )
+        self.store.save_call(
+            ref_id=rid2, candidate_id=cid, calle_call_id="c2",
+            status="completed", scores={}, strengths=[], growth_areas=[],
+            overall_recommendation="", key_quotes=[], summary="ok",
+        )
+        assert self.store.count_calls_for_ref(rid1) == 1
+        assert self.store.count_calls_for_ref(rid2) == 1
 
 
 class TestAssessCallQuality:
+    def _mock_llm_yes_no(self, identity_answer, consent_answer):
+        call_count = [0]
+        def side_effect(question, context):
+            call_count[0] += 1
+            if "confirm they are" in question:
+                return identity_answer
+            if "consent" in question:
+                return consent_answer
+            return False
+        return side_effect
+
     def test_verified_transcript(self):
         from llm import assess_call_quality
         transcript = """Bot: Am I speaking with Jordan Lee?
@@ -499,7 +592,7 @@ Bot: Were there areas where Alex could grow or improve?
 User: He could be more vocal in larger meetings, that's about it.
 Bot: On a scale of 1 to 10, how strongly would you recommend Alex?
 User: I'd say a 9, I'd hire him again in a heartbeat."""
-        with patch("llm._llm_check_yes_no"):
+        with patch("llm._llm_check_yes_no", side_effect=self._mock_llm_yes_no(True, True)):
             result = assess_call_quality(transcript, "Jordan Lee")
         assert result["quality_status"] == "verified"
         assert result["identity_confirmed"] is True
@@ -509,7 +602,7 @@ User: I'd say a 9, I'd hire him again in a heartbeat."""
     def test_wrong_person(self):
         from llm import assess_call_quality
         transcript = "Bot: Am I speaking with Jordan Lee?\nUser: No, wrong number."
-        with patch("llm._llm_check_yes_no"):
+        with patch("llm._llm_check_yes_no", side_effect=self._mock_llm_yes_no(False, True)):
             result = assess_call_quality(transcript, "Jordan Lee")
         assert result["quality_status"] == "wrong_person"
 
@@ -519,7 +612,7 @@ User: I'd say a 9, I'd hire him again in a heartbeat."""
 User: Yes, speaking.
 Bot: This call will be analyzed by AI. Is that okay with you?
 User: No, I'd prefer not to do that."""
-        with patch("llm._llm_check_yes_no"):
+        with patch("llm._llm_check_yes_no", side_effect=self._mock_llm_yes_no(True, False)):
             result = assess_call_quality(transcript, "Jordan Lee")
         assert result["quality_status"] == "no_consent"
 
@@ -530,7 +623,7 @@ User: Yes, speaking.
 Bot: This call will be analyzed by AI. Is that okay with you?
 User: Sure, go ahead.
 Bot: Thanks, goodbye."""
-        with patch("llm._llm_check_yes_no"):
+        with patch("llm._llm_check_yes_no", side_effect=self._mock_llm_yes_no(True, True)):
             result = assess_call_quality(transcript, "Jordan Lee")
         assert result["quality_status"] == "insufficient"
         assert result["turn_count"] < 6

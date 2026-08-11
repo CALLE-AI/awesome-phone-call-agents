@@ -5,7 +5,8 @@ from difflib import SequenceMatcher
 from google import genai
 from config import (
     GEMINI_API_KEY, GEMINI_MODEL, DIMENSIONS, sanitize_name,
-    MIN_TRANSCRIPT_TURNS, MIN_QUESTIONS_ANSWERED,
+    MIN_TRANSCRIPT_TURNS, MIN_QUESTIONS_ANSWERED, EXPECTED_QUESTIONS,
+    RELATION_WEIGHTS,
 )
 
 _client = None
@@ -91,18 +92,46 @@ def _check_score_recommendation_coherence(scores: dict, recommendation: str) -> 
     return recommendation
 
 
+def _ref_weight(call: dict) -> float:
+    """Compute a reference's weight based on relation type and call quality.
+
+    Weight = relation_weight × quality_discount
+
+    relation_weight: seniority/proximity to the candidate determines base
+    importance. A direct manager (1.5×) carries more weight than a peer (1.0×)
+    because they observed performance more closely and evaluated it formally.
+
+    quality_discount: min(1.0, questions_answered / expected_questions). A full
+    6-question call gets 1.0; a 3-question call gets 0.5. This prevents short
+    calls from carrying disproportionate influence without zeroing them out.
+
+    CALL-E completion_confidence is intentionally excluded — it measures audio/
+    connection quality, not reference credibility. A manager on a choppy line
+    still matters more than a peer with perfect audio.
+    """
+    relation = (call.get("ref_relation") or "").lower().strip()
+    base = RELATION_WEIGHTS.get(relation, 1.0)
+    qa = call.get("questions_answered", EXPECTED_QUESTIONS)
+    quality_discount = min(1.0, qa / EXPECTED_QUESTIONS) if EXPECTED_QUESTIONS > 0 else 1.0
+    return base * quality_discount
+
+
 def _compute_confidence(calls: list[dict]) -> int:
     completed = [c for c in calls if c.get("status") == "completed"]
     if len(completed) < 2:
         return max(30, min(50, len(completed) * 25))
+    weights = [_ref_weight(c) for c in completed]
+    total_w = sum(weights) or 1.0
     variances = []
     for dim in DIMENSIONS:
         key = f"{dim}_score"
-        scores = [c.get(key, 0) for c in completed if c.get(key, 0) > 0]
-        if len(scores) >= 2:
-            mean = sum(scores) / len(scores)
-            var = sum((s - mean) ** 2 for s in scores) / len(scores)
-            variances.append(var)
+        pairs = [(c.get(key, 0), w) for c, w in zip(completed, weights) if c.get(key, 0) > 0]
+        if len(pairs) >= 2:
+            w_sum = sum(w for _, w in pairs)
+            if w_sum > 0:
+                w_mean = sum(s * w for s, w in pairs) / w_sum
+                w_var = sum(w * (s - w_mean) ** 2 for s, w in pairs) / w_sum
+                variances.append(w_var)
     if not variances:
         return 50
     avg_var = sum(variances) / len(variances)
@@ -116,63 +145,6 @@ def _count_transcript_turns(transcript: str) -> int:
         return 0
     return sum(1 for line in transcript.strip().split("\n")
                if line.startswith("Bot:") or line.startswith("User:"))
-
-
-IDENTITY_AFFIRMATIVE = (
-    "yes", "yeah", "yep", "that's me", "speaking", "this is",
-)
-IDENTITY_NEGATIVE = (
-    "no", "wrong", "not",
-)
-
-CONSENT_AFFIRMATIVE = (
-    "yes", "yeah", "yep", "sure", "okay", "ok", "go ahead", "fine",
-    "that's fine", "no problem", "absolutely", "of course", "certainly",
-    "no worries", "sounds good", "that works", "all good", "please",
-)
-CONSENT_NEGATIVE = (
-    "no", "don't", "decline", "rather not", "not okay", "prefer not",
-    "i'd rather", "not comfortable", "not interested",
-)
-
-_AMBIGUOUS = "ambiguous"
-
-
-def _keyword_check_identity(transcript: str, reference_name: str):
-    if not transcript or not reference_name:
-        return False
-    lines = transcript.strip().split("\n")
-    first_name = reference_name.split()[0].lower()
-    for i, line in enumerate(lines):
-        if "am i speaking with" in line.lower():
-            for response_line in lines[i + 1:i + 3]:
-                if response_line.startswith("User:"):
-                    text = response_line[5:].lower()
-                    if any(w in text for w in IDENTITY_AFFIRMATIVE) or first_name in text:
-                        return True
-                    if any(w in text for w in IDENTITY_NEGATIVE):
-                        return False
-                    return _AMBIGUOUS
-            break
-    return False
-
-
-def _keyword_check_consent(transcript: str):
-    if not transcript:
-        return False
-    lines = transcript.strip().split("\n")
-    for i, line in enumerate(lines):
-        if "analyzed by ai" in line.lower() or "is that okay" in line.lower():
-            for response_line in lines[i + 1:i + 3]:
-                if response_line.startswith("User:"):
-                    text = response_line[5:].lower()
-                    if any(w in text for w in CONSENT_AFFIRMATIVE):
-                        return True
-                    if any(w in text for w in CONSENT_NEGATIVE):
-                        return False
-                    return _AMBIGUOUS
-            break
-    return False
 
 
 def _llm_check_yes_no(question: str, context: str) -> bool:
@@ -192,9 +164,8 @@ Answer with ONLY "yes" or "no". Nothing else."""
 
 
 def _check_identity_confirmed(transcript: str, reference_name: str) -> bool:
-    result = _keyword_check_identity(transcript, reference_name)
-    if result is not _AMBIGUOUS:
-        return result
+    if not transcript or not reference_name:
+        return False
     lines = transcript.strip().split("\n")[:10]
     excerpt = "\n".join(lines)
     return _llm_check_yes_no(
@@ -204,9 +175,8 @@ def _check_identity_confirmed(transcript: str, reference_name: str) -> bool:
 
 
 def _check_consent_given(transcript: str) -> bool:
-    result = _keyword_check_consent(transcript)
-    if result is not _AMBIGUOUS:
-        return result
+    if not transcript:
+        return False
     lines = transcript.strip().split("\n")[:10]
     excerpt = "\n".join(lines)
     return _llm_check_yes_no(
@@ -390,6 +360,12 @@ Return ONLY valid JSON, no markdown formatting."""
 
 def cross_reference_analysis(candidate_name: str, role_title: str,
                              calls: list[dict]) -> dict:
+    """Analyze all references together with relation-based weighting.
+
+    Each reference is assigned a weight (shown as 'weight' in the prompt) so
+    the LLM knows a manager's 8/10 matters more than a peer's 8/10. See
+    _ref_weight() for the formula.
+    """
     candidate_name = sanitize_name(candidate_name)
     role_title = sanitize_name(role_title)
     refs_summary = []
@@ -397,6 +373,7 @@ def cross_reference_analysis(candidate_name: str, role_title: str,
         refs_summary.append({
             "reference": c.get("ref_name", "Unknown"),
             "relation": c.get("ref_relation", "Unknown"),
+            "weight": round(_ref_weight(c), 2),
             "collaboration": c.get("collaboration_score"),
             "technical": c.get("technical_ability_score"),
             "reliability": c.get("reliability_score"),
@@ -415,6 +392,8 @@ ROLE: {role_title}
 
 REFERENCE RESULTS:
 {json.dumps(refs_summary, indent=2)}
+
+Each reference has a "weight" field (higher = more influential). Weights reflect the reference's relationship to the candidate (e.g. a direct manager weighs more than a peer) and call completeness. Give proportionally more consideration to higher-weighted references when forming your recommendation.
 
 Analyze all references together and return a JSON object with:
 - "discrepancies": list of objects, each with "dimension" (which score/trait), "detail" (what doesn't match), and "severity" ("minor", "notable", "major"). Look for:

@@ -13,7 +13,8 @@ def _get_client() -> CalleClient:
 
 def make_call(phone: str, goal: str,
               region: str = "IN", locale: str = "en-IN",
-              timeout_seconds: float = 300.0) -> dict:
+              timeout_seconds: float = 300.0,
+              idempotency_key: str | None = None) -> dict:
     return _get_client().calls.create_and_wait(
         task=goal,
         recipient={
@@ -22,6 +23,7 @@ def make_call(phone: str, goal: str,
             "locale": locale,
         },
         timeout_seconds=timeout_seconds,
+        idempotency_key=idempotency_key,
     )
 
 

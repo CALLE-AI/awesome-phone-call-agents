@@ -17,6 +17,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             role_title TEXT NOT NULL,
+            contact_consent INTEGER DEFAULT 0,
+            contact_consent_at TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -63,6 +65,15 @@ def init_db():
         );
     """)
     _migrate_quality_status(conn)
+    _migrate_contact_consent(conn)
+
+
+def _migrate_contact_consent(conn):
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(candidates)").fetchall()]
+    if "contact_consent" not in cols:
+        conn.execute("ALTER TABLE candidates ADD COLUMN contact_consent INTEGER DEFAULT 0")
+        conn.execute("ALTER TABLE candidates ADD COLUMN contact_consent_at TEXT")
+        conn.commit()
 
 
 def _migrate_quality_status(conn):
@@ -80,6 +91,26 @@ def add_candidate(name: str, role_title: str) -> int:
     )
     conn.commit()
     return cursor.lastrowid
+
+
+def record_candidate_consent(candidate_id: int) -> bool:
+    conn = _connect()
+    cursor = conn.execute(
+        "UPDATE candidates SET contact_consent = 1, contact_consent_at = datetime('now') "
+        "WHERE id = ?",
+        (candidate_id,),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
+def has_candidate_consent(candidate_id: int) -> bool:
+    conn = _connect()
+    row = conn.execute(
+        "SELECT contact_consent FROM candidates WHERE id = ?",
+        (candidate_id,),
+    ).fetchone()
+    return bool(row and row[0])
 
 
 def get_candidate(candidate_id: int) -> dict:
@@ -181,6 +212,12 @@ def get_calls_for_candidate(candidate_id: int) -> list[dict]:
             d["transcript"] = decrypt_field(d["transcript"])
         results.append(d)
     return results
+
+
+def count_calls_for_ref(ref_id: int) -> int:
+    conn = _connect()
+    row = conn.execute("SELECT COUNT(*) FROM calls WHERE ref_id = ?", (ref_id,)).fetchone()
+    return row[0] if row else 0
 
 
 def get_completed_call_ids(candidate_id: int) -> set:

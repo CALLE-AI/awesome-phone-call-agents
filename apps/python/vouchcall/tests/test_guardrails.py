@@ -10,27 +10,25 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from config import mask_phone, validate_e164, sanitize_name
+from unittest.mock import patch, MagicMock
+
 from llm import (
     _clamp_score,
     _fuzzy_match,
     _check_score_recommendation_coherence,
     _compute_confidence,
+    _ref_weight,
     _validate_call_analysis,
     _validate_cross_analysis,
     _count_transcript_turns,
     _count_questions_answered,
-    _keyword_check_identity,
-    _keyword_check_consent,
-    _AMBIGUOUS,
+    _check_identity_confirmed,
+    _check_consent_given,
     VALID_RECOMMENDATIONS,
     VALID_HIRE_RECOMMENDATIONS,
     VALID_SEVERITIES,
     VALID_QUALITY_STATUSES,
     QUESTION_MARKERS,
-    IDENTITY_AFFIRMATIVE,
-    IDENTITY_NEGATIVE,
-    CONSENT_AFFIRMATIVE,
-    CONSENT_NEGATIVE,
 )
 
 
@@ -434,75 +432,139 @@ User: I'd say a 9."""
         assert _count_questions_answered(transcript) == 0
 
 
-class TestKeywordCheckIdentity:
-    def test_affirmative_yes(self):
+class TestRefWeight:
+    def test_manager_higher_than_peer(self):
+        manager = {"ref_relation": "Former Manager", "questions_answered": 6}
+        peer = {"ref_relation": "Peer", "questions_answered": 6}
+        assert _ref_weight(manager) > _ref_weight(peer)
+
+    def test_partial_call_discounted(self):
+        full = {"ref_relation": "Peer", "questions_answered": 6}
+        partial = {"ref_relation": "Peer", "questions_answered": 3}
+        assert _ref_weight(full) > _ref_weight(partial)
+
+    def test_quality_discount_caps_at_one(self):
+        over = {"ref_relation": "Peer", "questions_answered": 10}
+        assert _ref_weight(over) == 1.0
+
+    def test_unknown_relation_defaults_to_one(self):
+        unknown = {"ref_relation": "Intern Buddy", "questions_answered": 6}
+        assert _ref_weight(unknown) == 1.0
+
+    def test_missing_relation_defaults_to_one(self):
+        empty = {"questions_answered": 6}
+        assert _ref_weight(empty) == 1.0
+
+    def test_case_insensitive_relation(self):
+        upper = {"ref_relation": "FORMER MANAGER", "questions_answered": 6}
+        lower = {"ref_relation": "former manager", "questions_answered": 6}
+        assert _ref_weight(upper) == _ref_weight(lower)
+
+    def test_skip_level_between_manager_and_peer(self):
+        manager = {"ref_relation": "Former Manager", "questions_answered": 6}
+        skip = {"ref_relation": "Skip-Level Manager", "questions_answered": 6}
+        peer = {"ref_relation": "Peer", "questions_answered": 6}
+        assert _ref_weight(manager) > _ref_weight(skip) > _ref_weight(peer)
+
+
+class TestWeightedConfidence:
+    def test_manager_agreement_boosts_confidence(self):
+        calls_with_manager = [
+            {"status": "completed", "ref_relation": "Former Manager",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+        ]
+        calls_equal_weight = [
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 8, "reliability_score": 8, "questions_answered": 6},
+        ]
+        assert _compute_confidence(calls_with_manager) >= _compute_confidence(calls_equal_weight)
+
+    def test_disagreement_keeps_confidence_low(self):
+        manager_disagrees = [
+            {"status": "completed", "ref_relation": "Former Manager",
+             "collaboration_score": 3, "reliability_score": 3, "questions_answered": 6},
+            {"status": "completed", "ref_relation": "Peer",
+             "collaboration_score": 9, "reliability_score": 9, "questions_answered": 6},
+        ]
+        assert _compute_confidence(manager_disagrees) <= 60
+
+
+class TestCheckIdentityConfirmed:
+    def _mock_llm(self, answer):
+        mock_response = MagicMock()
+        mock_response.text = answer
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        return mock_client
+
+    def test_confirmed_via_llm(self):
         transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Yes, this is Jordan."
-        assert _keyword_check_identity(transcript, "Jordan Lee") is True
+        with patch("llm._get_client", return_value=self._mock_llm("yes")):
+            assert _check_identity_confirmed(transcript, "Jordan Lee") is True
 
-    def test_affirmative_thats_me(self):
-        transcript = "Bot: Am I speaking with Priya Sharma?\nUser: Yeah, that's me."
-        assert _keyword_check_identity(transcript, "Priya Sharma") is True
-
-    def test_affirmative_speaking(self):
-        transcript = "Bot: Am I speaking with Michael Chen?\nUser: Yes, speaking."
-        assert _keyword_check_identity(transcript, "Michael Chen") is True
-
-    def test_negative_wrong_person(self):
+    def test_denied_via_llm(self):
         transcript = "Bot: Am I speaking with Jordan Lee?\nUser: No, wrong number."
-        assert _keyword_check_identity(transcript, "Jordan Lee") is False
+        with patch("llm._get_client", return_value=self._mock_llm("no")):
+            assert _check_identity_confirmed(transcript, "Jordan Lee") is False
 
-    def test_ambiguous_response(self):
-        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Who is calling?"
-        result = _keyword_check_identity(transcript, "Jordan Lee")
-        assert result is _AMBIGUOUS
+    def test_empty_transcript_returns_false(self):
+        assert _check_identity_confirmed("", "Jordan Lee") is False
 
-    def test_first_name_match(self):
-        transcript = "Bot: Am I speaking with Jordan Lee?\nUser: Jordan here."
-        assert _keyword_check_identity(transcript, "Jordan Lee") is True
+    def test_empty_name_returns_false(self):
+        assert _check_identity_confirmed("Bot: Hi\nUser: Hello", "") is False
 
-    def test_empty_transcript(self):
-        assert _keyword_check_identity("", "Jordan Lee") is False
+    def test_none_transcript_returns_false(self):
+        assert _check_identity_confirmed(None, "Jordan Lee") is False
 
-    def test_empty_name(self):
-        assert _keyword_check_identity("Bot: Am I speaking with?\nUser: Yes", "") is False
+    def test_llm_error_returns_false(self):
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = Exception("API error")
+        with patch("llm._get_client", return_value=mock_client):
+            assert _check_identity_confirmed("Bot: Hi\nUser: Yes", "Jordan Lee") is False
 
-    def test_no_identity_question(self):
-        transcript = "Bot: Hello, how are you?\nUser: Fine thanks."
-        assert _keyword_check_identity(transcript, "Jordan Lee") is False
+    def test_uses_first_10_lines_only(self):
+        lines = [f"Bot: line {i}" for i in range(20)]
+        transcript = "\n".join(lines)
+        with patch("llm._get_client", return_value=self._mock_llm("yes")) as mock_get:
+            _check_identity_confirmed(transcript, "Jordan Lee")
+            call_args = mock_get.return_value.models.generate_content.call_args
+            prompt = call_args.kwargs.get("contents", call_args[1].get("contents", ""))
+            assert "line 15" not in prompt
 
 
-class TestKeywordCheckConsent:
-    def test_affirmative_yes(self):
-        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: Yes, go ahead."
-        assert _keyword_check_consent(transcript) is True
+class TestCheckConsentGiven:
+    def _mock_llm(self, answer):
+        mock_response = MagicMock()
+        mock_response.text = answer
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+        return mock_client
 
-    def test_affirmative_sure(self):
-        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: Sure, no problem."
-        assert _keyword_check_consent(transcript) is True
+    def test_consent_given_via_llm(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: Yes, go ahead."
+        with patch("llm._get_client", return_value=self._mock_llm("yes")):
+            assert _check_consent_given(transcript) is True
 
-    def test_affirmative_no_problem(self):
-        transcript = "Bot: analyzed by AI. Is that okay?\nUser: No problem at all."
-        assert _keyword_check_consent(transcript) is True
+    def test_consent_denied_via_llm(self):
+        transcript = "Bot: This call will be analyzed by AI. Is that okay?\nUser: No, I'd rather not."
+        with patch("llm._get_client", return_value=self._mock_llm("no")):
+            assert _check_consent_given(transcript) is False
 
-    def test_negative_decline(self):
-        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: No, I'd rather not."
-        assert _keyword_check_consent(transcript) is False
+    def test_empty_transcript_returns_false(self):
+        assert _check_consent_given("") is False
 
-    def test_negative_not_comfortable(self):
-        transcript = "Bot: analyzed by AI. Is that okay?\nUser: I'm not comfortable with that."
-        assert _keyword_check_consent(transcript) is False
+    def test_none_transcript_returns_false(self):
+        assert _check_consent_given(None) is False
 
-    def test_ambiguous_response(self):
-        transcript = "Bot: This call will be analyzed by AI. Is that okay with you?\nUser: What does that mean exactly?"
-        result = _keyword_check_consent(transcript)
-        assert result is _AMBIGUOUS
-
-    def test_empty_transcript(self):
-        assert _keyword_check_consent("") is False
-
-    def test_no_consent_question(self):
-        transcript = "Bot: Hello, how are you?\nUser: Fine thanks."
-        assert _keyword_check_consent(transcript) is False
+    def test_llm_error_returns_false(self):
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = Exception("API error")
+        with patch("llm._get_client", return_value=mock_client):
+            assert _check_consent_given("Bot: consent?\nUser: sure") is False
 
 
 class TestQualityConstants:
@@ -513,11 +575,14 @@ class TestQualityConstants:
     def test_question_markers_count(self):
         assert len(QUESTION_MARKERS) == 6
 
-    def test_consent_affirmative_includes_no_problem(self):
-        assert "no problem" in CONSENT_AFFIRMATIVE
+    def test_valid_recommendations(self):
+        expected = {"strong_yes", "yes", "neutral", "hesitant", "no"}
+        assert VALID_RECOMMENDATIONS == expected
 
-    def test_consent_negative_includes_prefer_not(self):
-        assert "prefer not" in CONSENT_NEGATIVE
+    def test_valid_hire_recommendations(self):
+        expected = {"strong_hire", "hire", "lean_hire", "lean_no", "no_hire"}
+        assert VALID_HIRE_RECOMMENDATIONS == expected
 
-    def test_identity_affirmative_includes_speaking(self):
-        assert "speaking" in IDENTITY_AFFIRMATIVE
+    def test_valid_severities(self):
+        expected = {"minor", "notable", "major"}
+        assert VALID_SEVERITIES == expected

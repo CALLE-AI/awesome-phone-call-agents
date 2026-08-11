@@ -67,3 +67,18 @@ DIMENSIONS = [
 
 MIN_TRANSCRIPT_TURNS = 6
 MIN_QUESTIONS_ANSWERED = 3
+EXPECTED_QUESTIONS = len(["capacity", "strengths", "collaboration", "reliability", "growth", "recommend"])
+
+RELATION_WEIGHTS = {
+    "former manager": 1.5,
+    "manager": 1.5,
+    "direct manager": 1.5,
+    "skip-level manager": 1.3,
+    "team lead": 1.1,
+    "team lead / peer": 1.1,
+    "peer": 1.0,
+    "colleague": 1.0,
+    "direct report": 1.1,
+    "former direct report": 1.1,
+    "engineering lead": 1.3,
+}

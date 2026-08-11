@@ -35,6 +35,7 @@ class TestCalleWrapper:
                 task="Test goal",
                 recipient={"phone": "+14155551234", "region": "US", "locale": "en-US"},
                 timeout_seconds=300.0,
+                idempotency_key=None,
             )
             assert result["status"] == "completed"
 
@@ -74,6 +75,21 @@ class TestCalleWrapper:
             calle_wrapper.make_call(phone="+11234567890", goal="Test")
             call_args = mock_client.calls.create_and_wait.call_args
             assert call_args.kwargs["timeout_seconds"] == 300.0
+
+    def test_idempotency_key_passed_through(self):
+        mock_client = MagicMock()
+        mock_client.calls.create_and_wait.return_value = {"id": "456", "status": "completed"}
+
+        with patch("calle_wrapper._client", mock_client):
+            import calle_wrapper
+            calle_wrapper._client = mock_client
+
+            calle_wrapper.make_call(
+                phone="+14155551234", goal="Test",
+                idempotency_key="vouchcall_1_2_g0",
+            )
+            call_args = mock_client.calls.create_and_wait.call_args
+            assert call_args.kwargs["idempotency_key"] == "vouchcall_1_2_g0"
 
 
 # -- seed_data tests (hardcoded candidates only, no Gemini) ------------------
@@ -205,6 +221,15 @@ class TestSeedDataRyanCooperFullSet:
             transcript = data["transcript"]
             assert "analyzed by ai" in transcript.lower() or "is that okay" in transcript.lower(), \
                 f"Consent question missing from {name}'s transcript"
+
+    def test_seed_records_candidate_consent(self):
+        from seed_data import seed
+        with patch("store.DB_PATH", self.db_path), patch("sys.argv", ["seed_data.py"]):
+            seed()
+        candidates = self.store.get_all_candidates()
+        for c in candidates:
+            assert self.store.has_candidate_consent(c["id"]), \
+                f"Candidate {c['name']} missing consent record"
 
 
 # -- dashboard logic tests (no Streamlit runtime needed) ---------------------

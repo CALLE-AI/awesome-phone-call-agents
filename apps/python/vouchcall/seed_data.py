@@ -74,6 +74,7 @@ Bot: Thank you so much for your time, Michael. Your input is really valuable. Ha
 def _seed_candidate_hardcoded(name, role, refs_data, analysis_data):
     """Seed a candidate with pre-computed data (no Gemini calls)."""
     cid = store.add_candidate(name=name, role_title=role)
+    store.record_candidate_consent(cid)
     print(f"\nCreated candidate '{name}' (ID: {cid})")
 
     for ref in refs_data:
@@ -183,6 +184,7 @@ def seed():
         require_keys("GEMINI_API_KEY")
         print("Using Gemini for Alex Morgan analysis (--gemini flag)")
         cid = store.add_candidate(name="Alex Morgan", role_title="Senior Software Engineer")
+        store.record_candidate_consent(cid)
         refs = {}
         for ref_name, data in ALEX_TRANSCRIPTS.items():
             refs[ref_name] = store.add_reference(cid, ref_name, "+10000000000", data["relation"])

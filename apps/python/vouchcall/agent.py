@@ -1,5 +1,6 @@
 import sys
 import logging
+import uuid
 import store
 import calle_wrapper
 import llm
@@ -18,7 +19,12 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
         return
 
     if live:
-        require_keys("CALLE_API_KEY", "GEMINI_API_KEY")
+        require_keys("CALLE_API_KEY", "GEMINI_API_KEY", "ENCRYPTION_KEY")
+        if not store.has_candidate_consent(candidate_id):
+            log.error("Cannot proceed: candidate %s has not authorized contact with their references. "
+                      "Record consent first with store.record_candidate_consent(%d).",
+                      candidate["name"], candidate_id)
+            return
         refs = store.get_references_for_calling(candidate_id)
     else:
         refs = store.get_references(candidate_id)
@@ -59,6 +65,8 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
             continue
 
         goal = _build_goal(candidate, ref)
+        ref_attempts = store.count_calls_for_ref(ref["id"])
+        idem_key = f"vouchcall_{candidate_id}_{ref['id']}_g{ref_attempts}"
 
         try:
             call_result = calle_wrapper.make_call(
@@ -66,10 +74,11 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
                 goal=goal,
                 region=ref.get("region", "IN"),
                 locale=ref.get("locale", "en-IN"),
+                idempotency_key=idem_key,
             )
         except ConnectionError as e:
             log.error("Network error calling %s: %s", ref["name"], e)
-            _save_unanalyzed_call(ref, candidate_id, "", "failed",
+            _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
                                   f"Call failed: connection_error", "insufficient")
             if fail_fast:
                 log.error("Aborting: --fail-fast is set.")
@@ -77,7 +86,7 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
             continue
         except TimeoutError as e:
             log.error("Timeout calling %s: %s", ref["name"], e)
-            _save_unanalyzed_call(ref, candidate_id, "", "failed",
+            _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
                                   f"Call failed: timeout", "insufficient")
             if fail_fast:
                 log.error("Aborting: --fail-fast is set.")
@@ -85,7 +94,7 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
             continue
         except Exception as e:
             log.error("Unexpected error calling %s: %s: %s", ref["name"], type(e).__name__, e)
-            _save_unanalyzed_call(ref, candidate_id, "", "failed",
+            _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
                                   f"Call failed: {type(e).__name__}", "insufficient")
             if fail_fast:
                 log.error("Aborting: --fail-fast is set.")
@@ -108,6 +117,11 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
                 log.error("Aborting: --fail-fast is set.")
                 return
             continue
+
+        completion = call_result.get("completion_confidence", {})
+        if completion:
+            log.info("CALL-E confidence: %s (score=%.2f)",
+                     completion.get("label", "?"), completion.get("score", 0))
 
         transcript = llm.extract_transcript(call_result)
         quality = llm.assess_call_quality(transcript, ref["name"])
@@ -140,6 +154,17 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
             _save_unanalyzed_call(ref, candidate_id, call_id_str, "completed",
                                   f"Insufficient call data ({quality['turn_count']} turns).",
                                   "insufficient", transcript=transcript)
+            if fail_fast:
+                log.error("Aborting: --fail-fast is set.")
+                return
+            continue
+
+        if quality_status == "partial":
+            log.warning("Partial data from %s (%d questions answered, need %d). Retryable on next run.",
+                        ref["name"], quality["questions_answered"], 3)
+            _save_unanalyzed_call(ref, candidate_id, call_id_str, "completed",
+                                  f"Partial call data ({quality['questions_answered']} questions answered).",
+                                  "partial", transcript=transcript)
             if fail_fast:
                 log.error("Aborting: --fail-fast is set.")
                 return
