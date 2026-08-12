@@ -120,6 +120,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
+- [`customer-onboarding-call`](skills/customer-onboarding-call/) - Welcome-call skill that turns a new signup into at most one conversation, a consent-gated structured result, and a CRM follow-up task, with evidence-backed dispositions, ordered outcome classification, per-attempt idempotency, and cancellable retries.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
 - [`voice-preflight`](skills/voice-preflight/) - Hear a call task spoken by your own text-to-speech provider before a real person does, then refuse a script whose critical line would not survive being spoken.
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
@@ -192,6 +193,8 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`Disclosure budget`](apps/typescript/call-on-behalf/docs/privacy-budget.md) - Authorizing what a caller may say about a person, checking the script before the call and checking what was actually said after it.
 - [`Contact-claim limits`](apps/typescript/verify-contact-claim/docs/limits.md) - Why an institution refusing to confirm a contact is the expected outcome, what a confirmed contact still does not prove and what has never been tested live.
 - [`Provider descriptors`](apps/typescript/voice-preflight/docs/providers.md) - How one HTTP client drives any text-to-speech API from a JSON file, where the audio sits in a response, plus the order in which a run refuses so a failure says what has already happened.
+- [`Onboarding call safety`](skills/customer-onboarding-call/references/safety.md) - Consent and recording disclosure, refusal suppression, content boundaries for price and policy claims, working-hours limits, and honest not-reached reporting.
+- [`International routing`](skills/customer-onboarding-call/references/international-routing.md) - Forwarding pattern for unsupported regions, distinguishing congestion from no-answer from unsupported destination, and handling providers that report failure then dial anyway.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 - [`Fail-closed dispositions`](plugins/zapier-calle/docs/fail-closed-dispositions.md) - Classifying phone-call outcomes so ambiguity, low confidence, and unrecognized statuses route to a human instead of a success branch.
 
