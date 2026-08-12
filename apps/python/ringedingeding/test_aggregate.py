@@ -104,6 +104,45 @@ def test_an_uninterpretable_call_lands_in_unknown_not_in_unreached():
     assert coverage.by_bucket[Bucket.UNKNOWN] and not coverage.by_bucket[Bucket.UNREACHED]
 
 
+def test_voicemail_and_wrong_person_land_in_unreached_not_answered_or_refused():
+    assert Status.VOICEMAIL.bucket is Bucket.UNREACHED
+    assert Status.WRONG_PERSON.bucket is Bucket.UNREACHED
+    # Neither is "nobody picked up" and neither is the invited person's own
+    # answer -- both stay apart from ANSWERED and REFUSED, so a follow-up round
+    # can act on them differently from an outright refusal.
+    assert Status.VOICEMAIL.bucket is not Bucket.ANSWERED
+    assert Status.WRONG_PERSON.bucket is not Bucket.REFUSED
+
+
+def test_a_wrong_person_answer_is_never_counted_as_this_participants_refusal():
+    """A stranger's answer is never this participant's answer -- not even a stranger's no."""
+    persons = people(2)
+    answers = {
+        "ana": Answer("ana", Status.COMPLETED, choice="A"),
+        "ben": Answer(
+            "ben",
+            Status.WRONG_PERSON,
+            raw="Someone else answered and declined on Ben's behalf.",
+        ),
+    }
+    coverage, result = merge_opinions(persons, answers)
+
+    assert coverage.by_bucket[Bucket.REFUSED] == []
+    assert len(coverage.by_bucket[Bucket.UNREACHED]) == 1
+    assert sum(result.tally.values()) == 1  # only Ana's own choice counts
+
+
+def test_a_mailbox_pickup_is_offered_a_catch_up_round_a_refusal_is_not():
+    persons = people(2)
+    answers = {
+        "ana": Answer("ana", Status.DECLINED),
+        "ben": Answer("ben", Status.VOICEMAIL),
+    }
+    targets = [p.id for p in pending_for_catch_up(persons, answers)]
+    assert targets == ["ben"]
+    assert "ana" not in targets  # a refusal is an answer, not a machine's greeting
+
+
 # -- silence is not a no -----------------------------------------------------------------
 
 

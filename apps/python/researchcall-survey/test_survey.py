@@ -104,6 +104,23 @@ def test_a_study_may_add_rules_of_its_own():
     assert set(LOCKED_ETHICS) <= set(merged)
 
 
+def test_disclosure_is_the_first_locked_rule_a_study_meets():
+    """A person cannot consent to talking to a machine before being told it is one."""
+    assert next(iter(LOCKED_ETHICS)) == "ai_disclosure_before_consent"
+
+
+def test_disclosure_is_named_before_consent_in_the_rendered_report():
+    report = build_report("s", 1, [])
+    rendered = render(report, [], merge_ethics(None))
+    disclosure_line = next(
+        line for line in rendered.splitlines() if "automated assistant is calling" in line
+    )
+    consent_line = next(
+        line for line in rendered.splitlines() if "consented in this call" in line
+    )
+    assert rendered.index(disclosure_line) < rendered.index(consent_line)
+
+
 def test_no_answers_may_be_recorded_without_consent():
     with pytest.raises(EthicsViolation, match="without consent"):
         Interview(
@@ -279,6 +296,27 @@ def test_dispositions_stay_distinct():
         "busy": 1,
         "ineligible": 1,
     }
+
+
+def test_voicemail_stays_distinct_from_no_answer_and_busy():
+    records = [
+        record("a", Disposition.VOICEMAIL),
+        record("b", Disposition.NO_ANSWER),
+        record("c", Disposition.BUSY),
+    ]
+    report = build_report("s", 1, records)
+    assert report.dispositions == {"voicemail": 1, "no_answer": 1, "busy": 1}
+
+
+def test_a_mailbox_pickup_does_not_count_as_reached():
+    records = [
+        record("a", Disposition.COMPLETED, consent_given=True),
+        record("b", Disposition.VOICEMAIL),
+    ]
+    report = build_report("s", 1, records)
+    assert report.included_drawn == 2
+    assert report.reached == 1
+    assert report.completion_yield == pytest.approx(0.5)
 
 
 def test_an_empty_denominator_does_not_divide_by_zero():
