@@ -50,6 +50,12 @@ Distinguish these three, because they look similar in a dashboard and have oppos
 | Platform logs the forward leg as *no answer* with zero duration | Nobody picked up | Retry in the recipient's working hours |
 | Provider rejects the destination before dialing | Region not supported by the provider | Use the forwarding pattern, or change provider |
 
+The "retry" fixes above are licensed by what was *observed* — carrier speech in the transcript, or
+the provider's own no-answer signal — both of which are on the closed no-human evidence set in
+`SKILL.md`. That set is the only gate to an automatic redial anywhere in this workflow, routing
+included. A symptom that is merely the *absence* of something — no result, no provider record, no
+answer from the provider's API — is not on it and never authorises a redial; it is `needs-review`.
+
 Two rules that prevent most misdiagnosis:
 
 **Do not conclude from a single attempt.** A corridor that fails once and succeeds two minutes
@@ -76,8 +82,19 @@ attributes it to the customer:
 
 Consequences to design around:
 
-- Do not treat any transcript containing carrier phrases as a real conversation.
-- Rely on the presence of a structured result, not on turn count, to decide a human was reached.
+- **Decide reachability from observed call evidence, never from whether a structured result
+  exists.** A human was reached when the provider reports a human answered, or the transcript
+  contains customer speech that is not carrier or IVR audio. The presence of a result proves
+  nothing here — the extractor will happily emit fields from a carrier recording — and the absence
+  of one proves nothing either.
+- A carrier or network announcement **is** no-human evidence: it is on the closed evidence set in
+  `SKILL.md`, so a transcript carrying only carrier phrases is `not-reached`, and it is one of the
+  few things in this document that may authorise a retry on its own.
+- Turn count is not evidence in either direction. A single carrier utterance is no-human evidence;
+  a single genuine customer word is enough to make reachability `human`.
+- Where a transcript contains carrier phrases **and** customer speech, the customer speech wins:
+  the carrier audio was an earlier leg, reachability is `human`, and the call goes to Stage B. A
+  missing result there is `needs-review`, never a redial.
 - Suppress hold music and connection beeps on any intermediate leg. Anything audible before the
   customer answers may be transcribed and can corrupt extraction.
 
@@ -104,8 +121,13 @@ Design for it:
 
 - Make webhook ingestion idempotent, keyed on the provider event or call id.
 - Reconcile against provider billing or platform call logs before concluding a call never happened.
-- Do not retry immediately on a reported failure during an incident; a delayed original can arrive
-  while the retry is in flight and call the customer twice.
+- **A reported failure is not no-human evidence.** It says the control plane thinks something went
+  wrong, not that nobody answered — and during exactly this incident it may be wrong. Do not retry
+  on it; a delayed original can arrive while the retry is in flight and call the customer twice.
+- A matching charge or log entry proves the call *was placed*, which makes a conversation more
+  likely rather than less. It is evidence **against** a redial. If the outcome cannot be obtained,
+  the attempt is `needs-review` and a human reads the record. Only the provider positively
+  establishing that no call was placed releases a retry.
 
 ## Cost note
 
