@@ -16,7 +16,19 @@ from typing import Any
 
 RAW_PHONE_RE = re.compile(r"(?<!\w)\+?\d[\d\s().-]{7,}\d(?!\w)")
 RAW_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# Account/reference/order/etc identifiers — same classes the skill masks in
+# summarize_call.py. The validator must check the same PII classes the brief
+# promises to remove (review item #1).
+RAW_ID_RE = re.compile(
+    r"\b(?:account|reference|order|case|ticket|claim|policy|invoice)\s*(?:#|no\.?|number)?\s*[A-Z0-9][A-Z0-9-]{3,}\b",
+    re.IGNORECASE,
+)
 REQUIRED_TOP = {"outcome", "summary", "actions", "sentiment", "caller_fingerprint", "masked"}
+
+
+def _leaks_pii(text: str) -> bool:
+    """True if `text` contains any raw phone, email, or account identifier."""
+    return bool(RAW_PHONE_RE.search(text) or RAW_EMAIL_RE.search(text) or RAW_ID_RE.search(text))
 
 
 def validate(brief: dict[str, Any]) -> list[str]:
@@ -49,14 +61,19 @@ def validate(brief: dict[str, Any]) -> list[str]:
         errors.append("caller_fingerprint must be a sha256: prefixed string")
     if brief.get("masked") is not True:
         errors.append("masked must be true")
-    # Masking check: no raw PII should survive in summary or action source spans
+    # Masking check: no raw PII should survive in summary, action verbs, or
+    # action source spans (review item #1 — verb and source_span both copy raw
+    # transcript content and must be masked + validated).
     summary = str(brief.get("summary", ""))
-    if RAW_PHONE_RE.search(summary) or RAW_EMAIL_RE.search(summary):
-        errors.append("summary contains unmasked phone or email")
+    if _leaks_pii(summary):
+        errors.append("summary contains unmasked phone, email, or account identifier")
     for i, action in enumerate(brief.get("actions", [])):
         if isinstance(action, dict):
+            verb = str(action.get("verb", ""))
+            if _leaks_pii(verb):
+                errors.append(f"action[{i}] verb contains unmasked PII")
             span = str(action.get("source_span", ""))
-            if RAW_PHONE_RE.search(span) or RAW_EMAIL_RE.search(span):
+            if _leaks_pii(span):
                 errors.append(f"action[{i}] source_span contains unmasked PII")
     return errors
 

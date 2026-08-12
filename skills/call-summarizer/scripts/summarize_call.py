@@ -91,23 +91,103 @@ OUTCOME_CUES = [
 ]
 
 
-def detect_outcome(flat: str) -> str:
-    """Return a one-line outcome grounded in transcript language."""
-    low = flat.lower()
-    if not flat.strip():
+# Speaker-role labels that represent the contacted party (the callee). Any
+# other label is treated as the agent side. This keeps outcome detection
+# grounded in the callee's own words, not in the agent's prompts.
+CALLEE_ROLES = {"callee", "customer", "patient", "caller", "recipient"}
+
+
+def _callee_effective_text(turns: list[dict[str, str]]) -> str:
+    """Return the callee's latest non-trivial response text.
+
+    "Effective" means we skip empty, placeholder, and no-answer turns such as
+    "(no response)" so a trailing machine placeholder cannot be misread as a
+    decline or a confirmation. If the callee never spoke effectively, this
+    returns an empty string and the caller must fail closed to "unknown".
+    """
+    placeholder_re = re.compile(r"^\s*(?:\(no response\)|\(silence\)|\(no answer\)|\(voicemail\)|\.\.\.)\s*$", re.IGNORECASE)
+    effective: list[str] = []
+    for turn in turns:
+        speaker = str(turn.get("speaker", "")).lower().strip()
+        if speaker not in CALLEE_ROLES:
+            continue
+        text = str(turn.get("text", "")).strip()
+        if not text or placeholder_re.match(text):
+            continue
+        effective.append(text)
+    return effective[-1] if effective else ""
+
+
+def _classify_callee_response(text: str) -> str:
+    """Classify a single callee utterance. Returns one of the OUTCOME_CUES
+    labels, or 'unknown' when no cue matches."""
+    if not text.strip():
         return "unknown"
+    low = text.lower()
     for label, pattern in OUTCOME_CUES:
         if re.search(pattern, low):
-            if label == "confirmed":
-                return "Appointment or request confirmed."
-            if label == "declined":
-                return "Request declined by the callee."
-            if label == "rescheduled":
-                return "Reschedule requested."
-            if label == "no-answer":
-                return "No answer; call ended without contact."
-            if label == "voicemail":
-                return "Voicemail reached; no live contact."
+            return label
+    return "unknown"
+
+
+def detect_outcome(turns: list[dict[str, str]]) -> str:
+    """Return a one-line outcome grounded in the callee's latest effective
+    response.
+
+    Per review item #2, outcome detection must consider only the callee's own
+    words (the agent asking "can you confirm?" must not be read as a
+    confirmation) and must fail closed (return 'unknown') when the callee's
+    responses contradict one another.
+    """
+    if not turns:
+        return "unknown"
+    callee_text = _callee_effective_text(turns)
+    if not callee_text:
+        # The callee never spoke effectively (no-answer / voicemail path).
+        # Detect those system-level signals from the full transcript so the
+        # caller still gets a meaningful outcome line, but never "confirmed"
+        # or "declined" from agent-only text.
+        flat_low = " ".join(t.get("text", "") for t in turns).lower()
+        if re.search(OUTCOME_CUES[3][1], flat_low):  # no-answer cue
+            return "No answer; call ended without contact."
+        if re.search(OUTCOME_CUES[4][1], flat_low):  # voicemail cue
+            return "Voicemail reached; no live contact."
+        return "unknown"
+
+    latest = _classify_callee_response(callee_text)
+    if latest in ("no-answer", "voicemail"):
+        # A callee explicitly saying "no answer"/"voicemail" is a system-style
+        # signal; keep the dedicated outcome lines for those.
+        if latest == "no-answer":
+            return "No answer; call ended without contact."
+        return "Voicemail reached; no live contact."
+
+    # Fail-closed contradiction check: gather every distinct cue the callee
+    # produced across the call. If the latest cue conflicts with an earlier
+    # positive/decline cue (e.g., "yes" earlier then "can't" later, or vice
+    # versa), we refuse to assert an outcome and fail closed to "unknown".
+    callee_utterances = [
+        str(t.get("text", ""))
+        for t in turns
+        if str(t.get("speaker", "")).lower().strip() in CALLEE_ROLES
+        and str(t.get("text", "")).strip()
+    ]
+    seen_labels: set[str] = set()
+    for utt in callee_utterances:
+        lab = _classify_callee_response(utt)
+        if lab and lab != "unknown":
+            seen_labels.add(lab)
+    contradiction_pairs = {("confirmed", "declined"), ("confirmed", "rescheduled"), ("declined", "rescheduled")}
+    for a, b in contradiction_pairs:
+        if a in seen_labels and b in seen_labels and latest in (a, b):
+            return "unknown"
+
+    if latest == "confirmed":
+        return "Appointment or request confirmed."
+    if latest == "declined":
+        return "Request declined by the callee."
+    if latest == "rescheduled":
+        return "Reschedule requested."
     return "unknown"
 
 
@@ -163,11 +243,11 @@ def extract_actions(turns: list[dict[str, str]]) -> list[dict[str, Any]]:
             actions.append(
                 {
                     "owner": owner,
-                    "verb": verb_text,
+                    "verb": mask_pii(verb_text),
                     "due": due,
                     "category": category,
                     "sensitive": sensitive,
-                    "source_span": text.strip(),
+                    "source_span": mask_pii(text.strip()),
                 }
             )
     return actions
@@ -215,12 +295,34 @@ def detect_sentiment(flat: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def caller_fingerprint(callee_masked: str, call_id: str) -> str:
-    """Return a one-way hash of the redacted caller identity for dedup."""
+def caller_fingerprint(callee_masked: str, caller_id: str | None = None) -> str:
+    """Return a one-way hash of a stable caller identity for dedup.
+
+    Per review item #3, the fingerprint must be stable across calls from the
+    same caller. We therefore deliberately exclude `call_id` (which is unique
+    per call) and instead hash a stable caller identity input.
+
+    Preference order for the stable identity:
+      1. `caller_id` — an explicit, operator-provided stable caller identifier
+         (e.g., a CRM contact id, a normalized phone number), if present.
+      2. `callee_masked` — the caller's masked phone number, e.g.
+         "+155****1234". This is already redacted (so we do not hash raw PII)
+         and is stable across calls from the same number.
+
+    We hash whichever identity we use so the fingerprint is one-way and the
+    raw identifier cannot be recovered from it. If neither field is available,
+    we fail closed and return a fingerprint of the literal string "unknown"
+    rather than mixing in `call_id` (which would silently break dedup).
+    """
+    stable = ""
+    if caller_id and str(caller_id).strip():
+        stable = str(caller_id).strip()
+    elif callee_masked and str(callee_masked).strip() and str(callee_masked).strip() != "[redacted]":
+        stable = str(callee_masked).strip()
+    else:
+        stable = "unknown"
     h = hashlib.sha256()
-    h.update(callee_masked.encode("utf-8"))
-    h.update(b"|")
-    h.update(call_id.encode("utf-8"))
+    h.update(stable.encode("utf-8"))
     return f"sha256:{h.hexdigest()[:12]}"
 
 
@@ -260,8 +362,8 @@ def summarize(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     flat, turns = load_transcript(path)
     callee_masked = data.get("callee_masked", data.get("callee", "[redacted]"))
-    call_id = data.get("call_id", "unknown")
-    outcome = detect_outcome(flat)
+    caller_id = data.get("caller_id")  # optional stable caller identifier
+    outcome = detect_outcome(turns)
     actions = extract_actions(turns)
     sentiment = detect_sentiment(flat)
     summary = build_summary(turns)
@@ -270,7 +372,7 @@ def summarize(path: Path) -> dict[str, Any]:
         "summary": summary,
         "actions": actions,
         "sentiment": sentiment,
-        "caller_fingerprint": caller_fingerprint(str(callee_masked), str(call_id)),
+        "caller_fingerprint": caller_fingerprint(str(callee_masked), caller_id),
         "masked": True,
     }
     return brief

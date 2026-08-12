@@ -158,6 +158,150 @@ def test_fingerprint_is_sha256() -> None:
     assert brief["caller_fingerprint"].startswith("sha256:"), brief["caller_fingerprint"]
 
 
+# ---------------------------------------------------------------------------
+# Review item #1: actions[].verb and actions[].source_span must be masked.
+# ---------------------------------------------------------------------------
+
+def test_action_verb_and_source_span_are_masked() -> None:
+    fixture = write_fixture(
+        {
+            "call_id": "act-pii-001",
+            "callee_masked": "+155****1234",
+            "transcript": [
+                {
+                    "speaker": "callee",
+                    "text": "I will call back about account #ACME4242 at +15555550199.",
+                },
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    actions = brief["actions"]
+    assert actions, "expected at least one action"
+    for a in actions:
+        verb = a["verb"]
+        span = a["source_span"]
+        assert "ACME4242" not in verb, f"account id leaked into verb: {verb!r}"
+        assert "15555550199" not in verb, f"phone leaked into verb: {verb!r}"
+        assert "ACME4242" not in span, f"account id leaked into source_span: {span!r}"
+        assert "15555550199" not in span, f"phone leaked into source_span: {span!r}"
+    rc, val_text = run_validate(out_path)
+    assert rc == 0, f"validate failed (PII leaked in actions): {val_text}"
+
+
+# ---------------------------------------------------------------------------
+# Review item #2: outcome detection must be callee-only and fail-closed on
+# contradictions. An agent asking for confirmation followed by a callee
+# declining must NOT be reported as confirmed.
+# ---------------------------------------------------------------------------
+
+def test_outcome_agent_confirm_then_callee_decline_is_not_confirmed() -> None:
+    fixture = write_fixture(
+        {
+            "call_id": "contra-001",
+            "transcript": [
+                {"speaker": "agent", "text": "Can I confirm your appointment?"},
+                {"speaker": "callee", "text": "No, I can't make it."},
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    assert brief["outcome"].startswith("Request declined"), brief["outcome"]
+    assert "confirm" not in brief["outcome"].lower() or "declined" in brief["outcome"].lower(), brief["outcome"]
+
+
+def test_outcome_callee_contradiction_fails_closed() -> None:
+    # Callee says yes then later declines — the skill must fail closed to
+    # "unknown" rather than asserting either side.
+    fixture = write_fixture(
+        {
+            "call_id": "contra-002",
+            "transcript": [
+                {"speaker": "agent", "text": "Can you confirm?"},
+                {"speaker": "callee", "text": "Yes, sounds good."},
+                {"speaker": "agent", "text": "Great."},
+                {"speaker": "callee", "text": "Actually, I can't make it."},
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    assert brief["outcome"] == "unknown", (
+        f"contradictory callee responses must fail closed to unknown, got {brief['outcome']!r}"
+    )
+
+
+def test_outcome_agent_only_confirmation_is_not_confirmed() -> None:
+    # An agent asking "can you confirm?" with no effective callee response must
+    # never be reported as confirmed.
+    fixture = write_fixture(
+        {
+            "call_id": "agent-only-001",
+            "transcript": [
+                {"speaker": "agent", "text": "Can I confirm your appointment for Tuesday?"},
+                {"speaker": "agent", "text": "(no response)"},
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    assert not brief["outcome"].startswith("Appointment"), (
+        f"agent-only confirm must not be reported as confirmed: {brief['outcome']!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Review item #3: caller fingerprint must be stable across calls from the
+# same caller (call_id must not be mixed in).
+# ---------------------------------------------------------------------------
+
+def test_fingerprint_is_stable_across_calls_with_same_caller() -> None:
+    base = {"callee_masked": "+155****9999"}
+    f1 = write_fixture({**base, "call_id": "call-A"})
+    f2 = write_fixture({**base, "call_id": "call-B"})
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out1, \
+         tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out2:
+        out1_path, out2_path = Path(out1.name), Path(out2.name)
+    rc1, _ = run_summarize(f1, out1_path)
+    rc2, _ = run_summarize(f2, out2_path)
+    assert rc1 == 0 and rc2 == 0
+    b1 = json.loads(out1_path.read_text(encoding="utf-8"))
+    b2 = json.loads(out2_path.read_text(encoding="utf-8"))
+    assert b1["caller_fingerprint"] == b2["caller_fingerprint"], (
+        f"same caller must produce same fingerprint across calls; got "
+        f"{b1['caller_fingerprint']} vs {b2['caller_fingerprint']}"
+    )
+
+
+def test_fingerprint_does_not_change_with_call_id() -> None:
+    # Explicit regression test for review item #3: varying call_id alone must
+    # NOT change the fingerprint when the caller identity is stable.
+    f1 = write_fixture({"callee_masked": "+155****4321", "call_id": "x-1"})
+    f2 = write_fixture({"callee_masked": "+155****4321", "call_id": "x-2"})
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out1, \
+         tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out2:
+        out1_path, out2_path = Path(out1.name), Path(out2.name)
+    run_summarize(f1, out1_path)
+    run_summarize(f2, out2_path)
+    b1 = json.loads(out1_path.read_text(encoding="utf-8"))
+    b2 = json.loads(out2_path.read_text(encoding="utf-8"))
+    assert b1["caller_fingerprint"] == b2["caller_fingerprint"]
+
+
 def main() -> int:
     tests = [
         test_example_transcript_produces_valid_brief,
@@ -167,6 +311,15 @@ def main() -> int:
         test_action_owner_extraction,
         test_sensitive_category_tagging,
         test_fingerprint_is_sha256,
+        # Review item #1: PII masking in actions verb + source_span
+        test_action_verb_and_source_span_are_masked,
+        # Review item #2: callee-only outcome detection + fail-closed
+        test_outcome_agent_confirm_then_callee_decline_is_not_confirmed,
+        test_outcome_callee_contradiction_fails_closed,
+        test_outcome_agent_only_confirmation_is_not_confirmed,
+        # Review item #3: stable fingerprint across calls (no call_id)
+        test_fingerprint_is_stable_across_calls_with_same_caller,
+        test_fingerprint_does_not_change_with_call_id,
     ]
     failures = 0
     for test in tests:

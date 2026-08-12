@@ -79,8 +79,11 @@ The script performs:
 4. **Sentiment**: a coarse label (`positive`, `neutral`, `negative`, `mixed`)
    with a short justification span from the transcript. It never reports a
    sentiment the transcript does not support.
-5. **Caller fingerprint**: a one-way hash of the redacted caller identity
-   fields, for de-duplicating repeat callers without storing PII.
+5. **Caller fingerprint**: a one-way hash of a stable caller identity input
+   (the masked caller phone number, or an explicit `caller_id` field if
+   provided). The `call_id` is deliberately excluded so the same caller
+   produces the same fingerprint across calls, enabling de-duplication without
+   storing PII.
 
 ### 3. Validate the brief
 
