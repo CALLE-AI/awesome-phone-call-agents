@@ -45,15 +45,17 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 # HEDGE_MARKERS) deliberately does NOT count as affirmation: a hedge is not
 # a commitment, firm or soft, in the recipient's own words.
 #
-# Two further failure modes on top of the denial-phrase list, both about
+# Three further failure modes on top of the denial-phrase list, all about
 # the SAME root cause: an affirmation regex matched an embedded phrase
-# with no regard for what wraps it. "Not right now" matches on "right
-# now"; "I don't think I can make it" matches on "i can make it" -- and a
-# denial-phrase list can only ever catch wordings someone anticipated,
-# never the next unlisted reversal. Listing more phrases forever chases
-# the last repro instead of closing the class of bug.
+# with no regard for what wraps it, or an earlier "yes" survived a later
+# statement the classifier didn't recognize as invalidating it. "Not right
+# now" matches on "right now"; "I don't think I can make it" matches on "i
+# can make it" -- and a denial-phrase list can only ever catch wordings
+# someone anticipated, never the next unlisted reversal. Listing more
+# phrases forever chases the last repro instead of closing the class of
+# bug.
 #
-# Fixed properly with two mechanisms instead of a longer list:
+# Fixed properly with three mechanisms instead of a longer list:
 #
 # 1. NEGATION SCOPE, not more denial phrases: split each recipient turn
 #    into clauses (on sentence punctuation and contrastive words like
@@ -66,8 +68,20 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 # 2. LATEST clause wins, not just latest turn: "Yes, I am definitely
 #    coming" ... "Actually I need to stay home" must resolve to the LATER
 #    statement, the same way a human listening to the whole call would.
+# 3. EXPLICIT WITHDRAWAL, a distinct category from negation: "Scratch
+#    that" and "forget I said that" contain no negation word at all (no
+#    "no"/"not"/"can't"/etc.) -- they withdraw a PRIOR statement rather
+#    than negating the current one, so mechanism 1 can't catch them. A
+#    dedicated retraction-cue check fails these closed too, on the same
+#    principle: withdrawing a commitment must never leave the earlier
+#    commitment standing.
 _NEGATION_CUE_RE = re.compile(
     r"\b(no|not|never|don'?t|doesn'?t|didn'?t|won'?t|can'?t|cannot|unable|nope|nah)\b",
+    re.IGNORECASE,
+)
+_RETRACTION_CUE_RE = re.compile(
+    r"\b(scratch that|forget (it|that|what i said|i said( that)?)|"
+    r"take (it|that) back|disregard (it|that)|on second thought)\b",
     re.IGNORECASE,
 )
 _RECIPIENT_DENIAL_RE = re.compile(
@@ -93,12 +107,16 @@ def _recipient_text(transcript: list[dict]) -> str:
 
 
 def _clause_signal(clause: str) -> str:
-    """"affirm" / "deny" / "neutral" for a single clause. A negation cue OR
-    a listed decline phrase ANYWHERE in the clause fails the whole clause
-    closed as a denial -- checked before affirmation, so an affirmative
-    phrase later in the SAME clause never overrides the negation that
-    wraps it."""
-    if _NEGATION_CUE_RE.search(clause) or _RECIPIENT_DENIAL_RE.search(clause):
+    """"affirm" / "deny" / "neutral" for a single clause. A negation cue, a
+    retraction cue, or a listed decline phrase ANYWHERE in the clause fails
+    the whole clause closed as a denial -- checked before affirmation, so
+    an affirmative phrase later in the SAME clause never overrides a
+    negation or withdrawal that wraps it."""
+    if (
+        _NEGATION_CUE_RE.search(clause)
+        or _RETRACTION_CUE_RE.search(clause)
+        or _RECIPIENT_DENIAL_RE.search(clause)
+    ):
         return "deny"
     if _RECIPIENT_AFFIRMATION_RE.search(clause):
         return "affirm"

@@ -202,6 +202,40 @@ def test_unlisted_negated_affirmation_phrase_fails_closed():
     assert result.commitment_score == 0.0
 
 
+def test_explicit_retraction_without_a_negation_word_fails_closed():
+    """"Scratch that, something came up" withdraws the earlier "yes" but
+    contains no negation word at all ("no"/"not"/"can't"/etc.) -- a
+    negation-scope check alone can't catch it. A retraction is a distinct
+    category from a negation and must be recognized on its own."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I am definitely coming"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "Actually, scratch that, something came up"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_forget_i_said_that_retraction_fails_closed():
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I'll be there"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "Wait, forget I said that"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
 def test_yes_with_empty_transcript_is_not_trusted():
     candidate = _candidate()
     call = _call(status="completed", can_come="yes", transcript_turns=[])
