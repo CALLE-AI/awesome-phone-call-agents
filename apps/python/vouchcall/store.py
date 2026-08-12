@@ -220,6 +220,34 @@ def count_calls_for_ref(ref_id: int) -> int:
     return row[0] if row else 0
 
 
+def count_confirmed_failures_for_ref(ref_id: int) -> int:
+    conn = _connect()
+    row = conn.execute(
+        "SELECT COUNT(*) FROM calls WHERE ref_id = ? "
+        "AND quality_status IN ('wrong_person', 'no_consent')",
+        (ref_id,),
+    ).fetchone()
+    return row[0] if row else 0
+
+
+def get_last_call_id_for_ref(ref_id: int) -> str | None:
+    conn = _connect()
+    row = conn.execute(
+        "SELECT calle_call_id FROM calls WHERE ref_id = ? ORDER BY id DESC LIMIT 1",
+        (ref_id,),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def get_call_status_for_ref(ref_id: int) -> str | None:
+    conn = _connect()
+    row = conn.execute(
+        "SELECT quality_status FROM calls WHERE ref_id = ? ORDER BY id DESC LIMIT 1",
+        (ref_id,),
+    ).fetchone()
+    return row[0] if row else None
+
+
 def get_completed_call_ids(candidate_id: int) -> set:
     conn = _connect()
     rows = conn.execute(
@@ -233,7 +261,7 @@ def get_refs_by_quality(candidate_id: int, statuses: set) -> set:
     conn = _connect()
     placeholders = ",".join("?" for _ in statuses)
     rows = conn.execute(
-        f"SELECT r.name FROM calls c JOIN refs r ON c.ref_id = r.id "
+        f"SELECT c.ref_id FROM calls c "
         f"WHERE c.candidate_id = ? AND c.quality_status IN ({placeholders})",
         (candidate_id, *statuses),
     ).fetchall()

@@ -156,8 +156,8 @@ class TestStore:
             quality_status="no_consent",
         )
         no_consent_refs = self.store.get_refs_by_quality(cid, {"no_consent"})
-        assert "BadRef" in no_consent_refs
-        assert "GoodRef" not in no_consent_refs
+        assert rid2 in no_consent_refs
+        assert rid1 not in no_consent_refs
 
     def test_migrate_quality_status_idempotent(self):
         conn = sqlite3.connect(str(self.db_path))
@@ -560,6 +560,192 @@ class TestCountCallsForRef:
         )
         assert self.store.count_calls_for_ref(rid1) == 1
         assert self.store.count_calls_for_ref(rid2) == 1
+
+
+class TestGetLastCallIdForRef:
+    @pytest.fixture(autouse=True)
+    def setup_db(self, tmp_path):
+        self.db_path = tmp_path / "test_lastcall.db"
+        with patch("store.DB_PATH", self.db_path):
+            import store
+            self.store = store
+            store.init_db()
+            yield
+
+    def test_no_calls_returns_none(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        assert self.store.get_last_call_id_for_ref(rid) is None
+
+    def test_returns_most_recent_call_id(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        self.store.save_call(ref_id=rid, candidate_id=cid, calle_call_id="first",
+                             status="failed", scores={}, strengths=[], growth_areas=[],
+                             overall_recommendation="", key_quotes=[], summary="fail",
+                             quality_status="insufficient")
+        self.store.save_call(ref_id=rid, candidate_id=cid, calle_call_id="second",
+                             status="completed", scores={}, strengths=[], growth_areas=[],
+                             overall_recommendation="", key_quotes=[], summary="ok",
+                             quality_status="verified")
+        assert self.store.get_last_call_id_for_ref(rid) == "second"
+
+    def test_get_call_status_for_ref(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        self.store.save_call(ref_id=rid, candidate_id=cid, calle_call_id="c1",
+                             status="failed", scores={}, strengths=[], growth_areas=[],
+                             overall_recommendation="", key_quotes=[], summary="fail",
+                             quality_status="insufficient")
+        assert self.store.get_call_status_for_ref(rid) == "insufficient"
+
+    def test_get_call_status_no_calls_returns_none(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        assert self.store.get_call_status_for_ref(rid) is None
+
+
+class TestBindCallToRequest:
+    def test_matching_phone_passes(self):
+        from agent import _bind_call_to_request
+        result = {
+            "recipients": [{"phone": "+14155551234", "attempts": [{"transcript_turns": []}]}],
+        }
+        assert _bind_call_to_request(result, "+14155551234") is None
+
+    def test_mismatched_phone_fails(self):
+        from agent import _bind_call_to_request
+        result = {
+            "recipients": [{"phone": "+14155559999", "attempts": [{"transcript_turns": []}]}],
+        }
+        error = _bind_call_to_request(result, "+14155551234")
+        assert error is not None
+        assert "mismatch" in error.lower()
+
+    def test_no_recipients_fails(self):
+        from agent import _bind_call_to_request
+        error = _bind_call_to_request({"recipients": []}, "+14155551234")
+        assert error is not None
+        assert "No recipients" in error
+
+    def test_no_attempts_fails(self):
+        from agent import _bind_call_to_request
+        result = {"recipients": [{"phone": "+14155551234", "attempts": []}]}
+        error = _bind_call_to_request(result, "+14155551234")
+        assert error is not None
+        assert "No call attempts" in error
+
+    def test_ignores_formatting_differences(self):
+        from agent import _bind_call_to_request
+        result = {
+            "recipients": [{"phone": "+1-415-555-1234", "attempts": [{"transcript_turns": []}]}],
+        }
+        assert _bind_call_to_request(result, "+14155551234") is None
+
+    def test_empty_phone_fails_closed(self):
+        from agent import _bind_call_to_request
+        result = {
+            "recipients": [{"phone": "", "attempts": [{"transcript_turns": []}]}],
+        }
+        error = _bind_call_to_request(result, "+14155551234")
+        assert error is not None
+        assert "No recipient phone" in error
+
+
+class TestCountConfirmedFailures:
+    @pytest.fixture(autouse=True)
+    def setup_db(self, tmp_path):
+        self.db_path = tmp_path / "test_confirmed.db"
+        with patch("store.DB_PATH", self.db_path):
+            import store
+            self.store = store
+            store.init_db()
+            yield
+
+    def test_no_failures(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        assert self.store.count_confirmed_failures_for_ref(rid) == 0
+
+    def test_counts_wrong_person_and_no_consent(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        self.store.save_call(ref_id=rid, candidate_id=cid, calle_call_id="c1",
+                             status="completed", scores={}, strengths=[], growth_areas=[],
+                             overall_recommendation="", key_quotes=[], summary="wrong",
+                             quality_status="wrong_person")
+        self.store.save_call(ref_id=rid, candidate_id=cid, calle_call_id="c2",
+                             status="completed", scores={}, strengths=[], growth_areas=[],
+                             overall_recommendation="", key_quotes=[], summary="no",
+                             quality_status="no_consent")
+        assert self.store.count_confirmed_failures_for_ref(rid) == 2
+
+    def test_ignores_ambiguous_failures(self):
+        cid = self.store.add_candidate("Test", "Role")
+        rid = self.store.add_reference(cid, "Ref", "+10000000000", "Peer")
+        self.store.save_call(ref_id=rid, candidate_id=cid, calle_call_id="err_abc",
+                             status="failed", scores={}, strengths=[], growth_areas=[],
+                             overall_recommendation="", key_quotes=[], summary="timeout",
+                             quality_status="insufficient")
+        assert self.store.count_confirmed_failures_for_ref(rid) == 0
+
+
+class TestEncryptionKeyValidation:
+    def test_invalid_fernet_key_raises(self):
+        from config import require_keys
+        with patch("config.ENCRYPTION_KEY", "not-a-valid-key"):
+            with pytest.raises(SystemExit, match="not a valid Fernet key"):
+                require_keys("ENCRYPTION_KEY")
+
+    def test_valid_fernet_key_passes(self):
+        from cryptography.fernet import Fernet
+        from config import require_keys
+        valid_key = Fernet.generate_key().decode()
+        with patch("config.ENCRYPTION_KEY", valid_key):
+            require_keys("ENCRYPTION_KEY")
+
+
+class TestReconcileAmbiguousCall:
+    def test_no_prior_call_returns_none(self):
+        from agent import _reconcile_ambiguous_call
+        with patch("store.get_last_call_id_for_ref", return_value=None):
+            assert _reconcile_ambiguous_call({"id": 1}, 1) is None
+
+    def test_err_sentinel_returns_none(self):
+        from agent import _reconcile_ambiguous_call
+        with patch("store.get_last_call_id_for_ref", return_value="err_abc123def456"):
+            assert _reconcile_ambiguous_call({"id": 1}, 1) is None
+
+    def test_completed_status_skips_reconciliation(self):
+        from agent import _reconcile_ambiguous_call
+        with patch("store.get_last_call_id_for_ref", return_value="call_123"), \
+             patch("store.get_call_status_for_ref", return_value="completed"):
+            assert _reconcile_ambiguous_call({"id": 1}, 1) is None
+
+    def test_reconciles_ambiguous_to_completed(self):
+        from agent import _reconcile_ambiguous_call
+        with patch("store.get_last_call_id_for_ref", return_value="call_123"), \
+             patch("store.get_call_status_for_ref", return_value="insufficient"), \
+             patch("calle_wrapper.get_call_status", return_value={"id": "call_123", "status": "completed"}):
+            result = _reconcile_ambiguous_call({"id": 1}, 1)
+            assert result is not None
+            assert result["status"] == "completed"
+
+    def test_reconciles_ambiguous_to_failed(self):
+        from agent import _reconcile_ambiguous_call
+        with patch("store.get_last_call_id_for_ref", return_value="call_123"), \
+             patch("store.get_call_status_for_ref", return_value="insufficient"), \
+             patch("calle_wrapper.get_call_status", return_value={"id": "call_123", "status": "failed"}):
+            result = _reconcile_ambiguous_call({"id": 1}, 1)
+            assert result is None
+
+    def test_api_error_returns_none(self):
+        from agent import _reconcile_ambiguous_call
+        with patch("store.get_last_call_id_for_ref", return_value="call_123"), \
+             patch("store.get_call_status_for_ref", return_value="insufficient"), \
+             patch("calle_wrapper.get_call_status", side_effect=Exception("API down")):
+            result = _reconcile_ambiguous_call({"id": 1}, 1)
+            assert result is None
 
 
 class TestAssessCallQuality:

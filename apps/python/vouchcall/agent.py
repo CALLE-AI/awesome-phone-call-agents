@@ -12,6 +12,54 @@ PERMANENT_QUALITY_STATUSES = {"no_consent"}
 RETRYABLE_QUALITY_STATUSES = {"wrong_person", "insufficient"}
 
 
+def _reconcile_ambiguous_call(ref, candidate_id):
+    """Check CALL-E for the outcome of a prior ambiguous call before redialing.
+
+    Returns the resolved call_result dict if the call actually completed,
+    or None if it definitively failed / was never placed.
+    """
+    last_call_id = store.get_last_call_id_for_ref(ref["id"])
+    if not last_call_id or last_call_id.startswith("err_"):
+        return None
+    last_status = store.get_call_status_for_ref(ref["id"])
+    if last_status in ("completed", "no_consent", "wrong_person"):
+        return None
+    try:
+        result = calle_wrapper.get_call_status(last_call_id)
+        remote_status = result.get("status", "unknown")
+        if remote_status == "completed":
+            log.info("Reconciled ambiguous call %s — actually completed.", last_call_id)
+            return result
+        log.info("Reconciled ambiguous call %s — confirmed %s.", last_call_id, remote_status)
+        return None
+    except Exception as e:
+        log.warning("Could not reconcile call %s: %s", last_call_id, e)
+        return None
+
+
+def _bind_call_to_request(call_result: dict, expected_phone: str) -> str | None:
+    """Verify the CALL-E response corresponds to the reference we intended to call.
+
+    Returns None on success, or an error message if binding fails.
+    """
+    recipients = call_result.get("recipients", [])
+    if not recipients:
+        return "No recipients in call result"
+    recipient = recipients[0]
+    returned_phone = recipient.get("phone", "")
+    if not returned_phone:
+        return "No recipient phone in call result"
+    if expected_phone:
+        clean_returned = returned_phone.replace(" ", "").replace("-", "")
+        clean_expected = expected_phone.replace(" ", "").replace("-", "")
+        if clean_returned != clean_expected:
+            return f"Recipient phone mismatch: expected {mask_phone(expected_phone)}, got {mask_phone(returned_phone)}"
+    attempts = recipient.get("attempts", [])
+    if not attempts:
+        return "No call attempts in result"
+    return None
+
+
 def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool = False):
     candidate = store.get_candidate(candidate_id)
     if not candidate:
@@ -46,7 +94,7 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
         masked = mask_phone(ref["phone"]) if live else ref["phone"]
         log.info("[%d/%d] %s (%s) at %s", i, len(refs), ref["name"], ref["relation"], masked)
 
-        if live and ref["name"] in permanent_skip_refs:
+        if live and ref["id"] in permanent_skip_refs:
             log.info("Skipping %s — previously declined consent.", ref["name"])
             continue
 
@@ -64,42 +112,46 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
                 return
             continue
 
-        goal = _build_goal(candidate, ref)
-        ref_attempts = store.count_calls_for_ref(ref["id"])
-        idem_key = f"vouchcall_{candidate_id}_{ref['id']}_g{ref_attempts}"
+        reconciled = _reconcile_ambiguous_call(ref, candidate_id)
+        if reconciled:
+            call_result = reconciled
+        else:
+            goal = _build_goal(candidate, ref)
+            confirmed_failures = store.count_confirmed_failures_for_ref(ref["id"])
+            idem_key = f"vouchcall_{candidate_id}_{ref['id']}_g{confirmed_failures}"
 
-        try:
-            call_result = calle_wrapper.make_call(
-                phone=ref["phone"],
-                goal=goal,
-                region=ref.get("region", "IN"),
-                locale=ref.get("locale", "en-IN"),
-                idempotency_key=idem_key,
-            )
-        except ConnectionError as e:
-            log.error("Network error calling %s: %s", ref["name"], e)
-            _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
-                                  f"Call failed: connection_error", "insufficient")
-            if fail_fast:
-                log.error("Aborting: --fail-fast is set.")
-                return
-            continue
-        except TimeoutError as e:
-            log.error("Timeout calling %s: %s", ref["name"], e)
-            _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
-                                  f"Call failed: timeout", "insufficient")
-            if fail_fast:
-                log.error("Aborting: --fail-fast is set.")
-                return
-            continue
-        except Exception as e:
-            log.error("Unexpected error calling %s: %s: %s", ref["name"], type(e).__name__, e)
-            _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
-                                  f"Call failed: {type(e).__name__}", "insufficient")
-            if fail_fast:
-                log.error("Aborting: --fail-fast is set.")
-                return
-            continue
+            try:
+                call_result = calle_wrapper.make_call(
+                    phone=ref["phone"],
+                    goal=goal,
+                    region=ref.get("region", "IN"),
+                    locale=ref.get("locale", "en-IN"),
+                    idempotency_key=idem_key,
+                )
+            except ConnectionError as e:
+                log.error("Network error calling %s: %s", ref["name"], e)
+                _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
+                                      f"Call failed: connection_error", "insufficient")
+                if fail_fast:
+                    log.error("Aborting: --fail-fast is set.")
+                    return
+                continue
+            except TimeoutError as e:
+                log.error("Timeout calling %s: %s", ref["name"], e)
+                _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
+                                      f"Call failed: timeout", "insufficient")
+                if fail_fast:
+                    log.error("Aborting: --fail-fast is set.")
+                    return
+                continue
+            except Exception as e:
+                log.error("Unexpected error calling %s: %s: %s", ref["name"], type(e).__name__, e)
+                _save_unanalyzed_call(ref, candidate_id, f"err_{uuid.uuid4().hex[:12]}", "failed",
+                                      f"Call failed: {type(e).__name__}", "insufficient")
+                if fail_fast:
+                    log.error("Aborting: --fail-fast is set.")
+                    return
+                continue
 
         call_id_str = str(call_result.get("id", ""))
         status = call_result.get("status", "unknown")
@@ -118,12 +170,31 @@ def run_reference_check(candidate_id: int, live: bool = False, fail_fast: bool =
                 return
             continue
 
+        bind_error = _bind_call_to_request(call_result, ref["phone"])
+        if bind_error:
+            log.error("Call binding failed for %s: %s", ref["name"], bind_error)
+            _save_unanalyzed_call(ref, candidate_id, call_id_str, "completed",
+                                  f"Binding failed: {bind_error}", "insufficient")
+            if fail_fast:
+                log.error("Aborting: --fail-fast is set.")
+                return
+            continue
+
         completion = call_result.get("completion_confidence", {})
         if completion:
             log.info("CALL-E confidence: %s (score=%.2f)",
                      completion.get("label", "?"), completion.get("score", 0))
 
         transcript = llm.extract_transcript(call_result)
+        if not transcript:
+            log.warning("No transcript returned for %s. Cannot analyze.", ref["name"])
+            _save_unanalyzed_call(ref, candidate_id, call_id_str, "completed",
+                                  "Completed but no transcript returned.", "insufficient")
+            if fail_fast:
+                log.error("Aborting: --fail-fast is set.")
+                return
+            continue
+
         quality = llm.assess_call_quality(transcript, ref["name"])
         quality_status = quality["quality_status"]
 

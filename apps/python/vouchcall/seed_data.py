@@ -176,6 +176,11 @@ ALEX_HARDCODED = {
 def seed():
     store.init_db()
 
+    existing = store.get_all_candidates()
+    if existing:
+        print(f"Database already has {len(existing)} candidate(s). Delete vouchcall.db to re-seed.")
+        return
+
     use_gemini = "--gemini" in sys.argv
 
     # ── Candidate 1: Alex Morgan — mixed signals ────

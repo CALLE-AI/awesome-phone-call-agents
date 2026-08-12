@@ -13,6 +13,13 @@ def require_keys(*names):
     missing = [n for n in names if not globals().get(n)]
     if missing:
         raise SystemExit(f"Missing env vars: {', '.join(missing)}. See .env.example")
+    if "ENCRYPTION_KEY" in names and ENCRYPTION_KEY:
+        from cryptography.fernet import Fernet
+        try:
+            Fernet(ENCRYPTION_KEY.encode())
+        except Exception:
+            raise SystemExit("VOUCHCALL_ENCRYPTION_KEY is not a valid Fernet key. "
+                             "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
 
 
 def validate_e164(phone: str) -> str:
