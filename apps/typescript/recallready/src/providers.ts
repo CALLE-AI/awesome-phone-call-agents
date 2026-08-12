@@ -50,6 +50,14 @@ function boundedConfidence(value: unknown, field: string): number {
   return value;
 }
 
+const MIN_CONFIDENCE = 0.75;
+
+function trustedConfidence(value: unknown, field: string): number {
+  const score = boundedConfidence(value, field);
+  if (score < MIN_CONFIDENCE) reject(`low ${field}`);
+  return score;
+}
+
 const ELIGIBILITY = new Set<CallResult["eligibility"]>([
   "confirmed", "not_confirmed", "needs_more_information", "unknown",
 ]);
@@ -60,7 +68,7 @@ const REMEDIES = new Set<CallResult["remedy"]>([
 function validatedResult(raw: Call, approvedPhone: string): CallResult {
   if (raw.status !== "completed") reject(`terminal status was ${raw.status}`);
   if (raw.taskCompleted !== true) reject("task was not completed");
-  boundedConfidence(raw.completionConfidence?.score, "completion confidence");
+  trustedConfidence(raw.completionConfidence?.score, "completion confidence");
   if (raw.recipients.length !== 1) reject("recipient count was not exactly one");
   const recipient = raw.recipients.find((candidate) => candidate.phones.includes(approvedPhone));
   if (!recipient) reject("approved recipient was not bound to the result");
@@ -87,7 +95,7 @@ function validatedResult(raw: Call, approvedPhone: string): CallResult {
     deadline: optionalText(result.deadline, "deadline"),
     needsHuman: result.needs_human,
     caseReference: optionalText(result.case_reference, "case_reference"),
-    confidence: boundedConfidence(result.confidence, "result confidence"),
+    confidence: trustedConfidence(result.confidence, "result confidence"),
     evidence,
     callId: requiredText(raw.id, "call id", 120),
   };

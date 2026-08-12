@@ -40,7 +40,7 @@ Demo numbers require an attestation that the operator owns the number or has exp
 - Live call without server opt-in or API key → refuse.
 - Ambiguous conversation → `unknown` or `needs_more_information`, never “safe.”
 - Existing started or completed durable checkpoint → refuse an automatic redial and require manual reconciliation.
-- Non-completed call/task/recipient, recipient mismatch, missing evidence, invalid enums, or invalid confidence → refuse to present a remedy.
+- Non-completed call/task/recipient, recipient mismatch, missing evidence, invalid enums, or result/completion confidence below 0.75 → refuse to present a remedy.
 
 ## Threats explicitly not solved
 

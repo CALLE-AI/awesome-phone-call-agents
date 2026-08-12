@@ -28,6 +28,7 @@ RecallReady grounds the call in the official record and prevents the agent from 
 - The task prohibits names, addresses, emails, accounts, orders, payment data, passwords, health information, and full serial numbers.
 - The task cannot buy, accept terms, schedule service, claim an item is safe, or give medical/legal/emergency advice.
 - A preview is single-use and expires after 15 minutes.
+- Completed responses are accepted only when both CALL-E completion confidence and structured-result confidence are at least 0.75; lower-confidence responses require manual review and show no remedy.
 - Transcripts and phone numbers are not persisted by RecallReady.
 
 CALL-E may retain service-side operational data under its own terms; operators should review those terms before using live mode.
@@ -87,7 +88,7 @@ Important files:
 pnpm check
 ```
 
-Tests cover official-data parsing, phone extraction/masking, demo consent, single-use previews, expiry, exact approval, SDK recipient/idempotency binding, strict terminal-result validation, durable restart protection, structured mock results, task boundaries, and private-data markers.
+Tests cover official-data parsing, phone extraction/masking, demo consent, single-use previews, expiry, exact approval, SDK recipient/idempotency binding, strict terminal-result and confidence-threshold validation, durable restart protection, structured mock results, task boundaries, and private-data markers.
 
 No test places a real phone call.
 

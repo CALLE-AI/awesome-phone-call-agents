@@ -64,3 +64,50 @@ test("live provider rejects failed, incomplete, unbound, and invalid results", a
     await assert.rejects(() => provider.run(phone, "Synthetic recall check", key), /CALL-E result rejected/, item.name);
   }
 });
+
+test("live provider fails closed on low-confidence completed results", async () => {
+  const cases = [
+    {
+      name: "completion confidence",
+      patch: { completionConfidence: { score: 0, label: "low" } },
+    },
+    {
+      name: "result confidence",
+      patch: {
+        structuredResult: { ...validPayload().structuredResult, confidence: 0 },
+      },
+    },
+  ];
+
+  for (const item of cases) {
+    const client = {
+      calls: { createAndWait: async () => ({ ...validPayload(), ...item.patch }) },
+    } as unknown as CalleClient;
+    const provider = new CalleCallProvider("test-key", client);
+
+    await assert.rejects(
+      () => provider.run(phone, "Synthetic recall check", key),
+      /CALL-E result rejected: low .* confidence/,
+      item.name,
+    );
+  }
+});
+
+test("live provider accepts confidence exactly at the safety threshold", async () => {
+  const client = {
+    calls: {
+      createAndWait: async () => ({
+        ...validPayload(),
+        structuredResult: {
+          ...validPayload().structuredResult,
+          confidence: 0.75,
+        },
+        completionConfidence: { score: 0.75, label: "medium" },
+      }),
+    },
+  } as unknown as CalleClient;
+  const provider = new CalleCallProvider("test-key", client);
+
+  const result = await provider.run(phone, "Synthetic recall check", key);
+  assert.equal(result.confidence, 0.75);
+});
