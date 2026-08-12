@@ -46,9 +46,10 @@ def _bind_call_to_request(call_result: dict, expected_phone: str) -> str | None:
     if not recipients:
         return "No recipients in call result"
     recipient = recipients[0]
-    returned_phone = recipient.get("phone", "")
-    if not returned_phone:
+    phones = recipient.get("phones", [])
+    if not phones or not phones[0]:
         return "No recipient phone in call result"
+    returned_phone = phones[0]
     if expected_phone:
         clean_returned = returned_phone.replace(" ", "").replace("-", "")
         clean_expected = expected_phone.replace(" ", "").replace("-", "")

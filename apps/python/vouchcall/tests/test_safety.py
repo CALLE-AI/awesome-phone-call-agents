@@ -609,14 +609,14 @@ class TestBindCallToRequest:
     def test_matching_phone_passes(self):
         from agent import _bind_call_to_request
         result = {
-            "recipients": [{"phone": "+14155551234", "attempts": [{"transcript_turns": []}]}],
+            "recipients": [{"phones": ["+14155551234"], "attempts": [{"transcript_turns": []}]}],
         }
         assert _bind_call_to_request(result, "+14155551234") is None
 
     def test_mismatched_phone_fails(self):
         from agent import _bind_call_to_request
         result = {
-            "recipients": [{"phone": "+14155559999", "attempts": [{"transcript_turns": []}]}],
+            "recipients": [{"phones": ["+14155559999"], "attempts": [{"transcript_turns": []}]}],
         }
         error = _bind_call_to_request(result, "+14155551234")
         assert error is not None
@@ -630,7 +630,7 @@ class TestBindCallToRequest:
 
     def test_no_attempts_fails(self):
         from agent import _bind_call_to_request
-        result = {"recipients": [{"phone": "+14155551234", "attempts": []}]}
+        result = {"recipients": [{"phones": ["+14155551234"], "attempts": []}]}
         error = _bind_call_to_request(result, "+14155551234")
         assert error is not None
         assert "No call attempts" in error
@@ -638,14 +638,32 @@ class TestBindCallToRequest:
     def test_ignores_formatting_differences(self):
         from agent import _bind_call_to_request
         result = {
-            "recipients": [{"phone": "+1-415-555-1234", "attempts": [{"transcript_turns": []}]}],
+            "recipients": [{"phones": ["+1-415-555-1234"], "attempts": [{"transcript_turns": []}]}],
         }
         assert _bind_call_to_request(result, "+14155551234") is None
 
     def test_empty_phone_fails_closed(self):
         from agent import _bind_call_to_request
         result = {
-            "recipients": [{"phone": "", "attempts": [{"transcript_turns": []}]}],
+            "recipients": [{"phones": [""], "attempts": [{"transcript_turns": []}]}],
+        }
+        error = _bind_call_to_request(result, "+14155551234")
+        assert error is not None
+        assert "No recipient phone" in error
+
+    def test_empty_phones_list_fails_closed(self):
+        from agent import _bind_call_to_request
+        result = {
+            "recipients": [{"phones": [], "attempts": [{"transcript_turns": []}]}],
+        }
+        error = _bind_call_to_request(result, "+14155551234")
+        assert error is not None
+        assert "No recipient phone" in error
+
+    def test_missing_phones_field_fails_closed(self):
+        from agent import _bind_call_to_request
+        result = {
+            "recipients": [{"attempts": [{"transcript_turns": []}]}],
         }
         error = _bind_call_to_request(result, "+14155551234")
         assert error is not None
