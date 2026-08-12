@@ -95,7 +95,7 @@ def decimal(value: Any, field_name: str, *, precision: int | None = None, scale:
 def metadata_integer(value: Any, field_name: str) -> int | None:
     """Decode integer schema metadata returned by the Decimal JSON decoder.
 
-    The Salesforce CLI's JSON parser deliberately decodes all JSON numbers as
+    Salesforce JSON numbers are deliberately decoded as
     ``Decimal`` so that monetary values never pass through a binary float.  A
     describe response therefore carries ``precision`` and ``scale`` as
     ``Decimal`` instances too; this boundary converts only exact integral

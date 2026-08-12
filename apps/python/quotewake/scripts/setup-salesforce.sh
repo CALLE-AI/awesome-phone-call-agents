@@ -11,6 +11,9 @@ RESET_DATA=false
 ASSIGN_PERMISSIONS=false
 CHANGES_APPLIED=false
 DEMO_QUOTE_PREFIX='QuoteWake Demo - '
+TEST_PHONES=()
+COUNTRY_CODE='ES'
+CALL_LOCALE='es-ES'
 
 info() { printf '[INFO] %s\n' "$1"; }
 ok() { printf '[OK] %s\n' "$1"; }
@@ -35,10 +38,58 @@ Usage: ./scripts/setup-salesforce.sh [options]
 Options:
   --target-org ALIAS       Salesforce CLI alias or username to modify.
   --seed-data              Create or update 10 Quotes, 10 Opportunities and 9 Accounts.
+  --country-code CODE      ISO 3166-1 alpha-2 country code for demo Accounts (default: ES).
+  --call-locale LOCALE     BCP-47 locale for demo Contacts (default: es-ES).
+  --test-phones LIST       Comma-separated E.164 phone numbers for demo Contacts.
+                           One number is used for every Contact; multiple numbers
+                           are assigned randomly. Requires --seed-data or --reset-data.
   --reset-data             Seed the demo hierarchy, delete its Tasks, and reset QuoteWake state.
   --assign-permissions     Assign QuoteWake_User to the current target-org user.
   -h, --help               Show this help.
 EOF
+}
+
+parse_test_phones() {
+    local value="$1" phone existing
+    local -a candidates
+    IFS=',' read -r -a candidates <<<"$value"
+    ((${#candidates[@]} > 0)) || fail "--test-phones requires at least one E.164 phone number."
+    for phone in "${candidates[@]}"; do
+        # Trim optional whitespace around comma-separated values.
+        phone="${phone#"${phone%%[![:space:]]*}"}"
+        phone="${phone%"${phone##*[![:space:]]}"}"
+        [[ "$phone" =~ ^\+[1-9][0-9]{7,14}$ ]] || \
+            fail "Invalid test phone '$phone'. Use E.164 format, for example +14155550101."
+        for existing in "${TEST_PHONES[@]}"; do
+            [[ "$existing" != "$phone" ]] || fail "Duplicate test phone: $phone"
+        done
+        TEST_PHONES+=("$phone")
+    done
+}
+
+parse_country_code() {
+    local value="$1"
+    [[ "$value" =~ ^[A-Za-z]{2}$ ]] || \
+        fail "Invalid country code '$value'. Use an ISO 3166-1 alpha-2 code, for example ES."
+    COUNTRY_CODE="${value^^}"
+}
+
+parse_call_locale() {
+    local value="$1" language region
+    [[ "$value" =~ ^[A-Za-z]{2,3}(-[A-Za-z]{2}|-[0-9]{3})?$ ]] || \
+        fail "Invalid call locale '$value'. Use a BCP-47 locale, for example es-ES."
+
+    language="${value%%-*}"
+    language="${language,,}"
+    if [[ "$value" == *-* ]]; then
+        region="${value#*-}"
+        if [[ "$region" =~ ^[A-Za-z]{2}$ ]]; then
+            region="${region^^}"
+        fi
+        CALL_LOCALE="$language-$region"
+    else
+        CALL_LOCALE="$language"
+    fi
 }
 
 while (($#)); do
@@ -51,6 +102,21 @@ while (($#)); do
         --seed-data)
             SEED_DATA=true
             shift
+            ;;
+        --country-code)
+            (($# >= 2)) || fail "--country-code requires an ISO 3166-1 alpha-2 code."
+            parse_country_code "$2"
+            shift 2
+            ;;
+        --call-locale)
+            (($# >= 2)) || fail "--call-locale requires a BCP-47 locale."
+            parse_call_locale "$2"
+            shift 2
+            ;;
+        --test-phones)
+            (($# >= 2)) || fail "--test-phones requires a comma-separated phone list."
+            parse_test_phones "$2"
+            shift 2
             ;;
         --reset-data)
             RESET_DATA=true
@@ -75,13 +141,28 @@ if [[ "$RESET_DATA" == true ]]; then
     SEED_DATA=true
 fi
 
+if ((${#TEST_PHONES[@]} > 0)) && [[ "$SEED_DATA" != true ]]; then
+    fail "--test-phones requires --seed-data or --reset-data."
+fi
+
+test_phone_for_contact() {
+    local fallback="$1"
+    if ((${#TEST_PHONES[@]} == 0)); then
+        printf '%s\n' "$fallback"
+    elif ((${#TEST_PHONES[@]} == 1)); then
+        printf '%s\n' "${TEST_PHONES[0]}"
+    else
+        printf '%s\n' "${TEST_PHONES[RANDOM % ${#TEST_PHONES[@]}]}"
+    fi
+}
+
 command -v sf >/dev/null 2>&1 || fail "Salesforce CLI (sf) is not installed or is not on PATH."
 command -v jq >/dev/null 2>&1 || fail "jq is required to inspect Salesforce CLI JSON responses."
-command -v python3 >/dev/null 2>&1 || fail "Python 3 is required to load quotewake.toml."
+command -v uv >/dev/null 2>&1 || fail "uv is required to load the QuoteWake project configuration."
 [[ -d "$SALESFORCE_DIR" ]] || fail "Salesforce project directory not found: $SALESFORCE_DIR"
 
 TIMING_JSON="$(
-    PYTHONPATH="$APP_DIR" python3 -c '
+    uv run --project "$APP_DIR" python -c '
 import json
 import sys
 from pathlib import Path
@@ -152,7 +233,7 @@ fi
 ok "Quotes are enabled"
 
 info "Deploying QuoteWake fields and permission set..."
-(cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" --source-dir force-app/main/default/objects/Quote --source-dir force-app/main/default/permissionsets --wait 30 --concise)
+(cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" --source-dir force-app/main/default/objects/Quote --source-dir force-app/main/default/objects/Contact --source-dir force-app/main/default/permissionsets --wait 30 --concise)
 CHANGES_APPLIED=true
 ok "QuoteWake metadata deployment completed"
 
@@ -172,7 +253,7 @@ fi
 verify_fields() {
     local schema="$1"
     local field
-    local fields=(QuoteWake_Enabled__c Follow_Up_Status__c Next_Follow_Up_At__c Attempt_Count__c Last_Follow_Up_At__c Last_Follow_Up_Result__c)
+    local fields=(QuoteWake_Enabled__c Follow_Up_Status__c Next_Follow_Up_At__c Attempt_Count__c)
     for field in "${fields[@]}"; do
         if jq -e --arg field "$field" '.result.fields[] | select(.name == $field)' <<<"$schema" >/dev/null; then
             ok "$field exists"
@@ -262,7 +343,7 @@ ensure_record() {
 ensure_contact() {
     local account_id="$1" first_name="$2" last_name="$3" email="$4" phone="$5" existing_id values
     existing_id="$(query_id "SELECT Id FROM Contact WHERE Email = '$email' LIMIT 1")"
-    values="FirstName='$first_name' LastName='$last_name' AccountId=$account_id Email=$email Phone=$phone"
+    values="FirstName='$first_name' LastName='$last_name' AccountId=$account_id Email=$email Phone=$phone QuoteWake_Call_Locale__c='$CALL_LOCALE'"
     if [[ -n "$existing_id" ]]; then
         sf data update record "${ORG_ARGS[@]}" --sobject Contact --record-id "$existing_id" --values "$values" >/dev/null
         printf '%s\n' "$existing_id"
@@ -318,7 +399,7 @@ reset_demo_data() {
         sf data update record "${ORG_ARGS[@]}" \
             --sobject Quote \
             --record-id "$quote_id" \
-            --values "QuoteWake_Enabled__c=true Follow_Up_Status__c= Next_Follow_Up_At__c= Attempt_Count__c=0 Last_Follow_Up_At__c= Last_Follow_Up_Result__c=" \
+            --values "QuoteWake_Enabled__c=true Follow_Up_Status__c= Next_Follow_Up_At__c= Attempt_Count__c=0" \
             >/dev/null
         reset_quotes=$((reset_quotes + 1))
     done <<<"$quote_ids"
@@ -326,8 +407,13 @@ reset_demo_data() {
 }
 
 if [[ "$SEED_DATA" == true ]]; then
+    if ((${#TEST_PHONES[@]} == 1)); then
+        info "Using one configured test phone for all demo Contacts."
+    elif ((${#TEST_PHONES[@]} > 1)); then
+        info "Assigning ${#TEST_PHONES[@]} configured test phones randomly across demo Contacts."
+    fi
     info "Inspecting required standard fields before seeding demo data..."
-    check_required_fields Account "Name Phone"
+    check_required_fields Account "Name Phone BillingCountryCode"
     check_required_fields Contact "FirstName LastName AccountId Email Phone"
     check_required_fields Opportunity "Name AccountId StageName CloseDate Amount"
     check_required_fields OpportunityContactRole "OpportunityId ContactId IsPrimary Role"
@@ -359,28 +445,28 @@ if [[ "$SEED_DATA" == true ]]; then
     TODAY="$(date -u +%Y-%m-%d)"
 
     info "Creating or updating QuoteWake demo hierarchy..."
-    ACCOUNT_1="$(ensure_record Account 'QuoteWake Demo - Instalaciones Sol y Mar S.L.' "Name='QuoteWake Demo - Instalaciones Sol y Mar S.L.' Phone=+14155550101")"
-    ACCOUNT_2="$(ensure_record Account 'QuoteWake Demo - Cargas Eléctricas del Norte S.L.' "Name='QuoteWake Demo - Cargas Eléctricas del Norte S.L.' Phone=+14155550102")"
-    ACCOUNT_3="$(ensure_record Account 'QuoteWake Demo - Oficinas Iberia S.L.' "Name='QuoteWake Demo - Oficinas Iberia S.L.' Phone=+14155550103")"
-    ACCOUNT_4="$(ensure_record Account 'QuoteWake Demo - Energía Clara S.L.' "Name='QuoteWake Demo - Energía Clara S.L.' Phone=+14155550104")"
-    ACCOUNT_5="$(ensure_record Account 'QuoteWake Demo - Alba Domótica S.L.' "Name='QuoteWake Demo - Alba Domótica S.L.' Phone=+14155550105")"
-    ACCOUNT_6="$(ensure_record Account 'QuoteWake Demo - Clima y Luz Levante S.L.' "Name='QuoteWake Demo - Clima y Luz Levante S.L.' Phone=+14155550106")"
-    ACCOUNT_7="$(ensure_record Account 'QuoteWake Demo - Talleres Costa Verde S.L.' "Name='QuoteWake Demo - Talleres Costa Verde S.L.' Phone=+14155550107")"
-    ACCOUNT_8="$(ensure_record Account 'QuoteWake Demo - Servicios Norte Claro S.L.' "Name='QuoteWake Demo - Servicios Norte Claro S.L.' Phone=+14155550108")"
-    ACCOUNT_9="$(ensure_record Account 'QuoteWake Demo - Construcciones Lumen S.L.' "Name='QuoteWake Demo - Construcciones Lumen S.L.' Phone=+14155550109")"
+    ACCOUNT_1="$(ensure_record Account 'QuoteWake Demo - Instalaciones Sol y Mar S.L.' "Name='QuoteWake Demo - Instalaciones Sol y Mar S.L.' Phone=+14155550101 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_2="$(ensure_record Account 'QuoteWake Demo - Cargas Eléctricas del Norte S.L.' "Name='QuoteWake Demo - Cargas Eléctricas del Norte S.L.' Phone=+14155550102 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_3="$(ensure_record Account 'QuoteWake Demo - Oficinas Iberia S.L.' "Name='QuoteWake Demo - Oficinas Iberia S.L.' Phone=+14155550103 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_4="$(ensure_record Account 'QuoteWake Demo - Energía Clara S.L.' "Name='QuoteWake Demo - Energía Clara S.L.' Phone=+14155550104 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_5="$(ensure_record Account 'QuoteWake Demo - Alba Domótica S.L.' "Name='QuoteWake Demo - Alba Domótica S.L.' Phone=+14155550105 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_6="$(ensure_record Account 'QuoteWake Demo - Clima y Luz Levante S.L.' "Name='QuoteWake Demo - Clima y Luz Levante S.L.' Phone=+14155550106 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_7="$(ensure_record Account 'QuoteWake Demo - Talleres Costa Verde S.L.' "Name='QuoteWake Demo - Talleres Costa Verde S.L.' Phone=+14155550107 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_8="$(ensure_record Account 'QuoteWake Demo - Servicios Norte Claro S.L.' "Name='QuoteWake Demo - Servicios Norte Claro S.L.' Phone=+14155550108 BillingCountryCode=$COUNTRY_CODE")"
+    ACCOUNT_9="$(ensure_record Account 'QuoteWake Demo - Construcciones Lumen S.L.' "Name='QuoteWake Demo - Construcciones Lumen S.L.' Phone=+14155550109 BillingCountryCode=$COUNTRY_CODE")"
 
-    CONTACT_1="$(ensure_contact "$ACCOUNT_1" Marta García marta.garcia.quotewake@example.invalid +14155550101)"
-    CONTACT_2="$(ensure_contact "$ACCOUNT_2" Javier López javier.lopez.quotewake@example.invalid +14155550102)"
-    CONTACT_3="$(ensure_contact "$ACCOUNT_3" Lucía Martín lucia.martin.quotewake@example.invalid +14155550103)"
-    CONTACT_4="$(ensure_contact "$ACCOUNT_4" Diego Navarro diego.navarro.quotewake@example.invalid +14155550104)"
-    CONTACT_5="$(ensure_contact "$ACCOUNT_5" Ana Romero ana.romero.quotewake@example.invalid +14155550105)"
-    CONTACT_6="$(ensure_contact "$ACCOUNT_6" Pablo Sanz pablo.sanz.quotewake@example.invalid +14155550106)"
-    CONTACT_7="$(ensure_contact "$ACCOUNT_7" Elena Vidal elena.vidal.quotewake@example.invalid +14155550107)"
-    CONTACT_8="$(ensure_contact "$ACCOUNT_8" Sergio Moya sergio.moya.quotewake@example.invalid +14155550108)"
-    CONTACT_9="$(ensure_contact "$ACCOUNT_9" Nora Gil nora.gil.quotewake@example.invalid +14155550109)"
+    CONTACT_1="$(ensure_contact "$ACCOUNT_1" Marta García marta.garcia.quotewake@example.invalid "$(test_phone_for_contact +14155550101)")"
+    CONTACT_2="$(ensure_contact "$ACCOUNT_2" Javier López javier.lopez.quotewake@example.invalid "$(test_phone_for_contact +14155550102)")"
+    CONTACT_3="$(ensure_contact "$ACCOUNT_3" Lucía Martín lucia.martin.quotewake@example.invalid "$(test_phone_for_contact +14155550103)")"
+    CONTACT_4="$(ensure_contact "$ACCOUNT_4" Diego Navarro diego.navarro.quotewake@example.invalid "$(test_phone_for_contact +14155550104)")"
+    CONTACT_5="$(ensure_contact "$ACCOUNT_5" Ana Romero ana.romero.quotewake@example.invalid "$(test_phone_for_contact +14155550105)")"
+    CONTACT_6="$(ensure_contact "$ACCOUNT_6" Pablo Sanz pablo.sanz.quotewake@example.invalid "$(test_phone_for_contact +14155550106)")"
+    CONTACT_7="$(ensure_contact "$ACCOUNT_7" Elena Vidal elena.vidal.quotewake@example.invalid "$(test_phone_for_contact +14155550107)")"
+    CONTACT_8="$(ensure_contact "$ACCOUNT_8" Sergio Moya sergio.moya.quotewake@example.invalid "$(test_phone_for_contact +14155550108)")"
+    CONTACT_9="$(ensure_contact "$ACCOUNT_9" Nora Gil nora.gil.quotewake@example.invalid "$(test_phone_for_contact +14155550109)")"
     # The second opportunity under ACCOUNT_1 deliberately has its own contact
     # so both primary OpportunityContactRole records are independently testable.
-    CONTACT_10="$(ensure_contact "$ACCOUNT_1" Tomás Ríos tomas.rios.quotewake@example.invalid +14155550110)"
+    CONTACT_10="$(ensure_contact "$ACCOUNT_1" Tomás Ríos tomas.rios.quotewake@example.invalid "$(test_phone_for_contact +14155550110)")"
     : "$CONTACT_1" "$CONTACT_2" "$CONTACT_3" "$CONTACT_4" "$CONTACT_5" "$CONTACT_6" "$CONTACT_7" "$CONTACT_8" "$CONTACT_9" "$CONTACT_10"
 
     OPPORTUNITY_1="$(ensure_record Opportunity 'QuoteWake Demo - Reforma eléctrica cocina' "Name='QuoteWake Demo - Reforma eléctrica cocina' AccountId=$ACCOUNT_1 StageName='Proposal/Price Quote' CloseDate=$TODAY Amount=4250")"
@@ -460,7 +546,7 @@ if [[ "$RESET_DATA" == true ]]; then
 fi
 
 info "Verifying QuoteWake fields and querying Quotes..."
-sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, OpportunityId, Status, Subtotal, GrandTotal, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote ORDER BY CreatedDate DESC" --result-format human
+sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, OpportunityId, Status, Subtotal, GrandTotal, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c FROM Quote ORDER BY CreatedDate DESC" --result-format human
 if [[ "$SEED_DATA" == true ]]; then
     sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, Phone FROM Account WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Name" --result-format human
     sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, Account.Name FROM Opportunity WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Account.Name, Name" --result-format human
@@ -473,6 +559,6 @@ INITIAL_STANDARD_CUTOFF="$(date -u -d "-$STANDARD_DELAY_SECONDS seconds" +%Y-%m-
 INITIAL_MINIMUM_CUTOFF="$(date -u -d "-$MINIMUM_DELAY_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)"
 DUE_SOON_DATE="$(date -u -d "+$DUE_SOON_SECONDS seconds" +%Y-%m-%d)"
 TODAY="$(date -u +%Y-%m-%d)"
-printf '%s\n' "SELECT Id, Name, OpportunityId, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote WHERE QuoteWake_Enabled__c = true AND Status = 'Presented' AND Opportunity.IsClosed = false AND (ExpirationDate = null OR ExpirationDate >= $TODAY) AND (Attempt_Count__c = null OR Attempt_Count__c < 3) AND ((Follow_Up_Status__c = null AND (LastModifiedDate <= $INITIAL_STANDARD_CUTOFF OR (LastModifiedDate <= $INITIAL_MINIMUM_CUTOFF AND ExpirationDate != null AND ExpirationDate <= $DUE_SOON_DATE))) OR (Follow_Up_Status__c = 'Retry' AND Next_Follow_Up_At__c != null AND Next_Follow_Up_At__c <= $QUERY_NOW)) ORDER BY Next_Follow_Up_At__c ASC NULLS FIRST, LastModifiedDate ASC"
+printf '%s\n' "SELECT Id, Name, OpportunityId, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c FROM Quote WHERE QuoteWake_Enabled__c = true AND Status = 'Presented' AND Opportunity.IsClosed = false AND (ExpirationDate = null OR ExpirationDate >= $TODAY) AND (Attempt_Count__c = null OR Attempt_Count__c < 3) AND ((Follow_Up_Status__c = null AND (LastModifiedDate <= $INITIAL_STANDARD_CUTOFF OR (LastModifiedDate <= $INITIAL_MINIMUM_CUTOFF AND ExpirationDate != null AND ExpirationDate <= $DUE_SOON_DATE))) OR (Follow_Up_Status__c = 'Retry' AND Next_Follow_Up_At__c != null AND Next_Follow_Up_At__c <= $QUERY_NOW)) ORDER BY Next_Follow_Up_At__c ASC NULLS FIRST, LastModifiedDate ASC"
 
 ok "QuoteWake Salesforce MVP setup finished"

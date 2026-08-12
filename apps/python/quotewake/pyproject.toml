@@ -1,12 +1,13 @@
 [project]
 name = "quotewake-salesforce"
 version = "0.1.0"
-description = "Salesforce quote selection and CALL-E planning-only dry-run for QuoteWake."
+description = "One-shot Salesforce quote follow-up calls for QuoteWake."
 requires-python = ">=3.11"
 dependencies = [
   "Babel>=2.14",
   "calle-ai>=0.6.0",
-  "python-dotenv>=1.0.1",
+  "httpx>=0.27",
+  "python-dotenv>=1.0",
   "tzdata>=2024.1",
 ]
 
@@ -17,3 +18,4 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

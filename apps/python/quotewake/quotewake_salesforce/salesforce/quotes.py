@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from quotewake_salesforce.config import RegionalSettings
 from quotewake_salesforce.domain.models import ContactTarget, Money, QuoteCandidate, QuoteLine
 from quotewake_salesforce.structured_logging import log_event
 
@@ -36,22 +37,12 @@ REQUIRED_QUOTE_FIELDS = {
     "Follow_Up_Status__c",
     "Next_Follow_Up_At__c",
     "Attempt_Count__c",
-    "Last_Follow_Up_At__c",
-    "Last_Follow_Up_Result__c",
 }
 REQUIRED_CONTACT_FIELDS = {"Id", "Name", "Phone", "MobilePhone"}
+REQUIRED_CONTACT_FIELDS.add("QuoteWake_Call_Locale__c")
+REQUIRED_ACCOUNT_FIELDS = {"BillingCountryCode"}
+REQUIRED_ORGANIZATION_FIELDS = {"TimeZoneSidKey", "DefaultLocaleSidKey"}
 ID_PATTERN = re.compile(r"^[A-Za-z0-9]{15,18}$")
-FOLLOW_UP_RESULT_VALUES = frozenset(
-    {
-        "Interested",
-        "Not Interested",
-        "Call Back Later",
-        "No Answer",
-        "Busy",
-        "Invalid Number",
-        "Error",
-    }
-)
 
 
 def _field_map(description: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -82,8 +73,6 @@ _EXPECTED_FIELD_TYPES: dict[str, frozenset[str]] = {
     "Follow_Up_Status__c": frozenset({"picklist", "string"}),
     "Next_Follow_Up_At__c": frozenset({"datetime"}),
     "Attempt_Count__c": frozenset({"int", "double", "currency"}),
-    "Last_Follow_Up_At__c": frozenset({"datetime"}),
-    "Last_Follow_Up_Result__c": frozenset({"picklist", "string", "textarea"}),
 }
 
 
@@ -129,10 +118,18 @@ class QuoteRepository:
     """Read Quotes and primary Opportunity Contact Roles from Salesforce."""
 
     def __init__(
-        self, client: SalesforceClient, do_not_call_field: str | None = None
+        self,
+        client: SalesforceClient,
+        do_not_call_field: str | None = None,
+        default_currency_code: str | None = None,
     ) -> None:
         self.client = client
         self.do_not_call_field = do_not_call_field
+        if default_currency_code is not None and not re.fullmatch(
+            r"[A-Z]{3}", default_currency_code
+        ):
+            raise ValueError("default currency code must be a three-letter ISO code")
+        self.default_currency_code = default_currency_code
 
     def validate_schema(self) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
         """Validate required objects/fields and return their field maps."""
@@ -157,22 +154,6 @@ class QuoteRepository:
         _validate_field_metadata(quote_fields, REQUIRED_QUOTE_FIELDS, object_name="Quote")
         for picklist_name in ("Status", "Follow_Up_Status__c"):
             _active_picklist_values(quote_fields[picklist_name])
-        result_field = quote_fields["Last_Follow_Up_Result__c"]
-        if result_field.get("type") == "picklist":
-            result_values = _active_picklist_values(result_field)
-            if result_values is None:
-                raise SalesforceSchemaError(
-                    "Salesforce Quote.Last_Follow_Up_Result__c is a picklist "
-                    "without picklist values metadata."
-                )
-            missing_results = sorted(FOLLOW_UP_RESULT_VALUES - result_values)
-            if missing_results:
-                raise SalesforceSchemaError(
-                    "Salesforce Quote.Last_Follow_Up_Result__c is missing active "
-                    "picklist values: "
-                    + ", ".join(missing_results)
-                )
-
         try:
             contact_fields = _field_map(self.client.describe("Contact"))
         except Exception as exc:
@@ -199,6 +180,12 @@ class QuoteRepository:
                 raise SalesforceSchemaError(
                     f"Salesforce Contact.{name} has unexpected type {field_type!r}."
                 )
+        locale_type = contact_fields["QuoteWake_Call_Locale__c"].get("type")
+        if locale_type is not None and locale_type not in {"picklist", "string"}:
+            raise SalesforceSchemaError(
+                "Salesforce Contact.QuoteWake_Call_Locale__c has unexpected type "
+                f"{locale_type!r}."
+            )
         if self.do_not_call_field is not None:
             if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", self.do_not_call_field):
                 raise SalesforceSchemaError(
@@ -209,13 +196,81 @@ class QuoteRepository:
                     "Configured Contact opt-out field does not exist on Contact: "
                     f"{self.do_not_call_field}"
                 )
+        try:
+            account_fields = _field_map(self.client.describe("Account"))
+        except Exception as exc:
+            raise SalesforceSchemaError(
+                "The standard Salesforce Account object is unavailable or cannot be described."
+            ) from exc
+        missing_accounts = sorted(REQUIRED_ACCOUNT_FIELDS - account_fields.keys())
+        if missing_accounts:
+            raise SalesforceSchemaError(
+                "Salesforce Account fields required for regional call context are missing: "
+                + ", ".join(missing_accounts)
+            )
+        country_type = account_fields["BillingCountryCode"].get("type")
+        if country_type is not None and country_type not in {"picklist", "string"}:
+            raise SalesforceSchemaError(
+                "Salesforce Account.BillingCountryCode has unexpected type "
+                f"{country_type!r}."
+            )
+        try:
+            organization_fields = _field_map(self.client.describe("Organization"))
+        except Exception as exc:
+            raise SalesforceSchemaError(
+                "The Salesforce Organization object is unavailable or cannot be described."
+            ) from exc
+        missing_organization = sorted(
+            REQUIRED_ORGANIZATION_FIELDS - organization_fields.keys()
+        )
+        if missing_organization:
+            raise SalesforceSchemaError(
+                "Salesforce Organization fields required for regional settings are missing: "
+                + ", ".join(missing_organization)
+            )
+        for name in REQUIRED_ORGANIZATION_FIELDS:
+            field_type = organization_fields[name].get("type")
+            if field_type is not None and field_type not in {"picklist", "string"}:
+                raise SalesforceSchemaError(
+                    f"Salesforce Organization.{name} has unexpected type {field_type!r}."
+                )
         log_event(
             "salesforce_schema_validation_completed",
             quote_field_count=len(quote_fields),
             contact_field_count=len(contact_fields),
+            account_field_count=len(account_fields),
+            organization_field_count=len(organization_fields),
             do_not_call_field_configured=bool(self.do_not_call_field),
         )
         return quote_fields, contact_fields
+
+    def load_organization_regional_settings(self) -> RegionalSettings:
+        """Read the organization timezone and default locale from Salesforce."""
+
+        records = self.client.query(
+            "SELECT TimeZoneSidKey, DefaultLocaleSidKey FROM Organization LIMIT 1"
+        )
+        if len(records) != 1:
+            raise SalesforceResponseError(
+                "Salesforce Organization query did not return exactly one record."
+            )
+        record = records[0]
+        timezone_value = required(record, "TimeZoneSidKey")
+        locale = required(record, "DefaultLocaleSidKey")
+        if not isinstance(timezone_value, str) or not timezone_value.strip():
+            raise SalesforceResponseError(
+                "Salesforce Organization.TimeZoneSidKey is missing or malformed."
+            )
+        if not isinstance(locale, str) or not locale.strip():
+            raise SalesforceResponseError(
+                "Salesforce Organization.DefaultLocaleSidKey is missing or malformed."
+            )
+        try:
+            return RegionalSettings.from_values(timezone_value, locale)
+        except ValueError as exc:
+            raise SalesforceResponseError(
+                "Salesforce Organization regional settings are invalid."
+            ) from exc
 
     def load(
         self, *, quote_id: str | None = None
@@ -270,6 +325,7 @@ class QuoteRepository:
             "OpportunityId",
             "Opportunity.Name",
             "Opportunity.Account.Name",
+            "Opportunity.Account.BillingCountryCode",
             "Opportunity.IsClosed",
             *(
                 [amount_field]
@@ -281,8 +337,6 @@ class QuoteRepository:
             "Follow_Up_Status__c",
             "Next_Follow_Up_At__c",
             "Attempt_Count__c",
-            "Last_Follow_Up_At__c",
-            "Last_Follow_Up_Result__c",
         ]
         where_clause = "OpportunityId != null"
         if quote_id is not None:
@@ -316,25 +370,14 @@ class QuoteRepository:
         return quotes, contacts
 
     def _corporate_currency(self) -> str:
-        """Return the Salesforce org default currency for single-currency Quotes."""
+        """Return the explicitly configured currency for a single-currency org."""
 
-        records = self.client.query(
-            "SELECT DefaultCurrencyIsoCode FROM Organization LIMIT 1"
-        )
-        if len(records) != 1:
-            raise SalesforceResponseError(
-                "Salesforce Organization query did not return exactly one currency."
+        if self.default_currency_code is None:
+            raise SalesforceSchemaError(
+                "Salesforce Quote.CurrencyIsoCode is unavailable in this single-currency "
+                "org. Configure SALESFORCE_CURRENCY_CODE with its ISO code, for example EUR."
             )
-        value = nullable_text(
-            required(records[0], "DefaultCurrencyIsoCode"),
-            "Organization.DefaultCurrencyIsoCode",
-            maximum=3,
-        )
-        if value is None or not re.fullmatch(r"[A-Z]{3}", value):
-            raise SalesforceResponseError(
-                "Salesforce Organization returned an invalid default currency code."
-            )
-        return value
+        return self.default_currency_code
 
     def _quote_from_record(
         self,
@@ -364,6 +407,15 @@ class QuoteRepository:
             raise SalesforceResponseError(f"Quote {quote_id} has invalid Account data.")
         account_name = (
             nullable_text(required(account, "Name"), "Opportunity.Account.Name", maximum=255)
+            if isinstance(account, dict)
+            else None
+        )
+        account_billing_country_code = (
+            nullable_text(
+                required(account, "BillingCountryCode"),
+                "Opportunity.Account.BillingCountryCode",
+                maximum=2,
+            )
             if isinstance(account, dict)
             else None
         )
@@ -397,11 +449,6 @@ class QuoteRepository:
             if field_metadata and "Follow_Up_Status__c" in field_metadata
             else None
         )
-        follow_up_result_values = (
-            _active_picklist_values(field_metadata["Last_Follow_Up_Result__c"])
-            if field_metadata and "Last_Follow_Up_Result__c" in field_metadata
-            else None
-        )
         status = picklist(required(record, "Status"), "Status", status_values)
         if not status:
             raise SalesforceResponseError("Salesforce field Status is unexpectedly empty.")
@@ -432,17 +479,8 @@ class QuoteRepository:
             follow_up_status=follow_up_status,
             next_follow_up_at=nullable_datetime(required(record, "Next_Follow_Up_At__c"), "Next_Follow_Up_At__c"),
             attempt_count=non_negative_integer(required(record, "Attempt_Count__c"), "Attempt_Count__c", precision=(field_metadata or {}).get("Attempt_Count__c", {}).get("precision")),
-            last_follow_up_at=nullable_datetime(required(record, "Last_Follow_Up_At__c"), "Last_Follow_Up_At__c"),
-            last_follow_up_result=picklist(
-                nullable_text(
-                    required(record, "Last_Follow_Up_Result__c"),
-                    "Last_Follow_Up_Result__c",
-                    maximum=255,
-                ),
-                "Last_Follow_Up_Result__c",
-                follow_up_result_values,
-            ),
             money=money,
+            account_billing_country_code=account_billing_country_code,
         )
 
     def load_quote_lines(
@@ -520,6 +558,7 @@ class QuoteRepository:
                 "Contact.Name",
                 "Contact.Phone",
                 "Contact.MobilePhone",
+                "Contact.QuoteWake_Call_Locale__c",
             ]
             if self.do_not_call_field is not None:
                 contact_fields.append(f"Contact.{self.do_not_call_field}")
@@ -562,6 +601,11 @@ class QuoteRepository:
                     required(contact, "Phone"), "Contact.Phone", maximum=40
                 )
                 selected_phone = mobile_phone or phone
+                call_locale = nullable_text(
+                    required(contact, "QuoteWake_Call_Locale__c"),
+                    "Contact.QuoteWake_Call_Locale__c",
+                    maximum=35,
+                )
                 if self.do_not_call_field is not None:
                     opt_out = required(contact, self.do_not_call_field)
                     if opt_out is not None and not isinstance(opt_out, bool):
@@ -581,6 +625,7 @@ class QuoteRepository:
                             self.do_not_call_field is not None
                             and contact.get(self.do_not_call_field) is True
                         ),
+                        call_locale=call_locale,
                     )
                 )
         return contact_map

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Last_Follow_Up_At__c</fullName>
-    <description>Date and time of the most recent QuoteWake provider call attempt or explicit demo simulation, including technical failures. Used as the per-Quote cooldown anchor.</description>
-    <label>Last Follow Up At</label>
-    <type>DateTime</type>
-</CustomField>

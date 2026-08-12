@@ -1,221 +1,214 @@
-"""Planning-only adapter around the authenticated official CALL-E CLI."""
+"""Direct CALL-E SDK integration with a deterministic no-network dry-run."""
 
 from __future__ import annotations
 
-import json
-import os
-import re
-import subprocess
-from collections.abc import Sequence
+from datetime import date, datetime, timezone
+import hashlib
 from typing import Any
 
 from quotewake_salesforce.domain.models import (
-    CallPlanDecision,
-    CallPlanRequest,
-    CallPlanResult,
+    CALL_OUTCOME_VALUES,
+    CALL_OUTCOME_VOCABULARY,
+    CallOutcomeKind,
+    CallRequest,
+    CallResult,
 )
 from quotewake_salesforce.structured_logging import log_event
 
 
-class CallEPlanningError(RuntimeError):
-    """Raised when CALL-E cannot safely produce a planning result."""
+class CallEError(RuntimeError):
+    pass
 
 
-PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?[1-9]\d{7,14}(?!\w)")
+def result_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": ["outcome", "interest_level", "preferred_date", "summary", "next_action"],
+        "properties": {
+            "outcome": {"type": "string", "enum": list(CALL_OUTCOME_VALUES)},
+            "interest_level": {"type": "string"},
+            "preferred_date": {"type": ["string", "null"]},
+            "summary": {"type": "string"},
+            "next_action": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
 
 
-def _redact_remote_text(value: str) -> str:
-    """Remove phone-like values from untrusted remote planning prose."""
+def idempotency_key(quote_id: str, next_attempt: int, retry_marker: datetime | None = None) -> str:
+    if next_attempt < 1:
+        raise ValueError("next attempt must be positive")
+    key = f"quotewake-{quote_id}-{next_attempt}"
+    if retry_marker is not None:
+        if retry_marker.tzinfo is None or retry_marker.utcoffset() is None:
+            raise ValueError("retry marker must be timezone-aware")
+        marker = retry_marker.astimezone(timezone.utc).isoformat()
+        key += "-" + hashlib.sha256(marker.encode("utf-8")).hexdigest()[:12]
+    return key
 
-    return PHONE_LIKE_PATTERN.sub("[phone-redacted]", value)
+
+SUCCESS_STATUSES = frozenset({"completed", "succeeded", "success"})
+TECHNICAL_STATUSES = frozenset({"failed", "canceled", "cancelled"})
 
 
-class CallEPlanningClient:
-    """Call only CALL-E plan_call; this class has no call execution method."""
+def _required_text(value: Any, field: str, maximum: int = 1000) -> str:
+    if not isinstance(value, str):
+        raise CallEError(f"CALL-E structured_result.{field} must be a non-empty string")
+    cleaned = " ".join(value.split())
+    if not cleaned:
+        raise CallEError(f"CALL-E structured_result.{field} must be a non-empty string")
+    return cleaned[:maximum]
 
-    def __init__(
-        self,
-        command: Sequence[str] = ("calle",),
-        *,
-        timeout_seconds: int = 120,
-    ) -> None:
-        if not command:
-            raise ValueError("CALL-E CLI command cannot be empty.")
-        self.command = tuple(command)
+
+def _parse_date(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise CallEError("CALL-E structured_result.preferred_date must be an ISO date")
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise CallEError("CALL-E structured_result.preferred_date must be an ISO date") from None
+
+
+def _required_outcome(value: Any) -> str:
+    """Validate an outcome without accepting provider-specific aliases."""
+
+    if not isinstance(value, str) or value not in CALL_OUTCOME_VOCABULARY:
+        raise CallEError("CALL-E structured_result.outcome is unsupported")
+    return value
+
+
+def _failure_reason(error: BaseException) -> str:
+    """Map provider failures to a small, non-sensitive operational vocabulary."""
+
+    if isinstance(error, TimeoutError) or type(error).__name__ in {
+        "TimeoutException",
+        "ReadTimeout",
+        "ConnectTimeout",
+    }:
+        return "timeout"
+    if isinstance(error, CallEError):
+        message = str(error)
+        if "structured_result.outcome" in message:
+            return "invalid_outcome"
+        if "preferred_date" in message:
+            return "invalid_preferred_date"
+        if "provider status" in message or "non-terminal" in message:
+            return "invalid_provider_status"
+        if "structured_result" in message or "malformed" in message:
+            return "malformed_result"
+        return "invalid_result"
+    return "provider_error"
+
+
+class CallEClient:
+    """Run one call or report its request without contacting CALL-E."""
+
+    def __init__(self, api_key: str | None = None, *, base_url: str = "https://api.heycall-e.com", execute: bool = False, client: Any | None = None, timeout_seconds: int = 600) -> None:
+        self.api_key = api_key
+        self.base_url = base_url
+        self.execute_enabled = execute
+        self._client = client
         self.timeout_seconds = timeout_seconds
 
-    def _environment(self) -> dict[str, str]:
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "CALLE_SOURCE": "quotewake_salesforce",
-                "CALLE_INTEGRATION": "python_app",
-                "CALLE_INTEGRATION_VERSION": "0.1.0",
-            }
-        )
-        return environment
+    def _sdk(self) -> Any:
+        if self._client is None:
+            if not self.api_key:
+                raise CallEError("CALLE_API_KEY is required with --execute")
+            from calle import CalleClient
+            self._client = CalleClient(api_key=self.api_key, base_url=self.base_url)
+        return self._client
 
-    def _run(
-        self,
-        arguments: Sequence[str],
-        *,
-        expect_json: bool,
-        quote_id: str | None = None,
-    ) -> dict[str, Any]:
-        command = [*self.command, *arguments]
-        operation = " ".join(arguments[:3])
-        log_event(
-            "call_e_cli_command_started",
-            quote_id=quote_id,
-            operation=operation,
-            expect_json=expect_json,
-        )
-        try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                env=self._environment(),
-            )
-        except FileNotFoundError as exc:
-            raise CallEPlanningError(
-                "The official CALL-E CLI is not installed or is not on PATH."
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
-            raise CallEPlanningError(
-                f"CALL-E CLI timed out after {self.timeout_seconds} seconds."
-            ) from exc
+    def preview(self, request: CallRequest, *, next_attempt: int, retry_marker: datetime | None = None) -> dict[str, Any]:
+        """Build a masked dry-run payload; it never constructs the SDK client."""
 
-        payload: dict[str, Any] = {}
-        if expect_json:
-            try:
-                parsed = json.loads(completed.stdout)
-            except json.JSONDecodeError as exc:
-                raise CallEPlanningError(
-                    "CALL-E CLI returned malformed JSON."
-                ) from exc
-            if not isinstance(parsed, dict):
-                raise CallEPlanningError("CALL-E CLI did not return a JSON object.")
-            payload = parsed
-
-        if completed.returncode != 0 or payload.get("ok") is False:
-            error = payload.get("error")
-            code = error.get("code") if isinstance(error, dict) else None
-            if code == "auth_required":
-                raise CallEPlanningError(
-                    "CALL-E authentication is required. Run 'calle auth login' and retry."
-                )
-            suffix = f" ({code})" if isinstance(code, str) and code else ""
-            raise CallEPlanningError(f"CALL-E CLI command failed{suffix}.")
-        log_event(
-            "call_e_cli_command_completed",
-            quote_id=quote_id,
-            operation=operation,
-            expect_json=expect_json,
-        )
-        return payload
-
-    def verify_ready(self) -> None:
-        """Verify CLI availability and an already usable login without interactive auth."""
-
-        log_event("call_e_readiness_check_started")
-        self._run(("--help",), expect_json=False)
-        status = self._run(("auth", "status", "--json"), expect_json=True)
-        if status.get("usable") is not True:
-            raise CallEPlanningError(
-                "CALL-E authentication is not usable. Run 'calle auth login' and retry."
-            )
-        tools_payload = self._run(("mcp", "tools", "--json"), expect_json=True)
-        tools_result = tools_payload.get("result")
-        tools = tools_result.get("tools") if isinstance(tools_result, dict) else None
-        names = (
-            {
-                item.get("name")
-                for item in tools
-                if isinstance(item, dict) and isinstance(item.get("name"), str)
-            }
-            if isinstance(tools, list)
-            else set()
-        )
-        if "plan_call" not in names:
-            raise CallEPlanningError("CALL-E does not expose the required plan_call tool.")
-        log_event("call_e_readiness_check_completed", plan_call_available=True)
-
-    def plan(self, request: CallPlanRequest) -> CallPlanResult:
-        """Create one remote CALL-E plan without invoking run_call."""
-
-        log_event(
-            "call_e_plan_request_started",
-            quote_id=request.quote_id,
-            language=request.language,
-            region=request.region,
-        )
-        arguments = {
-            "to_phones": [request.phone],
-            "goal": request.goal,
-            "user_input": request.user_input,
-            "language": request.language,
+        return {
+            "mode": "dry_run",
+            "quote_id": request.quote_id,
+            "locale": request.locale,
             "region": request.region,
+            "idempotency_key": idempotency_key(request.quote_id, next_attempt, retry_marker),
+            "phone_configured": bool(request.phone),
+            "task": request.goal,
         }
-        payload = self._run(
-            (
-                "mcp",
-                "call",
-                "plan_call",
-                "--args-json",
-                json.dumps(arguments, ensure_ascii=False, separators=(",", ":")),
-                "--json",
-            ),
-            expect_json=True,
-            quote_id=request.quote_id,
-        )
-        result = payload.get("result")
-        if not isinstance(result, dict):
-            raise CallEPlanningError("CALL-E plan_call returned no result object.")
-        structured = result.get("structuredContent") or result.get("structured_content")
-        if not isinstance(structured, dict):
-            structured = result
 
-        plan_id = structured.get("plan_id")
-        ready_to_run = structured.get("ready_to_run")
-        if not isinstance(plan_id, str) or not isinstance(ready_to_run, bool):
-            raise CallEPlanningError(
-                "CALL-E plan_call returned an incomplete structured result."
+    def execute(self, request: CallRequest, *, next_attempt: int, retry_marker: datetime | None = None) -> CallResult:
+        if not self.execute_enabled:
+            raise CallEError("live CALL-E execution requires --execute")
+        key = idempotency_key(request.quote_id, next_attempt, retry_marker)
+        sdk = self._sdk()
+        try:
+            created = sdk.calls.create(
+                task=request.goal,
+                recipient={"phone": request.phone, "locale": request.locale},
+                result_schema=result_schema(),
+                metadata={"quotewake_quote_id": request.quote_id},
+                idempotency_key=key,
             )
-        summary = structured.get("confirm_summary")
-        if summary is not None and not isinstance(summary, str):
-            summary = None
-        if isinstance(summary, str):
-            summary = _redact_remote_text(summary)
-        raw_questions = structured.get("clarifying_questions")
-        questions = (
-            tuple(
-                _redact_remote_text(item)
-                for item in raw_questions
-                if isinstance(item, str)
+            call_id = created.get("id") if isinstance(created, dict) else None
+            if not isinstance(call_id, str) or not call_id:
+                raise CallEError("CALL-E create returned no call ID")
+            log_event("call_e_call_accepted", quote_id=request.quote_id, call_id=call_id)
+        except Exception as exc:
+            log_event(
+                "call_e_execution_failed",
+                quote_id=request.quote_id,
+                phase="create",
+                reason=_failure_reason(exc),
+                error_type=type(exc).__name__,
             )
-            if isinstance(raw_questions, list)
-            else ()
-        )
-        plan_result = CallPlanResult(
-            quote_id=request.quote_id,
-            decision=(
-                CallPlanDecision.PLAN_READY
-                if ready_to_run
-                else CallPlanDecision.PLAN_INCOMPLETE
-            ),
-            ready_to_run=ready_to_run,
-            plan_id=plan_id,
-            confirm_summary=summary,
-            clarifying_questions=questions,
-        )
-        log_event(
-            "call_e_plan_request_completed",
-            quote_id=request.quote_id,
-            decision=plan_result.decision.value,
-            ready_to_run=plan_result.ready_to_run,
-            plan_id=plan_result.plan_id,
-        )
-        return plan_result
+            raise
+        try:
+            completed = sdk.calls.wait_for_result(call_id, timeout_seconds=self.timeout_seconds, interval_seconds=2)
+        except Exception as exc:
+            log_event(
+                "call_e_wait_failed",
+                quote_id=request.quote_id,
+                call_id=call_id,
+                phase="wait",
+                reason=_failure_reason(exc),
+                error_type=type(exc).__name__,
+            )
+            raise
+        try:
+            if isinstance(completed, dict) and str(completed.get("status", "")).strip().lower() in TECHNICAL_STATUSES:
+                return self._technical_result(request.quote_id, call_id, str(completed["status"]))
+            return self._parse_result(request.quote_id, call_id, completed)
+        except Exception as exc:
+            log_event(
+                "call_e_parse_failed",
+                quote_id=request.quote_id,
+                call_id=call_id,
+                phase="parse",
+                reason=_failure_reason(exc),
+                error_type=type(exc).__name__,
+            )
+            raise
+
+    @staticmethod
+    def _technical_result(quote_id: str, call_id: str, status: str) -> CallResult:
+        return CallResult(quote_id, call_id, status, "technical_failure", "unknown", None, "CALL-E provider failure", "Retry after the technical failure.", None, CallOutcomeKind.TECHNICAL_FAILURE, datetime.now(timezone.utc))
+
+    def _parse_result(self, quote_id: str, call_id: str, payload: Any) -> CallResult:
+        if not isinstance(payload, dict):
+            raise CallEError("CALL-E result was malformed")
+        raw_status = payload.get("status")
+        if not isinstance(raw_status, str) or not raw_status.strip():
+            raise CallEError("CALL-E result did not contain a provider status")
+        status = raw_status.strip().lower()
+        if status not in SUCCESS_STATUSES:
+            raise CallEError(f"CALL-E result has non-terminal provider status: {status}")
+        structured = payload.get("structured_result")
+        if not isinstance(structured, dict):
+            raise CallEError("CALL-E result did not contain structured_result")
+        if "preferred_date" not in structured:
+            raise CallEError("CALL-E structured_result.preferred_date is required")
+        preferred = _parse_date(structured.get("preferred_date"))
+        outcome = _required_outcome(structured.get("outcome"))
+        interest = _required_text(structured.get("interest_level"), "interest_level", 80)
+        summary = _required_text(structured.get("summary"), "summary")
+        next_action = _required_text(structured.get("next_action"), "next_action")
+        occurred = datetime.now(timezone.utc)
+        preferred_at = datetime.combine(preferred, datetime.min.time(), timezone.utc) if preferred is not None else None
+        return CallResult(quote_id, call_id, status, outcome, interest, preferred, summary, next_action, preferred_at, CallOutcomeKind.BUSINESS, occurred)

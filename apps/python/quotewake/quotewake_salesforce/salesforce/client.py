@@ -1,25 +1,16 @@
-"""Small Salesforce CLI client for read and explicitly-scoped demo writes.
-
-Authentication remains in the user's Salesforce CLI session. Normal selection
-operations are read-only. The simulator uses the separate ``composite_write``
-method for one atomic Quote + Task write and never exposes general CRUD.
-"""
+"""Small Salesforce REST/OAuth boundary used by QuoteWake."""
 
 from __future__ import annotations
 
-import json
-import subprocess
 from dataclasses import dataclass
-from datetime import timezone, tzinfo
+from datetime import datetime, timezone
 from decimal import Decimal
+import re
 from typing import Any
 
-from quotewake_salesforce.domain.models import (
-    CallResult,
-    ContactTarget,
-    FollowUpUpdate,
-    QuoteCandidate,
-)
+import httpx
+
+from quotewake_salesforce.domain.models import ContactTarget, FollowUpUpdate, QuoteCandidate
 from quotewake_salesforce.structured_logging import log_event
 
 
@@ -28,351 +19,157 @@ class SalesforceError(RuntimeError):
 
 
 class SalesforceSchemaError(SalesforceError):
-    """Raised when the target org cannot support this selection milestone."""
+    pass
 
 
 class SalesforceQueryError(SalesforceError):
-    """Raised when Salesforce rejects a SOQL query."""
+    pass
 
 
 class SalesforceResponseError(SalesforceError):
-    """Raised when the CLI returns an unexpected JSON response."""
+    pass
 
 
 def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-standard JSON number {value}")
 
 
-@dataclass(frozen=True)
-class OrgInfo:
-    alias: str | None
-    username: str
-    org_id: str
-    api_version: str | None = None
-    instance_url: str | None = None
+_SENSITIVE_TEXT = re.compile(
+    r"(?i)(access[_ -]?token|client[_ -]?secret|authorization)\s*[:=]\s*\S+"
+)
+
+
+def _error_detail(response: httpx.Response) -> str | None:
+    """Return only Salesforce's bounded error code/message, with secrets redacted."""
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    item: Any = payload[0] if isinstance(payload, list) and payload else payload
+    if not isinstance(item, dict):
+        return None
+    code = item.get("errorCode") or item.get("error")
+    message = item.get("message") or item.get("error_description")
+    parts = [value.strip() for value in (code, message) if isinstance(value, str) and value.strip()]
+    if not parts:
+        return None
+    return _SENSITIVE_TEXT.sub(r"\1=[redacted]", ": ".join(parts))[:600]
 
 
 @dataclass(frozen=True)
 class CompositeWriteResult:
-    """Identifiers returned by a successful QuoteWake composite write."""
-
     quote_id: str
     task_id: str
 
 
 class SalesforceClient:
-    """Execute safe Salesforce CLI read commands for one target org."""
+    """Authenticate once for a one-shot process and expose REST primitives."""
 
-    def __init__(self, target_org: str | None = None, executable: str = "sf") -> None:
-        self.target_org = target_org
-        self.executable = executable
+    def __init__(self, domain: str, client_id: str, client_secret: str, api_version: str, *, http_client: httpx.Client | None = None) -> None:
+        if not domain or not client_id or not client_secret or not api_version:
+            raise ValueError("Salesforce domain, client ID, secret, and API version are required")
+        self.domain = domain.rstrip("/")
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.api_version = api_version.lstrip("v")
+        self.http = http_client or httpx.Client(timeout=60.0)
+        self._access_token: str | None = None
+        self.instance_url: str | None = None
 
-    def _base_command(self, *args: str) -> list[str]:
-        command = [self.executable, *args]
-        if self.target_org:
-            command.extend(["--target-org", self.target_org])
-        command.append("--json")
-        return command
+    @property
+    def api_root(self) -> str:
+        return f"/services/data/v{self.api_version}"
 
-    def _run_json(self, *args: str) -> dict[str, Any]:
-        command = self._base_command(*args)
-        operation = ".".join(args[:2]) if args else "unknown"
-        log_event(
-            "salesforce_cli_command_started",
-            operation=operation,
-            target_org_configured=bool(self.target_org),
+    def _authenticate(self) -> None:
+        response = self.http.post(
+            f"{self.domain}/services/oauth2/token",
+            data={"grant_type": "client_credentials", "client_id": self.client_id, "client_secret": self.client_secret},
         )
+        if response.status_code >= 400:
+            raise SalesforceError("Salesforce OAuth authentication failed")
         try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-        except FileNotFoundError as exc:
-            raise SalesforceError(
-                "Salesforce CLI 'sf' is not installed or is not on PATH."
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
-            raise SalesforceError("Salesforce CLI command timed out after 120 seconds.") from exc
-
-        try:
-            payload = json.loads(
-                completed.stdout,
-                parse_int=Decimal,
+            payload = response.json(
                 parse_float=Decimal,
                 parse_constant=_reject_json_constant,
             )
-        except (json.JSONDecodeError, ValueError) as exc:
-            detail = completed.stderr.strip() or "no JSON response"
-            raise SalesforceResponseError(
-                f"Salesforce CLI returned malformed JSON: {detail[:400]}"
-            ) from exc
+        except ValueError as exc:
+            raise SalesforceResponseError("Salesforce OAuth response was malformed") from exc
+        token = payload.get("access_token") if isinstance(payload, dict) else None
+        instance = payload.get("instance_url") if isinstance(payload, dict) else None
+        if not isinstance(token, str) or not token or not isinstance(instance, str) or not instance:
+            raise SalesforceResponseError("Salesforce OAuth response did not contain required fields")
+        self._access_token, self.instance_url = token, instance.rstrip("/")
+        log_event("salesforce_authenticated")
 
-        if not isinstance(payload, dict):
-            raise SalesforceResponseError("Salesforce CLI returned a JSON value instead of an object.")
-        if completed.returncode != 0 or payload.get("status") not in (0, None, Decimal(0)):
-            result = payload.get("result")
-            result_message = result.get("message") if isinstance(result, dict) else None
-            message = payload.get("message") or result_message
-            if not isinstance(message, str) or not message.strip():
-                message = completed.stderr.strip() or "Salesforce CLI command failed"
-            command_text = " ".join(command[:-1])
+    def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
+        if self._access_token is None or self.instance_url is None:
+            self._authenticate()
+        assert self.instance_url is not None and self._access_token is not None
+        response = self.http.request(method, f"{self.instance_url}{path}", headers={"Authorization": f"Bearer {self._access_token}"}, **kwargs)
+        if response.status_code >= 400:
+            detail = _error_detail(response)
+            suffix = f": {detail}" if detail else ""
             raise SalesforceQueryError(
-                f"Salesforce CLI command failed ({command_text}): {message.strip()[:600]}"
+                f"Salesforce REST request failed with HTTP {response.status_code}{suffix}"
             )
-        log_event(
-            "salesforce_cli_command_completed",
-            operation=operation,
-            target_org_configured=bool(self.target_org),
-        )
+        try:
+            payload = response.json(
+                parse_float=Decimal,
+                parse_constant=_reject_json_constant,
+            )
+        except ValueError as exc:
+            raise SalesforceResponseError("Salesforce REST response was malformed") from exc
+        if not isinstance(payload, dict):
+            raise SalesforceResponseError("Salesforce REST response was not an object")
         return payload
 
-    def org_info(self) -> OrgInfo:
-        """Verify authentication and return non-secret org identity fields."""
-
-        payload = self._run_json("org", "display")
-        result = payload.get("result")
-        if not isinstance(result, dict):
-            raise SalesforceResponseError("sf org display returned no org details.")
-        if result.get("connectedStatus") not in {None, "Connected"}:
-            raise SalesforceError(
-                f"Salesforce target org is not connected: {result.get('connectedStatus')}"
-            )
-        username = result.get("username")
-        org_id = result.get("id")
-        if not isinstance(username, str) or not isinstance(org_id, str):
-            raise SalesforceResponseError(
-                "sf org display did not return a username and org ID."
-            )
-        alias = result.get("alias")
-        api_version = result.get("apiVersion")
-        if api_version is None:
-            api_version = result.get("api_version")
-        return OrgInfo(
-            alias if isinstance(alias, str) else None,
-            username,
-            org_id,
-            str(api_version) if api_version is not None else None,
-            result.get("instanceUrl") if isinstance(result.get("instanceUrl"), str) else None,
-        )
-
     def describe(self, object_name: str) -> dict[str, Any]:
-        """Describe a Salesforce object through the CLI."""
-
-        payload = self._run_json("sobject", "describe", "--sobject", object_name)
-        result = payload.get("result")
-        if not isinstance(result, dict):
-            raise SalesforceResponseError(
-                f"sf sobject describe {object_name} returned no schema."
-            )
-        return result
+        return self._request("GET", f"{self.api_root}/sobjects/{object_name}/describe")
 
     def query(self, soql: str) -> list[dict[str, Any]]:
-        """Run SOQL and return records, never silently converting errors to []."""
-
-        payload = self._run_json("data", "query", "--query", soql)
-        result = payload.get("result")
-        if not isinstance(result, dict) or not isinstance(result.get("records"), list):
-            raise SalesforceResponseError("SOQL response did not contain records.")
-        records = result["records"]
-        if not all(isinstance(record, dict) for record in records):
-            raise SalesforceResponseError("SOQL response contained a malformed record.")
+        path = f"{self.api_root}/query"
+        records: list[dict[str, Any]] = []
+        first = True
+        while path:
+            payload = self._request("GET", path, **({"params": {"q": soql}} if first else {}))
+            first = False
+            page = payload.get("records")
+            if not isinstance(page, list) or not all(isinstance(item, dict) for item in page):
+                raise SalesforceResponseError("Salesforce query response did not contain records")
+            records.extend(page)
+            next_path = payload.get("nextRecordsUrl")
+            path = next_path if isinstance(next_path, str) and next_path else ""
         return records
 
-    def _run_api_json(
-        self, command: list[str], *, quote_id: str | None = None
-    ) -> dict[str, Any]:
-        """Run ``sf api request rest`` and parse its raw JSON response."""
+    def composite_write(self, quote: QuoteCandidate, contact: ContactTarget, update: FollowUpUpdate, result: Any, *, task_description: str, business_timezone: Any = timezone.utc) -> CompositeWriteResult:
+        """Atomically update the Quote and create a completed standard Task."""
 
-        log_event(
-            "salesforce_rest_request_started",
-            quote_id=quote_id,
-            operation="composite_write" if "/composite" in command else "rest_request",
-            target_org_configured=bool(self.target_org),
-        )
-
-        try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-        except FileNotFoundError as exc:
-            raise SalesforceError(
-                "Salesforce CLI 'sf' is not installed or is not on PATH."
-            ) from exc
-        except subprocess.TimeoutExpired as exc:
-            raise SalesforceError("Salesforce REST request timed out after 120 seconds.") from exc
-        try:
-            payload = json.loads(
-                completed.stdout,
-                parse_int=Decimal,
-                parse_float=Decimal,
-                parse_constant=_reject_json_constant,
-            )
-        except (json.JSONDecodeError, ValueError) as exc:
-            detail = completed.stderr.strip() or "no JSON response"
-            raise SalesforceResponseError(
-                f"Salesforce CLI returned malformed REST JSON: {detail[:400]}"
-            ) from exc
-        if not isinstance(payload, dict):
-            raise SalesforceResponseError("Salesforce REST response was not a JSON object.")
-        # ``sf api request rest`` returns the REST body directly unless the CLI
-        # itself wraps an error/result envelope. Support both forms without
-        # adding ``--json`` (which this command does not accept).
-        if completed.returncode != 0 or payload.get("status") not in (0, None, Decimal(0)):
-            message = payload.get("message") or completed.stderr.strip() or "Salesforce REST request failed"
-            raise SalesforceQueryError(str(message)[:600])
-        result = payload.get("result", payload)
-        if isinstance(result, str):
-            try:
-                result = json.loads(
-                    result,
-                    parse_int=Decimal,
-                    parse_float=Decimal,
-                    parse_constant=_reject_json_constant,
-                )
-            except (json.JSONDecodeError, ValueError) as exc:
-                raise SalesforceResponseError("Salesforce REST response body was malformed JSON.") from exc
-        if not isinstance(result, dict):
-            raise SalesforceResponseError("Salesforce REST response had no JSON body.")
-        if "compositeResponse" not in result and isinstance(result.get("response"), str):
-            try:
-                nested = json.loads(
-                    result["response"],
-                    parse_int=Decimal,
-                    parse_float=Decimal,
-                    parse_constant=_reject_json_constant,
-                )
-            except (json.JSONDecodeError, ValueError) as exc:
-                raise SalesforceResponseError("Salesforce REST response body was malformed JSON.") from exc
-            if isinstance(nested, dict):
-                result = nested
-        if "compositeResponse" not in result and isinstance(result.get("body"), dict):
-            result = result["body"]
-        log_event(
-            "salesforce_rest_request_completed",
-            quote_id=quote_id,
-            operation="composite_write" if "compositeResponse" in result else "rest_request",
-            target_org_configured=bool(self.target_org),
-        )
-        return result
-
-    def composite_write(
-        self,
-        quote: QuoteCandidate,
-        contact: ContactTarget,
-        result: CallResult,
-        *,
-        follow_up_update: FollowUpUpdate,
-        task_description: str,
-        business_timezone: tzinfo | None = None,
-        regional_settings: Any | None = None,
-    ) -> CompositeWriteResult:
-        """Atomically update one Quote and create its completed demo Task.
-
-        This is intentionally the only write operation exposed by the MVP. The
-        Composite API ``allOrNone`` flag ensures the Quote is not updated if the
-        Task cannot be created.
-        """
-
-        if regional_settings is not None:
-            configured_timezone = getattr(regional_settings, "business_timezone", None)
-            if not isinstance(configured_timezone, tzinfo):
-                raise SalesforceError("regional_settings has no valid business timezone.")
-            business_timezone = configured_timezone
-        if business_timezone is None:
-            business_timezone = timezone.utc
-        if not result.simulated:
-            raise SalesforceError("composite_write only accepts simulated results.")
         if result.quote_id != quote.quote_id:
-            raise SalesforceError("Simulation result does not match the selected Quote.")
-        if follow_up_update.last_follow_up_result != result.outcome:
-            raise SalesforceError("Follow-up update does not match the call result.")
-        if follow_up_update.last_follow_up_at.tzinfo is None:
-            raise SalesforceError("Follow-up update timestamp is timezone-naive.")
-        org = self.org_info()
-        if not org.api_version:
-            raise SalesforceError("Salesforce org display did not provide an API version.")
-        version = org.api_version.removeprefix("v")
-        quote_body = follow_up_update.as_salesforce_fields()
-        task_body = {
-            "WhatId": quote.quote_id,
-            "WhoId": contact.contact_id,
-            "Status": "Completed",
-            "Priority": "Normal",
-            "Subject": f"[SIMULATED] QuoteWake follow-up: {result.outcome}",
-            "Description": task_description,
-            "ActivityDate": _task_activity_date(follow_up_update, business_timezone),
-        }
+            raise SalesforceError("call result does not match Quote")
+        occurred = result.occurred_at or datetime.now(timezone.utc)
+        local_date = occurred.astimezone(business_timezone).date().isoformat()
         body = {
             "allOrNone": True,
             "compositeRequest": [
-                {
-                    "method": "PATCH",
-                    "url": f"/services/data/v{version}/sobjects/Quote/{quote.quote_id}",
-                    "referenceId": "quoteUpdate",
-                    "body": quote_body,
-                },
-                {
-                    "method": "POST",
-                    "url": f"/services/data/v{version}/sobjects/Task",
-                    "referenceId": "taskCreate",
-                    "body": task_body,
-                },
+                {"method": "PATCH", "url": f"{self.api_root}/sobjects/Quote/{quote.quote_id}", "referenceId": "quoteUpdate", "body": update.as_salesforce_fields()},
+                {"method": "POST", "url": f"{self.api_root}/sobjects/Task", "referenceId": "taskCreate", "body": {"WhatId": quote.quote_id, "WhoId": contact.contact_id, "Status": "Completed", "Priority": "Normal", "Subject": "QuoteWake follow-up", "Description": task_description[:32000], "ActivityDate": local_date}},
             ],
         }
-        command = [
-            self.executable,
-            "api",
-            "request",
-            "rest",
-            f"/services/data/v{version}/composite",
-            "--method",
-            "POST",
-            "--body",
-            json.dumps(body, ensure_ascii=False, separators=(",", ":")),
-        ]
-        if self.target_org:
-            command.extend(["--target-org", self.target_org])
-        response = self._run_api_json(command, quote_id=quote.quote_id)
-        responses = response.get("compositeResponse")
+        payload = self._request("POST", f"{self.api_root}/composite", json=body)
+        responses = payload.get("compositeResponse")
         if not isinstance(responses, list):
-            raise SalesforceResponseError("Salesforce Composite response had no subresponses.")
-        failures: list[dict[str, Any]] = []
+            raise SalesforceResponseError("Salesforce composite response was malformed")
+        if any(isinstance(item, dict) and isinstance(item.get("httpStatusCode"), int) and item["httpStatusCode"] >= 300 for item in responses):
+            raise SalesforceQueryError("Salesforce composite write was not successful")
+        if len(responses) != 2:
+            raise SalesforceResponseError("Salesforce composite response was incomplete")
         for item in responses:
-            if not isinstance(item, dict):
-                continue
-            status = item.get("httpStatusCode", 200)
-            if isinstance(status, (int, Decimal)) and status >= 400:
-                failures.append(item)
-        if failures:
-            raise SalesforceQueryError(
-                "Salesforce Composite write failed: "
-                + json.dumps(failures, ensure_ascii=False, default=str)[:800]
-            )
-        task_id: str | None = None
-        for item in responses:
-            if not isinstance(item, dict) or item.get("referenceId") != "taskCreate":
-                continue
-            item_body = item.get("body")
-            if isinstance(item_body, dict) and isinstance(item_body.get("id"), str):
-                task_id = item_body["id"]
-        if task_id is None:
-            raise SalesforceResponseError("Salesforce Composite response did not return the Task ID.")
-        log_event(
-            "salesforce_composite_write_completed",
-            quote_id=quote.quote_id,
-            task_id=task_id,
-            outcome=result.outcome,
-        )
+            if not isinstance(item, dict) or not isinstance(item.get("httpStatusCode"), int):
+                raise SalesforceQueryError("Salesforce composite write was not successful")
+        task_body = responses[1].get("body") if isinstance(responses[1], dict) else None
+        task_id = task_body.get("id") if isinstance(task_body, dict) else None
+        if not isinstance(task_id, str) or not task_id:
+            raise SalesforceResponseError("Salesforce composite response did not contain Task ID")
+        log_event("salesforce_follow_up_persisted", quote_id=quote.quote_id, task_id=task_id)
         return CompositeWriteResult(quote.quote_id, task_id)
-def _task_activity_date(update: FollowUpUpdate, business_timezone: tzinfo) -> str:
-    timestamp = update.last_follow_up_at
-    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-        raise SalesforceResponseError("Follow-up update timestamp is timezone-naive.")
-    return timestamp.astimezone(business_timezone).date().isoformat()

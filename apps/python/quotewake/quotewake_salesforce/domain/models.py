@@ -9,6 +9,17 @@ from enum import Enum
 import re
 
 
+# This is the business vocabulary exchanged with CALL-E.  Keep the ordered
+# tuple for provider schemas and the set for cheap validation at boundaries.
+CALL_OUTCOME_VALUES = (
+    "interested",
+    "call_back_later",
+    "no_answer",
+    "busy",
+)
+CALL_OUTCOME_VOCABULARY = frozenset(CALL_OUTCOME_VALUES)
+
+
 class SelectionDecision(str, Enum):
     """The action QuoteWake would take for a quote."""
 
@@ -24,8 +35,6 @@ class SelectionReason(str, Enum):
     INVALID_FOLLOW_UP_STATUS = "INVALID_FOLLOW_UP_STATUS"
     NON_ACTIONABLE_FOLLOW_UP_STATUS = "NON_ACTIONABLE_FOLLOW_UP_STATUS"
     NOT_DUE = "NOT_DUE"
-    COOLDOWN_ACTIVE = "COOLDOWN_ACTIVE"
-    OUTSIDE_CALLING_HOURS = "OUTSIDE_CALLING_HOURS"
     MAX_ATTEMPTS = "MAX_ATTEMPTS"
     QUOTE_EXPIRED = "QUOTE_EXPIRED"
     INVALID_QUOTE_STATUS = "INVALID_QUOTE_STATUS"
@@ -35,26 +44,6 @@ class SelectionReason(str, Enum):
     DO_NOT_CALL = "DO_NOT_CALL"
     NO_PHONE = "NO_PHONE"
     INVALID_PHONE = "INVALID_PHONE"
-
-
-class CallPlanDecision(str, Enum):
-    """Result of asking CALL-E to plan a selected follow-up."""
-
-    PLAN_READY = "PLAN_READY"
-    PLAN_INCOMPLETE = "PLAN_INCOMPLETE"
-    PLAN_ERROR = "PLAN_ERROR"
-
-
-class SimulationOutcome(str, Enum):
-    """Supported deterministic outcomes for the local CALL-E substitute."""
-
-    INTERESTED = "interested"
-    NOT_INTERESTED = "not_interested"
-    CALL_BACK_LATER = "call_back_later"
-    NO_ANSWER = "no_answer"
-    BUSY = "busy"
-    INVALID_NUMBER = "invalid_number"
-    ERROR = "error"
 
 
 class CallOutcomeKind(str, Enum):
@@ -103,9 +92,8 @@ class QuoteCandidate:
     follow_up_status: str | None
     next_follow_up_at: datetime | None
     attempt_count: int
-    last_follow_up_at: datetime | None
-    last_follow_up_result: str | None
     money: Money | None = None
+    account_billing_country_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -116,6 +104,7 @@ class ContactTarget:
     name: str
     phone: str | None
     do_not_call: bool
+    call_locale: str | None = None
 
 
 @dataclass(frozen=True)
@@ -141,30 +130,16 @@ class QuoteLine:
 
 
 @dataclass(frozen=True)
-class CallPlanRequest:
-    """Stable input passed from the QuoteWake domain to CALL-E planning."""
+class CallRequest:
+    """Stable input passed from the QuoteWake domain to CALL-E execution."""
 
     quote_id: str
     opportunity_id: str
     contact_id: str
     phone: str
     goal: str
-    user_input: str
-    language: str
+    locale: str
     region: str
-
-
-@dataclass(frozen=True)
-class CallPlanResult:
-    """Redacted subset of a CALL-E plan response safe for local reporting."""
-
-    quote_id: str
-    decision: CallPlanDecision
-    ready_to_run: bool
-    plan_id: str | None = None
-    confirm_summary: str | None = None
-    clarifying_questions: tuple[str, ...] = ()
-    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -172,7 +147,7 @@ class CallResult:
     """Stable structured outcome shared by CALL-E adapters and persistence."""
 
     quote_id: str
-    simulation_id: str
+    call_id: str
     provider_status: str
     outcome: str
     interest_level: str
@@ -181,17 +156,14 @@ class CallResult:
     next_action: str
     next_follow_up_at: datetime | None
     outcome_kind: CallOutcomeKind
-    simulation_timestamp: datetime | None = None
-    simulated: bool = True
+    occurred_at: datetime | None = None
 
 
 @dataclass(frozen=True)
 class FollowUpUpdate:
-    """Salesforce fields calculated from one normalized call result."""
+    """The four QuoteWake fields calculated from one normalized call result."""
 
     attempt_count: int
-    last_follow_up_at: datetime
-    last_follow_up_result: str
     follow_up_status: str
     next_follow_up_at: datetime | None
 
@@ -207,8 +179,6 @@ class FollowUpUpdate:
 
         return {
             "Attempt_Count__c": self.attempt_count,
-            "Last_Follow_Up_At__c": timestamp(self.last_follow_up_at),
-            "Last_Follow_Up_Result__c": self.last_follow_up_result,
             "Follow_Up_Status__c": self.follow_up_status,
             "Next_Follow_Up_At__c": timestamp(self.next_follow_up_at),
         }

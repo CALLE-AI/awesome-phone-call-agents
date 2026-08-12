@@ -1,2 +1,1 @@
-"""Salesforce CLI integration for QuoteWake."""
-
+"""Salesforce REST integration for QuoteWake."""

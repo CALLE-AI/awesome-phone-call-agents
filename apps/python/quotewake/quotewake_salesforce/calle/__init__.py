@@ -1,20 +1,11 @@
 """CALL-E planning integration for QuoteWake Salesforce."""
 
-from .client import CallEPlanningClient, CallEPlanningError
-from .simulator import (
-    CallSimulationError,
-    RETRY_OUTCOMES,
-    SimulationOutcome,
-    simulate_call,
-)
+from .client import CallEClient, CallEError
 from quotewake_salesforce.domain.models import CallResult
 
 __all__ = [
-    "CallEPlanningClient",
-    "CallEPlanningError",
-    "CallSimulationError",
+    "CallEClient",
+    "CallEError",
+    "CallEError",
     "CallResult",
-    "RETRY_OUTCOMES",
-    "SimulationOutcome",
-    "simulate_call",
 ]

@@ -1,246 +1,218 @@
 # QuoteWake
 
-QuoteWake is a Salesforce-first back-office process for following up commercial
-Quotes by phone. It helps a sales team turn the Salesforce quote pipeline into
-an orderly, auditable follow-up queue while keeping Salesforce as the workflow,
-user-interface, and system of record.
+Many businesses manage their sales cycle in Salesforce, but manually calling
+back every Quote—especially the many lower-value Quotes—does not scale. QuoteWake
+is a Salesforce-first integration and companion service that connects that
+pipeline to CALL-E, then brings a structured call result back into Salesforce.
 
-QuoteWake selects eligible Quotes, resolves the related Opportunity, Account,
-and Contact, prepares a focused CALL-E call context, classifies the result, and
-writes the outcome back to the Quote. A standard Salesforce Task records the
-activity so a seller can see what happened alongside the rest of the sales
-workflow.
+QuoteWake is a small Python service for commercial teams already using
+Salesforce. It is deliberately an integration companion, not a native
+Salesforce plug-in or a managed package. Salesforce remains the system of
+record; QuoteWake does not create a second database.
+
+## Who it is for
+
+QuoteWake is aimed at small and midsize sales teams that already keep Quotes,
+Accounts, Opportunities, and Contacts in Salesforce and need a practical way
+to follow up a high volume of commercial proposals without asking a seller to
+remember every call.
 
 ## Workflow
 
-1. Read Salesforce `Quote` records and their related open `Opportunity`.
-2. Apply configured eligibility rules for Quote status, expiration, follow-up
-   state, attempt count, cooldown, and (when enabled) calling days and hours.
-3. Resolve exactly one primary `OpportunityContactRole` and validate opt-out and
-   phone availability.
-4. Load concise quote-line context and prepare a bounded CALL-E plan.
-5. Classify the structured call result as a business outcome or technical
-   failure.
-6. Persist the outcome, next follow-up time, attempt count, and a standard
-   Salesforce Task atomically.
+```text
+Salesforce Quotes
+      │ SOQL / REST
+      ▼
+QuoteWake ── select, build context, enforce policy ──┐
+      │                                               │
+      └──────── CALL-E dry-run or outbound call ◄─────┘
+                              │ structured result
+                              ▼
+              Salesforce Quote + completed Task
+```
 
-Retry, cooldown, and calling-hours policies are application configuration. No
-external database or `Max_Attempts__c` field is used.
+The normal workflow is:
 
-## Product capabilities
+1. Read Quotes and their related Opportunity, Account, Contact, and line-item
+   context from Salesforce.
+2. Select eligible Quotes and resolve exactly one primary contact.
+3. Build a bounded CALL-E task from the commercial context.
+4. Preview the request or place the call and wait for its structured result.
+5. Update the Quote follow-up state and create a completed standard Task.
 
-QuoteWake provides the operational controls a sales team needs for dependable
-quote follow-up:
+## Functionality today
 
-- Eligibility filters prevent calls for disabled, expired, closed, invalid, or
-  commercially ineligible Quotes and require a single callable primary Contact.
-- Retry limits and delays are configurable. The maximum includes the first
-  business call; `NO_ANSWER` and other configured retry outcomes schedule the
-  next follow-up without embedding a fixed cadence in code.
-- A per-Quote cooldown prevents the same customer Quote from being called too
-  frequently.
-- Calling days and hours are opt-in. When enabled, the configured regional IANA
-  timezone determines local windows, including daylight-saving transitions.
-  When disabled, QuoteWake does not restrict call timing.
-- Technical CALL-E failures are recorded and retried without consuming a
-  business attempt. A `NO_ANSWER` is a business outcome and does consume one.
-- Dry-run selection, CALL-E planning, and the deterministic Salesforce
-  simulation provide safe demonstrations without placing a real call.
-- Structured outcomes update `Attempt_Count__c`, `Last_Follow_Up_At__c`,
-  `Last_Follow_Up_Result__c`, `Follow_Up_Status__c`, and
-  `Next_Follow_Up_At__c`; the accompanying standard Task gives users a visible
-  audit trail.
+- Headless Salesforce OAuth 2.0 Client Credentials authentication and REST/SOQL
+  access.
+- Quote eligibility checks for enablement, Quote status, open Opportunity,
+  expiration, follow-up state, attempt count, due time, contact role, phone,
+  and optional opt-out field.
+- Quote-line context (up to the first ten lines) in the CALL-E task, with the
+  Contact locale, Account country, and Salesforce organization regional settings.
+- Safe dry-run output without creating a CALL-E client, placing a call, or
+  writing Salesforce records.
+- Direct CALL-E execution with a fixed structured result schema and the
+  business outcomes `interested`, `call_back_later`, `no_answer`, and `busy`.
+- Atomic Quote + Task write-back through one Salesforce Composite API request.
+- Bounded, rotating, human-readable logs and a per-run `--max-calls` limit.
 
-The current repository does not yet invoke CALL-E `run_call`. Planning and the
-explicit simulator exercise the same domain result and Salesforce write-back
-boundaries, so live execution can be added without moving business rules into
-the CLI or Salesforce client.
+### Selection truth
 
-## Security and operational safety
+The current Salesforce query orders candidates by `CreatedDate ASC`. QuoteWake
+then evaluates them in Python; it does not score or rank them by account value,
+Quote amount, expiration urgency, engagement, or any other priority signal.
+`--max-calls` takes the first READY candidates in that order (default: `10`) in
+both dry-run and execute modes. It is a throughput limit, not a concurrency
+lock.
 
-Salesforce remains authoritative; QuoteWake does not create a second database
-of commercial records. Salesforce authentication and CALL-E credentials stay
-in their respective CLI/environment mechanisms. Normal tests use mocks and
-deterministic results rather than external calls. The application emits
-structured, redacted logs and avoids writing credentials, access tokens, raw
-provider payloads, or unmasked customer phone numbers to reports.
+By default, a Quote is READY when it is enabled, has status `Presented`, belongs
+to an open Opportunity, is not expired, is below the configured maximum of three
+business attempts, and has either a blank follow-up status or a due `Retry`
+status. The initial timing policy uses `LastModifiedDate`; a `Retry` uses
+`Next_Follow_Up_At__c`. The candidate must also have exactly one primary
+`OpportunityContactRole`, a valid phone (MobilePhone is preferred over Phone),
+and must not match a configured opt-out field. `Completed`, `Stopped`, invalid,
+and otherwise non-actionable states are skipped.
 
-## Requirements
+The default `quotewake.toml` sets initial delays to zero for a demonstrable
+dataset. Set non-zero values for a real operating cadence. Allowed Quote
+statuses can be repeated with `--allowed-quote-status` or configured with the
+`QUOTEWAKE_ALLOWED_QUOTE_STATUSES` environment variable.
+
+## Salesforce model
+
+Salesforce standard objects are used wherever possible:
+
+| Object | How QuoteWake uses it |
+| --- | --- |
+| `Quote` | Reads commercial state and writes follow-up state. Standard fields include `Name`, `Status`, `ExpirationDate`, `LastModifiedDate`, amount/currency, and `OpportunityId`. |
+| `Opportunity` | Resolves the related opportunity and checks `IsClosed`. |
+| `Account` | Supplies the account name and `BillingCountryCode` for call context. |
+| `Contact` | Supplies the callable person, `MobilePhone`/`Phone`, and call locale. |
+| `OpportunityContactRole` | Requires exactly one primary contact for the opportunity. |
+| `QuoteLineItem` / `Product2` | Supplies concise product, quantity, and line-total context. |
+| `Organization` | Supplies `TimeZoneSidKey` and `DefaultLocaleSidKey` for regional formatting. |
+| `Task` | Stores each completed follow-up activity, linked to the Quote (`WhatId`) and Contact (`WhoId`). |
+
+The deployed QuoteWake custom fields are:
+
+On `Quote`:
+
+- `QuoteWake_Enabled__c`: opt a Quote into automation.
+- `Follow_Up_Status__c`: `Retry`, `Completed`, or `Stopped` after processing;
+  blank means the initial follow-up is pending. `In Progress` is reserved in
+  the Salesforce picklist and treated as non-actionable by the current worker.
+- `Next_Follow_Up_At__c`: persisted retry time, stored by Salesforce as a
+  DateTime.
+- `Attempt_Count__c`: completed business attempts; technical CALL-E failures do
+  not consume one.
+
+On `Contact`:
+
+- `QuoteWake_Call_Locale__c`: BCP-47 locale required by CALL-E.
+
+An opt-out field is optional because Salesforce orgs differ: configure a
+Contact checkbox API name with `SALESFORCE_DO_NOT_CALL_FIELD` or
+`--do-not-call-field`. If it is not configured, QuoteWake cannot apply that
+field-level opt-out filter.
+
+No custom call-history object is required today. The standard Task is the
+Salesforce activity record. QuoteWake writes the three follow-up fields above;
+it does not overwrite commercial Quote amount, status, expiration, or other
+business fields.
+
+## Quick demo
+
+### Requirements
 
 - Python 3.11 or newer.
-- Salesforce CLI (`sf`) in WSL.
-- An authenticated Salesforce Developer Org with the QuoteWake fields already deployed.
-- The official CALL-E CLI (`calle`) and an authenticated CALL-E session when
-  using `--plan-calls`.
+- [`uv`](https://docs.astral.sh/uv/) for the Python environment.
+- Salesforce CLI (`sf`) and `jq` for Salesforce metadata/demo setup.
+- A Salesforce org with Quotes enabled, the QuoteWake metadata deployed, and an
+  External Client App configured for runtime OAuth.
+- A CALL-E API key only when making live calls.
 
-## Salesforce setup
+Install the project and create a private local environment file:
 
-From this directory, authenticate the Developer Org if needed:
+```shell
+uv sync
+cp .env.example .env
+chmod 600 .env
+```
 
-```bash
+Fill in the environment values described below. For a Salesforce demo org,
+authenticate the CLI and deploy metadata with the included idempotent setup
+script:
+
+```shell
 sf org login web --alias quotewake-dev --set-default
-```
-
-Deploy QuoteWake metadata to the authenticated org:
-
-```bash
-./scripts/setup-salesforce.sh --target-org quotewake-dev
-```
-
-To create the reusable fictional demo dataset (10 Quotes, 10 Opportunities and
-9 Accounts):
-
-```bash
 ./scripts/setup-salesforce.sh \
   --target-org quotewake-dev \
-  --seed-data
+  --seed-data \
+  --country-code ES \
+  --call-locale es-ES \
+  --test-phones "+14155550101"
 ```
 
-The seed preserves the four original electrical-services scenarios and adds six
-safe fictional scenarios. One demo Account intentionally owns two of the ten
-demo Opportunities, and each Opportunity has its own primary
-`OpportunityContactRole`, so both one-to-one and one-to-many relationships can
-be exercised. The records, contacts, products, price-book entries and quote
-lines are identified by stable `QuoteWake Demo - ` names and are created or
-updated idempotently. For existing Quotes, `--seed-data` updates only their
-structural/commercial fields and preserves all six QuoteWake progress fields;
-use `--reset-data` when that progress should be cleared. The seed does not
-delete existing Salesforce records.
+Use only E.164 numbers that you are authorized to call. The script stores test
+numbers in the demo Contacts in Salesforce; it does not add them to the
+repository. Omit `--test-phones` when live calling is not authorized.
 
-To start a clean QuoteWake data run, seed the hierarchy, delete only Tasks whose
-`WhatId` points to a Quote with that stable demo prefix, and reset all ten demo
-Quotes to `QuoteWake_Enabled__c=true`, blank follow-up status/timestamps/results,
-and `Attempt_Count__c=0`:
+The CLI provides a safe default plus two explicit, mutually exclusive modes:
 
-```bash
-./scripts/setup-salesforce.sh \
-  --target-org quotewake-dev \
-  --reset-data
+```shell
+# Default: read Salesforce and preview the selected calls; no CALL-E call or write.
+uv run python -m quotewake_salesforce --max-calls 1
+
+# Render selected prompts; no CALL-E call or Salesforce write.
+uv run python -m quotewake_salesforce --show-prompt --max-calls 1
+
+# Explicit live mode: place calls and persist results.
+uv run python -m quotewake_salesforce --execute --max-calls 1
 ```
 
-`--reset-data` implies `--seed-data`. It never deletes demo Accounts,
-Opportunities, Quotes, Contacts, Products, price-book entries, or quote lines;
-it only deletes the scoped Tasks and resets the six QuoteWake state fields.
+Use `--config /path/to/quotewake.toml` to select another TOML file. The default
+configuration is the repository's [`quotewake.toml`](quotewake.toml).
 
-The script is safe to run repeatedly. It enables standard Quotes through `QuoteSettings`, deploys six fields on `Quote`, deploys the minimal `QuoteWake_User` permission set, and validates the result. Permission-set assignment is explicit:
+## Configuration and environment
 
-```bash
-./scripts/setup-salesforce.sh \
-  --target-org quotewake-dev \
-  --assign-permissions
-```
+Runtime Salesforce authentication is server-to-server OAuth. Create an
+External Client App with the `api` scope and Client Credentials Flow, assign a
+dedicated execution user, and grant only the read access needed for `Quote`,
+`Opportunity`, `Account`, `Contact`, `OpportunityContactRole`,
+`QuoteLineItem`, `Product2`, and `Organization`, plus permission to update
+`Quote` and create `Task`. Salesforce CLI login is used by the setup script
+only; it is not used for application runtime authentication.
 
-The optional seed command discovers required standard fields and the standard Price Book dynamically. It also creates fictional `Product2`, `PricebookEntry`, and `QuoteLineItem` records so each demo Quote has visible concepts, quantities, unit prices, and calculated totals. Salesforce uses `Presented` as the standard quote status equivalent to sent; the kitchen and EV demos use that status and are due for QuoteWake follow-up.
+Copy the placeholders from [`.env.example`](.env.example):
 
-## Salesforce dry-run
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SALESFORCE_DOMAIN` | Every run | Salesforce My Domain URL, without the token path. |
+| `SALESFORCE_CLIENT_ID` | Every run | External Client App consumer key. |
+| `SALESFORCE_CLIENT_SECRET` | Every run | External Client App consumer secret. |
+| `SALESFORCE_API_VERSION` | Every run | REST API version such as `v67.0`; the application also accepts `67.0` and normalizes the `v` prefix. |
+| `SALESFORCE_CURRENCY_CODE` | Single-currency orgs when `CurrencyIsoCode` is unavailable | Three-letter ISO currency code, such as `EUR`. |
+| `SALESFORCE_DO_NOT_CALL_FIELD` | Optional | Contact checkbox API name used to skip opted-out contacts. |
+| `CALLE_API_KEY` | `--execute` only | CALL-E API credential. |
+| `CALLE_BASE_URL` | Optional | CALL-E API base URL; defaults to `https://api.heycall-e.com`. |
+| `QUOTEWAKE_ALLOWED_QUOTE_STATUSES` | Optional | Comma-separated replacement for the default `Presented` status. |
 
-Run the read-only quote selection layer:
+Exported environment variables take precedence over `.env`. Keep `.env` out of
+version control and never commit credentials, access tokens, or real customer
+phone data.
 
-```bash
-python3 -m quotewake_salesforce --dry-run --target-org quotewake-dev
-```
+### TOML policy
 
-The command verifies the target org, describes the required objects, runs the
-Quote and `OpportunityContactRole` SOQL queries, and evaluates the rules in
-Python. It prints the human-readable selection and planning outcomes; it does
-not create local result reports. Human-readable totals, dates, and CALL-E context use the configured
-CLDR locale and business timezone from `[regional]` in `quotewake.toml`:
-
-```toml
-[regional]
-business_timezone = "Europe/Madrid"
-locale = "es_ES"
-```
-
-The timezone and locale are explicit configuration; they are never inferred
-from a phone number or the machine running QuoteWake. Expiration and due-soon
-date rules, as well as Salesforce Task `ActivityDate`, use the configured
-business timezone. Locale values may use CLDR (`en_US`) or BCP-47 (`en-US`)
-syntax. If a BCP-47 Unicode extension such as `-u-ca-gregory` is supplied,
-QuoteWake validates and formats with its base locale because Babel does not
-currently preserve that extension in formatter locale identifiers.
-
-QuoteWake also emits production-oriented, readable application logs as one
-event per line to stderr and to `logs/quotewake.log` by default, in the form
-`<timestamp> [<LEVEL>] <event>: <readable English text>`. Every run has
-a `run_id`, and Quote processing and CALL-E events include the related
-`quote_id`. Tokens, credentials, and raw request/response fields are never
-logged; authorized phone values are retained for operational correlation. The
-rotating file location, format, level and retention are configured in the
-`[logging]` section of `quotewake.toml`:
-
-```toml
-[logging]
-directory = "logs" # relative to the QuoteWake application directory
-format = "text"
-level = "INFO"
-max_bytes = 5242880
-backup_count = 5
-```
-
-## CALL-E planning dry-run
-
-Authenticate the official CLI once if needed:
-
-```bash
-calle auth login
-```
-
-Generate CALL-E plans for the selected records without starting calls:
-
-```bash
-python3 -m quotewake_salesforce \
-  --dry-run \
-  --plan-calls \
-  --target-org quotewake-dev \
-  --call-language Spanish \
-  --call-region ES
-```
-
-Language and region are mandatory and are never inferred from the phone number.
-The command checks `calle auth status`, loads Quote line items only for `READY`
-records, and invokes the `plan_call` MCP tool through the official CLI. It does
-not invoke `run_call` or `get_call_run`.
-
-Planning outcomes are printed for each `READY` Quote. Confirmation tokens and
-OAuth credentials are never persisted. One planning failure is reported without
-preventing later `READY` Quotes from being planned; the command exits non-zero
-if any plan failed.
-
-`plan_call` creates a remote CALL-E plan record, but it does not contact the
-recipient. Omit `--plan-calls` for a Salesforce-only dry-run with no CALL-E
-interaction.
-
-The default allowed commercial status is `Presented`, based on the status
-picklist discovered in the current Developer Org. Configure a different policy
-without changing code, for example:
-
-```bash
-python3 -m quotewake_salesforce \
-  --dry-run \
-  --target-org quotewake-dev \
-  --allowed-quote-status Presented \
-  --allowed-quote-status Approved
-```
-
-Initial follow-up timing is configured in `quotewake.toml`:
+The shipped [`quotewake.toml`](quotewake.toml) contains the following policy
+shape and defaults:
 
 ```toml
 [selection.initial_follow_up]
-minimum_delay_hours = 4
-standard_delay_hours = 48
-due_soon_window_days = 3
-```
+minimum_delay_hours = 0
+standard_delay_hours = 0
+due_soon_window_days = 0
 
-Use `--config /path/to/quotewake.toml` to load another configuration. Values
-must be non-negative and the standard delay cannot be shorter than the minimum
-delay.
-
-The three follow-up policy tables are required in the same TOML file. The
-maximum includes the first call, so `retry_delays_days` has exactly
-`max_attempts - 1` entries:
-
-```toml
 [follow_up.retry]
 max_attempts = 3
 retry_delays_days = [2, 4]
@@ -248,240 +220,125 @@ retry_outcomes = ["call_back_later", "no_answer", "busy"]
 technical_failure_retry_delay_minutes = 30
 completed_outcomes = ["interested"]
 
-[follow_up.cooldown]
-enabled = true
-minimum_delay_hours = 24
+[call]
+# Optional. The default prompt is used when this is omitted.
+prompt = "Follow up quote {quote_name} with {contact_name} at {account_name}."
 
-[follow_up.calling_hours]
-enabled = false
-days = ["monday", "tuesday", "wednesday", "thursday", "friday"]
-start = "09:00"
-end = "18:00"
+[logging]
+directory = "logs"
+format = "text"
+level = "INFO"
+max_bytes = 5242880
+backup_count = 5
 ```
 
-Cooldown is evaluated per Quote using `Last_Follow_Up_At__c`. Calling hours,
-when enabled, use the configured `regional.business_timezone` for weekday and
-local time; Salesforce DateTimes remain UTC. The end time is exclusive. When
-disabled, calling hours do not restrict call eligibility.
+`max_attempts` includes the first business call, so
+`retry_delays_days` must contain exactly `max_attempts - 1` values. The
+`[call].prompt` template may use only `{locale}`, `{region}`,
+`{contact_name}`, `{account_name}`, `{quote_name}`, `{quote_total}`,
+`{expiration_date}`, `{attempt_count}`, and `{quote_items}`. Fixed compliance
+rules are appended to every rendered prompt. Relative log directories are
+resolved from the application directory.
 
-`READY` means the Quote is enabled and has either a blank or `Retry`
-`Follow_Up_Status__c`, is below the configured maximum attempts, unexpired, linked to an
-open Opportunity, in an allowed commercial status, and has exactly one primary
-Opportunity Contact Role with permission to call and a valid phone number. A
-blank follow-up status represents the initial follow-up and ignores
-`Next_Follow_Up_At__c`. Salesforce does not expose a standard sent timestamp in
-this org, so QuoteWake conservatively uses `LastModifiedDate` as its initial
-reference. It always waits the configured minimum delay. After that, the Quote
-is eligible once the standard delay has passed or its `ExpirationDate` is
-within the configured due-soon window. `Retry` is eligible only when
-`Next_Follow_Up_At__c` exists and is due and the cooldown has elapsed; initial
-timing is not reapplied. If calling hours are enabled, the current time must
-also be inside the configured window.
-`In Progress` represents an active call, while `Completed` and `Stopped` are
-terminal states. Other results are `SKIP` with a
-machine-readable reason such as `NOT_DUE`, `MAX_ATTEMPTS`,
-`NON_ACTIONABLE_FOLLOW_UP_STATUS`, `NO_PRIMARY_CONTACT`, `DO_NOT_CALL`, or
-`NO_PHONE`. `Completed` and `Stopped` are valid terminal statuses, so they are
-not eligible for another call; an unknown picklist value is reported as
-`INVALID_FOLLOW_UP_STATUS`.
+## Outcomes, retries, and write safety
 
-Contact opt-out filtering is optional because Salesforce orgs may not expose a
-standard `Contact.DoNotCall` field. Without `--do-not-call-field`, QuoteWake
-does not query an opt-out field, continues normal Contact validation, and emits
-a warning that opt-out filtering is disabled. If the org uses a customer-specific
-boolean field, pass its API name; QuoteWake verifies that it exists before
-querying it:
+CALL-E business results use a deliberately small vocabulary:
 
-```bash
-python3 -m quotewake_salesforce \
-  --dry-run \
-  --target-org quotewake-dev \
-  --do-not-call-field Do_Not_Call__c
+| Result | Salesforce effect |
+| --- | --- |
+| `interested` | Increment `Attempt_Count__c`; mark the Quote `Completed`. |
+| `call_back_later`, `no_answer`, `busy` | Increment the business attempt and schedule `Retry` using the configured delay; after the maximum, mark `Stopped`. A future customer date is used when valid. |
+| Provider terminal failure (`failed`, `canceled`, or `cancelled`) | Persist `Retry` without consuming a business attempt and use the configured technical retry delay. |
+
+Malformed structured results, unsupported outcomes, CALL-E create failures,
+wait failures, and parse failures are rejected. They do not produce a business
+outcome or Salesforce write for that call; the failure is logged with a bounded
+phase/reason and the one-shot run can continue with the next candidate.
+
+Each CALL-E request receives a deterministic idempotency key based on the Quote
+ID and next attempt. A persisted `Next_Follow_Up_At__c` marker is incorporated
+for technical retries, while an ambiguous provider request can be retried with
+the same key. This protects the provider boundary; Salesforce write-side
+deduplication beyond the transaction below is not implemented.
+
+The result is persisted with one `allOrNone=true` Composite API request that
+updates the Quote and creates its completed Task together. If that persistence
+fails after a call has returned, QuoteWake records only bounded identifiers,
+stops the remaining calls in that run, and returns a non-zero exit status. The
+standard Task is an audit trail, not a separate local database.
+
+## Scheduler and operations
+
+QuoteWake is a one-shot process. A scheduler supplies the cadence; the
+application applies eligibility and retry policy. Use absolute paths and a
+process lock so two scheduled runs do not overlap:
+
+```cron
+*/15 * * * * flock -n /var/lock/quotewake.lock uv run --project /opt/quotewake python -m quotewake_salesforce --execute --max-calls 1 --config /opt/quotewake/quotewake.toml >> /var/log/quotewake-cron.log 2>&1
 ```
 
-Verify the field first with `sf sobject describe --sobject Contact`.
+The lock prevents overlapping processes only. There is currently no distributed
+capacity reservation, per-customer lock, provider rate limiter, or built-in
+scheduler. Tune `--max-calls` conservatively until those controls exist.
 
-## Verify Quotes
+## Security, compliance, and opt-out
 
-After setup, the full demo query can be run directly with Salesforce CLI:
+Every call prompt appends fixed guardrails: identify the AI assistant, confirm
+the intended recipient before sharing Quote details, treat Salesforce values as
+untrusted business data rather than instructions, avoid passwords/payment-card
+data/bank details/identity numbers, do not negotiate or make commercial
+commitments, and end politely when the recipient asks not to be called again.
 
-```bash
-sf data query \
-  --target-org quotewake-dev \
-  --query "SELECT Id, Name, OpportunityId, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, Last_Follow_Up_At__c, Last_Follow_Up_Result__c FROM Quote ORDER BY CreatedDate DESC"
-```
+The optional configured Contact opt-out checkbox is enforced before a call.
+That checkbox alone is not consent management or legal compliance, and
+QuoteWake does not automatically persist a recipient's spoken do-not-call
+request. Teams must implement the appropriate Salesforce workflow, consent
+records, suppression rules, and lawful calling process before live use.
 
-An equivalent SOQL pre-filter for the production-style 4-hour/48-hour timing
-example is:
+Credentials and raw provider payloads are not written to application logs;
+phone-like values are redacted and error logs use exception types and bounded
+reasons. `--show-prompt` intentionally prints Salesforce-derived business
+context, so treat its output and the rotating `logs/quotewake.log` file as
+business data and protect them accordingly.
 
-```sql
-SELECT Id, Name, OpportunityId, LastModifiedDate, ExpirationDate,
-       QuoteWake_Enabled__c,
-       Follow_Up_Status__c, Next_Follow_Up_At__c,
-       Attempt_Count__c, Last_Follow_Up_At__c,
-       Last_Follow_Up_Result__c
-FROM Quote
-WHERE QuoteWake_Enabled__c = true
-  AND Status = 'Presented'
-  AND Opportunity.IsClosed = false
-  AND (ExpirationDate = null OR ExpirationDate >= 2026-08-09)
-  AND (Attempt_Count__c = null OR Attempt_Count__c < 3)
-  AND (
-    (
-      Follow_Up_Status__c = null
-      AND (
-        LastModifiedDate <= 2026-08-07T17:30:00Z
-        OR (
-          LastModifiedDate <= 2026-08-09T13:30:00Z
-          AND ExpirationDate != null
-          AND ExpirationDate <= 2026-08-12
-        )
-      )
-    )
-    OR (
-      Follow_Up_Status__c = 'Retry'
-      AND Next_Follow_Up_At__c != null
-      AND Next_Follow_Up_At__c <= 2026-08-09T17:30:00Z
-    )
-  )
-ORDER BY Next_Follow_Up_At__c ASC NULLS FIRST, LastModifiedDate ASC
-```
+## Current limitations
 
-The Date and DateTime literals above are examples. The application currently
-loads candidate Quotes and evaluates these rules in Python using the current
-UTC time and values loaded from `quotewake.toml`.
+- Candidate priority is `CreatedDate ASC`; there is no scoring or ranking by
+  customer value, Quote amount, urgency, engagement, territory, consent, or
+  capacity.
+- Exactly one primary Opportunity Contact Role is required. There is no contact
+  fallback, contact rotation, or multi-contact campaign.
+- The service is synchronous and one-shot. Scheduling, distributed locks,
+  capacity management, rate limiting, and operational dashboards are external.
+- Completed standard Tasks provide history, but there is no local database,
+  custom call-history object, Salesforce-side write deduplication ledger, or
+  analytics/ROI model.
+- The live path depends on CALL-E availability and credentials. Normal tests use
+  mocks and do not place calls or contact Salesforce.
+- QuoteWake currently does not add Salesforce Flow, Platform Events, Change Data
+  Capture, Agentforce, or Apex automation, and is not a Salesforce-native
+  package.
 
-## CALL-E simulation for Spain
+## Roadmap
 
-CALL-E calls are not currently available for region `ES`. QuoteWake therefore
-provides an explicit, deterministic simulator that exercises the same context,
-result parsing, and Salesforce write-back path without invoking CALL-E. It is
-restricted to seeded Quotes whose name starts with `QuoteWake Demo - ` and
-requires an explicit acknowledgement before writing.
+Priorities follow the operational need rather than adding Salesforce technology
+for its own sake:
 
-```bash
-python3 -m quotewake_salesforce \
-  --simulate-call \
-  --target-org quotewake-dev \
-  --quote-id <QUOTE_ID> \
-  --simulation-outcome interested \
-  --call-language Spanish \
-  --call-region ES \
-  --confirm-demo-write
-```
-
-The supported outcomes are `interested`, `not_interested`, `call_back_later`,
-`no_answer`, `busy`, `invalid_number`, and `error`. `NO_ANSWER` and other
-configured business retry outcomes use the configured retry delays.
-`--next-follow-up-at` is optional and represents a customer-requested future
-time for `call_back_later`, for example `2026-08-10T10:00:00Z`. The command updates the selected Quote and creates a
-completed standard `Task` in one Salesforce Composite API request with
-`allOrNone=true`. It never runs `calle`, `plan_call`, or `run_call`.
-
-The simulator prints the outcome and created Salesforce Task ID and writes the
-structured result only to Salesforce. It does not create a local report.
-
-### CLI help and temporary timing configuration
-
-The complete CLI reference is available with either of these commands:
-
-```bash
-python3 -m quotewake_salesforce --help
-python3 -m quotewake_salesforce --simulate-call --help
-```
-
-Both forms show the Salesforce dry-run, CALL-E planning, simulator options, and
-the temporary configuration helper.
-
-The shipped demo configuration uses zero-hour initial timing so seeded Quotes
-can be exercised immediately. A production-style configuration can use, for
-example, a 4-hour minimum and a 48-hour standard delay. For a one-off demo or
-timing override, provide a temporary TOML configuration through `/dev/stdin`;
-this does not modify the repository:
-
-```bash
-printf '%s\n' \\
-  '[regional]' \\
-  'business_timezone = "Europe/Madrid"' \\
-  'locale = "es_ES"' \\
-  '' \\
-  '[selection.initial_follow_up]' \\
-  'minimum_delay_hours = 0' \\
-  'standard_delay_hours = 0' \\
-  'due_soon_window_days = 0' \\
-  '' \\
-  '[follow_up.retry]' \\
-  'max_attempts = 3' \\
-  'retry_delays_days = [2, 4]' \\
-  'retry_outcomes = ["call_back_later", "no_answer", "busy"]' \\
-  'technical_failure_retry_delay_minutes = 30' \\
-  'completed_outcomes = ["interested"]' \\
-  '' \\
-  '[follow_up.cooldown]' \\
-  'enabled = true' \\
-  'minimum_delay_hours = 24' \\
-  '' \\
-  '[follow_up.calling_hours]' \\
-  'enabled = false' \\
-  'days = ["monday", "tuesday", "wednesday", "thursday", "friday"]' \\
-  'start = "09:00"' \\
-  'end = "18:00"' |
-python3 -m quotewake_salesforce \\
-  --simulate-call \\
-  --target-org quotewake-dev \\
-  --quote-id <QUOTE_ID> \\
-  --simulation-outcome interested \\
-  --call-language Spanish \\
-  --call-region ES \\
-  --confirm-demo-write \\
-  --config /dev/stdin
-```
-
-This temporary configuration only changes eligibility timing for that command;
-the simulator still requires a seeded `QuoteWake Demo - ...` Quote, a callable
-Contact, and the explicit `--confirm-demo-write` acknowledgement.
-
-## Opt-in Salesforce E2E verification
-
-`test_e2e_salesforce.py` is a manual runner and is intentionally outside
-`tests/`, so normal unit-test discovery never writes to Salesforce. It requires
-an explicit target org and confirmation, and refuses production-style orgs:
-only Developer Edition and Sandbox orgs are accepted.
-
-After deploying metadata and seeding the ten-Quote demo dataset, run:
-
-```bash
-python3 test_e2e_salesforce.py \
-  --target-org quotewake-dev \
-  --confirm-demo-write
-```
-
-The runner resolves the Kitchen, EV Charger, and Office Quotes by name and
-resolves each primary Contact through its Opportunity relationship; it never
-uses hard-coded Salesforce IDs. Immediately before each scenario it resets
-only the six QuoteWake fields, then invokes the existing simulator CLI with a
-temporary zero-delay configuration. The matrix is:
-
-| Fixture | Simulated outcome | Expected Quote status |
-| --- | --- | --- |
-| Kitchen Electrical Renovation | `interested` | `Completed` |
-| EV Charger Installation | `call_back_later` | `Retry` |
-| Office Electrical Upgrade | `invalid_number` | `Stopped` |
-
-The runner verifies the resulting Quote fields, commercial-field invariants,
-and the created Task and its Quote/Contact relationships. It does not delete or
-clean up Quotes or Tasks, and it does not create files under the application
-`results` directory. This runner is not executed by the normal test suite and
-does not place real calls.
+1. Make selection useful at scale with customer/account value, Quote amount,
+   expiration urgency, and prior engagement/activity signals.
+2. Add policy-aware territory, local calling time, consent, and opt-out handling,
+   then capacity controls, per-Quote locks, and provider rate limiting.
+3. Add Salesforce-backed analytics and ROI reporting for follow-up performance.
+4. Consider Salesforce Flow, events/CDC, Agentforce actions, or Apex only when a
+   demonstrated workflow requirement justifies the additional complexity.
 
 ## Tests
 
-The unit and fake-CLI integration tests do not require Salesforce or CALL-E:
+Unit and integration-boundary tests use mocks; they do not place real calls or
+contact Salesforce:
 
-```bash
-python3 -m unittest discover -s tests -p 'test_*.py' -v
+```shell
+uv run pytest
+uv lock --check
+git diff --check
 ```
-
-The normal selection and planning paths remain read-only. The simulator uses
-only its scoped Composite API Quote + Task write, while the CALL-E adapter
-exposes planning only and has no call execution method.

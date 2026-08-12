@@ -13,6 +13,7 @@ from contextvars import ContextVar
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+import re
 from typing import Any
 
 
@@ -31,11 +32,27 @@ _LABELS = {
     "run_id": "run",
     "quote_id": "quote",
     "contact_id": "contact",
+    "call_id": "call",
     "task_id": "task",
     "plan_id": "plan",
-    "simulation_id": "simulation",
+    "phase": "phase",
+    "reason": "reason",
     "error_type": "error type",
 }
+_PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?[1-9]\d{7,14}(?!\w)")
+_SECRET_KEY_PATTERN = re.compile(r"(?:secret|token|password|api[_-]?key|client[_-]?secret)", re.I)
+
+
+def _redact_log_value(key: str, value: Any) -> Any:
+    if _SECRET_KEY_PATTERN.search(key):
+        return "[redacted]"
+    if isinstance(value, str):
+        return _PHONE_LIKE_PATTERN.sub("[phone-redacted]", value)
+    if isinstance(value, dict):
+        return {name: _redact_log_value(str(name), item) for name, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_redact_log_value(key, item) for item in value)
+    return value
 
 
 class _ReadableFormatter(logging.Formatter):
@@ -173,7 +190,7 @@ def log_event(
             if value is not None
         }
     )
-    event_fields.update(fields)
+    event_fields.update({key: _redact_log_value(key, value) for key, value in fields.items()})
     logger().log(
         _level_value(level),
         event,
