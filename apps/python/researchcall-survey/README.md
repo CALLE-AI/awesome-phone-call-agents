@@ -3,7 +3,7 @@
 Run a telephone survey — and report it honestly afterwards.
 
 A survey that dials is easy. A survey whose numbers survive scrutiny is not, and almost
-every way of getting it wrong flatters the result. Three of those ways are structural here
+every way of getting it wrong flatters the result. Four of those ways are structural here
 rather than configurable.
 
 ## The denominator
@@ -52,10 +52,16 @@ anywhere in either output.
 
 | Rule | |
 | --- | --- |
+| `ai_disclosure_before_consent` | The call states, before anything else and before it asks for consent, that an automated assistant is calling. |
 | `explicit_consent_before_questions` | No question is asked before the person has consented in this call. |
 | `right_to_stop_immediately` | The interview ends the moment the person asks, without a further question. |
 | `right_to_withdraw_afterwards` | A withdrawal removes the identifier and the number, and the record leaves every later denominator. |
 | `no_high_risk_topics` | Medical, legal, financial and emergency topics are refused, not handled — checked for the study subject and for every single question. |
+
+`ai_disclosure_before_consent` is listed first because it is also an ordering requirement,
+not only a rule to keep: consent obtained from someone who was never told they were talking
+to a machine is not informed consent, so the disclosure has to land before the consent
+question, not folded into it or spoken after.
 
 A study file may **add** rules. It cannot overwrite these — the load path raises instead. A
 survey whose consent requirement can be switched off in configuration does not have a
@@ -104,8 +110,10 @@ Non-response by contact window:
 
 ## Deliberate limits
 
-- **`consent_refused`, `broke_off`, `no_answer`, `busy`, `ineligible` and `not_attempted`
-  stay distinct.** Collapsing them loses exactly the information a methods section needs.
+- **`consent_refused`, `broke_off`, `no_answer`, `busy`, `voicemail`, `ineligible` and
+  `not_attempted` stay distinct.** Collapsing them loses exactly the information a methods
+  section needs — a mailbox pickup is not the same non-response as an unanswered line, and
+  neither counts toward `reached`.
 - **A break-off keeps no partial answers.** Someone who ended the call did not finish
   answering, and half an answer is not data — partial answers after stopping are deleted
   at construction, so they are never stored and never emitted.
@@ -123,13 +131,14 @@ python -m pytest -q
 ```
 
 ```text
-.........................................                                [100%]
-41 passed in 0.76s
+..............................................                           [100%]
+46 passed in 0.50s
 ```
 
 The regressions guard the ways a study could flatter itself: an irreproducible sample, a
-person contacted twice, a locked ethics rule overwritten, answers recorded without consent,
-a category without its source, the wrong denominator, a withdrawal that only sets a flag
+person contacted twice, a locked ethics rule overwritten, disclosure spoken after consent
+instead of before it, answers recorded without consent, a category without its source, the
+wrong denominator, a mailbox pickup counted as reached, a withdrawal that only sets a flag
 instead of deleting the data, a break-off that keeps partial answers, a high-risk question
 hiding under a benign subject, and a full number reaching an output.
 
