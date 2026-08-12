@@ -5,7 +5,14 @@
  * contract is for. This module reads the things a structured result must never be
  * the only source of: whether a person was actually there, whether that person
  * told the caller to go away, whether anything the callee said supports a claimed
- * answer and whether anybody agreed to anything.
+ * answer and whether anybody agreed to or refused the arrangement.
+ *
+ * Every one of those is anchored to what the caller had just put to the callee. A
+ * sentence is evidence for the thing it was answering and for nothing else, which is
+ * what stops a yes to one question standing in for an agreement and a no to another
+ * standing in for a refusal of the errand. What the caller put to them is read clause
+ * by clause, because a question mark at the end of a turn belongs to the thing it was
+ * asked about and not to everything else in that turn.
  *
  * A business declining to deal with an automated caller is a legitimate answer,
  * not an error to retry around. It is detected, reported and obeyed.
@@ -35,6 +42,28 @@ const DECLINE_AUTOMATED_PATTERNS: RegExp[] = [
   /\bneed to (?:speak|talk) (?:to|with) (?:the )?(?:patient|customer|client|person|her|him|them) (?:directly|in person|themselves)\b/i,
   /\bhave (?:her|him|them) call (?:us|me) (?:back )?(?:directly|themselves)\b/i,
   /\bwe only (?:speak|deal) with the (?:patient|customer|account holder)\b/i,
+];
+
+/**
+ * A refusal of the errand itself, as opposed to a refusal to deal with a robot.
+ * Deliberately narrow: the point is to find a turn that plainly will not do the
+ * thing, so an extraction that reports a refusal nobody voiced comes back
+ * unsupported. Missing a real refusal costs a softer report, inventing one costs
+ * the person a fact about their own errand.
+ *
+ * Matching one of these is not enough on its own. The same words refuse a question
+ * ("we do not take that plan") as easily as they refuse the arrangement, so
+ * `refusalEvidence` decides what a matching turn was actually answering.
+ */
+const REFUSAL_PATTERNS: RegExp[] = [
+  /\b(?:we|i)\s*(?:'?re| are| am)?\s*(?:not able|unable)\s+to\b/i,
+  /\b(?:we|i)\s*(?:can'?t|cannot|won'?t)\s+(?:do|book|make|arrange|schedule|take|fit|offer|help with|accommodate)\b/i,
+  /\b(?:we|i)\s+(?:do not|don'?t)\s+(?:do|book|offer|handle|arrange|take)\b/i,
+  /\bthat(?:'?s| is) not something we\b/i,
+  /\b(?:nothing|no (?:slots?|appointments?|openings?|availability|times?))\s+(?:is |are )?available\b/i,
+  /\bwe(?:'?re| are)\s+(?:fully )?booked\b/i,
+  /\bwe have (?:nothing|no availability)\b/i,
+  /\byou(?:'?ll| will) (?:have to|need to) (?:go|call|try) (?:somewhere else|elsewhere|another)\b/i,
 ];
 
 export interface TranscriptReading {
@@ -121,12 +150,15 @@ function polarity(text: string): "yes" | "no" | null {
   return yesAt < noAt ? "yes" : "no";
 }
 
+/** How much of a question a caller turn has to carry before it counts as asked. */
+const QUESTION_ASKED = 0.7;
+
 /** The last turn where the caller asked this question. -1 when it never did. */
 function askedAt(question: string, turns: TranscriptTurn[]): number {
   const wanted = tokens(question);
   let found = -1;
   for (const [index, turn] of turns.entries()) {
-    if (turn.speaker === "bot" && support(wanted, turn.text) >= 0.7) {
+    if (turn.speaker === "bot" && support(wanted, turn.text) >= QUESTION_ASKED) {
       found = index;
     }
   }
@@ -383,10 +415,11 @@ export interface AgreementEvidence {
  * not an agreement on its own.
  *
  * Two bindings, because booking language on its own proves nothing. The agreement
- * has to come after the caller raised the arrangement. When the extraction
- * claims a datetime that datetime has to be named around the agreement itself: in
- * the turn, in the caller's proposal before it or in the read back after it. An
- * unrelated yes plus a plausible time is not a booking.
+ * has to come after the caller raised the arrangement. When the extraction claims a
+ * datetime that datetime has to have been named by the time the callee spoke: in
+ * their own turn or in the caller's proposal before it. An unrelated yes plus a
+ * plausible time is not a booking. A time the caller only put to them afterwards
+ * is a proposal they have not answered.
  *
  * Booking language that fails either binding is still worth saying out loud, so it
  * comes back as `otherQuote` and the report quotes it as what was said instead.
@@ -413,7 +446,7 @@ export function agreementEvidence(
     if (!patterns.some((pattern) => pattern.test(turn.text))) {
       continue;
     }
-    if (offered.length > 0 && !namedAround(turns, index, offered)) {
+    if (offered.length > 0 && !namedBefore(turns, index, offered)) {
       otherQuote = turn.text;
       continue;
     }
@@ -426,40 +459,321 @@ export function agreementEvidence(
 const COMMITMENT_PROMPT =
   /\b(?:book|books|booked|booking|hold|holding|reserve|reserving|reserved|schedule|scheduled|scheduling|reschedule|pencil|slot|slots|appointment|appointments|availability|confirm|confirming)\b/i;
 
+/**
+ * Caller clauses that put a question or a request to the callee, rather than tell them
+ * something. The question mark is not required on its own, because a transcript of
+ * speech does not always carry one and an asked question is still an asked question
+ * without it, so the modal, auxiliary and request shapes a call script uses count too.
+ *
+ * These are interrogative and request forms only. A first-person purpose statement
+ * ("I am calling to book an appointment", "I would like to book an appointment") is
+ * not one of them: it tells the callee why the caller rang and asks them nothing, so
+ * it is not the caller putting the arrangement to them. A statement like that raises
+ * the arrangement only when it also names the offered time, which is the proposal arm
+ * in `clauseRaises`, not an ask.
+ *
+ * They are matched against one clause rather than a whole turn, because a question
+ * mark at the end of a turn belongs to the thing it was asked about and to nothing
+ * else in that turn.
+ */
+const ASK_FORMS: RegExp[] = [
+  /\?/,
+  /\b(?:can|could|would|will|shall|may)\s+(?:you|we|i|she|he|they)\b/i,
+  /\b(?:do|does|is|are|have|has)\s+(?:you|she|he|they|there)\b/i,
+  /\b(?:please|any chance)\b/i,
+];
+
+/**
+ * The clauses of a caller turn, in the order they were said.
+ *
+ * A turn is not one thing put to the callee. "I am calling to book an appointment. Do
+ * you accept Aetna?" says why the caller rang and then asks about insurance. The
+ * question mark belongs to the insurance question alone. Classifying a turn whole let a
+ * request form anywhere in it license booking words anywhere else, so a no to the
+ * insurance question came back as a refused appointment in a call where no slot had
+ * been put to anybody.
+ *
+ * The split is where one thing said ends and the next begins: a sentence end, a
+ * semicolon, a colon, a comma, a dash or a line break. A comma is in there because a
+ * transcript of speech splices two utterances with one as often as it writes a full
+ * stop. The half carrying the question mark is then the whole turn's only ask. A
+ * coordinator counts as a break when a fresh question opens right after it, as in "do
+ * you accept Aetna and can we book Thursday?", because that is a second thing put to
+ * them inside one sentence.
+ *
+ * The cost is a request whose booking word sits on the far side of a comma from its
+ * question form. "About the appointment, could you do Thursday?" is two clauses and
+ * neither is both halves, so it anchors nothing and the commitment reads
+ * `unconfirmed`. That is the direction to be wrong in. A turn that names the time the
+ * extraction reported still anchors on the proposal arm whatever its punctuation.
+ */
+const CLAUSE_BREAK =
+  /(?<=[.!?])\s+|[;:,\r\n]+|\s+[-\u2013\u2014]{1,2}\s+|\s+(?:and|or|but|so|then)\s+(?=(?:can|could|would|will|shall|may|do|does|did|is|are|was|were|have|has|had)\s+(?:you|we|i|she|he|they|there)\b)/i;
+
+function clausesOf(text: string): string[] {
+  return text
+    .split(CLAUSE_BREAK)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+}
+
+/**
+ * Whether one clause puts the arrangement to the callee.
+ *
+ * Two halves and both of them inside this clause, which is what binds the request form
+ * to the booking words rather than to whatever else the turn happened to say. The
+ * clause has to be about the arrangement, which is booking language or the time the
+ * extraction reported. It also has to put that to them, which is one of two things and
+ * not a third:
+ *
+ * - a genuine request: booking language in a question or request form, "could you hold
+ *   Thursday at nine forty?"
+ * - a concrete proposal: a clause that names the offered time itself, "Thursday the
+ *   thirteenth at nine forty would suit her", which is a time they can say yes to
+ *   whether or not it is phrased as a question.
+ *
+ * A declarative that only carries a booking word is neither, even when it also names
+ * some unrelated day. "Our appointment desk is open Monday", told between a question
+ * and its answer, asks nothing and offers no slot, so it must not make that answer a
+ * reply to the arrangement. That is why the proposal half is the offered time rather
+ * than any weekday: a bare weekday in a statement proposes nothing to answer.
+ *
+ * The proposal arm asks the whole turn as well as the clause, so the day check inside
+ * `mentionsDatetime` still sees every day the turn named. Reading a clause alone would
+ * take "Wednesday, at nine forty" for Thursday at nine forty, because the half holding
+ * the clock names no day at all.
+ */
+function clauseRaises(clause: string, text: string, offered: string): boolean {
+  if (mentionsDatetime(clause, offered) && mentionsDatetime(text, offered)) {
+    return true;
+  }
+  return COMMITMENT_PROMPT.test(clause) && ASK_FORMS.some((form) => form.test(clause));
+}
+
+/**
+ * Which clause of a caller turn last put the arrangement to the callee. -1 when none
+ * of them did.
+ *
+ * Where it happened matters as much as whether it did, because a turn can raise the
+ * arrangement and then ask something else. What a callee answers is the last thing said
+ * to them.
+ */
+function arrangementAt(text: string, offered: string): number {
+  const clauses = clausesOf(text);
+  for (let at = clauses.length - 1; at >= 0; at -= 1) {
+    if (clauseRaises(clauses[at]!, text, offered)) {
+      return at;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Which clause of a caller turn last asked one of the errand's questions. -1 when none
+ * of them did.
+ *
+ * A question whose words run across a clause break is still asked and it ends where
+ * the turn ends, so it counts as the last thing said. Without that, a question the
+ * split happens to cut in half would go missing and hand the turn back to the
+ * arrangement, which is the reading this whole rule exists to stop.
+ */
+function questionAt(text: string, questions: ErrandQuestion[]): number {
+  const asked = (part: string): boolean =>
+    questions.some((question) => support(tokens(question.text), part) >= QUESTION_ASKED);
+  const clauses = clausesOf(text);
+  for (let at = clauses.length - 1; at >= 0; at -= 1) {
+    if (asked(clauses[at]!)) {
+      return at;
+    }
+  }
+  return asked(text) ? clauses.length - 1 : -1;
+}
+
+/**
+ * Whether a caller turn puts the arrangement to the callee anywhere in it.
+ *
+ * All three bindings run through here, the agreement, the refusal and the
+ * confirmation code that belongs to the agreement, so the rule cannot hold on one
+ * side and not another.
+ *
+ * It is deliberately lexical and it fails closed. A real ask this misses leaves the
+ * evidence unbound, so the commitment reads unconfirmed and the report says less
+ * than the extraction claimed.
+ */
+function raisesArrangement(text: string, offered: string): boolean {
+  return arrangementAt(text, offered) >= 0;
+}
+
 /** Where the caller raised the arrangement. -1 when it never did. */
 function commitmentPromptAt(turns: TranscriptTurn[], offered: string): number {
   for (const [index, turn] of turns.entries()) {
-    if (turn.speaker !== "bot") {
-      continue;
-    }
-    // Proposing the time is raising the arrangement as much as the word book is.
-    if (COMMITMENT_PROMPT.test(turn.text) || mentionsDatetime(turn.text, offered)) {
+    if (turn.speaker === "bot" && raisesArrangement(turn.text, offered)) {
       return index;
     }
   }
   return -1;
 }
 
-/** How far either side of the agreement the time may have been said. */
-const NEIGHBOURING_TURNS = 1;
+/** What the caller last put to the callee, which is what their next turn answers. */
+type LastAsk = "commitment" | "question" | null;
 
-function nearby(turns: TranscriptTurn[], index: number): TranscriptTurn[] {
-  return turns.slice(Math.max(index - NEIGHBOURING_TURNS, 0), index + NEIGHBOURING_TURNS + 1);
+/**
+ * What the caller had last put to the callee before this turn.
+ *
+ * A turn answers the most recent thing asked of it, so this is what decides which
+ * claim a callee turn is evidence for. Statements are skipped: the caller reading
+ * out a date of birth does not change the subject, so a callee who refuses after
+ * that is still refusing whatever was last asked. A statement that names the
+ * arrangement is skipped for the same reason, because mentioning an appointment is
+ * not asking for one and the last real ask still stands.
+ *
+ * Inside a turn it is the last clause that counts, for the same reason it is the last
+ * turn. "Could you hold Thursday at nine forty? Do you accept Aetna?" raises the
+ * arrangement and then asks something else, so the no that follows is a no to the
+ * insurance question and the report must not read it as a refused booking.
+ *
+ * A clause that is both counts as the arrangement, which is the usual case: "what is
+ * the earliest appointment you have" is a question on the errand's list and the
+ * arrangement being put to them at the same time.
+ */
+function lastAskBefore(
+  turns: TranscriptTurn[],
+  index: number,
+  offered: string,
+  questions: ErrandQuestion[],
+): LastAsk {
+  for (let at = index - 1; at >= 0; at -= 1) {
+    const turn = turns[at]!;
+    if (turn.speaker !== "bot") {
+      continue;
+    }
+    const arrangement = arrangementAt(turn.text, offered);
+    const question = questionAt(turn.text, questions);
+    if (question > arrangement) {
+      return "question";
+    }
+    if (arrangement >= 0) {
+      return "commitment";
+    }
+  }
+  return null;
 }
 
-function namedAround(turns: TranscriptTurn[], index: number, offered: string): boolean {
-  return nearby(turns, index).some((turn) => mentionsDatetime(turn.text, offered));
+export interface RefusalEvidence {
+  /** The callee turn that refuses the arrangement. Empty when no turn does. */
+  quote: string;
+  index: number;
+  /**
+   * A refusal the callee voiced about something else, most often an answer to one of
+   * the questions or a no to another time. It is not evidence about the arrangement
+   * the extraction reported and it goes in the report so a person is not told nothing
+   * was said when something was.
+   */
+  otherQuote: string;
 }
 
 /**
- * Whether the confirmation code was said around the agreement.
+ * What the transcript shows about a refusal of the arrangement. An extraction saying
+ * `declined_by_callee` is not a refusal on its own.
+ *
+ * Two bindings, the same two an agreement is held to, because it is the same size of
+ * claim about the errand. Refusal words prove nothing by themselves: "no, we do not
+ * take that plan" is a refusal of a question and it says nothing about the booking,
+ * which may have been accepted in the same call. So the turn has to be answering the
+ * arrangement rather than a question. The caller also has to have raised an
+ * arrangement at all. Then, when the extraction reports a datetime, that datetime has
+ * to have been named by the time the callee spoke: in their own turn or in the
+ * caller's proposal before it. Two times proposed on one call is otherwise a way for a
+ * no to one of them to be reported as a no to the other, in either order.
+ *
+ * With no datetime reported there is nothing to bind to, so the prompt anchor stands
+ * alone. That is the same asymmetry the agreement side has.
+ *
+ * A refusal aimed at something else, another time included, still comes back as
+ * `otherQuote`, so the report can quote what was actually turned down. A refused
+ * arrangement that cannot be matched to the reported one fails closed: no evidence,
+ * so the commitment reads `unconfirmed` rather than turned down.
+ */
+export function refusalEvidence(
+  turns: TranscriptTurn[],
+  offered = "",
+  questions: ErrandQuestion[] = [],
+): RefusalEvidence {
+  let otherQuote = "";
+  if (commitmentPromptAt(turns, offered) === -1) {
+    // The caller never raised an arrangement, so nothing here can be a refusal of one.
+    const loose = turns.find(
+      (turn) => turn.speaker === "user" && REFUSAL_PATTERNS.some((pattern) => pattern.test(turn.text)),
+    );
+    return { quote: "", index: -1, otherQuote: loose?.text ?? "" };
+  }
+  for (const [index, turn] of turns.entries()) {
+    if (turn.speaker !== "user" || !REFUSAL_PATTERNS.some((pattern) => pattern.test(turn.text))) {
+      continue;
+    }
+    if (lastAskBefore(turns, index, offered, questions) !== "commitment") {
+      if (otherQuote.length === 0) {
+        otherQuote = turn.text;
+      }
+      continue;
+    }
+    if (offered.length > 0 && !namedBefore(turns, index, offered)) {
+      // A no to another time is not a no to this one. A no given before the caller
+      // had put this time to them is not about it either. The same binding the
+      // agreement side uses, so a call where two slots were discussed cannot report
+      // the refusal of one as the refusal of the other in either order.
+      if (otherQuote.length === 0) {
+        otherQuote = turn.text;
+      }
+      continue;
+    }
+    return { quote: turn.text, index, otherQuote: "" };
+  }
+  return { quote: "", index: -1, otherQuote };
+}
+
+/** How far back from a turn the caller's proposal may be. */
+const PRECEDING_TURNS = 1;
+
+/**
+ * The turn itself and the caller's turn before it.
+ *
+ * Those are the only two places the thing a turn was answering can have been said,
+ * which is the rule the rest of this module already runs on. Nothing after the turn
+ * is in here: a turn cannot be an answer to something nobody had said yet.
+ *
+ * This used to reach one turn forward as well, on the grounds that the caller reads
+ * the time back once it is settled and that read back is sometimes the first precise
+ * form of it in the call. A read back and a fresh proposal are the same shape from one
+ * turn away, so that reach let a later turn decide what an earlier one had meant. The
+ * caller offers Wednesday, the callee refuses, the caller then offers Thursday. The
+ * refusal of Wednesday passed as evidence about Thursday, which the callee had not
+ * answered yet. Two arrangements in one call did the same thing to a reference number.
+ *
+ * The cost is a call where the only precise form of the time is in the caller's read
+ * back. That now reads as not named, so the commitment comes back unconfirmed and the
+ * report says less than the extraction claimed, which is the direction to be wrong in.
+ */
+function upTo(turns: TranscriptTurn[], index: number): TranscriptTurn[] {
+  return turns.slice(Math.max(index - PRECEDING_TURNS, 0), index + 1);
+}
+
+function namedBefore(turns: TranscriptTurn[], index: number, offered: string): boolean {
+  return upTo(turns, index).some((turn) => mentionsDatetime(turn.text, offered));
+}
+
+/**
+ * Whether the confirmation code was said at the agreement or in the turn it answered.
  *
  * A reference number is part of the same claim as the booking, so it is held to the
- * same standard. A code the extraction produced and nobody read out is dropped.
+ * same standard and bound the same way. Two bookings in one call is otherwise a way
+ * for the second reference to be printed against the first appointment. A code the
+ * callee only reads out in a later turn is dropped, so the report gives no number
+ * rather than the wrong one.
  */
-export function codeNamedAround(turns: TranscriptTurn[], index: number, code: string): boolean {
+export function codeNamedBefore(turns: TranscriptTurn[], index: number, code: string): boolean {
   if (index < 0 || code.trim().length === 0) {
     return false;
   }
-  return nearby(turns, index).some((turn) => mentionsCode(turn.text, code));
+  return upTo(turns, index).some((turn) => mentionsCode(turn.text, code));
 }
