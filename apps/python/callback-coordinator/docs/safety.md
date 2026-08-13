@@ -13,14 +13,18 @@ boundaries.
 - The call script discloses that the caller is AI and ends immediately on a
   wrong-person response or opt-out. It never offers to book a specific callback
   time – the result schema cannot return a time.
+
 ## Quiet hours and do-not-call
+
 - The engine refuses to call during the intake's `quiet_hours` window, evaluated
   in the **recipient's** timezone.
 - `do_not_call: true` prevents any call.
 - `consent: false` or missing also prevents any call (fail-closed).
 - These gates apply to both preview (reported, not enforced against a real call)
   and execute (enforced before the SDK creates a call).
+
 ## Credentials – trusted origin only
+
 - `CALLE_API_KEY` is a server credential. Keep it in a secret manager or an
   environment variable. Never put it in request files, task text, exported
   examples, or source control.
@@ -29,6 +33,7 @@ boundaries.
   userinfo, or non-443 port is rejected **before** the bearer token is used,
   preventing credential exfiltration to arbitrary URLs. The default is
   `https://api.heycall-e.com`.
+
 ## Personal data
 - Do not put names, account numbers, health details, legal matters, payment
   data, credentials, or other sensitive information in the intake file or task.
