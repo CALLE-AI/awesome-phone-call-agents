@@ -4,7 +4,7 @@ from incidentbridge.ledger import ReservationLedger
 from incidentbridge.models import parse_request
 from incidentbridge.policy import simulated_result
 from incidentbridge.runtime import execute, validate_base_url
-from tests.test_policy import RAW
+from tests.test_policy import RAW, bound_provider_result
 
 
 class FakeCalls:
@@ -25,14 +25,8 @@ class FakeCalls:
 
 
 def completed_response():
-    return {
-        "status": "completed",
-        "task_completed": True,
-        "completion_confidence": {"score": 0.95},
-        "structured_result": simulated_result(
-            parse_request(RAW), "acknowledged"
-        )["structured_result"],
-    }
+    structured = simulated_result(parse_request(RAW), "acknowledged")["structured_result"]
+    return bound_provider_result(structured)
 
 
 def test_execute_calls_provider_and_returns_decision():

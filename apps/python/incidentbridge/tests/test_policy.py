@@ -29,6 +29,38 @@ def acknowledged_result():
     return simulated_result(parse_request(RAW), "acknowledged")["structured_result"]
 
 
+def bound_provider_result(structured=None):
+    result = structured or acknowledged_result()
+    return {
+        "id": "call_001",
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.95, "label": "high"},
+        "structured_result": result,
+        "evidence": ["The recipient supplied a vendor ticket."],
+        "metadata": {
+            "workflow_id": RAW["workflow_id"],
+            "workflow_type": "vendor_incident_support",
+            "incident_id": RAW["incident_id"],
+        },
+        "recipients": [
+            {
+                "phone": RAW["support_phone"],
+                "attempts": [
+                    {
+                        "transcript_turns": [
+                            {
+                                "speaker": "recipient",
+                                "text": f"Ticket {result.get('ticket_id', 'unknown')}.",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ],
+    }
+
+
 def test_parse_and_preview_mask_phone():
     request = parse_request(RAW)
     result = preview(request)
@@ -55,14 +87,21 @@ def test_rejects_invalid_or_unauthorized_inputs():
             raise AssertionError(f"expected {field} to fail")
 
 
-def test_rejects_secret_like_summary():
-    raw = {**RAW, "incident_summary": "The API key=abc is failing on every request."}
-    try:
-        parse_request(raw)
-    except ValueError as exc:
-        assert "credentials or secrets" in str(exc)
-    else:
-        raise AssertionError("expected secret-like summary to fail")
+def test_rejects_secret_or_contact_data_in_every_spoken_free_text_field():
+    cases = [
+        ("incident_summary", "The API key=abc is failing on every request."),
+        ("caller_business_name", "Bearer abc123 operations"),
+        ("provider_name", "Support at ops@example.com"),
+        ("affected_service", "ingestion password credential"),
+    ]
+    for field, value in cases:
+        try:
+            parse_request({**RAW, field: value})
+        except ValueError as exc:
+            assert field in str(exc)
+            assert "credentials, secrets, or personal contact data" in str(exc)
+        else:
+            raise AssertionError(f"expected secret-like {field} to fail")
 
 
 def test_task_has_disclosure_and_authority_boundary():
@@ -74,7 +113,9 @@ def test_task_has_disclosure_and_authority_boundary():
 
 
 def test_acknowledged_result_never_closes_incident():
-    decision = route_result(acknowledged_result())
+    decision = route_result(
+        parse_request(RAW), bound_provider_result(), expected_call_id="call_001"
+    )
     assert decision["route"] == "vendor_acknowledged"
     assert decision["incident_closed"] == "false"
 
@@ -82,16 +123,50 @@ def test_acknowledged_result_never_closes_incident():
 def test_fail_closed_routes():
     complete = acknowledged_result()
     cases = [
-        ({**complete, "right_support_desk": "no"}, {}),
-        ({**complete, "human_escalation_required": "yes"}, {}),
-        ({**complete, "ticket_id": "unknown"}, {}),
-        ({key: value for key, value in complete.items() if key != "ticket_id"}, {}),
-        (complete, {"completion_confidence": {"score": 0.4}}),
-        (complete, {"provider_status": "timeout"}),
-        (complete, {"task_completed": False}),
+        bound_provider_result({**complete, "right_support_desk": "no"}),
+        bound_provider_result({**complete, "human_escalation_required": "yes"}),
+        bound_provider_result({**complete, "ticket_id": "unknown"}),
+        bound_provider_result(
+            {key: value for key, value in complete.items() if key != "ticket_id"}
+        ),
+        {**bound_provider_result(), "completion_confidence": {"score": 0.4}},
+        {**bound_provider_result(), "status": "timeout"},
+        {**bound_provider_result(), "task_completed": False},
     ]
-    for structured, kwargs in cases:
-        assert route_result(structured, **kwargs)["route"] == "needs_human"
+    request = parse_request(RAW)
+    for provider_result in cases:
+        assert (
+            route_result(request, provider_result, expected_call_id="call_001")["route"]
+            == "needs_human"
+        )
+
+
+def test_acknowledged_route_requires_request_binding_and_recipient_corroboration():
+    request = parse_request(RAW)
+    cases = []
+    mismatched_metadata = bound_provider_result()
+    mismatched_metadata["metadata"] = {
+        **mismatched_metadata["metadata"],
+        "incident_id": "INC-other",
+    }
+    cases.append(mismatched_metadata)
+    mismatched_destination = bound_provider_result()
+    mismatched_destination["recipients"][0]["phone"] = "+15555550101"
+    cases.append(mismatched_destination)
+    missing_recipient_evidence = bound_provider_result()
+    missing_recipient_evidence["recipients"][0]["attempts"][0]["transcript_turns"] = []
+    cases.append(missing_recipient_evidence)
+    wrong_ticket = bound_provider_result()
+    wrong_ticket["recipients"][0]["attempts"][0]["transcript_turns"][0]["text"] = "Ticket SUP-9999."
+    cases.append(wrong_ticket)
+    mismatched_call = bound_provider_result()
+    mismatched_call["id"] = "call_other"
+    cases.append(mismatched_call)
+    for provider_result in cases:
+        assert (
+            route_result(request, provider_result, expected_call_id="call_001")["route"]
+            == "needs_human"
+        )
 
 
 def test_schema_validation_and_simulation():

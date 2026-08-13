@@ -11,13 +11,11 @@ E164 = re.compile(r"^\+[1-9]\d{7,14}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$")
 LOCALE = re.compile(r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
 REGION = re.compile(r"^[A-Z]{2}$")
-SECRET_MARKERS = (
-    "api key",
-    "access token",
-    "password",
-    "private key",
-    "secret=",
-    "credential",
+PHONE_LIKE = re.compile(r"(?<!\w)\+?[1-9]\d{7,14}(?!\w)")
+EMAIL_LIKE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+SECRET_LIKE = re.compile(
+    r"(?i)\b(api[_ -]?key|access[_ -]?token|password|private[_ -]?key|"
+    r"client[_ -]?secret|credential|bearer)\b"
 )
 
 
@@ -49,6 +47,15 @@ def clean_text(value: Any, field: str, minimum: int, maximum: int) -> str:
     return cleaned
 
 
+def clean_task_text(value: Any, field: str, minimum: int, maximum: int) -> str:
+    cleaned = clean_text(value, field, minimum, maximum)
+    if SECRET_LIKE.search(cleaned) or PHONE_LIKE.search(cleaned) or EMAIL_LIKE.search(cleaned):
+        raise ValueError(
+            f"{field} appears to contain credentials, secrets, or personal contact data"
+        )
+    return cleaned
+
+
 def parse_utc(value: Any) -> str:
     text = clean_text(value, "observed_at_utc", 20, 35)
     try:
@@ -77,9 +84,7 @@ def parse_request(raw: Any) -> IncidentRequest:
     if raw.get("authorized_support_contact") is not True:
         raise ValueError("authorized_support_contact must be true")
 
-    summary = clean_text(raw.get("incident_summary"), "incident_summary", 12, 500)
-    if any(marker in summary.lower() for marker in SECRET_MARKERS):
-        raise ValueError("incident_summary appears to contain credentials or secrets")
+    summary = clean_task_text(raw.get("incident_summary"), "incident_summary", 12, 500)
 
     severity = raw.get("severity")
     if severity not in {"degraded", "outage"}:
@@ -97,13 +102,11 @@ def parse_request(raw: Any) -> IncidentRequest:
         incident_id=incident_id,
         support_phone=support_phone,
         authorized_support_contact=True,
-        caller_business_name=clean_text(
+        caller_business_name=clean_task_text(
             raw.get("caller_business_name"), "caller_business_name", 2, 80
         ),
-        provider_name=clean_text(raw.get("provider_name"), "provider_name", 2, 80),
-        affected_service=clean_text(
-            raw.get("affected_service"), "affected_service", 2, 100
-        ),
+        provider_name=clean_task_text(raw.get("provider_name"), "provider_name", 2, 80),
+        affected_service=clean_task_text(raw.get("affected_service"), "affected_service", 2, 100),
         incident_summary=summary,
         severity=severity,
         observed_at_utc=parse_utc(raw.get("observed_at_utc")),

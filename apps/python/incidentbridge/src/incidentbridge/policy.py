@@ -15,6 +15,7 @@ EMAIL_LIKE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 TOKEN_LIKE = re.compile(r"(?i)(bearer|token|api[_ -]?key)\s*[:=]?\s*\S+")
 TERMINAL_SUCCESS = {"completed", "succeeded"}
 MIN_CONFIDENCE = 0.8
+RECIPIENT_SPEAKERS = {"recipient", "user", "callee"}
 
 
 def result_schema() -> dict[str, Any]:
@@ -149,17 +150,73 @@ def valid_result(value: Any) -> bool:
     return True
 
 
+def _recipient_transcript(provider_result: dict[str, Any], destination: str) -> str:
+    recipients = provider_result.get("recipients")
+    if not isinstance(recipients, list) or len(recipients) != 1:
+        return ""
+    recipient = recipients[0]
+    if not isinstance(recipient, dict) or recipient.get("phone") != destination:
+        return ""
+    attempts = recipient.get("attempts")
+    if not isinstance(attempts, list) or not attempts:
+        return ""
+    turns: list[str] = []
+    for attempt in attempts:
+        if not isinstance(attempt, dict):
+            continue
+        transcript = attempt.get("transcript_turns")
+        if not isinstance(transcript, list):
+            continue
+        for turn in transcript:
+            if (
+                isinstance(turn, dict)
+                and str(turn.get("speaker", "")).lower() in RECIPIENT_SPEAKERS
+                and isinstance(turn.get("text"), str)
+            ):
+                turns.append(turn["text"])
+    return "\n".join(turns)
+
+
+def _bound_and_corroborated(
+    request: IncidentRequest,
+    provider_result: dict[str, Any],
+    structured: dict[str, Any],
+    expected_call_id: str | None,
+) -> bool:
+    metadata = provider_result.get("metadata")
+    if not isinstance(metadata, dict) or metadata != {
+        "workflow_id": request.workflow_id,
+        "workflow_type": "vendor_incident_support",
+        "incident_id": request.incident_id,
+    }:
+        return False
+    if expected_call_id is not None and provider_result.get("id") != expected_call_id:
+        return False
+    evidence = provider_result.get("evidence")
+    if not isinstance(evidence, list) or not any(
+        isinstance(item, str) and item.strip() for item in evidence
+    ):
+        return False
+    transcript = _recipient_transcript(provider_result, request.support_phone)
+    ticket_id = structured.get("ticket_id")
+    return (
+        isinstance(ticket_id, str)
+        and ticket_id != "unknown"
+        and ticket_id.casefold() in transcript.casefold()
+    )
+
+
 def route_result(
-    structured: dict[str, Any] | None,
+    request: IncidentRequest,
+    provider_result: dict[str, Any],
     *,
-    provider_status: str = "completed",
-    task_completed: bool = True,
-    completion_confidence: Any = 1.0,
+    expected_call_id: str | None = None,
 ) -> dict[str, str]:
+    structured = provider_result.get("structured_result")
     if (
-        provider_status not in TERMINAL_SUCCESS
-        or task_completed is not True
-        or confidence_score(completion_confidence) < MIN_CONFIDENCE
+        provider_result.get("status") not in TERMINAL_SUCCESS
+        or provider_result.get("task_completed") is not True
+        or confidence_score(provider_result.get("completion_confidence")) < MIN_CONFIDENCE
     ):
         return {
             "route": "needs_human",
@@ -173,6 +230,14 @@ def route_result(
             "incident_closed": "false",
         }
     assert structured is not None
+    if not _bound_and_corroborated(request, provider_result, structured, expected_call_id):
+        return {
+            "route": "needs_human",
+            "reason": (
+                "CALL-E evidence was not bound to and corroborated against the approved request."
+            ),
+            "incident_closed": "false",
+        }
     if (
         structured["right_support_desk"] != "yes"
         or structured["continued_after_ai_disclosure"] != "yes"
@@ -273,11 +338,39 @@ def simulated_result(request: IncidentRequest, scenario: str) -> dict[str, Any]:
         },
     }
     structured = scenarios[scenario]
+    provider_result = {
+        "id": "simulation-call",
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.95, "label": "high"},
+        "structured_result": structured,
+        "evidence": ["Synthetic no-call evidence for local route testing."],
+        "metadata": {
+            "workflow_id": request.workflow_id,
+            "workflow_type": "vendor_incident_support",
+            "incident_id": request.incident_id,
+        },
+        "recipients": [
+            {
+                "phone": request.support_phone,
+                "attempts": [
+                    {
+                        "transcript_turns": [
+                            {
+                                "speaker": "recipient",
+                                "text": f"The vendor ticket is {structured['ticket_id']}.",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ],
+    }
     return {
         "mode": "simulate",
         "creates_phone_call": False,
         "scenario": scenario,
         "incident_id": request.incident_id,
         "structured_result": structured,
-        "decision": route_result(structured),
+        "decision": route_result(request, provider_result, expected_call_id="simulation-call"),
     }

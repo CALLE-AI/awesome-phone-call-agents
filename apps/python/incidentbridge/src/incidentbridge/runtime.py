@@ -56,17 +56,13 @@ def execute(
     timeout_seconds: int,
     on_created: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    created = calls.create(
-        **call_arguments(request), idempotency_key=idempotency_key(request)
-    )
+    created = calls.create(**call_arguments(request), idempotency_key=idempotency_key(request))
     call_id = created.get("id")
     if not isinstance(call_id, str) or not call_id:
         raise RuntimeError("CALL-E create response did not contain a call id")
     if on_created is not None:
         on_created(call_id)
-    completed = calls.wait_for_result(
-        call_id, timeout_seconds=timeout_seconds, interval_seconds=2
-    )
+    completed = calls.wait_for_result(call_id, timeout_seconds=timeout_seconds, interval_seconds=2)
     structured = completed.get("structured_result")
     if structured is not None and not isinstance(structured, dict):
         raise RuntimeError("CALL-E structured_result was not an object")
@@ -79,10 +75,5 @@ def execute(
         "task_completed": completed.get("task_completed"),
         "completion_confidence": completed.get("completion_confidence"),
         "structured_result": redact(structured),
-        "decision": route_result(
-            structured,
-            provider_status=completed.get("status"),
-            task_completed=completed.get("task_completed"),
-            completion_confidence=completed.get("completion_confidence"),
-        ),
+        "decision": route_result(request, completed, expected_call_id=call_id),
     }

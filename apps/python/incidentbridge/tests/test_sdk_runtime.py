@@ -49,9 +49,27 @@ class CaptureHandler(BaseHTTPRequestHandler):
                 "status": "completed",
                 "task_completed": True,
                 "completion_confidence": {"score": 0.96, "label": "high"},
-                "structured_result": simulated_result(
-                    parse_request(RAW), "acknowledged"
-                )["structured_result"],
+                "structured_result": simulated_result(parse_request(RAW), "acknowledged")[
+                    "structured_result"
+                ],
+                "evidence": ["The recipient supplied ticket SUP-4821."],
+                "metadata": {
+                    "workflow_id": RAW["workflow_id"],
+                    "workflow_type": "vendor_incident_support",
+                    "incident_id": RAW["incident_id"],
+                },
+                "recipients": [
+                    {
+                        "phone": RAW["support_phone"],
+                        "attempts": [
+                            {
+                                "transcript_turns": [
+                                    {"speaker": "recipient", "text": "Ticket SUP-4821."}
+                                ]
+                            }
+                        ],
+                    }
+                ],
             },
         )
 

@@ -34,6 +34,8 @@ incident → validated, non-secret briefing → masked preview → exact phone a
   changes.
 - Wrong desk, declined AI disclosure, low confidence, incomplete schema, uncertain provider state,
   or requested escalation all fail closed to `needs_human`.
+- `vendor_acknowledged` additionally requires the terminal call ID, workflow, incident, and exact
+  approved destination to match, plus recipient transcript evidence containing the returned ticket.
 - Phone numbers, email addresses, and credential-like strings are redacted from returned free text.
 
 ## Install
