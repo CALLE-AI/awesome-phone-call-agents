@@ -92,7 +92,9 @@ to target a specialist, otherwise they land in "General Intake (human review)".
 Phone numbers are masked and phone-like text (including formatted forms like
 `(202) 555-0123`, `202-555-0123`, `202.555.0123`, `+1 (202) 555-0123`,
 `+44 20 7123 4567`) is removed from evidence via fail-closed redaction.
+
 ## Side effects and safety
+
 - A live run places a real outbound phone call. Use it only when the intake
   records `consent: true` **and** you pass `--confirm-consent`.
 - The agent discloses it is AI and ends immediately after a wrong-person
@@ -103,7 +105,7 @@ Phone numbers are masked and phone-like text (including formatted forms like
   recipient's timezone and fail-closed (gate blocks the call).
 - `--base-url` and `CALLE_BASE_URL` are locked to `https://api.heycall-e.com`
   – any other origin is rejected before the bearer token is used.
-- Result binding is fail-closed: terminal result must have `id` == created call id (when present), `metadata.workflow_id` == intake workflow_id, and `recipients[].phones` must contain intake phone – otherwise `binding_*` → `needs_human`, preventing a payload for a different recipient/session from being accepted as `scheduled`.
+- Result binding is strict fail-closed: every field must be present and match exact approved CALL-E payload – `id` == created call id (missing id when expected exists → `binding_call_id_mismatch`), `task` == approved task, `metadata` exact (`workflow_id`, `workflow_type=callback_triage`, `source`), `recipients` exact (len==1, `phones==[intake.phone]`, `locale==intake.locale`), optional `result_schema` == approved schema – otherwise `binding_*` → `needs_human`, preventing any stale/mismatched result from being accepted as `scheduled`.
 - Result classification is fail-closed: `status` must be `completed` and
   `task_completed` must be `true`; otherwise the ticket becomes `needs_human`.
   Unbound enum values in `structured_result` also become `needs_human`.
