@@ -150,8 +150,10 @@ def test_attempt_gate_respects_do_not_call():
 # --------------------------------------------------------------------------- #
 def _completed(**overrides):
     # Base terminal result that matches the default intake() binding
+    default_intake = intake()
     base = {
         "id": "call-abc-123",
+        "task": coordinator.build_task(default_intake),
         "status": "completed",
         "task_completed": True,
         "completion_confidence": {"score": 0.94, "label": "high"},
@@ -174,14 +176,27 @@ def _completed(**overrides):
     return base
 def _completed_for_intake(intake_obj, **overrides):
     """Build a completed result bound to the given intake (for execute tests)."""
-    result = _completed(
-        metadata={
+    result = {
+        "id": "call-abc-123",
+        "task": coordinator.build_task(intake_obj),
+        "status": "completed",
+        "task_completed": True,
+        "completion_confidence": {"score": 0.94, "label": "high"},
+        "metadata": {
             "workflow_id": intake_obj.workflow_id,
             "workflow_type": "callback_triage",
             "source": intake_obj.source,
         },
-        recipients=[{"phones": [intake_obj.phone], "locale": intake_obj.locale}],
-    )
+        "recipients": [{"phones": [intake_obj.phone], "locale": intake_obj.locale}],
+        "structured_result": {
+            "right_person": "yes",
+            "consent_after_ai_disclosure": "yes",
+            "contact_reason": "billing",
+            "urgent": "no",
+            "voicemail_allowed": "yes",
+            "evidence_summary": "Recipient requested a call about an invoice.",
+        },
+    }
     result.update(overrides)
     return result
 def test_classify_scheduled_on_high_confidence_actionable():
@@ -387,9 +402,51 @@ def test_classify_needs_human_on_binding_mismatch():
     v = intake()
     # Direct classify with intake should also fail-closed on binding
     bad = _completed(
-        metadata={"workflow_id": "evil-id", "workflow_type": "callback_triage"},
-        recipients=[{"phones": [v.phone]}],
+        metadata={"workflow_id": "evil-id", "workflow_type": "callback_triage", "source": "web_form"},
+        recipients=[{"phones": [v.phone], "locale": "en-US"}],
     )
     result = coordinator.classify_disposition(bad, intake=v, expected_call_id="call-abc-123")
     assert result["disposition"] == "needs_human"
     assert "binding" in result["reason"]
+def test_execute_fail_closed_on_strict_binding():
+    v = intake()
+    # No id when expected exists – should be rejected (previous bug allowed it)
+    no_id = _completed_for_intake(v)
+    no_id.pop("id")
+    client = FakeClient(no_id)
+    ticket = coordinator.execute_with_client(v, client, now=_ny(14, 0), timeout_seconds=60)
+    assert ticket["disposition"] == "needs_human"
+    assert "binding_call_id" in ticket["reason"]
+    # Task mismatch
+    bad_task = _completed_for_intake(v)
+    bad_task["task"] = "different task"
+    assert "binding_task" in coordinator.classify_disposition(
+        bad_task, intake=v, expected_call_id="call-abc-123"
+    )["reason"]
+    # Source mismatch
+    bad_src = _completed_for_intake(v)
+    bad_src["metadata"] = {"workflow_id": v.workflow_id, "workflow_type": "callback_triage", "source": "missed_call"}
+    assert "binding_metadata_source" in coordinator.classify_disposition(
+        bad_src, intake=v, expected_call_id="call-abc-123"
+    )["reason"]
+    # Locale mismatch
+    bad_locale = _completed_for_intake(v)
+    bad_locale["recipients"] = [{"phones": [v.phone], "locale": "en-GB"}]
+    assert "binding_recipient_locale" in coordinator.classify_disposition(
+        bad_locale, intake=v, expected_call_id="call-abc-123"
+    )["reason"]
+    # Recipients count mismatch
+    bad_count = _completed_for_intake(v)
+    bad_count["recipients"] = [
+        {"phones": [v.phone], "locale": "en-US"},
+        {"phones": [v.phone], "locale": "en-US"},
+    ]
+    assert "binding_recipients_count" in coordinator.classify_disposition(
+        bad_count, intake=v, expected_call_id="call-abc-123"
+    )["reason"]
+    # Result schema mismatch (if present)
+    bad_schema = _completed_for_intake(v)
+    bad_schema["result_schema"] = {"type": "object", "properties": {"evil": {"type": "string"}}}
+    assert "binding_result_schema" in coordinator.classify_disposition(
+        bad_schema, intake=v, expected_call_id="call-abc-123"
+    )["reason"]
