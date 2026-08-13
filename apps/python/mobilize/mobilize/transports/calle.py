@@ -299,6 +299,7 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
         transcript.extend(attempt.get("transcript_turns") or [])
 
     can_come = structured.get("can_come", "unknown")
+    final_position = structured.get("final_position", "unclear")
     evidence = structured.get("evidence_summary", "") or (call.get("summary") or "")
     prior_showup_rate = expected_candidate.historical_showup_rate if expected_candidate is not None else 0.5
     # Only "yes" counts as an opt-out request -- "unknown" (e.g. the call
@@ -346,11 +347,30 @@ def _to_call_result(call_id: str, call: dict, expected_candidate: Candidate | No
         # is trusted.
         elif task_completed is not True:
             outcome, commitment = CallOutcome.NO_ANSWER, 0.0
+        # can_come reads any agreement in the call, even a retracted one --
+        # it has no notion of what happened LAST. Recognizing that a later
+        # statement withdraws an earlier one, in arbitrary phrasing, is a
+        # semantic judgment CALL-E's own language understanding is far
+        # better positioned to make than a hand-written pattern list ever
+        # will be (several rounds of finding one more unlisted retraction
+        # phrasing proved that ceiling directly) -- final_position asks for
+        # that judgment explicitly, as the recipient's position after the
+        # WHOLE call. Required and trusted no more blindly than can_come
+        # was: an absent/unclear value fails closed here rather than being
+        # waved through, exactly like task_completed above.
+        elif final_position != "confirmed":
+            outcome, commitment = CallOutcome.NO_ANSWER, 0.0
         # Cross-check the structured "yes" against what the recipient
         # actually said. structured_result/evidence_summary are
         # provider-authored extractions and can misread or fabricate a
         # commitment -- the recipient's own words must affirmatively
-        # corroborate it, not merely fail to contradict it.
+        # corroborate it, not merely fail to contradict it. This transcript
+        # check and final_position above are deliberately independent,
+        # cross-validating signals, not a replacement for one another: this
+        # one still catches the retraction phrasings already in the local
+        # pattern list even if final_position were ever wrong, and
+        # final_position catches the open-ended ones this transcript check
+        # structurally cannot.
         elif not _recipient_corroborates_commitment(transcript):
             outcome, commitment = CallOutcome.NO_ANSWER, 0.0
         else:

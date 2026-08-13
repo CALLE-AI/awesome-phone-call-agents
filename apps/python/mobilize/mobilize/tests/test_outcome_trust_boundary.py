@@ -13,7 +13,14 @@ from mobilize.tests.test_planner import make_candidate
 from mobilize.transports.calle import _to_call_result
 
 
-def _call(status="completed", can_come="yes", task_completed=None, transcript_turns=None, evidence="leaving now"):
+def _call(status="completed", can_come="yes", task_completed=None, transcript_turns=None,
+          evidence="leaving now", final_position="confirmed"):
+    structured_result = {"can_come": can_come, "evidence_summary": evidence}
+    # final_position is allowed to be omitted entirely (pass None) to
+    # simulate a non-compliant/older response missing the field, which
+    # must fail closed the same way an explicit "unclear" does.
+    if final_position is not None:
+        structured_result["final_position"] = final_position
     return {
         "status": status,
         "task_completed": task_completed,
@@ -21,7 +28,7 @@ def _call(status="completed", can_come="yes", task_completed=None, transcript_tu
         "recipients": [{
             "phones": ["+15550000000"],
             "status": "completed",
-            "structured_result": {"can_come": can_come, "evidence_summary": evidence},
+            "structured_result": structured_result,
             "attempts": [{"transcript_turns": transcript_turns or []}],
         }],
     }
@@ -280,6 +287,61 @@ def test_plans_have_changed_retraction_fails_closed():
                       {"speaker": "bot", "text": "great, see you soon"},
                       {"speaker": "user", "text": "Plans have changed"},
                   ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_final_position_declined_overrides_a_retraction_no_pattern_list_would_catch():
+    """"I have to cancel," "Count me out," "I rescind my commitment," and
+    "That agreement is off" are all real retraction phrasings a hand-
+    written pattern list failed to recognize (each still resolved to
+    affirm under the old transcript-only mechanism -- verified directly
+    against _recipient_effective_position before this fix). Recognizing
+    an open-ended retraction in arbitrary wording is a semantic judgment
+    delegated to CALL-E's own final_position extraction instead: this
+    proves _to_call_result actually trusts and acts on that field when it
+    correctly reports the call ended in a withdrawal, for any of the four
+    phrasings, without needing our own regex to understand any of them."""
+    candidate = _candidate()
+    for retraction_text in (
+        "I have to cancel",
+        "Count me out",
+        "I rescind my commitment",
+        "That agreement is off",
+    ):
+        call = _call(status="completed", can_come="yes", task_completed=True,
+                      evidence="leaving now", final_position="declined_or_withdrawn",
+                      transcript_turns=[
+                          {"speaker": "bot", "text": "can you come donate right now?"},
+                          {"speaker": "user", "text": "Yes, I am definitely coming"},
+                          {"speaker": "bot", "text": "great, see you soon"},
+                          {"speaker": "user", "text": retraction_text},
+                      ])
+        result = _to_call_result("call_1", call, candidate)
+        assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES), retraction_text
+        assert result.commitment_score == 0.0, retraction_text
+
+
+def test_missing_final_position_fails_closed():
+    """final_position is a required schema field, but a non-compliant or
+    older response could omit it -- that must fail closed exactly like an
+    explicit "unclear" would, not be waved through as "no contradiction"
+    the way task_completed=None almost was in an earlier round."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now", final_position=None,
+                  transcript_turns=[{"speaker": "user", "text": "yes, leaving now"}])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_final_position_unclear_fails_closed():
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now", final_position="unclear",
+                  transcript_turns=[{"speaker": "user", "text": "yes, leaving now"}])
     result = _to_call_result("call_1", call, candidate)
     assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
     assert result.commitment_score == 0.0

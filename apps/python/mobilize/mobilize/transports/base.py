@@ -36,7 +36,7 @@ def validate_trusted_base_url(base_url: str) -> None:
 
 MOBILIZE_RESULT_SCHEMA = {
     "type": "object",
-    "required": ["can_come", "eta_minutes", "evidence_summary"],
+    "required": ["can_come", "eta_minutes", "evidence_summary", "final_position"],
     "properties": {
         "can_come": {
             "type": "string",
@@ -45,6 +45,36 @@ MOBILIZE_RESULT_SCHEMA = {
                 "Use yes only if the recipient clearly agreed to come. Use no if they "
                 "declined or are ineligible. Use unknown if the call did not reach them "
                 "or the answer was unclear."
+            ),
+        },
+        # can_come reads any agreement in the call, even one the recipient
+        # went on to take back -- it has no notion of what came LAST.
+        # Several review rounds found real transcripts where an early "yes"
+        # was withdrawn later in the same call using phrasing no
+        # hand-written pattern list could keep up with ("I have to
+        # cancel," "count me out," "I rescind my commitment," "that
+        # agreement is off," ...). Recognizing that a statement retracts an
+        # EARLIER one, in arbitrary phrasing, is a semantic judgment CALL-E's
+        # own language understanding is positioned to make far better than
+        # a regex ever will -- so this field asks for it directly, as the
+        # recipient's position after weighing the WHOLE call, not a second
+        # attempt to extract the same single-moment signal as can_come.
+        # It is required and independently cross-checked against the
+        # transcript before being trusted (see _to_call_result) -- this is
+        # an additional signal, not a replacement for verifying the
+        # conversation actually supports it.
+        "final_position": {
+            "type": "string",
+            "enum": ["confirmed", "declined_or_withdrawn", "unclear"],
+            "description": (
+                "The recipient's position at the END of the call, after weighing the "
+                "ENTIRE conversation, not just their first answer. If they agreed and "
+                "then later changed their mind, cancelled, backed out, or said anything "
+                "inconsistent with still coming -- in ANY wording, not just an obvious "
+                "'no' -- use declined_or_withdrawn, even though they said yes earlier. "
+                "Use confirmed only if their final, un-retracted position was a genuine "
+                "agreement to come. Use unclear if the call never established a clear "
+                "final position."
             ),
         },
         "eta_minutes": {
