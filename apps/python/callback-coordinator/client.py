@@ -1,29 +1,23 @@
 """Callback Coordinator CLI.
-
 Preview (default) validates an intake and prints a masked no-call plan.
 Execute places exactly one CALL-E triage call and returns a fail-closed ticket.
-
 Live execution requires:
   - a request file that records explicit consent for this callback (consent: true);
   - the --confirm-consent flag (a separate explicit confirmation);
   - a server-side CALLE_API_KEY in the environment.
   - base URL is locked to https://api.heycall-e.com to prevent credential leakage.
-
 Example:
   uv run python client.py --request example_request_web_form.json
   CALLE_API_KEY=... uv run python client.py --request example_request_web_form.json \\
       --execute --confirm-consent --output ticket.json
 """
-
 from __future__ import annotations
-
 import argparse
 import json
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
 from coordinator import (
     TRUSTED_BASE_URL,
     execute_with_client,
@@ -31,10 +25,7 @@ from coordinator import (
     preview,
     validate_trusted_base_url,
 )
-
 DEFAULT_BASE_URL = TRUSTED_BASE_URL
-
-
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Preview or run one consent-first callback triage call with CALL-E."
@@ -81,8 +72,6 @@ def parse_args(argv=None) -> argparse.Namespace:
     )
     parser.add_argument("--timeout-seconds", type=int, default=600)
     return parser.parse_args(argv)
-
-
 def parse_now(raw: str | None) -> datetime:
     if raw is None:
         return datetime.now(timezone.utc)
@@ -93,8 +82,6 @@ def parse_now(raw: str | None) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value
-
-
 def write_output(path: Path | None, payload: dict) -> None:
     rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if path is None:
@@ -106,19 +93,14 @@ def write_output(path: Path | None, payload: dict) -> None:
         handle.write(rendered)
     destination.chmod(0o600)
     sys.stdout.write(f"Wrote {destination}\n")
-
-
 def check_api(base_url: str) -> dict:
     """Verify the CALL-E API key and connectivity via GET /health. No call placed."""
     # Fail-closed: validate origin and credentials before any network or import
     validated = validate_trusted_base_url(base_url)
-
     api_key = os.environ.get("CALLE_API_KEY")
     if not api_key:
         raise ValueError("CALLE_API_KEY is required for --check-api")
-
     import httpx
-
     url = validated.rstrip("/") + "/health"
     with httpx.Client(timeout=15.0) as http:
         response = http.get(url, headers={"Authorization": f"Bearer {api_key}"})
@@ -129,36 +111,27 @@ def check_api(base_url: str) -> dict:
         "status_code": response.status_code,
         "healthy": response.status_code < 400,
     }
-
-
 def main(argv=None) -> int:
     args = parse_args(argv)
     try:
         # Always validate base_url early – credentials must stay on trusted origin
         validated_base_url = validate_trusted_base_url(args.base_url)
-
         if args.check_api:
             write_output(args.output, check_api(validated_base_url))
             return 0
-
         intake = load_intake(args.request)
         now = parse_now(args.now)
-
         if not args.execute:
             write_output(args.output, preview(intake, now))
             return 0
-
         if not args.confirm_consent:
             raise ValueError("--execute requires --confirm-consent")
         if args.timeout_seconds <= 0:
             raise ValueError("--timeout-seconds must be positive")
-
         api_key = os.environ.get("CALLE_API_KEY")
         if not api_key:
             raise ValueError("CALLE_API_KEY is required for --execute")
-
         from calle import CalleClient
-
         client = CalleClient(api_key=api_key, base_url=validated_base_url)
         ticket = execute_with_client(
             intake, client, now=now, timeout_seconds=args.timeout_seconds
@@ -174,7 +147,5 @@ def main(argv=None) -> int:
     ) as exc:
         sys.stderr.write(f"error: {exc}\n")
         return 2
-
-
 if __name__ == "__main__":
     raise SystemExit(main())
