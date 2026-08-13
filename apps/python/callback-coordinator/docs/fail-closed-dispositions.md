@@ -6,19 +6,22 @@ not reach a clear, consented answer is not auto-closed.
 ## Disposition matrix
 | Disposition | Condition (all must hold) | Routing |
 |---|---|---|
-| `scheduled` | **Binding bound**: `id` matches created call, `metadata.workflow_id` matches intake, `recipients[].phones` contains intake phone; plus `status=completed`, `task_completed=true`, `right_person=yes`, `consent=yes`, reason ∈ actionable set, confidence ≥ 0.7 (or label `high`), not urgent, all enums bound | Matched team |
+| `scheduled` | **Strict binding required**: `id` present and == created call id, `task` == approved task, `metadata` exact: `workflow_id`, `workflow_type=callback_triage`, `source` match intake, `recipients` exact: len==1, `phones==[intake.phone]`, `locale==intake.locale`, optional `result_schema` must == approved schema; plus `status=completed`, `task_completed=true`, `right_person=yes`, `consent=yes`, reason ∈ actionable set, confidence ≥ 0.7 (or label `high`), not urgent, all enums bound | Matched team |
 | `declined` | consent `no`, or reason `declined` (with completed true) | Closed (no callback wanted) |
 | `skipped` | Gate blocked the call (quiet hours, `do_not_call`, or `consent_not_recorded`) | No call made |
 | `needs_human` | Anything else – including binding mismatches, non-completed status, task_completed=false, unbound enum values | Human review |
+
 ## What lands in `needs_human`
+
 Each case below routes to a human instead of a success branch:
+
 - **Missing terminal result** – CALL-E returned no dict.
-- **Binding mismatch** – terminal result not bound to approved session:
-  - `id` present and != expected call id → `binding_call_id_mismatch`
-  - `metadata` missing or `workflow_id` != intake → `binding_metadata_missing` / `binding_workflow_id_mismatch`
-  - `workflow_type` present and != `callback_triage` → `binding_workflow_type_mismatch`
-  - `recipients` missing or intake phone not in `recipients[].phones` → `binding_recipients_missing` / `binding_recipient_phone_mismatch`
-  - Prevents a completed payload for a different workflow or phone from being accepted as `scheduled`.
+- **Binding mismatch – every field must be present and match exact approved payload** (prevents stale/mismatched result becoming `scheduled`):
+  - `id` missing or != expected call id → `binding_call_id_mismatch` / `binding_call_id_missing` (when expected exists, no id is rejected)
+  - `task` missing or != `build_task(intake)` → `binding_task_mismatch`
+  - `metadata` missing → `binding_metadata_missing`; `workflow_id` != intake → `binding_workflow_id_mismatch`; `workflow_type` != `callback_triage` → `binding_workflow_type_mismatch`; `source` != intake.source → `binding_metadata_source_mismatch`
+  - `recipients` missing or len !=1 → `binding_recipients_missing` / `binding_recipients_count_mismatch`; `phones` != `[intake.phone]` → `binding_recipient_phone_mismatch`; `locale` != intake.locale → `binding_recipient_locale_mismatch`
+  - `result_schema` present and != approved `build_result_schema()` → `binding_result_schema_mismatch`
 - **Not completed** – `status` is not exactly `completed` (e.g. `in_progress`, `failed`, `canceled`) or missing. `failed`/`canceled` map to `call_failed`/`call_canceled`, others to `call_not_completed_status_*`.
 - **Task not completed** – `task_completed != true` → `task_not_completed`.
 - **Missing structured result** – no `structured_result`.
@@ -30,15 +33,19 @@ Each case below routes to a human instead of a success branch:
 - **Low confidence** — completion confidence below threshold.
 - **Urgent matter** — `urgent = yes`: fast-tracked to a human, not auto-routed.
 - **Create/result error** — the create response had no call id, the lookup timed out or raised, or the outcome of `POST /v1/calls` was indeterminate.
+
 For `needs_human`, the engine keeps the matched team when the reason is still
 confident enough to target a specialist (e.g. low confidence but clear
 `billing` → the Billing team reviews). Otherwise it falls back to
 "General Intake (human review)".
+
 ## Why the task no longer offers a callback time
+
 The earlier prompt offered "book a specific callback time now" but the result
 schema has no time field. That mismatch meant a promised time could be lost or
 hallucinated. The fixed prompt explicitly says: do **not** attempt to book a
 time; it only triages why the callback is needed and whether voicemail is okay.
+
 ## Idempotency and reconciliation
 - The create request uses a stable `callback-triage-<workflow_id>` idempotency
   key, so replaying the same intake after an ambiguous create cannot create a
