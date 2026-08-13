@@ -5,7 +5,7 @@ def test_authorized_business_can_be_called():
     business = {
         "authorized": True,
         "do_not_call": False,
-        "phone": "+911234567890"
+        "phone": "+919876543210"
     }
 
     allowed, _ = can_call_business(business)
