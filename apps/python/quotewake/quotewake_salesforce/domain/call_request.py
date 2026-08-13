@@ -39,15 +39,31 @@ def _line_context(lines: Iterable[QuoteLine], currency: str | None, *, regional_
     return "\n".join(rendered) if rendered else "- No Quote line items were available."
 
 
-def _validate_locale(value: str) -> str:
-    value = value.strip()
+def canonicalize_call_locale(value: str) -> str:
+    """Accept Salesforce/CLDR locale spelling and return a BCP-47 tag.
+
+    Salesforce stores the demo Contact locale as ``en_US`` while CALL-E's
+    OpenAPI recipient schema requires the hyphenated ``en-US`` spelling.  The
+    conversion belongs at this domain boundary so prompts, dry-runs, and live
+    provider requests use the same canonical value.
+    """
+
+    if not isinstance(value, str):
+        raise ValueError("CALL-E locale must use BCP-47 form such as en-US")
+    value = value.strip().replace("_", "-")
     if not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z]{2}|-[0-9]{3})?", value):
-        raise ValueError("CALL-E locale must use BCP-47 form such as es-ES")
+        raise ValueError("CALL-E locale must use BCP-47 form such as en-US")
     try:
         Locale.parse(value, sep="-")
     except (UnknownLocaleError, ValueError, TypeError) as exc:
         raise ValueError("CALL-E locale must be a valid BCP-47 locale") from exc
-    return value
+    language, separator, region = value.partition("-")
+    if not separator:
+        return language.lower()
+    return f"{language.lower()}-{region.upper() if region.isalpha() else region}"
+
+
+_validate_locale = canonicalize_call_locale
 
 
 def _validate_region(value: str | None) -> str:
@@ -67,7 +83,7 @@ def build_call_request(result: SelectionResult, lines: Iterable[QuoteLine], *, p
     quote, contact = result.quote, result.contact
     if not contact.call_locale:
         raise ValueError("Salesforce Contact.QuoteWake_Call_Locale__c is required for CALL-E calls")
-    locale = _validate_locale(contact.call_locale)
+    locale = canonicalize_call_locale(contact.call_locale)
     region = _validate_region(quote.account_billing_country_code)
     account_name = _safe_context(quote.account_name, "the customer account")
     contact_name = _safe_context(contact.name, "the quote contact")

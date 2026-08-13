@@ -5,10 +5,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from quotewake_salesforce.cli import main
+from quotewake_salesforce.calle.client import CallEError
+from quotewake_salesforce.cli import _call_error_message, _task_description, main
 from quotewake_salesforce.config import EnvironmentSettings, LoggingSettings, RegionalSettings
 from quotewake_salesforce.domain.models import CallOutcomeKind, CallResult, ContactTarget, QuoteCandidate
 from quotewake_salesforce.domain.policy import FollowUpPolicies, InitialFollowUpTiming, RetryPolicy
+from quotewake_salesforce.structured_logging import log_event
 
 
 def quote(identifier):
@@ -19,7 +21,7 @@ def setup():
     env = EnvironmentSettings("https://salesforce.invalid", "id", "secret", "61.0", "calle-key")
     regional = RegionalSettings.from_values("UTC", "en_US")
     timing = InitialFollowUpTiming(__import__("datetime").timedelta(0), __import__("datetime").timedelta(0), __import__("datetime").timedelta(0))
-    retry = RetryPolicy(3, (__import__("datetime").timedelta(days=1), __import__("datetime").timedelta(days=2)), frozenset({"no_answer"}), __import__("datetime").timedelta(minutes=5), frozenset({"interested"}))
+    retry = RetryPolicy(3, (__import__("datetime").timedelta(days=1), __import__("datetime").timedelta(days=2)), frozenset({"no_answer", "call_back_later", "busy"}), __import__("datetime").timedelta(minutes=5), frozenset({"interested"}))
     policies = FollowUpPolicies(retry)
     fake_sf = Mock()
     repository = Mock()
@@ -30,6 +32,21 @@ def setup():
     return env, regional, timing, policies, fake_sf, repository
 
 
+def test_task_description_is_multiline_and_keeps_result_line_breaks():
+    result = CallResult(
+        "0Q0000000000001", "call-1", "completed", "no_answer", "unknown", None,
+        "Recipient did not answer.\nNo voicemail was left.",
+        "Retry tomorrow.\nUse the same quote context.", None,
+        CallOutcomeKind.BUSINESS, datetime(2026, 8, 13, tzinfo=timezone.utc),
+    )
+
+    description = _task_description(result)
+
+    assert "Summary:\nRecipient did not answer.\nNo voicemail was left." in description
+    assert "Next action:\nRetry tomorrow.\nUse the same quote context." in description
+    assert "CALL-E call ID:\ncall-1" in description
+
+
 def test_default_run_plans_without_call_or_write():
     env, regional, timing, policies, fake_sf, repository = setup()
     fake_calle = Mock()
@@ -37,6 +54,58 @@ def test_default_run_plans_without_call_or_write():
         assert main([]) == 0
     fake_calle.preview.assert_called_once()
     fake_sf.composite_write.assert_not_called()
+
+
+def test_cli_passes_configured_call_wait_timeout_to_calle():
+    env, regional, timing, policies, fake_sf, repository = setup()
+    fake_calle = Mock()
+    prompt_settings = Mock(wait_timeout_seconds=37)
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_call_prompt", return_value=prompt_settings), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle) as calle_class:
+        assert main([]) == 0
+    assert calle_class.call_args.kwargs["timeout_seconds"] == 37
+
+
+def test_cli_passes_idempotency_suffix_to_calle():
+    env, regional, timing, policies, fake_sf, repository = setup()
+    fake_calle = Mock()
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle) as calle_class:
+        assert main(["--idempotency-suffix", "test-02"]) == 0
+    assert calle_class.call_args.kwargs["idempotency_suffix"] == "test-02"
+
+
+@pytest.mark.parametrize("value", ["", "_invalid", "a" * 33])
+def test_cli_rejects_invalid_idempotency_suffix(value):
+    with pytest.raises(SystemExit):
+        main(["--idempotency-suffix", value])
+
+
+def test_run_finished_is_last_event_after_calle_close(caplog):
+    env, regional, timing, policies, fake_sf, repository = setup()
+
+    class FakeCallE:
+        def preview(self, request, *, next_attempt, retry_marker=None):
+            return {"idempotency_key": "quotewake-test-1"}
+
+        def close(self):
+            log_event("call_e_client_closed", level=logging.INFO, service="call_e")
+
+    logger = logging.getLogger("quotewake_salesforce")
+    logger.addHandler(caplog.handler)
+    try:
+        with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=FakeCallE()):
+            assert main([]) == 0
+    finally:
+        logger.removeHandler(caplog.handler)
+
+    events = [record for record in caplog.records if hasattr(record, "quotewake_event")]
+    assert events[-1].quotewake_event == "run_finished"
+    assert events[-2].quotewake_event == "call_e_client_closed"
+    fields = events[-1].quotewake_fields
+    assert fields["mode"] == "dry_run"
+    assert fields["exit_code"] == 0
+    assert fields["evaluated"] == 1
+    assert fields["failures"] == 0
+    assert isinstance(fields["elapsed_ms"], (int, float))
 
 
 def test_max_calls_limits_dry_run_in_salesforce_order():
@@ -63,7 +132,7 @@ def test_regional_call_overrides_are_removed_from_cli():
         main(["--call-region", "ES"])
 
 
-def test_max_calls_limits_execute_without_processing_deferred_quotes():
+def test_max_calls_limits_execute_without_processing_deferred_quotes(capsys):
     env, regional, timing, policies, fake_sf, repository = setup()
     repository.load_organization_regional_settings.return_value = regional
     repository.load.return_value = ([quote("0Q0000000000001"), quote("0Q0000000000002")], {"006000000000001": [ContactTarget("003000000000001", "Contact", "+14155550101", False, "en-US")]})
@@ -74,6 +143,13 @@ def test_max_calls_limits_execute_without_processing_deferred_quotes():
         assert main(["--execute", "--max-calls", "1"]) == 0
     fake_calle.execute.assert_called_once()
     fake_sf.composite_write.assert_called_once()
+    output = capsys.readouterr().out
+    assert "Call results:" in output
+    assert (
+        "Quote 0Q0000000000001: Demo | €10.00 | CALLED (interested)"
+        in output
+    )
+    assert "0Q0000000000002: Demo | €10.00 | CALLED" not in output
 
 
 def test_show_prompt_respects_limit_without_constructing_calle(capsys):
@@ -136,3 +212,59 @@ def test_execute_aborts_remaining_calls_when_persistence_fails(caplog):
     assert failure.quotewake_fields["call_id"] == "call-1"
     assert failure.quotewake_fields["phase"] == "persist"
     assert "raw persistence response" not in repr(failure.quotewake_fields)
+
+
+def test_cli_error_message_is_actionable_but_does_not_echo_provider_data():
+    error = CallEError(
+        "provider returned token=secret phone=+14155550101",
+        classification="provider",
+        http_status=503,
+        code="provider_unavailable",
+        reason="provider_unavailable",
+        creation_unknown=True,
+        idempotency_key="quotewake-0Q0000000000001-1",
+    )
+    message = _call_error_message(error)
+    assert "classification=provider" in message
+    assert "http_status=503" in message
+    assert "provider_unavailable" in message
+    assert "same idempotency key" in message
+    assert "secret" not in message
+    assert "+14155550101" not in message
+
+
+def test_cli_call_not_ready_message_is_actionable_without_reconciliation_warning():
+    error = CallEError(
+        "provider returned token=secret phone=+14155550101",
+        classification="provider",
+        http_status=422,
+        code="call_not_ready",
+        reason="call_not_ready",
+        creation_unknown=False,
+    )
+    message = _call_error_message(error)
+    assert "call_not_ready" in message
+    assert "Review CALL-E task, recipient, locale, and region readiness" in message
+    assert "Creation outcome is unknown" not in message
+    assert "secret" not in message
+    assert "+14155550101" not in message
+
+
+def test_cli_wait_result_unknown_reconciles_call_without_replaying_creation():
+    error = CallEError(
+        "provider timeout with token=secret",
+        classification="timeout",
+        code="provider_error",
+        reason="timeout",
+        creation_unknown=False,
+        result_unknown=True,
+        provider_call_id="call-123",
+        phase="wait",
+    )
+    message = _call_error_message(error)
+    assert message.endswith(
+        "CALL-E accepted call call-123, terminal result is unknown; "
+        "reconcile this call before any new attempt."
+    )
+    assert "same idempotency key" not in message
+    assert "token=secret" not in message

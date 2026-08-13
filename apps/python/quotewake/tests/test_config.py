@@ -15,10 +15,25 @@ from quotewake_salesforce.config import (
     load_follow_up_policies,
     load_initial_follow_up_timing,
     load_logging_settings,
+    parse_duration,
+    validate_calle_base_url,
 )
 
 
 class TestQuoteWakeConfiguration(unittest.TestCase):
+    def test_calle_base_url_accepts_only_official_https_origin(self) -> None:
+        self.assertEqual(validate_calle_base_url("https://api.heycall-e.com/"), "https://api.heycall-e.com")
+        for value in (
+            "http://api.heycall-e.com",
+            "https://api.heycall-e.com/v1",
+            "https://user:pass@api.heycall-e.com",
+            "https://api.heycall-e.com?token=secret",
+            "https://example.invalid",
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    validate_calle_base_url(value)
+
     def _config(self, content: str) -> Path:
         directory = Path(tempfile.mkdtemp(prefix="quotewake-config-test-"))
         path = directory / "quotewake.toml"
@@ -30,9 +45,9 @@ class TestQuoteWakeConfiguration(unittest.TestCase):
             self._config(
                 """
 [selection.initial_follow_up]
-minimum_delay_hours = 4
-standard_delay_hours = 48
-due_soon_window_days = 3
+minimum_delay = "4h"
+standard_delay = "2d"
+due_soon_window = "3d"
 """
             )
         )
@@ -45,13 +60,13 @@ due_soon_window_days = 3
         path = self._config(
             """
 [selection.initial_follow_up]
-minimum_delay_hours = 4
-standard_delay_hours = 2
-due_soon_window_days = 3
+minimum_delay = "4h"
+standard_delay = "2h"
+due_soon_window = "3d"
 """
         )
 
-        with self.assertRaisesRegex(ValueError, "standard_delay_hours"):
+        with self.assertRaisesRegex(ValueError, "standard_delay"):
             load_initial_follow_up_timing(path)
 
     def test_rejects_missing_timing_table(self) -> None:
@@ -60,14 +75,88 @@ due_soon_window_days = 3
         with self.assertRaisesRegex(ValueError, "selection.initial_follow_up"):
             load_initial_follow_up_timing(path)
 
+    def test_parse_duration_accepts_ordered_integer_components(self) -> None:
+        self.assertEqual(
+            parse_duration("1d2h30m15s"),
+            timedelta(days=1, hours=2, minutes=30, seconds=15),
+        )
+        self.assertEqual(parse_duration("0s", allow_zero=True), timedelta(0))
+
+    def test_parse_duration_rejects_non_strict_values(self) -> None:
+        for value in ("", "1h2d", "1h1h", "1.5h", "-1h", "1 h", "1", 1, True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    parse_duration(value)
+        with self.assertRaisesRegex(ValueError, "greater than zero"):
+            parse_duration("0s")
+
+    def test_parse_duration_reports_contextual_overflow(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, r"follow_up\.retry\.retry_delays\[0\].*out of range"
+        ):
+            parse_duration(
+                "999999999999999999999999999999d",
+                context="TOML setting follow_up.retry.retry_delays[0]",
+                allow_zero=True,
+            )
+
+    def test_rejects_legacy_initial_duration_keys(self) -> None:
+        path = self._config(
+            """
+[selection.initial_follow_up]
+minimum_delay_hours = 4
+minimum_delay = "4h"
+standard_delay = "4h"
+due_soon_window = "0s"
+"""
+        )
+
+        with self.assertRaisesRegex(ValueError, r"minimum_delay_hours -> minimum_delay"):
+            load_initial_follow_up_timing(path)
+
+    def test_rejects_legacy_retry_duration_keys(self) -> None:
+        path = self._config(
+            """
+[follow_up.retry]
+max_attempts = 1
+retry_delays_days = []
+retry_delays = []
+retry_outcomes = ["call_back_later", "no_answer", "busy"]
+technical_failure_retry_delay_minutes = 30
+technical_failure_retry_delay = "30m"
+completed_outcomes = ["interested"]
+"""
+        )
+
+        with self.assertRaisesRegex(ValueError, r"retry_delays_days -> retry_delays"):
+            load_follow_up_policies(path)
+
+    def test_loads_string_retry_durations_and_allows_one_attempt(self) -> None:
+        policies = load_follow_up_policies(
+            self._config(
+                """
+[follow_up.retry]
+max_attempts = 1
+retry_delays = []
+retry_outcomes = ["call_back_later", "no_answer", "busy"]
+technical_failure_retry_delay = "0s"
+completed_outcomes = ["interested"]
+"""
+            )
+        )
+
+        self.assertEqual(policies.retry.max_attempts, 1)
+        self.assertEqual(policies.retry.retry_delays, ())
+        self.assertEqual(policies.retry.technical_failure_retry_delay, timedelta(0))
+
     def test_rejects_follow_up_outcome_outside_call_e_vocabulary(self) -> None:
         path = self._config(
             """
 [follow_up.retry]
 max_attempts = 2
-retry_delays_days = [1]
+retry_delays = ["1d"]
 retry_outcomes = ["interested", "provider_specific"]
-technical_failure_retry_delay_minutes = 30
+technical_failure_retry_delay = "30m"
 completed_outcomes = ["busy"]
 """
         )
@@ -102,6 +191,13 @@ backup_count = 2
         self.assertEqual(settings.level, "INFO")
         self.assertGreater(settings.max_bytes, 0)
         self.assertGreaterEqual(settings.backup_count, 0)
+        self.assertFalse(settings.raw_calle_api)
+
+    def test_logging_raw_calle_api_is_explicit_boolean(self) -> None:
+        settings = load_logging_settings(self._config("[logging]\nraw_calle_api = true\n"))
+        self.assertTrue(settings.raw_calle_api)
+        with self.assertRaisesRegex(ValueError, "raw_calle_api.*boolean"):
+            load_logging_settings(self._config('[logging]\nraw_calle_api = "true"\n'))
 
     def test_rejects_invalid_logging_values(self) -> None:
         invalid_documents = (
@@ -119,6 +215,7 @@ backup_count = 2
     def test_call_prompt_falls_back_and_renders_compliance_rules(self) -> None:
         settings = load_call_prompt(self._config("[call]\n"))
         self.assertEqual(settings.template, DEFAULT_CALL_PROMPT)
+        self.assertEqual(settings.wait_timeout_seconds, 60)
         rendered = settings.render(
             {
                 "locale": "es-ES",
@@ -134,6 +231,19 @@ backup_count = 2
         )
         self.assertIn("Fixed compliance rules", rendered)
         self.assertIn("Marta", rendered)
+
+    def test_call_wait_timeout_is_configurable_and_positive_integer(self) -> None:
+        settings = load_call_prompt(
+            self._config("[call]\nwait_timeout_seconds = 45\n")
+        )
+        self.assertEqual(settings.wait_timeout_seconds, 45)
+        for value in (0, -1, True, "45"):
+            with self.subTest(value=value):
+                toml_value = "true" if value is True else repr(value)
+                with self.assertRaisesRegex(ValueError, "call.wait_timeout_seconds"):
+                    load_call_prompt(
+                        self._config(f"[call]\nwait_timeout_seconds = {toml_value}\n")
+                    )
 
     def test_call_prompt_rejects_unsafe_formatting(self) -> None:
         values = (

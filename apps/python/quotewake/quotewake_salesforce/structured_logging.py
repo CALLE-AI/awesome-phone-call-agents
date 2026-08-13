@@ -2,7 +2,7 @@
 
 The CLI writes readable events to a rotating project-local log file and to
 stderr. Both streams use one event per line in the form
-``timestamp [LEVEL] event: readable message``.
+``timestamp [LEVEL] [Service] [event]: readable message``.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -39,24 +40,101 @@ _LABELS = {
     "reason": "reason",
     "error_type": "error type",
 }
+_HIDDEN_RENDER_FIELDS = frozenset({"run_id"})
 _PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?[1-9]\d{7,14}(?!\w)")
-_SECRET_KEY_PATTERN = re.compile(r"(?:secret|token|password|api[_-]?key|client[_-]?secret)", re.I)
+_SECRET_KEY_PATTERN = re.compile(
+    r"(?:authorization|headers?|cookie|secret|token|password|api[\s_-]?key|apikey|"
+    r"access[_-]?token|refresh[_-]?token|client[_-]?secret)",
+    re.I,
+)
+_SECRET_TEXT_PATTERN = re.compile(
+    r"(?i)\b(?:authorization|api[\s_-]?key|apikey|access[_-]?token|refresh[_-]?token|"
+    r"client[_-]?secret)\b\s*[:=]\s*(?:bearer\s+)?[^\s,;\]}]+"
+)
+_BEARER_PATTERN = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{8,}")
+_ANSI_RESET = "\x1b[0m"
+_SERVICE_TAG_COLORS = {
+    # Bright ANSI colors keep service boundaries legible on dark and light
+    # terminals, following a high-contrast CLI palette.
+    "[Salesforce]": "\x1b[94m",  # bright blue
+    "[Call-E]": "\x1b[92m",  # bright green
+    "[QuoteWake]": "\x1b[93m",  # bright yellow
+}
 
 
-def _redact_log_value(key: str, value: Any) -> Any:
+def _service_tag(service: object) -> str:
+    """Return the stable visual tag used by the human-readable formatter."""
+
+    normalized = str(service or "").strip().lower().replace("_", "-")
+    return {
+        "salesforce": "[Salesforce]",
+        "call-e": "[Call-E]",
+        "quotewake": "[QuoteWake]",
+    }.get(normalized, "[QuoteWake]")
+
+
+def _colorize_service_tag(tag: str) -> str:
+    color = _SERVICE_TAG_COLORS.get(tag)
+    if color is None:
+        return tag
+    return f"{color}{tag}{_ANSI_RESET}"
+
+
+def _colorize_with_service(text: str, service_tag: str) -> str:
+    """Color arbitrary service-adjacent text with the service tag palette."""
+
+    color = _SERVICE_TAG_COLORS.get(service_tag)
+    return f"{color}{text}{_ANSI_RESET}" if color is not None else text
+
+
+def _stream_supports_color(stream: object) -> bool:
+    """Return whether a console stream should receive ANSI color sequences."""
+
+    if "NO_COLOR" in os.environ:
+        return False
+    isatty = getattr(stream, "isatty", None)
+    return callable(isatty) and bool(isatty())
+
+
+def _redact_log_value(
+    key: str,
+    value: Any,
+    *,
+    preserve_phone_fields: bool = False,
+) -> Any:
     if _SECRET_KEY_PATTERN.search(key):
         return "[redacted]"
+    phone_field = key.strip().lower() in {"phone", "phones"}
     if isinstance(value, str):
-        return _PHONE_LIKE_PATTERN.sub("[phone-redacted]", value)
+        redacted = value if preserve_phone_fields and phone_field else _PHONE_LIKE_PATTERN.sub(
+            "[phone-redacted]", value
+        )
+        redacted = _SECRET_TEXT_PATTERN.sub("[secret-redacted]", redacted)
+        return _BEARER_PATTERN.sub("Bearer [secret-redacted]", redacted)
     if isinstance(value, dict):
-        return {name: _redact_log_value(str(name), item) for name, item in value.items()}
+        return {
+            name: _redact_log_value(
+                str(name), item, preserve_phone_fields=preserve_phone_fields
+            )
+            for name, item in value.items()
+            if not _SECRET_KEY_PATTERN.search(str(name))
+        }
     if isinstance(value, (list, tuple)):
-        return type(value)(_redact_log_value(key, item) for item in value)
+        return type(value)(
+            _redact_log_value(
+                key, item, preserve_phone_fields=preserve_phone_fields
+            )
+            for item in value
+        )
     return value
 
 
 class _ReadableFormatter(logging.Formatter):
     """Render application records as concise, human-readable text."""
+
+    def __init__(self, *args: Any, use_color: bool = False, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.use_color = use_color
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = self.formatTime(record, self.datefmt)
@@ -64,12 +142,19 @@ class _ReadableFormatter(logging.Formatter):
         fields = getattr(record, "quotewake_fields", {})
         details = []
         for name, value in fields.items():
-            if value is None:
+            if value is None or name in _HIDDEN_RENDER_FIELDS:
                 continue
             label = _LABELS.get(name, name.replace("_", " "))
             details.append(f"{label} {value}")
         message = "; ".join(details) or event.replace("_", " ").capitalize() + "."
-        return f"{timestamp} [{record.levelname.upper()}] {event}: {message}"
+        service_tag = _service_tag(fields.get("service"))
+        tag = service_tag
+        if self.use_color:
+            tag = _colorize_service_tag(tag)
+            event = _colorize_with_service(f"[{event}]", service_tag)
+        else:
+            event = f"[{event}]"
+        return f"{timestamp} [{record.levelname.upper()}] {tag} {event}: {message}"
 
 
 def logger() -> logging.Logger:
@@ -112,7 +197,7 @@ def configure_logging(
     directory = _project_path(log_directory)
     directory.mkdir(parents=True, exist_ok=True)
     log_path = directory / "quotewake.log"
-    formatter = _ReadableFormatter(datefmt="%Y-%m-%d %H:%M:%S")
+    file_formatter = _ReadableFormatter(datefmt="%Y-%m-%d %H:%M:%S")
 
     application_logger = logger()
     for handler in list(application_logger.handlers):
@@ -127,10 +212,17 @@ def configure_logging(
         encoding="utf-8",
     )
     stderr_handler = logging.StreamHandler()
-    for handler in (file_handler, stderr_handler):
+    stderr_formatter = _ReadableFormatter(
+        datefmt="%Y-%m-%d %H:%M:%S",
+        use_color=_stream_supports_color(stderr_handler.stream),
+    )
+    for handler, handler_formatter in (
+        (file_handler, file_formatter),
+        (stderr_handler, stderr_formatter),
+    ):
         handler._quotewake_managed = True  # type: ignore[attr-defined]
         handler.setLevel(log_level)
-        handler.setFormatter(formatter)
+        handler.setFormatter(handler_formatter)
         application_logger.addHandler(handler)
     application_logger.setLevel(log_level)
     application_logger.propagate = False
@@ -173,13 +265,14 @@ def log_event(
     level: int | str = logging.INFO,
     run_id: str | None = None,
     quote_id: str | None = None,
+    preserve_phone_fields: bool = False,
     **fields: Any,
 ) -> None:
     """Emit one readable event with optional correlation identifiers.
 
-    Call sites intentionally pass only operational identifiers and bounded
-    domain values. Credentials, raw payloads, and exception text are not
-    accepted by the application event vocabulary.
+    Call sites normally pass only operational identifiers and bounded domain
+    values. The explicitly opt-in CALL-E support events may pass a payload;
+    values are recursively redacted before the record is created.
     """
 
     event_fields = dict(_LOG_CONTEXT.get())
@@ -190,7 +283,14 @@ def log_event(
             if value is not None
         }
     )
-    event_fields.update({key: _redact_log_value(key, value) for key, value in fields.items()})
+    event_fields.update(
+        {
+            key: _redact_log_value(
+                key, value, preserve_phone_fields=preserve_phone_fields
+            )
+            for key, value in fields.items()
+        }
+    )
     logger().log(
         _level_value(level),
         event,

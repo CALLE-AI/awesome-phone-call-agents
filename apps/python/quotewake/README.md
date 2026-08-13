@@ -51,10 +51,11 @@ The normal workflow is:
   Contact locale, Account country, and Salesforce organization regional settings.
 - Safe dry-run output without creating a CALL-E client, placing a call, or
   writing Salesforce records.
-- Direct CALL-E execution with a fixed structured result schema and the
-  business outcomes `interested`, `call_back_later`, `no_answer`, and `busy`.
+- Direct CALL-E execution with a fixed structured result schema and the seven
+  explicit business outcomes listed in the outcomes table below.
 - Atomic Quote + Task write-back through one Salesforce Composite API request.
-- Bounded, rotating, human-readable logs and a per-run `--max-calls` limit.
+- Bounded, rotating, human-readable service-tagged logs, a final line-by-line
+  call result summary, and a per-run `--max-calls` limit.
 
 ### Selection truth
 
@@ -92,7 +93,7 @@ Salesforce standard objects are used wherever possible:
 | `OpportunityContactRole` | Requires exactly one primary contact for the opportunity. |
 | `QuoteLineItem` / `Product2` | Supplies concise product, quantity, and line-total context. |
 | `Organization` | Supplies `TimeZoneSidKey` and `DefaultLocaleSidKey` for regional formatting. |
-| `Task` | Stores each completed follow-up activity, linked to the Quote (`WhatId`) and Contact (`WhoId`). |
+| `Task` | Stores each persisted follow-up result, linked to the Quote (`WhatId`) and Contact (`WhoId`), with the commercial outcome in the subject and a multiline description. |
 
 The deployed QuoteWake custom fields are:
 
@@ -102,14 +103,17 @@ On `Quote`:
 - `Follow_Up_Status__c`: `Retry`, `Completed`, or `Stopped` after processing;
   blank means the initial follow-up is pending. `In Progress` is reserved in
   the Salesforce picklist and treated as non-actionable by the current worker.
-- `Next_Follow_Up_At__c`: persisted retry time, stored by Salesforce as a
+- `Next_Follow_Up_At__c`: persisted retry time, or the UTC reset-generation
+  marker when `Follow_Up_Status__c` is blank; stored by Salesforce as a
   DateTime.
 - `Attempt_Count__c`: completed business attempts; technical CALL-E failures do
   not consume one.
 
 On `Contact`:
 
-- `QuoteWake_Call_Locale__c`: BCP-47 locale required by CALL-E.
+- `QuoteWake_Call_Locale__c`: call locale stored in Salesforce form (for
+  example `en_US`) and normalized to CALL-E's BCP-47 form (`en-US`) at the
+  provider boundary.
 
 An opt-out field is optional because Salesforce orgs differ: configure a
 Contact checkbox API name with `SALESFORCE_DO_NOT_CALL_FIELD` or
@@ -120,6 +124,13 @@ No custom call-history object is required today. The standard Task is the
 Salesforce activity record. QuoteWake writes the three follow-up fields above;
 it does not overwrite commercial Quote amount, status, expiration, or other
 business fields.
+
+Task subjects use `QuoteWake call outcome: <outcome>`; `unknown` adds
+`(human review)`. The description keeps the summary and next action on separate
+lines and includes the CALL-E call ID. A Task is created whenever QuoteWake
+obtains a terminal result that it can safely persist, including commercial
+outcomes and terminal technical failures. Create/wait errors with no accepted
+terminal result do not create a Task.
 
 ## Quick demo
 
@@ -149,14 +160,30 @@ sf org login web --alias quotewake-dev --set-default
 ./scripts/setup-salesforce.sh \
   --target-org quotewake-dev \
   --seed-data \
-  --country-code ES \
-  --call-locale es-ES \
-  --test-phones "+14155550101"
+  --country-code US \
+  --call-locale en_US
 ```
 
 Use only E.164 numbers that you are authorized to call. The script stores test
 numbers in the demo Contacts in Salesforce; it does not add them to the
-repository. Omit `--test-phones` when live calling is not authorized.
+repository. The defaults are `US` for Account `BillingCountryCode` and
+`en_US` for the Salesforce Contact locale; QuoteWake converts that underscore
+form to the CALL-E-required BCP-47 form `en-US` at the domain boundary. When
+`--test-phones` is omitted, newly created Contacts receive fictional fixture
+numbers and both existing demo Contact phone fields (`Phone` and
+`MobilePhone`) are preserved exactly during `--reset-data` unless
+`--test-phones` is explicitly supplied.
+Omit `--test-phones` when live calling is not authorized.
+
+`--reset-data` starts a new demo generation. It creates one UTC timestamp for
+the whole reset and stores that same value in `Next_Follow_Up_At__c` on all
+10 demo Quotes while leaving `Follow_Up_Status__c` blank and resetting
+`Attempt_Count__c` to zero. When the status is blank, that timestamp is a
+generation marker rather than a retry due date, so the initial READY rules
+continue to use `LastModifiedDate`. A later reset receives a new marker and
+therefore a new CALL-E idempotency key for the first attempt. A regular
+`--seed-data` run preserves the existing follow-up fields, so repeating it
+does not change that key.
 
 The CLI provides a safe default plus two explicit, mutually exclusive modes:
 
@@ -169,10 +196,63 @@ uv run python -m quotewake_salesforce --show-prompt --max-calls 1
 
 # Explicit live mode: place calls and persist results.
 uv run python -m quotewake_salesforce --execute --max-calls 1
+
+# Test/support mode: use a new suffix when intentionally starting a fresh
+# provider request with the same Quote/attempt data.
+uv run python -m quotewake_salesforce --execute --idempotency-suffix test-02 --max-calls 1
 ```
 
 Use `--config /path/to/quotewake.toml` to select another TOML file. The default
 configuration is the repository's [`quotewake.toml`](quotewake.toml).
+
+`--idempotency-suffix` is an optional test/support escape hatch for avoiding a
+CALL-E idempotency conflict while repeatedly testing the same Quote. It is
+appended to the deterministic key after the Quote, attempt, and retry marker;
+the same suffix produces the same key and a different suffix produces a new
+key. It accepts an ASCII alphanumeric first character followed by ASCII
+letters, digits, `.`, `_`, or `-`, up to 32 characters. Omit it in normal
+production runs so retries continue to reuse their original key.
+
+After an execute run, QuoteWake prints only the calls whose result was safely
+persisted, one per line, using the same Quote presentation as selection:
+
+```text
+Call results:
+Quote 0Q0123456789ABC: Example Quote | $1,250.00 | CALLED (no_answer)
+```
+
+### Query QuoteWake state
+
+Use the Salesforce CLI wrapper to inspect Quote status and follow-up fields:
+
+```shell
+./scripts/query-quotes.sh --target-org quotewake-dev
+```
+
+If the Salesforce CLI already has a default org, omit `--target-org`. In an
+interactive terminal the script opens `less -S`; use the left/right arrow keys
+to scroll across wide columns and `q` to exit. Redirected and CI output is
+written directly without a pager.
+
+### Manually update a Quote
+
+For a one-off Salesforce state change, use `scripts/update-quote.sh` with a
+15- or 18-character Quote ID beginning with `0Q`. It queries the record before
+and after the update and changes only the requested QuoteWake fields:
+
+```shell
+./scripts/update-quote.sh 0Q0123456789ABC --enabled true --attempt-count 1
+./scripts/update-quote.sh 0Q0123456789ABC --retry-in 1d2h30m
+./scripts/update-quote.sh 0Q0123456789ABC --retry-at 2026-08-13T10:30:00+00:00
+./scripts/update-quote.sh 0Q0123456789ABC --clear-follow-up-status --clear-retry
+```
+
+`--follow-up-status` accepts only `In Progress`, `Retry`, `Completed`, or
+`Stopped`. A retry duration is a strict, ordered, positive composition of
+integer `d`, `h`, `m`, and `s` components, with each unit used at most once
+(for example `2d`, `30m`, or `1d2h30m15s`). `--retry-at` accepts UTC ISO 8601
+timestamps ending in `Z` or `+00:00`; the latter is normalized to `Z`. Either
+retry option automatically sets the status to `Retry`.
 
 ## Configuration and environment
 
@@ -195,7 +275,7 @@ Copy the placeholders from [`.env.example`](.env.example):
 | `SALESFORCE_CURRENCY_CODE` | Single-currency orgs when `CurrencyIsoCode` is unavailable | Three-letter ISO currency code, such as `EUR`. |
 | `SALESFORCE_DO_NOT_CALL_FIELD` | Optional | Contact checkbox API name used to skip opted-out contacts. |
 | `CALLE_API_KEY` | `--execute` only | CALL-E API credential. |
-| `CALLE_BASE_URL` | Optional | CALL-E API base URL; defaults to `https://api.heycall-e.com`. |
+| `CALLE_BASE_URL` | Optional | Official CALL-E HTTPS origin only; defaults to `https://api.heycall-e.com`. Do not add a path, credentials, query, or fragment. |
 | `QUOTEWAKE_ALLOWED_QUOTE_STATUSES` | Optional | Comma-separated replacement for the default `Presented` status. |
 
 Exported environment variables take precedence over `.env`. Keep `.env` out of
@@ -209,18 +289,19 @@ shape and defaults:
 
 ```toml
 [selection.initial_follow_up]
-minimum_delay_hours = 0
-standard_delay_hours = 0
-due_soon_window_days = 0
+minimum_delay = "0s"
+standard_delay = "0s"
+due_soon_window = "0s"
 
 [follow_up.retry]
 max_attempts = 3
-retry_delays_days = [2, 4]
+retry_delays = ["2d", "4d"]
 retry_outcomes = ["call_back_later", "no_answer", "busy"]
-technical_failure_retry_delay_minutes = 30
+technical_failure_retry_delay = "30m"
 completed_outcomes = ["interested"]
 
 [call]
+wait_timeout_seconds = 600
 # Optional. The default prompt is used when this is omitted.
 prompt = "Follow up quote {quote_name} with {contact_name} at {account_name}."
 
@@ -230,36 +311,114 @@ format = "text"
 level = "INFO"
 max_bytes = 5242880
 backup_count = 5
+# Temporary, sensitive support diagnostics; disabled by default.
+raw_calle_api = false
 ```
 
 `max_attempts` includes the first business call, so
-`retry_delays_days` must contain exactly `max_attempts - 1` values. The
+`retry_delays` must be an array of strict compact duration strings containing
+exactly `max_attempts - 1` values. Durations use ordered integer `d`, `h`, `m`,
+and `s` components, with each unit at most once (for example `1d2h30m15s`).
+Configuration accepts `0s` where a zero delay is useful. The
+`retry_outcomes` and `completed_outcomes` lists are validated against the
+fixed policy vocabulary shown in the table; unsupported or alternate mappings
+are rejected rather than silently ignored. The
 `[call].prompt` template may use only `{locale}`, `{region}`,
 `{contact_name}`, `{account_name}`, `{quote_name}`, `{quote_total}`,
 `{expiration_date}`, `{attempt_count}`, and `{quote_items}`. Fixed compliance
 rules are appended to every rendered prompt. Relative log directories are
 resolved from the application directory.
 
+`call.wait_timeout_seconds` is the maximum time in seconds that the SDK polls
+for a non-terminal CALL-E result; it does not delay a terminal response. For
+example, a provider `failed` result such as `call_not_ready` finishes as soon
+as CALL-E reports it rather than using the full 600-second limit. QuoteWake
+keeps the official synchronous
+`create` + `wait_for_result` flow and uses a two-second polling interval.
+
+The shipped configuration uses `INFO`. At that level, the console shows the
+main completed Salesforce and CALL-E operations plus QuoteWake lifecycle
+events. Lines use the form
+`timestamp [LEVEL] [Service] [event]: details`, with high-contrast service and
+event colors on interactive terminals. `NO_COLOR` disables ANSI colors, and
+rotating files never contain ANSI sequences. The internal run correlation ID
+is retained on records but omitted from human-readable lines.
+
+Set `logging.level = "DEBUG"` when detailed API boundaries are needed. DEBUG
+events record only safe operational metadata:
+Salesforce service/method/route, HTTP status, and elapsed time, plus CALL-E
+operation phase, Quote ID, idempotency key, call ID, provider status, and
+elapsed time. Query strings, SOQL, headers, request bodies, prompts,
+recipients, phone numbers, and raw provider results are not included unless
+the opt-in setting below is enabled. The CALL-E `wait_for_result` event is one
+aggregate wait boundary because the SDK performs polling internally; QuoteWake
+does not emit one log event per poll.
+
+For temporary support investigations, set `logging.raw_calle_api = true` while
+keeping `logging.level = "DEBUG"`. QuoteWake then emits clearly labelled
+`call_e_raw_request` and `call_e_raw_response` events for CALL-E create and
+wait operations. These payloads are recursively sanitized: recipient values
+under `phone`/`phones` are intentionally preserved for support, while
+phone-like values in free text and all credentials are redacted. HTTP
+`Authorization`, API-key, and header fields are never logged. Tasks and
+structured results can still contain sensitive business data, so enable this
+setting only for the duration of the investigation, protect the log file, and
+turn it off afterwards. The default is `false`.
+
 ## Outcomes, retries, and write safety
 
-CALL-E business results use a deliberately small vocabulary:
+CALL-E business results use this explicit vocabulary and deterministic policy:
 
-| Result | Salesforce effect |
-| --- | --- |
-| `interested` | Increment `Attempt_Count__c`; mark the Quote `Completed`. |
-| `call_back_later`, `no_answer`, `busy` | Increment the business attempt and schedule `Retry` using the configured delay; after the maximum, mark `Stopped`. A future customer date is used when valid. |
-| Provider terminal failure (`failed`, `canceled`, or `cancelled`) | Persist `Retry` without consuming a business attempt and use the configured technical retry delay. |
+| Intent | Quote effect | Attempt consumed? | Next action |
+| --- | --- | --- | --- |
+| `interested` | Increment `Attempt_Count__c`; mark `Completed`. | Yes | No automated retry. |
+| `call_back_later` | Increment the count; mark `Retry` until the maximum, then `Stopped`. | Yes | Use a future requested date; otherwise the configured delay. |
+| `not_interested` | Increment the count; mark `Stopped`. | Yes | No automated retry. |
+| `stop_quote_follow_up` | Increment the count; mark `Stopped`. | Yes | Stop this Quote's follow-up and record the request in a Task; no Contact update. |
+| `unknown` | Increment the count; mark `Stopped`. | Yes | Create a human-review Task; do not infer an intention or redial automatically. |
+| `no_answer` | Increment the count; mark `Retry` until the maximum, then `Stopped`. | Yes | Use the configured retry delay. |
+| `busy` | Increment the count; mark `Retry` until the maximum, then `Stopped`. | Yes | Use the configured retry delay. |
+
+Provider and boundary failures are not business attempts:
+
+| Failure | Salesforce write | Attempt consumed? | Next action |
+| --- | --- | --- | --- |
+| Terminal CALL-E `failed`/`canceled` without a valid `no_answer`/`busy` disposition | Atomic Quote `Retry` update plus Task | No | Retry after the technical delay. |
+| Create `auth`, `balance`, `rate`, `schema`, `recipient`, `policy`, deterministic `idempotency`, or `call_not_ready` rejection (HTTP 4xx) | No commercial write | No | Fix the reported code/reason before a deliberate retry; review CALL-E task and recipient readiness for `call_not_ready`. |
+| Create `timeout`, `connection`, or `provider` failure without HTTP status or with HTTP 5xx | No commercial write | No | Creation may be unknown; reconcile first and, if replaying creation, reuse the exact same idempotency key. |
+| Any wait failure after a confirmed call ID, including HTTP 4xx/5xx, timeout, or connection failure | No commercial write | No | Terminal result is unknown; reconcile the accepted call ID before any new attempt. Do not replay creation; use the reported classification/code to fix the poll problem. |
+| Malformed structured result or invalid `task_completed` type | No commercial write | No | Send to operator review; never persist a guessed outcome. |
 
 Malformed structured results, unsupported outcomes, CALL-E create failures,
 wait failures, and parse failures are rejected. They do not produce a business
-outcome or Salesforce write for that call; the failure is logged with a bounded
-phase/reason and the one-shot run can continue with the next candidate.
+outcome or Salesforce write for that call; the failure is logged with bounded
+classification, HTTP status, code, and reason values and the one-shot run can
+continue with the next candidate. A create response without a confirmed call ID
+is treated as indeterminate: reconcile or replay with the exact same
+idempotency key and do not generate a new call attempt.
+
+The request sends the SDK's `phones`, `locale`, and `region` recipient fields.
+The result schema uses enums for the business outcome and interest level and
+does not use a JSON union for `preferred_date`; that date is optional by
+omission. Commercial conversation outcomes require an explicit JSON boolean
+`task_completed: true`. The retryable dispositions `no_answer` and `busy` are
+the deliberate exceptions: a valid aggregate structured result or an explicit
+provider attempt signal is sufficient even when `task_completed` is false and
+the terminal provider status is `failed`. This covers declined or unconnected
+calls without mistaking provider processing completion for commercial success.
+Other false, null, or missing task evidence becomes `unknown`, while malformed
+task evidence is rejected. Root aggregate `structured_result` takes precedence;
+recipient and last-attempt results remain supported as fallbacks. QuoteWake
+validates all locations before accepting a business result.
 
 Each CALL-E request receives a deterministic idempotency key based on the Quote
 ID and next attempt. A persisted `Next_Follow_Up_At__c` marker is incorporated
-for technical retries, while an ambiguous provider request can be retried with
-the same key. This protects the provider boundary; Salesforce write-side
-deduplication beyond the transaction below is not implemented.
+for technical retries and for each reset demo generation. An ambiguous create
+can be replayed only with the same key; after a call ID is confirmed, reconcile
+that call's terminal result instead of replaying creation. This protects the
+provider boundary;
+Salesforce write-side deduplication beyond the transaction below is not
+implemented.
 
 The result is persisted with one `allOrNone=true` Composite API request that
 updates the Quote and creates its completed Task together. If that persistence
@@ -290,16 +449,19 @@ data/bank details/identity numbers, do not negotiate or make commercial
 commitments, and end politely when the recipient asks not to be called again.
 
 The optional configured Contact opt-out checkbox is enforced before a call.
-That checkbox alone is not consent management or legal compliance, and
-QuoteWake does not automatically persist a recipient's spoken do-not-call
-request. Teams must implement the appropriate Salesforce workflow, consent
-records, suppression rules, and lawful calling process before live use.
+That checkbox alone is not consent management or legal compliance. A spoken
+`stop_quote_follow_up` request persists `Stopped` on that Quote and records a
+Task, but deliberately does not update Contact or create global suppression;
+teams must implement the appropriate Salesforce workflow, consent records,
+suppression rules, and lawful calling process before live use.
 
-Credentials and raw provider payloads are not written to application logs;
-phone-like values are redacted and error logs use exception types and bounded
-reasons. `--show-prompt` intentionally prints Salesforce-derived business
-context, so treat its output and the rotating `logs/quotewake.log` file as
-business data and protect them accordingly.
+Credentials are never written to application logs; phone-like values are
+redacted in normal events and error logs use exception types and bounded reasons. Raw CALL-E
+payloads are disabled by default and are only emitted with the temporary
+`logging.raw_calle_api` support setting described above. `--show-prompt`
+intentionally prints Salesforce-derived business context, so treat its output
+and the rotating `logs/quotewake.log` file as business data and protect them
+accordingly.
 
 ## Current limitations
 

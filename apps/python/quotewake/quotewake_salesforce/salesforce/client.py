@@ -5,8 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+import logging
 import re
+import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -37,6 +40,76 @@ def _reject_json_constant(value: str) -> None:
 _SENSITIVE_TEXT = re.compile(
     r"(?i)(access[_ -]?token|client[_ -]?secret|authorization)\s*[:=]\s*\S+"
 )
+_API_VERSION_PATH = re.compile(r"/services/data/v[0-9]+(?:\.[0-9]+)?")
+_SALESFORCE_ID = re.compile(r"^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$")
+
+
+def _safe_route(path: object) -> str:
+    """Return a route template without hosts, query strings, or record IDs."""
+
+    parsed = urlsplit(str(path))
+    route = parsed.path or "/"
+    route = _API_VERSION_PATH.sub("/services/data/v{version}", route)
+    parts = route.split("/")
+    for index, part in enumerate(parts):
+        if index and parts[index - 1] == "query" and part:
+            parts[index:] = ["{locator}"]
+            break
+        # Object API names are also path segments and may be custom names.
+        # Skip the segment immediately after ``sobjects`` so a 15/18-character
+        # object name is retained; any ID segment that follows it is masked.
+        if (
+            index
+            and parts[index - 1] != "sobjects"
+            and _SALESFORCE_ID.fullmatch(part)
+        ):
+            parts[index] = "{id}"
+    return "/".join(parts) or "/"
+
+
+def _operation_for_route(path: object) -> str:
+    route = _safe_route(path)
+    if "/query" in route:
+        return "query"
+    if "/composite" in route:
+        return "composite_write"
+    if route.endswith("/describe"):
+        return "describe"
+    return "rest_request"
+
+
+def _elapsed_ms(started: float) -> float:
+    return round(max(0.0, time.perf_counter() - started) * 1000, 2)
+
+
+def _log_api_boundary(
+    event: str,
+    *,
+    operation: str,
+    method: str,
+    route: str,
+    http_status: int | None,
+    elapsed_ms: float,
+    error_type: str | None = None,
+) -> None:
+    """Log an API boundary using only safe, operational metadata."""
+
+    fields: dict[str, object] = {
+        "service": "salesforce",
+        "operation": operation,
+        "method": method.upper(),
+        "route": route,
+        "path": route,
+        "http_status": http_status,
+        "elapsed_ms": elapsed_ms,
+    }
+    if error_type is not None:
+        fields["error_type"] = error_type
+    log_event(event, level=logging.DEBUG, **fields)
+    # Keep detailed request/response boundaries in DEBUG, while exposing the
+    # completed high-level Salesforce operation at normal INFO verbosity.
+    if event == "salesforce_response_received":
+        log_event("salesforce_operation_completed", level=logging.INFO, **fields)
 
 
 def _error_detail(response: httpx.Response) -> str | None:
@@ -82,9 +155,39 @@ class SalesforceClient:
         return f"/services/data/v{self.api_version}"
 
     def _authenticate(self) -> None:
-        response = self.http.post(
-            f"{self.domain}/services/oauth2/token",
-            data={"grant_type": "client_credentials", "client_id": self.client_id, "client_secret": self.client_secret},
+        route = "/services/oauth2/token"
+        started = time.perf_counter()
+        _log_api_boundary(
+            "salesforce_request_started",
+            operation="authenticate",
+            method="POST",
+            route=route,
+            http_status=None,
+            elapsed_ms=0,
+        )
+        try:
+            response = self.http.post(
+                f"{self.domain}{route}",
+                data={"grant_type": "client_credentials", "client_id": self.client_id, "client_secret": self.client_secret},
+            )
+        except Exception as exc:
+            _log_api_boundary(
+                "salesforce_response_received",
+                operation="authenticate",
+                method="POST",
+                route=route,
+                http_status=None,
+                elapsed_ms=_elapsed_ms(started),
+                error_type=type(exc).__name__,
+            )
+            raise
+        _log_api_boundary(
+            "salesforce_response_received",
+            operation="authenticate",
+            method="POST",
+            route=route,
+            http_status=response.status_code,
+            elapsed_ms=_elapsed_ms(started),
         )
         if response.status_code >= 400:
             raise SalesforceError("Salesforce OAuth authentication failed")
@@ -106,7 +209,38 @@ class SalesforceClient:
         if self._access_token is None or self.instance_url is None:
             self._authenticate()
         assert self.instance_url is not None and self._access_token is not None
-        response = self.http.request(method, f"{self.instance_url}{path}", headers={"Authorization": f"Bearer {self._access_token}"}, **kwargs)
+        route = _safe_route(path)
+        operation = _operation_for_route(path)
+        started = time.perf_counter()
+        _log_api_boundary(
+            "salesforce_request_started",
+            operation=operation,
+            method=method,
+            route=route,
+            http_status=None,
+            elapsed_ms=0,
+        )
+        try:
+            response = self.http.request(method, f"{self.instance_url}{path}", headers={"Authorization": f"Bearer {self._access_token}"}, **kwargs)
+        except Exception as exc:
+            _log_api_boundary(
+                "salesforce_response_received",
+                operation=operation,
+                method=method,
+                route=route,
+                http_status=None,
+                elapsed_ms=_elapsed_ms(started),
+                error_type=type(exc).__name__,
+            )
+            raise
+        _log_api_boundary(
+            "salesforce_response_received",
+            operation=operation,
+            method=method,
+            route=route,
+            http_status=response.status_code,
+            elapsed_ms=_elapsed_ms(started),
+        )
         if response.status_code >= 400:
             detail = _error_detail(response)
             suffix = f": {detail}" if detail else ""
@@ -149,11 +283,15 @@ class SalesforceClient:
             raise SalesforceError("call result does not match Quote")
         occurred = result.occurred_at or datetime.now(timezone.utc)
         local_date = occurred.astimezone(business_timezone).date().isoformat()
+        outcome = str(getattr(result, "outcome", "unknown")).strip() or "unknown"
+        task_subject = f"QuoteWake call outcome: {outcome}"
+        if outcome == "unknown":
+            task_subject += " (human review)"
         body = {
             "allOrNone": True,
             "compositeRequest": [
                 {"method": "PATCH", "url": f"{self.api_root}/sobjects/Quote/{quote.quote_id}", "referenceId": "quoteUpdate", "body": update.as_salesforce_fields()},
-                {"method": "POST", "url": f"{self.api_root}/sobjects/Task", "referenceId": "taskCreate", "body": {"WhatId": quote.quote_id, "WhoId": contact.contact_id, "Status": "Completed", "Priority": "Normal", "Subject": "QuoteWake follow-up", "Description": task_description[:32000], "ActivityDate": local_date}},
+                {"method": "POST", "url": f"{self.api_root}/sobjects/Task", "referenceId": "taskCreate", "body": {"WhatId": quote.quote_id, "WhoId": contact.contact_id, "Status": "Completed", "Priority": "Normal", "Subject": task_subject, "Description": task_description[:32000], "ActivityDate": local_date}},
             ],
         }
         payload = self._request("POST", f"{self.api_root}/composite", json=body)

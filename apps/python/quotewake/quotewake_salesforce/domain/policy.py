@@ -16,6 +16,9 @@ from .models import (
 
 DEFAULT_ALLOWED_QUOTE_STATUSES = frozenset({"Presented"})
 ACTIONABLE_FOLLOW_UP_STATUSES = frozenset({"Retry"})
+_MINIMUM_RETRY_DELAY = timedelta(seconds=1)
+_RETRY_OUTCOMES = frozenset({"call_back_later", "no_answer", "busy"})
+_COMPLETED_OUTCOMES = frozenset({"interested"})
 
 
 def normalize_outcome(value: str) -> str:
@@ -52,6 +55,15 @@ class RetryPolicy:
                 "retry policy contains unsupported outcomes: "
                 + ", ".join(sorted(unknown))
             )
+        if self.retry_outcomes != _RETRY_OUTCOMES:
+            raise ValueError(
+                "retry policy retry_outcomes must be exactly: "
+                + ", ".join(sorted(_RETRY_OUTCOMES))
+            )
+        if self.completed_outcomes != _COMPLETED_OUTCOMES:
+            raise ValueError(
+                "retry policy completed_outcomes must be exactly: interested"
+            )
 
     def delay_after_attempt(self, attempt_count: int) -> timedelta:
         if not 1 <= attempt_count < self.max_attempts:
@@ -59,10 +71,12 @@ class RetryPolicy:
         return self.retry_delays[attempt_count - 1]
 
     def retries_outcome(self, outcome: str) -> bool:
-        return normalize_outcome(outcome) in self.retry_outcomes
+        """Return whether an outcome is eligible for another business call."""
+
+        return normalize_outcome(outcome) in _RETRY_OUTCOMES
 
     def is_completed_outcome(self, outcome: str) -> bool:
-        return normalize_outcome(outcome) in self.completed_outcomes
+        return normalize_outcome(outcome) in _COMPLETED_OUTCOMES
 
 
 @dataclass(frozen=True)
@@ -111,7 +125,10 @@ def calculate_next_follow_up(
     retry = policies.retry
     if result.outcome_kind is CallOutcomeKind.TECHNICAL_FAILURE:
         attempts = quote.attempt_count
-        next_at = call_time + retry.technical_failure_retry_delay
+        # A technical failure is not an invitation to spin in an immediate
+        # retry loop.  Zero is accepted in configuration for dry-run fixtures,
+        # but the persisted state always moves into the future.
+        next_at = call_time + max(retry.technical_failure_retry_delay, _MINIMUM_RETRY_DELAY)
         status = "Retry"
     else:
         attempts = quote.attempt_count + 1
@@ -124,7 +141,7 @@ def calculate_next_follow_up(
                 and requested.tzinfo is not None
                 and requested.utcoffset() is not None
                 and requested > call_time
-                else call_time + retry.delay_after_attempt(attempts)
+                    else call_time + max(retry.delay_after_attempt(attempts), _MINIMUM_RETRY_DELAY)
             )
             status = "Retry"
         else:

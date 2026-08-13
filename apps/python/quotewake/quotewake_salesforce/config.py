@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
-import math
 import os
 from pathlib import Path
 import re
+from urllib.parse import urlsplit, urlunsplit
 import string
 import tomllib
 from typing import Any
@@ -18,6 +18,46 @@ from dotenv import load_dotenv
 from babel import Locale
 from babel.core import UnknownLocaleError
 
+from quotewake_salesforce.durations import parse_duration
+
+parse_compact_duration = parse_duration
+
+CALLE_PRODUCTION_BASE_URL = "https://api.heycall-e.com"
+# CALL-E currently uses the same official API origin for test keys.  Keeping a
+# single explicit allow-list prevents a typo or an attacker-controlled URL from
+# receiving the bearer key.
+TRUSTED_CALLE_BASE_URLS = frozenset({CALLE_PRODUCTION_BASE_URL})
+
+
+def validate_calle_base_url(value: str) -> str:
+    """Validate and normalize the official CALL-E API origin.
+
+    The SDK appends ``/v1`` itself.  Paths, credentials, query strings and
+    fragments are therefore rejected instead of being silently forwarded.
+    """
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("CALLE_BASE_URL must be an official CALL-E HTTPS origin")
+    raw = value.strip()
+    try:
+        parsed = urlsplit(raw)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("CALLE_BASE_URL must be a valid official CALL-E URL") from exc
+    if parsed.scheme.lower() != "https":
+        raise ValueError("CALLE_BASE_URL must use HTTPS")
+    if parsed.username or parsed.password:
+        raise ValueError("CALLE_BASE_URL must not contain credentials")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ValueError("CALLE_BASE_URL must not contain a path, query, or fragment")
+    origin = urlunsplit(("https", hostname or "", port and str(port) or "", "", "")).rstrip("/")
+    if origin not in TRUSTED_CALLE_BASE_URLS:
+        raise ValueError(
+            "CALLE_BASE_URL must be the official CALL-E API origin "
+            + ", ".join(sorted(TRUSTED_CALLE_BASE_URLS))
+        )
+    return origin
 from quotewake_salesforce.domain.policy import (
     FollowUpPolicies,
     InitialFollowUpTiming,
@@ -69,9 +109,10 @@ CALL_COMPLIANCE_RULES = (
 
 @dataclass(frozen=True)
 class CallPromptSettings:
-    """Validated prompt template used to build one CALL-E task."""
+    """Validated prompt and polling settings used to build one CALL-E task."""
 
     template: str
+    wait_timeout_seconds: int = 60
 
     def render(self, values: dict[str, object], *, phone: str | None = None) -> str:
         safe_values = {key: str(values[key]) for key in PROMPT_FIELDS}
@@ -124,6 +165,14 @@ def _validate_prompt_template(template: object) -> str:
     return template
 
 
+def _validate_call_wait_timeout(value: object) -> int:
+    """Validate the maximum non-terminal CALL-E polling duration."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("TOML setting call.wait_timeout_seconds must be a positive integer.")
+    return value
+
+
 def load_call_prompt(path: Path) -> CallPromptSettings:
     """Load and validate the optional call prompt before external setup."""
 
@@ -134,7 +183,8 @@ def load_call_prompt(path: Path) -> CallPromptSettings:
     if not isinstance(call_table, dict):
         raise ValueError("QuoteWake configuration [call] must be a table.")
     return CallPromptSettings(
-        _validate_prompt_template(call_table.get("prompt", DEFAULT_CALL_PROMPT))
+        _validate_prompt_template(call_table.get("prompt", DEFAULT_CALL_PROMPT)),
+        _validate_call_wait_timeout(call_table.get("wait_timeout_seconds", 60)),
     )
 
 
@@ -147,6 +197,7 @@ class LoggingSettings:
     level: str = "INFO"
     max_bytes: int = 5 * 1024 * 1024
     backup_count: int = 5
+    raw_calle_api: bool = False
 
 
 def _logging_string(
@@ -169,6 +220,13 @@ def _logging_integer(table: dict[str, Any], key: str, default: int, *, minimum: 
     if value < minimum:
         comparison = "greater than zero" if minimum == 1 else f"at least {minimum}"
         raise ValueError(f"TOML setting logging.{key} must be {comparison}.")
+    return value
+
+
+def _logging_boolean(table: dict[str, Any], key: str, default: bool) -> bool:
+    value = table.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"TOML setting logging.{key} must be a boolean.")
     return value
 
 
@@ -228,16 +286,6 @@ def _parse_locale(value: str) -> str:
     return str(Locale.parse(base, sep=base_separator))
 
 
-def _number(table: dict[str, Any], key: str) -> float:
-    value = table.get(key)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"TOML setting selection.initial_follow_up.{key} must be a number.")
-    number = float(value)
-    if not math.isfinite(number):
-        raise ValueError(f"TOML setting selection.initial_follow_up.{key} must be finite.")
-    return number
-
-
 def _load_document(path: Path) -> dict[str, Any]:
     try:
         with path.open("rb") as handle:
@@ -271,12 +319,14 @@ def load_logging_settings(path: Path) -> LoggingSettings:
     )
     max_bytes = _logging_integer(logging_table, "max_bytes", 5 * 1024 * 1024, minimum=1)
     backup_count = _logging_integer(logging_table, "backup_count", 5, minimum=0)
+    raw_calle_api = _logging_boolean(logging_table, "raw_calle_api", False)
     return LoggingSettings(
         directory=directory,
         format=log_format.lower(),
         level=level.upper(),
         max_bytes=max_bytes,
         backup_count=backup_count,
+        raw_calle_api=raw_calle_api,
     )
 
 
@@ -292,22 +342,22 @@ def load_initial_follow_up_timing(path: Path) -> InitialFollowUpTiming:
             "QuoteWake configuration requires [selection.initial_follow_up]."
         )
 
-    minimum_hours = _number(initial, "minimum_delay_hours")
-    standard_hours = _number(initial, "standard_delay_hours")
-    due_soon_days = _number(initial, "due_soon_window_days")
-    if minimum_hours < 0:
-        raise ValueError("minimum_delay_hours cannot be negative.")
-    if standard_hours < minimum_hours:
+    section = "selection.initial_follow_up"
+    _reject_legacy_duration_key(initial, section, "minimum_delay_hours", "minimum_delay")
+    _reject_legacy_duration_key(initial, section, "standard_delay_hours", "standard_delay")
+    _reject_legacy_duration_key(initial, section, "due_soon_window_days", "due_soon_window")
+    minimum_delay = _required_duration(initial, "minimum_delay", section)
+    standard_delay = _required_duration(initial, "standard_delay", section)
+    due_soon_window = _required_duration(initial, "due_soon_window", section)
+    if standard_delay < minimum_delay:
         raise ValueError(
-            "standard_delay_hours must be greater than or equal to minimum_delay_hours."
+            "TOML setting selection.initial_follow_up.standard_delay must be greater than or equal to minimum_delay."
         )
-    if due_soon_days < 0:
-        raise ValueError("due_soon_window_days cannot be negative.")
 
     return InitialFollowUpTiming(
-        minimum_delay=timedelta(hours=minimum_hours),
-        standard_delay=timedelta(hours=standard_hours),
-        due_soon_window=timedelta(days=due_soon_days),
+        minimum_delay=minimum_delay,
+        standard_delay=standard_delay,
+        due_soon_window=due_soon_window,
     )
 
 
@@ -324,14 +374,26 @@ def _required_table(document: dict[str, Any], dotted_name: str) -> dict[str, Any
     return current
 
 
-def _required_number(table: dict[str, Any], key: str, section: str) -> float:
-    value = table.get(key)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"TOML setting {section}.{key} must be a number.")
-    result = float(value)
-    if not math.isfinite(result):
-        raise ValueError(f"TOML setting {section}.{key} must be finite.")
-    return result
+def _reject_legacy_duration_key(
+    table: dict[str, Any], section: str, legacy_key: str, replacement_key: str
+) -> None:
+    if legacy_key in table:
+        raise ValueError(
+            f"TOML setting {section}.{legacy_key} is no longer supported; use "
+            f"{section}.{replacement_key} ({legacy_key} -> {replacement_key})."
+        )
+
+
+def _required_duration(
+    table: dict[str, Any], key: str, section: str, *, allow_zero: bool = True
+) -> timedelta:
+    if key not in table:
+        raise ValueError(f"TOML setting {section}.{key} is required.")
+    return parse_duration(
+        table[key],
+        context=f"TOML setting {section}.{key}",
+        allow_zero=allow_zero,
+    )
 
 
 def _required_string_list(table: dict[str, Any], key: str, section: str) -> list[str]:
@@ -348,6 +410,14 @@ def load_follow_up_policies(path: Path) -> FollowUpPolicies:
 
     document = _load_document(path)
     retry_table = _required_table(document, "follow_up.retry")
+    section = "follow_up.retry"
+    _reject_legacy_duration_key(retry_table, section, "retry_delays_days", "retry_delays")
+    _reject_legacy_duration_key(
+        retry_table,
+        section,
+        "technical_failure_retry_delay_minutes",
+        "technical_failure_retry_delay",
+    )
 
     max_attempts_value = retry_table.get("max_attempts")
     if isinstance(max_attempts_value, bool) or not isinstance(max_attempts_value, int):
@@ -355,23 +425,21 @@ def load_follow_up_policies(path: Path) -> FollowUpPolicies:
     if max_attempts_value < 1:
         raise ValueError("TOML setting follow_up.retry.max_attempts must be at least 1.")
 
-    delay_values = retry_table.get("retry_delays_days")
+    delay_values = retry_table.get("retry_delays")
     if not isinstance(delay_values, list) or len(delay_values) != max_attempts_value - 1:
         raise ValueError(
-            "TOML setting follow_up.retry.retry_delays_days must contain exactly "
+            "TOML setting follow_up.retry.retry_delays must be an array containing exactly "
             "max_attempts - 1 values."
         )
     delays: list[timedelta] = []
     for index, value in enumerate(delay_values):
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(
-                f"TOML setting follow_up.retry.retry_delays_days[{index}] must be a number."
+        delays.append(
+            parse_duration(
+                value,
+                context=f"TOML setting follow_up.retry.retry_delays[{index}]",
+                allow_zero=True,
             )
-        if not math.isfinite(float(value)) or float(value) < 0:
-            raise ValueError(
-                f"TOML setting follow_up.retry.retry_delays_days[{index}] must be finite and non-negative."
-            )
-        delays.append(timedelta(days=float(value)))
+        )
 
     retry_values = _required_string_list(
         retry_table, "retry_outcomes", "follow_up.retry"
@@ -382,15 +450,9 @@ def load_follow_up_policies(path: Path) -> FollowUpPolicies:
             "TOML setting follow_up.retry.retry_outcomes cannot contain normalized duplicates."
         )
     retry_outcomes = frozenset(retry_normalized)
-    technical_minutes = _required_number(
-        retry_table,
-        "technical_failure_retry_delay_minutes",
-        "follow_up.retry",
+    technical_delay = _required_duration(
+        retry_table, "technical_failure_retry_delay", section
     )
-    if technical_minutes < 0:
-        raise ValueError(
-            "TOML setting follow_up.retry.technical_failure_retry_delay_minutes cannot be negative."
-        )
     completed_values = _required_string_list(
         retry_table, "completed_outcomes", "follow_up.retry"
     )
@@ -419,7 +481,7 @@ def load_follow_up_policies(path: Path) -> FollowUpPolicies:
         max_attempts=max_attempts_value,
         retry_delays=tuple(delays),
         retry_outcomes=retry_outcomes,
-        technical_failure_retry_delay=timedelta(minutes=technical_minutes),
+        technical_failure_retry_delay=technical_delay,
         completed_outcomes=completed_outcomes,
     )
 
@@ -455,6 +517,9 @@ def load_environment(path: Path | None = None, *, require_calle: bool = False) -
     currency_code = os.environ.get("SALESFORCE_CURRENCY_CODE", "").strip().upper() or None
     if currency_code is not None and not re.fullmatch(r"[A-Z]{3}", currency_code):
         raise ValueError("SALESFORCE_CURRENCY_CODE must be a three-letter ISO currency code")
+    calle_base_url = validate_calle_base_url(
+        os.environ.get("CALLE_BASE_URL", CALLE_PRODUCTION_BASE_URL)
+    )
     return EnvironmentSettings(
         salesforce_domain=values["SALESFORCE_DOMAIN"].rstrip("/"),
         salesforce_client_id=values["SALESFORCE_CLIENT_ID"],
@@ -462,6 +527,6 @@ def load_environment(path: Path | None = None, *, require_calle: bool = False) -
         salesforce_api_version=values["SALESFORCE_API_VERSION"].lstrip("v"),
         calle_api_key=calle_key,
         salesforce_currency_code=currency_code,
-        calle_base_url=os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com").rstrip("/"),
+        calle_base_url=calle_base_url,
         salesforce_do_not_call_field=os.environ.get("SALESFORCE_DO_NOT_CALL_FIELD", "").strip() or None,
     )

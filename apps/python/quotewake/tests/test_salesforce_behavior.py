@@ -133,3 +133,81 @@ def test_composite_failure_is_not_silently_accepted():
             ContactTarget("003000000000001", "Contact", "+14155550101", False), FollowUpUpdate(1, "Completed", None),
             CallResult("0Q0000000000001", "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc)), task_description="summary",
         )
+
+
+def test_stop_quote_follow_up_is_atomic_quote_and_review_task_without_contact_patch():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "token", "instance_url": "https://instance.invalid"})
+        return httpx.Response(200, json={"compositeResponse": [
+            {"httpStatusCode": 204, "referenceId": "quoteUpdate", "body": None},
+            {"httpStatusCode": 201, "referenceId": "taskCreate", "body": {"id": "00T000000000001"}},
+        ]})
+
+    client = SalesforceClient(
+        "https://login.invalid", "id", "secret", "61.0",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    quote = QuoteCandidate(
+        "0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None,
+        datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0,
+    )
+    contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
+    result = CallResult(
+        quote.quote_id, "call-1", "completed", "stop_quote_follow_up", "unknown", None,
+        "Do not call again", "Stop Quote follow-up", None, CallOutcomeKind.BUSINESS,
+        datetime.now(timezone.utc),
+    )
+    client.composite_write(
+        quote, contact, FollowUpUpdate(1, "Stopped", None), result,
+        task_description="Review the request to stop Quote follow-up.",
+    )
+    import json
+    payload = json.loads(seen[-1].content)
+    requests = payload["compositeRequest"]
+    assert payload["allOrNone"] is True
+    assert [(item["method"], item["url"]) for item in requests] == [
+        ("PATCH", "/services/data/v61.0/sobjects/Quote/0Q0000000000001"),
+        ("POST", "/services/data/v61.0/sobjects/Task"),
+    ]
+    assert all("Contact" not in item["url"] for item in requests)
+    assert requests[1]["body"]["WhoId"] == contact.contact_id
+    assert requests[1]["body"]["Subject"] == "QuoteWake call outcome: stop_quote_follow_up"
+
+
+def test_unknown_result_creates_human_review_task_in_same_composite():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "token", "instance_url": "https://instance.invalid"})
+        return httpx.Response(200, json={"compositeResponse": [
+            {"httpStatusCode": 204, "referenceId": "quoteUpdate", "body": None},
+            {"httpStatusCode": 201, "referenceId": "taskCreate", "body": {"id": "00T000000000001"}},
+        ]})
+
+    client = SalesforceClient(
+        "https://login.invalid", "id", "secret", "61.0",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    quote = QuoteCandidate(
+        "0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None,
+        datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0,
+    )
+    contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
+    result = CallResult(
+        quote.quote_id, "call-1", "completed", "unknown", "unknown", None,
+        "Insufficient evidence", "Human review", None, CallOutcomeKind.BUSINESS,
+        datetime.now(timezone.utc),
+    )
+    client.composite_write(
+        quote, contact, FollowUpUpdate(1, "Stopped", None), result,
+        task_description="Review the call evidence.",
+    )
+    import json
+    payload = json.loads(seen[-1].content)
+    assert payload["compositeRequest"][1]["body"]["Subject"] == "QuoteWake call outcome: unknown (human review)"

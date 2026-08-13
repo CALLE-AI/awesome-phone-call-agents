@@ -14,10 +14,19 @@ import re
 CALL_OUTCOME_VALUES = (
     "interested",
     "call_back_later",
+    "not_interested",
+    "stop_quote_follow_up",
+    "unknown",
     "no_answer",
     "busy",
 )
 CALL_OUTCOME_VOCABULARY = frozenset(CALL_OUTCOME_VALUES)
+
+# Keep the provider-facing interest vocabulary equally narrow.  These values
+# are intentionally plain strings at the domain boundary so Salesforce writes
+# do not depend on SDK-specific enum classes.
+CALL_INTEREST_VALUES = ("high", "medium", "low", "unknown")
+CALL_INTEREST_VOCABULARY = frozenset(CALL_INTEREST_VALUES)
 
 
 class SelectionDecision(str, Enum):

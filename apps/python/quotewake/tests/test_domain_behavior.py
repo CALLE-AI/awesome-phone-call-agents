@@ -10,6 +10,8 @@ from quotewake_salesforce.domain.models import (
     SelectionResult,
     QuoteCandidate,
 )
+from quotewake_salesforce.domain.call_request import build_call_request
+from quotewake_salesforce.config import CallPromptSettings
 from quotewake_salesforce.domain.policy import (
     FollowUpPolicies,
     InitialFollowUpTiming,
@@ -34,7 +36,7 @@ def quote(**changes):
 
 
 def policy(max_attempts=3):
-    retry = RetryPolicy(max_attempts, tuple(timedelta(days=n) for n in range(1, max_attempts)), frozenset({"no_answer", "call_back_later"}), timedelta(minutes=15), frozenset({"interested"}))
+    retry = RetryPolicy(max_attempts, tuple(timedelta(days=n) for n in range(1, max_attempts)), frozenset({"no_answer", "call_back_later", "busy"}), timedelta(minutes=15), frozenset({"interested"}))
     return SelectionPolicy(InitialFollowUpTiming(timedelta(0), timedelta(0), timedelta(0)), retry)
 
 
@@ -46,6 +48,22 @@ def test_selection_rejects_expired_and_contact_opt_out_or_bad_phone():
     assert validate_callable_contact(ready, [ContactTarget("003000000000001", "A", "+1 415 555 0101", False)]).contact.phone == "+14155550101"
     assert validate_callable_contact(ready, [ContactTarget("003000000000001", "A", "+14155550101", True)]).reason is SelectionReason.DO_NOT_CALL
     assert validate_callable_contact(ready, [ContactTarget("003000000000001", "A", "123", False)]).reason is SelectionReason.INVALID_PHONE
+
+
+def test_call_request_canonicalizes_salesforce_locale_for_calle():
+    result = SelectionResult(
+        SelectionDecision.READY,
+        SelectionReason.READY,
+        quote(account_billing_country_code="US"),
+        ContactTarget("003000000000001", "A", "+14155550121", False, "en_US"),
+    )
+    request = build_call_request(
+        result,
+        [],
+        prompt_settings=CallPromptSettings("Call {contact_name} in {locale} for {region}."),
+    )
+    assert request.locale == "en-US"
+    assert request.region == "US"
 
 
 def test_phone_normalization_and_masking_are_conservative():
@@ -63,3 +81,68 @@ def test_retry_policy_handles_preferred_date_and_max_attempts():
     assert update.next_follow_up_at == datetime(2026, 8, 20, tzinfo=timezone.utc)
     terminal = CallResult(first.quote_id, "c", "completed", "no_answer", "unknown", None, "summary", "stop", None, CallOutcomeKind.BUSINESS, datetime(2026, 8, 10, tzinfo=timezone.utc))
     assert calculate_next_follow_up(quote(attempt_count=2), terminal, FollowUpPolicies(policy().retry_policy)).follow_up_status == "Stopped"
+
+
+def test_technical_and_zero_delay_retries_are_always_in_the_future():
+    now = datetime(2026, 8, 10, tzinfo=timezone.utc)
+    zero = FollowUpPolicies(
+        RetryPolicy(2, (timedelta(0),), frozenset({"no_answer", "call_back_later", "busy"}), timedelta(0), frozenset({"interested"}))
+    )
+    technical = CallResult("0Q0000000000001", "c", "failed", "technical_failure", "unknown", None, "summary", "retry", None, CallOutcomeKind.TECHNICAL_FAILURE, now)
+    assert calculate_next_follow_up(quote(), technical, zero).next_follow_up_at > now
+    no_answer = CallResult("0Q0000000000001", "c", "completed", "no_answer", "unknown", None, "summary", "retry", None, CallOutcomeKind.BUSINESS, now)
+    assert calculate_next_follow_up(quote(), no_answer, zero).next_follow_up_at > now
+
+
+def test_policy_maps_every_business_intention_without_provider_aliases():
+    now = datetime(2026, 8, 10, tzinfo=timezone.utc)
+    policies = FollowUpPolicies(policy().retry_policy)
+    expected = {
+        "interested": "Completed",
+        "not_interested": "Stopped",
+        "stop_quote_follow_up": "Stopped",
+        "unknown": "Stopped",
+    }
+    for outcome, status in expected.items():
+        result = CallResult("0Q0000000000001", "c", "completed", outcome, "unknown", None, "summary", "review", None, CallOutcomeKind.BUSINESS, now)
+        update = calculate_next_follow_up(quote(), result, policies)
+        assert update.follow_up_status == status
+        assert update.attempt_count == 1
+        assert update.next_follow_up_at is None
+
+    for outcome in ("no_answer", "busy"):
+        result = CallResult("0Q0000000000001", "c", "completed", outcome, "unknown", None, "summary", "retry", None, CallOutcomeKind.BUSINESS, now)
+        update = calculate_next_follow_up(quote(), result, policies)
+        assert update.follow_up_status == "Retry"
+        assert update.attempt_count == 1
+        assert update.next_follow_up_at is not None and update.next_follow_up_at > now
+
+
+def test_retry_policy_rejects_configured_sets_that_would_be_ignored():
+    try:
+        RetryPolicy(
+            2,
+            (timedelta(days=1),),
+            frozenset({"no_answer"}),
+            timedelta(minutes=15),
+            frozenset({"interested"}),
+        )
+    except ValueError as error:
+        assert "retry_outcomes" in str(error)
+    else:  # pragma: no cover - assertion documents the fixed policy contract
+        raise AssertionError("non-canonical retry outcomes must be rejected")
+
+
+def test_callback_uses_only_a_future_preferred_date():
+    now = datetime(2026, 8, 10, tzinfo=timezone.utc)
+    policies = FollowUpPolicies(policy().retry_policy)
+    for preferred in (None, date(2026, 8, 9)):
+        result = CallResult(
+            "0Q0000000000001", "c", "completed", "call_back_later", "medium",
+            preferred, "summary", "call again",
+            datetime.combine(preferred, datetime.min.time(), timezone.utc) if preferred else None,
+            CallOutcomeKind.BUSINESS, now,
+        )
+        update = calculate_next_follow_up(quote(), result, policies)
+        assert update.follow_up_status == "Retry"
+        assert update.next_follow_up_at == now + timedelta(days=1)

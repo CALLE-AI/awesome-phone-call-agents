@@ -1,4 +1,5 @@
 [call]
+wait_timeout_seconds = 600
 prompt = """
 Conduct a commercial quote follow-up call in locale {locale} for business region {region}.
 
@@ -15,15 +16,15 @@ Close by accurately summarizing the agreed next step and thanking the recipient.
 """
 
 [selection.initial_follow_up]
-minimum_delay_hours = 0
-standard_delay_hours = 0
-due_soon_window_days = 0
+minimum_delay = "0s"
+standard_delay = "0s"
+due_soon_window = "0s"
 
 [follow_up.retry]
 max_attempts = 3
-retry_delays_days = [2, 4]
+retry_delays = ["2d", "4d"]
 retry_outcomes = ["call_back_later", "no_answer", "busy"]
-technical_failure_retry_delay_minutes = 30
+technical_failure_retry_delay = "30m"
 completed_outcomes = ["interested"]
 
 [logging]
@@ -33,3 +34,5 @@ format = "text"
 level = "INFO"
 max_bytes = 5242880
 backup_count = 5
+# Temporary support diagnostics; only emits redacted CALL-E payloads at DEBUG.
+raw_calle_api = false

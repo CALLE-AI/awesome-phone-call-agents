@@ -29,7 +29,7 @@ def test_call_dry_run_does_not_construct_provider_client():
 
 def test_technical_result_does_not_consume_business_attempt():
     result = CallResult("0Q0000000000001", "provider-error", "technical_failure", "error", "unknown", None, "provider failed", "retry", None, CallOutcomeKind.TECHNICAL_FAILURE, datetime(2026, 8, 2, tzinfo=timezone.utc))
-    policy = FollowUpPolicies(RetryPolicy(3, (timedelta(days=1), timedelta(days=2)), frozenset({"no_answer"}), timedelta(minutes=30), frozenset({"interested"})))
+    policy = FollowUpPolicies(RetryPolicy(3, (timedelta(days=1), timedelta(days=2)), frozenset({"no_answer", "call_back_later", "busy"}), timedelta(minutes=30), frozenset({"interested"})))
     update = calculate_next_follow_up(_quote(), result, policy)
     assert update.attempt_count == 0
     assert update.follow_up_status == "Retry"

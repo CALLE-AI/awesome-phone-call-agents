@@ -130,9 +130,13 @@ class QuoteRepository:
         ):
             raise ValueError("default currency code must be a three-letter ISO code")
         self.default_currency_code = default_currency_code
+        self._schema_cache: tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]] | None = None
 
     def validate_schema(self) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
         """Validate required objects/fields and return their field maps."""
+
+        if self._schema_cache is not None:
+            return self._schema_cache
 
         log_event(
             "salesforce_schema_validation_started",
@@ -242,7 +246,8 @@ class QuoteRepository:
             organization_field_count=len(organization_fields),
             do_not_call_field_configured=bool(self.do_not_call_field),
         )
-        return quote_fields, contact_fields
+        self._schema_cache = (quote_fields, contact_fields)
+        return self._schema_cache
 
     def load_organization_regional_settings(self) -> RegionalSettings:
         """Read the organization timezone and default locale from Salesforce."""
