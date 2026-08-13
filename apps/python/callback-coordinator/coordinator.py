@@ -15,17 +15,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, available_timezones
-# E.164: + followed by 1-9 then 7-14 more digits = 8-15 digits total,
-# first digit after + must not be 0 (prevents +0...).
 E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
 SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,119}$")
 LOCALE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
 TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-# Legacy contiguous pattern (still used as fallback)
-PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?\\d{7,15}(?!\w)")
 PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?\d{7,15}(?!\w)")
-# Formatted phone patterns – catches (202) 555-0123, 202-555-0123, 202.555.0123,
-# 202 555 0123, +1 (202) 555-0123, +44 20 7123 4567, etc.
 PHONE_CANDIDATE_RE = re.compile(r"\+?\(?\d[\d\s\-\.\(\)]{5,}\d")
 DATE_RE = re.compile(r"^\d{4}[-/]\d{2}[-/]\d{2}$")
 TRUSTED_API_HOST = "api.heycall-e.com"
@@ -71,9 +65,6 @@ class CallbackIntake:
     routing_rules: tuple[RoutingRule, ...] = field(
         default_factory=lambda: tuple(RoutingRule(**r) for r in DEFAULT_ROUTING_RULES)
     )
-# --------------------------------------------------------------------------- #
-# Trusted origin validation
-# --------------------------------------------------------------------------- #
 def validate_trusted_base_url(url: str) -> str:
     if not isinstance(url, str) or not url.strip():
         raise ValueError(f"base_url must be {TRUSTED_BASE_URL}")
@@ -89,9 +80,6 @@ def validate_trusted_base_url(url: str) -> str:
     if parsed.port is not None and parsed.port != 443:
         raise ValueError(f"base_url must not use custom port; only {TRUSTED_BASE_URL} is allowed")
     return raw.rstrip("/")
-# --------------------------------------------------------------------------- #
-# Parsing and validation
-# --------------------------------------------------------------------------- #
 def _clean_text(value, field, *, minimum, maximum) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field} must be a string")
@@ -186,9 +174,6 @@ def mask_phone(phone: str) -> str:
     if len(phone) <= 6:
         return "*" * len(phone)
     return f"{phone[:3]}{'*' * max(4, len(phone) - 6)}{phone[-3:]}"
-# --------------------------------------------------------------------------- #
-# Gates
-# --------------------------------------------------------------------------- #
 def _to_minutes(hhmm: str) -> int:
     hour, minute = hhmm.split(":")
     return int(hour) * 60 + int(minute)
@@ -213,9 +198,6 @@ def attempt_gate(intake: CallbackIntake, now: datetime) -> tuple[bool, str | Non
     if _in_quiet_hours(current_minutes, start, end):
         return False, "quiet_hours"
     return True, None
-# --------------------------------------------------------------------------- #
-# CALL-E task, schema, and arguments
-# --------------------------------------------------------------------------- #
 def build_task(intake: CallbackIntake) -> str:
     reason_context = (
         f"The person previously reached out by web form with this note: {intake.request_reason_hint}."
@@ -296,7 +278,7 @@ def build_call_arguments(intake: CallbackIntake) -> dict:
         "idempotency_key": idempotency_key(intake),
     }
 # --------------------------------------------------------------------------- #
-# Fail-closed disposition classification + binding verification
+# Fail-closed disposition classification + strict binding verification
 # --------------------------------------------------------------------------- #
 def _confidence_ok(completed: dict) -> bool:
     confidence = completed.get("completion_confidence")
@@ -312,51 +294,62 @@ def _confidence_ok(completed: dict) -> bool:
 def verify_result_binding(
     completed: dict, intake: CallbackIntake, expected_call_id: str | None = None
 ) -> tuple[bool, str | None]:
-    """Verify that the terminal CALL-E result belongs to the approved intake.
-    Checks:
-      - call identity: completed.id must equal expected_call_id when present
-      - metadata: workflow_id must match intake.workflow_id
-      - recipient: intake.phone must be present in completed.recipients[].phones
-    Fail-closed: any mismatch or missing binding field returns False.
+    """Strict binding: every returned field must match the exact approved payload.
+    Required present and equal:
+      - id must be present and == expected_call_id (when expected_call_id provided)
+      - task must be present and == build_task(intake)
+      - metadata must contain workflow_id, workflow_type, source matching intake
+      - recipients must be exact: len==1, phones==[intake.phone], locale==intake.locale
+      - if result_schema present, must equal build_result_schema()
+    Fail-closed: any missing or mismatched field → False.
     """
     if not isinstance(completed, dict) or not completed:
         return False, "missing_terminal_result"
+    # 1. Call identity – must be present and must match expected when expected exists
     got_id = completed.get("id")
-    if expected_call_id is not None and got_id is not None:
-        if not isinstance(got_id, str) or got_id != expected_call_id:
+    if expected_call_id is not None:
+        if not isinstance(got_id, str) or not got_id or got_id != expected_call_id:
             return False, "call_id_mismatch"
+    else:
+        if not isinstance(got_id, str) or not got_id:
+            return False, "call_id_missing"
+    # 2. Task binding – exact match to approved task
+    expected_task = build_task(intake)
+    got_task = completed.get("task")
+    if not isinstance(got_task, str) or got_task != expected_task:
+        return False, "task_mismatch"
+    # 3. Metadata binding – every field must be present and match
     md = completed.get("metadata")
     if not isinstance(md, dict):
         return False, "metadata_missing"
     if md.get("workflow_id") != intake.workflow_id:
         return False, "workflow_id_mismatch"
-    if "workflow_type" in md and md.get("workflow_type") != "callback_triage":
+    if md.get("workflow_type") != "callback_triage":
         return False, "workflow_type_mismatch"
+    if md.get("source") != intake.source:
+        return False, "metadata_source_mismatch"
+    # 4. Recipients exact binding
     recips = completed.get("recipients")
-    if not isinstance(recips, list) or len(recips) == 0:
-        return False, "recipients_missing"
-    found = False
-    for r in recips:
-        if not isinstance(r, dict):
-            continue
-        phones = r.get("phones")
-        if isinstance(phones, list) and intake.phone in phones:
-            found = True
-            break
-    if not found:
+    if not isinstance(recips, list) or len(recips) != 1:
+        return False, "recipients_count_mismatch"
+    r0 = recips[0]
+    if not isinstance(r0, dict):
+        return False, "recipients_invalid"
+    phones = r0.get("phones")
+    if not isinstance(phones, list) or phones != [intake.phone]:
         return False, "recipient_phone_mismatch"
+    if r0.get("locale") != intake.locale:
+        return False, "recipient_locale_mismatch"
+    # 5. Result schema binding – if present, must exactly equal approved schema
+    #    (GET may omit it, but if present we enforce exact match to prevent schema drift)
+    got_schema = completed.get("result_schema")
+    if got_schema is not None:
+        if got_schema != build_result_schema():
+            return False, "result_schema_mismatch"
     return True, None
 def classify_disposition(
     completed: dict, intake: CallbackIntake | None = None, expected_call_id: str | None = None
 ) -> dict:
-    """Turn a CALL-E terminal result into a fail-closed disposition.
-    Every outcome that does not confidently reach a 'scheduled' or 'declined'
-    state is routed to a human (needs_human). This is fail-closed:
-      - when intake provided: call id, metadata workflow_id, and recipient phone must match
-      - status must be exactly 'completed'
-      - task_completed must be True
-      - structured_result must be bound to declared enums
-    """
     if not isinstance(completed, dict) or not completed:
         return {"disposition": "needs_human", "needs_human": True, "reason": "missing_terminal_result"}
     # Binding verification first, when intake is available
@@ -419,9 +412,6 @@ def route(intake: CallbackIntake, reason: str | None) -> dict:
         "team": "General Intake (human review)",
         "action": "Route to a human coordinator; no routing rule matched.",
     }
-# --------------------------------------------------------------------------- #
-# Orchestration
-# --------------------------------------------------------------------------- #
 def preview(intake: CallbackIntake, now: datetime) -> dict:
     attempt, gate_reason = attempt_gate(intake, now)
     arguments = build_call_arguments(intake)
@@ -502,7 +492,6 @@ def execute_with_client(
             "call_id": call_id,
             "idempotency_key": idempotency_key(intake),
         }
-    # Binding verification + disposition classification (fail-closed)
     disposition = classify_disposition(completed, intake=intake, expected_call_id=call_id)
     sr = completed.get("structured_result") or {}
     routed = route(intake, sr.get("contact_reason"))
