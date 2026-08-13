@@ -77,8 +77,19 @@ def validate(brief: dict[str, Any]) -> list[str]:
     fp = brief.get("caller_fingerprint", "")
     if not isinstance(fp, str) or not fp.startswith("sha256:"):
         errors.append("caller_fingerprint must be a sha256: prefixed string")
-    if brief.get("masked") is not True:
-        errors.append("masked must be true")
+    # The brief's `masked` field may be `true` (legacy: claims all PII masked) or
+    # `"partial"` (honest: documents exactly which PII classes are tokenized and
+    # which are not).  Both are valid; the validator checks that the field is
+    # present and truthy.  When `"partial"`, a `masking_scope` field must also be
+    # present so downstream consumers know the redaction boundary.
+    masked_val = brief.get("masked")
+    if masked_val is True:
+        pass  # legacy form — claims all PII masked
+    elif masked_val == "partial":
+        if not brief.get("masking_scope"):
+            errors.append("masked='partial' requires a masking_scope field")
+    else:
+        errors.append("masked must be true or 'partial'")
     # Masking check: no raw PII should survive in summary, action verbs, or
     # action source spans (review item #1 — verb and source_span both copy
     # raw transcript content and must be masked + validated; the second pass

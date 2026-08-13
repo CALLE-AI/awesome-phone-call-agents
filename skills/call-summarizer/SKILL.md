@@ -72,9 +72,12 @@ The script performs:
    effective response (agent text never counts as a confirmation), and any
    contradictory intent — across utterances or within a single utterance
    (e.g. "Yes, I can't make it") — fails closed to `unknown`.
-2. **Masked summary**: a short prose summary with all phone numbers, email
-   addresses, names, and account identifiers replaced by masked tokens so the
-   summary is safe to log.
+2. **Masked summary**: a short prose summary with phone numbers, emails,
+   account identifiers, and title-prefixed or cue-introduced personal names
+   replaced by masked tokens. The brief sets `masked: "partial"` with a
+   `masking_scope` field documenting exactly which PII classes are tokenized;
+   ordinary personal names without an introduction cue are NOT redacted (the
+   skill uses no NER model and the contract is honest about this boundary).
 3. **Action items**: each commitment, follow-up, or next step extracted with an
    owner (the party who said they would do it), a verb, and an optional due
    date parsed from natural-language time references. Ambiguous items keep
@@ -123,7 +126,9 @@ The brief is a single JSON object:
     "justification": "Callee confirmed without hesitation."
   },
   "caller_fingerprint": "sha256:9f2c...",
-  "masked": true
+  "masked": "partial",
+  "masking_scope": "phone_numbers emails account_ids title_prefixed_names cue_introduced_names",
+  "masking_note": "Structured PII and cued personal names are tokenized. Ordinary uncued names are NOT redacted."
 }
 ```
 
@@ -132,7 +137,10 @@ The brief is a single JSON object:
 Read `references/safety.md` for the full safety contract.
 
 - This skill never places a call and never modifies call state.
-- Every output is masked: phone numbers, emails, and account IDs are tokenized.
+- Every output is partially masked: phone numbers, emails, account IDs, and
+  cued personal names are tokenized. The `masked` field is `"partial"` with a
+  `masking_scope` documenting the boundary; ordinary uncued names are NOT
+  redacted (no NER model).
 - The caller fingerprint is a one-way hash; the raw identity is never stored.
 - Action items are reported, not executed. Medical, legal, financial, and
   emergency commitments are flagged as `category: sensitive` and routed to a

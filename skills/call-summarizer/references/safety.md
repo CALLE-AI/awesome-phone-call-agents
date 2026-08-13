@@ -14,16 +14,30 @@ and the brief, not about the call itself.
 
 ## Masking and PII
 
-Every output is masked before it leaves the script:
+The brief uses a **partial masking** contract. The `masked` field is set to
+`"partial"` (not `true`) and a `masking_scope` field documents exactly which
+PII classes are tokenized:
 
 - Phone numbers are replaced with `[phone:••••]` tokens.
 - Email addresses are replaced with `[email:••••]` tokens.
 - Account or reference identifiers are replaced with `[id:••••]` tokens.
 - Personal names introduced by a title (`Dr.`, `Mr.`, `Ms.`, `Mrs.`, `Prof.`)
-  or an introduction cue (`this is`, `I'm`, `my name is`) are replaced with
-  `[name:••••]` tokens. Role labels (`the agent`, `the callee`, `the
-  receptionist`) are kept only when they are role labels; personal names are
-  redacted. The validator checks every emitted field for residual names.
+  or an introduction cue (`this is`, `I'm`, `my name is`, `with me is`,
+  `speaking, this is`) are replaced with `[name:••••]` tokens.
+
+**What is NOT masked:** ordinary personal names that appear in transcript text
+without a title prefix or introduction cue (e.g. "Alice will call Bob
+tomorrow") are NOT redacted. The skill is deterministic and stdlib-only (no
+NER model), so it cannot reliably detect every personal name. The contract
+is honest about this boundary: `masked: "partial"` with a `masking_scope`
+field listing the PII classes that ARE tokenized. A `masking_note` field in
+the brief warns downstream consumers not to store or log the brief if the
+transcript may contain uncued personal names.
+
+The validator checks that the specific PII classes listed in `masking_scope`
+do not survive in `summary`, `actions[].verb`, or `actions[].source_span`.
+A brief with `masked: true` (legacy form) is still accepted but is held to
+the stricter standard of zero residual PII of any kind.
 
 The `caller_fingerprint` field is a one-way SHA-256 hash of the redacted caller
 identity fields. The raw identity is never stored or emitted. The fingerprint

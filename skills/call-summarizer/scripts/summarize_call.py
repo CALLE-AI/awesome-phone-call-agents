@@ -462,7 +462,20 @@ def summarize(path: Path) -> dict[str, Any]:
         "actions": actions,
         "sentiment": sentiment,
         "caller_fingerprint": caller_fingerprint(str(callee_masked), caller_id),
-        "masked": True,
+        "masked": "partial",
+        "masking_scope": (
+            "phone_numbers emails account_ids title_prefixed_names "
+            "cue_introduced_names"
+        ),
+        "masking_note": (
+            "Structured PII (phone, email, account/reference/order IDs) and "
+            "personal names introduced by titles (Dr., Mr., Ms., Mrs., Prof.) "
+            "or explicit introduction cues (this is, I am, my name is, with me "
+            "is, speaking this is) are tokenized. Ordinary personal names "
+            "appearing without an introduction cue are NOT redacted. Do not "
+            "store or log this brief if the transcript may contain uncued "
+            "personal names; redact manually or strip the summary first."
+        ),
     }
     return brief
 

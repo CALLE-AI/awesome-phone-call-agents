@@ -48,7 +48,7 @@ def test_example_transcript_produces_valid_brief() -> None:
     rc, out_text = run_summarize(EXAMPLE_TRANSCRIPT, out_path)
     assert rc == 0, f"summarize failed: {out_text}"
     brief = json.loads(out_path.read_text(encoding="utf-8"))
-    assert brief["masked"] is True, "brief must be masked"
+    assert brief["masked"] in (True, "partial"), "brief must be masked"
     assert "outcome" in brief and brief["outcome"], "outcome must be non-empty"
     assert brief["outcome"].startswith(("Appointment", "Request", "Reschedule", "No answer", "Voicemail", "unknown")), brief["outcome"]
     assert isinstance(brief["actions"], list), "actions must be a list"
@@ -346,7 +346,8 @@ def test_personal_names_are_redacted_from_summary_verb_and_source_span() -> None
 
 def test_validator_rejects_brief_that_leaks_personal_name() -> None:
     # The validator must flag a hand-crafted brief that still contains a
-    # cue-introduced personal name in the summary (masked: true is a lie).
+    # cue-introduced personal name in the summary while masked is true (legacy
+    # form: claims all PII is masked — a name leak is a contract violation).
     bad_brief = {
         "outcome": "Appointment or request confirmed.",
         "summary": "The callee said: this is John Smith, I can make it.",
@@ -357,10 +358,48 @@ def test_validator_rejects_brief_that_leaks_personal_name() -> None:
     }
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
         out_path = Path(out.name)
-        out_path.write_text(json.dumps(bad_brief), encoding="utf-8")
+    out_path.write_text(json.dumps(bad_brief), encoding="utf-8")
     rc, val_text = run_validate(out_path)
     assert rc != 0, "validator should reject a brief with a leaked personal name"
     assert "name" in val_text.lower(), f"validator error should mention name: {val_text}"
+
+
+def test_partial_masking_contract_is_honest_about_uncued_names() -> None:
+    # Review item #1 (third pass): the reviewer's frozen Must Fix is that
+    # ordinary names like "Alice will call Bob" pass through while masked is
+    # true. We narrow the contract: masked is now "partial" with a
+    # masking_scope documenting exactly what IS tokenized. An uncued name
+    # like "Alice" in the summary is NOT a violation when masked is "partial"
+    # because the contract no longer claims all-name redaction.
+    fixture = write_fixture(
+        {
+            "call_id": "uncued-name-001",
+            "callee_masked": "+155****1234",
+            "transcript": [
+                {
+                    "speaker": "agent",
+                    "text": "Alice will call Bob tomorrow about the appointment.",
+                },
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    # The contract is now honest: masked is "partial", not True.
+    assert brief["masked"] == "partial", (
+        f"masked must be 'partial' (honest contract), got {brief['masked']!r}"
+    )
+    assert "masking_scope" in brief, "partial masking must document its scope"
+    # The uncued names "Alice" and "Bob" may appear — the brief does NOT
+    # claim to redact them. The validator must ACCEPT this brief because the
+    # contract is honest about the boundary.
+    rc, val_text = run_validate(out_path)
+    assert rc == 0, (
+        f"validator must accept honest partial-masking brief with uncued names: {val_text}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +474,8 @@ def main() -> int:
         # Review item #1 (second pass): personal-name redaction
         test_personal_names_are_redacted_from_summary_verb_and_source_span,
         test_validator_rejects_brief_that_leaks_personal_name,
+        # Review item #1 (third pass): narrowed masking contract
+        test_partial_masking_contract_is_honest_about_uncued_names,
         # Review item #2 (second pass): intra-utterance contradiction
         test_outcome_single_utterance_contradiction_fails_closed,
         test_outcome_unambiguous_confirmation_still_confirmed,
