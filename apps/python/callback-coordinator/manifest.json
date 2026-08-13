@@ -3,7 +3,7 @@
   "title": "Callback Coordinator",
   "language": "Python",
   "type": "workflow-plugin",
-  "description": "Consent-first callback triage engine that gates a callback request against quiet hours, do-not-call, and explicit consent flags, places one CALL-E call to learn why the person needs a callback, classifies the outcome into a fail-closed disposition (requiring status=completed and task_completed=true), and routes it to a team.",
+  "description": "Consent-first callback triage engine that gates a callback request against quiet hours, do-not-call, and explicit consent flags, places one CALL-E call to learn why the person needs a callback, verifies terminal result binding (call id, metadata.workflow_id, recipients phone) against intake, classifies the outcome into a fail-closed disposition (requiring status=completed and task_completed=true), and routes it to a team.",
   "entrypoints": [
     {
       "name": "CLI preview",
@@ -23,7 +23,7 @@
     "Skips calls during quiet hours (recipient local time), for do_not_call=true, and for consent=false/missing.",
     "Base URL is locked to https://api.heycall-e.com; arbitrary --base-url or CALLE_BASE_URL values are rejected before bearer credential use.",
     "Uses a stable idempotency key derived from the workflow id to prevent duplicate calls.",
-    "Fail-closed disposition: requires status=completed and task_completed=true, validates all structured_result enums, and routes ambiguous, unbound, low-confidence, wrong-person, unconfirmed-consent, unknown-reason, and lookup-error outcomes to a human.",
+    "Fail-closed disposition: verifies call identity (id), metadata.workflow_id, and recipients[].phones against approved intake (binding_* → needs_human), requires status=completed and task_completed=true, validates all structured_result enums, and routes ambiguous, unbound, low-confidence, wrong-person, unconfirmed-consent, unknown-reason, and lookup-error outcomes to a human.",
     "Masks phone numbers in previews and removes phone-like text from evidence output, including formatted forms like (202) 555-0123, 202-555-0123, 202.555.0123, +1 (202) 555-0123, +44 20 7123 4567.",
     "Task prompt does not offer to book a specific callback time – the result schema cannot return a time, so booking is out-of-scope.",
     "Excludes transcripts and provider evidence that may contain personal data.",
