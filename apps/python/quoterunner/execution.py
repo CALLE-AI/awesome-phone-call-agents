@@ -406,6 +406,7 @@ def run_batch(
     locale: str = "en-US",
     timeout_seconds: int = MAX_WAIT_SECONDS,
     on_event: Callable[[str], None] | None = None,
+    on_accepted: Callable[[dict[str, Any]], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Place one call per candidate, in sequence, and collect the answers.
 
@@ -496,16 +497,46 @@ def run_batch(
         call_id = created.get("id") if isinstance(created, dict) else None
         if not isinstance(call_id, str) or not call_id:
             # The dangerous case: the call may have been accepted but there is
-            # no id to reconcile it by. Recorded loudly, never retried.
+            # no id to reconcile it by. The idempotency key is the only handle
+            # left, so it is recorded rather than dropped. Never retried.
             say("      no call id returned -- not retrying")
             results.append({
                 "name": candidate.name,
                 "phone_masked": candidate.masked,
                 "status": "unknown",
                 "reason": "CALL-E accepted the request without returning a call id",
+                "idempotency_key": key,
                 "quote": None,
             })
             continue
+
+        # The call is accepted and the phone is ringing. Everything from here on
+        # can be interrupted -- Ctrl+C, a crash, the machine losing power -- and
+        # the call keeps going regardless, because it lives on CALL-E's side and
+        # not in this loop.
+        #
+        # So the row goes into the results BEFORE the wait, not after. An
+        # interrupted run then still hands back the call id and the idempotency
+        # key of every call it started, which is the only way to reconcile them
+        # afterwards. Writing the row after the wait meant that killing the
+        # process during a five-minute call erased the only record that it had
+        # ever been placed.
+        fila = {
+            "name": candidate.name,
+            "phone_masked": candidate.masked,
+            "call_id": call_id,
+            "idempotency_key": key,
+            "status": "in_flight",
+            "reason": "call accepted by CALL-E; waiting for the outcome",
+            "quote": None,
+        }
+        results.append(fila)
+        say(f"      accepted, call_id={call_id}")
+        if on_accepted is not None:
+            # Hook for a caller that wants to persist this somewhere durable
+            # before the wait. The in-memory list survives an exception; it does
+            # not survive the process dying.
+            on_accepted(dict(fila))
 
         try:
             final = calls.wait_for_result(
@@ -513,57 +544,44 @@ def run_batch(
             )
         except Exception as error:  # noqa: BLE001
             say(f"      result unavailable: {type(error).__name__}")
-            results.append({
-                "name": candidate.name,
-                "phone_masked": candidate.masked,
-                "call_id": call_id,
-                "status": "unknown",
-                "reason": f"call placed, outcome not retrieved ({type(error).__name__})",
-                "quote": None,
-            })
+            fila["status"] = "unknown"
+            fila["reason"] = (
+                f"call placed, outcome not retrieved ({type(error).__name__})")
             continue
 
         status = str((final or {}).get("status", "unknown")).strip().lower() or "unknown"
         structured = (final or {}).get("structured_result")
+        fila["status"] = status
 
         if status in NO_ANSWER:
             say(f"      {status}")
-            results.append({
-                "name": candidate.name, "phone_masked": candidate.masked,
-                "call_id": call_id, "status": status,
-                "reason": "nobody picked up; not redialled automatically",
-                "quote": None,
-            })
+            fila["reason"] = "nobody picked up; not redialled automatically"
             continue
 
-        # `task_completed` is CALL-E saying whether the agent actually finished
-        # what it was sent to do. Absent means the provider did not report it;
-        # an explicit False means it did not, and that is not a quote.
+        # `task_completed` is CALL-E attesting that the agent finished what it
+        # was sent to do. Absent is not the same as true: it means nobody
+        # attested anything, and an unattested call is exactly the one whose
+        # structured_result you should not put a price on. Only an explicit
+        # True passes.
         task_done = (final or {}).get("task_completed")
 
-        if status not in SUCCESSFUL or task_done is False or not _valid_result(structured):
+        if status not in SUCCESSFUL or task_done is not True or not _valid_result(structured):
             if status not in SUCCESSFUL:
-                reason = f"the call ended as {status}, not as a completed call"
+                fila["reason"] = f"the call ended as {status}, not as a completed call"
             elif task_done is False:
-                reason = "CALL-E reported the task was not completed"
+                fila["reason"] = "CALL-E reported the task was not completed"
+            elif task_done is None:
+                fila["reason"] = ("CALL-E did not attest that the task completed; "
+                                  "treated as unfinished")
             else:
-                reason = "the call did not return the full quote schema"
+                fila["reason"] = "the call did not return the full quote schema"
             say(f"      {status}, no usable answer")
-            results.append({
-                "name": candidate.name, "phone_masked": candidate.masked,
-                "call_id": call_id, "status": status,
-                "reason": reason,
-                "quote": None,
-            })
             continue
 
         quote = sanitise_quote(structured)
         say(f"      {quote['quoted_price']} {quote['currency']}")
-        results.append({
-            "name": candidate.name, "phone_masked": candidate.masked,
-            "call_id": call_id, "status": status,
-            "reason": "", "quote": quote,
-        })
+        fila["reason"] = ""
+        fila["quote"] = quote
 
     return results
 

@@ -79,7 +79,12 @@ class FakeCalls:
         self.waited.append(call_id)
         if self._wait_raises:
             raise self._wait_raises
-        return {"id": call_id, "status": self._status, "structured_result": self._result}
+        # A real completed call carries the attestation. The fake has to as
+        # well, or every test would be exercising the unattested path by
+        # accident -- which is exactly the case the gate now rejects.
+        return {"id": call_id, "status": self._status,
+                "task_completed": True,
+                "structured_result": self._result}
 
 
 # ---------------------------------------------------------------- token --
@@ -661,3 +666,110 @@ class TestReviewFindings(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# --------------------------------- third review round on #118 (8888ab6) --
+class TestThirdReviewRound(unittest.TestCase):
+    """The reviewer's third pass. All three were real."""
+
+    def test_missing_attestation_is_not_a_quote(self):
+        """Silence is not consent.
+
+        The gate rejected only an explicit False, so a completed call with
+        `task_completed` absent or null slipped through and its answers were
+        ranked as a real quote. Nobody attested that the call finished.
+        """
+        class SinAtestar(FakeCalls):
+            def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+                r = super().wait_for_result(
+                    call_id, timeout_seconds=timeout_seconds,
+                    interval_seconds=interval_seconds)
+                r.pop("task_completed", None)
+                return r
+        rows = run_batch([candidate()], "job", "Ivan", SinAtestar(), moment=MOMENT)
+        self.assertIsNone(rows[0]["quote"])
+        self.assertIn("did not attest", rows[0]["reason"])
+
+    def test_null_attestation_is_not_a_quote(self):
+        class Nula(FakeCalls):
+            def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+                r = super().wait_for_result(
+                    call_id, timeout_seconds=timeout_seconds,
+                    interval_seconds=interval_seconds)
+                r["task_completed"] = None
+                return r
+        rows = run_batch([candidate()], "job", "Ivan", Nula(), moment=MOMENT)
+        self.assertIsNone(rows[0]["quote"])
+
+    def test_explicit_true_still_produces_a_quote(self):
+        """The fix must not have closed the working path."""
+        class Atestada(FakeCalls):
+            def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+                r = super().wait_for_result(
+                    call_id, timeout_seconds=timeout_seconds,
+                    interval_seconds=interval_seconds)
+                r["task_completed"] = True
+                return r
+        rows = run_batch([candidate()], "job", "Ivan", Atestada(), moment=MOMENT)
+        self.assertIsNotNone(rows[0]["quote"])
+
+    def test_a_create_without_an_id_keeps_its_idempotency_key(self):
+        """That key is the only handle left to reconcile the call by."""
+        rows = run_batch([candidate()], "job", "Ivan", FakeCalls(call_id=""),
+                         moment=MOMENT)
+        self.assertEqual(rows[0]["status"], "unknown")
+        self.assertEqual(rows[0]["idempotency_key"],
+                         idempotency_key(candidate(), "job", "Ivan", "en-US"))
+
+    def test_the_call_is_recorded_before_the_wait(self):
+        """An interrupted run must still know what it started.
+
+        The call lives on CALL-E's side. Killing this process does not stop it,
+        so the record cannot be written only after the call ends.
+        """
+        vistos = []
+
+        class LentaYRota(FakeCalls):
+            def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+                # Lo que veria un Ctrl+C a mitad de la espera.
+                raise KeyboardInterrupt("interrumpido a mitad de llamada")
+
+        fake = LentaYRota()
+        with self.assertRaises(KeyboardInterrupt):
+            run_batch([candidate()], "job", "Ivan", fake, moment=MOMENT,
+                      on_accepted=vistos.append)
+
+        self.assertEqual(len(vistos), 1, "no se aviso de la llamada aceptada")
+        self.assertEqual(vistos[0]["call_id"], "call-1")
+        self.assertEqual(vistos[0]["status"], "in_flight")
+        self.assertEqual(vistos[0]["idempotency_key"],
+                         idempotency_key(candidate(), "job", "Ivan", "en-US"))
+
+    def test_on_accepted_fires_before_the_result_arrives(self):
+        orden = []
+
+        class Ordenada(FakeCalls):
+            def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+                orden.append("wait")
+                return super().wait_for_result(
+                    call_id, timeout_seconds=timeout_seconds,
+                    interval_seconds=interval_seconds)
+
+        run_batch([candidate()], "job", "Ivan", Ordenada(), moment=MOMENT,
+                  on_accepted=lambda f: orden.append("accepted"))
+        self.assertEqual(orden, ["accepted", "wait"])
+
+    def test_the_row_carries_the_call_id_while_in_flight(self):
+        filas = []
+        run_batch([candidate()], "job", "Ivan", FakeCalls(), moment=MOMENT,
+                  on_accepted=filas.append)
+        self.assertEqual(filas[0]["status"], "in_flight")
+        self.assertIn("call_id", filas[0])
+
+    def test_a_lost_result_keeps_call_id_and_key(self):
+        rows = run_batch([candidate()], "job", "Ivan",
+                         FakeCalls(wait_raises=TimeoutError("gateway")),
+                         moment=MOMENT)
+        self.assertEqual(rows[0]["status"], "unknown")
+        self.assertEqual(rows[0]["call_id"], "call-1")
+        self.assertIn("idempotency_key", rows[0])

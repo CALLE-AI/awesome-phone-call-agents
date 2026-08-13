@@ -211,10 +211,12 @@ machinery, and is not a substitute for it.
   rang anybody. A timeout or a 5xx may have been accepted, with the phone
   ringing while we read the exception — so it is recorded as `unknown`, carries
   its idempotency key for reconciliation, and is never quietly retried.
-- **A finished call is not a successful one.** `failed` and `canceled` are
-  terminal, and their `structured_result` can still satisfy the schema. Only a
-  `completed` call that CALL-E did not flag as unfinished produces a quote; the
-  rest are listed with what actually happened.
+- **A finished call is not a successful one, and silence is not consent.**
+  `failed` and `canceled` are terminal, and their `structured_result` can still
+  satisfy the schema. A quote requires a `completed` status **and** an explicit
+  `task_completed: true`. A missing or null attestation is not treated as
+  success: nobody said the call finished, and an unattested call is exactly the
+  one whose answers you should not put a price on.
 - **Nothing is redialled automatically.** Busy, no answer and voicemail are
   recorded and left alone. A redial the operator did not ask for is a second
   call to a real business.
@@ -228,8 +230,14 @@ machinery, and is not a substitute for it.
   it must say plainly that it is an AI if asked.
 - **Fictional data only in the fixture.** The `+1 555-0100..555-0199` range is
   reserved for fiction and belongs to nobody.
-- **Cancellation.** Stopping the process stops it. Calls already placed are
-  listed with their call id; nothing is scheduled to run later.
+- **Cancellation, stated accurately.** Stopping the process stops *this batch
+  from starting more calls*. It does **not** stop a call CALL-E has already
+  accepted — that call lives on the provider's side and will run to its end.
+  Because of that, every accepted call is written into the results with its
+  call id and idempotency key **before** the wait begins, and `on_accepted`
+  fires at the same moment so a caller can persist it somewhere durable.
+  Killing the process mid-call therefore leaves a record of what is still in
+  flight instead of erasing it. Nothing is scheduled to run later.
 - Not for medical, legal, financial or emergency workflows.
 
 ## Deliberate limits
@@ -256,7 +264,7 @@ python -m unittest discover -p "test_*.py"
 ```
 
 ```text
-Ran 119 tests in 0.138s
+Ran 127 tests in 0.140s
 OK
 ```
 
