@@ -236,6 +236,55 @@ def test_forget_i_said_that_retraction_fails_closed():
     assert result.commitment_score == 0.0
 
 
+def test_curly_apostrophe_negation_is_not_a_bypass():
+    """A curly/typographic apostrophe (U+2019) in "don't" -- entirely
+    plausible output from a real transcription service -- must not defeat
+    the `'?` in every negation/retraction pattern at once. This is a
+    Unicode normalization gap, not a missing word."""
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I am definitely coming"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "Actually, I don’t think I can make it"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_withdraw_that_commitment_retraction_fails_closed():
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I am definitely coming"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "I withdraw that commitment"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
+def test_plans_have_changed_retraction_fails_closed():
+    candidate = _candidate()
+    call = _call(status="completed", can_come="yes", task_completed=True,
+                  evidence="leaving now",
+                  transcript_turns=[
+                      {"speaker": "bot", "text": "can you come donate right now?"},
+                      {"speaker": "user", "text": "Yes, I am definitely coming"},
+                      {"speaker": "bot", "text": "great, see you soon"},
+                      {"speaker": "user", "text": "Plans have changed"},
+                  ])
+    result = _to_call_result("call_1", call, candidate)
+    assert result.outcome not in (CallOutcome.FIRM_YES, CallOutcome.SOFT_YES)
+    assert result.commitment_score == 0.0
+
+
 def test_yes_with_empty_transcript_is_not_trusted():
     candidate = _candidate()
     call = _call(status="completed", can_come="yes", transcript_turns=[])

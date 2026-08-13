@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 
 import httpx
 
@@ -75,15 +76,44 @@ TERMINAL_STATUSES = {"completed", "failed", "canceled"}
 #    dedicated retraction-cue check fails these closed too, on the same
 #    principle: withdrawing a commitment must never leave the earlier
 #    commitment standing.
+#
+# A fourth failure mode a reviewer found is not about vocabulary at all:
+# "don't" typed with a curly/typographic apostrophe (U+2019, the character
+# a transcription service is entirely likely to emit) never matched `'?`
+# in ANY of the patterns above, because `'?` only ever matched the plain
+# ASCII apostrophe (U+0027) or nothing. That's not one more phrase to add
+# -- it silently defeated every negation/retraction pattern that contains
+# an apostrophe, all at once, regardless of which word. Fixed at the root
+# with Unicode normalization (_normalize_recipient_text): curly
+# apostrophes and quotes are folded to their ASCII equivalents, and
+# NFKC-normalized, before any pattern below ever runs, so this class of
+# bypass is closed structurally rather than per-word.
 _NEGATION_CUE_RE = re.compile(
     r"\b(no|not|never|don'?t|doesn'?t|didn'?t|won'?t|can'?t|cannot|unable|nope|nah)\b",
     re.IGNORECASE,
 )
 _RETRACTION_CUE_RE = re.compile(
     r"\b(scratch that|forget (it|that|what i said|i said( that)?)|"
-    r"take (it|that) back|disregard (it|that)|on second thought)\b",
+    r"take (it|that) back|disregard (it|that)|on second thought|"
+    r"withdraw|retract|back(ing)? out|"
+    r"plans? (have |has |just )?chang(ed|ing)|"
+    r"no longer (can|able|coming|going))\b",
     re.IGNORECASE,
 )
+_APOSTROPHE_RE = re.compile(r"[‘’ʼ′]")
+_QUOTE_RE = re.compile(r"[“”″]")
+
+
+def _normalize_recipient_text(text: str) -> str:
+    """Fold curly/typographic punctuation to ASCII before any pattern
+    above runs. Without this, a curly apostrophe (U+2019) in "don't" fails
+    every `'?` in every regex above at once -- not a missing word, a
+    silent bypass of the whole negation/retraction/affirmation vocabulary
+    for any contraction, however it's spelled."""
+    text = unicodedata.normalize("NFKC", text)
+    text = _APOSTROPHE_RE.sub("'", text)
+    text = _QUOTE_RE.sub('"', text)
+    return text
 _RECIPIENT_DENIAL_RE = re.compile(
     # Decline phrases that don't contain a generic negation cue word above
     # and so wouldn't otherwise be caught by _NEGATION_CUE_RE.
@@ -103,7 +133,15 @@ _CLAUSE_SPLIT_RE = re.compile(r"[.,;!?]+|\bbut\b|\bactually\b|\bhowever\b", re.I
 
 
 def _recipient_text(transcript: list[dict]) -> str:
-    return " ".join(turn.get("text", "") for turn in transcript if turn.get("speaker") == "user")
+    # Normalized here too, not just in the clause classifier below -- this
+    # text also feeds calibrated_commitment()'s own firm/hedge scoring
+    # (commitment.py), whose patterns have the exact same `'?` blind spot
+    # against a curly apostrophe.
+    return " ".join(
+        _normalize_recipient_text(turn.get("text", ""))
+        for turn in transcript
+        if turn.get("speaker") == "user"
+    )
 
 
 def _clause_signal(clause: str) -> str:
@@ -136,7 +174,8 @@ def _recipient_effective_position(transcript: list[dict]) -> str:
     for turn in transcript:
         if turn.get("speaker") != "user":
             continue
-        for clause in _CLAUSE_SPLIT_RE.split(turn.get("text", "")):
+        normalized = _normalize_recipient_text(turn.get("text", ""))
+        for clause in _CLAUSE_SPLIT_RE.split(normalized):
             clause = clause.strip()
             if not clause:
                 continue
