@@ -302,6 +302,118 @@ def test_fingerprint_does_not_change_with_call_id() -> None:
     assert b1["caller_fingerprint"] == b2["caller_fingerprint"]
 
 
+# ---------------------------------------------------------------------------
+# Review item #1 (second pass): personal names leak through summary, verb,
+# and source_span while the brief claims masked:true. The summarizer must
+# redact names and the validator must reject a brief that still leaks them.
+# ---------------------------------------------------------------------------
+
+def test_personal_names_are_redacted_from_summary_verb_and_source_span() -> None:
+    # "Dr. Patel" (title-prefixed) and "John Smith" (cue-introduced) must not
+    # survive into any emitted field while masked is true.
+    fixture = write_fixture(
+        {
+            "call_id": "name-001",
+            "callee_masked": "+155****1234",
+            "transcript": [
+                {
+                    "speaker": "agent",
+                    "text": "Hello, this is Dr. Patel from Example Clinic. May I confirm your appointment?",
+                },
+                {
+                    "speaker": "callee",
+                    "text": "Yes, this is John Smith, I will call back tomorrow.",
+                },
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    blob = json.dumps(brief)
+    assert "Patel" not in blob, f"personal name 'Patel' leaked into brief: {blob}"
+    assert "Smith" not in blob, f"personal name 'Smith' leaked into brief: {blob}"
+    # Role labels must be preserved (the safety contract keeps them).
+    assert "callee" in brief["summary"].lower(), f"role label 'callee' was stripped: {brief['summary']!r}"
+    for a in brief["actions"]:
+        assert "Patel" not in a["verb"] and "Smith" not in a["verb"]
+        assert "Patel" not in a["source_span"] and "Smith" not in a["source_span"]
+    rc, val_text = run_validate(out_path)
+    assert rc == 0, f"validate failed (name leaked): {val_text}"
+
+
+def test_validator_rejects_brief_that_leaks_personal_name() -> None:
+    # The validator must flag a hand-crafted brief that still contains a
+    # cue-introduced personal name in the summary (masked: true is a lie).
+    bad_brief = {
+        "outcome": "Appointment or request confirmed.",
+        "summary": "The callee said: this is John Smith, I can make it.",
+        "actions": [],
+        "sentiment": {"label": "positive", "justification": "Callee confirmed."},
+        "caller_fingerprint": "sha256:abcdef012345",
+        "masked": True,
+    }
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+        out_path.write_text(json.dumps(bad_brief), encoding="utf-8")
+    rc, val_text = run_validate(out_path)
+    assert rc != 0, "validator should reject a brief with a leaked personal name"
+    assert "name" in val_text.lower(), f"validator error should mention name: {val_text}"
+
+
+# ---------------------------------------------------------------------------
+# Review item #2 (second pass): outcome classification must not take the
+# first matching cue inside a single utterance. A contradictory response
+# such as "Yes, I can't make it" must fail closed to "unknown".
+# ---------------------------------------------------------------------------
+
+def test_outcome_single_utterance_contradiction_fails_closed() -> None:
+    # "Yes, I can't make it." contains both a confirmation cue and a decline
+    # cue. The previous implementation matched "confirmed" first. It must now
+    # fail closed to "unknown".
+    fixture = write_fixture(
+        {
+            "call_id": "intra-contra-001",
+            "transcript": [
+                {"speaker": "agent", "text": "Can you confirm your appointment?"},
+                {"speaker": "callee", "text": "Yes, I can\u0027t make it."},
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    assert brief["outcome"] == "unknown", (
+        f"single-utterance contradiction must fail closed to unknown, got {brief['outcome']!r}"
+    )
+
+
+def test_outcome_unambiguous_confirmation_still_confirmed() -> None:
+    # Guard against over-fitting: a clean confirmation with no decline cue
+    # must still be reported as confirmed, not closed to unknown.
+    fixture = write_fixture(
+        {
+            "call_id": "clean-confirm-001",
+            "transcript": [
+                {"speaker": "agent", "text": "May I confirm your appointment?"},
+                {"speaker": "callee", "text": "Yes, sounds good. I will be there."},
+            ],
+        }
+    )
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+        out_path = Path(out.name)
+    rc, out_text = run_summarize(fixture, out_path)
+    assert rc == 0, f"summarize failed: {out_text}"
+    brief = json.loads(out_path.read_text(encoding="utf-8"))
+    assert brief["outcome"].startswith("Appointment"), (
+        f"clean confirmation must still be confirmed, got {brief['outcome']!r}"
+    )
+
+
 def main() -> int:
     tests = [
         test_example_transcript_produces_valid_brief,
@@ -320,6 +432,12 @@ def main() -> int:
         # Review item #3: stable fingerprint across calls (no call_id)
         test_fingerprint_is_stable_across_calls_with_same_caller,
         test_fingerprint_does_not_change_with_call_id,
+        # Review item #1 (second pass): personal-name redaction
+        test_personal_names_are_redacted_from_summary_verb_and_source_span,
+        test_validator_rejects_brief_that_leaks_personal_name,
+        # Review item #2 (second pass): intra-utterance contradiction
+        test_outcome_single_utterance_contradiction_fails_closed,
+        test_outcome_unambiguous_confirmation_still_confirmed,
     ]
     failures = 0
     for test in tests:

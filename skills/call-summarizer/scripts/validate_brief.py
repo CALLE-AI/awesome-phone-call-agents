@@ -23,12 +23,30 @@ RAW_ID_RE = re.compile(
     r"\b(?:account|reference|order|case|ticket|claim|policy|invoice)\s*(?:#|no\.?|number)?\s*[A-Z0-9][A-Z0-9-]{3,}\b",
     re.IGNORECASE,
 )
+# Personal names following the same introduction cues the summarizer masks
+# (review item #1, second pass: names were leaking through summary/verb/
+# source_span while the brief claimed masked:true). The validator checks the
+# same name classes the skill promises to redact.
+RAW_NAME_TITLE_RE = re.compile(
+    r"\b(?:Dr\.|Mr\.|Ms\.|Mrs\.|Prof\.)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b"
+)
+RAW_NAME_CUE_RE = re.compile(
+    r"\b(?:this is|I am|I'm|my name is|name is|with me is|speaking,?\s*this is)\s+"
+    r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b",
+)
 REQUIRED_TOP = {"outcome", "summary", "actions", "sentiment", "caller_fingerprint", "masked"}
 
 
 def _leaks_pii(text: str) -> bool:
-    """True if `text` contains any raw phone, email, or account identifier."""
-    return bool(RAW_PHONE_RE.search(text) or RAW_EMAIL_RE.search(text) or RAW_ID_RE.search(text))
+    """True if `text` contains any raw phone, email, account identifier, or
+    personal name that should have been redacted."""
+    return bool(
+        RAW_PHONE_RE.search(text)
+        or RAW_EMAIL_RE.search(text)
+        or RAW_ID_RE.search(text)
+        or RAW_NAME_TITLE_RE.search(text)
+        or RAW_NAME_CUE_RE.search(text)
+    )
 
 
 def validate(brief: dict[str, Any]) -> list[str]:
@@ -62,11 +80,12 @@ def validate(brief: dict[str, Any]) -> list[str]:
     if brief.get("masked") is not True:
         errors.append("masked must be true")
     # Masking check: no raw PII should survive in summary, action verbs, or
-    # action source spans (review item #1 — verb and source_span both copy raw
-    # transcript content and must be masked + validated).
+    # action source spans (review item #1 — verb and source_span both copy
+    # raw transcript content and must be masked + validated; the second pass
+    # also covers personal names, which were leaking while masked:true).
     summary = str(brief.get("summary", ""))
     if _leaks_pii(summary):
-        errors.append("summary contains unmasked phone, email, or account identifier")
+        errors.append("summary contains unmasked phone, email, account identifier, or personal name")
     for i, action in enumerate(brief.get("actions", [])):
         if isinstance(action, dict):
             verb = str(action.get("verb", ""))

@@ -19,8 +19,11 @@ Every output is masked before it leaves the script:
 - Phone numbers are replaced with `[phone:••••]` tokens.
 - Email addresses are replaced with `[email:••••]` tokens.
 - Account or reference identifiers are replaced with `[id:••••]` tokens.
-- Names mentioned in the summary are kept only when they are role labels
-  (`the agent`, `the callee`, `the receptionist`); personal names are redacted.
+- Personal names introduced by a title (`Dr.`, `Mr.`, `Ms.`, `Mrs.`, `Prof.`)
+  or an introduction cue (`this is`, `I'm`, `my name is`) are replaced with
+  `[name:••••]` tokens. Role labels (`the agent`, `the callee`, `the
+  receptionist`) are kept only when they are role labels; personal names are
+  redacted. The validator checks every emitted field for residual names.
 
 The `caller_fingerprint` field is a one-way SHA-256 hash of the redacted caller
 identity fields. The raw identity is never stored or emitted. The fingerprint
@@ -34,6 +37,10 @@ exists only to de-duplicate repeat callers across calls without retaining PII.
   does not support.
 - Hedged language ("I think so", "probably") is preserved in the outcome and
   the sentiment justification rather than flattened to a confident statement.
+- Outcome detection never asserts an outcome from agent-only text. If the
+  callee's intent is contradictory — whether across separate utterances or
+  within a single one (e.g. "Yes, I can't make it") — the outcome fails
+  closed to `unknown` rather than picking the first cue that matched.
 
 ## Sensitive categories
 

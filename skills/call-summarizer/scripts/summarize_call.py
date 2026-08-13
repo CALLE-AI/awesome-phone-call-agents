@@ -35,16 +35,71 @@ ID_RE = re.compile(
 
 MASK_TOKEN = "[redacted]"
 
+# Personal-name redaction (review item #1, second pass).
+#
+# The skill's safety contract (references/safety.md) promises that personal
+# names are redacted while role labels (`the agent`, `the callee`, `the
+# receptionist`) are kept. Phone/email/id masking alone is not enough. We
+# redact names that appear after explicit introduction cues, which is the
+# pattern that actually leaks names in call transcripts, and redaction stays
+# deterministic and stdlib-only (no NER).
+#
+# Two forms are matched:
+#   1. Title-prefixed names: `Dr. Patel`, `Mr. Lee`, `Ms. Garcia`,
+#      `Mrs. Nguyen`, `Prof. Smith`.
+#   2. Cued introductions: `this is John Smith`, `I'm Jane`,
+#      `my name is Sam`, `with me is Carol`, `speaking, this is Bob`.
+# We never redact role labels (`this is the agent`, `the callee`,
+# `the receptionist`) — only proper-noun-like capitalized tokens following an
+# explicit name cue. Punctuation after the name is preserved.
+NAME_TITLE_RE = re.compile(
+    r"\b(Dr\.|Mr\.|Ms\.|Mrs\.|Prof\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b"
+)
+NAME_CUE_RE = re.compile(
+    r"\b(?:this is|I am|I'm|my name is|name is|with me is|speaking,?\s*this is)\s+"
+    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b",
+)
+
+
+def _redact_names(text: str) -> str:
+    """Replace title-prefixed and cue-introduced personal names with a token.
+
+    Role labels (`the agent`, `the callee`, `the receptionist`, `the
+    customer`) are deliberately left intact; only capitalized proper-noun
+    tokens that follow an explicit name cue are redacted. This matches the
+    safety contract: role labels are kept, personal names are not.
+    """
+
+    def _title_repl(match: re.Match[str]) -> str:
+        # Keep the title (it is a role-like honorific), redact the name.
+        return f"{match.group(1)} [name:\u2022\u2022\u2022\u2022]"
+
+    text = NAME_TITLE_RE.sub(_title_repl, text)
+
+    def _cue_repl(match: re.Match[str]) -> str:
+        # Replace only the captured name group, preserving the cue phrase
+        # so the sentence still reads grammatically.
+        return match.group(0).replace(match.group(1), "[name:\u2022\u2022\u2022\u2022]")
+
+    text = NAME_CUE_RE.sub(_cue_repl, text)
+    return text
+
 
 def mask_pii(text: str) -> str:
-    """Replace phone numbers, emails, and account IDs with a redaction token."""
+    """Replace phone numbers, emails, account IDs, and personal names with
+    redaction tokens. This covers every PII class the skill promises to mask
+    (review item #1, second pass: names were still leaking through summary,
+    verb, and source_span).
+    """
     text = PHONE_RE.sub("[phone:\u2022\u2022\u2022\u2022]", text)
     text = EMAIL_RE.sub("[email:\u2022\u2022\u2022\u2022]", text)
 
     def _id_repl(match: re.Match[str]) -> str:
         return match.group(0).replace(match.group(1), "[id:\u2022\u2022\u2022\u2022]")
 
-    return ID_RE.sub(_id_repl, text)
+    text = ID_RE.sub(_id_repl, text)
+    text = _redact_names(text)
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -118,16 +173,48 @@ def _callee_effective_text(turns: list[dict[str, str]]) -> str:
     return effective[-1] if effective else ""
 
 
-def _classify_callee_response(text: str) -> str:
-    """Classify a single callee utterance. Returns one of the OUTCOME_CUES
-    labels, or 'unknown' when no cue matches."""
+def _classify_callee_response(text: str) -> tuple[str, set[str]]:
+    """Classify a single callee utterance.
+
+    Returns `(primary, all_cues)` where `primary` is the outcome label and
+    `all_cues` is every distinct cue label the utterance contains. `primary`
+    is `'unknown'` when no cue matches OR when the utterance contains
+    contradictory cues (review item #2, second pass: the previous
+    implementation took the first matching cue in a fixed order, so
+    "Yes, I can't make it" was reported as confirmed because the
+    confirmation cue matched before the decline cue).
+
+    Contradiction here means a single utterance matching two of the
+    mutually-exclusive outcome labels `confirmed`, `declined`,
+    `rescheduled`. When that happens we refuse to assert either side and
+    return `'unknown'` so the caller fails closed.
+    """
     if not text.strip():
-        return "unknown"
+        return "unknown", set()
     low = text.lower()
+    found: set[str] = set()
     for label, pattern in OUTCOME_CUES:
+        if label in ("no-answer", "voicemail"):
+            # These are system-style signals, not callee intent cues; they are
+            # handled separately from intent contradictions.
+            continue
         if re.search(pattern, low):
-            return label
-    return "unknown"
+            found.add(label)
+    contradiction_pairs = (("confirmed", "declined"), ("confirmed", "rescheduled"), ("declined", "rescheduled"))
+    for a, b in contradiction_pairs:
+        if a in found and b in found:
+            return "unknown", found
+    if not found:
+        return "unknown", set()
+    # Unambiguous single-intent utterance: return the (only) intent cue.
+    if len(found) == 1:
+        return next(iter(found)), found
+    # Multiple cues that are not a contradiction pair (e.g. confirmed +
+    # no-answer from system text). Prefer the intent cue over a system cue.
+    for label in ("confirmed", "declined", "rescheduled"):
+        if label in found:
+            return label, found
+    return "unknown", found
 
 
 def detect_outcome(turns: list[dict[str, str]]) -> str:
@@ -137,7 +224,8 @@ def detect_outcome(turns: list[dict[str, str]]) -> str:
     Per review item #2, outcome detection must consider only the callee's own
     words (the agent asking "can you confirm?" must not be read as a
     confirmation) and must fail closed (return 'unknown') when the callee's
-    responses contradict one another.
+    responses contradict one another — whether across separate utterances or
+    inside a single utterance (e.g. "Yes, I can't make it").
     """
     if not turns:
         return "unknown"
@@ -154,18 +242,19 @@ def detect_outcome(turns: list[dict[str, str]]) -> str:
             return "Voicemail reached; no live contact."
         return "unknown"
 
-    latest = _classify_callee_response(callee_text)
-    if latest in ("no-answer", "voicemail"):
-        # A callee explicitly saying "no answer"/"voicemail" is a system-style
-        # signal; keep the dedicated outcome lines for those.
-        if latest == "no-answer":
-            return "No answer; call ended without contact."
+    latest, latest_cues = _classify_callee_response(callee_text)
+    # A callee explicitly saying "no answer"/"voicemail" is a system-style
+    # signal; keep the dedicated outcome lines for those.
+    if "no-answer" in latest_cues and not (latest_cues - {"no-answer"}):
+        return "No answer; call ended without contact."
+    if "voicemail" in latest_cues and not (latest_cues - {"voicemail"}):
         return "Voicemail reached; no live contact."
 
-    # Fail-closed contradiction check: gather every distinct cue the callee
-    # produced across the call. If the latest cue conflicts with an earlier
-    # positive/decline cue (e.g., "yes" earlier then "can't" later, or vice
-    # versa), we refuse to assert an outcome and fail closed to "unknown".
+    # Fail-closed contradiction check. Gather every distinct intent cue the
+    # callee produced across the call. If the latest cue conflicts with an
+    # earlier positive/decline/reschedule cue, OR the latest utterance itself
+    # was internally contradictory (returned "unknown"), we refuse to assert
+    # an outcome and fail closed to "unknown".
     callee_utterances = [
         str(t.get("text", ""))
         for t in turns
@@ -174,12 +263,12 @@ def detect_outcome(turns: list[dict[str, str]]) -> str:
     ]
     seen_labels: set[str] = set()
     for utt in callee_utterances:
-        lab = _classify_callee_response(utt)
-        if lab and lab != "unknown":
-            seen_labels.add(lab)
-    contradiction_pairs = {("confirmed", "declined"), ("confirmed", "rescheduled"), ("declined", "rescheduled")}
+        _, cues = _classify_callee_response(utt)
+        seen_labels |= cues
+    contradiction_pairs = (("confirmed", "declined"), ("confirmed", "rescheduled"), ("declined", "rescheduled"))
     for a, b in contradiction_pairs:
-        if a in seen_labels and b in seen_labels and latest in (a, b):
+        if a in seen_labels and b in seen_labels:
+            # Any cross-utterance contradiction closes the outcome.
             return "unknown"
 
     if latest == "confirmed":

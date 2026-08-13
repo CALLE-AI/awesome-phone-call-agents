@@ -68,7 +68,10 @@ The script performs:
 
 1. **Outcome line**: a single sentence stating the call result (confirmed,
    declined, rescheduled, no-answer, voicemail, unknown) using only words that
-   appear in the transcript.
+   appear in the transcript. The outcome is bound to the callee's latest
+   effective response (agent text never counts as a confirmation), and any
+   contradictory intent — across utterances or within a single utterance
+   (e.g. "Yes, I can't make it") — fails closed to `unknown`.
 2. **Masked summary**: a short prose summary with all phone numbers, email
    addresses, names, and account identifiers replaced by masked tokens so the
    summary is safe to log.
@@ -89,8 +92,9 @@ The script performs:
 
 Run `scripts/validate_brief.py` to confirm the brief is well-formed before any
 downstream system consumes it. It checks that every action item has an owner,
-that masking has no residual raw phone numbers or emails, and that the outcome
-line is non-empty and grounded in the transcript.
+that masking has no residual raw phone numbers, emails, account identifiers,
+or personal names, and that the outcome line is non-empty and grounded in the
+transcript.
 
 ### 4. Review or route
 
