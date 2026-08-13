@@ -2,3 +2,4 @@ streamlit
 python-dotenv
 calle-ai
 pytest
+httpx

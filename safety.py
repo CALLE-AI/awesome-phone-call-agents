@@ -1,23 +1,73 @@
+import re
+
+
+# Strict E.164:
+# - starts with +
+# - first digit cannot be 0
+# - total digits after + must be 8 to 15
+E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+def is_valid_e164(phone_number: str) -> bool:
+    """
+    Return True only for strict E.164 phone numbers.
+
+    Valid examples:
+        +919876543210
+        +14155552671
+
+    Invalid examples:
+        +not-a-phone
+        9876543210
+        +0123456789
+        +91 98765 43210
+    """
+    if not isinstance(phone_number, str):
+        return False
+
+    phone_number = phone_number.strip()
+    return bool(E164_PATTERN.fullmatch(phone_number))
+
+
 def can_call_business(business: dict) -> tuple[bool, str]:
-    if not business.get("authorized", False):
-        return False, "Business is not authorized for outreach."
+    """
+    Fail closed before any live call is dispatched.
 
-    if business.get("do_not_call", False):
-        return False, "Business has requested no further calls."
+    Expected business fields:
+        authorized_for_calling: bool
+        do_not_call: bool
+        phone_number: str
+    """
+    if not isinstance(business, dict):
+        return False, "Invalid business record."
 
-    phone = business.get("phone", "").strip()
+    if business.get("authorized_for_calling") is not True:
+        return False, "Business is not authorized for calling."
 
-    if not phone:
-        return False, "Phone number is missing."
+    if business.get("do_not_call") is True:
+        return False, "Business has opted out of calls."
 
-    if not phone.startswith("+"):
-        return False, "Phone number must be in E.164 format."
+    phone_number = business.get("phone_number")
 
-    return True, "Eligible for calling."
+    if not phone_number:
+        return False, "Business phone number is missing."
+
+    if not is_valid_e164(phone_number):
+        return False, "Business phone number is not valid E.164."
+
+    return True, "Call allowed."
 
 
-def mask_phone_number(phone: str) -> str:
-    if len(phone) <= 4:
-        return "****"
+def mask_phone_number(phone_number: str) -> str:
+    """
+    Mask a phone number for logs/UI so the full number is not exposed.
+    """
+    if not isinstance(phone_number, str) or not phone_number:
+        return "***"
 
-    return f"{phone[:3]}******{phone[-2:]}"
+    phone_number = phone_number.strip()
+
+    if len(phone_number) <= 4:
+        return "*" * len(phone_number)
+
+    return f"{phone_number[:3]}{'*' * max(len(phone_number) - 7, 3)}{phone_number[-4:]}"
