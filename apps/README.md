@@ -30,7 +30,7 @@ Current apps:
 | [`python/oauth-login-client`](python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/vibehub-founder-relay`](typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
-| [`typescript/calle-mcp-result-extractor`](typescript/calle-mcp-result-extractor/) | TypeScript | Schema-validated structured results from CALL-E calls placed over MCP, which has no `result_schema` parameter of its own — extracts from the transcript instead, with a documented fix for a real Bedrock Converse API tool_use/tool_result retry pitfall. |
+| [`typescript/ringer`](typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
 
 Suggested grouping:
 
