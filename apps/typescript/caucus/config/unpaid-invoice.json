@@ -1,0 +1,32 @@
+{
+  "id": "unpaid-invoice",
+  "displayName": "Unpaid B2B invoice",
+  "disputeNoun": "unpaid invoice",
+  "partyRoles": {
+    "A": {
+      "label": "the supplier",
+      "description": "Issued the invoice and is owed the disputed balance."
+    },
+    "B": {
+      "label": "the customer",
+      "description": "Received the goods or services and disputes part or all of the invoice."
+    }
+  },
+  "defaultPolicy": {
+    "maxRounds": 10,
+    "coolingOffMinutes": 120,
+    "callWindow": { "startHour": 9, "endHour": 17, "timezone": "America/Chicago" },
+    "retryDelaysMinutes": [60, 240],
+    "ttlHours": 336
+  },
+  "suggestedConditions": [
+    "customer pays the settled amount within 30 days",
+    "supplier issues a corrected final invoice for the settled amount",
+    "supplier waives late fees and interest on the disputed balance",
+    "both parties keep the existing service agreement unchanged"
+  ],
+  "guidance": {
+    "consent": "This is a commercial disagreement between businesses that expect to keep working together; stay matter-of-fact.",
+    "shuttle": "Keep the discussion on the disputed invoice balance and delivery record, not on either company's finances."
+  }
+}

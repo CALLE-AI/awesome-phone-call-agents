@@ -1,0 +1,16 @@
+{
+  "kind": "caucus_case_list",
+  "cases": [
+    {
+      "caseId": "case_invoice_demo",
+      "state": "settled",
+      "vertical": "unpaid-invoice",
+      "summary": "Disputed unpaid invoice of $3,485 between the supplier and the customer.",
+      "amountCents": 348500,
+      "rounds": 9,
+      "epoch": 14,
+      "updatedAt": "2026-08-08T14:19:30.000Z",
+      "href": "case.json"
+    }
+  ]
+}

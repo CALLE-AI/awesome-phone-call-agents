@@ -1,0 +1,268 @@
+{
+  "kind": "caucus_case_view",
+  "caseId": "case_invoice_demo",
+  "state": "settled",
+  "epoch": 14,
+  "createdAt": "2026-08-08T14:00:00.000Z",
+  "updatedAt": "2026-08-08T14:19:30.000Z",
+  "dispute": {
+    "vertical": "unpaid-invoice",
+    "summary": "Disputed unpaid invoice of $3,485 between the supplier and the customer.",
+    "amountCents": 348500,
+    "currency": "USD"
+  },
+  "policy": {
+    "maxRounds": 10
+  },
+  "parties": [
+    {
+      "id": "A",
+      "label": "Kestrel Supply Co (the supplier)",
+      "phoneMasked": "***0001"
+    },
+    {
+      "id": "B",
+      "label": "Harbor Bistro LLC (the customer)",
+      "phoneMasked": "***0002"
+    }
+  ],
+  "consent": {
+    "A": "mock_001_case_invoice_demo_r0_A",
+    "B": "mock_002_case_invoice_demo_r0_B"
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "party": "A",
+      "partyLabel": "Kestrel Supply Co (the supplier)",
+      "kind": "open",
+      "amountCents": 348500,
+      "conditions": [
+        "customer signs the corrected delivery receipt"
+      ],
+      "publicRationale": "The goods shipped complete against the signed purchase order.",
+      "evidence": [
+        "Invoice 2214 stands at $3,485 — the pallets left our dock complete."
+      ],
+      "callId": "mock_003_case_invoice_demo_r1_A",
+      "outcome": "completed",
+      "at": "2026-08-08T14:04:30.000Z"
+    },
+    {
+      "round": 2,
+      "party": "B",
+      "partyLabel": "Harbor Bistro LLC (the customer)",
+      "kind": "open",
+      "amountCents": 90000,
+      "conditions": [
+        "supplier issues a credit memo for the short-shipped case"
+      ],
+      "publicRationale": "One pallet arrived a full case short.",
+      "evidence": [
+        "We'll pay $900 — we're not paying for a case we never received."
+      ],
+      "callId": "mock_004_case_invoice_demo_r2_B",
+      "outcome": "completed",
+      "at": "2026-08-08T14:06:00.000Z"
+    },
+    {
+      "round": 3,
+      "party": "A",
+      "partyLabel": "Kestrel Supply Co (the supplier)",
+      "kind": "counter",
+      "amountCents": 296200,
+      "conditions": [
+        "customer signs the corrected delivery receipt"
+      ],
+      "publicRationale": "The goods shipped complete against the signed purchase order.",
+      "evidence": [
+        "Invoice 2214 stands at $2,962 — the pallets left our dock complete."
+      ],
+      "callId": "mock_005_case_invoice_demo_r3_A",
+      "outcome": "completed",
+      "at": "2026-08-08T14:07:30.000Z"
+    },
+    {
+      "round": 4,
+      "party": "B",
+      "partyLabel": "Harbor Bistro LLC (the customer)",
+      "kind": "counter",
+      "amountCents": 117000,
+      "conditions": [
+        "supplier issues a credit memo for the short-shipped case"
+      ],
+      "publicRationale": "One pallet arrived a full case short.",
+      "evidence": [
+        "We'll pay $1,170 — we're not paying for a case we never received."
+      ],
+      "callId": "mock_006_case_invoice_demo_r4_B",
+      "outcome": "completed",
+      "at": "2026-08-08T14:09:00.000Z"
+    },
+    {
+      "round": 5,
+      "party": "A",
+      "partyLabel": "Kestrel Supply Co (the supplier)",
+      "kind": "counter",
+      "amountCents": 251800,
+      "conditions": [
+        "customer signs the corrected delivery receipt"
+      ],
+      "publicRationale": "The goods shipped complete against the signed purchase order.",
+      "evidence": [
+        "Invoice 2214 stands at $2,518 — the pallets left our dock complete."
+      ],
+      "callId": "mock_007_case_invoice_demo_r5_A",
+      "outcome": "completed",
+      "at": "2026-08-08T14:10:30.000Z"
+    },
+    {
+      "round": 6,
+      "party": "B",
+      "partyLabel": "Harbor Bistro LLC (the customer)",
+      "kind": "counter",
+      "amountCents": 152100,
+      "conditions": [
+        "supplier issues a credit memo for the short-shipped case"
+      ],
+      "publicRationale": "One pallet arrived a full case short.",
+      "evidence": [
+        "We'll pay $1,521 — we're not paying for a case we never received."
+      ],
+      "callId": "mock_008_case_invoice_demo_r6_B",
+      "outcome": "completed",
+      "at": "2026-08-08T14:12:00.000Z"
+    },
+    {
+      "round": 7,
+      "party": "A",
+      "partyLabel": "Kestrel Supply Co (the supplier)",
+      "kind": "counter",
+      "amountCents": 214000,
+      "conditions": [
+        "customer signs the corrected delivery receipt"
+      ],
+      "publicRationale": "The goods shipped complete against the signed purchase order.",
+      "evidence": [
+        "Invoice 2214 stands at $2,140 — the pallets left our dock complete."
+      ],
+      "callId": "mock_009_case_invoice_demo_r7_A",
+      "outcome": "completed",
+      "at": "2026-08-08T14:13:30.000Z"
+    },
+    {
+      "round": 8,
+      "party": "B",
+      "partyLabel": "Harbor Bistro LLC (the customer)",
+      "kind": "counter",
+      "amountCents": 197700,
+      "conditions": [
+        "supplier issues a credit memo for the short-shipped case"
+      ],
+      "publicRationale": "One pallet arrived a full case short.",
+      "evidence": [
+        "We'll pay $1,977 — we're not paying for a case we never received."
+      ],
+      "callId": "mock_010_case_invoice_demo_r8_B",
+      "outcome": "completed",
+      "at": "2026-08-08T14:15:00.000Z"
+    },
+    {
+      "round": 9,
+      "party": "A",
+      "partyLabel": "Kestrel Supply Co (the supplier)",
+      "kind": "accept",
+      "amountCents": 197700,
+      "conditions": [],
+      "publicRationale": "Wants this resolved this week.",
+      "evidence": [
+        "Fine — $1,977 works. Let's close it out."
+      ],
+      "callId": "mock_011_case_invoice_demo_r9_A",
+      "outcome": "completed",
+      "at": "2026-08-08T14:16:30.000Z"
+    }
+  ],
+  "curve": [
+    {
+      "round": 1,
+      "party": "A",
+      "amountCents": 348500
+    },
+    {
+      "round": 2,
+      "party": "B",
+      "amountCents": 90000
+    },
+    {
+      "round": 3,
+      "party": "A",
+      "amountCents": 296200
+    },
+    {
+      "round": 4,
+      "party": "B",
+      "amountCents": 117000
+    },
+    {
+      "round": 5,
+      "party": "A",
+      "amountCents": 251800
+    },
+    {
+      "round": 6,
+      "party": "B",
+      "amountCents": 152100
+    },
+    {
+      "round": 7,
+      "party": "A",
+      "amountCents": 214000
+    },
+    {
+      "round": 8,
+      "party": "B",
+      "amountCents": 197700
+    },
+    {
+      "round": 9,
+      "party": "A",
+      "amountCents": 197700
+    }
+  ],
+  "assessment": {
+    "impasse": false,
+    "impasseReason": null,
+    "nextSuggestionCents": null
+  },
+  "settlement": {
+    "amountCents": 197700,
+    "conditions": [
+      "supplier issues a credit memo for the short-shipped case"
+    ],
+    "termsDigest": "1801eef0d1a846ece71e7564e4eeac55cdce938dfd2a2fa367dd7b2a2c75136a",
+    "attestationPhrase": "656106",
+    "attestations": [
+      {
+        "party": "A",
+        "callId": "mock_012_case_invoice_demo_r9_A",
+        "spokenPhrase": "656106",
+        "verified": true,
+        "at": "2026-08-08T14:18:00.000Z"
+      },
+      {
+        "party": "B",
+        "callId": "mock_013_case_invoice_demo_r9_B",
+        "spokenPhrase": "656106",
+        "verified": true,
+        "at": "2026-08-08T14:19:30.000Z"
+      }
+    ]
+  },
+  "ledger": {
+    "entries": 16,
+    "chainOk": true,
+    "brokenAtSeq": null,
+    "headHash": "fc3c8fd4480daee8f918ec10f6a20d4cb8e1572f71496c1bb947148c77fc250b"
+  }
+}

@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderMemo > matches the golden snapshot 1`] = `
+"# Settlement Memorandum — Case cs_memo_0001
+
+> **NON-BINDING DOCUMENT — NOT LEGAL ADVICE. This memorandum is an automated, neutral summary of communications relayed between the parties by the Caucus mediation system. It records what was said and agreed; it does not constitute a contract, a legal determination, or legal advice. Either party should consult a licensed attorney before relying on these terms.**
+
+- Generated at: 2026-07-30T12:00:00.000Z
+- Case state: \`settled\`
+
+## Parties
+
+| Party | Label | Phone |
+| --- | --- | --- |
+| A | Tenant Alex | ***0001 |
+| B | Landlord Sam | ***0002 |
+
+## Dispute
+
+- Vertical: \`security_deposit\`
+- Summary: Disagreement over how much of a $1,200 deposit is returned.
+- Amount in dispute: $1,200.00 USD
+
+## Rounds
+
+| Round | Party | Kind | Amount | Conditions | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | A (Tenant Alex) | open | $1,200.00 | itemized deduction list provided | "I want the full deposit back" |
+| 2 | B (Landlord Sam) | counter | $600.00 | — | "the carpet \\| was damaged in two rooms" |
+| 3 | A (Tenant Alex) | counter | $900.00 | tenant returns garage remote | "nine hundred and the remote back, final" |
+| 4 | B (Landlord Sam) | accept | $900.00 | — | "fine, nine hundred works" |
+
+## Settlement Terms
+
+- Amount: $900.00
+- Conditions:
+  - tenant returns garage remote
+- Terms digest (SHA-256): \`d1f2e3a4b5c6d7e8f90112233445566778899aabbccddeeff0011223344556677\`
+- Attestation phrase: "amber falcon nine"
+
+### Attestations
+
+| Party | Call | Spoken phrase | Verified | At |
+| --- | --- | --- | --- | --- |
+| A | \`call_att_a\` | "amber falcon nine" | yes | 2026-07-29T19:00:00.000Z |
+| B | \`call_att_b\` | "Amber Falcon Nine" | yes | 2026-07-29T19:20:00.000Z |
+
+## Ledger
+
+- Entries: 3
+- Chain head hash: \`hash_ccc333\`
+"
+`;

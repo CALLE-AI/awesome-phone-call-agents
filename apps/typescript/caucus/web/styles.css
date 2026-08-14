@@ -1,0 +1,947 @@
+/*
+ * Caucus operator dashboard — no external fonts, no CDN, works offline.
+ * Light/dark follows the operating system (prefers-color-scheme).
+ * Sized to read clearly in a 1080p screen recording: 16px base, high contrast.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #f2f4f7;
+  --panel: #ffffff;
+  --card: #f9fafc;
+  --ink: #191d24;
+  --muted: #5a6472;
+  --line: #dbe0e7;
+
+  /* Party A = blue, Party B = orange: a colorblind-safe pair. */
+  --party-a: #2257b8;
+  --party-a-soft: rgba(34, 87, 184, 0.1);
+  --party-b: #a85416;
+  --party-b-soft: rgba(168, 84, 22, 0.12);
+
+  --ok: #167444;
+  --ok-soft: rgba(22, 116, 68, 0.12);
+  --bad: #ab2418;
+  --bad-soft: rgba(171, 36, 24, 0.1);
+  --info-soft: rgba(34, 87, 184, 0.08);
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10141a;
+    --panel: #181e26;
+    --card: #1e2530;
+    --ink: #e8ebef;
+    --muted: #9aa4b1;
+    --line: #2b3441;
+
+    --party-a: #7fa9f2;
+    --party-a-soft: rgba(127, 169, 242, 0.14);
+    --party-b: #e59a5a;
+    --party-b-soft: rgba(229, 154, 90, 0.14);
+
+    --ok: #52c58c;
+    --ok-soft: rgba(82, 197, 140, 0.14);
+    --bad: #ef8377;
+    --bad-soft: rgba(239, 131, 119, 0.13);
+    --info-soft: rgba(127, 169, 242, 0.12);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The hidden attribute must win over any display rule (e.g. flex containers). */
+[hidden] {
+  display: none !important;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+code {
+  font-family: var(--mono);
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 1.1rem 1.5rem 0.4rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.brand-mark path {
+  fill: none;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mark-a {
+  stroke: var(--party-a);
+}
+
+.mark-b {
+  stroke: var(--party-b);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brand-sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.case-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.case-picker select {
+  font: 0.85rem var(--mono);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  max-width: 22rem;
+}
+
+.source-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.source-badge::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  background: var(--muted);
+  vertical-align: 0.05rem;
+}
+
+.source-live {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.source-live::before {
+  background: var(--ok);
+}
+
+.source-stale {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.source-stale::before {
+  background: var(--bad);
+}
+
+/* ---------- page frame ---------- */
+
+#main {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0.6rem 1.5rem 1.5rem;
+}
+
+.status-line {
+  color: var(--muted);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.error-panel {
+  background: var(--bad-soft);
+  border: 1px solid var(--bad);
+  border-radius: 12px;
+  color: var(--ink);
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.error-panel h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  color: var(--bad);
+}
+
+.error-panel p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.page-foot {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ---------- panels ---------- */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.15rem 1.35rem;
+  margin-bottom: 1.1rem;
+}
+
+.panel h3 {
+  margin: 0 0 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+
+.empty-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0.25rem 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+.layout > * {
+  min-width: 0;
+}
+
+/* ---------- chips & badges ---------- */
+
+.chip {
+  display: inline-block;
+  padding: 0.16rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.state-good {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.state-active {
+  background: var(--info-soft);
+  color: var(--party-a);
+}
+
+.state-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.state-muted {
+  background: var(--card);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.chip-plain {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.kind-accept {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.kind-reject,
+.kind-no_response,
+.kind-none {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.kind-open,
+.kind-counter {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.call-id {
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.06rem 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- case header ---------- */
+
+.case-header .header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.header-id h2 {
+  margin: 0 0 0.45rem;
+  font: 600 1.15rem var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.header-chips {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.header-amount {
+  text-align: right;
+}
+
+.header-amount .label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.amount-big {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.case-summary {
+  margin: 0.8rem 0 0.9rem;
+  font-size: 1.02rem;
+  max-width: 60rem;
+}
+
+.parties-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+.party-plate {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.45rem 0.8rem;
+}
+
+.party-plate.party-a {
+  border-left: 3px solid var(--party-a);
+}
+
+.party-plate.party-b {
+  border-left: 3px solid var(--party-b);
+}
+
+.party-badge {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 0.8rem var(--sans);
+  color: var(--panel);
+  flex: none;
+}
+
+.party-a .party-badge {
+  background: var(--party-a);
+}
+
+.party-b .party-badge {
+  background: var(--party-b);
+}
+
+.party-name {
+  font-weight: 600;
+}
+
+.party-phone {
+  font: 0.82rem var(--mono);
+  color: var(--muted);
+}
+
+.shuttle-glyph {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.shuttle-glyph path {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.header-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+/* ---------- concession curve ---------- */
+
+.curve-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.tick-label,
+.axis-label {
+  fill: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.series-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.series-a {
+  stroke: var(--party-a);
+}
+
+.series-b {
+  stroke: var(--party-b);
+}
+
+.series-dot {
+  stroke: var(--panel);
+  stroke-width: 1.5;
+}
+
+.dot-a {
+  fill: var(--party-a);
+}
+
+.dot-b {
+  fill: var(--party-b);
+}
+
+.settle-ring {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 2.5;
+}
+
+.settle-label {
+  fill: var(--ok);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend-swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.legend-a {
+  background: var(--party-a);
+}
+
+.legend-b {
+  background: var(--party-b);
+}
+
+.legend-settle {
+  background: none;
+  border: 2.5px solid var(--ok);
+}
+
+/* ---------- shuttle timeline ---------- */
+
+.consent-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.consent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.consent-chip.party-a {
+  color: var(--party-a);
+}
+
+.consent-chip.party-b {
+  color: var(--party-b);
+}
+
+.consent-chip.missing {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+.timeline::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--line);
+}
+
+.t-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 3.4rem 1fr;
+  align-items: start;
+  padding: 0.45rem 0;
+}
+
+.t-row .round-card {
+  grid-row: 1;
+}
+
+.t-a .round-card {
+  grid-column: 1;
+}
+
+.t-b .round-card {
+  grid-column: 3;
+}
+
+.t-node {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  margin-top: 0.55rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 650 0.8rem var(--mono);
+  color: var(--muted);
+  z-index: 1;
+}
+
+.t-a .t-node {
+  border-color: var(--party-a);
+  color: var(--party-a);
+}
+
+.t-b .t-node {
+  border-color: var(--party-b);
+  color: var(--party-b);
+}
+
+.round-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+}
+
+.round-card.party-a {
+  border-left: 3px solid var(--party-a);
+}
+
+.round-card.party-b {
+  border-right: 3px solid var(--party-b);
+}
+
+.round-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.round-title {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.round-amount {
+  margin: 0.3rem 0 0.1rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.round-rationale {
+  margin: 0.3rem 0;
+  font-size: 0.9rem;
+}
+
+.round-conditions {
+  margin: 0.4rem 0 0.1rem;
+  font-size: 0.85rem;
+}
+
+.round-conditions .cond-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.round-conditions ul {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.evidence {
+  margin: 0.55rem 0 0.2rem;
+  padding: 0.35rem 0.75rem;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.88rem;
+}
+
+.round-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.55rem;
+}
+
+.round-time {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.t-terminal {
+  margin: 0.8rem auto 0;
+  max-width: 34rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.t-terminal.tone-good {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.t-terminal.tone-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.t-terminal.tone-neutral {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+/* ---------- settlement panel ---------- */
+
+.settle-amount {
+  margin: 0 0 0.5rem;
+  font-size: 1.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.kv {
+  margin: 0.55rem 0;
+}
+
+.kv .kv-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.kv code {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.digest {
+  cursor: help;
+}
+
+.attest-code {
+  font: 650 1.35rem var(--mono);
+  letter-spacing: 0.35em;
+}
+
+.settle-conditions {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+}
+
+.attest-list {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+}
+
+.attest-row {
+  border-top: 1px solid var(--line);
+  padding: 0.6rem 0;
+}
+
+.attest-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.attest-head .party-badge {
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.72rem;
+}
+
+.attest-row.party-a .party-badge {
+  background: var(--party-a);
+}
+
+.attest-row.party-b .party-badge {
+  background: var(--party-b);
+}
+
+.attest-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.attest-spoken {
+  margin: 0.35rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.attest-meta {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- assessment & ledger panels ---------- */
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 650;
+  margin: 0.2rem 0 0.5rem;
+}
+
+.status-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.status-ok {
+  color: var(--ok);
+}
+
+.status-ok .status-dot {
+  background: var(--ok);
+}
+
+.status-bad {
+  color: var(--bad);
+}
+
+.status-bad .status-dot {
+  background: var(--bad);
+}
+
+.panel-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0.6rem 0 0;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 940px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .header-amount {
+    text-align: left;
+  }
+
+  .timeline::before {
+    left: 1.05rem;
+  }
+
+  .t-row {
+    grid-template-columns: 2.1rem 1fr;
+  }
+
+  .t-node {
+    grid-column: 1;
+    justify-self: start;
+    width: 1.7rem;
+    height: 1.7rem;
+    font-size: 0.72rem;
+  }
+
+  .t-a .round-card,
+  .t-b .round-card {
+    grid-column: 2;
+  }
+
+  .round-card.party-b {
+    border-right: 1px solid var(--line);
+    border-left: 3px solid var(--party-b);
+  }
+}

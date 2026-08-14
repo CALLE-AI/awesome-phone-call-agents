@@ -1,0 +1,32 @@
+{
+  "id": "security-deposit",
+  "displayName": "Residential security deposit",
+  "disputeNoun": "security deposit",
+  "partyRoles": {
+    "A": {
+      "label": "the landlord",
+      "description": "Holds the deposit and has withheld some or all of it after move-out."
+    },
+    "B": {
+      "label": "the tenant",
+      "description": "Paid the deposit and disputes the amount withheld."
+    }
+  },
+  "defaultPolicy": {
+    "maxRounds": 8,
+    "coolingOffMinutes": 60,
+    "callWindow": { "startHour": 9, "endHour": 20, "timezone": "America/New_York" },
+    "retryDelaysMinutes": [30, 120, 480],
+    "ttlHours": 168
+  },
+  "suggestedConditions": [
+    "landlord provides an itemized list of deductions",
+    "tenant returns all keys, remotes, and access fobs",
+    "payment is sent within 14 days of settlement",
+    "both parties confirm the forwarding address on file"
+  ],
+  "guidance": {
+    "consent": "Deposit disputes often follow a difficult move-out; keep the tone even and do not revisit fault.",
+    "shuttle": "Keep the discussion on the deposit amount and documented deductions, not on how the tenancy ended."
+  }
+}

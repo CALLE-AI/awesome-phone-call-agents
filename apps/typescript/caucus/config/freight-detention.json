@@ -1,0 +1,32 @@
+{
+  "id": "freight-detention",
+  "displayName": "Freight detention charges",
+  "disputeNoun": "detention charge",
+  "partyRoles": {
+    "A": {
+      "label": "the broker",
+      "description": "Booked the load and disputes the detention hours billed."
+    },
+    "B": {
+      "label": "the carrier",
+      "description": "Ran the load and billed detention for time held at the shipper's dock."
+    }
+  },
+  "defaultPolicy": {
+    "maxRounds": 6,
+    "coolingOffMinutes": 15,
+    "callWindow": { "startHour": 7, "endHour": 19, "timezone": "America/Chicago" },
+    "retryDelaysMinutes": [15, 60],
+    "ttlHours": 72
+  },
+  "suggestedConditions": [
+    "carrier provides time-stamped arrival and departure records",
+    "broker pays the settled amount on the next settlement cycle",
+    "the detention rate for future loads is confirmed in writing",
+    "the shipper is notified about the dock delay"
+  ],
+  "guidance": {
+    "consent": "Both sides book loads together regularly; frame the mediation as protecting a working relationship.",
+    "shuttle": "Keep the discussion on documented dock time and the billed hours, not on dispatcher or driver conduct."
+  }
+}
