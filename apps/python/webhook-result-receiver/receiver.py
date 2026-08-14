@@ -9,6 +9,8 @@ import os
 import re
 import sqlite3
 import sys
+import threading
+import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -54,7 +56,14 @@ except ModuleNotFoundError:  # Replay remains usable before dependencies are ins
 
 MAX_BODY_BYTES = 1_048_576
 BODY_READ_TIMEOUT_SECONDS = 2.0
+BODY_READ_DEADLINE_SECONDS = 10.0
+BODY_READ_CHUNK_BYTES = 64 * 1024
+API_TIMEOUT_SECONDS = 10.0
+MAX_ACTIVE_REQUESTS = 8
+SATURATED_DRAIN_DEADLINE_SECONDS = 0.1
+SATURATED_DRAIN_LIMIT_BYTES = MAX_BODY_BYTES + 64 * 1024
 WEBHOOK_PATH = "/calle/webhook"
+SAFE_PROVIDER_TOKEN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 TERMINAL_STATUSES = {
     "call.completed": {"completed"},
     "call.failed": {"failed", "canceled"},
@@ -82,6 +91,31 @@ class InvalidEvent(ValueError):
         self.code = code
 
 
+class InvalidBody(OSError):
+    pass
+
+
+def _reject_json_constant(_value: str) -> object:
+    raise ValueError("non-finite JSON number")
+
+
+def _strict_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def strict_json_loads(raw: str) -> object:
+    return json.loads(
+        raw,
+        parse_constant=_reject_json_constant,
+        object_pairs_hook=_strict_json_object,
+    )
+
+
 class EventStore:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
@@ -99,44 +133,74 @@ class EventStore:
         connection.execute("PRAGMA busy_timeout = 5000")
         return connection
 
-    def digest_for(self, event_id: str) -> str | None:
+    def receipt_for(self, event_id: str) -> tuple[str, str] | None:
         connection = self._connect()
         try:
             row = connection.execute(
-                "SELECT payload_digest FROM events WHERE event_id = ?", (event_id,)
+                """
+                SELECT payload_digest, verification_mode
+                FROM events
+                WHERE event_id = ?
+                """,
+                (event_id,),
             ).fetchone()
-            return None if row is None else str(row["payload_digest"])
+            if row is None:
+                return None
+            return str(row["payload_digest"]), str(row["verification_mode"])
         finally:
             connection.close()
 
-    def insert(self, record: Mapping[str, Any]) -> bool:
+    def persist(self, record: Mapping[str, Any]) -> str:
         connection = self._connect()
         try:
-            try:
-                with connection:
-                    connection.execute(
-                        """
-                        INSERT INTO events (
-                          event_id, payload_digest, event_type, call_id,
-                          call_status, workflow_id, wants_human_callback,
-                          verification_mode, received_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            record["event_id"],
-                            record["payload_digest"],
-                            record["event_type"],
-                            record["call_id"],
-                            record["call_status"],
-                            record["workflow_id"],
-                            record["wants_human_callback"],
-                            record["verification_mode"],
-                            record["received_at"],
-                        ),
-                    )
-            except sqlite3.IntegrityError:
-                return False
-            return True
+            with connection:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO events (
+                      event_id, payload_digest, event_type, call_id,
+                      call_status, workflow_id, wants_human_callback,
+                      verification_mode, received_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(event_id) DO UPDATE SET
+                      payload_digest = excluded.payload_digest,
+                      event_type = excluded.event_type,
+                      call_id = excluded.call_id,
+                      call_status = excluded.call_status,
+                      workflow_id = excluded.workflow_id,
+                      wants_human_callback = excluded.wants_human_callback,
+                      verification_mode = excluded.verification_mode,
+                      received_at = excluded.received_at
+                    WHERE events.payload_digest = excluded.payload_digest
+                      AND events.verification_mode = 'fixture'
+                      AND excluded.verification_mode = 'api'
+                    """,
+                    (
+                        record["event_id"],
+                        record["payload_digest"],
+                        record["event_type"],
+                        record["call_id"],
+                        record["call_status"],
+                        record["workflow_id"],
+                        record["wants_human_callback"],
+                        record["verification_mode"],
+                        record["received_at"],
+                    ),
+                )
+                if cursor.rowcount == 1:
+                    return "accepted"
+                winner = connection.execute(
+                    """
+                    SELECT payload_digest, verification_mode
+                    FROM events
+                    WHERE event_id = ?
+                    """,
+                    (record["event_id"],),
+                ).fetchone()
+                if winner is None:
+                    raise sqlite3.IntegrityError("event persistence lost its row")
+                if str(winner["payload_digest"]) == record["payload_digest"]:
+                    return "duplicate"
+                return "conflict"
         finally:
             connection.close()
 
@@ -160,6 +224,11 @@ def validate_event(value: object, event_header: str | None) -> dict[str, Any]:
         or not _nonempty_string(data.get("id"))
     ):
         raise InvalidEvent("invalid_event")
+    if (
+        SAFE_PROVIDER_TOKEN.fullmatch(event_id) is None
+        or SAFE_PROVIDER_TOKEN.fullmatch(data["id"]) is None
+    ):
+        raise InvalidEvent("invalid_event")
     if event_header != event_id:
         raise InvalidEvent("event_id_mismatch")
     if event_type not in TERMINAL_STATUSES:
@@ -173,6 +242,7 @@ def canonical_digest(event: Mapping[str, Any]) -> str:
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
+        allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
@@ -249,50 +319,115 @@ def process_event(
     except (RecursionError, TypeError, UnicodeError, ValueError):
         return 400, {"error": "invalid_json"}
     try:
-        existing = store.digest_for(event["id"])
+        existing = store.receipt_for(event["id"])
     except Exception:  # noqa: BLE001
         return 500, {"error": "internal_error"}
     if existing is not None:
-        if existing == digest:
+        existing_digest, existing_mode = existing
+        if existing_digest != digest:
+            return 409, {"error": "event_id_conflict"}
+        if existing_mode == "api" or verification_mode == "fixture":
             return 200, {"received": True, "duplicate": True}
-        return 409, {"error": "event_id_conflict"}
+        if existing_mode != "fixture" or verification_mode != "api":
+            return 500, {"error": "internal_error"}
 
-    try:
-        if verification_mode == "fixture":
-            snapshot = event["data"]
-        else:
+    if verification_mode == "fixture":
+        snapshot = event["data"]
+    else:
+        try:
             if call_fetcher is None:
                 raise RuntimeError("live receiver has no call fetcher")
             snapshot = call_fetcher(event["data"]["id"])
-        record = authoritative_record(event, snapshot, digest, verification_mode)
-    except CalleAuthenticationError:
-        return 500, {"error": "internal_error"}
-    except (CalleConnectionError, CalleTimeoutError, CalleRateLimitError):
-        return 503, {"error": "upstream_unavailable"}
-    except CalleAPIError as error:
-        if error.status_code >= 500:
+        except CalleAuthenticationError:
+            return 500, {"error": "internal_error"}
+        except (CalleConnectionError, CalleTimeoutError, CalleRateLimitError):
             return 503, {"error": "upstream_unavailable"}
-        return 409, {"error": "authoritative_rejected"}
+        except CalleAPIError as error:
+            if error.status_code >= 500:
+                return 503, {"error": "upstream_unavailable"}
+            return 409, {"error": "authoritative_rejected"}
+        except (json.JSONDecodeError, UnicodeError, RecursionError, EOFError):
+            return 503, {"error": "upstream_unavailable"}
+        except Exception:  # noqa: BLE001
+            return 500, {"error": "internal_error"}
+
+    try:
+        record = authoritative_record(event, snapshot, digest, verification_mode)
     except InvalidEvent as error:
         return 409, {"error": error.code}
     except Exception:  # noqa: BLE001
         return 500, {"error": "internal_error"}
 
     try:
-        inserted = store.insert(record)
-        if inserted:
+        outcome = store.persist(record)
+        if outcome == "accepted":
             return 200, {"received": True, "duplicate": False}
-        winner = store.digest_for(event["id"])
     except Exception:  # noqa: BLE001
         return 500, {"error": "internal_error"}
-    if winner == digest:
+    if outcome == "duplicate":
         return 200, {"received": True, "duplicate": True}
-    return 409, {"error": "event_id_conflict"}
+    if outcome == "conflict":
+        return 409, {"error": "event_id_conflict"}
+    return 500, {"error": "internal_error"}
 
 
 class WebhookHTTPServer(ThreadingHTTPServer):
     daemon_threads = False
     block_on_close = True
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._request_slots = threading.BoundedSemaphore(MAX_ACTIVE_REQUESTS)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if not self._request_slots.acquire(blocking=False):
+            body = b'{"error":"receiver_busy"}'
+            response = (
+                b"HTTP/1.1 503 Service Unavailable\r\n"
+                b"Content-Type: application/json\r\n"
+                + f"Content-Length: {len(body)}\r\n".encode("ascii")
+                + b"Connection: close\r\n\r\n"
+                + body
+            )
+            try:
+                request.settimeout(BODY_READ_TIMEOUT_SECONDS)
+                request.sendall(response)
+            except OSError:
+                pass
+            finally:
+                drain_deadline = time.monotonic() + SATURATED_DRAIN_DEADLINE_SECONDS
+                drained = 0
+                while drained < SATURATED_DRAIN_LIMIT_BYTES:
+                    remaining = drain_deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    try:
+                        request.settimeout(remaining)
+                        chunk = request.recv(
+                            min(
+                                BODY_READ_CHUNK_BYTES,
+                                SATURATED_DRAIN_LIMIT_BYTES - drained,
+                            )
+                        )
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    drained += len(chunk)
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._request_slots.release()
+            self.shutdown_request(request)
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._request_slots.release()
 
     def handle_error(self, request: object, client_address: object) -> None:
         return
@@ -317,13 +452,44 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def send_json(
         self, status: int, payload: Mapping[str, object], *, include_body: bool = True
     ) -> None:
-        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        body = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode(
+            "utf-8"
+        )
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if include_body:
             self.wfile.write(body)
+
+    def _discard_small_declared_body(self) -> None:
+        length = parse_content_length(self.headers.get_all("Content-Length"))
+        if (
+            length is None
+            or length > MAX_BODY_BYTES
+            or self.headers.get_all("Transfer-Encoding")
+        ):
+            return
+        deadline = time.monotonic() + SATURATED_DRAIN_DEADLINE_SECONDS
+        remaining = length
+        read_chunk = getattr(self.rfile, "read1", self.rfile.read)
+        try:
+            while remaining:
+                deadline_remaining = deadline - time.monotonic()
+                if deadline_remaining <= 0:
+                    return
+                self.request.settimeout(deadline_remaining)
+                chunk = read_chunk(min(BODY_READ_CHUNK_BYTES, remaining))
+                if not chunk:
+                    return
+                remaining -= len(chunk)
+        except OSError:
+            return
+
+    def send_early_json(self, status: int, payload: Mapping[str, object]) -> None:
+        self.close_connection = True
+        self.send_json(status, payload)
+        self._discard_small_declared_body()
 
     def _method_response(self, *, include_body: bool = True) -> None:
         if self.path == WEBHOOK_PATH:
@@ -356,44 +522,82 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def do_HEAD(self) -> None:
         self._method_response(include_body=False)
 
+    def _read_body(self, length: int) -> bytes:
+        deadline = time.monotonic() + BODY_READ_DEADLINE_SECONDS
+        remaining = length
+        chunks: list[bytes] = []
+        read_chunk = getattr(self.rfile, "read1", self.rfile.read)
+        try:
+            while remaining:
+                deadline_remaining = deadline - time.monotonic()
+                if deadline_remaining <= 0:
+                    raise InvalidBody
+                self.request.settimeout(
+                    min(BODY_READ_TIMEOUT_SECONDS, deadline_remaining)
+                )
+                chunk = read_chunk(min(BODY_READ_CHUNK_BYTES, remaining))
+                if not chunk:
+                    raise InvalidBody
+                chunks.append(chunk)
+                remaining -= len(chunk)
+                if time.monotonic() >= deadline:
+                    raise InvalidBody
+        except (OSError, TimeoutError) as error:
+            raise InvalidBody from error
+        finally:
+            try:
+                self.request.settimeout(BODY_READ_TIMEOUT_SECONDS)
+            except OSError:
+                pass
+        return b"".join(chunks)
+
     def do_POST(self) -> None:
         if self.path != WEBHOOK_PATH:
-            self.send_json(404, {"error": "not_found"})
+            self.send_early_json(404, {"error": "not_found"})
             return
-        content_type = self.headers.get("Content-Type")
+        content_types = self.headers.get_all("Content-Type")
         if (
-            not isinstance(content_type, str)
-            or content_type.split(";", 1)[0].strip().lower() != "application/json"
+            content_types is None
+            or len(content_types) != 1
+            or not isinstance(content_types[0], str)
         ):
-            self.send_json(400, {"error": "invalid_content_type"})
+            self.send_early_json(400, {"error": "invalid_content_type"})
+            return
+        content_type = content_types[0]
+        if content_type.split(";", 1)[0].strip().lower() != "application/json":
+            self.send_early_json(400, {"error": "invalid_content_type"})
             return
         length = parse_content_length(self.headers.get_all("Content-Length"))
         if length is None or self.headers.get_all("Transfer-Encoding"):
             self.send_json(400, {"error": "invalid_content_length"})
+            return
+        event_headers = self.headers.get_all("CALL-E-Event-Id")
+        if (
+            event_headers is None
+            or len(event_headers) != 1
+            or not isinstance(event_headers[0], str)
+        ):
+            self.send_early_json(400, {"error": "invalid_event_header"})
             return
         if length > MAX_BODY_BYTES:
             self.close_connection = True
             self.send_json(413, {"error": "payload_too_large"})
             return
         try:
-            raw = self.rfile.read(length)
-        except OSError:
-            self.close_connection = True
-            self.send_json(400, {"error": "invalid_body"})
-            return
-        if len(raw) != length:
+            raw = self._read_body(length)
+        except InvalidBody:
             self.close_connection = True
             self.send_json(400, {"error": "invalid_body"})
             return
         try:
-            value = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
+            value = strict_json_loads(raw.decode("utf-8"))
+        except (UnicodeError, ValueError, RecursionError):
             self.send_json(400, {"error": "invalid_json"})
             return
         status, payload = process_event(
             self.store,
             value,
-            self.headers.get("CALL-E-Event-Id"),
+            event_headers[0],
             call_fetcher=self.call_fetcher,
         )
         self.send_json(status, payload)
@@ -429,11 +633,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def default_client_factory(*, api_key: str) -> object:
     from calle import CalleClient
 
-    return CalleClient(api_key=api_key)
+    return CalleClient(api_key=api_key, timeout=API_TIMEOUT_SECONDS)
 
 
 def _print_response(payload: Mapping[str, object]) -> None:
-    sys.stdout.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    sys.stdout.write(json.dumps(payload, separators=(",", ":"), allow_nan=False) + "\n")
 
 
 def main(
@@ -445,22 +649,27 @@ def main(
     args = parse_args(argv)
     if args.replay is not None:
         try:
-            raw = args.replay.read_bytes()
+            with args.replay.open("rb") as fixture_file:
+                raw = fixture_file.read(MAX_BODY_BYTES + 1)
             if len(raw) > MAX_BODY_BYTES:
                 raise ValueError("fixture is too large")
-            value = json.loads(raw.decode("utf-8"))
-        except (OSError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            value = strict_json_loads(raw.decode("utf-8"))
+        except Exception:  # noqa: BLE001 - fixture failures use one private code.
             _print_response({"error": "invalid_fixture"})
             return 1
         event_header = value.get("id") if isinstance(value, dict) else None
-        store = EventStore(args.database)
-        status, payload = process_event(
-            store,
-            value,
-            event_header,
-            call_fetcher=None,
-            verification_mode="fixture",
-        )
+        try:
+            store = EventStore(args.database)
+            status, payload = process_event(
+                store,
+                value,
+                event_header,
+                call_fetcher=None,
+                verification_mode="fixture",
+            )
+        except Exception:  # noqa: BLE001 - replay never emits traceback details.
+            _print_response({"error": "internal_error"})
+            return 1
         _print_response(payload)
         return 0 if 200 <= status < 300 else 1
 

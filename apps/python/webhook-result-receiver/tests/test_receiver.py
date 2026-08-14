@@ -10,6 +10,7 @@ import sqlite3
 import sys
 import threading
 import time
+import types
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -27,8 +28,32 @@ def fixture(name: str) -> dict[str, object]:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def private_fixture_values(event: dict[str, object]) -> list[str]:
+    data = event["data"]
+    evidence = data["evidence"]
+    transcript = data["transcript"]
+    recipient = data["recipient"]
+    structured_result = data["structured_result"]
+    return [
+        recipient["phone"],
+        data["task"],
+        data["summary"],
+        *(item for item in evidence),
+        *(turn["text"] for turn in transcript),
+        structured_result["free_form_note"],
+    ]
+
+
 def fetch_snapshot(event: dict[str, object]) -> dict[str, object]:
     return copy.deepcopy(event["data"])
+
+
+def distinct_event(number: int, *, prefix: str = "load") -> dict[str, object]:
+    event = fixture("call-completed.json")
+    event["id"] = f"evt_{prefix}_{number}"
+    event["data"]["id"] = f"call_{prefix}_{number}"
+    event["data"]["metadata"]["workflow_id"] = f"workflow_{prefix}_{number}"
+    return event
 
 
 class Fetcher:
@@ -42,8 +67,8 @@ class Fetcher:
 
 
 @contextmanager
-def running_server(tmp_path: Path, fetcher):
-    database = tmp_path / "nested" / "events.sqlite3"
+def running_server(tmp_path: Path, fetcher, *, database_path: Path | None = None):
+    database = database_path or tmp_path / "nested" / "events.sqlite3"
     server = receiver.create_server(
         host="127.0.0.1",
         port=0,
@@ -315,6 +340,144 @@ def test_server_shutdown_waits_for_bounded_active_body_reader(tmp_path, monkeypa
     assert not server_thread.is_alive()
 
 
+def test_absolute_body_deadline_stops_trickle_and_releases_handler(
+    tmp_path, monkeypatch
+):
+    event = fixture("call-completed.json")
+    fetcher = Fetcher(fetch_snapshot(event))
+    monkeypatch.setattr(receiver, "BODY_READ_TIMEOUT_SECONDS", 1.0)
+    monkeypatch.setattr(receiver, "BODY_READ_DEADLINE_SECONDS", 0.35)
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        connection = socket.create_connection(
+            ("127.0.0.1", server.server_port), timeout=3
+        )
+        connection.sendall(
+            b"POST /calle/webhook HTTP/1.1\r\n"
+            b"Host: 127.0.0.1\r\n"
+            b"Content-Type: application/json\r\n"
+            b"CALL-E-Event-Id: evt_trickle\r\n"
+            b"Content-Length: 20\r\n"
+            b"Connection: close\r\n\r\n"
+            b"{"
+        )
+        stop = threading.Event()
+
+        def trickle() -> None:
+            for _ in range(19):
+                if stop.wait(0.05):
+                    return
+                try:
+                    connection.sendall(b" ")
+                except OSError:
+                    return
+
+        sender = threading.Thread(target=trickle)
+        sender.start()
+        started = time.monotonic()
+        response = http.client.HTTPResponse(connection)
+        response.begin()
+        raw = response.read()
+        elapsed = time.monotonic() - started
+        stop.set()
+        sender.join(timeout=2)
+        connection.close()
+
+        recovered = post_event(server, event)
+
+    assert response.status == 400
+    assert json.loads(raw) == {"error": "invalid_body"}
+    assert elapsed < 0.8
+    assert not sender.is_alive()
+    assert recovered[:2] == (200, {"received": True, "duplicate": False})
+    assert fetcher.call_ids == [event["data"]["id"]]
+    assert len(rows(database)) == 1
+
+
+def test_body_read_timeout_is_capped_by_deterministic_absolute_deadline(
+    monkeypatch,
+):
+    now = [0.0]
+    timeouts: list[float] = []
+
+    class FakeRequest:
+        @staticmethod
+        def settimeout(timeout: float) -> None:
+            timeouts.append(timeout)
+
+    class FakeReader:
+        @staticmethod
+        def read1(size: int) -> bytes:
+            assert size in {1, 2, 3}
+            now[0] += 0.4
+            return b"x"
+
+        read = read1
+
+    handler = object.__new__(receiver.WebhookHandler)
+    handler.request = FakeRequest()
+    handler.rfile = FakeReader()
+    monkeypatch.setattr(receiver, "BODY_READ_TIMEOUT_SECONDS", 2.0)
+    monkeypatch.setattr(receiver, "BODY_READ_DEADLINE_SECONDS", 1.0)
+    monkeypatch.setattr(receiver.time, "monotonic", lambda: now[0])
+
+    with pytest.raises(receiver.InvalidBody):
+        handler._read_body(3)
+
+    assert timeouts == pytest.approx([1.0, 0.6, 0.2, 2.0])
+
+
+def test_server_admits_only_eight_active_handlers_and_recovers_capacity(tmp_path):
+    events = [distinct_event(index, prefix="saturation") for index in range(10)]
+    snapshots = {str(event["data"]["id"]): fetch_snapshot(event) for event in events}
+    release = threading.Event()
+    all_eight_active = threading.Event()
+    lock = threading.Lock()
+    active = 0
+    maximum_active = 0
+    fetched: list[str] = []
+
+    def blocked_fetch(call_id: str) -> dict[str, object]:
+        nonlocal active, maximum_active
+        with lock:
+            active += 1
+            maximum_active = max(maximum_active, active)
+            fetched.append(call_id)
+            if active == 8:
+                all_eight_active.set()
+        try:
+            assert release.wait(timeout=5)
+            return copy.deepcopy(snapshots[call_id])
+        finally:
+            with lock:
+                active -= 1
+
+    with running_server(tmp_path, blocked_fetch) as (server, database):
+        with ThreadPoolExecutor(max_workers=9) as executor:
+            accepted_futures = [
+                executor.submit(post_event, server, event) for event in events[:8]
+            ]
+            assert all_eight_active.wait(timeout=5)
+            saturated_future = executor.submit(post_event, server, events[8])
+            try:
+                saturated = saturated_future.result(timeout=2)
+            finally:
+                release.set()
+            accepted = [future.result(timeout=10) for future in accepted_futures]
+
+        recovered = post_event(server, events[9])
+
+    assert saturated[:2] == (503, {"error": "receiver_busy"})
+    assert all(
+        response[:2] == (200, {"received": True, "duplicate": False})
+        for response in accepted
+    )
+    assert recovered[:2] == (200, {"received": True, "duplicate": False})
+    assert maximum_active == 8
+    assert str(events[8]["data"]["id"]) not in fetched
+    assert len(rows(database)) == 9
+
+
 @pytest.mark.parametrize(
     ("body", "event_header", "error"),
     [
@@ -377,6 +540,67 @@ def test_malformed_and_untrusted_inputs_are_rejected_before_fetch(
     assert rows(database) == []
 
 
+@pytest.mark.parametrize("field", ["event_id", "call_id"])
+@pytest.mark.parametrize(
+    "unsafe_token",
+    [
+        "..",
+        "token/path",
+        "token\\path",
+        "token%2Fpath",
+        "token?query",
+        "token#fragment",
+        "token with space",
+        "token\tcontrol",
+        "unicode_\u00e9",
+        "x" * 129,
+    ],
+)
+def test_event_and_call_ids_must_be_bounded_ascii_path_tokens_before_fetch(
+    tmp_path, field, unsafe_token
+):
+    event = fixture("call-completed.json")
+    if field == "event_id":
+        event["id"] = unsafe_token
+        event_header = unsafe_token
+    else:
+        event["data"]["id"] = unsafe_token
+        event_header = str(event["id"])
+    fetched: list[str] = []
+
+    def forbidden_fetch(call_id: str) -> object:
+        fetched.append(call_id)
+        return copy.deepcopy(event["data"])
+
+    status, payload = receiver.process_event(
+        receiver.EventStore(tmp_path / f"{field}-{len(unsafe_token)}.sqlite3"),
+        event,
+        event_header,
+        call_fetcher=forbidden_fetch,
+    )
+
+    assert (status, payload) == (400, {"error": "invalid_event"})
+    assert fetched == []
+
+
+@pytest.mark.parametrize("token_length", [1, 128])
+def test_event_and_call_id_path_token_boundaries_are_accepted(tmp_path, token_length):
+    event = fixture("call-completed.json")
+    event["id"] = "e" * token_length
+    event["data"]["id"] = "c" * token_length
+    fetcher = Fetcher(fetch_snapshot(event))
+
+    status, payload = receiver.process_event(
+        receiver.EventStore(tmp_path / f"safe-token-{token_length}.sqlite3"),
+        event,
+        str(event["id"]),
+        call_fetcher=fetcher,
+    )
+
+    assert (status, payload) == (200, {"received": True, "duplicate": False})
+    assert fetcher.call_ids == [event["data"]["id"]]
+
+
 def test_deep_json_and_lone_surrogate_are_private_400_errors(tmp_path, capsys):
     event = fixture("call-completed.json")
     fetcher = Fetcher(fetch_snapshot(event))
@@ -404,6 +628,59 @@ def test_deep_json_and_lone_surrogate_are_private_400_errors(tmp_path, capsys):
     assert rows(database) == []
 
 
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_http_strict_json_rejects_nonfinite_numbers_before_fetch(tmp_path, constant):
+    event = fixture("call-completed.json")
+    rendered = json.dumps(event, separators=(",", ":")).encode()
+    rendered = rendered.replace(
+        b'"summary":',
+        f'"nonfinite":{constant},"summary":'.encode(),
+        1,
+    )
+    fetcher = Fetcher(fetch_snapshot(event))
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        response = post_event(server, event, rendered=rendered)
+
+    assert response[:2] == (400, {"error": "invalid_json"})
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
+def test_http_strict_json_rejects_duplicate_object_keys_before_fetch(tmp_path):
+    event = fixture("call-completed.json")
+    rendered = json.dumps(event, separators=(",", ":")).encode()
+    rendered = rendered.replace(
+        b'"summary":',
+        b'"duplicate":1,"duplicate":2,"summary":',
+        1,
+    )
+    fetcher = Fetcher(fetch_snapshot(event))
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        response = post_event(server, event, rendered=rendered)
+
+    assert response[:2] == (400, {"error": "invalid_json"})
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
+def test_canonical_json_rejects_programmatic_nonfinite_values_before_fetch(tmp_path):
+    event = fixture("call-completed.json")
+    event["data"]["nonfinite"] = float("nan")
+    fetcher = Fetcher(fetch_snapshot(event))
+
+    status, payload = receiver.process_event(
+        receiver.EventStore(tmp_path / "nonfinite.sqlite3"),
+        event,
+        str(event["id"]),
+        call_fetcher=fetcher,
+    )
+
+    assert (status, payload) == (400, {"error": "invalid_json"})
+    assert fetcher.call_ids == []
+
+
 @pytest.mark.parametrize("failure_point", ["initial", "insert", "race_read"])
 def test_storage_failures_return_private_500_without_server_traceback(
     tmp_path, capsys, failure_point
@@ -414,17 +691,15 @@ def test_storage_failures_return_private_500_without_server_traceback(
         def __init__(self):
             self.reads = 0
 
-        def digest_for(self, event_id):
+        def receipt_for(self, event_id):
             self.reads += 1
-            if failure_point == "initial" or (
-                failure_point == "race_read" and self.reads == 2
-            ):
+            if failure_point == "initial":
                 raise sqlite3.OperationalError("private storage failure")
 
-        def insert(self, record):
-            if failure_point == "insert":
+        def persist(self, record):
+            if failure_point in {"insert", "race_read"}:
                 raise sqlite3.OperationalError("private storage failure")
-            return failure_point != "race_read"
+            return "accepted"
 
     with running_server(tmp_path, Fetcher(fetch_snapshot(event))) as (
         server,
@@ -490,6 +765,68 @@ def test_signed_underscored_and_duplicate_content_lengths_are_rejected(tmp_path)
     assert rows(database) == []
 
 
+def test_duplicate_content_type_and_event_id_headers_are_rejected_on_wire(tmp_path):
+    event = fixture("call-completed.json")
+    body = json.dumps(event, separators=(",", ":")).encode()
+    fetcher = Fetcher(fetch_snapshot(event))
+    request_line = (
+        b"POST /calle/webhook HTTP/1.1\r\n"
+        b"Host: 127.0.0.1\r\n"
+        + f"Content-Length: {len(body)}\r\n".encode()
+        + b"Connection: close\r\n"
+    )
+    event_header = f"CALL-E-Event-Id: {event['id']}\r\n".encode()
+    wires = [
+        request_line
+        + b"Content-Type: application/json\r\n"
+        + b"Content-Type: application/json\r\n"
+        + event_header
+        + b"\r\n"
+        + body,
+        request_line
+        + b"Content-Type: application/json\r\n"
+        + event_header
+        + event_header
+        + b"\r\n"
+        + body,
+    ]
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        responses = [raw_request(server, wire) for wire in wires]
+
+    assert responses[0][:2] == (400, {"error": "invalid_content_type"})
+    assert responses[1][:2] == (400, {"error": "invalid_event_header"})
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
+def test_invalid_event_header_precedes_oversize_rejection(tmp_path):
+    event = fixture("call-completed.json")
+    fetcher = Fetcher(fetch_snapshot(event))
+    request_line = (
+        b"POST /calle/webhook HTTP/1.1\r\n"
+        b"Host: 127.0.0.1\r\n"
+        b"Content-Type: application/json\r\n"
+        + f"Content-Length: {receiver.MAX_BODY_BYTES + 1}\r\n".encode()
+        + b"Connection: close\r\n"
+    )
+    event_header = f"CALL-E-Event-Id: {event['id']}\r\n".encode()
+    wires = [
+        request_line + b"\r\n",
+        request_line + event_header + event_header + b"\r\n",
+    ]
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        responses = [raw_request(server, wire) for wire in wires]
+
+    assert all(
+        response[:2] == (400, {"error": "invalid_event_header"})
+        for response in responses
+    )
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
 def test_one_mib_body_is_accepted_and_larger_body_is_rejected_before_read(
     tmp_path,
 ):
@@ -546,6 +883,216 @@ def test_canonical_dedupe_skips_refetch_and_conflicting_id_returns_409(tmp_path)
     assert len(rows(database)) == 1
 
 
+def test_matching_fixture_receipt_is_live_verified_and_upgraded_without_downgrade(
+    tmp_path,
+):
+    event = fixture("call-failed.json")
+    database = tmp_path / "cross-mode.sqlite3"
+    store = receiver.EventStore(database)
+    fixture_status, fixture_payload = receiver.process_event(
+        store,
+        event,
+        str(event["id"]),
+        call_fetcher=None,
+        verification_mode="fixture",
+    )
+    assert (fixture_status, fixture_payload) == (
+        200,
+        {"received": True, "duplicate": False},
+    )
+    fixture_duplicate = receiver.process_event(
+        receiver.EventStore(database),
+        event,
+        str(event["id"]),
+        call_fetcher=None,
+        verification_mode="fixture",
+    )
+    assert fixture_duplicate == (200, {"received": True, "duplicate": True})
+
+    authoritative = fetch_snapshot(event)
+    authoritative["status"] = "canceled"
+    authoritative["structured_result"] = {"wants_human_callback": "no"}
+    fetcher = Fetcher(authoritative)
+    with running_server(
+        tmp_path,
+        fetcher,
+        database_path=database,
+    ) as (server, _):
+        upgraded = post_event(server, event)
+        duplicate = post_event(server, event)
+
+    replay_status, replay_payload = receiver.process_event(
+        receiver.EventStore(database),
+        event,
+        str(event["id"]),
+        call_fetcher=None,
+        verification_mode="fixture",
+    )
+
+    assert upgraded[:2] == (200, {"received": True, "duplicate": False})
+    assert duplicate[:2] == (200, {"received": True, "duplicate": True})
+    assert (replay_status, replay_payload) == (
+        200,
+        {"received": True, "duplicate": True},
+    )
+    assert fetcher.call_ids == [event["data"]["id"]]
+    stored = dict(rows(database)[0])
+    assert stored["verification_mode"] == "api"
+    assert stored["call_status"] == "canceled"
+    assert stored["wants_human_callback"] == "no"
+
+
+def test_cross_mode_digest_conflict_stays_fixture_and_skips_live_fetch(tmp_path):
+    event = fixture("call-completed.json")
+    database = tmp_path / "cross-mode-conflict.sqlite3"
+    fixture_result = receiver.process_event(
+        receiver.EventStore(database),
+        event,
+        str(event["id"]),
+        call_fetcher=None,
+        verification_mode="fixture",
+    )
+    conflicting = copy.deepcopy(event)
+    conflicting["data"]["summary"] = "different private conflicting summary"
+    fetcher = Fetcher(fetch_snapshot(conflicting))
+
+    with running_server(
+        tmp_path,
+        fetcher,
+        database_path=database,
+    ) as (server, _):
+        response = post_event(server, conflicting)
+
+    assert fixture_result == (200, {"received": True, "duplicate": False})
+    assert response[:2] == (409, {"error": "event_id_conflict"})
+    assert fetcher.call_ids == []
+    stored = rows(database)[0]
+    assert stored["verification_mode"] == "fixture"
+
+
+@pytest.mark.parametrize("failure_kind", ["unavailable", "mismatch"])
+def test_failed_live_reconciliation_leaves_matching_fixture_receipt_untrusted(
+    tmp_path, failure_kind
+):
+    event = fixture("call-completed.json")
+    database = tmp_path / f"fixture-live-{failure_kind}.sqlite3"
+    receiver.process_event(
+        receiver.EventStore(database),
+        event,
+        str(event["id"]),
+        call_fetcher=None,
+        verification_mode="fixture",
+    )
+
+    def fail_or_mismatch(call_id: str) -> object:
+        assert call_id == event["data"]["id"]
+        if failure_kind == "unavailable":
+            raise receiver.CalleTimeoutError("private fixture upgrade timeout")
+        snapshot = fetch_snapshot(event)
+        snapshot["id"] = "different_call"
+        return snapshot
+
+    with running_server(
+        tmp_path,
+        fail_or_mismatch,
+        database_path=database,
+    ) as (server, _):
+        response = post_event(server, event)
+
+    expected = (
+        (503, {"error": "upstream_unavailable"})
+        if failure_kind == "unavailable"
+        else (409, {"error": "authoritative_mismatch"})
+    )
+    assert response[:2] == expected
+    stored = rows(database)[0]
+    assert stored["verification_mode"] == "fixture"
+    assert stored["wants_human_callback"] == "yes"
+
+
+def test_live_fetch_racing_fixture_insert_still_performs_atomic_api_upgrade(tmp_path):
+    event = fixture("call-failed.json")
+    authoritative = fetch_snapshot(event)
+    authoritative["status"] = "canceled"
+    authoritative["structured_result"] = {"wants_human_callback": "yes"}
+    database = tmp_path / "cross-mode-insert-race.sqlite3"
+    fetch_started = threading.Event()
+    allow_fetch = threading.Event()
+
+    def blocked_fetch(call_id: str) -> dict[str, object]:
+        assert call_id == event["data"]["id"]
+        fetch_started.set()
+        assert allow_fetch.wait(timeout=5)
+        return copy.deepcopy(authoritative)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        live = executor.submit(
+            receiver.process_event,
+            receiver.EventStore(database),
+            event,
+            str(event["id"]),
+            call_fetcher=blocked_fetch,
+            verification_mode="api",
+        )
+        assert fetch_started.wait(timeout=5)
+        replay = receiver.process_event(
+            receiver.EventStore(database),
+            event,
+            str(event["id"]),
+            call_fetcher=None,
+            verification_mode="fixture",
+        )
+        allow_fetch.set()
+        live_result = live.result(timeout=5)
+
+    assert replay == (200, {"received": True, "duplicate": False})
+    assert live_result == (200, {"received": True, "duplicate": False})
+    stored = rows(database)[0]
+    assert stored["verification_mode"] == "api"
+    assert stored["call_status"] == "canceled"
+    assert stored["wants_human_callback"] == "yes"
+
+
+def test_concurrent_live_upgrade_of_fixture_has_one_acceptance_and_one_duplicate(
+    tmp_path,
+):
+    event = fixture("call-completed.json")
+    database = tmp_path / "cross-mode-upgrade-race.sqlite3"
+    receiver.process_event(
+        receiver.EventStore(database),
+        event,
+        str(event["id"]),
+        call_fetcher=None,
+        verification_mode="fixture",
+    )
+    barrier = threading.Barrier(2)
+
+    def synchronized_fetch(call_id: str) -> dict[str, object]:
+        assert call_id == event["data"]["id"]
+        barrier.wait(timeout=5)
+        snapshot = fetch_snapshot(event)
+        snapshot["structured_result"] = {"wants_human_callback": "unknown"}
+        return snapshot
+
+    with (
+        running_server(
+            tmp_path,
+            synchronized_fetch,
+            database_path=database,
+        ) as (server, _),
+        ThreadPoolExecutor(max_workers=2) as executor,
+    ):
+        futures = [executor.submit(post_event, server, event) for _ in range(2)]
+        responses = [future.result(timeout=10) for future in futures]
+
+    assert sorted(
+        (response[0], response[1]["duplicate"]) for response in responses
+    ) == [(200, False), (200, True)]
+    stored = rows(database)[0]
+    assert stored["verification_mode"] == "api"
+    assert stored["wants_human_callback"] == "unknown"
+
+
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_code"),
     [
@@ -583,6 +1130,15 @@ def test_canonical_dedupe_skips_refetch_and_conflicting_id_returns_409(tmp_path)
             409,
             "authoritative_rejected",
         ),
+        (
+            json.JSONDecodeError(
+                "secret upstream JSON detail",
+                "secret upstream response body",
+                0,
+            ),
+            503,
+            "upstream_unavailable",
+        ),
         (RuntimeError("secret unexpected error"), 500, "internal_error"),
     ],
 )
@@ -594,11 +1150,21 @@ def test_fetch_error_policy_is_stable_private_and_never_inserts(
     def fail(_call_id):
         raise error
 
-    with running_server(tmp_path, fail) as (server, database):
+    output = io.StringIO()
+    errors = io.StringIO()
+    with (
+        redirect_stdout(output),
+        redirect_stderr(errors),
+        running_server(tmp_path, fail) as (server, database),
+    ):
         status, payload, _, raw = post_event(server, event)
 
     assert (status, payload) == (expected_status, {"error": expected_code})
-    assert str(error).encode() not in raw
+    rendered = raw + output.getvalue().encode() + errors.getvalue().encode()
+    assert str(error).encode() not in rendered
+    assert b"secret upstream response body" not in rendered
+    assert b"Traceback" not in rendered
+    assert b"127.0.0.1" not in rendered
     assert rows(database) == []
 
 
@@ -741,32 +1307,63 @@ def test_concurrent_conflicting_deliveries_create_one_row_and_one_conflict(tmp_p
     assert len(rows(database)) == 1
 
 
-def test_private_fixture_values_never_appear_in_database_response_or_logs(
-    tmp_path, caplog
-):
+def test_private_fixture_values_never_appear_in_database_response_or_streams(tmp_path):
     event = fixture("call-completed.json")
-    private_values = [
-        "+12025550123",
-        event["data"]["task"],
-        event["data"]["summary"],
-        event["data"]["evidence"][0],
-        event["data"]["transcript"][0]["text"],
-        event["data"]["structured_result"]["free_form_note"],
-    ]
+    private_values = private_fixture_values(event)
 
-    with running_server(tmp_path, Fetcher(fetch_snapshot(event))) as (
-        server,
-        database,
+    output = io.StringIO()
+    errors = io.StringIO()
+    with (
+        redirect_stdout(output),
+        redirect_stderr(errors),
+        running_server(tmp_path, Fetcher(fetch_snapshot(event))) as (
+            server,
+            database,
+        ),
     ):
         _, _, _, raw = post_event(server, event)
 
     durable = database.read_bytes()
-    logs = caplog.text.encode()
+    streams = (output.getvalue() + errors.getvalue()).encode()
     for value in private_values:
         encoded = value.encode()
         assert encoded not in durable
         assert encoded not in raw
-        assert encoded not in logs
+        assert encoded not in streams
+    assert b"Traceback" not in streams
+    assert b"127.0.0.1" not in streams
+
+
+def test_server_failure_hides_fixture_values_exception_and_client_address(tmp_path):
+    event = fixture("call-completed.json")
+    private_values = [
+        *private_fixture_values(event),
+        "private handler exception detail",
+        "Traceback",
+        "127.0.0.1",
+    ]
+
+    def fail(_call_id: str) -> object:
+        raise RuntimeError(private_values[-3])
+
+    output = io.StringIO()
+    errors = io.StringIO()
+    with (
+        redirect_stdout(output),
+        redirect_stderr(errors),
+        running_server(tmp_path, fail) as (server, database),
+    ):
+        status, payload, _, raw = post_event(server, event)
+
+    exposed = (
+        raw
+        + output.getvalue().encode("utf-8")
+        + errors.getvalue().encode("utf-8")
+        + database.read_bytes()
+    )
+    assert (status, payload) == (500, {"error": "internal_error"})
+    for private_value in private_values:
+        assert private_value.encode("utf-8") not in exposed
 
 
 class ForbiddenEnvironment:
@@ -791,6 +1388,197 @@ def test_replay_uses_fixture_snapshot_without_credentials_client_or_network(tmp_
     stored = rows(database)[0]
     assert stored["verification_mode"] == "fixture"
     assert stored["wants_human_callback"] == "yes"
+
+
+@pytest.mark.parametrize("malformation", ["duplicate", "nan"])
+def test_replay_uses_strict_json_for_duplicate_keys_and_nonfinite_values(
+    tmp_path, malformation
+):
+    event = fixture("call-completed.json")
+    raw = json.dumps(event, separators=(",", ":")).encode()
+    if malformation == "duplicate":
+        raw = raw.replace(
+            b'"summary":',
+            b'"duplicate":1,"duplicate":2,"summary":',
+            1,
+        )
+    else:
+        raw = raw.replace(b'"summary":', b'"nonfinite":NaN,"summary":', 1)
+    fixture_path = tmp_path / f"{malformation}.json"
+    fixture_path.write_bytes(raw)
+    output = io.StringIO()
+    errors = io.StringIO()
+
+    with redirect_stdout(output), redirect_stderr(errors):
+        exit_code = receiver.main(
+            [
+                "--database",
+                str(tmp_path / f"{malformation}.sqlite3"),
+                "--replay",
+                str(fixture_path),
+            ],
+            environ=ForbiddenEnvironment(),
+            client_factory=lambda **kwargs: pytest.fail("replay constructed client"),
+        )
+
+    assert exit_code == 1
+    assert json.loads(output.getvalue()) == {"error": "invalid_fixture"}
+    assert errors.getvalue() == ""
+
+
+def test_replay_reads_only_limit_plus_one_before_rejecting_oversize(tmp_path):
+    read_sizes: list[int] = []
+
+    class TrackingFile(io.BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            read_sizes.append(size)
+            return super().read(size)
+
+    output = io.StringIO()
+    oversized = b"x" * (receiver.MAX_BODY_BYTES + 1)
+    with (
+        patch.object(receiver.Path, "open", return_value=TrackingFile(oversized)),
+        redirect_stdout(output),
+        redirect_stderr(io.StringIO()),
+    ):
+        exit_code = receiver.main(
+            [
+                "--database",
+                str(tmp_path / "must-not-exist.sqlite3"),
+                "--replay",
+                str(tmp_path / "oversize.json"),
+            ],
+            environ=ForbiddenEnvironment(),
+            client_factory=lambda **kwargs: pytest.fail("replay constructed client"),
+        )
+
+    assert exit_code == 1
+    assert json.loads(output.getvalue()) == {"error": "invalid_fixture"}
+    assert read_sizes == [receiver.MAX_BODY_BYTES + 1]
+    assert not (tmp_path / "must-not-exist.sqlite3").exists()
+
+
+def test_replay_contains_deep_json_without_traceback_or_private_output(tmp_path):
+    private_detail = "private-deep-fixture-marker"
+    fixture_path = tmp_path / "deep.json"
+    fixture_path.write_bytes(
+        ("[" * 10_000 + json.dumps(private_detail) + "]" * 10_000).encode()
+    )
+    output = io.StringIO()
+    errors = io.StringIO()
+
+    with redirect_stdout(output), redirect_stderr(errors):
+        exit_code = receiver.main(
+            [
+                "--database",
+                str(tmp_path / "deep.sqlite3"),
+                "--replay",
+                str(fixture_path),
+            ],
+            environ=ForbiddenEnvironment(),
+            client_factory=lambda **kwargs: pytest.fail("replay constructed client"),
+        )
+
+    rendered = output.getvalue() + errors.getvalue()
+    assert exit_code == 1
+    assert json.loads(output.getvalue()) == {"error": "invalid_fixture"}
+    assert private_detail not in rendered
+    assert "Traceback" not in rendered
+    assert "127.0.0.1" not in rendered
+
+
+@pytest.mark.parametrize("malformation", ["invalid_utf8", "lone_surrogate"])
+def test_replay_contains_unicode_and_canonicalization_failures(tmp_path, malformation):
+    fixture_path = tmp_path / f"{malformation}.json"
+    if malformation == "invalid_utf8":
+        fixture_path.write_bytes(b"{\xff}")
+        expected = {"error": "invalid_fixture"}
+    else:
+        event = fixture("call-completed.json")
+        event["data"]["summary"] = "\ud800"
+        fixture_path.write_text(json.dumps(event), encoding="ascii")
+        expected = {"error": "invalid_json"}
+    output = io.StringIO()
+    errors = io.StringIO()
+
+    with redirect_stdout(output), redirect_stderr(errors):
+        exit_code = receiver.main(
+            [
+                "--database",
+                str(tmp_path / f"{malformation}.sqlite3"),
+                "--replay",
+                str(fixture_path),
+            ],
+            environ=ForbiddenEnvironment(),
+            client_factory=lambda **kwargs: pytest.fail("replay constructed client"),
+        )
+
+    rendered = output.getvalue() + errors.getvalue()
+    assert exit_code == 1
+    assert json.loads(output.getvalue()) == expected
+    assert "Traceback" not in rendered
+    assert "127.0.0.1" not in rendered
+
+
+@pytest.mark.parametrize("failure_point", ["database", "processing"])
+def test_replay_contains_storage_and_processing_failures_privately(
+    tmp_path, failure_point
+):
+    event = fixture("call-completed.json")
+    private_values = [
+        "private replay failure detail",
+        *private_fixture_values(event),
+        "Traceback",
+        "127.0.0.1",
+    ]
+    output = io.StringIO()
+    errors = io.StringIO()
+    replacement = (
+        patch.object(
+            receiver,
+            "EventStore",
+            side_effect=RuntimeError(private_values[0]),
+        )
+        if failure_point == "database"
+        else patch.object(
+            receiver,
+            "process_event",
+            side_effect=RuntimeError(private_values[0]),
+        )
+    )
+
+    with replacement, redirect_stdout(output), redirect_stderr(errors):
+        exit_code = receiver.main(
+            [
+                "--database",
+                str(tmp_path / f"{failure_point}.sqlite3"),
+                "--replay",
+                str(FIXTURES / "call-completed.json"),
+            ],
+            environ=ForbiddenEnvironment(),
+            client_factory=lambda **kwargs: pytest.fail("replay constructed client"),
+        )
+
+    rendered = output.getvalue() + errors.getvalue()
+    assert exit_code == 1
+    assert json.loads(output.getvalue()) == {"error": "internal_error"}
+    for private_value in private_values:
+        assert private_value not in rendered
+
+
+def test_receiver_default_client_factory_sets_ten_second_api_timeout():
+    captured: dict[str, object] = {}
+
+    class FakeCalleClient:
+        def __init__(self, **kwargs: object):
+            captured.update(kwargs)
+
+    fake_module = types.SimpleNamespace(CalleClient=FakeCalleClient)
+    with patch.dict(sys.modules, {"calle": fake_module}):
+        client = receiver.default_client_factory(api_key="private-test-key")
+
+    assert isinstance(client, FakeCalleClient)
+    assert captured == {"api_key": "private-test-key", "timeout": 10.0}
 
 
 def test_serve_mode_requires_key_and_closes_client_and_server(tmp_path):
