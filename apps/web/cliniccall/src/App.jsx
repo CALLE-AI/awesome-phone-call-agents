@@ -1,216 +1,122 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://cliniccall-api.onrender.com";
 
 function App() {
-  const [page, setPage] = useState("Dashboard");
+  const [started, setStarted] = useState(false);
+  const [activePage, setActivePage] = useState("Dashboard");
 
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [calls, setCalls] = useState([]);
+  const [callHistory, setCallHistory] = useState([]);
 
   const [showPatientForm, setShowPatientForm] = useState(false);
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [showCallForm, setShowCallForm] = useState(false);
 
-  const [newPatientName, setNewPatientName] = useState("");
+  const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
 
   const [selectedPatient, setSelectedPatient] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
 
-  const [message, setMessage] = useState("");
-  const [callStatus, setCallStatus] = useState("");
-  const [callingPatient, setCallingPatient] = useState(null);
-  const [calling, setCalling] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState("");
 
-  // ============================================================
-  // LOAD DATA
-  // ============================================================
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     loadPatients();
     loadAppointments();
-    loadCalls();
+    loadCallHistory();
   }, []);
 
   async function loadPatients() {
     try {
       const response = await fetch(`${API_URL}/patients`);
-
-      if (!response.ok) {
-        console.error("Could not load patients:", response.status);
-        return;
-      }
-
       const data = await response.json();
 
-      setPatients(Array.isArray(data) ? data : []);
+      if (response.ok && Array.isArray(data)) {
+        setPatients(data);
+      } else {
+        console.error("Patients error:", data);
+      }
     } catch (error) {
-      console.error("Patients error:", error);
+      console.error("Unable to load patients:", error);
     }
   }
 
   async function loadAppointments() {
     try {
       const response = await fetch(`${API_URL}/appointments`);
-
-      if (!response.ok) {
-        console.error(
-          "Could not load appointments:",
-          response.status
-        );
-        return;
-      }
-
       const data = await response.json();
 
-      setAppointments(Array.isArray(data) ? data : []);
+      if (response.ok && Array.isArray(data)) {
+        setAppointments(data);
+      } else {
+        console.error("Appointments error:", data);
+      }
     } catch (error) {
-      console.error("Appointments error:", error);
+      console.error("Unable to load appointments:", error);
     }
   }
 
-  async function loadCalls() {
+  async function loadCallHistory() {
     try {
       const response = await fetch(`${API_URL}/call-history`);
-
-      if (!response.ok) {
-        console.error("Could not load calls:", response.status);
-        return;
-      }
-
       const data = await response.json();
 
-      setCalls(Array.isArray(data) ? data : []);
+      if (response.ok && Array.isArray(data)) {
+        setCallHistory(data);
+      } else {
+        console.error("Call history error:", data);
+      }
     } catch (error) {
-      console.error("Calls error:", error);
+      console.error("Unable to load call history:", error);
     }
   }
 
-  // ============================================================
-  // PHONE NUMBER NORMALIZATION
-  // ============================================================
-
-  function normalizeKenyanPhone(phone) {
-    let value = String(phone || "").trim();
-
-    // Remove spaces, hyphens and brackets
-    value = value
-      .replace(/\s+/g, "")
-      .replace(/-/g, "")
-      .replace(/\(/g, "")
-      .replace(/\)/g, "");
-
-    // 0712345678 -> +254712345678
-    if (value.startsWith("0")) {
-      value = "+254" + value.substring(1);
-    }
-
-    // 254712345678 -> +254712345678
-    else if (value.startsWith("254")) {
-      value = "+" + value;
-    }
-
-    return value;
-  }
-
-  function isValidKenyanPhone(phone) {
-    return /^\+254\d{9}$/.test(phone);
-  }
-
-  // ============================================================
-  // ADD PATIENT
-  // ============================================================
-
-  async function addPatient(event) {
+  async function createPatient(event) {
     event.preventDefault();
 
-    const name = newPatientName.trim();
-    const phone = normalizeKenyanPhone(patientPhone);
-
-    setMessage("");
-
-    if (!name) {
-      setMessage("Please enter the patient's name.");
-      return;
-    }
-
-    if (!phone) {
-      setMessage("Please enter the patient's phone number.");
-      return;
-    }
-
-    if (!isValidKenyanPhone(phone)) {
-      setMessage(
-        "Invalid Kenyan phone number. Use 0712345678 or +254712345678."
-      );
+    if (!patientName.trim() || !patientPhone.trim()) {
+      setMessage("Please enter the patient's name and phone number.");
       return;
     }
 
     setLoading(true);
+    setMessage("");
 
     try {
-      console.log("Creating patient:", {
-        name,
-        phone_number: phone,
-      });
-
       const response = await fetch(`${API_URL}/patients`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
         body: JSON.stringify({
-          name: name,
-          phone_number: phone,
+          name: patientName,
+          phone_number: patientPhone,
         }),
       });
 
-      const text = await response.text();
-
-      let data = {};
-
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
-      }
-
-      console.log("Create patient response:", response.status, data);
+      const data = await response.json();
 
       if (!response.ok) {
-        let errorMessage = "Could not create patient.";
-
-        if (typeof data.detail === "string") {
-          errorMessage = data.detail;
-        } else if (Array.isArray(data.detail)) {
-          errorMessage = data.detail
-            .map((item) => {
-              if (typeof item === "string") return item;
-
-              return (
-                item.msg ||
-                item.message ||
-                JSON.stringify(item)
-              );
-            })
-            .join(", ");
-        }
-
         setMessage(
-          `Patient creation failed (${response.status}): ${errorMessage}`
+          data.detail
+            ? typeof data.detail === "string"
+              ? data.detail
+              : JSON.stringify(data.detail)
+            : "Unable to create patient."
         );
-
         return;
       }
 
-      setMessage("Patient added successfully ✓");
+      setMessage("Patient created successfully.");
 
-      setNewPatientName("");
+      setPatientName("");
       setPatientPhone("");
 
       await loadPatients();
@@ -218,30 +124,19 @@ function App() {
       setTimeout(() => {
         setShowPatientForm(false);
         setMessage("");
-      }, 1200);
+      }, 1000);
     } catch (error) {
-      console.error("Create patient error:", error);
-
-      setMessage(
-        "Could not connect to the ClinicCall API. Make sure the backend is running."
-      );
+      console.error(error);
+      setMessage("Unable to connect to ClinicCall API.");
     } finally {
       setLoading(false);
     }
   }
 
-  // ============================================================
-  // ADD APPOINTMENT
-  // ============================================================
-
-  async function addAppointment(event) {
+  async function createAppointment(event) {
     event.preventDefault();
 
-    if (
-      !selectedPatient ||
-      !appointmentDate ||
-      !appointmentTime
-    ) {
+    if (!selectedPatient || !appointmentDate || !appointmentTime) {
       setMessage("Please complete all appointment fields.");
       return;
     }
@@ -254,7 +149,6 @@ function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
         body: JSON.stringify({
           patient_id: Number(selectedPatient),
@@ -264,26 +158,20 @@ function App() {
         }),
       });
 
-      const text = await response.text();
-
-      let data = {};
-
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
-      }
+      const data = await response.json();
 
       if (!response.ok) {
         setMessage(
-          typeof data.detail === "string"
-            ? data.detail
-            : `Could not create appointment (${response.status}).`
+          data.detail
+            ? typeof data.detail === "string"
+              ? data.detail
+              : JSON.stringify(data.detail)
+            : "Unable to create appointment."
         );
         return;
       }
 
-      setMessage("Appointment created successfully ✓");
+      setMessage("Appointment created successfully.");
 
       setSelectedPatient("");
       setAppointmentDate("");
@@ -294,66 +182,31 @@ function App() {
       setTimeout(() => {
         setShowAppointmentForm(false);
         setMessage("");
-      }, 1200);
+      }, 1000);
     } catch (error) {
-      console.error("Appointment error:", error);
-
-      setMessage(
-        "Could not connect to the ClinicCall API."
-      );
+      console.error(error);
+      setMessage("Unable to connect to ClinicCall API.");
     } finally {
       setLoading(false);
     }
   }
 
   // ============================================================
-  // CALL PATIENT
+  // FIXED CALL PATIENT FUNCTION
   // ============================================================
 
-  async function callPatient(patientId) {
-    if (!patientId) {
-      setMessage("This patient does not have a valid ID.");
+  async function callPatient(event) {
+    event.preventDefault();
+
+    if (!selectedAppointment) {
+      setMessage("Please select an appointment.");
       return;
     }
 
-    if (calling) {
-      setMessage("A patient call is already in progress.");
-      return;
-    }
-
-    const patient = patients.find(
-      (item) => Number(item.id) === Number(patientId)
-    );
-
-    if (!patient) {
-      setMessage("Patient could not be found.");
-      return;
-    }
-
-    const phone = normalizeKenyanPhone(
-      patient.phone_number
-    );
-
-    if (!isValidKenyanPhone(phone)) {
-      setMessage(
-        `Invalid phone number for ${patient.name}: ${patient.phone_number}`
-      );
-      return;
-    }
-
-    setCalling(true);
     setLoading(true);
-    setCallingPatient(patientId);
-    setCallStatus("Starting AI call...");
     setMessage("");
 
     try {
-      console.log("----------------------------------------");
-      console.log("STARTING PATIENT CALL");
-      console.log("Patient:", patient.name);
-      console.log("Phone:", phone);
-      console.log("----------------------------------------");
-
       const response = await fetch(`${API_URL}/call-patient`, {
         method: "POST",
         headers: {
@@ -361,7 +214,7 @@ function App() {
           Accept: "application/json",
         },
         body: JSON.stringify({
-          patient_id: Number(patientId),
+          appointment_id: Number(selectedAppointment),
         }),
       });
 
@@ -369,149 +222,271 @@ function App() {
 
       let data = {};
 
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = {
+            message: text,
+          };
+        }
       }
 
-      console.log(
-        "Call response:",
-        response.status,
-        data
-      );
+      console.log("Call API status:", response.status);
+      console.log("Call API response:", data);
 
       if (!response.ok) {
-        setCallStatus("Call failed");
+        let errorMessage = "Unable to start patient call.";
 
-        let errorMessage =
-          "Could not start the patient call.";
-
-        if (typeof data.detail === "string") {
-          errorMessage = data.detail;
-        } else if (Array.isArray(data.detail)) {
-          errorMessage = data.detail
-            .map((item) => {
-              if (typeof item === "string") return item;
-
-              return (
-                item.msg ||
-                item.message ||
-                JSON.stringify(item)
-              );
-            })
-            .join(", ");
+        if (data.detail) {
+          if (typeof data.detail === "string") {
+            errorMessage = data.detail;
+          } else {
+            errorMessage = JSON.stringify(data.detail);
+          }
+        } else if (data.message) {
+          errorMessage = data.message;
+        } else if (text) {
+          errorMessage = text;
         }
 
-        setMessage(
-          `Call failed (${response.status}): ${errorMessage}`
-        );
-
+        setMessage(`❌ ${errorMessage}`);
         return;
       }
 
-      setCallStatus("AI call completed ✓");
+      // THE CALL WAS SUCCESSFUL
+      setMessage("✅ Patient call started successfully!");
 
-      setMessage(
-        `ClinicCall successfully contacted ${patient.name}.`
-      );
+      setSelectedAppointment("");
 
-      await loadCalls();
+      // Call history is separate from the actual call.
+      // If it fails, don't tell the user that the call failed.
+      try {
+        await loadCallHistory();
+      } catch (historyError) {
+        console.warn(
+          "Call succeeded, but call history could not refresh:",
+          historyError
+        );
+      }
 
       setTimeout(() => {
-        loadCalls();
-      }, 1500);
+        setShowCallForm(false);
+        setMessage("");
+      }, 3000);
     } catch (error) {
-      console.error("Call error:", error);
-
-      setCallStatus("Connection error");
+      console.error("Frontend call error:", error);
 
       setMessage(
-        "Could not connect to the ClinicCall API. Please check that the backend is running."
+        "⚠️ The call request could not be confirmed. Please check the Call Center."
       );
     } finally {
-      setCalling(false);
       setLoading(false);
     }
   }
-
-  // ============================================================
-  // HELPERS
-  // ============================================================
 
   function getPatientName(patientId) {
     const patient = patients.find(
       (item) => Number(item.id) === Number(patientId)
     );
 
-    return patient
-      ? patient.name
-      : `Patient #${patientId}`;
-  }
-
-  function getPatientPhone(patientId) {
-    const patient = patients.find(
-      (item) => Number(item.id) === Number(patientId)
-    );
-
-    return patient
-      ? patient.phone_number
-      : "";
-  }
-
-  function getInitials(name) {
-    if (!name) return "PT";
-
-    return name
-      .split(" ")
-      .filter(Boolean)
-      .map((word) => word[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase();
-  }
-
-  function getCallStatus(call) {
-    return (
-      call?.call_status ||
-      call?.status ||
-      "completed"
-    );
-  }
-
-  function getCallStatusClass(status) {
-    const value = String(status || "").toLowerCase();
-
-    if (
-      value.includes("fail") ||
-      value.includes("error")
-    ) {
-      return "completed failed-status";
-    }
-
-    if (
-      value.includes("calling") ||
-      value.includes("progress")
-    ) {
-      return "completed calling-status";
-    }
-
-    return "completed";
+    return patient?.name || `Patient #${patientId}`;
   }
 
   // ============================================================
-  // UI
+  // LANDING PAGE
+  // ============================================================
+
+  if (!started) {
+    return (
+      <div className="landing">
+        <nav className="landing-nav">
+          <div className="brand">
+            <div className="brand-mark">+</div>
+            <span>ClinicCall</span>
+          </div>
+
+          <div className="landing-links">
+            <a href="#features">Features</a>
+
+            <button onClick={() => setStarted(true)}>
+              Open dashboard →
+            </button>
+          </div>
+        </nav>
+
+        <section className="landing-hero">
+          <div className="hero-copy">
+            <div className="eyebrow">
+              <span className="pulse"></span>
+              AI-POWERED PATIENT COMMUNICATION
+            </div>
+
+            <h1>
+              Your clinic's
+              <span>smartest caller.</span>
+            </h1>
+
+            <p>
+              ClinicCall helps clinics reduce missed appointments with
+              intelligent automated patient calls and reminders.
+            </p>
+
+            <div className="hero-actions">
+              <button
+                className="main-cta"
+                onClick={() => setStarted(true)}
+              >
+                Explore ClinicCall →
+              </button>
+
+              <button
+                className="watch-btn"
+                onClick={() => setStarted(true)}
+              >
+                ▶ See how it works
+              </button>
+            </div>
+
+            <div className="trust">
+              <strong>Built for modern clinics</strong>
+              <small>
+                Smarter communication. Better attendance.
+              </small>
+            </div>
+          </div>
+
+          <div className="hero-art">
+            <div className="glow"></div>
+
+            <div className="floating-card call-card">
+              <div className="mini-icon">☎</div>
+
+              <div>
+                <strong>Patient call</strong>
+                <span>Connected</span>
+              </div>
+
+              <div className="online-dot"></div>
+            </div>
+
+            <div className="dashboard-preview">
+              <div className="preview-top">
+                <div>
+                  <small>ClinicCall AI</small>
+                  <strong>Good morning, Doctor</strong>
+                </div>
+
+                <div className="preview-avatar">DR</div>
+              </div>
+
+              <div className="preview-number">
+                <small>Today's calls</small>
+                <strong>{callHistory.length}</strong>
+              </div>
+
+              <div className="preview-appointment">
+                <div className="preview-person">CC</div>
+
+                <div>
+                  <strong>ClinicCall</strong>
+                  <small>Appointment reminder</small>
+                </div>
+
+                <b>AI</b>
+              </div>
+            </div>
+
+            <div className="floating-card success-card">
+              <div className="success-check">✓</div>
+
+              <div>
+                <strong>Call completed</strong>
+                <span>Patient communication</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-stats">
+          <div>
+            <strong>24/7</strong>
+            <span>Patient communication</span>
+          </div>
+
+          <div>
+            <strong>92%</strong>
+            <span>Call success rate</span>
+          </div>
+
+          <div>
+            <strong>40%</strong>
+            <span>Fewer missed appointments</span>
+          </div>
+
+          <div>
+            <strong>1</strong>
+            <span>Simple clinic platform</span>
+          </div>
+        </section>
+
+        <section className="feature-section" id="features">
+          <div className="section-heading">
+            <div className="eyebrow">WHY CLINICCALL</div>
+
+            <h2>Everything your clinic needs.</h2>
+
+            <p>
+              Manage patients, appointments and AI-powered calls
+              from one place.
+            </p>
+          </div>
+
+          <div className="feature-grid">
+            <div className="feature">
+              <div className="feature-icon blue-icon">☎</div>
+
+              <h3>Smart patient calls</h3>
+
+              <p>
+                Contact patients about their appointments.
+              </p>
+            </div>
+
+            <div className="feature">
+              <div className="feature-icon purple-icon">▣</div>
+
+              <h3>Appointment management</h3>
+
+              <p>
+                Create and manage clinic appointments.
+              </p>
+            </div>
+
+            <div className="feature">
+              <div className="feature-icon green-icon">✓</div>
+
+              <h3>Patient management</h3>
+
+              <p>
+                Keep patient information organized.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // DASHBOARD
   // ============================================================
 
   return (
-    <div className="clinic-app">
-
-      {/* SIDEBAR */}
-
+    <div className="app">
       <aside className="sidebar">
-
         <div className="logo">
-          <div className="logo-icon">✚</div>
+          <div className="logo-icon">+</div>
 
           <div>
             <h2>ClinicCall</h2>
@@ -519,1153 +494,549 @@ function App() {
           </div>
         </div>
 
-        <div className="menu-title">
-          WORKSPACE
-        </div>
+        <div className="menu-title">WORKSPACE</div>
 
-        <button
-          className={
-            page === "Dashboard"
-              ? "menu active"
-              : "menu"
-          }
-          onClick={() => setPage("Dashboard")}
-        >
-          <span>⌂</span>
-          Dashboard
-        </button>
+        <nav>
+          {[
+            "Dashboard",
+            "Appointments",
+            "Patients",
+            "Call Center",
+          ].map((item, index) => (
+            <button
+              key={item}
+              className={`menu-item ${
+                activePage === item ? "active" : ""
+              }`}
+              onClick={() => setActivePage(item)}
+            >
+              <span>
+                {["⌂", "▣", "♙", "☎"][index]}
+              </span>
 
-        <button
-          className={
-            page === "Appointments"
-              ? "menu active"
-              : "menu"
-          }
-          onClick={() => setPage("Appointments")}
-        >
-          <span>▣</span>
-          Appointments
-        </button>
-
-        <button
-          className={
-            page === "Patients"
-              ? "menu active"
-              : "menu"
-          }
-          onClick={() => setPage("Patients")}
-        >
-          <span>♙</span>
-          Patients
-        </button>
-
-        <button
-          className={
-            page === "Call Center"
-              ? "menu active"
-              : "menu"
-          }
-          onClick={() => setPage("Call Center")}
-        >
-          <span>☎</span>
-          Call Center
-        </button>
+              {item}
+            </button>
+          ))}
+        </nav>
 
         <div className="sidebar-bottom">
-
-          <div className="ai-box">
-
-            <div className="ai-icon">
-              ☎
-            </div>
+          <div className="ai-status">
+            <div className="ai-orb">✦</div>
 
             <div>
-              <strong>
-                AI Call Center
-              </strong>
+              <strong>ClinicCall AI</strong>
 
               <span>
-                <i></i>
-                Online & Ready
+                <i></i> System operational
               </span>
             </div>
-
           </div>
 
-          <div className="admin-box">
-
-            <div className="admin-avatar">
-              C
-            </div>
+          <div className="user">
+            <div className="avatar">DR</div>
 
             <div>
-              <strong>
-                Clinic Admin
-              </strong>
-
-              <span>
-                Demo Clinic
-              </span>
+              <strong>Dr. Admin</strong>
+              <span>Clinic Manager</span>
             </div>
-
-            <b>⌄</b>
-
           </div>
-
         </div>
-
       </aside>
 
-      {/* MAIN */}
-
-      <main className="main-content">
-
-        {/* TOPBAR */}
-
+      <main className="main">
         <header className="topbar">
-
           <div>
-
-            <small>
-              CLINICCALL WORKSPACE
-            </small>
-
-            <h1>
-              {page}
-              {page === "Dashboard" && " 👋"}
-            </h1>
-
+            <p className="welcome">CLINICCALL WORKSPACE</p>
+            <h1>{activePage}</h1>
           </div>
 
-          <div className="top-buttons">
-
+          <div className="top-actions">
             <button
-              className="secondary-button"
-              onClick={() =>
-                setShowPatientForm(true)
-              }
+              className="primary-btn"
+              onClick={() => {
+                setMessage("");
+                setShowAppointmentForm(true);
+              }}
             >
-              ♙ &nbsp; Add patient
+              + New appointment
             </button>
-
-            <button
-              className="primary-button"
-              onClick={() =>
-                setShowAppointmentForm(true)
-              }
-            >
-              + &nbsp; New appointment
-            </button>
-
           </div>
-
         </header>
 
-        {/* MESSAGE */}
-
-        {message && (
-          <div className="message">
-            {message}
-          </div>
-        )}
-
-        {/* CALL STATUS */}
-
-        {callStatus && (
-
-          <div
-            className={
-              callStatus === "Call failed" ||
-              callStatus === "Connection error"
-                ? "call-status failed"
-                : "call-status"
-            }
-          >
-
-            <div className="call-status-icon">
-
-              {calling ? (
-                <span className="phone-pulse">
-                  ☎
-                </span>
-              ) : (
-                "✓"
-              )}
-
-            </div>
-
-            <div>
-
-              <strong>
-                {callStatus}
-              </strong>
-
-              {callingPatient && (
-
-                <span>
-
-                  Patient:{" "}
-                  {getPatientName(
-                    callingPatient
-                  )}
-
-                  {getPatientPhone(
-                    callingPatient
-                  ) && (
-                    <>
-                      {" • "}
-                      {getPatientPhone(
-                        callingPatient
-                      )}
-                    </>
-                  )}
-
-                </span>
-
-              )}
-
-            </div>
-
-            {calling && (
-
-              <div className="calling-dots">
-
-                <span></span>
-                <span></span>
-                <span></span>
-
-              </div>
-
-            )}
-
-          </div>
-
-        )}
-
-        {/* ====================================================
-            DASHBOARD
-        ==================================================== */}
-
-        {page === "Dashboard" && (
-
+        {activePage === "Dashboard" && (
           <>
-
-            <section className="hero">
-
-              <div className="hero-content">
-
-                <div className="online-badge">
-                  <i></i>
+            <section className="dashboard-welcome">
+              <div>
+                <div className="small-label">
+                  <span></span>
                   AI CALL CENTER ONLINE
                 </div>
 
                 <h2>
                   Keep your patients
                   <br />
-                  <span>
-                    connected.
-                  </span>
+                  <em>connected.</em>
                 </h2>
 
                 <p>
-                  Manage patients,
-                  appointments and
-                  automated patient
-                  communication from
-                  one simple dashboard.
+                  ClinicCall helps your clinic manage patients,
+                  appointments and communication.
                 </p>
 
                 <button
-                  className="hero-button"
+                  className="dashboard-cta"
                   onClick={() =>
-                    setPage("Call Center")
+                    setActivePage("Call Center")
                   }
                 >
-                  ☎ &nbsp; Open Call Center
-                  <span>→</span>
+                  Open call center →
                 </button>
-
-                <div className="hero-features">
-                  <span>◉ Secure</span>
-                  <span>⚡ Fast</span>
-                  <span>✓ Reliable</span>
-                </div>
-
               </div>
 
-              <div className="doctor-area">
-
-                <div className="doctor-glow"></div>
-
-                <div className="heartbeat">
-                  〰〰〰〰〰
-                </div>
-
-                <img
-                  src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=900&q=85"
-                  alt="Doctor"
-                  className="doctor-image"
-                />
-
-                <div className="phone-floating">
-                  ☎
-                </div>
-
+              <div className="dashboard-phone">
+                <div className="phone-ring ring-a"></div>
+                <div className="phone-ring ring-b"></div>
+                <div className="phone-core">☎</div>
               </div>
-
             </section>
 
             <section className="stats">
-
               <div className="stat-card">
+                <div className="stat-icon blue">♙</div>
 
-                <div className="stat-icon green">
-                  ♙
+                <div>
+                  <span>Patients</span>
+                  <strong>{patients.length}</strong>
+                  <small>Live database</small>
                 </div>
-
-                <span>
-                  Patients
-                </span>
-
-                <strong>
-                  {patients.length}
-                </strong>
-
-                <small>
-                  Total patients
-                </small>
-
               </div>
 
               <div className="stat-card">
+                <div className="stat-icon purple">▣</div>
 
-                <div className="stat-icon purple">
-                  ▣
+                <div>
+                  <span>Appointments</span>
+                  <strong>{appointments.length}</strong>
+                  <small>Scheduled</small>
                 </div>
-
-                <span>
-                  Appointments
-                </span>
-
-                <strong>
-                  {appointments.length}
-                </strong>
-
-                <small>
-                  Scheduled
-                </small>
-
               </div>
 
               <div className="stat-card">
+                <div className="stat-icon green">☎</div>
 
-                <div className="stat-icon blue">
-                  ☎
+                <div>
+                  <span>Calls</span>
+                  <strong>{callHistory.length}</strong>
+                  <small>Call history</small>
                 </div>
-
-                <span>
-                  AI Calls
-                </span>
-
-                <strong>
-                  {calls.length}
-                </strong>
-
-                <small>
-                  Patient calls
-                </small>
-
               </div>
 
               <div className="stat-card">
+                <div className="stat-icon orange">✓</div>
 
-                <div className="stat-icon orange">
-                  ✓
+                <div>
+                  <span>System</span>
+                  <strong>Online</strong>
+                  <small>API connected</small>
                 </div>
-
-                <span>
-                  System Status
-                </span>
-
-                <strong className="online-text">
-                  Online
-                </strong>
-
-                <small>
-                  AI calling system operational
-                </small>
-
               </div>
-
             </section>
 
-            <section className="dashboard-grid">
-
-              {/* UPCOMING APPOINTMENTS */}
-
-              <div className="card">
-
-                <div className="card-header">
-
+            <section className="content-grid">
+              <div className="panel">
+                <div className="panel-header">
                   <div>
-
-                    <h2>
-                      📅 Upcoming Appointments
-                    </h2>
-
-                    <p>
-                      Your latest appointments
-                    </p>
-
+                    <h3>Upcoming appointments</h3>
+                    <p>Live appointments from your clinic</p>
                   </div>
 
                   <button
+                    className="view-btn"
                     onClick={() =>
-                      setPage("Appointments")
+                      setActivePage("Appointments")
                     }
                   >
-                    View all
+                    View all →
                   </button>
-
                 </div>
 
                 {appointments.length === 0 ? (
+                  <div className="empty-message">
+                    <div>▣</div>
 
-                  <div className="empty">
-
-                    <h3>
-                      No appointments yet
-                    </h3>
+                    <h3>No appointments yet</h3>
 
                     <p>
-                      Create an appointment
-                      to see it here.
+                      Create an appointment to start managing
+                      your clinic schedule.
                     </p>
 
+                    <button
+                      className="primary-btn"
+                      onClick={() =>
+                        setShowAppointmentForm(true)
+                      }
+                    >
+                      + New appointment
+                    </button>
                   </div>
-
                 ) : (
-
-                  appointments
-                    .slice(0, 5)
-                    .map((appointment) => {
-
-                      const name =
-                        getPatientName(
-                          appointment.patient_id
-                        );
-
-                      return (
-
+                  <div className="appointment-list">
+                    {appointments.slice(0, 5).map(
+                      (appointment) => (
                         <div
-                          className="appointment-row"
+                          className="appointment"
                           key={appointment.id}
                         >
-
                           <div className="patient-avatar">
-                            {getInitials(name)}
+                            {getPatientName(
+                              appointment.patient_id
+                            )
+                              .slice(0, 2)
+                              .toUpperCase()}
                           </div>
 
                           <div className="patient-info">
-
                             <strong>
-                              {name}
+                              {getPatientName(
+                                appointment.patient_id
+                              )}
                             </strong>
 
                             <span>
-                              {getPatientPhone(
-                                appointment.patient_id
-                              )}
+                              {appointment.clinic_name ||
+                                "ClinicCall Demo Clinic"}
                             </span>
-
                           </div>
 
                           <div className="appointment-time">
-
                             <strong>
                               {appointment.appointment_date}
                             </strong>
 
-                            <span>
+                            <span className="status confirmed">
                               {appointment.appointment_time}
                             </span>
-
                           </div>
-
-                          <button
-                            className="call-small"
-                            onClick={() =>
-                              callPatient(
-                                appointment.patient_id
-                              )
-                            }
-                            disabled={calling}
-                          >
-                            {calling &&
-                            Number(callingPatient) ===
-                              Number(
-                                appointment.patient_id
-                              )
-                              ? "☎ Calling..."
-                              : "☎ Call"}
-                          </button>
-
                         </div>
-
-                      );
-                    })
-
+                      )
+                    )}
+                  </div>
                 )}
-
-                {appointments.length > 0 && (
-
-                  <button
-                    className="view-bottom"
-                    onClick={() =>
-                      setPage("Appointments")
-                    }
-                  >
-                    View all appointments →
-                  </button>
-
-                )}
-
               </div>
 
-              {/* RECENT CALLS */}
-
-              <div className="card">
-
-                <div className="card-header">
-
+              <div className="panel call-panel">
+                <div className="panel-header">
                   <div>
-
-                    <h2>
-                      ☎ Recent Calls
-                    </h2>
-
-                    <p>
-                      Latest patient communication
-                    </p>
-
+                    <h3>AI Call Center</h3>
+                    <p>Patient communication</p>
                   </div>
 
-                  <button
-                    onClick={() =>
-                      setPage("Call Center")
-                    }
-                  >
-                    View all
-                  </button>
-
-                </div>
-
-                {calls.length === 0 ? (
-
-                  <div className="empty">
-
-                    <h3>
-                      No calls yet
-                    </h3>
-
-                    <p>
-                      Patient calls will appear
-                      here.
-                    </p>
-
+                  <div className="live">
+                    <span></span> Live
                   </div>
-
-                ) : (
-
-                  calls
-                    .slice(0, 5)
-                    .map((call, index) => {
-
-                      const name =
-                        call.patient_id
-                          ? getPatientName(
-                              call.patient_id
-                            )
-                          : "Patient call";
-
-                      const status =
-                        getCallStatus(call);
-
-                      return (
-
-                        <div
-                          className="appointment-row"
-                          key={
-                            call.id || index
-                          }
-                        >
-
-                          <div className="patient-avatar blue-avatar">
-                            {getInitials(name)}
-                          </div>
-
-                          <div className="patient-info">
-
-                            <strong>
-                              {name}
-                            </strong>
-
-                            <span>
-                              {call.phone_number ||
-                                "AI Patient Call"}
-                            </span>
-
-                          </div>
-
-                          <div
-                            className={getCallStatusClass(
-                              status
-                            )}
-                          >
-                            {String(status)
-                              .toLowerCase() ===
-                            "completed"
-                              ? "✓ Completed"
-                              : status}
-                          </div>
-
-                        </div>
-
-                      );
-                    })
-
-                )}
-
-                {calls.length > 0 && (
-
-                  <button
-                    className="view-bottom"
-                    onClick={() =>
-                      setPage("Call Center")
-                    }
-                  >
-                    View all calls →
-                  </button>
-
-                )}
-
-              </div>
-
-            </section>
-
-            <section className="ai-banner">
-
-              <div className="ai-banner-icon">
-                ☎
-              </div>
-
-              <div>
-
-                <h3>
-                  ClinicCall AI Call Center
-                </h3>
-
-                <p>
-                  Your AI voice assistant is
-                  ready to help your patients.
-                </p>
-
-              </div>
-
-              <button
-                onClick={() =>
-                  setPage("Call Center")
-                }
-              >
-                Open Call Center →
-              </button>
-
-            </section>
-
-          </>
-
-        )}
-
-        {/* ====================================================
-            PATIENTS
-        ==================================================== */}
-
-        {page === "Patients" && (
-
-          <section className="card full-card">
-
-            <div className="card-header">
-
-              <div>
-
-                <h2>
-                  👥 Patients
-                </h2>
-
-                <p>
-                  Patients stored in your
-                  ClinicCall database.
-                </p>
-
-              </div>
-
-              <button
-                className="primary-button"
-                onClick={() =>
-                  setShowPatientForm(true)
-                }
-              >
-                + Add patient
-              </button>
-
-            </div>
-
-            {patients.length === 0 ? (
-
-              <div className="empty">
-
-                <h3>
-                  No patients found
-                </h3>
-
-                <p>
-                  Add your first patient.
-                </p>
-
-              </div>
-
-            ) : (
-
-              <div className="patients-grid">
-
-                {patients.map((patient) => (
-
-                  <div
-                    className="patient-big-card"
-                    key={patient.id}
-                  >
-
-                    <div className="big-avatar">
-                      {getInitials(
-                        patient.name
-                      )}
-                    </div>
-
-                    <h3>
-                      {patient.name}
-                    </h3>
-
-                    <p>
-                      {patient.phone_number}
-                    </p>
-
-                    <small>
-                      Patient ID: {patient.id}
-                    </small>
-
-                    <button
-                      className="patient-call-button"
-                      onClick={() =>
-                        callPatient(
-                          patient.id
-                        )
-                      }
-                      disabled={calling}
-                    >
-                      {calling &&
-                      Number(callingPatient) ===
-                        Number(patient.id)
-                        ? "☎ Calling..."
-                        : "☎ Call patient"}
-                    </button>
-
-                  </div>
-
-                ))}
-
-              </div>
-
-            )}
-
-          </section>
-
-        )}
-
-        {/* ====================================================
-            APPOINTMENTS
-        ==================================================== */}
-
-        {page === "Appointments" && (
-
-          <section className="card full-card">
-
-            <div className="card-header">
-
-              <div>
-
-                <h2>
-                  📅 Appointments
-                </h2>
-
-                <p>
-                  Manage your clinic
-                  appointments.
-                </p>
-
-              </div>
-
-              <button
-                className="primary-button"
-                onClick={() =>
-                  setShowAppointmentForm(true)
-                }
-              >
-                + New appointment
-              </button>
-
-            </div>
-
-            {appointments.length === 0 ? (
-
-              <div className="empty">
-
-                <h3>
-                  No appointments yet
-                </h3>
-
-                <p>
-                  Create an appointment
-                  to get started.
-                </p>
-
-              </div>
-
-            ) : (
-
-              appointments.map(
-                (appointment) => {
-
-                  const name =
-                    getPatientName(
-                      appointment.patient_id
-                    );
-
-                  return (
-
-                    <div
-                      className="appointment-full-row"
-                      key={appointment.id}
-                    >
-
-                      <div className="patient-avatar">
-                        {getInitials(name)}
-                      </div>
-
-                      <div className="patient-info">
-
-                        <strong>
-                          {name}
-                        </strong>
-
-                        <span>
-                          {getPatientPhone(
-                            appointment.patient_id
-                          )}
-                        </span>
-
-                      </div>
-
-                      <div className="appointment-date">
-
-                        <strong>
-                          {appointment.appointment_date}
-                        </strong>
-
-                        <span>
-                          {appointment.appointment_time}
-                        </span>
-
-                      </div>
-
-                      <button
-                        className="call-small"
-                        onClick={() =>
-                          callPatient(
-                            appointment.patient_id
-                          )
-                        }
-                        disabled={calling}
-                      >
-                        {calling &&
-                        Number(callingPatient) ===
-                          Number(
-                            appointment.patient_id
-                          )
-                          ? "☎ Calling..."
-                          : "☎ Call patient"}
-                      </button>
-
-                    </div>
-
-                  );
-                }
-              )
-
-            )}
-
-          </section>
-
-        )}
-
-        {/* ====================================================
-            CALL CENTER
-        ==================================================== */}
-
-        {page === "Call Center" && (
-
-          <section className="call-page">
-
-            <div className="call-hero">
-
-              <div className="big-call-icon">
-                ☎
-              </div>
-
-              <div>
-
-                <div className="online-badge">
-
-                  <i></i>
-
-                  AI CALL CENTER ONLINE
-
                 </div>
 
-                <h2>
-                  ClinicCall AI
-                </h2>
-
-                <p>
-                  Make real AI patient calls
-                  directly from your clinic
-                  dashboard.
-                </p>
-
-              </div>
-
-            </div>
-
-            <div className="card full-card">
-
-              <div className="card-header">
-
-                <div>
-
-                  <h2>
-                    📞 Patient Calling
-                  </h2>
-
-                  <p>
-                    Select a patient to start
-                    an automated AI voice call.
-                  </p>
-
+                <div className="call-visual">
+                  <div className="call-orb">☎</div>
                 </div>
 
-              </div>
-
-              {patients.length === 0 ? (
-
-                <div className="empty">
-
-                  <h3>
-                    No patients available
-                  </h3>
-
-                  <p>
-                    Add a patient first to make
-                    an AI call.
-                  </p>
-
-                  <button
-                    className="primary-button"
-                    onClick={() =>
-                      setShowPatientForm(true)
-                    }
-                  >
-                    + Add patient
-                  </button>
-
-                </div>
-
-              ) : (
-
-                <div className="call-patient-grid">
-
-                  {patients.map((patient) => (
-
-                    <div
-                      className="call-patient-card"
-                      key={patient.id}
-                    >
-
-                      <div className="patient-avatar">
-                        {getInitials(
-                          patient.name
-                        )}
-                      </div>
-
-                      <div className="patient-info">
-
-                        <strong>
-                          {patient.name}
-                        </strong>
-
-                        <span>
-                          {patient.phone_number}
-                        </span>
-
-                      </div>
-
-                      <button
-                        className="primary-button"
-                        onClick={() =>
-                          callPatient(
-                            patient.id
-                          )
-                        }
-                        disabled={calling}
-                      >
-                        {calling &&
-                        Number(callingPatient) ===
-                          Number(patient.id)
-                          ? "☎ Calling..."
-                          : "☎ Call"}
-                      </button>
-
-                    </div>
-
-                  ))}
-
-                </div>
-
-              )}
-
-            </div>
-
-            <div className="card full-card">
-
-              <div className="card-header">
-
-                <div>
-
-                  <h2>
-                    Recent Calls
-                  </h2>
-
-                  <p>
-                    Patient communication
-                    history
-                  </p>
-
+                <div className="call-number">
+                  <strong>{callHistory.length}</strong>
+                  <span>calls recorded</span>
                 </div>
 
                 <button
-                  onClick={loadCalls}
+                  className="call-button"
+                  onClick={() =>
+                    setActivePage("Call Center")
+                  }
                 >
-                  ↻ Refresh
+                  Open call center →
                 </button>
-
               </div>
-
-              {calls.length === 0 ? (
-
-                <div className="empty">
-
-                  <h3>
-                    No calls yet
-                  </h3>
-
-                  <p>
-                    Start a patient call above.
-                  </p>
-
-                </div>
-
-              ) : (
-
-                calls.map((call, index) => {
-
-                  const name =
-                    call.patient_id
-                      ? getPatientName(
-                          call.patient_id
-                        )
-                      : "Patient call";
-
-                  const status =
-                    getCallStatus(call);
-
-                  return (
-
-                    <div
-                      className="appointment-full-row"
-                      key={
-                        call.id || index
-                      }
-                    >
-
-                      <div className="patient-avatar blue-avatar">
-                        {getInitials(name)}
-                      </div>
-
-                      <div className="patient-info">
-
-                        <strong>
-                          {name}
-                        </strong>
-
-                        <span>
-                          {call.phone_number ||
-                            "AI patient call"}
-                        </span>
-
-                      </div>
-
-                      <div
-                        className={getCallStatusClass(
-                          status
-                        )}
-                      >
-                        {status}
-                      </div>
-
-                    </div>
-
-                  );
-
-                })
-
-              )}
-
-            </div>
-
-          </section>
-
+            </section>
+          </>
         )}
 
+        {activePage === "Appointments" && (
+          <section className="page-card">
+            <div className="page-heading">
+              <div>
+                <div className="eyebrow">SCHEDULE</div>
+
+                <h2>Appointments</h2>
+
+                <p>
+                  Manage your clinic's appointment schedule.
+                </p>
+              </div>
+
+              <button
+                className="primary-btn"
+                onClick={() => {
+                  setMessage("");
+                  setShowAppointmentForm(true);
+                }}
+              >
+                + New appointment
+              </button>
+            </div>
+
+            {appointments.length === 0 ? (
+              <div className="empty-message large-empty">
+                <div>▣</div>
+
+                <h3>Your schedule is clear</h3>
+
+                <p>
+                  Create an appointment to see it here.
+                </p>
+
+                <button
+                  className="primary-btn"
+                  onClick={() =>
+                    setShowAppointmentForm(true)
+                  }
+                >
+                  + New appointment
+                </button>
+              </div>
+            ) : (
+              <div className="appointment-list">
+                {appointments.map((appointment) => (
+                  <div
+                    className="appointment"
+                    key={appointment.id}
+                  >
+                    <div className="patient-avatar">
+                      {getPatientName(
+                        appointment.patient_id
+                      )
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+
+                    <div className="patient-info">
+                      <strong>
+                        {getPatientName(
+                          appointment.patient_id
+                        )}
+                      </strong>
+
+                      <span>
+                        {appointment.clinic_name ||
+                          "ClinicCall Demo Clinic"}
+                      </span>
+                    </div>
+
+                    <div className="appointment-time">
+                      <strong>
+                        {appointment.appointment_date}
+                      </strong>
+
+                      <span className="status confirmed">
+                        {appointment.appointment_time}
+                      </span>
+                    </div>
+
+                    <button
+                      className="call-button"
+                      onClick={() => {
+                        setSelectedAppointment(
+                          String(appointment.id)
+                        );
+                        setMessage("");
+                        setShowCallForm(true);
+                      }}
+                    >
+                      ☎ Call patient
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {activePage === "Patients" && (
+          <section className="page-card">
+            <div className="page-heading">
+              <div>
+                <div className="eyebrow">PATIENTS</div>
+
+                <h2>Your patients</h2>
+
+                <p>
+                  Patients currently stored in your database.
+                </p>
+              </div>
+
+              <button
+                className="primary-btn"
+                onClick={() => {
+                  setMessage("");
+                  setShowPatientForm(true);
+                }}
+              >
+                + Add patient
+              </button>
+            </div>
+
+            {patients.length === 0 ? (
+              <div className="empty-message large-empty">
+                <div>♙</div>
+
+                <h3>No patients found</h3>
+
+                <p>
+                  Add your first patient to ClinicCall.
+                </p>
+
+                <button
+                  className="primary-btn"
+                  onClick={() =>
+                    setShowPatientForm(true)
+                  }
+                >
+                  + Add patient
+                </button>
+              </div>
+            ) : (
+              <div className="patient-grid">
+                {patients.map((patient) => (
+                  <div
+                    className="patient-card"
+                    key={patient.id}
+                  >
+                    <div className="patient-avatar big">
+                      {patient.name
+                        ? patient.name
+                            .slice(0, 2)
+                            .toUpperCase()
+                        : "PT"}
+                    </div>
+
+                    <div>
+                      <h3>
+                        {patient.name ||
+                          `Patient #${patient.id}`}
+                      </h3>
+
+                      <p>
+                        {patient.phone_number ||
+                          "No phone number"}
+                      </p>
+                    </div>
+
+                    <span>ID #{patient.id}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {activePage === "Call Center" && (
+          <section className="page-card call-center-page">
+            <div className="call-center-hero">
+              <div>
+                <div className="eyebrow">CLINICCALL AI</div>
+
+                <h2>
+                  Your intelligent
+                  <br />
+                  <em>calling assistant.</em>
+                </h2>
+
+                <p>
+                  Select an appointment and ClinicCall will
+                  use the appointment ID to start the patient
+                  call.
+                </p>
+
+                <button
+                  className="primary-btn"
+                  onClick={() => {
+                    if (appointments.length === 0) {
+                      setMessage(
+                        "Create an appointment first."
+                      );
+                      return;
+                    }
+
+                    setMessage("");
+                    setShowCallForm(true);
+                  }}
+                >
+                  ☎ Call a patient
+                </button>
+              </div>
+
+              <div className="large-call-orb">
+                <div>☎</div>
+              </div>
+            </div>
+
+            <div className="call-history">
+              <div className="panel-header">
+                <div>
+                  <h3>Recent calls</h3>
+
+                  <p>
+                    Your latest patient communication
+                  </p>
+                </div>
+              </div>
+
+              {callHistory.length === 0 ? (
+                <div className="empty-message">
+                  <div>☎</div>
+
+                  <h3>No calls yet</h3>
+
+                  <p>
+                    Calls made through ClinicCall will
+                    appear here.
+                  </p>
+                </div>
+              ) : (
+                callHistory.map((call, index) => (
+                  <div
+                    className="appointment"
+                    key={call.id || index}
+                  >
+                    <div className="patient-avatar">
+                      ☎
+                    </div>
+
+                    <div className="patient-info">
+                      <strong>
+                        {call.patient_id
+                          ? getPatientName(
+                              call.patient_id
+                            )
+                          : "Patient call"}
+                      </strong>
+
+                      <span>
+                        {call.status ||
+                          "Call recorded"}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
       </main>
 
-      {/* ======================================================
-          ADD PATIENT MODAL
-      ====================================================== */}
+      {/* ADD PATIENT */}
 
       {showPatientForm && (
-
         <div className="modal-overlay">
-
           <div className="modal">
-
             <button
               className="close"
               onClick={() => {
@@ -1676,82 +1047,72 @@ function App() {
               ×
             </button>
 
-            <div className="modal-icon">
-              ♙
-            </div>
+            <div className="modal-icon">+</div>
 
-            <h2>
-              Add new patient
-            </h2>
+            <div className="eyebrow">NEW PATIENT</div>
+
+            <h2>Add patient</h2>
 
             <p>
-              Add a patient to your clinic.
+              Enter the patient's information.
             </p>
 
-            <form onSubmit={addPatient}>
-
-              <label>
-                Patient name
-              </label>
+            <form onSubmit={createPatient}>
+              <label>Patient name</label>
 
               <input
-                value={newPatientName}
-                onChange={(event) =>
-                  setNewPatientName(
-                    event.target.value
-                  )
+                type="text"
+                placeholder="e.g. Angela Mwangi"
+                value={patientName}
+                onChange={(e) =>
+                  setPatientName(e.target.value)
                 }
-                placeholder="e.g. Jane Doe"
                 required
               />
 
-              <label>
-                Phone number
-              </label>
+              <label>Phone number</label>
 
               <input
-                value={patientPhone}
-                onChange={(event) =>
-                  setPatientPhone(
-                    event.target.value
-                  )
-                }
-                placeholder="+254712345678"
                 type="tel"
+                placeholder="e.g. +254712345678"
+                value={patientPhone}
+                onChange={(e) =>
+                  setPatientPhone(e.target.value)
+                }
                 required
               />
 
-              <small>
-                Example: +254712345678
-              </small>
+              {message && (
+                <div
+                  className={
+                    message.includes("successfully")
+                      ? "success-message"
+                      : "error-message"
+                  }
+                >
+                  {message}
+                </div>
+              )}
 
               <button
-                className="primary-button full"
+                className="submit-btn"
+                type="submit"
                 disabled={loading}
               >
                 {loading
-                  ? "Adding..."
-                  : "Add patient"}
+                  ? "Creating..."
+                  : "Save patient →"}
               </button>
-
             </form>
-
           </div>
-
         </div>
-
       )}
 
-      {/* ======================================================
-          APPOINTMENT MODAL
-      ====================================================== */}
+      {/* ADD APPOINTMENT */}
 
       {showAppointmentForm && (
-
         <div className="modal-overlay">
-
           <div className="modal">
-
             <button
               className="close"
               onClick={() => {
@@ -1762,99 +1123,195 @@ function App() {
               ×
             </button>
 
-            <div className="modal-icon">
-              ▣
+            <div className="modal-icon">+</div>
+
+            <div className="eyebrow">
+              NEW APPOINTMENT
             </div>
 
-            <h2>
-              New appointment
-            </h2>
+            <h2>Schedule a visit</h2>
 
             <p>
-              Schedule a patient appointment.
+              Select a patient and choose their
+              appointment time.
             </p>
 
-            <form onSubmit={addAppointment}>
+            {patients.length === 0 ? (
+              <div className="error-message">
+                You need to add a patient first.
 
-              <label>
-                Patient
-              </label>
+                <button
+                  className="primary-btn"
+                  type="button"
+                  onClick={() => {
+                    setShowAppointmentForm(false);
+                    setShowPatientForm(true);
+                  }}
+                  style={{ marginTop: "12px" }}
+                >
+                  + Add patient
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={createAppointment}>
+                <label>Patient</label>
+
+                <select
+                  value={selectedPatient}
+                  onChange={(e) =>
+                    setSelectedPatient(e.target.value)
+                  }
+                  required
+                >
+                  <option value="">
+                    Select a patient
+                  </option>
+
+                  {patients.map((patient) => (
+                    <option
+                      key={patient.id}
+                      value={patient.id}
+                    >
+                      {patient.name ||
+                        `Patient #${patient.id}`}
+                      {patient.phone_number
+                        ? ` — ${patient.phone_number}`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+
+                <label>Appointment date</label>
+
+                <input
+                  type="date"
+                  value={appointmentDate}
+                  onChange={(e) =>
+                    setAppointmentDate(e.target.value)
+                  }
+                  required
+                />
+
+                <label>Appointment time</label>
+
+                <input
+                  type="time"
+                  value={appointmentTime}
+                  onChange={(e) =>
+                    setAppointmentTime(e.target.value)
+                  }
+                  required
+                />
+
+                {message && (
+                  <div
+                    className={
+                      message.includes("successfully")
+                        ? "success-message"
+                        : "error-message"
+                    }
+                  >
+                    {message}
+                  </div>
+                )}
+
+                <button
+                  className="submit-btn"
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading
+                    ? "Creating..."
+                    : "Confirm appointment →"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CALL PATIENT */}
+
+      {showCallForm && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <button
+              className="close"
+              onClick={() => {
+                setShowCallForm(false);
+                setMessage("");
+              }}
+            >
+              ×
+            </button>
+
+            <div className="modal-icon">☎</div>
+
+            <div className="eyebrow">
+              CLINICCALL AI
+            </div>
+
+            <h2>Call patient</h2>
+
+            <p>
+              Select an appointment and ClinicCall AI will
+              start the patient call.
+            </p>
+
+            <form onSubmit={callPatient}>
+              <label>Appointment</label>
 
               <select
-                value={selectedPatient}
-                onChange={(event) =>
-                  setSelectedPatient(
-                    event.target.value
-                  )
+                value={selectedAppointment}
+                onChange={(e) =>
+                  setSelectedAppointment(e.target.value)
                 }
                 required
               >
-
                 <option value="">
-                  Select a patient
+                  Select an appointment
                 </option>
 
-                {patients.map((patient) => (
-
+                {appointments.map((appointment) => (
                   <option
-                    key={patient.id}
-                    value={patient.id}
+                    key={appointment.id}
+                    value={appointment.id}
                   >
-                    {patient.name} —{" "}
-                    {patient.phone_number}
+                    #{appointment.id} —{" "}
+                    {getPatientName(
+                      appointment.patient_id
+                    )}{" "}
+                    — {appointment.appointment_date}{" "}
+                    {appointment.appointment_time}
                   </option>
-
                 ))}
-
               </select>
 
-              <label>
-                Date
-              </label>
-
-              <input
-                type="date"
-                value={appointmentDate}
-                onChange={(event) =>
-                  setAppointmentDate(
-                    event.target.value
-                  )
-                }
-                required
-              />
-
-              <label>
-                Time
-              </label>
-
-              <input
-                type="time"
-                value={appointmentTime}
-                onChange={(event) =>
-                  setAppointmentTime(
-                    event.target.value
-                  )
-                }
-                required
-              />
+              {message && (
+                <div
+                  className={
+                    message.includes("successfully")
+                      ? "success-message"
+                      : "error-message"
+                  }
+                >
+                  {message}
+                </div>
+              )}
 
               <button
-                className="primary-button full"
+                className="submit-btn"
+                type="submit"
                 disabled={loading}
               >
                 {loading
-                  ? "Creating..."
-                  : "Create appointment"}
+                  ? "Calling..."
+                  : "☎ Start patient call"}
               </button>
-
             </form>
-
           </div>
-
         </div>
-
       )}
-
     </div>
   );
 }
