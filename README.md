@@ -166,6 +166,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/oauth-login-client`](apps/typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`apps/typescript/vibehub-founder-relay`](apps/typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/typescript/ringer`](apps/typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
+| [`apps/web/local-atlas`](apps/web/local-atlas/) | JavaScript / Node | Map-first local guide where one confirmed call becomes a dated, evidence-quoted fact every later visitor reuses: stored answers, opinion refusal, closed-business and calling-window checks all work to avoid placing a call at all, results keep their uncertainty and expire by outcome, and private results are written where the public list cannot read them. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
@@ -195,6 +196,8 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`Provider descriptors`](apps/typescript/voice-preflight/docs/providers.md) - How one HTTP client drives any text-to-speech API from a JSON file, where the audio sits in a response, plus the order in which a run refuses so a failure says what has already happened.
 - [`Onboarding call safety`](skills/customer-onboarding-call/references/safety.md) - Consent and recording disclosure, refusal suppression, content boundaries for price and policy claims, working-hours limits, and honest not-reached reporting.
 - [`International routing`](skills/customer-onboarding-call/references/international-routing.md) - Forwarding pattern for unsupported regions, distinguishing congestion from no-answer from unsupported destination, and handling providers that report failure then dial anyway.
+- [`Calls not placed`](apps/web/local-atlas/docs/calls-not-placed.md) - Refusing before dialling: reusing a stored answer, rejecting questions a phone cannot answer, closed-business and calling-window checks, and defaulting to simulated when no access code is configured.
+- [`Fact freshness`](apps/web/local-atlas/docs/fact-freshness.md) - Expiring a call result by outcome so failures are not cached as conclusions, keeping hedges and refusals distinct from answers, and defeating idempotent replay when a reader rechecks.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 - [`Fail-closed dispositions`](plugins/zapier-calle/docs/fail-closed-dispositions.md) - Classifying phone-call outcomes so ambiguity, low confidence, and unrecognized statuses route to a human instead of a success branch.
 
