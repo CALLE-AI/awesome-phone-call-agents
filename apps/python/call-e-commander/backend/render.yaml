@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: call-e-commander-api
+    env: docker
+    region: ohio
+    plan: free
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: CALLE_API_KEY
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: MEDOPS_TEST_PHONE
+        sync: false
