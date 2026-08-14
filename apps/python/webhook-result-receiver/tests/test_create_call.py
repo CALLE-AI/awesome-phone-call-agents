@@ -40,7 +40,7 @@ class CreateCallTests(unittest.TestCase):
         self.assertNotIn("+12025550100", output.getvalue())
 
     def test_execute_requires_opt_ins_public_webhook_and_api_key(self):
-        def no_client(_: str) -> object:
+        def no_client(*, api_key: str) -> object:
             self.fail("invalid live request constructed a client")
 
         valid = [
@@ -66,6 +66,11 @@ class CreateCallTests(unittest.TestCase):
             (valid, {"CALLE_API_KEY": "test-key"}, "confirm"),
             (unsafe_webhook, {"CALLE_API_KEY": "test-key"}, "public HTTPS"),
             (valid + ["--confirm-authorized-recipient"], {}, "CALLE_API_KEY"),
+            (
+                valid + ["--confirm-authorized-recipient"],
+                {"CALLE_API_KEY": "   "},
+                "CALLE_API_KEY",
+            ),
         ):
             with self.subTest(message=message), redirect_stderr(io.StringIO()) as error:
                 self.assertEqual(
@@ -108,10 +113,15 @@ class CreateCallTests(unittest.TestCase):
         ]
         for webhook_url in (
             "https://user:pass@receiver.example/calle/webhook",
+            "https://@receiver.example/calle/webhook",
+            "https://:@receiver.example/calle/webhook",
             "https://receiver.example/calle/webhook?debug=true",
+            "https://receiver.example/calle/webhook?",
             "https://receiver.example/calle/webhook#section",
+            "https://receiver.example/calle/webhook#",
             "https://127.0.0.1/calle/webhook",
             "https://localhost/calle/webhook",
+            "https://localhost./calle/webhook",
             "https://receiver.example:not-a-port/calle/webhook",
             "https://[not-a-valid-ipv6/calle/webhook",
         ):
@@ -265,6 +275,42 @@ class CreateCallTests(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertEqual(output.getvalue(), "")
         self.assertIn("call ID", error.getvalue())
+
+    def test_execute_rejects_malformed_provider_responses_without_printing(self):
+        argv = [
+            "--phone",
+            "+12025550100",
+            "--webhook-url",
+            "https://receiver.example/calle/webhook",
+            "--workflow-id",
+            "workflow_123",
+            "--execute",
+            "--confirm-authorized-recipient",
+        ]
+
+        for response in (None, [], {"id": ""}, {"id": "   "}, {"id": 123}):
+            class FakeClient:
+                class calls:
+                    @staticmethod
+                    def create(**kwargs: object) -> object:
+                        return response
+
+            output = io.StringIO()
+            error = io.StringIO()
+            with (
+                self.subTest(response=response),
+                redirect_stdout(output),
+                redirect_stderr(error),
+            ):
+                exit_code = create_call.main(
+                    argv,
+                    environ={"CALLE_API_KEY": "test-key"},
+                    client_factory=lambda *, api_key: FakeClient(),
+                )
+
+                self.assertEqual(exit_code, 2)
+                self.assertEqual(output.getvalue(), "")
+                self.assertIn("call ID", error.getvalue())
 
 
 if __name__ == "__main__":

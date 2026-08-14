@@ -56,10 +56,9 @@ def is_public_https_webhook_url(value: str) -> bool:
     if (
         parsed.scheme != "https"
         or not parsed.hostname
-        or parsed.username
-        or parsed.password
-        or parsed.query
-        or parsed.fragment
+        or "@" in parsed.netloc
+        or "?" in value
+        or "#" in value
     ):
         return False
     try:
@@ -69,7 +68,8 @@ def is_public_https_webhook_url(value: str) -> bool:
     try:
         return ipaddress.ip_address(parsed.hostname).is_global
     except ValueError:
-        return parsed.hostname.lower() != "localhost" and "." in parsed.hostname
+        hostname = parsed.hostname.lower().rstrip(".")
+        return hostname != "localhost" and "." in hostname
 
 
 def idempotency_key(
@@ -133,18 +133,18 @@ def main(
         return 2
     environment = os.environ if environ is None else environ
     api_key = environment.get("CALLE_API_KEY")
-    if not api_key:
+    if not isinstance(api_key, str) or not api_key.strip():
         sys.stderr.write("error: CALLE_API_KEY is required for --execute\n")
         return 2
     factory = default_client_factory if client_factory is None else client_factory
     created = factory(api_key=api_key).calls.create(
         **build_call_request(args.phone, args.webhook_url, args.workflow_id)
     )
-    call_id = created.get("id")
-    status = created.get("status")
-    if not isinstance(call_id, str) or not call_id:
+    call_id = created.get("id") if isinstance(created, dict) else None
+    if not isinstance(call_id, str) or not call_id.strip():
         sys.stderr.write("error: CALL-E create response did not contain a call ID\n")
         return 2
+    status = created.get("status")
     sys.stdout.write(f"call_id={call_id} status={status}\n")
     return 0
 
