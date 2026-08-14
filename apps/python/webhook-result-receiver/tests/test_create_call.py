@@ -100,6 +100,32 @@ class CreateCallTests(unittest.TestCase):
                 self.assertEqual(create_call.main(argv), 2)
                 self.assertIn(message, error.getvalue())
 
+    def test_e164_validation_uses_ascii_digits_and_enforces_length_bounds(self):
+        def preview(phone: str) -> int:
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                return create_call.main(
+                    [
+                        "--phone",
+                        phone,
+                        "--webhook-url",
+                        "https://receiver.example/calle/webhook",
+                        "--workflow-id",
+                        "workflow_123",
+                    ]
+                )
+
+        for phone in ("+12345678", "+123456789012345"):
+            with self.subTest(phone=phone):
+                self.assertEqual(preview(phone), 0)
+
+        for phone in (
+            "+1234567",
+            "+1234567890123456",
+            "+1٢٠٢٥٥٥٠١٠٠",
+        ):
+            with self.subTest(phone=phone):
+                self.assertEqual(preview(phone), 2)
+
     def test_execute_rejects_private_or_decorated_webhook_urls(self):
         base = [
             "--phone",
@@ -122,6 +148,10 @@ class CreateCallTests(unittest.TestCase):
             "https://127.0.0.1/calle/webhook",
             "https://localhost/calle/webhook",
             "https://localhost./calle/webhook",
+            "https://service.localhost/calle/webhook",
+            "https://Service.LocalHost./calle/webhook",
+            "https://printer.local/calle/webhook",
+            "https://Printer.Local./calle/webhook",
             "https://receiver.example:not-a-port/calle/webhook",
             "https://[not-a-valid-ipv6/calle/webhook",
         ):

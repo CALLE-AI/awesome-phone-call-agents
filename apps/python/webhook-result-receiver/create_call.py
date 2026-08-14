@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+E164 = re.compile(r"^\+[1-9][0-9]{7,14}$")
 WORKFLOW_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 TASK = (
     "Call the recipient and ask whether they would like a human follow-up call. "
@@ -65,11 +65,17 @@ def is_public_https_webhook_url(value: str) -> bool:
         parsed.port
     except ValueError:
         return False
+    hostname = parsed.hostname.lower().rstrip(".")
     try:
-        return ipaddress.ip_address(parsed.hostname).is_global
+        return ipaddress.ip_address(hostname).is_global
     except ValueError:
-        hostname = parsed.hostname.lower().rstrip(".")
-        return hostname != "localhost" and "." in hostname
+        is_local_name = (
+            hostname == "localhost"
+            or hostname.endswith(".localhost")
+            or hostname == "local"
+            or hostname.endswith(".local")
+        )
+        return not is_local_name and "." in hostname
 
 
 def idempotency_key(
