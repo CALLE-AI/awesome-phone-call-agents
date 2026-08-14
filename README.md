@@ -119,6 +119,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
+- [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`customer-onboarding-call`](skills/customer-onboarding-call/) - Welcome-call skill that turns a new signup into at most one conversation, a consent-gated structured result, and a CRM follow-up task, with evidence-backed dispositions, ordered outcome classification, per-attempt idempotency, and cancellable retries.
 - [`deployment-approval-call`](skills/deployment-approval-call/) - Spoken, code-verified human approval before an agent or pipeline does something irreversible.
