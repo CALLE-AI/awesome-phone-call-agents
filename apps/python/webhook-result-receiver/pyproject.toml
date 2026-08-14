@@ -1,0 +1,13 @@
+[project]
+name = "webhook-result-receiver"
+version = "0.1.0"
+description = "Durable CALL-E webhook receiver reference app"
+requires-python = ">=3.11"
+dependencies = [
+  "calle-ai==0.6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+]
