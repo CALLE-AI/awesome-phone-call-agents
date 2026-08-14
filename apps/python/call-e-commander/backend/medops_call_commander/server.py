@@ -48,7 +48,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://gen-lang-client-0574518291.web.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
