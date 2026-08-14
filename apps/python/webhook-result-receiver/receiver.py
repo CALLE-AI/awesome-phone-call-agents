@@ -10,11 +10,10 @@ import re
 import sqlite3
 import sys
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-
 
 try:
     from calle import (
@@ -25,6 +24,7 @@ try:
         CalleTimeoutError,
     )
 except ModuleNotFoundError:  # Replay remains usable before dependencies are installed.
+
     class CalleAPIError(Exception):
         def __init__(
             self,
@@ -145,9 +145,7 @@ def _nonempty_string(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def validate_event(
-    value: object, event_header: str | None
-) -> dict[str, Any]:
+def validate_event(value: object, event_header: str | None) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise InvalidEvent("invalid_event")
     event_id = value.get("id")
@@ -217,7 +215,9 @@ def authoritative_record(
         raise InvalidEvent("authoritative_mismatch")
 
     result = snapshot.get("structured_result")
-    wants_callback = result.get("wants_human_callback") if isinstance(result, dict) else None
+    wants_callback = (
+        result.get("wants_human_callback") if isinstance(result, dict) else None
+    )
     if wants_callback not in {"yes", "no", "unknown"}:
         wants_callback = None
     return {
@@ -229,7 +229,7 @@ def authoritative_record(
         "workflow_id": metadata["workflow_id"],
         "wants_human_callback": wants_callback,
         "verification_mode": mode,
-        "received_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "received_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
 
 
@@ -250,7 +250,7 @@ def process_event(
         return 400, {"error": "invalid_json"}
     try:
         existing = store.digest_for(event["id"])
-    except Exception:
+    except Exception:  # noqa: BLE001
         return 500, {"error": "internal_error"}
     if existing is not None:
         if existing == digest:
@@ -275,7 +275,7 @@ def process_event(
         return 409, {"error": "authoritative_rejected"}
     except InvalidEvent as error:
         return 409, {"error": error.code}
-    except Exception:
+    except Exception:  # noqa: BLE001
         return 500, {"error": "internal_error"}
 
     try:
@@ -283,7 +283,7 @@ def process_event(
         if inserted:
             return 200, {"received": True, "duplicate": False}
         winner = store.digest_for(event["id"])
-    except Exception:
+    except Exception:  # noqa: BLE001
         return 500, {"error": "internal_error"}
     if winner == digest:
         return 200, {"received": True, "duplicate": True}
@@ -409,7 +409,10 @@ def create_server(
     handler = type(
         "ConfiguredWebhookHandler",
         (WebhookHandler,),
-        {"store": EventStore(database_path), "call_fetcher": staticmethod(call_fetcher)},
+        {
+            "store": EventStore(database_path),
+            "call_fetcher": staticmethod(call_fetcher),
+        },
     )
     return WebhookHTTPServer((host, port), handler)
 

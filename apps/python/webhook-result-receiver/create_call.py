@@ -13,7 +13,6 @@ from collections.abc import Callable, Mapping
 from typing import Any
 from urllib.parse import urlparse
 
-
 E164 = re.compile(r"^\+[1-9][0-9]{7,14}$")
 WORKFLOW_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 TASK = (
@@ -62,18 +61,15 @@ def is_public_https_webhook_url(value: str) -> bool:
     ):
         return False
     try:
-        parsed.port
+        _ = parsed.port
     except ValueError:
         return False
     hostname = parsed.hostname.lower().rstrip(".")
     try:
         return ipaddress.ip_address(hostname).is_global
     except ValueError:
-        is_local_name = (
-            hostname == "localhost"
-            or hostname.endswith(".localhost")
-            or hostname == "local"
-            or hostname.endswith(".local")
+        is_local_name = hostname in {"localhost", "local"} or hostname.endswith(
+            (".localhost", ".local")
         )
         return not is_local_name and "." in hostname
 
@@ -95,7 +91,9 @@ def idempotency_key(
     return f"webhook-result-receiver:{hashlib.sha256(canonical).hexdigest()[:32]}"
 
 
-def build_call_request(phone: str, webhook_url: str, workflow_id: str) -> dict[str, Any]:
+def build_call_request(
+    phone: str, webhook_url: str, workflow_id: str
+) -> dict[str, Any]:
     return {
         "task": TASK,
         "result_schema": RESULT_SCHEMA,

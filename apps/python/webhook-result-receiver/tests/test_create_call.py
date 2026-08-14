@@ -6,10 +6,9 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-
 APP_DIR = Path(__file__).parents[1]
 sys.path.insert(0, str(APP_DIR))
-import create_call  # noqa: E402
+import create_call
 
 
 class ForbiddenEnvironment:
@@ -18,7 +17,9 @@ class ForbiddenEnvironment:
 
 
 class CreateCallTests(unittest.TestCase):
-    def test_preview_masks_phone_without_reading_credentials_or_constructing_client(self):
+    def test_preview_masks_phone_without_reading_credentials_or_constructing_client(
+        self,
+    ):
         output = io.StringIO()
 
         with redirect_stdout(output):
@@ -32,7 +33,9 @@ class CreateCallTests(unittest.TestCase):
                     "workflow_123",
                 ],
                 environ=ForbiddenEnvironment(),
-                client_factory=lambda api_key: self.fail("preview constructed a client"),
+                client_factory=lambda api_key: self.fail(
+                    "preview constructed a client"
+                ),
             )
 
         self.assertEqual(exit_code, 0)
@@ -155,7 +158,10 @@ class CreateCallTests(unittest.TestCase):
             "https://receiver.example:not-a-port/calle/webhook",
             "https://[not-a-valid-ipv6/calle/webhook",
         ):
-            with self.subTest(webhook_url=webhook_url), redirect_stderr(io.StringIO()) as error:
+            with (
+                self.subTest(webhook_url=webhook_url),
+                redirect_stderr(io.StringIO()) as error,
+            ):
                 argv = [*base]
                 argv[3] = webhook_url
                 self.assertEqual(
@@ -319,11 +325,14 @@ class CreateCallTests(unittest.TestCase):
         ]
 
         for response in (None, [], {"id": ""}, {"id": "   "}, {"id": 123}):
+
             class FakeClient:
                 class calls:
                     @staticmethod
-                    def create(**kwargs: object) -> object:
-                        return response
+                    def create(
+                        *, _response: object = response, **kwargs: object
+                    ) -> object:
+                        return _response
 
             output = io.StringIO()
             error = io.StringIO()

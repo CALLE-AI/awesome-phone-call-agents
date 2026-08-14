@@ -17,11 +17,10 @@ from unittest.mock import patch
 
 import pytest
 
-
 APP_DIR = Path(__file__).parents[1]
 FIXTURES = APP_DIR / "fixtures"
 sys.path.insert(0, str(APP_DIR))
-import receiver  # noqa: E402
+import receiver
 
 
 def fixture(name: str) -> dict[str, object]:
@@ -69,9 +68,7 @@ def request(
     body: bytes = b"",
     headers: dict[str, str] | None = None,
 ) -> tuple[int, dict[str, object], dict[str, str], bytes]:
-    connection = http.client.HTTPConnection(
-        "127.0.0.1", server.server_port, timeout=5
-    )
+    connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
     connection.request(method, path, body=body, headers=headers or {})
     response = connection.getresponse()
     raw = response.read()
@@ -86,9 +83,7 @@ def raw_request(
     *,
     shutdown_write: bool = False,
 ) -> tuple[int, dict[str, object], bytes]:
-    connection = socket.create_connection(
-        ("127.0.0.1", server.server_port), timeout=5
-    )
+    connection = socket.create_connection(("127.0.0.1", server.server_port), timeout=5)
     connection.sendall(wire)
     if shutdown_write:
         connection.shutdown(socket.SHUT_WR)
@@ -247,9 +242,7 @@ def test_route_method_content_type_and_length_contract(tmp_path):
             connection.endheaders()
             response = connection.getresponse()
             assert response.status == 400
-            assert json.loads(response.read()) == {
-                "error": "invalid_content_length"
-            }
+            assert json.loads(response.read()) == {"error": "invalid_content_length"}
             connection.close()
 
     assert fetcher.call_ids == []
@@ -292,9 +285,7 @@ def test_server_shutdown_waits_for_bounded_active_body_reader(tmp_path, monkeypa
     )
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
-    connection = socket.create_connection(
-        ("127.0.0.1", server.server_port), timeout=5
-    )
+    connection = socket.create_connection(("127.0.0.1", server.server_port), timeout=5)
     connection.sendall(
         b"POST /calle/webhook HTTP/1.1\r\n"
         b"Host: 127.0.0.1\r\n"
@@ -403,9 +394,7 @@ def test_deep_json_and_lone_surrogate_are_private_400_errors(tmp_path, capsys):
                 "CALL-E-Event-Id": "evt_deep",
             },
         )
-        surrogate_response = post_event(
-            server, surrogate, rendered=rendered_surrogate
-        )
+        surrogate_response = post_event(server, surrogate, rendered=rendered_surrogate)
 
     captured = capsys.readouterr()
     assert deep_response[:2] == (400, {"error": "invalid_json"})
@@ -431,7 +420,6 @@ def test_storage_failures_return_private_500_without_server_traceback(
                 failure_point == "race_read" and self.reads == 2
             ):
                 raise sqlite3.OperationalError("private storage failure")
-            return None
 
         def insert(self, record):
             if failure_point == "insert":
@@ -561,7 +549,11 @@ def test_canonical_dedupe_skips_refetch_and_conflicting_id_returns_409(tmp_path)
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_code"),
     [
-        (receiver.CalleConnectionError("secret connection"), 503, "upstream_unavailable"),
+        (
+            receiver.CalleConnectionError("secret connection"),
+            503,
+            "upstream_unavailable",
+        ),
         (receiver.CalleTimeoutError("secret timeout"), 503, "upstream_unavailable"),
         (
             receiver.CalleRateLimitError(
@@ -637,8 +629,12 @@ def test_transient_failure_can_be_retried_and_committed(tmp_path):
     [
         lambda snapshot: snapshot.update(id="different_call"),
         lambda snapshot: snapshot.update(status="failed"),
-        lambda snapshot: snapshot.update(metadata={"workflow": "other", "workflow_id": "workflow_fixture_completed"}),
-        lambda snapshot: snapshot.update(metadata={"workflow": "webhook-result-receiver", "workflow_id": ""}),
+        lambda snapshot: snapshot.update(
+            metadata={"workflow": "other", "workflow_id": "workflow_fixture_completed"}
+        ),
+        lambda snapshot: snapshot.update(
+            metadata={"workflow": "webhook-result-receiver", "workflow_id": ""}
+        ),
         lambda snapshot: snapshot["metadata"].update(workflow_id="different_workflow"),
     ],
 )
@@ -701,12 +697,16 @@ def test_concurrent_first_delivery_creates_one_row(tmp_path):
         barrier.wait(timeout=5)
         return fetch_snapshot(event)
 
-    with running_server(tmp_path, synchronized_fetch) as (server, database):
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [executor.submit(post_event, server, event) for _ in range(2)]
-            responses = [future.result(timeout=10) for future in futures]
+    with (
+        running_server(tmp_path, synchronized_fetch) as (server, database),
+        ThreadPoolExecutor(max_workers=2) as executor,
+    ):
+        futures = [executor.submit(post_event, server, event) for _ in range(2)]
+        responses = [future.result(timeout=10) for future in futures]
 
-    assert sorted((response[0], response[1]["duplicate"]) for response in responses) == [
+    assert sorted(
+        (response[0], response[1]["duplicate"]) for response in responses
+    ) == [
         (200, False),
         (200, True),
     ]
@@ -724,13 +724,14 @@ def test_concurrent_conflicting_deliveries_create_one_row_and_one_conflict(tmp_p
         barrier.wait(timeout=5)
         return fetch_snapshot(event)
 
-    with running_server(tmp_path, synchronized_fetch) as (server, database):
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [
-                executor.submit(post_event, server, body)
-                for body in (event, conflicting)
-            ]
-            responses = [future.result(timeout=10) for future in futures]
+    with (
+        running_server(tmp_path, synchronized_fetch) as (server, database),
+        ThreadPoolExecutor(max_workers=2) as executor,
+    ):
+        futures = [
+            executor.submit(post_event, server, body) for body in (event, conflicting)
+        ]
+        responses = [future.result(timeout=10) for future in futures]
 
     assert sorted(response[0] for response in responses) == [200, 409]
     assert {response[1].get("error") for response in responses} == {
@@ -825,11 +826,23 @@ def test_serve_mode_requires_key_and_closes_client_and_server(tmp_path):
     fake_server = FakeServer()
     fake_client = FakeClient()
     with patch.object(receiver, "create_server", return_value=fake_server) as create:
-        assert receiver.main(
-            ["--host", "127.0.0.1", "--port", "9090", "--database", str(tmp_path / "db.sqlite3")],
-            environ={"CALLE_API_KEY": "test-key"},
-            client_factory=lambda *, api_key: fake_client,
-        ) == 0
+        assert (
+            receiver.main(
+                [
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "9090",
+                    "--database",
+                    str(tmp_path / "db.sqlite3"),
+                ],
+                environ={"CALLE_API_KEY": "test-key"},
+                client_factory=lambda *, api_key, _fake_client=fake_client: (
+                    _fake_client
+                ),
+            )
+            == 0
+        )
 
     assert fake_server.served and fake_server.closed and fake_client.closed
     create.assert_called_once_with(
@@ -877,7 +890,9 @@ def test_serve_mode_closes_client_on_server_construction_or_close_failure(tmp_pa
             receiver.main(
                 ["--database", str(tmp_path / f"{failure_point}.sqlite3")],
                 environ={"CALLE_API_KEY": "test-key"},
-                client_factory=lambda *, api_key: fake_client,
+                client_factory=lambda *, api_key, _fake_client=fake_client: (
+                    _fake_client
+                ),
             )
 
         assert fake_client.closed
