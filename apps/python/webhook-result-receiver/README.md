@@ -104,18 +104,25 @@ shipping, modify profiles, or perform another business action.
 
 ## Webhook contract and delivery behavior
 
-The endpoint accepts `POST /calle/webhook` with JSON, a single valid
-`Content-Length`, and a `CALL-E-Event-Id` header matching the body's `id`.
-Only these terminal event types are supported:
+The endpoint accepts `POST /calle/webhook`. Requests require
+`Content-Type: application/json`, exactly one valid decimal `Content-Length`,
+no `Transfer-Encoding`, a body no larger than 1,048,576 bytes, and a
+`CALL-E-Event-Id` header matching the body's `id`. Only these terminal event
+types are supported:
 
 | Condition | Result |
 | --- | --- |
 | First valid, reconciled terminal event | `200` and a durable receipt |
 | Canonically identical retry | `200` with `duplicate: true`; no second receipt or API fetch |
+| Wrong path | `404 not_found` |
+| Unsupported method on the webhook path | `405 method_not_allowed` with `Allow: POST` |
+| Missing/invalid JSON content type, invalid/duplicate `Content-Length`, or `Transfer-Encoding` | `400` |
+| Body over 1,048,576 bytes | `413 payload_too_large` |
 | Same event ID with a different payload | `409 event_id_conflict` |
 | Malformed input, unsupported type, or header/body mismatch | `400` |
 | Authenticated call does not match ID, terminal state, or workflow | `409` |
 | Temporary CALL-E outage or rate limit | `503` so delivery can retry |
+| Authentication, configured receiver/API, SQLite, or unexpected internal failure | Generic `500 internal_error` without exception details |
 
 Supported types are `call.completed`, `call.failed`, and
 `call.result_validation_failed`. Canonical event-ID deduplication makes the
