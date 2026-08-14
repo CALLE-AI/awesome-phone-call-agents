@@ -5,9 +5,11 @@ import hashlib
 import http.client
 import io
 import json
+import socket
 import sqlite3
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -76,6 +78,26 @@ def request(
     result_headers = {key: value for key, value in response.getheaders()}
     connection.close()
     return response.status, json.loads(raw), result_headers, raw
+
+
+def raw_request(
+    server,
+    wire: bytes,
+    *,
+    shutdown_write: bool = False,
+) -> tuple[int, dict[str, object], bytes]:
+    connection = socket.create_connection(
+        ("127.0.0.1", server.server_port), timeout=5
+    )
+    connection.sendall(wire)
+    if shutdown_write:
+        connection.shutdown(socket.SHUT_WR)
+    response = http.client.HTTPResponse(connection)
+    response.begin()
+    raw = response.read()
+    status = response.status
+    connection.close()
+    return status, json.loads(raw), raw
 
 
 def post_event(
@@ -234,6 +256,74 @@ def test_route_method_content_type_and_length_contract(tmp_path):
     assert rows(database) == []
 
 
+def test_partial_and_stalled_bodies_return_private_json_without_fetch(
+    tmp_path, monkeypatch
+):
+    event = fixture("call-completed.json")
+    fetcher = Fetcher(fetch_snapshot(event))
+    monkeypatch.setattr(receiver, "BODY_READ_TIMEOUT_SECONDS", 0.1)
+    headers = (
+        b"POST /calle/webhook HTTP/1.1\r\n"
+        b"Host: 127.0.0.1\r\n"
+        b"Content-Type: application/json\r\n"
+        b"CALL-E-Event-Id: evt_partial\r\n"
+        b"Content-Length: 50\r\n"
+        b"Connection: close\r\n\r\n"
+    )
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        partial = raw_request(server, headers + b"{}", shutdown_write=True)
+        stalled = raw_request(server, headers + b"{")
+
+    assert partial[:2] == (400, {"error": "invalid_body"})
+    assert stalled[:2] == (400, {"error": "invalid_body"})
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
+def test_server_shutdown_waits_for_bounded_active_body_reader(tmp_path, monkeypatch):
+    event = fixture("call-completed.json")
+    monkeypatch.setattr(receiver, "BODY_READ_TIMEOUT_SECONDS", 0.2)
+    server = receiver.create_server(
+        host="127.0.0.1",
+        port=0,
+        database_path=tmp_path / "shutdown.sqlite3",
+        call_fetcher=Fetcher(fetch_snapshot(event)),
+    )
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    connection = socket.create_connection(
+        ("127.0.0.1", server.server_port), timeout=5
+    )
+    connection.sendall(
+        b"POST /calle/webhook HTTP/1.1\r\n"
+        b"Host: 127.0.0.1\r\n"
+        b"Content-Type: application/json\r\n"
+        b"CALL-E-Event-Id: evt_shutdown\r\n"
+        b"Content-Length: 100\r\n"
+        b"Connection: close\r\n\r\n"
+        b"{"
+    )
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline and not getattr(server, "_threads", ()):
+        time.sleep(0.01)
+
+    started = time.monotonic()
+    server.shutdown()
+    server.server_close()
+    elapsed = time.monotonic() - started
+    server_thread.join(timeout=2)
+    response = http.client.HTTPResponse(connection)
+    response.begin()
+    raw = response.read()
+    connection.close()
+
+    assert response.status == 400
+    assert json.loads(raw) == {"error": "invalid_body"}
+    assert elapsed < 2
+    assert not server_thread.is_alive()
+
+
 @pytest.mark.parametrize(
     ("body", "event_header", "error"),
     [
@@ -292,6 +382,122 @@ def test_malformed_and_untrusted_inputs_are_rejected_before_fetch(
         )
 
     assert (status, payload) == (400, {"error": error})
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
+def test_deep_json_and_lone_surrogate_are_private_400_errors(tmp_path, capsys):
+    event = fixture("call-completed.json")
+    fetcher = Fetcher(fetch_snapshot(event))
+    deep = ("[" * 10_000 + "0" + "]" * 10_000).encode()
+    surrogate = copy.deepcopy(event)
+    surrogate["data"]["summary"] = "\ud800"
+    rendered_surrogate = json.dumps(surrogate).encode("ascii")
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        deep_response = request(
+            server,
+            body=deep,
+            headers={
+                "Content-Type": "application/json",
+                "CALL-E-Event-Id": "evt_deep",
+            },
+        )
+        surrogate_response = post_event(
+            server, surrogate, rendered=rendered_surrogate
+        )
+
+    captured = capsys.readouterr()
+    assert deep_response[:2] == (400, {"error": "invalid_json"})
+    assert surrogate_response[:2] == (400, {"error": "invalid_json"})
+    assert captured.err == ""
+    assert fetcher.call_ids == []
+    assert rows(database) == []
+
+
+@pytest.mark.parametrize("failure_point", ["initial", "insert", "race_read"])
+def test_storage_failures_return_private_500_without_server_traceback(
+    tmp_path, capsys, failure_point
+):
+    event = fixture("call-completed.json")
+
+    class FailingStore:
+        def __init__(self):
+            self.reads = 0
+
+        def digest_for(self, event_id):
+            self.reads += 1
+            if failure_point == "initial" or (
+                failure_point == "race_read" and self.reads == 2
+            ):
+                raise sqlite3.OperationalError("private storage failure")
+            return None
+
+        def insert(self, record):
+            if failure_point == "insert":
+                raise sqlite3.OperationalError("private storage failure")
+            return failure_point != "race_read"
+
+    with running_server(tmp_path, Fetcher(fetch_snapshot(event))) as (
+        server,
+        database,
+    ):
+        server.RequestHandlerClass.store = FailingStore()
+        status, payload, _, raw = post_event(server, event)
+
+    captured = capsys.readouterr()
+    assert (status, payload) == (500, {"error": "internal_error"})
+    assert b"private storage failure" not in raw
+    assert "private storage failure" not in captured.err
+    assert "Traceback" not in captured.err
+    assert "127.0.0.1" not in captured.err
+    assert rows(database) == []
+
+
+@pytest.mark.parametrize("method", ["TRACE", "BREW"])
+def test_unknown_methods_use_stable_route_contract(tmp_path, method):
+    event = fixture("call-completed.json")
+    with running_server(tmp_path, Fetcher(fetch_snapshot(event))) as (server, _):
+        status, payload, headers, _ = request(
+            server, method=method, path="/calle/webhook"
+        )
+        other_status, other_payload, _, _ = request(
+            server, method=method, path="/other"
+        )
+
+    assert (status, payload) == (405, {"error": "method_not_allowed"})
+    assert headers["Allow"] == "POST"
+    assert (other_status, other_payload) == (404, {"error": "not_found"})
+
+
+@pytest.mark.parametrize("values", [["+1"], [" 1"], ["1 "], ["1_0"], ["1", "2"]])
+def test_content_length_parser_requires_one_ascii_decimal_header(values):
+    assert receiver.parse_content_length(values) is None
+
+
+def test_signed_underscored_and_duplicate_content_lengths_are_rejected(tmp_path):
+    event = fixture("call-completed.json")
+    fetcher = Fetcher(fetch_snapshot(event))
+    base = (
+        b"POST /calle/webhook HTTP/1.1\r\n"
+        b"Host: 127.0.0.1\r\n"
+        b"Content-Type: application/json\r\n"
+        b"CALL-E-Event-Id: evt_length\r\n"
+        b"Connection: close\r\n"
+    )
+    wires = [
+        base + b"Content-Length: +1\r\n\r\nx",
+        base + b"Content-Length: 1_0\r\n\r\nxxxxxxxxxx",
+        base + b"Content-Length: 1\r\nContent-Length: 2\r\n\r\nx",
+    ]
+
+    with running_server(tmp_path, fetcher) as (server, database):
+        responses = [raw_request(server, wire) for wire in wires]
+
+    assert all(
+        response[:2] == (400, {"error": "invalid_content_length"})
+        for response in responses
+    )
     assert fetcher.call_ids == []
     assert rows(database) == []
 
@@ -507,6 +713,33 @@ def test_concurrent_first_delivery_creates_one_row(tmp_path):
     assert len(rows(database)) == 1
 
 
+def test_concurrent_conflicting_deliveries_create_one_row_and_one_conflict(tmp_path):
+    event = fixture("call-completed.json")
+    conflicting = copy.deepcopy(event)
+    conflicting["data"]["summary"] = "different concurrent private summary"
+    barrier = threading.Barrier(2)
+
+    def synchronized_fetch(call_id):
+        assert call_id == event["data"]["id"]
+        barrier.wait(timeout=5)
+        return fetch_snapshot(event)
+
+    with running_server(tmp_path, synchronized_fetch) as (server, database):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(post_event, server, body)
+                for body in (event, conflicting)
+            ]
+            responses = [future.result(timeout=10) for future in futures]
+
+    assert sorted(response[0] for response in responses) == [200, 409]
+    assert {response[1].get("error") for response in responses} == {
+        None,
+        "event_id_conflict",
+    }
+    assert len(rows(database)) == 1
+
+
 def test_private_fixture_values_never_appear_in_database_response_or_logs(
     tmp_path, caplog
 ):
@@ -605,3 +838,46 @@ def test_serve_mode_requires_key_and_closes_client_and_server(tmp_path):
         database_path=tmp_path / "db.sqlite3",
         call_fetcher=fake_client.calls.get,
     )
+
+
+def test_serve_mode_closes_client_on_server_construction_or_close_failure(tmp_path):
+    class FakeClient:
+        class Calls:
+            @staticmethod
+            def get(call_id):
+                raise AssertionError("cleanup test fetched a call")
+
+        def __init__(self):
+            self.calls = self.Calls()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    for failure_point in ("construction", "close"):
+        fake_client = FakeClient()
+
+        class FailingServer:
+            def serve_forever(self):
+                return
+
+            def server_close(self):
+                raise RuntimeError("private server close failure")
+
+        replacement = (
+            patch.object(
+                receiver,
+                "create_server",
+                side_effect=RuntimeError("private construction failure"),
+            )
+            if failure_point == "construction"
+            else patch.object(receiver, "create_server", return_value=FailingServer())
+        )
+        with replacement, pytest.raises(RuntimeError):
+            receiver.main(
+                ["--database", str(tmp_path / f"{failure_point}.sqlite3")],
+                environ={"CALLE_API_KEY": "test-key"},
+                client_factory=lambda *, api_key: fake_client,
+            )
+
+        assert fake_client.closed

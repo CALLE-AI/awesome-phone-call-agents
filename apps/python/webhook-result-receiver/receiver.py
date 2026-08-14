@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import sys
 from collections.abc import Callable, Mapping
@@ -52,6 +53,7 @@ except ModuleNotFoundError:  # Replay remains usable before dependencies are ins
 
 
 MAX_BODY_BYTES = 1_048_576
+BODY_READ_TIMEOUT_SECONDS = 2.0
 WEBHOOK_PATH = "/calle/webhook"
 TERMINAL_STATUSES = {
     "call.completed": {"completed"},
@@ -177,6 +179,20 @@ def canonical_digest(event: Mapping[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def parse_content_length(values: list[str] | None) -> int | None:
+    if (
+        values is None
+        or len(values) != 1
+        or not isinstance(values[0], str)
+        or re.fullmatch(r"[0-9]+", values[0]) is None
+    ):
+        return None
+    try:
+        return int(values[0])
+    except ValueError:
+        return None
+
+
 def authoritative_record(
     event: Mapping[str, Any], snapshot: object, digest: str, mode: str
 ) -> dict[str, Any]:
@@ -227,10 +243,15 @@ def process_event(
 ) -> tuple[int, dict[str, object]]:
     try:
         event = validate_event(value, event_header)
+        digest = canonical_digest(event)
     except InvalidEvent as error:
         return 400, {"error": error.code}
-    digest = canonical_digest(event)
-    existing = store.digest_for(event["id"])
+    except (RecursionError, TypeError, UnicodeError, ValueError):
+        return 400, {"error": "invalid_json"}
+    try:
+        existing = store.digest_for(event["id"])
+    except Exception:
+        return 500, {"error": "internal_error"}
     if existing is not None:
         if existing == digest:
             return 200, {"received": True, "duplicate": True}
@@ -259,14 +280,22 @@ def process_event(
 
     try:
         inserted = store.insert(record)
+        if inserted:
+            return 200, {"received": True, "duplicate": False}
+        winner = store.digest_for(event["id"])
     except Exception:
         return 500, {"error": "internal_error"}
-    if inserted:
-        return 200, {"received": True, "duplicate": False}
-    winner = store.digest_for(event["id"])
     if winner == digest:
         return 200, {"received": True, "duplicate": True}
     return 409, {"error": "event_id_conflict"}
+
+
+class WebhookHTTPServer(ThreadingHTTPServer):
+    daemon_threads = False
+    block_on_close = True
+
+    def handle_error(self, request: object, client_address: object) -> None:
+        return
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
@@ -275,6 +304,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: object) -> None:
         return
+
+    def setup(self) -> None:
+        self.request.settimeout(BODY_READ_TIMEOUT_SECONDS)
+        super().setup()
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("do_"):
+            return self._method_response
+        raise AttributeError(name)
 
     def send_json(
         self, status: int, payload: Mapping[str, object], *, include_body: bool = True
@@ -329,22 +367,27 @@ class WebhookHandler(BaseHTTPRequestHandler):
         ):
             self.send_json(400, {"error": "invalid_content_type"})
             return
-        raw_length = self.headers.get("Content-Length")
-        try:
-            length = int(raw_length) if raw_length is not None else -1
-        except ValueError:
-            length = -1
-        if length < 0:
+        length = parse_content_length(self.headers.get_all("Content-Length"))
+        if length is None or self.headers.get_all("Transfer-Encoding"):
             self.send_json(400, {"error": "invalid_content_length"})
             return
         if length > MAX_BODY_BYTES:
             self.close_connection = True
             self.send_json(413, {"error": "payload_too_large"})
             return
-        raw = self.rfile.read(length)
+        try:
+            raw = self.rfile.read(length)
+        except OSError:
+            self.close_connection = True
+            self.send_json(400, {"error": "invalid_body"})
+            return
+        if len(raw) != length:
+            self.close_connection = True
+            self.send_json(400, {"error": "invalid_body"})
+            return
         try:
             value = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
             self.send_json(400, {"error": "invalid_json"})
             return
         status, payload = process_event(
@@ -368,7 +411,7 @@ def create_server(
         (WebhookHandler,),
         {"store": EventStore(database_path), "call_fetcher": staticmethod(call_fetcher)},
     )
-    return ThreadingHTTPServer((host, port), handler)
+    return WebhookHTTPServer((host, port), handler)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -425,19 +468,24 @@ def main(
         return 2
     factory = default_client_factory if client_factory is None else client_factory
     client = factory(api_key=api_key)
-    server = create_server(
-        host=args.host,
-        port=args.port,
-        database_path=args.database,
-        call_fetcher=client.calls.get,
-    )
+    server = None
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        server = create_server(
+            host=args.host,
+            port=args.port,
+            database_path=args.database,
+            call_fetcher=client.calls.get,
+        )
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
     finally:
-        server.server_close()
-        client.close()
+        try:
+            if server is not None:
+                server.server_close()
+        finally:
+            client.close()
     return 0
 
 
