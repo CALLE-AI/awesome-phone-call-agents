@@ -31,6 +31,22 @@ must match, but that equality is only a consistency check, not authentication.
 Do not rely on deprecated legacy verification helpers for this workflow. The
 authenticated `calls.get` re-fetch is the trust boundary in server mode.
 
+### Production ownership
+
+The CALL-E Calls API is authoritative for call-execution state. The integrating
+application remains the source of truth for business intent and state,
+persisted idempotency keys and call IDs, retry coordination, state transitions,
+and audit history. A production application should commit its business intent
+and stable idempotency key before submitting the call, then record the call ID
+and creation outcome. This demo derives and sends a stable idempotency key, but
+does not persist it.
+
+An unverified webhook is a wake-up signal, not business authority. This demo's
+SQLite `events` table is only a minimal receipt and deduplication store; it is
+not a business-state store or a complete audit log. Once a matching receipt is
+API-verified, a canonical duplicate can be acknowledged from durable
+deduplication state without another API fetch.
+
 ## Requirements and setup
 
 Use Python 3.11 or newer and [uv](https://docs.astral.sh/uv/). From this
@@ -173,6 +189,43 @@ authenticated `calls.get`, validates the authoritative snapshot, and atomically
 replaces the authoritative receipt fields while changing `verification_mode`
 to `api`. Fixture replay never downgrades an `api` row. Live API requests use a
 ten-second client timeout.
+
+## Lifecycle and recovery
+
+A production host can wrap this demo's receiver flow in the following durable
+lifecycle:
+
+1. Persist the business intent and stable idempotency key before call creation.
+2. Create the call with that key and record the call ID and attempt outcome. If
+   submission reports an unknown outcome, retry only the identical intent.
+3. Receive the unsigned webhook, validate its envelope, and deduplicate by
+   event ID and canonical payload digest.
+4. Acknowledge a matching API-verified duplicate without another fetch.
+   Otherwise, call `calls.get` to retrieve the authoritative terminal state.
+5. On a transient Calls API failure, rate limit, timeout, or receiver-capacity
+   failure, do not save a successful receipt and return `503` so delivery can
+   retry.
+6. Return `409` for an authoritative-state conflict. Storage, authentication,
+   configuration, or unexpected internal failures return a private `500`.
+7. In the synchronous path, commit the verified receipt before returning `200`.
+   If a host also applies its business transition synchronously, commit that
+   transition within the same durable boundary.
+
+## Moving to production
+
+This synchronous reference app is not a production-ready workflow architecture.
+A production integration can replace in-request reconciliation with a durable
+inbox or queue and a worker. The webhook handler must acknowledge delivery only
+after the durable enqueue or inbox transaction commits.
+
+The worker should call `calls.get`, retry transient failures with bounded
+backoff, route permanent configuration or reconciliation failures for operator
+review, and transactionally update application-owned business state and audit
+history. The integrating application must define timeout budgets, maximum
+attempts, transient-versus-permanent error classification, recovery scans,
+event-ID retention, audit retention, and cleanup after the webhook retry
+horizon. This guidance does not prescribe or add a queue, worker, or workflow
+framework to this demo.
 
 ## Data and privacy
 
