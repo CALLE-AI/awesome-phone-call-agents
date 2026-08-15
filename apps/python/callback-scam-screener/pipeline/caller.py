@@ -1,5 +1,6 @@
 import datetime
 import json
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass
@@ -87,7 +88,17 @@ class RealCallEClient(CallEClient):
 
     @staticmethod
     def _run_cli(args: list[str]) -> dict:
-        proc = subprocess.run(["calle", *args, "--json"], capture_output=True, text=True, check=True)
+        # subprocess.run(["calle", ...]) fails on Windows with FileNotFoundError:
+        # npm installs global CLIs as calle.cmd, not a raw .exe, and CreateProcess
+        # won't resolve that the way a shell does. shutil.which() finds it correctly
+        # on every platform (checks PATHEXT on Windows), so resolve the real path first.
+        calle_path = shutil.which("calle")
+        if calle_path is None:
+            raise RuntimeError(
+                "The 'calle' CLI was not found on PATH. Install it with `npm install -g @call-e/cli` "
+                "and run `calle auth login` before placing a live call."
+            )
+        proc = subprocess.run([calle_path, *args, "--json"], capture_output=True, text=True, check=True)
         return json.loads(proc.stdout)
 
     @staticmethod
