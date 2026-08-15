@@ -349,7 +349,7 @@ class QuoteRepository:
         soql = (
             "SELECT "
             + ", ".join(selected_fields)
-            + f" FROM Quote WHERE {where_clause} ORDER BY CreatedDate ASC"
+            + f" FROM Quote WHERE {where_clause} ORDER BY LastModifiedDate ASC, Id ASC"
         )
         records = self.client.query(soql)
         # Single-currency orgs do not expose CurrencyIsoCode on Quote. Resolve

@@ -121,7 +121,7 @@ due_soon_window = "0s"
 max_attempts = 1
 retry_delays_days = []
 retry_delays = []
-retry_outcomes = ["call_back_later", "no_answer", "busy"]
+retry_outcomes = ["call_back_later", "call_not_established", "no_answer", "busy"]
 technical_failure_retry_delay_minutes = 30
 technical_failure_retry_delay = "30m"
 completed_outcomes = ["interested"]
@@ -138,7 +138,7 @@ completed_outcomes = ["interested"]
 [follow_up.retry]
 max_attempts = 1
 retry_delays = []
-retry_outcomes = ["call_back_later", "no_answer", "busy"]
+retry_outcomes = ["call_back_later", "call_not_established", "no_answer", "busy"]
 technical_failure_retry_delay = "0s"
 completed_outcomes = ["interested"]
 """
@@ -148,6 +148,7 @@ completed_outcomes = ["interested"]
         self.assertEqual(policies.retry.max_attempts, 1)
         self.assertEqual(policies.retry.retry_delays, ())
         self.assertEqual(policies.retry.technical_failure_retry_delay, timedelta(0))
+        self.assertIn("call_not_established", policies.retry.retry_outcomes)
 
     def test_rejects_follow_up_outcome_outside_call_e_vocabulary(self) -> None:
         path = self._config(
@@ -161,7 +162,7 @@ completed_outcomes = ["busy"]
 """
         )
 
-        with self.assertRaisesRegex(ValueError, "CALL-E vocabulary"):
+        with self.assertRaisesRegex(ValueError, "QuoteWake outcome vocabulary"):
             load_follow_up_policies(path)
 
     def test_loads_logging_settings(self) -> None:
@@ -192,6 +193,12 @@ backup_count = 2
         self.assertGreater(settings.max_bytes, 0)
         self.assertGreaterEqual(settings.backup_count, 0)
         self.assertFalse(settings.raw_calle_api)
+
+    def test_shipped_logging_configuration_enables_debug_support_diagnostics(self) -> None:
+        settings = load_logging_settings(Path(__file__).parents[1] / "quotewake.toml")
+
+        self.assertEqual(settings.level, "DEBUG")
+        self.assertTrue(settings.raw_calle_api)
 
     def test_logging_raw_calle_api_is_explicit_boolean(self) -> None:
         settings = load_logging_settings(self._config("[logging]\nraw_calle_api = true\n"))

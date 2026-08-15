@@ -13,6 +13,7 @@ from quotewake_salesforce.domain.models import CallRequest
 from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceQueryError, _safe_route
 from quotewake_salesforce.structured_logging import (
     _ReadableFormatter,
+    _redact_log_value,
     configure_logging,
     log_event,
 )
@@ -86,6 +87,52 @@ def test_structured_events_redact_phone_and_secret_values(caplog):
     rendered = repr([getattr(record, "quotewake_fields", {}) for record in caplog.records])
     assert "+14155550101" not in rendered
     assert "super-secret" not in rendered
+
+
+@pytest.mark.parametrize(
+    "phone",
+    [
+        "+1-415-555-0101",
+        "415 555 0101",
+        "415.555.0101",
+        "+34\u00a0910\u2011000\u2011001",
+    ],
+)
+def test_free_text_phone_formats_with_common_separators_are_redacted(phone):
+    redacted = _redact_log_value(
+        "summary",
+        f"CALL-E response mentioned {phone} in free text.",
+        preserve_phone_fields=True,
+    )
+
+    assert phone not in redacted
+    assert "[phone-redacted]" in redacted
+
+
+def test_explicit_phone_fields_remain_available_for_raw_support_logs():
+    payload = {
+        "phone": "+34\u00a0910\u2011000\u2011001",
+        "phones": ["415.555.0101"],
+        "summary": "Reached +34\u00a0910\u2011000\u2011001 and 415.555.0101.",
+    }
+
+    redacted = _redact_log_value(
+        "raw_payload",
+        payload,
+        preserve_phone_fields=True,
+    )
+
+    assert redacted["phone"] == "+34\u00a0910\u2011000\u2011001"
+    assert redacted["phones"] == ["415.555.0101"]
+    assert redacted["summary"] == (
+        "Reached [phone-redacted] and [phone-redacted]."
+    )
+
+
+def test_phone_redaction_leaves_ordinary_dotted_and_hyphenated_text_unchanged():
+    text = "Release 1.2.3 costs 910.00 EUR; quote ABC-123 remains open."
+
+    assert _redact_log_value("summary", text, preserve_phone_fields=True) == text
 
 
 @pytest.mark.parametrize(
@@ -330,12 +377,12 @@ def test_call_e_wait_boundary_records_configured_timeout_and_timeout_error_type(
         calls = Mock()
         calls.create.return_value = {"id": "call-1", "status": "accepted"}
         calls.wait_for_result.side_effect = CalleTimeoutError("provider timeout")
-        with pytest.raises(CalleTimeoutError):
-            CallEClient(
-                execute=True,
-                timeout_seconds=60,
-                client=Mock(calls=calls),
-            ).execute(REQUEST, next_attempt=1)
+        result = CallEClient(
+            execute=True,
+            timeout_seconds=60,
+            client=Mock(calls=calls),
+        ).execute(REQUEST, next_attempt=1)
+        assert result.outcome == "unknown"
     finally:
         logger.removeHandler(caplog.handler)
 
@@ -367,7 +414,12 @@ def test_call_e_opt_in_raw_logs_are_redacted_and_keep_support_structure(caplog):
             "status": "failed",
             "failure_code": "call_not_ready",
             "task_completed": False,
-            "structured_result": {"summary": "Call +14155550101"},
+            "structured_result": {
+                "summary": (
+                    "Call +1-415-555-0101, 415 555 0101, 415.555.0101, "
+                    "or +34\u00a0910\u2011000\u2011001"
+                )
+            },
             "api_key": "api-secret-value",
         }
         result = CallEClient(
@@ -375,7 +427,7 @@ def test_call_e_opt_in_raw_logs_are_redacted_and_keep_support_structure(caplog):
             raw_calle_api=True,
             client=Mock(calls=calls),
         ).execute(REQUEST, next_attempt=1)
-        assert result.outcome == "technical_failure"
+        assert result.outcome == "call_not_established"
     finally:
         logger.removeHandler(caplog.handler)
 
@@ -405,7 +457,18 @@ def test_call_e_opt_in_raw_logs_are_redacted_and_keep_support_structure(caplog):
         and record.quotewake_fields["operation"] == "calls.wait_for_result"
     )
     assert "+14155550101" in repr(request_record.quotewake_fields)
-    assert "+14155550101" not in repr(response_record.quotewake_fields)
+    response_rendered = repr(response_record.quotewake_fields)
+    assert "+1-415-555-0101" not in response_rendered
+    assert "415 555 0101" not in response_rendered
+    assert "415.555.0101" not in response_rendered
+    response_summary = response_record.quotewake_fields["raw_payload"][
+        "structured_result"
+    ]["summary"]
+    assert response_summary == (
+        "Call [phone-redacted], [phone-redacted], [phone-redacted], "
+        "or [phone-redacted]"
+    )
+    assert "[phone-redacted]" in response_rendered
     assert "api-secret-value" not in rendered
     assert "Authorization" not in rendered
     assert "headers" not in rendered

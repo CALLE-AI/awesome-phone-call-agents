@@ -41,6 +41,7 @@ def test_result_schema_exposes_only_supported_business_outcomes():
         "no_answer",
         "busy",
     ]
+    assert "call_not_established" not in result_schema()["properties"]["outcome"]["enum"]
 
 
 def test_live_sdk_call_uses_locale_wait_and_idempotency():
@@ -92,33 +93,41 @@ def test_invalid_salesforce_locale_is_rejected_before_provider_call(locale):
 
 
 @pytest.mark.parametrize("field", ["outcome", "interest_level", "summary", "next_action"])
-def test_missing_required_structured_field_is_technical(field):
+def test_missing_required_structured_field_becomes_unknown_after_acceptance(field):
     result = valid_result()
     result[field] = ""
-    with pytest.raises(CallEError):
-        CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+    parsed = CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+    assert parsed.call_id == "call-1"
+    assert parsed.outcome == "unknown"
+    assert parsed.outcome_kind is CallOutcomeKind.BUSINESS
 
 
-def test_invalid_date_and_failed_provider_status_are_technical():
+def test_invalid_date_is_unknown_but_terminal_failure_is_not_established():
     invalid = valid_result()
     invalid["preferred_date"] = "not-a-date"
-    with pytest.raises(CallEError):
-        CallEClient(execute=True, client=sdk(invalid)).execute(REQUEST, next_attempt=1)
+    parsed = CallEClient(execute=True, client=sdk(invalid)).execute(REQUEST, next_attempt=1)
+    assert parsed.outcome == "unknown"
+    assert parsed.outcome_kind is CallOutcomeKind.BUSINESS
     failed = CallEClient(execute=True, client=sdk({}, status="canceled")).execute(REQUEST, next_attempt=1)
-    assert failed.outcome_kind is CallOutcomeKind.TECHNICAL_FAILURE
+    assert failed.outcome == "call_not_established"
+    assert failed.outcome_kind is CallOutcomeKind.BUSINESS
 
 
-def test_wait_transport_failure_propagates_after_accepted_call(caplog):
+def test_wait_transport_failure_becomes_unknown_after_accepted_call(caplog):
     fake = sdk(valid_result())
     fake.calls.wait_for_result.side_effect = TimeoutError("provider timeout")
     caplog.set_level(logging.INFO, logger="quotewake_salesforce")
     logger = logging.getLogger("quotewake_salesforce")
     logger.addHandler(caplog.handler)
-    with pytest.raises(TimeoutError):
-        try:
-            CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
-        finally:
-            logger.removeHandler(caplog.handler)
+    try:
+        result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    finally:
+        logger.removeHandler(caplog.handler)
+    assert result.call_id == "call-1"
+    assert result.outcome == "unknown"
+    assert result.outcome_kind is CallOutcomeKind.BUSINESS
+    assert "timeout" in result.summary
+    assert "provider timeout" not in result.summary
     records = [record for record in caplog.records if record.name == "quotewake_salesforce"]
     failure = next(record for record in records if record.quotewake_event == "call_e_wait_failed")
     assert failure.quotewake_fields["call_id"] == "call-1"
@@ -130,23 +139,26 @@ def test_wait_transport_failure_propagates_after_accepted_call(caplog):
     assert "provider timeout" not in repr(failure.quotewake_fields)
 
 
-def test_unknown_outcome_is_rejected_and_parse_log_is_bounded(caplog):
+def test_unknown_outcome_becomes_business_unknown_and_parse_log_is_bounded(caplog):
     invalid = valid_result()
     invalid["outcome"] = "unexpected-provider-value"
     fake = sdk(invalid)
     caplog.set_level(logging.INFO, logger="quotewake_salesforce")
     logger = logging.getLogger("quotewake_salesforce")
     logger.addHandler(caplog.handler)
-    with pytest.raises(CallEError):
-        try:
-            CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
-        finally:
-            logger.removeHandler(caplog.handler)
+    try:
+        result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    finally:
+        logger.removeHandler(caplog.handler)
+    assert result.call_id == "call-1"
+    assert result.outcome == "unknown"
+    assert result.outcome_kind is CallOutcomeKind.BUSINESS
     records = [record for record in caplog.records if record.name == "quotewake_salesforce"]
     failure = next(record for record in records if record.quotewake_event == "call_e_parse_failed")
     assert failure.quotewake_fields["call_id"] == "call-1"
     assert failure.quotewake_fields["phase"] == "parse"
     assert failure.quotewake_fields["reason"] == "invalid_outcome"
+    assert failure.quotewake_fields["result_unknown"] is True
     assert "unexpected-provider-value" not in repr(failure.quotewake_fields)
 
 
@@ -210,8 +222,8 @@ def test_optional_preferred_date_is_accepted_but_null_is_rejected():
     assert parsed.preferred_date is None
 
     result["preferred_date"] = None
-    with pytest.raises(CallEError, match="preferred_date"):
-        CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+    parsed = CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+    assert parsed.outcome == "unknown"
 
 
 @pytest.mark.parametrize("value", ["2026-08-20", "2020-01-01"])
@@ -226,8 +238,8 @@ def test_preferred_date_accepts_future_or_past_iso_dates_for_policy_to_evaluate(
 def test_preferred_date_requires_exact_ascii_calendar_date(value):
     result = valid_result()
     result["preferred_date"] = value
-    with pytest.raises(CallEError, match="preferred_date"):
-        CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+    parsed = CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+    assert parsed.outcome == "unknown"
 
 
 @pytest.mark.parametrize("outcome", [
@@ -314,6 +326,21 @@ def test_failed_declined_call_uses_aggregate_no_answer_result():
     assert parsed.outcome_kind is CallOutcomeKind.BUSINESS
 
 
+def test_failure_message_declined_text_is_not_a_business_signal():
+    fake = sdk({}, status="failed", task_completed=False)
+    fake.calls.wait_for_result.return_value = {
+        "status": "failed",
+        "failure_code": "call_failed",
+        "failure_message": "calling task status=DECLINED (Hangup by: user)",
+    }
+
+    parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+
+    assert parsed.call_id == "call-1"
+    assert parsed.outcome == "call_not_established"
+    assert parsed.outcome_kind is CallOutcomeKind.BUSINESS
+
+
 def test_structured_text_preserves_line_breaks():
     result = valid_result()
     result["summary"] = "First line.\r\nSecond line."
@@ -333,11 +360,12 @@ def test_missing_task_completed_never_accepts_structured_interest():
 
 
 @pytest.mark.parametrize("task_completed", ["true", 1, [], {}])
-def test_invalid_task_completed_type_is_schema_error(task_completed):
+def test_invalid_task_completed_type_becomes_unknown_after_acceptance(task_completed):
     fake = sdk(valid_result())
     fake.calls.wait_for_result.return_value["task_completed"] = task_completed
-    with pytest.raises(CallEError, match="task_completed"):
-        CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    assert result.call_id == "call-1"
+    assert result.outcome == "unknown"
 
 
 def test_missing_or_null_structured_result_becomes_unknown():
@@ -375,17 +403,32 @@ def test_explicit_nested_no_answer_overrides_false_task_evidence():
     assert parsed.outcome == "no_answer"
 
 
-def test_malformed_structured_result_is_rejected_even_when_task_not_completed():
+def test_malformed_structured_result_becomes_unknown_even_when_task_not_completed():
     fake = sdk("not an object", task_completed=False)
-    with pytest.raises(CallEError, match="structured"):
-        CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    assert result.call_id == "call-1"
+    assert result.outcome == "unknown"
 
 
-@pytest.mark.parametrize("status", ["failed", "canceled"])
-def test_failed_and_canceled_statuses_are_technical_without_consuming_attempt(status):
+@pytest.mark.parametrize(
+    "status", ["failed", "rejected", "declined", "canceled", "cancelled"]
+)
+def test_terminal_unconnected_statuses_become_call_not_established(status):
     result = CallEClient(execute=True, client=sdk({}, status=status)).execute(REQUEST, next_attempt=1)
-    assert result.outcome_kind is CallOutcomeKind.TECHNICAL_FAILURE
+    assert result.outcome == "call_not_established"
+    assert result.outcome_kind is CallOutcomeKind.BUSINESS
     assert result.provider_status == status
+    assert "human review" not in result.summary.lower()
+    assert "review" not in result.next_action.lower()
+
+
+def test_internal_call_not_established_is_not_accepted_from_agent_output():
+    result = valid_result()
+    result["outcome"] = "call_not_established"
+
+    parsed = CallEClient(execute=True, client=sdk(result)).execute(REQUEST, next_attempt=1)
+
+    assert parsed.outcome == "unknown"
 
 
 def test_result_uses_recipient_and_last_attempt_statuses():
@@ -557,13 +600,10 @@ def test_wait_http_4xx_is_deterministic_after_confirmed_creation():
     fake.calls.wait_for_result.side_effect = CalleAPIError(
         code="call_not_ready", message="not ready", status_code=422
     )
-    with pytest.raises(CalleAPIError) as raised:
-        CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
-    details = failure_details(raised.value)
-    assert details["creation_unknown"] is False
-    assert details["result_unknown"] is True
-    assert details["provider_call_id"] == "call-1"
-    assert details["phase"] == "wait"
+    result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    assert result.call_id == "call-1"
+    assert result.outcome == "unknown"
+    assert result.outcome_kind is CallOutcomeKind.BUSINESS
 
 
 def test_sdk_owned_client_is_closed_but_injected_client_is_not():

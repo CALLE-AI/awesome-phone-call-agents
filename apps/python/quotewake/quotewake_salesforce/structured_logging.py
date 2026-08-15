@@ -41,7 +41,12 @@ _LABELS = {
     "error_type": "error type",
 }
 _HIDDEN_RENDER_FIELDS = frozenset({"run_id"})
-_PHONE_LIKE_PATTERN = re.compile(r"(?<!\w)\+?[1-9]\d{7,14}(?!\w)")
+_PHONE_SEPARATOR_PATTERN = r"(?:[^\S\r\n]|[.\-\u2010-\u2015\u2212])"
+_PHONE_LIKE_PATTERN = re.compile(
+    rf"(?<!\w)(?<!\d[.\-\u2010-\u2015\u2212])(?<!\d[^\S\r\n])"
+    rf"\+?[1-9](?:{_PHONE_SEPARATOR_PATTERN}?\d){{7,14}}"
+    rf"(?!{_PHONE_SEPARATOR_PATTERN}?\d|\w)"
+)
 _SECRET_KEY_PATTERN = re.compile(
     r"(?:authorization|headers?|cookie|secret|token|password|api[\s_-]?key|apikey|"
     r"access[_-]?token|refresh[_-]?token|client[_-]?secret)",

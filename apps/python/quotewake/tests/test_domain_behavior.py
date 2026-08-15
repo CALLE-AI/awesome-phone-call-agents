@@ -1,3 +1,4 @@
+from dataclasses import FrozenInstanceError
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -36,7 +37,7 @@ def quote(**changes):
 
 
 def policy(max_attempts=3):
-    retry = RetryPolicy(max_attempts, tuple(timedelta(days=n) for n in range(1, max_attempts)), frozenset({"no_answer", "call_back_later", "busy"}), timedelta(minutes=15), frozenset({"interested"}))
+    retry = RetryPolicy(max_attempts, tuple(timedelta(days=n) for n in range(1, max_attempts)), frozenset({"no_answer", "call_back_later", "call_not_established", "busy"}), timedelta(minutes=15), frozenset({"interested"}))
     return SelectionPolicy(InitialFollowUpTiming(timedelta(0), timedelta(0), timedelta(0)), retry)
 
 
@@ -81,14 +82,50 @@ def test_retry_policy_handles_preferred_date_and_max_attempts():
     assert update.next_follow_up_at == datetime(2026, 8, 20, tzinfo=timezone.utc)
     terminal = CallResult(first.quote_id, "c", "completed", "no_answer", "unknown", None, "summary", "stop", None, CallOutcomeKind.BUSINESS, datetime(2026, 8, 10, tzinfo=timezone.utc))
     assert calculate_next_follow_up(quote(attempt_count=2), terminal, FollowUpPolicies(policy().retry_policy)).follow_up_status == "Stopped"
+    not_established = CallResult(first.quote_id, "c", "failed", "call_not_established", "unknown", None, "summary", "retry", None, CallOutcomeKind.BUSINESS, datetime(2026, 8, 10, tzinfo=timezone.utc))
+    not_established_update = calculate_next_follow_up(
+        quote(attempt_count=2),
+        not_established,
+        FollowUpPolicies(policy().retry_policy),
+    )
+    assert not_established_update.attempt_count == 3
+    assert not_established_update.follow_up_status == "Stopped"
+    assert not_established_update.next_follow_up_at is None
+
+
+def test_every_retryable_outcome_stops_after_consuming_the_last_attempt():
+    now = datetime(2026, 8, 10, tzinfo=timezone.utc)
+    policies = FollowUpPolicies(policy().retry_policy)
+    for outcome in ("call_not_established", "no_answer", "busy", "call_back_later"):
+        result = CallResult(
+            "0Q0000000000001", "call-final", "completed", outcome, "unknown",
+            None, "summary", "original action", None,
+            CallOutcomeKind.BUSINESS, now,
+        )
+        update = calculate_next_follow_up(
+            quote(attempt_count=2),
+            result,
+            policies,
+        )
+        assert update.attempt_count == 3
+        assert update.follow_up_status == "Stopped"
+        assert update.next_follow_up_at is None
+        assert result.next_action == "original action"
+        try:
+            result.next_action = "changed"
+        except FrozenInstanceError:
+            pass
+        else:  # pragma: no cover - documents the immutable domain contract
+            raise AssertionError("CallResult must remain immutable")
 
 
 def test_technical_and_zero_delay_retries_are_always_in_the_future():
     now = datetime(2026, 8, 10, tzinfo=timezone.utc)
     zero = FollowUpPolicies(
-        RetryPolicy(2, (timedelta(0),), frozenset({"no_answer", "call_back_later", "busy"}), timedelta(0), frozenset({"interested"}))
+        RetryPolicy(2, (timedelta(0),), frozenset({"no_answer", "call_back_later", "call_not_established", "busy"}), timedelta(0), frozenset({"interested"}))
     )
-    technical = CallResult("0Q0000000000001", "c", "failed", "technical_failure", "unknown", None, "summary", "retry", None, CallOutcomeKind.TECHNICAL_FAILURE, now)
+    # Policy-only sentinel: not a provider call ID and never persisted.
+    technical = CallResult("0Q0000000000001", "pre-acceptance-error-fixture", "technical_failure", "create_failed", "unknown", None, "summary", "retry", None, CallOutcomeKind.TECHNICAL_FAILURE, now)
     assert calculate_next_follow_up(quote(), technical, zero).next_follow_up_at > now
     no_answer = CallResult("0Q0000000000001", "c", "completed", "no_answer", "unknown", None, "summary", "retry", None, CallOutcomeKind.BUSINESS, now)
     assert calculate_next_follow_up(quote(), no_answer, zero).next_follow_up_at > now
@@ -110,7 +147,7 @@ def test_policy_maps_every_business_intention_without_provider_aliases():
         assert update.attempt_count == 1
         assert update.next_follow_up_at is None
 
-    for outcome in ("no_answer", "busy"):
+    for outcome in ("no_answer", "busy", "call_not_established"):
         result = CallResult("0Q0000000000001", "c", "completed", outcome, "unknown", None, "summary", "retry", None, CallOutcomeKind.BUSINESS, now)
         update = calculate_next_follow_up(quote(), result, policies)
         assert update.follow_up_status == "Retry"

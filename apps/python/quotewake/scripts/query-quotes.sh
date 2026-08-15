@@ -52,7 +52,7 @@ if [[ -n "$TARGET_ORG" ]]; then
     ORG_ARGS=(--target-org "$TARGET_ORG")
 fi
 
-QUERY="SELECT Id, Name, Status, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, ExpirationDate, LastModifiedDate, OpportunityId, Opportunity.Name, Opportunity.IsClosed FROM Quote ORDER BY LastModifiedDate DESC"
+QUERY="SELECT Id, Name, Status, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c, ExpirationDate, LastModifiedDate, OpportunityId, Opportunity.Name, Opportunity.IsClosed FROM Quote ORDER BY Next_Follow_Up_At__c ASC NULLS FIRST, LastModifiedDate ASC"
 
 if [[ -t 1 ]] && command -v less >/dev/null 2>&1; then
     # -S chops long rows instead of wrapping them, so the terminal can scroll

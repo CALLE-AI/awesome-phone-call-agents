@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, tzinfo
 
 from .models import (
-    CALL_OUTCOME_VOCABULARY,
+    CALL_RESULT_OUTCOME_VOCABULARY,
     CallOutcomeKind,
     CallResult,
     FollowUpUpdate,
@@ -17,7 +17,9 @@ from .models import (
 DEFAULT_ALLOWED_QUOTE_STATUSES = frozenset({"Presented"})
 ACTIONABLE_FOLLOW_UP_STATUSES = frozenset({"Retry"})
 _MINIMUM_RETRY_DELAY = timedelta(seconds=1)
-_RETRY_OUTCOMES = frozenset({"call_back_later", "no_answer", "busy"})
+_RETRY_OUTCOMES = frozenset(
+    {"call_back_later", "call_not_established", "no_answer", "busy"}
+)
 _COMPLETED_OUTCOMES = frozenset({"interested"})
 
 
@@ -34,7 +36,7 @@ class InitialFollowUpTiming:
 
 @dataclass(frozen=True)
 class RetryPolicy:
-    """Retry policy; only completed business attempts increment the counter."""
+    """Retry policy; accepted CALL-E attempts increment the counter."""
 
     max_attempts: int
     retry_delays: tuple[timedelta, ...]
@@ -49,7 +51,9 @@ class RetryPolicy:
             raise ValueError("retry delays cannot be negative")
         if self.technical_failure_retry_delay < timedelta(0):
             raise ValueError("technical failure retry delay cannot be negative")
-        unknown = (self.retry_outcomes | self.completed_outcomes) - CALL_OUTCOME_VOCABULARY
+        unknown = (
+            self.retry_outcomes | self.completed_outcomes
+        ) - CALL_RESULT_OUTCOME_VOCABULARY
         if unknown:
             raise ValueError(
                 "retry policy contains unsupported outcomes: "
@@ -73,10 +77,10 @@ class RetryPolicy:
     def retries_outcome(self, outcome: str) -> bool:
         """Return whether an outcome is eligible for another business call."""
 
-        return normalize_outcome(outcome) in _RETRY_OUTCOMES
+        return normalize_outcome(outcome) in self.retry_outcomes
 
     def is_completed_outcome(self, outcome: str) -> bool:
-        return normalize_outcome(outcome) in _COMPLETED_OUTCOMES
+        return normalize_outcome(outcome) in self.completed_outcomes
 
 
 @dataclass(frozen=True)
@@ -118,12 +122,15 @@ def calculate_next_follow_up(
         raise ValueError("call result does not match the selected Quote")
     if (
         result.outcome_kind is CallOutcomeKind.BUSINESS
-        and result.outcome not in CALL_OUTCOME_VOCABULARY
+        and result.outcome not in CALL_RESULT_OUTCOME_VOCABULARY
     ):
         raise ValueError("call result contains an unsupported business outcome")
 
     retry = policies.retry
     if result.outcome_kind is CallOutcomeKind.TECHNICAL_FAILURE:
+        # This branch is reserved for failures before CALL-E accepts a call.
+        # Accepted calls are represented as business outcomes, including
+        # ``unknown``, so they always consume an attempt below.
         attempts = quote.attempt_count
         # A technical failure is not an invitation to spin in an immediate
         # retry loop.  Zero is accepted in configuration for dry-run fixtures,

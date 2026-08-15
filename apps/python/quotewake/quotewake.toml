@@ -23,7 +23,7 @@ due_soon_window = "0s"
 [follow_up.retry]
 max_attempts = 3
 retry_delays = ["2d", "4d"]
-retry_outcomes = ["call_back_later", "no_answer", "busy"]
+retry_outcomes = ["call_back_later", "call_not_established", "no_answer", "busy"]
 technical_failure_retry_delay = "30m"
 completed_outcomes = ["interested"]
 
@@ -31,8 +31,9 @@ completed_outcomes = ["interested"]
 # Relative directories are resolved from the QuoteWake application directory.
 directory = "logs"
 format = "text"
-level = "INFO"
+level = "DEBUG"
 max_bytes = 5242880
 backup_count = 5
-# Temporary support diagnostics; only emits redacted CALL-E payloads at DEBUG.
-raw_calle_api = false
+# Temporary support diagnostics for the demo; payloads are sanitized but can
+# still contain sensitive recipient and business data.
+raw_calle_api = true

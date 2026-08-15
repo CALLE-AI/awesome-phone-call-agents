@@ -64,7 +64,7 @@ from quotewake_salesforce.domain.policy import (
     RetryPolicy,
     normalize_outcome,
 )
-from quotewake_salesforce.domain.models import CALL_OUTCOME_VOCABULARY
+from quotewake_salesforce.domain.models import CALL_RESULT_OUTCOME_VOCABULARY
 
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "quotewake.toml"
@@ -462,10 +462,12 @@ def load_follow_up_policies(path: Path) -> FollowUpPolicies:
             "TOML setting follow_up.retry.completed_outcomes cannot contain normalized duplicates."
         )
     completed_outcomes = frozenset(completed_normalized)
-    unknown_outcomes = (retry_outcomes | completed_outcomes) - CALL_OUTCOME_VOCABULARY
+    unknown_outcomes = (
+        retry_outcomes | completed_outcomes
+    ) - CALL_RESULT_OUTCOME_VOCABULARY
     if unknown_outcomes:
         raise ValueError(
-            "TOML setting follow_up.retry outcomes must use the CALL-E vocabulary: "
+            "TOML setting follow_up.retry outcomes must use the QuoteWake outcome vocabulary: "
             + ", ".join(sorted(unknown_outcomes))
             + "."
         )

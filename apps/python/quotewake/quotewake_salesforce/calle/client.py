@@ -1,9 +1,10 @@
 """Small, defensive CALL-E SDK boundary used by QuoteWake.
 
-The provider owns call state.  QuoteWake only accepts a terminal, schema-valid
-business result, or deliberately records a provider technical failure.  In
-particular, an indeterminate create is never treated as a failed call: the
-same idempotency key must be used to reconcile it before another attempt.
+The provider owns call state.  QuoteWake records only a terminal, schema-valid
+business result, or a bounded ``unknown`` result after CALL-E has accepted a
+call.  An indeterminate create without a call ID is never treated as an
+accepted attempt: the same idempotency key must be used to reconcile it before
+another attempt.
 """
 
 from __future__ import annotations
@@ -72,9 +73,10 @@ class CallEError(RuntimeError):
     """A safe, actionable error at the CALL-E boundary.
 
     Provider exceptions are left intact for compatibility with the SDK, but
-    receive these attributes before they are re-raised.  This lets the CLI
-    report an actionable diagnosis without serialising provider text (which can
-    contain credentials, phone numbers, or request bodies).
+    receive these attributes before they are re-raised or converted into an
+    accepted-call ``unknown`` result.  This lets the CLI report an actionable
+    diagnosis without serialising provider text (which can contain credentials,
+    phone numbers, or request bodies).
     """
 
     def __init__(
@@ -285,7 +287,9 @@ def idempotency_key(
 
 
 SUCCESS_STATUSES = frozenset({"completed", "succeeded", "success"})
-TECHNICAL_STATUSES = frozenset({"failed", "canceled", "cancelled"})
+TECHNICAL_STATUSES = frozenset(
+    {"failed", "rejected", "declined", "canceled", "cancelled"}
+)
 TERMINAL_STATUSES = SUCCESS_STATUSES | TECHNICAL_STATUSES
 
 
@@ -647,10 +651,10 @@ def _signal_from_locations(
 ) -> str | None:
     """Derive only explicit no-answer/busy provider signals.
 
-    The SDK's last attempt exposes ``failure_code`` and ``failure_message``;
-    some API versions expose ``outcome``/``disposition`` instead.  We inspect
-    those machine-result fields, never arbitrary summaries, so prose cannot
-    accidentally become a commercial disposition.
+    The SDK's last attempt exposes ``failure_code`` and some API versions
+    expose ``outcome``/``disposition`` instead.  We inspect only those bounded
+    machine-result fields; ``failure_message`` and other prose are deliberately
+    ignored so text cannot become a commercial disposition.
     """
 
     fields = ("failure_code", "outcome", "disposition", "result_code", "reason_code", "status")
@@ -677,11 +681,13 @@ def _derived_result(
     next_action = {
         "no_answer": "Retry the quote follow-up after the configured delay.",
         "busy": "Retry the quote follow-up after the configured delay.",
+        "call_not_established": "Retry the quote follow-up after the configured delay.",
         "unknown": "Have a salesperson review the call evidence before taking action.",
     }[outcome]
     summary = {
         "no_answer": "CALL-E reported that the recipient did not answer.",
         "busy": "CALL-E reported that the recipient was busy.",
+        "call_not_established": "CALL-E reported that the call was not established.",
         "unknown": "CALL-E did not provide sufficient evidence for a commercial disposition.",
     }[outcome]
     return CallResult(
@@ -696,6 +702,34 @@ def _derived_result(
         None,
         CallOutcomeKind.BUSINESS,
         datetime.now(timezone.utc),
+    )
+
+
+def _bounded_failure_diagnostic(details: dict[str, object | None]) -> str:
+    """Return a short diagnostic made only from bounded machine fields."""
+
+    reason = normalize_reason(details.get("reason", "provider_error"))
+    code = normalize_error_code(details.get("code", "provider_error"))
+    if reason == code:
+        return reason
+    return f"{reason}/{code}"[:128]
+
+
+def _unknown_result(
+    quote_id: str,
+    call_id: str,
+    provider_status: str,
+    *,
+    diagnostic: str,
+) -> CallResult:
+    """Represent an accepted call with insufficient evidence as a business result."""
+
+    return _derived_result(
+        quote_id,
+        call_id,
+        "unknown",
+        provider_status or "unknown",
+        reason=diagnostic,
     )
 
 
@@ -1016,10 +1050,28 @@ class CallEClient:
                 idempotency_key=_safe_log_identifier(key),
                 error_type=type(exc).__name__,
             )
-            raise
+            return _unknown_result(
+                request.quote_id,
+                call_id,
+                str(details["code"]),
+                diagnostic=_bounded_failure_diagnostic(details),
+            )
         try:
             return self._parse_result(request.quote_id, call_id, completed)
         except Exception as exc:
+            details = failure_details(exc)
+            _set_failure_attributes(
+                exc,
+                classification=details["classification"],
+                http_status=details["http_status"],
+                code=details["code"],
+                reason=details["reason"],
+                creation_unknown=False,
+                result_unknown=True,
+                provider_call_id=call_id,
+                idempotency_key=key,
+                phase="parse",
+            )
             details = failure_details(exc)
             log_event(
                 "call_e_parse_failed",
@@ -1030,25 +1082,23 @@ class CallEClient:
                 http_status=details["http_status"],
                 code=details["code"],
                 reason=details["reason"],
+                creation_unknown=details["creation_unknown"],
+                result_unknown=details["result_unknown"],
+                provider_call_id=details["provider_call_id"],
+                idempotency_key=_safe_log_identifier(key),
                 error_type=type(exc).__name__,
             )
-            raise
-
-    @staticmethod
-    def _technical_result(quote_id: str, call_id: str, status: str) -> CallResult:
-        return CallResult(
-            quote_id,
-            call_id,
-            status,
-            "technical_failure",
-            "unknown",
-            None,
-            "CALL-E did not produce a business outcome.",
-            "Retry after the technical failure.",
-            None,
-            CallOutcomeKind.TECHNICAL_FAILURE,
-            datetime.now(timezone.utc),
-        )
+            provider_status = (
+                _safe_provider_status(completed.get("status"))
+                if isinstance(completed, dict)
+                else None
+            )
+            return _unknown_result(
+                request.quote_id,
+                call_id,
+                provider_status or str(details["code"]),
+                diagnostic=_bounded_failure_diagnostic(details),
+            )
 
     def _parse_result(self, quote_id: str, call_id: str, payload: Any) -> CallResult:
         if not isinstance(payload, dict):
@@ -1072,14 +1122,11 @@ class CallEClient:
                 reason="invalid_task_completed",
             )
 
-        # A terminal provider failure is an operational result, not a malformed
-        # business result.  It is safe to persist as Retry without consuming a
-        # business attempt.  An explicit no-answer/busy attempt code is
-        # sufficient evidence even when the conversation task was not completed.
-        # CALL-E can also return a valid aggregate structured disposition while
-        # the transport-level task status is ``failed`` (for example a declined
-        # call with no connected conversation).  Prefer that explicit business
-        # evidence over the generic terminal status.
+        # Once CALL-E has returned a call ID, the provider operation is an
+        # accepted attempt.  Failed/rejected/declined/canceled terminal states
+        # therefore become the internal ``call_not_established`` outcome unless
+        # CALL-E supplies an explicit, machine-readable no-answer/busy signal.
+        # Never inspect free-text failure messages for a disposition.
         if top_status in TECHNICAL_STATUSES or recipient_status in TECHNICAL_STATUSES or attempt_status in TECHNICAL_STATUSES:
             if (
                 structured is not None
@@ -1092,7 +1139,7 @@ class CallEClient:
                     effective_status or "failed",
                     reason="explicit aggregate structured outcome",
                 )
-            if signal is not None and structured is None:
+            if signal is not None:
                 return _derived_result(
                     quote_id,
                     call_id,
@@ -1100,21 +1147,27 @@ class CallEClient:
                     effective_status or "completed",
                     reason="explicit provider attempt code",
                 )
-            return self._technical_result(quote_id, call_id, effective_status or "failed")
-        if effective_status is None or effective_status not in SUCCESS_STATUSES:
-            raise CallEError(
-                "CALL-E result has no recognized terminal provider status",
-                classification="provider",
-                code="invalid_provider_status",
-                reason="invalid_provider_status",
+            return _derived_result(
+                quote_id,
+                call_id,
+                "call_not_established",
+                effective_status or "failed",
+                reason="terminal provider status without a reliable business signal",
             )
         if signal is not None and structured is None:
             return _derived_result(
                 quote_id,
                 call_id,
                 signal,
-                effective_status,
+                effective_status or signal,
                 reason="explicit provider attempt code",
+            )
+        if effective_status is None or effective_status not in SUCCESS_STATUSES:
+            raise CallEError(
+                "CALL-E result has no recognized terminal provider status",
+                classification="provider",
+                code="invalid_provider_status",
+                reason="invalid_provider_status",
             )
         if recipient_status is not None and recipient_status not in SUCCESS_STATUSES:
             raise CallEError(

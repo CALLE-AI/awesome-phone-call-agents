@@ -10,7 +10,7 @@ import re
 
 
 # This is the business vocabulary exchanged with CALL-E.  Keep the ordered
-# tuple for provider schemas and the set for cheap validation at boundaries.
+# tuple for provider schemas and the set for cheap validation at that boundary.
 CALL_OUTCOME_VALUES = (
     "interested",
     "call_back_later",
@@ -21,6 +21,11 @@ CALL_OUTCOME_VALUES = (
     "busy",
 )
 CALL_OUTCOME_VOCABULARY = frozenset(CALL_OUTCOME_VALUES)
+# Provider terminal states can produce this internal operational outcome.  It
+# is valid after the CALL-E boundary but must never be requested from the agent.
+CALL_RESULT_OUTCOME_VOCABULARY = CALL_OUTCOME_VOCABULARY | {
+    "call_not_established"
+}
 
 # Keep the provider-facing interest vocabulary equally narrow.  These values
 # are intentionally plain strings at the domain boundary so Salesforce writes

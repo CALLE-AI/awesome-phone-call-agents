@@ -211,3 +211,44 @@ def test_unknown_result_creates_human_review_task_in_same_composite():
     import json
     payload = json.loads(seen[-1].content)
     assert payload["compositeRequest"][1]["body"]["Subject"] == "QuoteWake call outcome: unknown (human review)"
+
+
+def test_call_not_established_task_does_not_request_human_review():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path.endswith("/token"):
+            return httpx.Response(200, json={"access_token": "token", "instance_url": "https://instance.invalid"})
+        return httpx.Response(200, json={"compositeResponse": [
+            {"httpStatusCode": 204, "referenceId": "quoteUpdate", "body": None},
+            {"httpStatusCode": 201, "referenceId": "taskCreate", "body": {"id": "00T000000000001"}},
+        ]})
+
+    client = SalesforceClient(
+        "https://login.invalid", "id", "secret", "61.0",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    quote = QuoteCandidate(
+        "0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None,
+        datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0,
+    )
+    result = CallResult(
+        quote.quote_id, "call-1", "declined", "call_not_established", "unknown", None,
+        "CALL-E reported that the call was not established.",
+        "Retry the quote follow-up after the configured delay.",
+        None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc),
+    )
+    client.composite_write(
+        quote,
+        ContactTarget("003000000000001", "Contact", "+14155550101", False),
+        FollowUpUpdate(1, "Retry", datetime.now(timezone.utc)),
+        result,
+        task_description="The call was not established; retry later.",
+    )
+
+    import json
+    payload = json.loads(seen[-1].content)
+    subject = payload["compositeRequest"][1]["body"]["Subject"]
+    assert subject == "QuoteWake call outcome: call_not_established"
+    assert "human review" not in subject.lower()

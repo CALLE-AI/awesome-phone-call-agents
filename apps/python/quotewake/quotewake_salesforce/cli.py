@@ -21,8 +21,8 @@ from quotewake_salesforce.config import (
     load_logging_settings,
 )
 from quotewake_salesforce.domain.call_request import build_call_request
-from quotewake_salesforce.domain.models import SelectionDecision, SelectionResult
-from quotewake_salesforce.domain.policy import SelectionPolicy, calculate_next_follow_up, configured_quote_statuses
+from quotewake_salesforce.domain.models import CallResult, FollowUpUpdate, SelectionDecision, SelectionResult
+from quotewake_salesforce.domain.policy import RetryPolicy, SelectionPolicy, calculate_next_follow_up, configured_quote_statuses
 from quotewake_salesforce.domain.selection import evaluate_quote, validate_callable_contact
 from quotewake_salesforce.presentation import format_money
 from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceError
@@ -34,6 +34,18 @@ def _print_selection(result: SelectionResult, *, regional_settings=None) -> None
     quote = result.quote
     amount = format_money(quote.money or quote.amount, quote.currency_code, regional_settings=regional_settings) if quote.amount is not None else "amount unavailable"
     print(f"Quote {quote.quote_id}: {quote.quote_name} | {amount} | {result.decision.value} ({result.reason.value})")
+
+
+def _follow_up_sort_key(selected: SelectionResult) -> tuple[object, object, str]:
+    """Order READY Quotes by the oldest actionable follow-up timestamp."""
+
+    quote = selected.quote
+    follow_up_at = (
+        quote.next_follow_up_at
+        if quote.follow_up_status == "Retry" and quote.next_follow_up_at is not None
+        else quote.last_modified_at
+    )
+    return (follow_up_at, quote.last_modified_at, quote.quote_id)
 
 
 def _print_call_summary(calls: list[tuple[object, object]], *, regional_settings=None) -> None:
@@ -58,14 +70,35 @@ def _print_call_summary(calls: list[tuple[object, object]], *, regional_settings
         )
 
 
-def _task_description(call_result) -> str:
+_MAX_ATTEMPTS_NEXT_ACTION = (
+    "QuoteWake will make no further attempts. A salesperson should call the "
+    "customer directly."
+)
+
+
+def _resolve_task_next_action(
+    call_result: CallResult,
+    update: FollowUpUpdate,
+    retry_policy: RetryPolicy,
+) -> str:
+    """Resolve Task guidance without changing domain or provider results."""
+
+    if (
+        update.follow_up_status == "Stopped"
+        and retry_policy.retries_outcome(call_result.outcome)
+    ):
+        return _MAX_ATTEMPTS_NEXT_ACTION
+    return call_result.next_action
+
+
+def _task_description(call_result: CallResult, *, next_action: str | None = None) -> str:
     lines = [
         f"QuoteWake call outcome: {call_result.outcome}",
         f"Interest level: {call_result.interest_level}",
         "Summary:",
         call_result.summary,
         "Next action:",
-        call_result.next_action,
+        call_result.next_action if next_action is None else next_action,
     ]
     if call_result.preferred_date:
         lines.extend(("Preferred date:", call_result.preferred_date.isoformat()))
@@ -226,6 +259,12 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                 selections.append(selected)
                 _print_selection(selected, regional_settings=regional)
             ready = [item for item in selections if item.decision is SelectionDecision.READY]
+            # The Salesforce query provides a stable candidate stream, but the
+            # throughput limit must favour the oldest actionable follow-up,
+            # not the oldest Salesforce record. Retry due dates and initial
+            # follow-up timestamps share one timeline; ties use LastModifiedDate
+            # and Quote ID.
+            ready.sort(key=_follow_up_sort_key)
             selected_for_processing = ready[: args.max_calls]
             deferred = len(ready) - len(selected_for_processing)
             evaluated = len(selections)
@@ -284,7 +323,15 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                             continue
                         result = calle.execute(request, next_attempt=next_attempt, retry_marker=retry_marker)
                         update = calculate_next_follow_up(quote, result, policies)
-                        task_description = _task_description(result)
+                        task_next_action = _resolve_task_next_action(
+                            result,
+                            update,
+                            policies.retry,
+                        )
+                        task_description = _task_description(
+                            result,
+                            next_action=task_next_action,
+                        )
                     except Exception as exc:
                         failures += 1
                         details = failure_details(exc)

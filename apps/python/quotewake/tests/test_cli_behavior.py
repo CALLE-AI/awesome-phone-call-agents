@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import logging
@@ -21,7 +22,7 @@ def setup():
     env = EnvironmentSettings("https://salesforce.invalid", "id", "secret", "61.0", "calle-key")
     regional = RegionalSettings.from_values("UTC", "en_US")
     timing = InitialFollowUpTiming(__import__("datetime").timedelta(0), __import__("datetime").timedelta(0), __import__("datetime").timedelta(0))
-    retry = RetryPolicy(3, (__import__("datetime").timedelta(days=1), __import__("datetime").timedelta(days=2)), frozenset({"no_answer", "call_back_later", "busy"}), __import__("datetime").timedelta(minutes=5), frozenset({"interested"}))
+    retry = RetryPolicy(3, (__import__("datetime").timedelta(days=1), __import__("datetime").timedelta(days=2)), frozenset({"no_answer", "call_back_later", "call_not_established", "busy"}), __import__("datetime").timedelta(minutes=5), frozenset({"interested"}))
     policies = FollowUpPolicies(retry)
     fake_sf = Mock()
     repository = Mock()
@@ -150,6 +151,165 @@ def test_max_calls_limits_execute_without_processing_deferred_quotes(capsys):
         in output
     )
     assert "0Q0000000000002: Demo | €10.00 | CALLED" not in output
+
+
+def test_max_calls_prefers_oldest_actionable_follow_up():
+    env, regional, timing, policies, fake_sf, repository = setup()
+    old_initial = replace(
+        quote("0Q0000000000001"),
+        last_modified_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+    )
+    newer_initial = replace(
+        quote("0Q0000000000002"),
+        last_modified_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+    )
+    old_retry = replace(
+        quote("0Q0000000000003"),
+        follow_up_status="Retry",
+        next_follow_up_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        last_modified_at=datetime(2026, 8, 2, tzinfo=timezone.utc),
+    )
+    repository.load.return_value = (
+        [newer_initial, old_initial, old_retry],
+        {"006000000000001": [ContactTarget("003000000000001", "Contact", "+14155550101", False, "en-US")]},
+    )
+    fake_calle = Mock()
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--max-calls", "1"]) == 0
+    fake_calle.preview.assert_called_once()
+    assert fake_calle.preview.call_args.args[0].quote_id == old_retry.quote_id
+
+
+def test_accepted_unknown_result_is_persisted_and_consumes_attempt(capsys):
+    env, regional, timing, policies, fake_sf, repository = setup()
+    result = CallResult(
+        "0Q0000000000001",
+        "call-unknown",
+        "failed",
+        "unknown",
+        "unknown",
+        None,
+        "CALL-E result unavailable (timeout/provider_error).",
+        "Have a salesperson review the call evidence before taking action.",
+        None,
+        CallOutcomeKind.BUSINESS,
+        datetime.now(timezone.utc),
+    )
+    fake_calle = Mock()
+    fake_calle.execute.return_value = result
+
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--execute"]) == 0
+
+    update = fake_sf.composite_write.call_args.args[2]
+    assert update.attempt_count == 1
+    assert update.follow_up_status == "Stopped"
+    assert fake_sf.composite_write.call_args.args[3].call_id == "call-unknown"
+    assert "CALLED (unknown)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ["call_not_established", "no_answer", "busy", "call_back_later"],
+)
+def test_last_retryable_attempt_persists_salesperson_action_without_mutating_result(
+    outcome,
+):
+    env, regional, timing, policies, fake_sf, repository = setup()
+    repository.load.return_value = (
+        [replace(quote("0Q0000000000001"), attempt_count=2)],
+        {"006000000000001": [ContactTarget("003000000000001", "Contact", "+14155550101", False, "en-US")]},
+    )
+    original_action = f"Provider action for {outcome}."
+    result = CallResult(
+        "0Q0000000000001",
+        "call-final",
+        "completed",
+        outcome,
+        "unknown",
+        None,
+        "summary",
+        original_action,
+        None,
+        CallOutcomeKind.BUSINESS,
+        datetime.now(timezone.utc),
+    )
+    fake_calle = Mock()
+    fake_calle.execute.return_value = result
+
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--execute"]) == 0
+
+    persisted = fake_sf.composite_write.call_args
+    assert persisted.args[2].follow_up_status == "Stopped"
+    assert persisted.args[3] is result
+    assert result.next_action == original_action
+    assert (
+        "Next action:\nQuoteWake will make no further attempts. "
+        "A salesperson should call the customer directly."
+        in persisted.kwargs["task_description"]
+    )
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ["call_not_established", "no_answer", "busy", "call_back_later"],
+)
+def test_retryable_outcome_before_limit_keeps_original_task_action(outcome):
+    env, regional, timing, policies, fake_sf, repository = setup()
+    original_action = f"Retry action for {outcome}."
+    result = CallResult(
+        "0Q0000000000001", "call-retry", "completed", outcome, "unknown",
+        None, "summary", original_action, None, CallOutcomeKind.BUSINESS,
+        datetime.now(timezone.utc),
+    )
+    fake_calle = Mock()
+    fake_calle.execute.return_value = result
+
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--execute"]) == 0
+
+    persisted = fake_sf.composite_write.call_args
+    assert persisted.args[2].follow_up_status == "Retry"
+    assert f"Next action:\n{original_action}" in persisted.kwargs["task_description"]
+    assert persisted.args[3] is result
+
+
+def test_non_retryable_outcome_keeps_original_task_action_when_stopped():
+    env, regional, timing, policies, fake_sf, repository = setup()
+    result = CallResult(
+        "0Q0000000000001", "call-stop", "completed", "not_interested", "low",
+        None, "summary", "Do not contact again.", None,
+        CallOutcomeKind.BUSINESS, datetime.now(timezone.utc),
+    )
+    fake_calle = Mock()
+    fake_calle.execute.return_value = result
+
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--execute"]) == 0
+
+    persisted = fake_sf.composite_write.call_args
+    assert persisted.args[2].follow_up_status == "Stopped"
+    assert "Next action:\nDo not contact again." in persisted.kwargs["task_description"]
+    assert persisted.args[3] is result
+
+
+def test_create_failure_without_call_id_is_not_persisted():
+    env, regional, timing, policies, fake_sf, repository = setup()
+    fake_calle = Mock()
+    fake_calle.execute.side_effect = CallEError(
+        "provider details are intentionally not exposed",
+        code="missing_call_id",
+        reason="create_outcome_unknown",
+        creation_unknown=True,
+        idempotency_key="quotewake-0Q0000000000001-1",
+        phase="create",
+    )
+
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--execute"]) == 1
+
+    fake_sf.composite_write.assert_not_called()
 
 
 def test_show_prompt_respects_limit_without_constructing_calle(capsys):
