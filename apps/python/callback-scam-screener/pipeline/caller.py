@@ -98,7 +98,11 @@ class RealCallEClient(CallEClient):
                 "The 'calle' CLI was not found on PATH. Install it with `npm install -g @call-e/cli` "
                 "and run `calle auth login` before placing a live call."
             )
-        proc = subprocess.run([calle_path, *args, "--json"], capture_output=True, text=True, check=True)
+        proc = subprocess.run([calle_path, *args, "--json"], capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"calle {' '.join(args)} exited {proc.returncode}.\nstderr: {proc.stderr.strip()}\nstdout: {proc.stdout.strip()}"
+            )
         return json.loads(proc.stdout)
 
     @staticmethod

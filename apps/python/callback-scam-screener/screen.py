@@ -102,8 +102,8 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.demo:
-        email_body = (SAMPLES / "suspicious_email.txt").read_text(encoding="utf-8")
-        transcript = (SAMPLES / DEMO_SCENARIOS[args.demo]).read_text(encoding="utf-8")
+        email_body = (SAMPLES / "suspicious_email.txt").read_text(encoding="utf-8-sig")
+        transcript = (SAMPLES / DEMO_SCENARIOS[args.demo]).read_text(encoding="utf-8-sig")
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             result = run_pipeline(
@@ -122,7 +122,7 @@ def main() -> int:
     if not args.email or not args.sender_domain:
         parser.error("--email and --sender-domain are required unless --demo is used.")
 
-    email_body = args.email.read_text(encoding="utf-8")
+    email_body = args.email.read_text(encoding="utf-8-sig")
     alert = extract_alert(email_body, args.sender_domain)
     if alert is None:
         print("Email did not meet the suspicious-alert threshold — nothing would be dialed.")
