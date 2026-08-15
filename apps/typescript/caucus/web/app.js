@@ -544,10 +544,22 @@
     return panel;
   }
 
+  function renderAnnotations(view) {
+    const notes = Array.isArray(view.annotations) ? view.annotations : [];
+    if (notes.length === 0) return el("div", { hidden: "hidden" });
+    const items = notes.map((n) =>
+      el("div", { class: "panel-block" },
+        el("h3", {}, String(n.title ?? "")),
+        el("p", { class: "muted" }, String(n.body ?? ""))));
+    return el("section", { class: "panel" },
+      el("h2", {}, "Operator annotations"),
+      ...items);
+  }
+
   function renderView(view) {
     const root = $("case-root");
     const main = el("div", {}, renderChart(view), renderTimeline(view));
-    const side = el("div", {}, renderSettlement(view), renderAssessment(view), renderLedger(view));
+    const side = el("div", {}, renderSettlement(view), renderAnnotations(view), renderAssessment(view), renderLedger(view));
     root.replaceChildren(renderHeader(view), el("div", { class: "layout" }, main, side));
     root.hidden = false;
     $("loading").hidden = true;

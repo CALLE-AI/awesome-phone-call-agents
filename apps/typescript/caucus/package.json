@@ -1,14 +1,19 @@
 {
   "name": "caucus",
   "version": "0.1.0",
-  "description": "Neutral AI mediation for two-party disputes over real phone calls — shuttle diplomacy as a protocol, built on CALL-E",
+  "description": "Neutral AI mediation for two-party disputes over real phone calls \u2014 shuttle diplomacy as a protocol, built on CALL-E",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run --reporter=verbose",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "rehearse": "tsx scripts/run-live-case.ts --rehearse --yes",
+    "demo": "tsx scripts/build-demo.ts demo.db",
+    "dashboard": "tsx scripts/serve-dashboard.ts"
   },
   "dependencies": {
     "@call-e/calle": "^0.2.2",
@@ -20,6 +25,7 @@
     "@types/node": "^25.5.0",
     "fast-check": "^4.7.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "tsx": "^4.23.5"
   }
 }

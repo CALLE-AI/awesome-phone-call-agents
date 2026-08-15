@@ -131,6 +131,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`calle-script-advisor`](skills/calle-script-advisor/) - Drafts and lints CALL-E call task text and result schemas for clarity, safety, and extraction quality before a call is placed.
 - [`verify-by-phone`](skills/verify-by-phone/) - Single disclosed verification call that checks a directory listing against the published line, grounds every answer in a transcript span, and abstains instead of guessing when the call does not establish one.
 - [`ringer-consumer-tasks`](skills/ringer-consumer-tasks/) - Compose and safely place the dreaded consumer phone calls (bill negotiation, cancellation, refund, booking, quote comparison, inquiry) as CALL-E tasks with strict result schemas, dry-run-by-default previews, and human-in-the-loop decision authority.
+- [`caucus-mediation`](skills/caucus-mediation/) - Run a neutral two-party money-dispute mediation over separate consent-gated CALL-E calls: shuttle rounds relayed verbatim, taint-checked information flow between opposing parties, dual digit-code attestation, and a hash-chained case ledger with a non-binding memorandum.
 
 ### Apps
 
@@ -166,6 +167,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/oauth-login-client`](apps/typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`apps/typescript/vibehub-founder-relay`](apps/typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/typescript/ringer`](apps/typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
+| [`apps/typescript/caucus`](apps/typescript/caucus/) | TypeScript | Neutral shuttle-diplomacy mediator for two-party money disputes: recorded consent from both parties before any substantive call, alternating rounds that relay each side's offer with verbatim transcript evidence, a compile-time-plus-runtime taint proof that one party's private data never enters the other's call, dual attestation by a six-digit code derived from a SHA-256 digest of the exact terms, and a hash-chained ledger any case can be rebuilt and re-verified from. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
@@ -190,6 +192,10 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`Ambiguous outcome handling`](skills/service-dispatch-call/references/ambiguous-outcomes.md) - Why an unknown call outcome is a state to reconcile rather than an error to retry, and how client timeouts cause duplicate calls.
 - [`Idempotency reference`](skills/service-dispatch-call/references/idempotency.md) - Deriving call idempotency keys from the authorization rather than the attempt, reserving before dialling, and replay-safe webhook handling.
 - [`Approval threat model`](apps/typescript/phone-approval-gate/docs/threat-model.md) - What a phone approval proves and does not prove, out-of-band secret handling, and why the phone network is a restricted verification channel.
+- [`Mediation threat model`](apps/typescript/caucus/docs/threat-model.md) - Assets, adversaries, and residual risk for a neutral go-between that holds both parties' private bounds; what dual attestation proves and does not prove.
+- [`Information-flow control`](apps/typescript/caucus/docs/safety-patterns/information-flow-control.md) - Keeping one party's private data out of the other party's call: a compile-time type proof plus a runtime taint scan that throws instead of dialing.
+- [`Consent-first mediation`](apps/typescript/caucus/docs/safety-patterns/consent-first-mediation.md) - Consent as an unskippable state-machine gate with strict extraction, disclosure scripts, and terminal refusal.
+- [`Dual attestation`](apps/typescript/caucus/docs/safety-patterns/dual-attestation.md) - A digest-derived spoken code read back by both parties on separate calls as evidence both heard the same recorded terms.
 - [`Disclosure budget`](apps/typescript/call-on-behalf/docs/privacy-budget.md) - Authorizing what a caller may say about a person, checking the script before the call and checking what was actually said after it.
 - [`Contact-claim limits`](apps/typescript/verify-contact-claim/docs/limits.md) - Why an institution refusing to confirm a contact is the expected outcome, what a confirmed contact still does not prove and what has never been tested live.
 - [`Provider descriptors`](apps/typescript/voice-preflight/docs/providers.md) - How one HTTP client drives any text-to-speech API from a JSON file, where the audio sits in a response, plus the order in which a run refuses so a failure says what has already happened.

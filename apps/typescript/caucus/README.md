@@ -272,7 +272,7 @@ stack, not only here.
 
 What happened, with its evidence:
 
-- **A real two-party case settled over 13 real CALL-E calls**: two recorded
+- **A real two-party case settled over 11 real CALL-E calls** — 10 on the ledger plus one refused read-back that never entered the chain: two recorded
   consents, six shuttle rounds (one side $400 → $550 → $700, the other
   $1,000 → $800 → accept at $700, conditions captured each round), then dual
   digit-code attestation. The hash chain verified (13 entries), rehydration
