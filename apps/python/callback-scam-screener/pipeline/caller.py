@@ -53,6 +53,7 @@ class RealCallEClient(CallEClient):
         poll_interval_seconds: float = 3.0,
         poll_timeout_seconds: float = 300.0,
         request_timeout_seconds: float = 60.0,
+        max_request_retries: int = 2,
     ):
         self.poll_interval_seconds = poll_interval_seconds
         self.poll_timeout_seconds = poll_timeout_seconds
@@ -62,6 +63,11 @@ class RealCallEClient(CallEClient):
         # user hitting "MCP request timed out for tools/call" at the 15s default
         # twice in a row; 60s is a more realistic budget for a single request.
         self.request_timeout_seconds = request_timeout_seconds
+        # Manual diagnosis (real number, real goal text, direct CLI invocation)
+        # showed CALL-E's service healthy and the same request succeeding
+        # outside our Python subprocess call, so this looks transient rather
+        # than a config problem — retry a couple of times before giving up.
+        self.max_request_retries = max_request_retries
 
     def place_screening_call(self, phone_number: str, task: str, result_schema: dict | None = None) -> CallResult:
         plan = self._structured(self._run_cli(["call", "plan", "--to-phone", phone_number, "--goal", task]))
@@ -109,12 +115,23 @@ class RealCallEClient(CallEClient):
                 "and run `calle auth login` before placing a live call."
             )
         full_args = [calle_path, *args, "--timeout-seconds", str(self.request_timeout_seconds), "--json"]
-        proc = subprocess.run(full_args, capture_output=True, text=True)
-        if proc.returncode != 0:
+
+        attempt = 0
+        while True:
+            attempt += 1
+            proc = subprocess.run(full_args, capture_output=True, text=True)
+            if proc.returncode == 0:
+                return json.loads(proc.stdout)
+
+            transient = "timed out" in proc.stderr.lower() or "timed out" in proc.stdout.lower()
+            if transient and attempt <= self.max_request_retries:
+                time.sleep(2 * attempt)  # short backoff: 2s, then 4s
+                continue
+
             raise RuntimeError(
-                f"calle {' '.join(args)} exited {proc.returncode}.\nstderr: {proc.stderr.strip()}\nstdout: {proc.stdout.strip()}"
+                f"calle {' '.join(args)} exited {proc.returncode} after {attempt} attempt(s).\n"
+                f"stderr: {proc.stderr.strip()}\nstdout: {proc.stdout.strip()}"
             )
-        return json.loads(proc.stdout)
 
     @staticmethod
     def _structured(response: dict) -> dict:
