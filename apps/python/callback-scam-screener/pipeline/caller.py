@@ -108,7 +108,7 @@ class RealCallEClient(CallEClient):
             )
         if not plan.get("ready_to_run"):
             questions = "; ".join(plan.get("clarifying_questions") or []) or plan.get("confirm_summary")
-            raise RuntimeError(f"CALL-E would not plan this call: {questions}")
+            raise RuntimeError(questions)
 
         run = self._structured(
             self._run_cli(["call", "run", "--plan-id", plan["plan_id"], "--confirm-token", plan["confirm_token"]])
