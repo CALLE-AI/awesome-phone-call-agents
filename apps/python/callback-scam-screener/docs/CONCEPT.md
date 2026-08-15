@@ -48,7 +48,7 @@ This isn't a nice-to-have — it's the thing that makes the agent safe to point 
 
 This project ships no API keys and never will. Anyone running it — including judges — authenticates with their own CALL-E account (`calle auth login`) and their own `ANTHROPIC_API_KEY`; there is no shared or bundled credential anywhere in the repo, enforced by `.gitignore` and by the code paths themselves (see `pipeline/caller.py` and `pipeline/signal_catalog.py`), which fail with a clear message rather than silently falling back to something shared.
 
-LLM spend (the transcript-tagging pass in `tag_transcript_llm`) is additionally capped in code at **$1.00/day per user**, tracked from the API's own reported token usage via `pipeline/guardrails.LLMBudgetGuard`, not a pre-call estimate — so a bug or runaway loop can't spend past pocket change on anyone's key. Call placement has its own separate cap (`pipeline/guardrails.CallGuardrails`, default 20/day matching CALL-E's free tier).
+LLM spend (the transcript-tagging pass in `tag_transcript_llm`) is additionally capped in code, tracked from the API's own reported token usage via `pipeline/guardrails.LLMBudgetGuard`, not a pre-call estimate — so a bug or runaway loop can't spend past pocket change on anyone's key. This defaults to $1.00/day per user, a conservative starting point rather than a judgment about what anyone else's usage should cost — `screen.py --daily-budget-usd` overrides it. Call placement has its own separate cap (`pipeline/guardrails.CallGuardrails`, default 20/day matching CALL-E's free tier, overridable via `screen.py --max-calls-per-day`).
 
 ## Limitations
 

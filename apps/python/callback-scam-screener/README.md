@@ -74,8 +74,8 @@ uv run python screen.py \
 - One CALL-E call per `screen.py --live` run. No recurring schedule, nothing to clean up.
 - `--to-phone` is cross-checked against the number extracted from `--email` and refused on mismatch — this app never guesses a phone number to dial (see `docs/design-principles.md` Principle 3 in the parent repo).
 - No API key is bundled or shared. CALL-E auth lives in your own local `~/.calle-mcp` token cache from `calle auth login`; `ANTHROPIC_API_KEY` is read from your own environment and the app fails with a clear message rather than falling back to anything shared.
-- LLM spend is capped in code at **$1.00/day**, tracked from the API's own reported token usage (`pipeline/guardrails.LLMBudgetGuard`), not a pre-call estimate.
-- Call placement is capped at 20/day by default, matching CALL-E's free tier (`pipeline/guardrails.CallGuardrails`), and refuses to re-dial a number already screened.
+- LLM spend is capped in code, tracked from the API's own reported token usage (`pipeline/guardrails.LLMBudgetGuard`), not a pre-call estimate. Defaults to **$1.00/day** — a conservative starting point, not a statement about what CALL-E itself should cost you — override with `screen.py --daily-budget-usd <amount>`.
+- Call placement is capped in code too (`pipeline/guardrails.CallGuardrails`), defaulting to 20/day to match CALL-E's free tier — override with `screen.py --max-calls-per-day <n>` if you're on a paid plan. Regardless of the cap, it refuses to re-dial a number already screened.
 - The Screener agent has no real account numbers, passwords, codes, or payment methods to disclose, and no tools to install software or move money — this is structural, not a prompt instruction a determined scammer could talk it out of.
 - Transcripts and verdicts are returned to stdout as JSON; this app does not persist a record file or write anywhere outside the guardrail state files listed below.
 

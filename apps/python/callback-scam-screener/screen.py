@@ -50,6 +50,20 @@ def main() -> int:
         help="Add a number to the dev/test allowlist enforced before dialing. Repeatable. "
         "Omit entirely to run unrestricted (production mode).",
     )
+    parser.add_argument(
+        "--daily-budget-usd",
+        type=float,
+        default=1.00,
+        help="Hard daily cap on LLM spend for transcript tagging, in USD (default: $1.00 — a conservative "
+        "starting point, not a limit on what CALL-E itself can cost you). Raise it if your own usage needs more.",
+    )
+    parser.add_argument(
+        "--max-calls-per-day",
+        type=int,
+        default=20,
+        help="Hard daily cap on how many screening calls this app will place (default: 20, matching CALL-E's "
+        "free tier). Raise it if you're on a paid plan with more headroom.",
+    )
     args = parser.parse_args()
 
     email_body = args.email.read_text(encoding="utf-8")
@@ -85,8 +99,11 @@ def main() -> int:
         )
         return EXIT_USAGE_OR_REFUSAL
 
-    guardrails = CallGuardrails(allowed_numbers=set(args.allow_number) if args.allow_number else None)
-    budget = LLMBudgetGuard()
+    guardrails = CallGuardrails(
+        allowed_numbers=set(args.allow_number) if args.allow_number else None,
+        max_calls=args.max_calls_per_day,
+    )
+    budget = LLMBudgetGuard(daily_limit_usd=args.daily_budget_usd)
     tagger = functools.partial(tag_transcript_llm, budget=budget)
 
     try:
