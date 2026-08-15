@@ -1147,7 +1147,7 @@
   </div>
   <div class="panel-head">
     <div class="head-top">
-      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v8.6</span></div>
+      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v8.8</span></div>
       <div>
         <button class="acct-btn" id="acctBtn" hidden>Sign in</button>
         <button class="hide-btn" id="themeToggle" aria-label="Toggle dark mode" title="Dark mode">◐</button>
@@ -3853,7 +3853,13 @@ async function submitAsk(it, box, idx, payload){
   // already answered by an earlier caller — nothing to wait for
   if(j.reused && j.entry){
     absorbEntry(it, j.entry);
-    return renderAsk(it, box, idx);
+    renderAsk(it, box, idx);
+    /* An exact repeat explains itself: the answer to what you typed appears.
+       A semantic match does not — you asked one thing and a differently worded
+       fact arrived — so say why, calmly, rather than looking like the button
+       did nothing. */
+    if(j.semantic) askError(box, 'Someone already asked this in different words, so no call was placed. Their answer is below — press Recheck on it if it looks out of date.', false, true);
+    return;
   }
   if(!j.callId){ if(btn) btn.disabled = false; return askError(box, j.error || 'The call could not be started.'); }
   /* Asked here rather than on load: the user has just chosen to place a call,
@@ -3891,11 +3897,18 @@ function waitForAnswer(it, box, idx, callId, label){
         { headers: await authHeaders() }, 9000);
       const j = await r.json().catch(()=>({}));
       if(j.state === 'done' && j.entry){
-        absorbEntry(it, j.entry);
+        /* Nobody was reached, so there is nothing to add to a list headed
+           "Confirmed by phone" — the server already declined to store it, and
+           absorbing it here would put it on screen until the next reload. The
+           person who asked still gets told what happened to their call. */
+        const unreachable = j.entry.answerStatus === 'unreachable';
+        if(!unreachable) absorbEntry(it, j.entry);
         renderAsk(it, box, idx);
         const ok = j.entry.answerStatus === 'answered';
-        finishCallOverlay(ok ? 'Answer received' : 'Call finished',
-          j.entry.topic || j.entry.question || '', ok);
+        finishCallOverlay(unreachable ? 'No answer' : (ok ? 'Answer received' : 'Call finished'),
+          unreachable ? 'Nobody picked up' : (j.entry.topic || j.entry.question || ''), ok);
+        if(unreachable)
+          askError(box, `No answer at ${it.name} — the call reached voicemail or nobody picked up, so there is nothing to add. You can try again in a moment.`, false, true);
         return notifyAnswer(it, j.entry);
       }
     }catch(e){}
