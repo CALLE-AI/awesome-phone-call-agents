@@ -275,54 +275,64 @@ business records:
 This deployment is separate from choosing Path A or Path B below. Do not add
 `--seed-data` yet.
 
-### 6. Create a dedicated runtime user
+### 6. Create the dedicated jury user
 
-In Salesforce Setup, enter `Users` in **Quick Find**, select **Users**, then
-select **New User**. Create a user dedicated to QuoteWake. Choose a user license
-and profile available in your org that support API access; license/profile
-names vary by Salesforce edition, so an administrator must make that choice.
-Keep the user active and record its full Salesforce **Username** (not its Alias).
-
-Grant least privilege through the profile and permission sets. The effective
-runtime access must include:
-
-| Resource | Required access |
-| --- | --- |
-| System | API access enabled. |
-| `Account`, `Contact`, `Opportunity` | Read the records and standard fields used by QuoteWake. |
-| `OpportunityContactRole` | Read `OpportunityId`, `ContactId`, and `IsPrimary`. |
-| `Quote` | Read standard Quote fields; read and edit all four deployed QuoteWake fields. |
-| `QuoteLineItem`, `Product2` | Read quote-line pricing and product name/unit fields. |
-| `Organization` | Read `TimeZoneSidKey` and `DefaultLocaleSidKey`. |
-| `Contact` custom field | Read `QuoteWake_Call_Locale__c`; also read the configured opt-out field, if used. |
-| `Task` | Create and read completed activities related to the selected Quote and Contact. |
-
-`QuoteWake_User` is necessary but **not sufficient today**. It grants the
-included custom-field permissions and object access for Quote, Account,
-Contact, Opportunity, and Task, but it does not currently grant access to
-`OpportunityContactRole`, `QuoteLineItem`, `Product2`, or `Organization`.
-Supply those missing permissions through the runtime profile or an additional
-permission set. Standard-field visibility must also allow every field listed
-above.
-
-Assign the included permission set to the runtime username from the admin CLI
-session. This syntax was verified against the local Salesforce CLI; `--target-org`
-selects the admin-authenticated org and `--on-behalf-of` selects the user who
-receives the permission set:
+Use the administrator CLI target to run the idempotent provisioning script. It
+only supports a Developer Edition or sandbox and performs all read-only checks
+(authentication, org type, profile, Salesforce license availability, QuoteWake
+schema, existing-user conflicts, and permission-set metadata) before its first
+write. Start with a dry-run:
 
 ```shell
-sf org assign permset \
-  --name QuoteWake_User \
+./scripts/create-jury-user.sh \
   --target-org quotewake-admin \
-  --on-behalf-of quotewake.runtime@example.com
+  --email jury@example.com \
+  --username quotewake.jury@example.com \
+  --dry-run
 ```
 
-Permission sets do not override record sharing. Ensure the runtime user can see
-the intended Accounts, Contacts, Opportunities, Quotes, Opportunity Contact
-Roles, Quote Lines, and Products through your org-wide defaults, role hierarchy,
-sharing rules, teams, or explicit sharing. Grant only the demo/test records when
-possible. Salesforce explains this distinction in
-[Control Who Sees What](https://help.salesforce.com/s/articleView?id=sf.security_data_access.htm&language=en_US&type=5).
+After reviewing the output, run the same command without `--dry-run`:
+
+```shell
+./scripts/create-jury-user.sh \
+  --target-org quotewake-admin \
+  --email jury@example.com \
+  --username quotewake.jury@example.com
+```
+
+The script deploys `QuoteWake_Jury_User`, creates the user with the
+`Minimum Access - Salesforce` profile and the Salesforce user license, assigns
+the permission set, and asks Salesforce to send the password-reset/welcome
+email. It never generates, prints, stores, or accepts a password. If the
+matching user already exists, it reuses it safely; a different email, username,
+profile, or license is a hard conflict. Use `--resend-welcome` only when the
+existing jury user needs another reset email.
+
+`QuoteWake_Jury_User` is separate from the narrower `QuoteWake_User` runtime
+permission set. It grants the jury API and Lightning Sales UI access needed to
+inspect and edit the demo's commercial records while denying delete, View All,
+and Modify All:
+
+| Resource | Jury access |
+| --- | --- |
+| System | API enabled and Lightning Sales app visible. |
+| `Account`, `Contact`, `Opportunity`, `Quote` | Read and edit selected commercial fields; create and delete denied. |
+| `OpportunityContactRole` | Read relationship and primary-contact fields. |
+| `QuoteLineItem` | Read and edit quantity, unit price, and description; create and delete denied. |
+| `Product2` | Read product name and unit fields. |
+| `Organization` | Read timezone, locale, and language settings. |
+| `Task` | Create, read, and edit follow-up activities; delete denied. |
+| UI tabs | Account, Contact, Opportunity, Quote, Product, and Task visible. |
+
+The user still needs record sharing for the Accounts, Contacts,
+Opportunities, Quotes, Opportunity Contact Roles, Quote Lines, and Products
+that the jury should inspect. A permission set does not override sharing; use
+org-wide defaults, sharing rules, teams, or explicit sharing to limit access to
+the intended demo records.
+
+The password-reset email contains the Salesforce UI sign-in path. The jury
+should set a unique password and complete MFA before testing. The UI username
+and password do not belong in `.env`.
 
 ### 7. Create the External Client App
 
@@ -331,8 +341,9 @@ Follow Salesforce's current
 
 1. In Setup, enter `External Client Apps Manager` in **Quick Find**, open it,
    and select **New External Client App**.
-2. Enter a descriptive app name such as `QuoteWake Runtime` and an administrator
-   contact email.
+2. Enter a descriptive app name such as `QuoteWake Jury` and an administrator
+   contact email. Keep this app separate from any existing administrator or
+   developer integration app.
 3. Under **API (Enable OAuth Settings)**, select **Enable OAuth**. If the form
    requires a callback URL, enter an HTTPS URL controlled by your organization;
    the client-credentials flow does not redirect to it.
@@ -342,10 +353,12 @@ Follow Salesforce's current
    the security warning, and create/save the app.
 6. Open the app's **Policies** tab, select **Edit**, set **Permitted Users** to
    **Admin approved users are pre-authorized**, and set **Run As** to the
-   dedicated runtime user. Save.
+   newly provisioned jury user. Save.
 7. Open the app's OAuth settings and select **Consumer Key and Secret** (the UI
    can require identity verification). Store both values in a secret manager;
-   never paste them into source control.
+   never paste them into source control. Anyone holding these two values can
+   obtain API tokens as the jury user, so share them only through a secret
+   manager or an encrypted handoff.
 
 All tokens from this flow inherit the Run As user's permissions and record
 access. Salesforce can take several minutes to make a new app usable.
