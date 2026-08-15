@@ -252,7 +252,8 @@ async function googPlaces(category, lat, lon, r){
   const rad = Math.min(r, 50000);                      // Google caps the circle at 50 km
   // gpl2: entries cached before primaryType joined the field mask have no
   // primaryType, so googOffTopic would silently pass everything for 6 h
-  const key = `gpl2:${category}:${(+lat).toFixed(4)},${(+lon).toFixed(4)}:${rad}`;
+  // gpl3: entries gained hoursWeek; gpl2 entries have no week to pick from
+  const key = `gpl3:${category}:${(+lat).toFixed(4)},${(+lon).toFixed(4)}:${rad}`;
   const data = await cached(key, 6 * 3600e3, async () => {
     /* Google 400s the whole request if any single includedType is unknown to it.
        Trim from the tail rather than collapsing to one type — dropping straight
@@ -288,7 +289,12 @@ async function googPlaces(category, lat, lon, r){
       dist: la == null ? 0 : haversineMi(+lat, +lon, la, lo),
       website: p.websiteUri || '',
       phone: p.nationalPhoneNumber || '',
+      /* `hours` is kept for frontends served from an old service-worker cache.
+         Do not read it in new code: the row is chosen with the server's clock,
+         which is UTC here, so from about 7pm Eastern it is tomorrow's row. The
+         whole week goes out instead and the viewer picks its own day. */
       hours: days[(today + 6) % 7] || '',
+      hoursWeek: days.length === 7 ? days : null,     // Monday first, as Google sends it
       openNow: typeof p.regularOpeningHours?.openNow === 'boolean' ? p.regularOpeningHours.openNow : null,
       addr: p.formattedAddress || '',
       rating: p.rating != null ? Math.round(p.rating * 20) / 10 : null,   // 0-5 → 0-10
@@ -322,7 +328,7 @@ function mergePlaces(lists){
       const k = normName(it.name);
       const prev = byName.get(k);
       if(!prev){ byName.set(k, it); out.push(it); continue; }
-      for(const f of ['website', 'phone', 'hours', 'addr', 'kind', 'fsqId', 'gid']){
+      for(const f of ['website', 'phone', 'hours', 'hoursWeek', 'addr', 'kind', 'fsqId', 'gid']){
         if(!prev[f] && it[f]) prev[f] = it[f];
       }
       for(const f of ['rating', 'price', 'openNow', 'rating5', 'ratingCount']){

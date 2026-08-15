@@ -1147,7 +1147,7 @@
   </div>
   <div class="panel-head">
     <div class="head-top">
-      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v8.5</span></div>
+      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v8.6</span></div>
       <div>
         <button class="acct-btn" id="acctBtn" hidden>Sign in</button>
         <button class="hide-btn" id="themeToggle" aria-label="Toggle dark mode" title="Dark mode">◐</button>
@@ -2602,15 +2602,30 @@ function mergeBuckets(osmB, provB){
   }
   return b;
 }
-/* Best-effort parser for common OSM opening_hours formats.
+/* Google sends the whole week, Monday first, and the row for "today" has to be
+   chosen on the viewer's clock. Choosing it server-side looked fine and was
+   not: the server runs UTC, so from about 7pm Eastern every card showed
+   tomorrow's hours — which is exactly when someone checks whether a place is
+   still open. `hours` remains as the fallback for OSM and Foursquare, which
+   send a single string. */
+function todayHours(it){
+  const w = it && it.hoursWeek;
+  if(Array.isArray(w) && w.length === 7) return w[(new Date().getDay() + 6) % 7] || '';
+  return (it && it.hours) || '';
+}
+
+/* Best-effort parser for common OSM opening_hours formats, plus the
+   human-readable weekday rows Google returns ("Monday: 9:00 AM - 5:00 PM").
    Returns true / false, or null when the format is beyond it (no badge shown).
    Uses the viewer's clock — close enough for same-region browsing. */
 const DAY_IDX = { su:0, mo:1, tu:2, we:3, th:4, fr:5, sa:6 };
 function isOpenNow(spec){
   if(!spec) return null;
   try{
-    spec = spec.trim();
-    if(spec === '24/7') return true;
+    /* Google separates with an en dash and pads with non-breaking spaces, so
+       normalise both before anything tries to match a range. */
+    spec = String(spec).replace(/[‒-―−]/g, '-').replace(/ /g, ' ').trim();
+    if(spec === '24/7' || /\bopen 24 hours\b/i.test(spec)) return true;
     const now = new Date();
     const today = now.getDay();
     const mins = now.getHours()*60 + now.getMinutes();
@@ -2636,11 +2651,37 @@ function isOpenNow(spec){
       const applies = days === null || days.has(today);
       if(!applies) continue;
       if(closed){ verdict = false; continue; }
-      const times = [...rule.matchAll(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/g)];
-      if(!times.length) continue;
+      /* Minutes and meridiem are both optional: "09:00-17:00" (OSM),
+         "9:00 AM - 5:00 PM" (Google), and "11 AM - 2 PM" all have to parse. */
+      /* Order matters and is load-bearing. The bare 24-hour alternative has to
+         come last, or "5:00 - 9:00 PM" matches it as 05:00-09:00 and an
+         evening service reads as a morning one. */
+      const ranges = [...rule.matchAll(new RegExp([
+        /(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m?\.?\b\s*-\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m?\.?\b/,  // 1-6  both marked
+        /(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m?\.?\b/,                     // 7-11 end marked
+        /(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/                                                   // 12-15 plain 24h
+      ].map(r => r.source).join('|'), 'gi'))];
+      if(!ranges.length) continue;
+      const hm = (h, m, mer) => {
+        h = +h; m = +(m || 0);
+        if(mer){ mer = mer.toLowerCase(); if(h === 12) h = 0; if(mer === 'p') h += 12; }
+        return h * 60 + m;
+      };
       let open = false;
-      for(const t of times){
-        const a = +t[1]*60 + +t[2], b = +t[3]*60 + +t[4];
+      for(const r of ranges){
+        let a, b;
+        if(r[3] !== undefined && r[6] !== undefined){          // both sides marked
+          a = hm(r[1], r[2], r[3]); b = hm(r[4], r[5], r[6]);
+        }else if(r[11] !== undefined){
+          /* "5:00 - 9:00 PM": only the end is marked, so the start inherits it.
+             If that puts the start after the end, it was the morning half. */
+          const mer = r[11].toLowerCase();
+          a = hm(r[7], r[8], mer); b = hm(r[9], r[10], mer);
+          if(a >= b) a = hm(r[7], r[8], mer === 'p' ? 'a' : 'p');
+        }else{                                                 // plain 24-hour
+          a = hm(r[12], r[13]); b = hm(r[14], r[15]);
+        }
+        if(!Number.isFinite(a) || !Number.isFinite(b)) continue;
         if(b >= a ? (mins >= a && mins < b) : (mins >= a || mins < b)) open = true;  // handles past-midnight
       }
       verdict = open;
@@ -2648,8 +2689,20 @@ function isOpenNow(spec){
     return verdict;
   }catch(e){ return null; }
 }
-function openBadge(hours, openNow){
-  const v = (openNow === true || openNow === false) ? openNow : isOpenNow(hours);
+/* Closed wins, and that asymmetry is the point. `openNow` is a provider
+   snapshot taken when the place was fetched and then frozen into a six-hour
+   cache, so it goes on claiming "Open" for hours after closing time; the hours
+   row is re-read against the clock on every render. Neither source is allowed
+   to override a "closed" from the other, so the badge never claims Open while
+   something says otherwise — the failure that sends someone to a locked door. */
+function openState(it){
+  const parsed = isOpenNow(todayHours(it));
+  if(parsed === false || it.openNow === false) return false;
+  if(parsed === true  || it.openNow === true)  return true;
+  return null;
+}
+function openBadge(it){
+  const v = openState(it);
   if(v === true)  return `<span class="openbadge open">Open</span>`;
   if(v === false) return `<span class="openbadge closed">Closed</span>`;
   return '';
@@ -2679,7 +2732,7 @@ function poiDetailHTML(it, idx){
     can place real phone calls to a line we own instead of to a business that never asked for
     them. The number below is not the park's — please don't call it expecting the park.</div>`);
   if(it.cuisine) rows.push(`<div class="row">Cuisine: ${esc(it.cuisine)}</div>`);
-  if(it.hours)   rows.push(`<div class="row">Hours: ${esc(it.hours)}</div>`);
+  if(todayHours(it)) rows.push(`<div class="row">Hours: ${esc(todayHours(it))}</div>`);
   if(it.phone)   rows.push(`<div class="row">${esc(it.phone)}</div>`);
   const acts = [
     `<a href="${gmapsURL(it)}" target="_blank" rel="noopener">Google Maps</a>`,
@@ -2831,7 +2884,7 @@ function drawPOIs(kind){
     items = items.filter(i=>i.name.toLowerCase().includes(q));
   }
   if(state.poiOpenOnly)
-    items = items.filter(i=> i.openNow === true || isOpenNow(i.hours) === true);
+    items = items.filter(i=> openState(i) === true);
   /* Hidden by default, but only ever counted against what survived the other
      filters — a chip offering "+57 across a bridge" has to mean 57 things you
      would otherwise be looking at right now. */
@@ -2895,7 +2948,7 @@ function drawPOIs(kind){
     html += `
       <details class="poi">
         <summary>
-          <div><div class="nm">${esc(it.name)}${ratingPill(it)}</div><div class="kind">${esc(it.kind)}${openBadge(it.hours, it.openNow)}${demoBadge(it)}</div></div>
+          <div><div class="nm">${esc(it.name)}${ratingPill(it)}</div><div class="kind">${esc(it.kind)}${openBadge(it)}${demoBadge(it)}</div></div>
           <div class="dist">${it.dist.toFixed(1)} mi</div>
         </summary>
         <div class="poi-more">${poiDetailHTML(it, idx++)}</div>
@@ -2906,8 +2959,8 @@ function drawPOIs(kind){
       : { radius:6, color:'#00583D', weight:2, fillColor:'#FFC72C', fillOpacity:.9, bubblingMouseEvents:false }
     ).addTo(poiLayer)
       .bindPopup(
-        `<strong>${esc(it.name)}</strong>${openBadge(it.hours, it.openNow)}${demoBadge(it)}<br>${esc(it.kind)} · ${it.dist.toFixed(1)} mi` +
-        (it.hours ? `<br><small>${esc(it.hours)}</small>` : '') +
+        `<strong>${esc(it.name)}</strong>${openBadge(it)}${demoBadge(it)}<br>${esc(it.kind)} · ${it.dist.toFixed(1)} mi` +
+        (todayHours(it) ? `<br><small>${esc(todayHours(it))}</small>` : '') +
         `<br><a href="${gmapsURL(it)}" target="_blank" rel="noopener">Google Maps</a> · ` +
         `<a href="${directionsURL(it)}" target="_blank" rel="noopener">Directions</a>` +
         (it.website ? ` · <a href="${esc(it.website)}" target="_blank" rel="noopener">Website</a>` : '')));
@@ -3128,8 +3181,8 @@ const ASK_CODE_KEY = 'atlasAskCode';
 const askPlaceBody = it => ({
   name: it.name, lat: it.lat, lon: it.lon, phone: it.phone || '',
   addr: it.addr || '', kind: it.kind || '', gid: it.gid || '', fsqId: it.fsqId || '',
-  openNow: it.openNow === true || it.openNow === false ? it.openNow : isOpenNow(it.hours),
-  hours: it.hours || ''
+  openNow: openState(it),
+  hours: todayHours(it)
 });
 
 /* Mirrors the server's E.164 check loosely — the server decides for real, this
