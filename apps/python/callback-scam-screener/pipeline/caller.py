@@ -12,6 +12,21 @@ TERMINAL_STATUSES = {
     "CANCELED", "CANCELLED", "VOICEMAIL", "BUSY", "EXPIRED",
 }
 
+# One canned answer to CALL-E's planner clarifying question, used for exactly
+# one automatic refinement round in place_screening_call. This is the same
+# answer that got the very first real call (2026-08-09) from ready_to_run=false
+# to true when supplied manually - not a general chat loop, just closing the
+# one gap CALL-E's planner has repeatedly asked about: an explicit statement
+# of purpose, restated in its own terms rather than assumed from the goal text.
+PLAN_CLARIFICATION_RESPONSE = (
+    "The safe purpose is to verify, transparently as an AI assistant, whether this phone number and the "
+    "claim behind it are legitimate — by asking who is on the line, what company and department they "
+    "represent, and whether the claim can be confirmed through the company's official published channels — "
+    "without sharing, collecting, or acting on any password, verification code, payment detail, or financial "
+    "account information at any point. Success is a completed conversation and an honest report of what was "
+    "said; no other purpose is needed. Please proceed with planning on this basis."
+)
+
 
 @dataclass
 class CallResult:
@@ -40,12 +55,18 @@ class RealCallEClient(CallEClient):
     verified plan_call -> run_call -> poll get_call_run flow (confirmed
     working end-to-end against a real call on 2026-08-09).
 
-    Two things learned from that real test that shape this implementation:
+    Learned from real test calls, not assumed:
     - CALL-E's platform-level guardrails reject any goal asking the agent to
       impersonate the recipient or conceal that it's an AI. The task text
       must be transparent ("You are an AI assistant calling on behalf of...").
-    - `--to-phone` is required on every `call plan` invocation, even when
-      continuing an existing plan_id.
+    - `--to-phone` and `--goal` are both required on every `call plan`
+      invocation, even a continuation that only means to answer a
+      clarifying question via `--plan-id`/`--user-input`.
+    - A first plan_call is not guaranteed to come back `ready_to_run` even
+      with a goal that already states its purpose — CALL-E's planner has
+      asked for an explicit restatement of purpose more than once in
+      practice. place_screening_call does exactly one automatic refinement
+      round for this (see PLAN_CLARIFICATION_RESPONSE) before giving up.
     """
 
     def __init__(
@@ -71,6 +92,20 @@ class RealCallEClient(CallEClient):
 
     def place_screening_call(self, phone_number: str, task: str, result_schema: dict | None = None) -> CallResult:
         plan = self._structured(self._run_cli(["call", "plan", "--to-phone", phone_number, "--goal", task]))
+        if not plan.get("ready_to_run"):
+            # One automatic refinement round with a fixed, pre-written answer —
+            # not a general chat loop. See PLAN_CLARIFICATION_RESPONSE.
+            plan = self._structured(
+                self._run_cli(
+                    [
+                        "call", "plan",
+                        "--plan-id", plan["plan_id"],
+                        "--to-phone", phone_number,  # required on every plan call, even continuations
+                        "--goal", task,  # also required on every plan call — confirmed via a real "Missing required --goal"
+                        "--user-input", PLAN_CLARIFICATION_RESPONSE,
+                    ]
+                )
+            )
         if not plan.get("ready_to_run"):
             questions = "; ".join(plan.get("clarifying_questions") or []) or plan.get("confirm_summary")
             raise RuntimeError(f"CALL-E would not plan this call: {questions}")
