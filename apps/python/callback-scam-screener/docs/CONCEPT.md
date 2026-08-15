@@ -52,7 +52,7 @@ LLM spend (the transcript-tagging pass in `tag_transcript_llm`) is additionally 
 
 ## Limitations
 
-Validated with a text-based persona test harness (Screener Agent vs. simulated scammer/legitimate personas from AGENT_PROMPTS.md, at three scammer difficulty tiers) before any real-call budget was spent — see AGENT_PROMPTS.md for the persona designs. Results, scored by the actual `pipeline/scoring.py` code (not estimated):
+Validated with a text-based test harness before any real-call budget was spent: the Screener Agent (see [AGENT_PROMPTS.md](AGENT_PROMPTS.md)) against simulated scammer personas at three difficulty tiers plus a legitimate-business control, each conversation scored by the actual `pipeline/scoring.py` code (not estimated):
 
 | Scenario | Verdict | Notes |
 |---|---|---|

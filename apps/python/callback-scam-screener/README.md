@@ -95,7 +95,7 @@ python3 ../../../scripts/validate_repository.py
 ## Reading further
 
 - [`docs/CONCEPT.md`](docs/CONCEPT.md) — full design writeup, including the Limitations section with real test-harness results
-- [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md) — the Screener/scammer-simulator/legit-simulator persona designs used to validate the scoring logic before spending real call budget
+- [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md) — the Screener Agent's aim, persona, and hard constraints, plus the actual production prompt it's built from
 - [`docs/SIGNALS.md`](docs/SIGNALS.md) — the full scam-signal checklist and scoring rules
 
 This is a demo app for a workflow pattern, not a CALL-E SDK and not a supported product API.
