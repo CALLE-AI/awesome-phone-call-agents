@@ -14,7 +14,7 @@ def load_catalog(path: Path | None = None) -> dict:
 
 def tag_transcript(transcript: str, catalog: dict) -> list[SignalTag]:
     """Cheap, offline tagger used by default for local/mock testing (see
-    demo.py) — no API key required. Matches literal example phrases from
+    screen.py --demo) — no API key required. Matches literal example phrases from
     signals.json against the transcript, which only works on synthetic
     transcripts written to contain those exact phrases. Confirmed against a
     real CALL-E test call (real, ad-libbed speech) that this scores 0
@@ -47,11 +47,12 @@ def tag_transcript_llm(
     budget: LLMBudgetGuard | None = None,
 ) -> list[SignalTag]:
     """Real tagger for live calls: an LLM reads the transcript and tags each
-    signal present/absent with a supporting quote, per SIGNALS.md's original
-    design. This exists because tag_transcript's keyword matching does not
-    generalize to real, ad-libbed speech — confirmed against a real CALL-E
-    test call, which it scored 0/0 despite real red flags being present
-    (evasive on company name, refused a verifiable callback number).
+    signal present/absent with a supporting quote, per the signal checklist's
+    original design (see README.md). This exists because tag_transcript's
+    keyword matching does not generalize to real, ad-libbed speech —
+    confirmed against a real CALL-E test call, which it scored 0/0 despite
+    real red flags being present (evasive on company name, refused a
+    verifiable callback number).
 
     Requires ANTHROPIC_API_KEY in the environment unless a client is passed
     in — deliberately not bundled or shared: every user of this project

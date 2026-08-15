@@ -2,7 +2,7 @@
 
 The Screener is a goal-directed LLM persona, not a decision tree. It gets an **aim** (what it's trying to achieve), a **persona** (how it talks), and **hard constraints** — but the constraints are enforced structurally, by what the agent can access or do, not just by prompt instruction. A prompt saying "don't reveal the account number" can be talked around by a persistent scammer; an agent that was never given an account number can't reveal it no matter how it's pressured. That distinction is what makes "freedom to improvise" safe here.
 
-This also fixes a risk in the original design: if the Screener judged its own call in real time, a skilled scammer could talk it into concluding "this seems legitimate." So it never decides — it only converses and produces a transcript. Verdict scoring happens afterward, deterministically, from [SIGNALS.md](SIGNALS.md), outside the conversation the scammer influenced.
+This also fixes a risk in the original design: if the Screener judged its own call in real time, a skilled scammer could talk it into concluding "this seems legitimate." So it never decides — it only converses and produces a transcript. Verdict scoring happens afterward, deterministically, from the signal checklist in [../README.md](../README.md#signal-checklist), outside the conversation the scammer influenced.
 
 ## Aim, persona, freedom
 
@@ -15,7 +15,7 @@ This also fixes a risk in the original design: if the Screener judged its own ca
 **Hard constraints (structural, not just instructed):**
 - Has no real account numbers, passwords, OTP/MFA codes, card details, or other PII in its context at all — so it cannot disclose them regardless of pressure. Its honest answer to "what's the code" is "I don't have that," because it's true.
 - Has no tools that can browse to a URL, install software, move money, or authorize anything. It is voice-only with no side channel a "technician" could direct it toward.
-- Does not decide the verdict. Its only output is the transcript (plus basic call metadata). Scoring happens afterward from the transcript, per SIGNALS.md, so nothing said mid-call by the other party can talk the agent into a favorable self-assessment.
+- Does not decide the verdict. Its only output is the transcript (plus basic call metadata). Scoring happens afterward from the transcript, per the signal checklist in the README, so nothing said mid-call by the other party can talk the agent into a favorable self-assessment.
 
 ## The actual production prompt
 

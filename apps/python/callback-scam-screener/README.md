@@ -16,6 +16,33 @@ A `likely_scam` verdict — especially one forced by a critical signal like a re
 
 Callback Scam Screener dials the **suspicious number from the message itself** and observes how it behaves. It can't tell you whether contact happened, but it can catch a scammer in the act of asking for a remote-access tool or a gift card — evidence a legitimate institution's own line will never produce, because it will never ask for those things. The two are complementary checks on different questions, not competing solutions to the same one.
 
+## Signal checklist
+
+Detection is an LLM pass over the transcript (tag present/absent + supporting quote); scoring is a deterministic function over those tags — every verdict is explainable and auditable, not a black-box judgment. The full config is [`signals.json`](signals.json); this is the human-readable version.
+
+**Critical** — any single occurrence is enough on its own. Legitimate companies never do these on an inbound "you owe us" call, so no context offsets them:
+
+| ID | Signal |
+|----|--------|
+| C1 | Requests installation of remote-access software (AnyDesk, TeamViewer, UltraViewer, LogMeIn, Chrome Remote Desktop, "let me take control of your screen") |
+| C2 | Requests payment via gift card, crypto, or wire transfer |
+| C3 | Requests a one-time passcode, MFA code, or full card PIN/CVV read aloud |
+
+**High** — strong indicators, weighted heavily but not decisive alone (3 points each):
+
+| ID | Signal |
+|----|--------|
+| H1 | Discourages independent verification ("don't call the number on your card," "you have to resolve this with me right now") |
+| H2 | Urgency/threat escalation, especially when questioned |
+| H3 | Refuses or hedges on stating company name/department clearly |
+| H4 | Cannot provide a callback number matching the company's published support line |
+
+**Medium** — corroborating signals only (1 point each): no real hold music/IVR routing (M1 — the weakest signal alone, since small legitimate businesses do this too), inconsistent details vs. the claimed company's known practices (M2), heavy reliance on a fixed script (M3), generic rehearsed phrasing (M4).
+
+**Scoring**: any Critical signal → `likely_scam` outright. Otherwise: score ≥ 6 → `likely_scam`; 3–5 → `inconclusive` (escalate to a human); 0–2 → `likely_legitimate`.
+
+Signals are deliberately behavior-based — what the caller asks you to do — rather than voice/accent/nationality-based, to avoid discriminatory or unreliable heuristics.
+
 ## Setup
 
 Python 3.11+ and [`uv`](https://docs.astral.sh/uv/) are recommended:
@@ -27,13 +54,13 @@ uv sync --dev
 
 ## Try it without any credentials
 
-`demo.py` runs the full pipeline against four canned sample transcripts with a mock CALL-E client — no account, no API key, nothing is dialed:
+`screen.py --demo` runs the full pipeline against four canned sample transcripts with a mock CALL-E client — no account, no API key, nothing is dialed:
 
 ```bash
-uv run python demo.py remote_access   # a caller asks to install AnyDesk -> likely_scam, with a distinct warning
-uv run python demo.py giftcard        # a caller asks for a gift card -> likely_scam
-uv run python demo.py subtle          # a patient, evasive caller -> inconclusive
-uv run python demo.py legit           # a cooperative, verifiable caller -> likely_legitimate
+uv run python screen.py --demo remote_access   # a caller asks to install AnyDesk -> likely_scam, with a distinct warning
+uv run python screen.py --demo giftcard        # a caller asks for a gift card -> likely_scam
+uv run python screen.py --demo subtle          # a patient, evasive caller -> inconclusive
+uv run python screen.py --demo legit           # a cooperative, verifiable caller -> likely_legitimate
 ```
 
 ## Preview a real email (still no calls placed)
@@ -81,7 +108,7 @@ uv run python screen.py \
 
 ## Cancellation and rollback
 
-`screen.py`'s preview mode and `demo.py` have no side effects — nothing to cancel. Once a live call is placed, this app cannot cancel it mid-call; use the CALL-E dashboard if it exposes a cancel action. There is no recurring schedule anywhere in this app to disable. The two local state files (`.call_guardrail_state.json`, `.llm_budget_state.json`) can be deleted at any time to reset the daily caps early — they hold nothing but counters and a date, no call content.
+`screen.py`'s preview mode and `--demo` mode have no side effects — nothing to cancel. Once a live call is placed, this app cannot cancel it mid-call; use the CALL-E dashboard if it exposes a cancel action. There is no recurring schedule anywhere in this app to disable. The two local state files (`.call_guardrail_state.json`, `.llm_budget_state.json`) can be deleted at any time to reset the daily caps early — they hold nothing but counters and a date, no call content.
 
 ## Validation
 
@@ -96,6 +123,5 @@ python3 ../../../scripts/validate_repository.py
 
 - [`docs/CONCEPT.md`](docs/CONCEPT.md) — full design writeup, including the Limitations section with real test-harness results
 - [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md) — the Screener Agent's aim, persona, and hard constraints, plus the actual production prompt it's built from
-- [`docs/SIGNALS.md`](docs/SIGNALS.md) — the full scam-signal checklist and scoring rules
 
 This is a demo app for a workflow pattern, not a CALL-E SDK and not a supported product API.

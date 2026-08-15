@@ -42,10 +42,10 @@ def run_pipeline(
     guardrails: CallGuardrails | None = None,
     tagger: Callable[[str, dict], list[SignalTag]] = tag_transcript,
 ) -> ScreeningResult | None:
-    """tagger defaults to the cheap offline keyword tagger so demo.py's mock
-    scenarios need no API key. Pass signal_catalog.tag_transcript_llm for
-    real calls — the keyword tagger does not generalize to real speech (see
-    its docstring)."""
+    """tagger defaults to the cheap offline keyword tagger so screen.py's
+    --demo scenarios need no API key. Pass signal_catalog.tag_transcript_llm
+    for real calls — the keyword tagger does not generalize to real speech
+    (see its docstring)."""
     alert = extract_alert(email_body, sender_domain)
     if alert is None:
         return None  # not flagged as suspicious — pipeline never dials
