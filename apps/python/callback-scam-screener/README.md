@@ -45,11 +45,11 @@ Signals are deliberately behavior-based — what the caller asks you to do — r
 
 ## Setup
 
-Python 3.11+ and [`uv`](https://docs.astral.sh/uv/) are recommended:
+Python 3.11+ and [`uv`](https://docs.astral.sh/uv/) are recommended. Install only the LLM provider extra matching what you already have a key for (see [`pipeline/llm_providers.py`](pipeline/llm_providers.py) — Anthropic and Gemini are supported, and adding another provider is one function):
 
 ```bash
 cd apps/python/callback-scam-screener
-uv sync --dev
+uv sync --dev --extra anthropic   # or: --extra gemini
 ```
 
 ## Try it without any credentials
@@ -73,7 +73,7 @@ uv run python screen.py --email samples/suspicious_email.txt --sender-domain sec
 
 ## Placing one real call
 
-Requires your own CALL-E sign-in (`calle auth login` — see [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md)) and your own `ANTHROPIC_API_KEY` for real transcript scoring. Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
+Requires your own CALL-E sign-in (`calle auth login` — see [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md)) and your own API key for real transcript scoring, for whichever LLM provider you pick with `--llm-provider` (default `anthropic`; reads `ANTHROPIC_API_KEY`. `--llm-provider gemini` reads `GEMINI_API_KEY`/`GOOGLE_API_KEY` instead). Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
 
 ```bash
 export ANTHROPIC_API_KEY="<your key>"
@@ -83,6 +83,19 @@ uv run python screen.py \
   --live --confirm \
   --to-phone "+18005550187" \
   --allow-number "+18005550187"
+```
+
+Or with Gemini instead:
+
+```bash
+export GEMINI_API_KEY="<your key>"
+uv run python screen.py \
+  --email samples/suspicious_email.txt \
+  --sender-domain secure-alerts-billing.com \
+  --live --confirm \
+  --to-phone "+18005550187" \
+  --allow-number "+18005550187" \
+  --llm-provider gemini
 ```
 
 `--allow-number` builds an explicit dev/test allowlist enforced in code before dialing (see [`pipeline/guardrails.py`](pipeline/guardrails.py)) — omit it entirely only once you're intentionally running unrestricted.
@@ -100,7 +113,7 @@ uv run python screen.py \
 
 - One CALL-E call per `screen.py --live` run. No recurring schedule, nothing to clean up.
 - `--to-phone` is cross-checked against the number extracted from `--email` and refused on mismatch — this app never guesses a phone number to dial (see `docs/design-principles.md` Principle 3 in the parent repo).
-- No API key is bundled or shared. CALL-E auth lives in your own local `~/.calle-mcp` token cache from `calle auth login`; `ANTHROPIC_API_KEY` is read from your own environment and the app fails with a clear message rather than falling back to anything shared.
+- No API key is bundled or shared. CALL-E auth lives in your own local `~/.calle-mcp` token cache from `calle auth login`; your chosen LLM provider's key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`/`GOOGLE_API_KEY`, see `--llm-provider`) is read from your own environment, and the app fails with a clear message rather than falling back to anything shared.
 - This app tries to cap LLM spend in code, checking a running total (tracked from the API's own reported token usage, not a pre-call estimate) before every call — see `pipeline/guardrails.LLMBudgetGuard`. It's an application-level guard, not a platform-enforced hard limit: it won't catch concurrent runs sharing one key, and its pricing table can drift out of date. Defaults to **$1.00/day**, a conservative starting point, not a statement about what CALL-E itself should cost you — override with `screen.py --daily-budget-usd <amount>`.
 - Call placement gets the same best-effort treatment (`pipeline/guardrails.CallGuardrails`), defaulting to 20/day to match CALL-E's free tier — override with `screen.py --max-calls-per-day <n>` if you're on a paid plan. Regardless of the cap, it refuses to re-dial a number already screened.
 - The Screener agent has no real account numbers, passwords, codes, or payment methods to disclose, and no tools to install software or move money — this is structural, not a prompt instruction a determined scammer could talk it out of.

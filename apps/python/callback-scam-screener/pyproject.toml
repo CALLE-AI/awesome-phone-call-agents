@@ -3,9 +3,13 @@ name = "calle-callback-scam-screener-app"
 version = "0.1.0"
 description = "Screens a suspicious callback-scam phone number with CALL-E before a human ever dials it."
 requires-python = ">=3.11"
-dependencies = [
-  "anthropic>=0.121.0",
-]
+dependencies = []
+
+[project.optional-dependencies]
+# Install only the one matching your --llm-provider choice (see
+# pipeline/llm_providers.py) — no reason to require both SDKs.
+anthropic = ["anthropic>=0.121.0"]
+gemini = ["google-genai>=1.0.0"]
 
 [dependency-groups]
 dev = [

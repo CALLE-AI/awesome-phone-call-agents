@@ -11,12 +11,16 @@ from pathlib import Path
 DEFAULT_STATE_PATH = Path(__file__).resolve().parent.parent / ".call_guardrail_state.json"
 DEFAULT_LLM_BUDGET_STATE_PATH = Path(__file__).resolve().parent.parent / ".llm_budget_state.json"
 
-# Anthropic list pricing, USD per million tokens — https://www.anthropic.com/pricing
-# Update if pricing changes; used only to estimate spend for the budget cap below.
+# List pricing, USD per million tokens. Update if pricing changes; used only
+# to estimate spend for the budget cap below — keep in step with whichever
+# provider/model pipeline.llm_providers actually calls.
+# Anthropic: https://www.anthropic.com/pricing
+# Gemini: https://ai.google.dev/gemini-api/docs/pricing
 MODEL_PRICING_PER_MTOK = {
     "claude-sonnet-5": {"input": 3.00, "output": 15.00},
     "claude-opus-5": {"input": 15.00, "output": 75.00},
     "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
+    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
 }
 DEFAULT_MODEL_PRICING = MODEL_PRICING_PER_MTOK["claude-sonnet-5"]
 

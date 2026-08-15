@@ -29,6 +29,7 @@ from pathlib import Path
 
 from pipeline.caller import MockCallEClient, RealCallEClient
 from pipeline.guardrails import BudgetExceeded, CallGuardrails, GuardrailViolation, LLMBudgetGuard, normalize_phone
+from pipeline.llm_providers import PROVIDERS as LLM_PROVIDERS
 from pipeline.orchestrator import SCREENER_TASK_TEMPLATE, run_pipeline
 from pipeline.signal_catalog import tag_transcript_llm
 from pipeline.trigger import extract_alert
@@ -84,6 +85,19 @@ def main() -> int:
         default=20,
         help="Best-effort daily cap on how many screening calls this app will place (default: 20, matching "
         "CALL-E's free tier). Raise it if you're on a paid plan with more headroom.",
+    )
+    parser.add_argument(
+        "--llm-provider",
+        choices=sorted(LLM_PROVIDERS),
+        default="anthropic",
+        help="Which LLM reads the transcript and tags scam signals (default: anthropic). Reads that provider's "
+        "own API key from your environment — see pipeline/llm_providers.py. Only install the SDK you need: "
+        "`uv sync --extra anthropic` or `uv sync --extra gemini`.",
+    )
+    parser.add_argument(
+        "--llm-model",
+        default=None,
+        help="Override the default model for --llm-provider (e.g. a specific Gemini or Claude model name).",
     )
     args = parser.parse_args()
 
@@ -146,7 +160,9 @@ def main() -> int:
         max_calls=args.max_calls_per_day,
     )
     budget = LLMBudgetGuard(daily_limit_usd=args.daily_budget_usd)
-    tagger = functools.partial(tag_transcript_llm, budget=budget)
+    tagger = functools.partial(
+        tag_transcript_llm, provider=args.llm_provider, model=args.llm_model, budget=budget
+    )
 
     try:
         with warnings.catch_warnings(record=True) as caught:

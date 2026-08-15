@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from .guardrails import LLMBudgetGuard
+from .llm_providers import PROVIDERS, call_llm
 from .models import SignalTag
 
 DEFAULT_CATALOG_PATH = Path(__file__).resolve().parent.parent / "signals.json"
@@ -42,8 +43,8 @@ def tag_transcript(transcript: str, catalog: dict) -> list[SignalTag]:
 def tag_transcript_llm(
     transcript: str,
     catalog: dict,
-    client=None,
-    model: str = "claude-sonnet-5",
+    provider: str = "anthropic",
+    model: str | None = None,
     budget: LLMBudgetGuard | None = None,
 ) -> list[SignalTag]:
     """Real tagger for live calls: an LLM reads the transcript and tags each
@@ -54,23 +55,14 @@ def tag_transcript_llm(
     real red flags being present (evasive on company name, refused a
     verifiable callback number).
 
-    Requires ANTHROPIC_API_KEY in the environment unless a client is passed
-    in — deliberately not bundled or shared: every user of this project
-    brings their own key. Pass a guardrails.LLMBudgetGuard as `budget` to
-    cap daily spend (see run_pipeline's tagger parameter for how to wire
+    Provider-agnostic (see llm_providers.py) — "bring your own key" applies
+    to whichever provider you already use, not just Anthropic. Pass
+    provider="gemini" (reads GEMINI_API_KEY/GOOGLE_API_KEY) or add another
+    provider there. Requires that provider's own API key in the
+    environment — deliberately not bundled or shared: every user of this
+    project brings their own. Pass a guardrails.LLMBudgetGuard as `budget`
+    to cap daily spend (see run_pipeline's tagger parameter for how to wire
     this via functools.partial)."""
-    import os
-
-    import anthropic
-
-    if client is None:
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY is not set. This project does not ship or share an API key — "
-                "set your own ANTHROPIC_API_KEY (from console.anthropic.com) to use tag_transcript_llm."
-            )
-        client = anthropic.Anthropic()
-
     if budget is not None:
         budget.check()
 
@@ -95,12 +87,13 @@ Respond with ONLY a JSON array, no other text, in this exact form:
 [{{"id": "<signal id>", "present": true or false, "quote": "<short supporting quote from the transcript, or null if not present>"}}, ...]
 Include exactly one entry for every signal id listed above."""
 
-    response = client.messages.create(model=model, max_tokens=2048, messages=[{"role": "user", "content": prompt}])
+    response = call_llm(prompt, provider=provider, model=model)
+    used_model = model or PROVIDERS[provider]["default_model"]
 
     if budget is not None:
-        budget.record_usage(model, response.usage.input_tokens, response.usage.output_tokens)
+        budget.record_usage(used_model, response.input_tokens, response.output_tokens)
 
-    raw = response.content[0].text.strip()
+    raw = response.text.strip()
     if raw.startswith("```"):
         raw = raw.strip("`")
         if raw.startswith("json"):
