@@ -1,0 +1,17 @@
+[project]
+name = "calle-callback-scam-screener-app"
+version = "0.1.0"
+description = "Screens a suspicious callback-scam phone number with CALL-E before a human ever dials it."
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic>=0.121.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

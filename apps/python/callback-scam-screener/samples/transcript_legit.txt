@@ -1,0 +1,6 @@
+Screener: Hi, can you tell me what company this call is regarding?
+Caller: Sure! This is Sarah from Northfield Bank's billing support team. I'm calling about a declined automatic payment on file.
+Screener: Okay, can I verify this by calling Northfield Bank's main support line instead?
+Caller: Absolutely, that's a great way to confirm — you can call the number on the back of your card or on our website and reference case number 48213.
+Screener: Great, thanks. Is there anything urgent I need to do right now?
+Caller: Not urgent at all, take your time. If the payment method on file needs updating, you can do that anytime through your online banking or the app — we don't need anything from you over the phone.
