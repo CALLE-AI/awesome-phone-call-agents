@@ -119,7 +119,14 @@ class RealCallEClient(CallEClient):
         attempt = 0
         while True:
             attempt += 1
-            proc = subprocess.run(full_args, capture_output=True, text=True)
+            # encoding/errors must be explicit: text=True alone decodes with
+            # locale.getpreferredencoding(), which on Windows is often a legacy
+            # codepage (e.g. cp1252) rather than UTF-8. CALL-E's JSON output can
+            # contain real Unicode (curly quotes, em dashes, etc.), so the wrong
+            # codec crashes the subprocess reader thread outright — confirmed
+            # against a real UnicodeDecodeError on byte 0x9d (the tail byte of
+            # U+201D "'" in UTF-8) from a real run.
+            proc = subprocess.run(full_args, capture_output=True, text=True, encoding="utf-8", errors="replace")
             if proc.returncode == 0:
                 return json.loads(proc.stdout)
 
