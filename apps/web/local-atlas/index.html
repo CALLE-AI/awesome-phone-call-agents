@@ -96,15 +96,11 @@
   }
   .hide-btn:hover{background:rgba(255,255,255,.12);color:#fff}
   .head-arrow{font-size:1.6rem;padding:2px 12px;line-height:1}
-  .viewtoggle{display:flex;gap:0;margin:0 0 10px}
-  .viewtoggle button{
-    flex:1;border:1.5px solid var(--sign-green);background:var(--surface);color:var(--sign-green);
-    font-family:'Overpass',sans-serif;font-weight:700;font-size:.74rem;
-    text-transform:uppercase;letter-spacing:.05em;padding:7px 0;cursor:pointer;
+  .poi-sentinel{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:14px 0;font-family:'IBM Plex Mono',monospace;
+    font-size:.68rem;color:var(--ink-soft);
   }
-  .viewtoggle button:first-child{border-radius:8px 0 0 8px}
-  .viewtoggle button:last-child{border-radius:0 8px 8px 0;border-left:0}
-  .viewtoggle button[aria-pressed="true"]{background:var(--sign-green);color:#fff}
   .chiprow{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
   .chiprow a{
     text-decoration:none;font-family:'Overpass',sans-serif;font-weight:700;font-size:.74rem;
@@ -1147,7 +1143,7 @@
   </div>
   <div class="panel-head">
     <div class="head-top">
-      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v8.8</span></div>
+      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v8.9</span></div>
       <div>
         <button class="acct-btn" id="acctBtn" hidden>Sign in</button>
         <button class="hide-btn" id="themeToggle" aria-label="Toggle dark mode" title="Dark mode">◐</button>
@@ -2598,7 +2594,11 @@ function mergeBuckets(osmB, provB){
       byName.set(k, it); merged.push(it);
     }
     merged.sort((a,x)=>a.dist-x.dist);
-    b[c] = merged.slice(0, 80);
+    /* 80 was a render budget, and it silently dropped restaurants that were
+       well inside the radius. The list is paged now, so the cap only has to
+       bound memory. Kids stays at 80: filterKidsList screens the first 80
+       names with the model, and anything past that would go unscreened. */
+    b[c] = merged.slice(0, c === 'kids' ? 80 : 300);
   }
   return b;
 }
@@ -2769,6 +2769,9 @@ function renderPOIs(items, kind){
    Grouped by town before asking, because the answer is a property of the town
    rather than of the shop: one route to Harlem covers every Harlem result. */
 const CROSSING_RATIO = 2.0;
+/* Cards are rendered a page at a time. 30 fills a tall panel with room to
+   spare, and the rest arrive on scroll. */
+const POI_PAGE = 30;
 
 /* "700 W 125th St (at 12th Ave), New York, NY 10027" -> "New York, NY"
    The street part is optional: providers also return a bare "New York, NY
@@ -2922,10 +2925,6 @@ function drawPOIs(kind){
   if(crossings.length && state.hideCrossings !== false) active.push('No bridges');
 
   let html = `
-    <div class="viewtoggle" role="group" aria-label="List or map view">
-      <button aria-pressed="true">List</button>
-      <button aria-pressed="false">Map</button>
-    </div>
     <details class="filters"${state.filtersOpen ? ' open' : ''}>
       <summary><span class="flabel">Filters</span><span class="fsum">${esc(active.join(' · '))}</span></summary>
       <div class="filterrow radiusrow" role="group" aria-label="Search radius">
@@ -2942,33 +2941,51 @@ function drawPOIs(kind){
         <button data-sort="rating" aria-pressed="${state.poiSort==='rating'}">Top rated</button>
       </div>` + crossingRowHTML(crossings) + catHTML + `</details>`;
   html += `<div class="sec-note countnote">${items.length} places within ~${(state.radiusM/1609).toFixed(0)} miles</div>`;
-  let idx = 0;
-  const markers = [];                    // parallel to items, for highlighting
-  for(const it of items){
-    html += `
+  /* Every match gets a pin straight away — the map is the whole point, and a
+     pin costs almost nothing. Only the cards are paged, because 200 <details>
+     with their inner markup is what actually makes the panel slow to open. */
+  const markers = items.map(it => L.circleMarker([it.lat, it.lon], it.demo
+    // the test listing gets its own colour so it is findable among fifty pins
+    ? { radius:9, color:'#C8402F', weight:3, fillColor:'#fff', fillOpacity:.95, bubblingMouseEvents:false }
+    : { radius:6, color:'#00583D', weight:2, fillColor:'#FFC72C', fillOpacity:.9, bubblingMouseEvents:false }
+  ).addTo(poiLayer)
+    .bindPopup(
+      `<strong>${esc(it.name)}</strong>${openBadge(it)}${demoBadge(it)}<br>${esc(it.kind)} · ${it.dist.toFixed(1)} mi` +
+      (todayHours(it) ? `<br><small>${esc(todayHours(it))}</small>` : '') +
+      `<br><a href="${gmapsURL(it)}" target="_blank" rel="noopener">Google Maps</a> · ` +
+      `<a href="${directionsURL(it)}" target="_blank" rel="noopener">Directions</a>` +
+      (it.website ? ` · <a href="${esc(it.website)}" target="_blank" rel="noopener">Website</a>` : '')));
+
+  const cardHTML = (it, i) => `
       <details class="poi">
         <summary>
           <div><div class="nm">${esc(it.name)}${ratingPill(it)}</div><div class="kind">${esc(it.kind)}${openBadge(it)}${demoBadge(it)}</div></div>
           <div class="dist">${it.dist.toFixed(1)} mi</div>
         </summary>
-        <div class="poi-more">${poiDetailHTML(it, idx++)}</div>
+        <div class="poi-more">${poiDetailHTML(it, i)}</div>
       </details>`;
-    // the test listing gets its own colour so it is findable among fifty pins
-    markers.push(L.circleMarker([it.lat, it.lon], it.demo
-      ? { radius:9, color:'#C8402F', weight:3, fillColor:'#fff', fillOpacity:.95, bubblingMouseEvents:false }
-      : { radius:6, color:'#00583D', weight:2, fillColor:'#FFC72C', fillOpacity:.9, bubblingMouseEvents:false }
-    ).addTo(poiLayer)
-      .bindPopup(
-        `<strong>${esc(it.name)}</strong>${openBadge(it)}${demoBadge(it)}<br>${esc(it.kind)} · ${it.dist.toFixed(1)} mi` +
-        (todayHours(it) ? `<br><small>${esc(todayHours(it))}</small>` : '') +
-        `<br><a href="${gmapsURL(it)}" target="_blank" rel="noopener">Google Maps</a> · ` +
-        `<a href="${directionsURL(it)}" target="_blank" rel="noopener">Directions</a>` +
-        (it.website ? ` · <a href="${esc(it.website)}" target="_blank" rel="noopener">Website</a>` : '')));
+
+  /* How many cards are already on screen has to survive a redraw that the user
+     did not ask for — loadDetours calls back here when the driving distances
+     land, and rebuilding a list somebody had scrolled halfway down back to one
+     page would throw away their place. Changing a filter is different: that is
+     a new list and it starts at the top. The signature tells the two apart. */
+  const sig = [kind, state.radiusM, state.poiFilter, state.poiSearch,
+               state.poiOpenOnly, state.poiSort, state.hideCrossings !== false].join('|');
+  if(sig !== state._poiSig){
+    state._poiSig = sig;
+    state.poiShown = POI_PAGE;
+    /* Back to the top, and only here. A new filter is a new list and reading
+       it from wherever the last one happened to be scrolled is disorienting —
+       and leaves the sentinel on screen, which immediately pulls in a page
+       nobody asked for. A background redraw must never move the view. */
+    contentEl.scrollTop = 0;
   }
+  let shown = Math.min(items.length, Math.max(POI_PAGE, state.poiShown || POI_PAGE));
+
+  html += items.slice(0, shown).map(cardHTML).join('');
+  if(items.length > shown) html += `<div class="poi-sentinel"><div class="spinner"></div>Loading more…</div>`;
   contentEl.innerHTML = html;
-  const [listBtn, mapBtn] = contentEl.querySelectorAll('.viewtoggle button');
-  mapBtn.addEventListener('click', ()=>{ hidePanel(); map.flyToBounds(getPOIBounds(items.length?items:all), {padding:[40,40], maxZoom:15}); });
-  listBtn.addEventListener('click', showPanel);
   contentEl.querySelectorAll('.filterrow:not(.radiusrow) button').forEach(b=>{
     b.addEventListener('click', ()=>{ state.poiFilter = b.dataset.k || null; drawPOIs(kind); });
   });
@@ -3009,17 +3026,50 @@ function drawPOIs(kind){
   const fBox = contentEl.querySelector('details.filters');
   if(fBox) fBox.addEventListener('toggle', ()=>{ state.filtersOpen = fBox.open; });
   /* Several cards can be expanded at once, so the ring follows the one just
-     opened, and falls back to whatever is still open when one is collapsed. */
-  const cards = [...contentEl.querySelectorAll('details.poi')];
-  cards.forEach((d,i)=>{
-    d.addEventListener('toggle', ()=>{
-      if(d.open) enrichPOI(state.currentPOIs[i], document.getElementById('desc-'+i));
-      const stillOpen = cards.filter(c=>c.open);
-      const sel = d.open ? d : stillOpen[stillOpen.length - 1];
-      const j = sel ? cards.indexOf(sel) : -1;
-      highlightPOI(j < 0 ? null : items[j], markers[j]);
-    });
-  });
+     opened, and falls back to whatever is still open when one is collapsed.
+     Wiring is incremental: `cards` grows as pages are appended, and a card's
+     index into it stays its index into `items` and `markers`. */
+  const cards = [];
+  const wireCards = ()=>{
+    const all = contentEl.querySelectorAll('details.poi');
+    for(let i = cards.length; i < all.length; i++){
+      const d = all[i], n = i;
+      cards.push(d);
+      d.addEventListener('toggle', ()=>{
+        if(d.open) enrichPOI(items[n], document.getElementById('desc-'+n));
+        const stillOpen = cards.filter(c=>c.open);
+        const sel = d.open ? d : stillOpen[stillOpen.length - 1];
+        const j = sel ? cards.indexOf(sel) : -1;
+        highlightPOI(j < 0 ? null : items[j], markers[j]);
+      });
+    }
+  };
+  wireCards();
+
+  /* Endless scroll. The sentinel sits after the last rendered card and pulls
+     in the next page as it comes into view; rootMargin loads it before it is
+     reached, so the list does not visibly stall. */
+  const sentinel = contentEl.querySelector('.poi-sentinel');
+  if(sentinel && 'IntersectionObserver' in window){
+    const io = new IntersectionObserver(entries=>{
+      if(!entries.some(e=>e.isIntersecting)) return;
+      const next = items.slice(shown, shown + POI_PAGE);
+      sentinel.insertAdjacentHTML('beforebegin',
+        next.map((it, n)=>cardHTML(it, shown + n)).join(''));
+      shown += next.length;
+      state.poiShown = shown;
+      wireCards();
+      if(shown >= items.length){ io.disconnect(); sentinel.remove(); }
+    }, { root: contentEl, rootMargin: '400px' });
+    io.observe(sentinel);
+  }else if(sentinel){
+    // no observer: show everything rather than stranding the rest of the list
+    sentinel.insertAdjacentHTML('beforebegin',
+      items.slice(shown).map((it, n)=>cardHTML(it, shown + n)).join(''));
+    state.poiShown = items.length;
+    sentinel.remove();
+    wireCards();
+  }
 }
 
 /* ---------------- descriptions + images (Wikipedia, lazy on expand) ---------------- */
@@ -3081,9 +3131,6 @@ async function enrichPOI(it, box){
       : `<p class="addrline">No description on file — the Google Maps link below has photos and reviews.</p>`;
   }
   box.innerHTML = it._desc;
-}
-function getPOIBounds(items){
-  return L.latLngBounds(items.map(i=>[i.lat, i.lon]).concat([[state.place.lat, state.place.lon]]));
 }
 
 /* ---------------- deals scanner ----------------
