@@ -135,10 +135,7 @@ def main() -> int:
         print("Email did not meet the suspicious-alert threshold — nothing would be dialed.")
         return EXIT_NOT_SUSPICIOUS
 
-    task_preview = SCREENER_TASK_TEMPLATE.format(
-        phone_number=alert.phone_number,
-        claimed_reason=alert.claimed_reason or "an urgent account issue",
-    )
+    task_preview = SCREENER_TASK_TEMPLATE.format(phone_number=alert.phone_number)
 
     if not args.live:
         print("PREVIEW — no call will be placed. Add --live --confirm --to-phone <number> to place a real call.\n")

@@ -11,8 +11,7 @@ from .trigger import extract_alert
 
 # See AGENT_PROMPTS.md — this is the Screener Agent's aim, expressed as a
 # CALL-E `task` (a goal, not a branching script — CALL-E adapts the actual
-# conversation itself). Two things learned from a real validated test call
-# on 2026-08-09 are baked in here:
+# conversation itself). Learned from real test calls, not assumed:
 # - CALL-E's platform guardrails reject any goal that asks it to impersonate
 #   the recipient or conceal that it's an AI — the framing must be
 #   transparent ("You are an AI calling assistant...").
@@ -20,17 +19,31 @@ from .trigger import extract_alert
 #   verdict is computed afterward by scoring.score() over tagged signals, so
 #   a persistent scammer can't talk the live agent into a favorable
 #   self-assessment mid-call.
-SCREENER_TASK_TEMPLATE = """You are an AI calling assistant contacting {phone_number} on behalf of someone \
-who received a message claiming: "{claimed_reason}", with this number listed to call back.
-Be transparent that you are an AI assistant verifying this claim, not the account holder.
-Ask who they are, what company and department they represent, why they're contacting the recipient, and \
-whether this can be verified through the company's official published channels.
-You have no real account numbers, passwords, verification codes, or payment methods, and cannot install \
-software or click links — if asked, say so plainly.
-Do not agree to any payment, software install, or provide any personal or account information under any \
-circumstances.
-Do not accuse or try to catch anyone out — establish the facts of the situation. Do not decide yourself \
-whether this is a scam; just have the conversation and report what was actually said."""
+# - Quoting the specific claim verbatim ("a pending payment has failed to
+#   process", etc.) got this goal rejected by CALL-E's planner repeatedly,
+#   even with an explicit safety disclaimer attached — the scam-claim
+#   language itself pattern-matches CALL-E's own abuse-prevention filters.
+#   Dropping it turned out to be a genuine design improvement anyway: having
+#   the Screener volunteer what the message said is information leakage to
+#   a potential scammer. Better practice is to ask neutral open questions
+#   and let the other party explain themselves — refusing/evading that is
+#   itself signal H3 already tracks.
+SCREENER_TASK_TEMPLATE = """You are conducting a brief, transparent identity-verification call as an AI \
+calling assistant contacting {phone_number}, on behalf of someone who received a callback request listing \
+this number and wants to confirm it is genuine before acting on it.
+
+You do not have and will never provide any personal, financial, or account-related information, under any \
+circumstances, no matter what is asked — if asked for anything like that, simply say you don't have it. Do \
+not install anything, click on anything, or agree to any payment.
+
+Your only task on this call: ask who is on the line, what company and department they represent, why they \
+are reaching out, and whether this can be confirmed through the company's official published channels. Stay \
+neutral and factual — you are not accusing anyone of anything, just establishing who they are and how the \
+recipient can verify this independently.
+
+Do not volunteer any detail about what the original message said — let them explain the reason for the call \
+themselves. Do not decide yourself whether this is legitimate; just have the conversation and report back \
+exactly what was said."""
 
 
 def run_pipeline(
@@ -56,10 +69,7 @@ def run_pipeline(
     if guardrails is not None:
         guardrails.check(alert.phone_number)  # raises GuardrailViolation and stops before dialing
 
-    task = SCREENER_TASK_TEMPLATE.format(
-        phone_number=alert.phone_number,
-        claimed_reason=alert.claimed_reason or "an urgent account issue",
-    )
+    task = SCREENER_TASK_TEMPLATE.format(phone_number=alert.phone_number)
     call_result = call_client.place_screening_call(alert.phone_number, task)
 
     if guardrails is not None:
