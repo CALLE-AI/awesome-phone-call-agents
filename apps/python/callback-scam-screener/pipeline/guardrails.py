@@ -77,13 +77,16 @@ class BudgetExceeded(Exception):
 
 
 class LLMBudgetGuard:
-    """Caps LLM spend (tag_transcript_llm) at a hard daily dollar limit,
-    tracked from the API's own reported token usage — not an estimate made
-    before the call. Resets automatically at the next calendar day. Default
-    of $1.00/day is deliberately small: this pipeline is meant to run on
-    each user's own ANTHROPIC_API_KEY, not a shared/bundled one, and this
-    cap exists so a bug or runaway loop can't spend past pocket change on
-    anyone's key, including a maintainer's."""
+    """Tries to cap LLM spend (tag_transcript_llm) at a daily dollar limit,
+    checked before each call against a running total tracked from the API's
+    own reported token usage — not an estimate made before the call. Resets
+    automatically at the next calendar day. This is an application-level
+    guard, not a platform-enforced hard limit: it won't catch concurrent
+    runs sharing one key, and MODEL_PRICING_PER_MTOK can drift out of date.
+    Default of $1.00/day is deliberately small: this pipeline is meant to
+    run on each user's own ANTHROPIC_API_KEY, not a shared/bundled one, and
+    this cap is meant to help stop a bug or runaway loop from spending past
+    pocket change on anyone's key, including a maintainer's."""
 
     def __init__(self, daily_limit_usd: float = 1.00, state_path: Path = DEFAULT_LLM_BUDGET_STATE_PATH):
         self.daily_limit_usd = daily_limit_usd

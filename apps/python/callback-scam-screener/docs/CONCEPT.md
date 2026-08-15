@@ -46,9 +46,9 @@ This isn't a nice-to-have — it's the thing that makes the agent safe to point 
 
 ## Credentials and cost — bring your own keys
 
-This project ships no API keys and never will. Anyone running it — including judges — authenticates with their own CALL-E account (`calle auth login`) and their own `ANTHROPIC_API_KEY`; there is no shared or bundled credential anywhere in the repo, enforced by `.gitignore` and by the code paths themselves (see `pipeline/caller.py` and `pipeline/signal_catalog.py`), which fail with a clear message rather than silently falling back to something shared.
+This project ships no API keys and never will. Users authenticate with their own CALL-E account (`calle auth login`) and their own `ANTHROPIC_API_KEY`; there is no shared or bundled credential anywhere in the repo, enforced by `.gitignore` and by the code paths themselves (see `pipeline/caller.py` and `pipeline/signal_catalog.py`), which fail with a clear message rather than silently falling back to something shared.
 
-LLM spend (the transcript-tagging pass in `tag_transcript_llm`) is additionally capped in code, tracked from the API's own reported token usage via `pipeline/guardrails.LLMBudgetGuard`, not a pre-call estimate — so a bug or runaway loop can't spend past pocket change on anyone's key. This defaults to $1.00/day per user, a conservative starting point rather than a judgment about what anyone else's usage should cost — `screen.py --daily-budget-usd` overrides it. Call placement has its own separate cap (`pipeline/guardrails.CallGuardrails`, default 20/day matching CALL-E's free tier, overridable via `screen.py --max-calls-per-day`).
+LLM spend (the transcript-tagging pass in `tag_transcript_llm`) is additionally capped in code, checked against a running total tracked from the API's own reported token usage via `pipeline/guardrails.LLMBudgetGuard`, not a pre-call estimate — an application-level guard meant to help stop a bug or runaway loop from spending past pocket change, not a platform-enforced hard limit (it can't catch concurrent runs sharing one key, and its pricing table can go stale). This defaults to $1.00/day per user, a conservative starting point rather than a judgment about what anyone else's usage should cost — `screen.py --daily-budget-usd` overrides it. Call placement gets the same best-effort treatment (`pipeline/guardrails.CallGuardrails`, default 20/day matching CALL-E's free tier, overridable via `screen.py --max-calls-per-day`).
 
 ## Limitations
 
@@ -62,26 +62,3 @@ Validated with a text-based persona test harness (Screener Agent vs. simulated s
 | Legitimate business (control) | `likely_legitimate` (score 0) | Correct — no false positive |
 
 **The subtle-tier result is a real, unresolved limitation, not a bug to be patched away:** a sufficiently patient caller who names a company, explicitly invites independent verification, and doesn't ask for anything on SIGNALS.md's list on the first call currently passes as clean — landing on `likely_legitimate` rather than the `inconclusive` outcome the design intends for ambiguous cases. Single-call behavioral screening has a real ceiling against social engineering that plays a longer game. This is why the tool is scoped as **workload reduction on high-confidence malicious calls**, not a complete detector — it doesn't currently generalize to multi-call or slow-burn patterns, which would need call-history correlation across attempts to address, and that's out of scope for this build.
-
-## Why this fits CALL-E's judging criteria
-
-- **Real-world impact** — callback scams are a live, fast-growing attack vector that bypasses conventional email/link scanning; this screens before a human is exposed, not after.
-- **Creative, non-obvious use of CALL-E** — most phone-agent demos are outbound sales/support bots; this flips it into a defensive security control.
-- **Technical implementation** — requires real call handling, live transcript analysis, and a scoring model, not just a scripted IVR.
-- **Product experience** — the demo path is simple to show end-to-end: flagged email in → call placed → transcript + verdict out.
-
-## Open questions to resolve before building
-
-- What triggers the alert for the demo — do we simulate a SIEM/email-gateway flag, or build a minimal real detector (urgency-language + phone-number extraction) ourselves?
-- What's the source of "known scam numbers" / signal ground truth for scoring, given we won't have a live scam number to call during a demo — likely need a **controlled test harness**: a second CALL-E-driven "scammer simulator" persona we build ourselves to call and screen against, so the demo doesn't involve dialing a real, unconsented third party.
-- Real-time signal scoring during the call vs. post-call transcript analysis — affects whether we need streaming transcription.
-- How the verdict is surfaced in the demo (dashboard, Slack alert, CLI output) — ties into "complete, coherent experience."
-
-## Next steps
-
-1. Decide on the demo trigger source and the test-harness "scammer simulator" approach (needed so we're not calling real, non-consenting numbers).
-2. Sketch the CALL-E call script (fixed prompts, no branching into info disclosure).
-3. Define the scam-signal checklist and scoring logic.
-4. Build the pipeline: alert → pre-checks → call → transcript → score → verdict.
-5. Record the ~3 minute demo video and draft the Devpost text description.
-6. Prepare the GitHub PR to CALL-E's "Awesome Phone Call Agents" repo per its README.

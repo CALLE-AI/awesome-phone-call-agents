@@ -12,9 +12,9 @@ A `likely_scam` verdict — especially one forced by a critical signal like a re
 
 ## How this differs from `apps/typescript/verify-contact-claim`
 
-That app verifies a suspicious voicemail/text/missed call by dialing the number **printed on the customer's own card** and asking that institution "did you contact this customer recently" — a standing-fact check that legally can't always get answered (it treats `refused_to_confirm` as an expected outcome under Reg P / HIPAA).
+`verify-contact-claim` verifies a suspicious voicemail/text/missed call by dialing the number **printed on the customer's own card** and asking that institution "did you contact this customer recently" — a standing-fact check that legally can't always get answered (it treats `refused_to_confirm` as an expected outcome under Reg P / HIPAA).
 
-This app dials the **suspicious number from the message itself** and observes how it behaves. It can't tell you whether contact happened, but it can catch a scammer in the act of asking for a remote-access tool or a gift card — evidence a legitimate institution's own line will never produce, because it will never ask for those things. The two are complementary checks on different questions, not competing solutions to the same one.
+Callback Scam Screener dials the **suspicious number from the message itself** and observes how it behaves. It can't tell you whether contact happened, but it can catch a scammer in the act of asking for a remote-access tool or a gift card — evidence a legitimate institution's own line will never produce, because it will never ask for those things. The two are complementary checks on different questions, not competing solutions to the same one.
 
 ## Setup
 
@@ -46,13 +46,13 @@ uv run python screen.py --email samples/suspicious_email.txt --sender-domain sec
 
 ## Placing one real call
 
-Requires your own CALL-E sign-in (`calle auth login` — see [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md)) and your own `ANTHROPIC_API_KEY` for real transcript scoring. Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial:
+Requires your own CALL-E sign-in (`calle auth login` — see [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md)) and your own `ANTHROPIC_API_KEY` for real transcript scoring. Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
 
 ```bash
 export ANTHROPIC_API_KEY="<your key>"
 uv run python screen.py \
-  --email your-email.txt \
-  --sender-domain example.com \
+  --email samples/suspicious_email.txt \
+  --sender-domain secure-alerts-billing.com \
   --live --confirm \
   --to-phone "+18005550187" \
   --allow-number "+18005550187"
@@ -74,8 +74,8 @@ uv run python screen.py \
 - One CALL-E call per `screen.py --live` run. No recurring schedule, nothing to clean up.
 - `--to-phone` is cross-checked against the number extracted from `--email` and refused on mismatch — this app never guesses a phone number to dial (see `docs/design-principles.md` Principle 3 in the parent repo).
 - No API key is bundled or shared. CALL-E auth lives in your own local `~/.calle-mcp` token cache from `calle auth login`; `ANTHROPIC_API_KEY` is read from your own environment and the app fails with a clear message rather than falling back to anything shared.
-- LLM spend is capped in code, tracked from the API's own reported token usage (`pipeline/guardrails.LLMBudgetGuard`), not a pre-call estimate. Defaults to **$1.00/day** — a conservative starting point, not a statement about what CALL-E itself should cost you — override with `screen.py --daily-budget-usd <amount>`.
-- Call placement is capped in code too (`pipeline/guardrails.CallGuardrails`), defaulting to 20/day to match CALL-E's free tier — override with `screen.py --max-calls-per-day <n>` if you're on a paid plan. Regardless of the cap, it refuses to re-dial a number already screened.
+- This app tries to cap LLM spend in code, checking a running total (tracked from the API's own reported token usage, not a pre-call estimate) before every call — see `pipeline/guardrails.LLMBudgetGuard`. It's an application-level guard, not a platform-enforced hard limit: it won't catch concurrent runs sharing one key, and its pricing table can drift out of date. Defaults to **$1.00/day**, a conservative starting point, not a statement about what CALL-E itself should cost you — override with `screen.py --daily-budget-usd <amount>`.
+- Call placement gets the same best-effort treatment (`pipeline/guardrails.CallGuardrails`), defaulting to 20/day to match CALL-E's free tier — override with `screen.py --max-calls-per-day <n>` if you're on a paid plan. Regardless of the cap, it refuses to re-dial a number already screened.
 - The Screener agent has no real account numbers, passwords, codes, or payment methods to disclose, and no tools to install software or move money — this is structural, not a prompt instruction a determined scammer could talk it out of.
 - Transcripts and verdicts are returned to stdout as JSON; this app does not persist a record file or write anywhere outside the guardrail state files listed below.
 
