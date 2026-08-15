@@ -48,9 +48,20 @@ class RealCallEClient(CallEClient):
       continuing an existing plan_id.
     """
 
-    def __init__(self, poll_interval_seconds: float = 3.0, poll_timeout_seconds: float = 300.0):
+    def __init__(
+        self,
+        poll_interval_seconds: float = 3.0,
+        poll_timeout_seconds: float = 300.0,
+        request_timeout_seconds: float = 60.0,
+    ):
         self.poll_interval_seconds = poll_interval_seconds
         self.poll_timeout_seconds = poll_timeout_seconds
+        # The calle CLI's own default --timeout-seconds is 15 (see @call-e/core's
+        # constants.js) — too short for plan_call, which does real backend work
+        # (goal validation, possibly its own LLM call). Confirmed against a real
+        # user hitting "MCP request timed out for tools/call" at the 15s default
+        # twice in a row; 60s is a more realistic budget for a single request.
+        self.request_timeout_seconds = request_timeout_seconds
 
     def place_screening_call(self, phone_number: str, task: str, result_schema: dict | None = None) -> CallResult:
         plan = self._structured(self._run_cli(["call", "plan", "--to-phone", phone_number, "--goal", task]))
@@ -86,8 +97,7 @@ class RealCallEClient(CallEClient):
             completion_confidence=confidence.get("score"),
         )
 
-    @staticmethod
-    def _run_cli(args: list[str]) -> dict:
+    def _run_cli(self, args: list[str]) -> dict:
         # subprocess.run(["calle", ...]) fails on Windows with FileNotFoundError:
         # npm installs global CLIs as calle.cmd, not a raw .exe, and CreateProcess
         # won't resolve that the way a shell does. shutil.which() finds it correctly
@@ -98,7 +108,8 @@ class RealCallEClient(CallEClient):
                 "The 'calle' CLI was not found on PATH. Install it with `npm install -g @call-e/cli` "
                 "and run `calle auth login` before placing a live call."
             )
-        proc = subprocess.run([calle_path, *args, "--json"], capture_output=True, text=True)
+        full_args = [calle_path, *args, "--timeout-seconds", str(self.request_timeout_seconds), "--json"]
+        proc = subprocess.run(full_args, capture_output=True, text=True)
         if proc.returncode != 0:
             raise RuntimeError(
                 f"calle {' '.join(args)} exited {proc.returncode}.\nstderr: {proc.stderr.strip()}\nstdout: {proc.stdout.strip()}"

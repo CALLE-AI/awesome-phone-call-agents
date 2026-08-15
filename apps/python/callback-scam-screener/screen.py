@@ -99,6 +99,13 @@ def main() -> int:
         default=None,
         help="Override the default model for --llm-provider (e.g. a specific Gemini or Claude model name).",
     )
+    parser.add_argument(
+        "--calle-request-timeout-seconds",
+        type=float,
+        default=60.0,
+        help="Per-request timeout passed to the calle CLI (default: 60 — the CLI's own default of 15 has been "
+        "seen timing out a real plan_call). Raise it if you keep seeing 'MCP request timed out' errors.",
+    )
     args = parser.parse_args()
 
     if args.demo:
@@ -170,7 +177,7 @@ def main() -> int:
             result = run_pipeline(
                 email_body=email_body,
                 sender_domain=args.sender_domain,
-                call_client=RealCallEClient(),
+                call_client=RealCallEClient(request_timeout_seconds=args.calle_request_timeout_seconds),
                 official_support_number=args.official_number,
                 guardrails=guardrails,
                 tagger=tagger,
