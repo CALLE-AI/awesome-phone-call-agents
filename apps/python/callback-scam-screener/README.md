@@ -117,7 +117,9 @@ uv run python screen.py \
 - This app tries to cap LLM spend in code, checking a running total (tracked from the API's own reported token usage, not a pre-call estimate) before every call — see `pipeline/guardrails.LLMBudgetGuard`. It's an application-level guard, not a platform-enforced hard limit: it won't catch concurrent runs sharing one key, and its pricing table can drift out of date. Defaults to **$1.00/day**, a conservative starting point, not a statement about what CALL-E itself should cost you — override with `screen.py --daily-budget-usd <amount>`.
 - Call placement gets the same best-effort treatment (`pipeline/guardrails.CallGuardrails`), defaulting to 20/day to match CALL-E's free tier — override with `screen.py --max-calls-per-day <n>` if you're on a paid plan. Regardless of the cap, it refuses to re-dial a number already screened.
 - The Screener agent has no real account numbers, passwords, codes, or payment methods to disclose, and no tools to install software or move money — this is structural, not a prompt instruction a determined scammer could talk it out of.
+- The call opens by disclosing it may be recorded and reviewed, and asks the other party not to share sensitive personal, account, or payment details — see `docs/AGENT_PROMPTS.md` for the full prompt.
 - Transcripts and verdicts are returned to stdout as JSON; this app does not persist a record file or write anywhere outside the guardrail state files listed below.
+- The screened phone number is redacted from the transcript before it's sent to the LLM provider for tagging (`pipeline/guardrails.redact_phone_number`) — best-effort, not a mathematical guarantee: it catches the number rendered as digits with common separators (which is how transcripts render a spoken number), but not, say, digits spelled out as words. The full, unredacted transcript is still what's scored and printed locally; only the LLM-bound copy is scrubbed.
 
 ## Cancellation and rollback
 

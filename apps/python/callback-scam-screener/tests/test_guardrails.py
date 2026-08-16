@@ -1,10 +1,48 @@
 import pytest
 
-from pipeline.guardrails import BudgetExceeded, CallGuardrails, GuardrailViolation, LLMBudgetGuard, normalize_phone
+from pipeline.guardrails import (
+    BudgetExceeded,
+    CallGuardrails,
+    GuardrailViolation,
+    LLMBudgetGuard,
+    normalize_phone,
+    redact_phone_number,
+)
 
 
 def test_normalize_phone_strips_formatting_and_keeps_last_ten_digits():
     assert normalize_phone("+1 (800) 555-0187") == normalize_phone("(800) 555-0187") == "8005550187"
+
+
+# --- redact_phone_number ---
+
+
+@pytest.mark.parametrize(
+    "rendering",
+    [
+        "+447700900000",
+        "07700900000",
+        "+44 7700 900 000",
+        "(0770) 090-0000",
+        "0770.090.0000",
+        "44 7700900000",
+    ],
+)
+def test_redact_phone_number_catches_common_transcript_renderings(rendering):
+    transcript = f"Caller: you can reach us back on {rendering} anytime."
+    redacted = redact_phone_number(transcript, "+447700900000")
+    assert rendering not in redacted
+    assert "[phone number redacted]" in redacted
+
+
+def test_redact_phone_number_leaves_unrelated_numbers_alone():
+    transcript = "Caller: your case reference is 12345678."
+    assert redact_phone_number(transcript, "+447700900000") == transcript
+
+
+def test_redact_phone_number_handles_transcript_with_no_match():
+    transcript = "Caller: I can't share any details right now."
+    assert redact_phone_number(transcript, "+447700900000") == transcript
 
 
 # --- CallGuardrails ---

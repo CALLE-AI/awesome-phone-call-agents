@@ -6,6 +6,7 @@ this is our layer on top of it."""
 
 import datetime
 import json
+import re
 from pathlib import Path
 
 DEFAULT_STATE_PATH = Path(__file__).resolve().parent.parent / ".call_guardrail_state.json"
@@ -133,3 +134,21 @@ class LLMBudgetGuard:
 
 def normalize_phone(number: str) -> str:
     return "".join(ch for ch in number if ch.isdigit())[-10:]
+
+
+def redact_phone_number(text: str, phone_number: str) -> str:
+    """Best-effort redaction of a specific phone number from text before
+    it's sent to a third-party LLM API. Matches the number's core 10 digits
+    with an optional leading 0/country-code prefix and any separators
+    (spaces, dashes, parens, dots) between digits, since transcripts render
+    a spoken number as a digit sequence, not necessarily formatted the same
+    way it was dialed. This is defense-in-depth, not a mathematical
+    guarantee — it won't catch digits spelled out as words ("oh seven nine
+    five..."), which STT engines rarely do for phone numbers specifically
+    but could in principle."""
+    digits = normalize_phone(phone_number)
+    if not digits:
+        return text
+    spaced_digits = r"[\s\-.()]*".join(re.escape(d) for d in digits)
+    pattern = re.compile(r"(?:\+?\d{1,3}[\s\-.()]*)?" + spaced_digits)
+    return pattern.sub("[phone number redacted]", text)

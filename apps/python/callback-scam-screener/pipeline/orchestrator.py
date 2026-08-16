@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Callable
 
 from .caller import CallEClient
-from .guardrails import CallGuardrails
+from .guardrails import CallGuardrails, redact_phone_number
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
@@ -28,9 +28,19 @@ from .trigger import extract_alert
 #   a potential scammer. Better practice is to ask neutral open questions
 #   and let the other party explain themselves — refusing/evading that is
 #   itself signal H3 already tracks.
+# - The recording/review disclosure near the top serves two purposes: it's
+#   the kind of AI-voice-call disclosure regulators like the FCC's TCPA
+#   rules expect (not a compliance guarantee — we're not lawyers), and it
+#   protects the other party's data, not just ours — a real company rep
+#   might otherwise recite genuine customer/account details without
+#   thinking, not realizing the call is transcribed and reviewed.
 SCREENER_TASK_TEMPLATE = """You are conducting a brief, transparent identity-verification call as an AI \
 calling assistant contacting {phone_number}, on behalf of someone who received a callback request listing \
 this number and wants to confirm it is genuine before acting on it.
+
+Early in the call, let them know plainly that the call may be recorded and reviewed as part of this \
+verification, and ask them not to share any sensitive personal, account, or payment details about \
+themselves or anyone else — none are needed for this conversation.
 
 You do not have and will never provide any personal, financial, or account-related information, under any \
 circumstances, no matter what is asked — if asked for anything like that, simply say you don't have it. Do \
@@ -75,7 +85,13 @@ def run_pipeline(
     if guardrails is not None:
         guardrails.record_call(alert.phone_number)
 
-    tags = tagger(call_result.transcript, catalog)
+    # Redact the phone number before it reaches a third-party LLM API — the
+    # transcript is speech-to-text of a real conversation, so if either party
+    # ever said the number aloud it would otherwise be sent verbatim. The
+    # unredacted transcript is still what's scored and returned below; this
+    # redaction is scoped to the LLM call only.
+    redacted_transcript = redact_phone_number(call_result.transcript, alert.phone_number)
+    tags = tagger(redacted_transcript, catalog)
 
     result = score(tags, catalog, call_result.transcript, call_result.metadata)
     result.precheck = precheck
