@@ -10,6 +10,13 @@ from pipeline.guardrails import (
 )
 
 
+# Ofcom's officially reserved UK mobile drama/fiction range (07700 900000-
+# 900999) — guaranteed never to belong to a real subscriber. Always use this
+# constant rather than a literal in any new test: a real number was
+# accidentally used here once already (caught and scrubbed from history).
+FICTIONAL_UK_MOBILE = "+447700900000"
+
+
 def test_normalize_phone_strips_formatting_and_keeps_last_ten_digits():
     assert normalize_phone("+1 (800) 555-0187") == normalize_phone("(800) 555-0187") == "8005550187"
 
@@ -20,7 +27,7 @@ def test_normalize_phone_strips_formatting_and_keeps_last_ten_digits():
 @pytest.mark.parametrize(
     "rendering",
     [
-        "+447700900000",
+        FICTIONAL_UK_MOBILE,
         "07700900000",
         "+44 7700 900 000",
         "(0770) 090-0000",
@@ -30,19 +37,19 @@ def test_normalize_phone_strips_formatting_and_keeps_last_ten_digits():
 )
 def test_redact_phone_number_catches_common_transcript_renderings(rendering):
     transcript = f"Caller: you can reach us back on {rendering} anytime."
-    redacted = redact_phone_number(transcript, "+447700900000")
+    redacted = redact_phone_number(transcript, FICTIONAL_UK_MOBILE)
     assert rendering not in redacted
     assert "[phone number redacted]" in redacted
 
 
 def test_redact_phone_number_leaves_unrelated_numbers_alone():
     transcript = "Caller: your case reference is 12345678."
-    assert redact_phone_number(transcript, "+447700900000") == transcript
+    assert redact_phone_number(transcript, FICTIONAL_UK_MOBILE) == transcript
 
 
 def test_redact_phone_number_handles_transcript_with_no_match():
     transcript = "Caller: I can't share any details right now."
-    assert redact_phone_number(transcript, "+447700900000") == transcript
+    assert redact_phone_number(transcript, FICTIONAL_UK_MOBILE) == transcript
 
 
 # --- CallGuardrails ---
