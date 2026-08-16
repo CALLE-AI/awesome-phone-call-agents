@@ -1,7 +1,7 @@
 import type { CheckInRequest } from './contract.js'
 import { assertLiveAuthorized, buildCallTask, checkInResultSchema, idempotencyKey } from './contract.js'
 
-export type CallSnapshot = { id: string; status?: string; structuredResult?: unknown }
+export type CallSnapshot = { id: string; status?: string; structuredResult?: unknown; recipients?: Array<{ structuredResult?: unknown }> }
 export interface CallePort {
   create(input: Record<string, unknown>, options: { idempotencyKey: string }): Promise<CallSnapshot>
   waitForResult(callId: string, options: { timeoutMs: number; intervalMs: number }): Promise<CallSnapshot>
@@ -11,8 +11,15 @@ export function buildCallInput(request: CheckInRequest): Record<string, unknown>
   return {
     task: buildCallTask(request),
     recipients: [{ phones: [request.participantPhone], locale: request.locale, ...(request.region ? { region: request.region } : {}) }],
-    resultSchema: checkInResultSchema,
-    metadata: { app: 'connected', run_id: request.runId, participant_id: request.participantId },
+    recipientResultSchema: checkInResultSchema,
+    metadata: {
+      app: 'connected',
+      workflow_version: '1',
+      run_id: request.runId,
+      participant_id: request.participantId,
+      offered_event_ids: request.eventOptions.map((event) => event.id),
+      continuation_request: request,
+    },
   }
 }
 

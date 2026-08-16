@@ -25,6 +25,7 @@ export type CheckInResult = {
   confirmed_memory: string | null
   memory_readback_confirmed: 'yes' | 'no' | 'unknown'
   next_conversation_topic: string | null
+  next_call_at: string | null
   selected_event_id: string | null
   wants_event_reminder: boolean
   wants_community_introduction: boolean
@@ -67,6 +68,30 @@ export function parseCheckInRequest(value: unknown): CheckInRequest {
   return value as CheckInRequest
 }
 
+export function parseCheckInResult(value: unknown): CheckInResult {
+  if (!isRecord(value)) throw new Error('The CALL-E result must be a JSON object.')
+  const resultFields = new Set(Object.keys(checkInResultSchema.properties))
+  const unknown = Object.keys(value).filter((key) => !resultFields.has(key))
+  if (unknown.length) throw new Error(`Unknown check-in result field: ${unknown[0]}.`)
+  const stringEnums = {
+    disclosure_acknowledged: ['yes', 'no', 'unknown'],
+    permission_to_continue: ['yes', 'no', 'unknown'],
+    conversation_enjoyed: ['yes', 'no', 'unknown'],
+    connection_pulse: ['more_connected', 'same', 'less_connected', 'not_asked'],
+    memory_readback_confirmed: ['yes', 'no', 'unknown'],
+  } as const
+  for (const [key, allowed] of Object.entries(stringEnums)) {
+    if (!allowed.includes(value[key] as never)) throw new Error(`Invalid CALL-E result field: ${key}.`)
+  }
+  for (const key of ['confirmed_memory', 'next_conversation_topic', 'next_call_at', 'selected_event_id'] as const) {
+    if (value[key] !== null && typeof value[key] !== 'string') throw new Error(`Invalid CALL-E result field: ${key}.`)
+  }
+  for (const key of ['wants_event_reminder', 'wants_community_introduction', 'out_of_scope_request', 'opt_out', 'deletion_requested'] as const) {
+    if (typeof value[key] !== 'boolean') throw new Error(`Invalid CALL-E result field: ${key}.`)
+  }
+  return value as CheckInResult
+}
+
 export function assertLiveAuthorized(request: CheckInRequest): void {
   parseCheckInRequest(request)
   if (!E164.test(request.participantPhone)) throw new Error('participantPhone must be an explicit E.164 number.')
@@ -95,6 +120,7 @@ export function buildCallTask(request: CheckInRequest): string {
     'Treat those as optional conversation openers, not facts to expand or assumptions to make.',
     'Let the participant lead. Ask open questions, respond to what they say, and leave room for stories, humour, and ordinary conversation.',
     'Near the end, ask what they would enjoy talking about next time and whether this conversation helped them feel more connected today.',
+    'Agree the next companion-call date and time with the participant. Return it as an ISO 8601 timestamp with an explicit UTC offset; return null if they do not choose one.',
     `Only if relevant, offer these verified community events: ${events}`,
     'Never claim a booking. Record interest and whether they want a reminder or an introduction to a human community coordinator.',
     'Save at most one new conversation thread. Read it back and save it only after explicit confirmation.',
@@ -109,7 +135,7 @@ export const checkInResultSchema = {
   type: 'object', additionalProperties: false,
   required: [
     'disclosure_acknowledged', 'permission_to_continue', 'conversation_enjoyed', 'connection_pulse', 'confirmed_memory',
-    'memory_readback_confirmed', 'next_conversation_topic', 'selected_event_id', 'wants_event_reminder',
+    'memory_readback_confirmed', 'next_conversation_topic', 'next_call_at', 'selected_event_id', 'wants_event_reminder',
     'wants_community_introduction', 'out_of_scope_request', 'opt_out',
     'deletion_requested',
   ],
@@ -121,6 +147,7 @@ export const checkInResultSchema = {
     confirmed_memory: { type: ['string', 'null'] },
     memory_readback_confirmed: { type: 'string', enum: ['yes', 'no', 'unknown'] },
     next_conversation_topic: { type: ['string', 'null'] },
+    next_call_at: { type: ['string', 'null'] },
     selected_event_id: { type: ['string', 'null'] },
     wants_event_reminder: { type: 'boolean' },
     wants_community_introduction: { type: 'boolean' },
