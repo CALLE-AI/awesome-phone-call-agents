@@ -72,6 +72,13 @@ def test_seed_writes_regional_options_to_accounts_and_contacts():
     assert script.count("Phone=+14155550100 BillingCountryCode=$COUNTRY_CODE") == 9
 
 
+def test_demo_quotes_expire_in_three_months():
+    script = SCRIPT.read_text()
+
+    assert "ExpirationDate=$(date -u -d '+3 months' +%Y-%m-%d)" in script
+    assert "+30 days" not in script
+
+
 def test_reset_preserves_existing_contact_phone_without_explicit_test_phones():
     script = SCRIPT.read_text()
 

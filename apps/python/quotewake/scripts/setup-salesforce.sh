@@ -648,7 +648,7 @@ if [[ "$SEED_DATA" == true ]]; then
         local name="$1" opportunity_id="$2" quote_status="$3"
         local existing_id structural_values create_values
         existing_id="$(query_id "SELECT Id FROM Quote WHERE Name = '$name' LIMIT 1")"
-        structural_values="Name='$name' OpportunityId=$opportunity_id Pricebook2Id=$PRICEBOOK_ID ExpirationDate=$(date -u -d '+30 days' +%Y-%m-%d) Status='$quote_status'"
+        structural_values="Name='$name' OpportunityId=$opportunity_id Pricebook2Id=$PRICEBOOK_ID ExpirationDate=$(date -u -d '+3 months' +%Y-%m-%d) Status='$quote_status'"
         create_values="$structural_values QuoteWake_Enabled__c=true Attempt_Count__c=0"
         if [[ -n "$existing_id" ]]; then
             # A normal seed repairs the demo hierarchy without erasing call
