@@ -6,43 +6,6 @@ A callback / TOAD (telephone-oriented attack delivery) scam puts a phone number 
 
 This app makes CALL-E dial that number first. It has a short, transparent conversation, and the transcript is scored against a fixed checklist of scam behaviors — remote-access requests, gift-card/crypto/wire payment asks, urgency escalation, evasiveness about identity. No human is exposed to the call, and the agent has no capability to hand over anything real: it has no account data, can't authorize a payment, and can't install anything, by construction rather than by prompting.
 
-## The value is triage, not clearance
-
-A `likely_scam` verdict — especially one forced by a critical signal like a remote-access-software ask — is high-precision enough to fast-track in a SOC queue. A `likely_legitimate` verdict is not the mirror image of that: every verdict still goes to a human, and a text-based test harness found a real false-negative case (a patient scammer who asks for nothing on the first call). See [`docs/CONCEPT.md`](docs/CONCEPT.md#limitations) for the full writeup. This tool reduces workload on the obvious cases; it does not clear anything as safe.
-
-## How this differs from `apps/typescript/verify-contact-claim`
-
-`verify-contact-claim` verifies a suspicious voicemail/text/missed call by dialing the number **printed on the customer's own card** and asking that institution "did you contact this customer recently" — a standing-fact check that legally can't always get answered (it treats `refused_to_confirm` as an expected outcome under Reg P / HIPAA).
-
-Callback Scam Screener dials the **suspicious number from the message itself** and observes how it behaves. It can't tell you whether contact happened, but it can catch a scammer in the act of asking for a remote-access tool or a gift card — evidence a legitimate institution's own line will never produce, because it will never ask for those things. The two are complementary checks on different questions, not competing solutions to the same one.
-
-## Signal checklist
-
-Detection is an LLM pass over the transcript (tag present/absent + supporting quote); scoring is a deterministic function over those tags — every verdict is explainable and auditable, not a black-box judgment. The full config is [`signals.json`](signals.json); this is the human-readable version.
-
-**Critical** — any single occurrence is enough on its own. Legitimate companies never do these on an inbound "you owe us" call, so no context offsets them:
-
-| ID | Signal |
-|----|--------|
-| C1 | Requests installation of remote-access software (AnyDesk, TeamViewer, UltraViewer, LogMeIn, Chrome Remote Desktop, "let me take control of your screen") |
-| C2 | Requests payment via gift card, crypto, or wire transfer |
-| C3 | Requests a one-time passcode, MFA code, or full card PIN/CVV read aloud |
-
-**High** — strong indicators, weighted heavily but not decisive alone (3 points each):
-
-| ID | Signal |
-|----|--------|
-| H1 | Discourages independent verification ("don't call the number on your card," "you have to resolve this with me right now") |
-| H2 | Urgency/threat escalation, especially when questioned |
-| H3 | Refuses or hedges on stating company name/department clearly |
-| H4 | Cannot provide a callback number matching the company's published support line |
-
-**Medium** — corroborating signals only (1 point each): no real hold music/IVR routing (M1 — the weakest signal alone, since small legitimate businesses do this too), inconsistent details vs. the claimed company's known practices (M2), heavy reliance on a fixed script (M3), generic rehearsed phrasing (M4).
-
-**Scoring**: any Critical signal → `likely_scam` outright. Otherwise: score ≥ 6 → `likely_scam`; 3–5 → `inconclusive` (escalate to a human); 0–2 → `likely_legitimate`.
-
-Signals are deliberately behavior-based — what the caller asks you to do — rather than voice/accent/nationality-based, to avoid discriminatory or unreliable heuristics.
-
 ## Setup
 
 Python 3.11+ and [`uv`](https://docs.astral.sh/uv/) are recommended:
@@ -139,6 +102,43 @@ Tests run with an injected mock CALL-E client and never place a phone call or us
 uv run pytest -q
 python3 ../../../scripts/validate_repository.py
 ```
+
+## Signal checklist
+
+Detection is an LLM pass over the transcript (tag present/absent + supporting quote); scoring is a deterministic function over those tags — every verdict is explainable and auditable, not a black-box judgment. The full config is [`signals.json`](signals.json); this is the human-readable version.
+
+**Critical** — any single occurrence is enough on its own. Legitimate companies never do these on an inbound "you owe us" call, so no context offsets them:
+
+| ID | Signal |
+|----|--------|
+| C1 | Requests installation of remote-access software (AnyDesk, TeamViewer, UltraViewer, LogMeIn, Chrome Remote Desktop, "let me take control of your screen") |
+| C2 | Requests payment via gift card, crypto, or wire transfer |
+| C3 | Requests a one-time passcode, MFA code, or full card PIN/CVV read aloud |
+
+**High** — strong indicators, weighted heavily but not decisive alone (3 points each):
+
+| ID | Signal |
+|----|--------|
+| H1 | Discourages independent verification ("don't call the number on your card," "you have to resolve this with me right now") |
+| H2 | Urgency/threat escalation, especially when questioned |
+| H3 | Refuses or hedges on stating company name/department clearly |
+| H4 | Cannot provide a callback number matching the company's published support line |
+
+**Medium** — corroborating signals only (1 point each): no real hold music/IVR routing (M1 — the weakest signal alone, since small legitimate businesses do this too), inconsistent details vs. the claimed company's known practices (M2), heavy reliance on a fixed script (M3), generic rehearsed phrasing (M4).
+
+**Scoring**: any Critical signal → `likely_scam` outright. Otherwise: score ≥ 6 → `likely_scam`; 3–5 → `inconclusive` (escalate to a human); 0–2 → `likely_legitimate`.
+
+Signals are deliberately behavior-based — what the caller asks you to do — rather than voice/accent/nationality-based, to avoid discriminatory or unreliable heuristics.
+
+## The value is triage, not clearance
+
+A `likely_scam` verdict — especially one forced by a critical signal like a remote-access-software ask — is high-precision enough to fast-track in a SOC queue. A `likely_legitimate` verdict is not the mirror image of that: every verdict still goes to a human, and a text-based test harness found a real false-negative case (a patient scammer who asks for nothing on the first call). See [`docs/CONCEPT.md`](docs/CONCEPT.md#limitations) for the full writeup. This tool reduces workload on the obvious cases; it does not clear anything as safe.
+
+## How this differs from `apps/typescript/verify-contact-claim`
+
+`verify-contact-claim` verifies a suspicious voicemail/text/missed call by dialing the number **printed on the customer's own card** and asking that institution "did you contact this customer recently" — a standing-fact check that legally can't always get answered (it treats `refused_to_confirm` as an expected outcome under Reg P / HIPAA).
+
+Callback Scam Screener dials the **suspicious number from the message itself** and observes how it behaves. It can't tell you whether contact happened, but it can catch a scammer in the act of asking for a remote-access tool or a gift card — evidence a legitimate institution's own line will never produce, because it will never ask for those things. The two are complementary checks on different questions, not competing solutions to the same one.
 
 ## Reading further
 
