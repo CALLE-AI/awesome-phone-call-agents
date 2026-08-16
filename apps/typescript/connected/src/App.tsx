@@ -152,6 +152,10 @@ export default function App() {
         <div className="section-heading compact"><span>COMPANION CONTINUITY</span><h2>The next lovely conversation already has a beginning.</h2></div>
         <div className="metric-row"><div><strong>{metrics.conversations}</strong><span>conversations completed</span></div><div><strong>{metrics.enjoyedRate}%</strong><span>said the call was enjoyable</span></div><div><strong>{metrics.memories}</strong><span>confirmed conversation threads</span></div><div><strong>{metrics.followUps}</strong><span>connections requested</span></div></div>
         <div className="console personal">
+          <aside className="companion-portrait-panel">
+            <img src="/margaret-phone-companion.png" alt="Margaret smiling while talking with her AI phone companion"/>
+            <div><span>THE FEELING</span><blockquote>“It remembered my tomatoes—and asked when I’d like to talk again.”</blockquote><small>Illustrative companion story</small></div>
+          </aside>
           <div className="detail">
             <div className="detail-head"><div><span className="status"><Check size={13}/>{person.action}</span><h3>{person.name}’s companion</h3><p>{person.nextTopic}</p></div><button className="primary small" onClick={() => setOperatorOpen(true)}>Experience the next call</button></div>
             <div className="signal-grid"><div><span>How the latest call felt</span><b>{person.tone}</b><small>Shared by {person.name}</small></div><div><span>Next call agreed together</span><b>{person.next}</b><small>Automatically added · always cancellable</small></div><div><span>Companion reaches</span><b>{maskPhone(person.phone)}</b><small>No smartphone needed after booking</small></div></div>
