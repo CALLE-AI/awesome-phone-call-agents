@@ -32,18 +32,15 @@ export const eventOptions: EventOption[] = [
 export const initialState: ConnectedState = {
   participants: [
     { id: 'margaret', initials: 'MH', name: 'Margaret H.', phone: '', locale: 'en-GB', region: 'GB', scheduledWindow: 'Friday afternoon', next: 'Today · 2:30 PM', memories: ['The tomatoes on the balcony', 'Grandson Leo’s school play'], nextTopic: 'Ask whether the first tomato beat the birds.', tone: 'Steady', action: 'Check-in ready', consentRecorded: true, aiDisclosureApproved: true, active: true },
-    { id: 'arthur', initials: 'AP', name: 'Arthur P.', phone: '', locale: 'en-GB', region: 'GB', scheduledWindow: 'Tuesday morning', next: 'Tomorrow · 10:00 AM', memories: ['Local history', 'Chess'], nextTopic: 'Ask about the chess puzzle he was trying.', tone: 'Brighter', action: 'Event reminder', consentRecorded: true, aiDisclosureApproved: true, active: true },
-    { id: 'ruth', initials: 'RS', name: 'Ruth S.', phone: '', locale: 'en-GB', region: 'GB', scheduledWindow: 'Friday afternoon', next: 'Friday · 4:00 PM', memories: ['Choir music', 'Neighbourhood walks'], nextTopic: 'Ask which choir song stayed with her.', tone: 'Follow-up', action: 'Community introduction', consentRecorded: true, aiDisclosureApproved: true, active: true },
   ],
   timeline: [
     { id: 't1', participantId: 'margaret', time: '2:31', title: 'Consent confirmed', text: 'Margaret chose to continue after the AI disclosure.' },
     { id: 't2', participantId: 'margaret', time: '2:39', title: 'A new thread, in her words', text: '“The first tomato finally turned red.” Read back and confirmed.' },
     { id: 't3', participantId: 'margaret', time: '2:42', title: 'Something to anticipate', text: 'Interested in Tuesday’s local history tea; reminder requested.' },
   ],
-  followUps: [{ id: 'f1', participantId: 'ruth', kind: 'community_introduction_review', title: 'Introduce Ruth to community coordinator Maya', status: 'open', createdAt: 'Today' }],
+  followUps: [{ id: 'f1', participantId: 'margaret', kind: 'community_introduction_review', title: 'Connect Margaret with the community garden circle', status: 'open', createdAt: 'Today' }],
   runs: [
     { id: 'demo-1', participantId: 'margaret', provider: 'demo', status: 'completed', enjoyed: true, completedAt: 'Today' },
-    { id: 'demo-2', participantId: 'arthur', provider: 'demo', status: 'completed', enjoyed: true, completedAt: 'Yesterday' },
   ],
 }
 

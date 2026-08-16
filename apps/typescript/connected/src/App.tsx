@@ -4,7 +4,7 @@ import type { CheckInResult } from '../server/contract.js'
 import type { PostCallPlan } from '../server/decision.js'
 import { applyCompletedRun, completeFollowUp, demoPlan, demoResult, eventOptions, initialState, toCheckInRequest, type ConnectedState, type Participant } from './workflow'
 
-const STORAGE_KEY = 'connected-operator-state-v1'
+const STORAGE_KEY = 'connected-companion-state-v2'
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function loadState(): ConnectedState {
