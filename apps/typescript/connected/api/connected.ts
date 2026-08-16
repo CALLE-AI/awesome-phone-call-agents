@@ -60,7 +60,7 @@ async function publicCall(call: Call) {
   }
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 })
   const url = new URL(request.url, 'https://connected.invalid')
 
@@ -94,3 +94,7 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: message }, status)
   }
 }
+
+export const GET = handler
+export const POST = handler
+export const OPTIONS = handler
