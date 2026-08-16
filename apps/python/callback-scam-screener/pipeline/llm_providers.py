@@ -1,7 +1,9 @@
 """Thin, provider-agnostic wrapper around single-turn LLM completions, used
 by signal_catalog.tag_transcript_llm. "Bring your own keys" shouldn't mean
 "bring your own Anthropic key specifically" — add a provider by writing one
-function with this signature and adding one PROVIDERS entry.
+function with this signature and adding one PROVIDERS entry. Only "gemini"
+is currently registered, since it's the only one proven against a real API
+call so far — see the PROVIDERS comment below.
 
 Pricing in guardrails.MODEL_PRICING_PER_MTOK must be kept in step with
 whichever provider/model is actually used, since LLMBudgetGuard depends on
@@ -51,7 +53,7 @@ def _call_gemini(prompt: str, model: str) -> LLMResponse:
     if not api_key:
         raise RuntimeError(
             "GEMINI_API_KEY (or GOOGLE_API_KEY) is not set. This project does not ship or share an API key — "
-            "set your own key (from aistudio.google.com/apikey), or use --llm-provider anthropic."
+            "set your own key (from aistudio.google.com/apikey)."
         )
     from google import genai  # imported after the key check — see _call_anthropic
 
@@ -64,8 +66,12 @@ def _call_gemini(prompt: str, model: str) -> LLMResponse:
     )
 
 
+# Anthropic is implemented (_call_anthropic above) but deliberately not
+# registered here yet — unlike the Gemini path, it has never been exercised
+# against a real API call in this project, only its error handling. Add
+# "anthropic": {"call": _call_anthropic, "default_model": "claude-sonnet-5"}
+# back once that's actually been verified end-to-end.
 PROVIDERS = {
-    "anthropic": {"call": _call_anthropic, "default_model": "claude-sonnet-5"},
     "gemini": {"call": _call_gemini, "default_model": "gemini-3.6-flash"},
 }
 

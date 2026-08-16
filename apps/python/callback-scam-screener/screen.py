@@ -89,10 +89,10 @@ def main() -> int:
     parser.add_argument(
         "--llm-provider",
         choices=sorted(LLM_PROVIDERS),
-        default="anthropic",
-        help="Which LLM reads the transcript and tags scam signals (default: anthropic). Reads that provider's "
-        "own API key from your environment — see pipeline/llm_providers.py. Only install the SDK you need: "
-        "`uv sync --extra anthropic` or `uv sync --extra gemini`.",
+        default="gemini",
+        help="Which LLM reads the transcript and tags scam signals (default: gemini — currently the only "
+        "registered provider, see pipeline/llm_providers.py). Reads that provider's own API key from your "
+        "environment. Only install the SDK you need: `uv sync --extra gemini`.",
     )
     parser.add_argument(
         "--llm-model",
