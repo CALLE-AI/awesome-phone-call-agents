@@ -75,7 +75,23 @@ uv run python screen.py --email samples/suspicious_email.txt --sender-domain sec
 
 ## Placing one real call
 
-Requires your own CALL-E sign-in (`calle auth login` — see [`docs/AGENT_PROMPTS.md`](docs/AGENT_PROMPTS.md)) and your own `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) for real transcript scoring. Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
+### One-time CALL-E sign-in
+
+`screen.py --live` shells out to the `calle` CLI, so it needs to be installed and authenticated first (Node.js required):
+
+```bash
+npm install -g @call-e/cli
+calle auth login    # opens a browser to complete sign-in
+calle auth status    # confirm it says "usable": true
+```
+
+### One-time Gemini key
+
+Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then set it as `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in your environment — see the command below.
+
+### Running it
+
+Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
 
 ```bash
 export GEMINI_API_KEY="<your key>"
