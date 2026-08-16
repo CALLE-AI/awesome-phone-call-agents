@@ -33,7 +33,8 @@ QuoteWake ── prioritize, prepare, enforce policy ───┐
 For each run, QuoteWake:
 
 1. Finds Salesforce Quotes that are due and eligible for follow-up.
-2. Resolves the customer, primary contact, products, locale, and call policy.
+2. Resolves the customer, primary contact, locale, call policy, and product
+   lines when the runtime user can access them.
 3. Converts the accepted call result into a clear commercial outcome.
 4. Updates the Quote and creates a completed Salesforce Task with the summary
    and next action.
@@ -43,7 +44,8 @@ For each run, QuoteWake:
 - **Consistent follow-up:** eligibility, retry, attempt-limit, and opt-out checks
   are applied before each planned call.
 - **Useful call context:** CALL-E receives the Quote, customer, primary contact,
-  products, locale, and regional context needed for the conversation.
+  locale, regional context, and any accessible product lines needed for the
+  conversation.
 - **Safe operator control:** dry-run and prompt-preview modes show what would
   happen before any outbound call or Salesforce write.
 - **Actionable Salesforce history:** accepted calls update follow-up state and
@@ -166,12 +168,12 @@ The browser login authorizes administrative CLI operations only. It does not
 populate `.env` and does not authenticate the QuoteWake Python process. See the
 official [`sf org login web` reference](https://developer.salesforce.com/docs/platform/salesforce-cli-reference/guide/cli_reference_org_login_web.html).
 
-### 4. Enable standard Quotes manually
+### 4. Ensure standard Quotes are enabled
 
-This is currently a prerequisite to the script: in Salesforce Setup, enter
-`Quote` in **Quick Find**, select **Quote Settings**, select **Enable Quotes**,
-and save. Do this manually before running the script because the current setup
-cannot reliably enable Quotes in every Sales org through metadata. The
+The setup script first tries to enable Quotes through deployable Salesforce
+settings. If the org rejects that deployment, follow the error guidance: in
+Salesforce Setup, enter `Quote` in **Quick Find**, select **Quote Settings**,
+select **Enable Quotes**, save, and rerun the script. The
 [Salesforce Quote setup guide](https://help.salesforce.com/s/articleView?id=sf.quotes_enable.htm&language=en_US&type=5)
 documents the same controls. QuoteWake requires Quotes related to Opportunities;
 it does not require the optional setting for Quotes without an Opportunity.
@@ -180,8 +182,8 @@ it does not require the optional setting for Quotes without an Opportunity.
 
 Run the setup script with no data option and provide a dedicated runtime user
 email and globally unique Salesforce username. The script deploys the Quote and
-Contact fields, creates or reconciles the user with the standard
-`Minimum Access - Salesforce` profile, assigns `QuoteWake_User`, and prepares
+Contact fields, creates or reconciles the user with the dedicated
+`QuoteWake Runtime` profile, assigns `QuoteWake_User`, and prepares
 the QuoteWake External Client App. It does not create demo business records:
 
 ```shell
@@ -195,8 +197,9 @@ This deployment only prepares the metadata. The demo records are created in
 step 9; do not add `--seed-data` yet.
 
 The created user's last name is `QuoteWake Runtime` and its alias is `qwrtuser`,
-so it is easy to identify in Salesforce. The standard profile remains
-`Minimum Access - Salesforce`; QuoteWake-specific access is isolated in the
+so it is easy to identify in Salesforce. The `QuoteWake Runtime` profile
+provides the minimal profile-level capabilities required for API access,
+Lightning, and Tasks; QuoteWake object and field access remains isolated in the
 `QuoteWake_User` permission set. The script never creates a password or prints
 one; Salesforce sends the welcome/reset email for a newly created user.
 
@@ -268,7 +271,8 @@ Seed the idempotent demo hierarchy after metadata and runtime access are ready:
 ```
 
 New demo Contacts receive fictional fixture numbers when `--test-phones` is
-omitted. Existing demo `Phone` and `MobilePhone` values are preserved. Use
+omitted. Existing demo `Phone` and `MobilePhone` values are preserved.
+
 To reset the demo before another test run, execute:
 
 ```shell
@@ -316,7 +320,7 @@ Before adding `--execute`, confirm every item:
 - `.env` has the correct My Domain, consumer key/secret, API version, and a valid
   `CALLE_API_KEY`; secrets and raw support logs are protected.
 - The dry-run and `--show-prompt` output contain the expected customer, locale,
-  Quote, and products.
+  Quote, and any product lines available to the runtime user.
 - `--max-calls 1` is set and no scheduler or second worker is running.
 
 Then place one call and persist its result:
@@ -426,11 +430,13 @@ creation for a wait or parse problem. This protects the provider boundary;
 Salesforce write-side deduplication beyond the transaction below is not
 implemented.
 
-The result is persisted with one `allOrNone=true` Composite API request that
-updates the Quote and creates its completed Task together. If that persistence
-fails after a call has returned, QuoteWake records only bounded identifiers,
-stops the remaining calls in that run, and returns a non-zero exit status. The
-standard Task is an audit trail, not a separate local database.
+QuoteWake first persists the result with one `allOrNone=true` Composite API
+request that updates the Quote and creates its completed Task together. In an
+org where the runtime license cannot insert Tasks, QuoteWake records that
+capability limitation and falls back to updating the Quote alone. Other
+persistence failures after a call has returned stop the remaining calls in that
+run and return a non-zero exit status. The standard Task is an audit trail, not
+a separate local database.
 
 ## Scheduler and operations
 
