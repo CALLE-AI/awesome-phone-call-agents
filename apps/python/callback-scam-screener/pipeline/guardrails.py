@@ -152,3 +152,46 @@ def redact_phone_number(text: str, phone_number: str) -> str:
     spaced_digits = r"[\s\-.()]*".join(re.escape(d) for d in digits)
     pattern = re.compile(r"(?:\+?\d{1,3}[\s\-.()]*)?" + spaced_digits)
     return pattern.sub("[phone number redacted]", text)
+
+
+# Officially reserved fictional phone-number ranges — anything else that
+# looks like a phone number in this codebase should be treated as suspect.
+PHONE_SAFE_CORE_PATTERNS = [
+    re.compile(r"^7700900\d{3}$"),    # Ofcom UK reserved mobile drama range
+    re.compile(r"^2079460\d{3}$"),    # Ofcom UK reserved London landline drama range
+    re.compile(r"^\d{3}5550\d{3}$"),  # NANP reserved 555-0100 to 555-0199, any area code
+]
+
+# Exact substrings that trip the phone-number heuristic below without being
+# one — e.g. version-like identifiers such as model names. Add to this list
+# (with a comment explaining why) rather than complicating the regex, if a
+# new false positive turns up.
+KNOWN_SAFE_NON_PHONE_SUBSTRINGS = {
+    "4-5-20251001",  # from the model name "claude-haiku-4-5-20251001"
+}
+
+
+def find_unsafe_phone_numbers(text: str) -> list[str]:
+    """Scans text for phone-number-shaped substrings that aren't from an
+    officially reserved fictional range. Best-effort heuristic, not a
+    guarantee — exists as a repo-wide safety net (see
+    tests/test_no_real_phone_numbers.py) after a real phone number was once
+    accidentally used as a test fixture and pushed to a public fork before
+    being caught and scrubbed from history. Shared with the local
+    .git/hooks/pre-commit safety net used during development (not part of
+    this app's own source, since git hooks aren't committed)."""
+    flagged = []
+    for match in re.finditer(r"\+?\(?\d[\d\-.() ]{7,14}\d", text):
+        raw = match.group()
+        if raw in KNOWN_SAFE_NON_PHONE_SUBSTRINGS:
+            continue
+        digits = re.sub(r"\D", "", raw)
+        core = digits[-10:] if len(digits) >= 10 else digits
+        if len(core) < 9:
+            continue
+        if len(set(core)) == 1:  # e.g. 1111111111 — obviously synthetic
+            continue
+        if any(p.match(core) for p in PHONE_SAFE_CORE_PATTERNS):
+            continue
+        flagged.append(raw)
+    return flagged
