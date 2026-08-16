@@ -34,9 +34,8 @@ For each run, QuoteWake:
 
 1. Finds Salesforce Quotes that are due and eligible for follow-up.
 2. Resolves the customer, primary contact, products, locale, and call policy.
-3. Lets an operator preview the planned call or asks CALL-E to place it.
-4. Converts the accepted call result into a clear commercial outcome.
-5. Updates the Quote and creates a completed Salesforce Task with the summary
+3. Converts the accepted call result into a clear commercial outcome.
+4. Updates the Quote and creates a completed Salesforce Task with the summary
    and next action.
 
 ## What QuoteWake delivers
@@ -54,136 +53,19 @@ For each run, QuoteWake:
 - **Operational visibility:** bounded rotating logs, a per-run call summary,
   deterministic idempotency, and `--max-calls` support controlled execution.
 
-## Run QuoteWake manually
+For details on how QuoteWake selects Quotes and on the Salesforce model, see
+the [Salesforce integration documentation](doc/salesforce-integration.md).
 
-Run these modes in order when validating a setup:
-
-1. **Dry-run first** — authenticates to Salesforce, evaluates Quotes, and shows
-   the calls that would be selected. It does not construct the CALL-E provider
-   SDK client, make CALL-E network requests, place a call, or write Salesforce.
-
-   ```shell
-   uv run python -m quotewake_salesforce --max-calls 1
-   ```
-
-2. **Preview the prompt** — performs the same read-only selection and prints the
-   Salesforce-derived prompt for review. It does not place a call or write
-   Salesforce; protect the output because it contains commercial context.
-
-   ```shell
-   uv run python -m quotewake_salesforce --show-prompt --max-calls 1
-   ```
-
-3. **Execute only after both checks** — places up to one CALL-E call and, when
-   an accepted result is available, atomically updates the Quote and creates a
-   completed Task.
-
-   ```shell
-   uv run python -m quotewake_salesforce --execute --max-calls 1
-   ```
-
-Increase `--max-calls` only after confirming selection, permissions, recipient
-authorization, operating hours, and CALL-E behavior. The onboarding below
-contains the full setup and pre-live checklist.
-
-## How QuoteWake selects Quotes
-
-The Salesforce query provides a stable `LastModifiedDate ASC, Id ASC` stream.
-Before applying `--max-calls`,
-READY Quotes are ordered by the oldest actionable follow-up timestamp: a due
-`Retry` uses `Next_Follow_Up_At__c`, while an initial follow-up uses
-`LastModifiedDate`. Ties use `LastModifiedDate` and Quote ID. It does not score
-or rank candidates by account value, Quote amount, engagement, or any other
-priority signal. `--max-calls` takes the first READY candidates in this
-follow-up-age order (default: `10`) in both dry-run and execute modes. It is a
-throughput limit, not a concurrency lock.
-
-By default, a Quote is READY when it is enabled, has status `Presented`, belongs
-to an open Opportunity, is not expired, is below the configured maximum of three
-accepted call attempts, and has either a blank follow-up status or a due `Retry`
-status. The initial timing policy uses `LastModifiedDate`; a `Retry` uses
-`Next_Follow_Up_At__c`. The candidate must also have exactly one primary
-`OpportunityContactRole`, a valid phone (MobilePhone is preferred over Phone),
-and must not match a configured opt-out field. `Completed`, `Stopped`, invalid,
-and otherwise non-actionable states are skipped.
-
-The default `quotewake.toml` sets initial delays to zero for a demonstrable
-dataset. Set non-zero values for a real operating cadence. Allowed Quote
-statuses can be repeated with `--allowed-quote-status` or configured with the
-`QUOTEWAKE_ALLOWED_QUOTE_STATUSES` environment variable.
-
-## Salesforce model
-
-Salesforce standard objects are used wherever possible:
-
-| Object | How QuoteWake uses it |
-| --- | --- |
-| `Quote` | Reads commercial state and writes follow-up state. Standard fields include `Name`, `Status`, `ExpirationDate`, `LastModifiedDate`, amount/currency, and `OpportunityId`. |
-| `Opportunity` | Resolves the related opportunity and checks `IsClosed`. |
-| `Account` | Supplies the account name and `BillingCountryCode` for call context. |
-| `Contact` | Supplies the callable person, `MobilePhone`/`Phone`, and call locale. |
-| `OpportunityContactRole` | Requires exactly one primary contact for the opportunity. |
-| `QuoteLineItem` / `Product2` | Supplies concise product, quantity, and line-total context. |
-| `Organization` | Supplies `TimeZoneSidKey` and `DefaultLocaleSidKey` for regional formatting. |
-| `Task` | Stores each persisted follow-up result, linked to the Quote (`WhatId`) and Contact (`WhoId`), with the commercial outcome in the subject and a multiline description. |
-
-The deployed QuoteWake custom fields are:
-
-On `Quote`:
-
-- `QuoteWake_Enabled__c`: opt a Quote into automation.
-- `Follow_Up_Status__c`: `Retry`, `Completed`, or `Stopped` after processing;
-  blank means the initial follow-up is pending. `In Progress` is reserved in
-  the Salesforce picklist and treated as non-actionable by the current worker.
-- `Next_Follow_Up_At__c`: persisted retry time, or the UTC reset-generation
-  marker when `Follow_Up_Status__c` is blank; stored by Salesforce as a
-  DateTime.
-- `Attempt_Count__c`: accepted CALL-E attempts. Failures before CALL-E returns a
-  `call_id` do not consume one; every accepted call consumes one. Reliable
-  terminal non-connection states use retryable `call_not_established`, while
-  wait/parse errors without a reliable terminal state use `unknown`.
-
-On `Contact`:
-
-- `QuoteWake_Call_Locale__c`: call locale stored in Salesforce form (for
-  example `en_US`) and normalized to CALL-E's BCP-47 form (`en-US`) at the
-  provider boundary.
-
-An opt-out field is optional because Salesforce orgs differ: configure a
-Contact checkbox API name with `SALESFORCE_DO_NOT_CALL_FIELD` or
-`--do-not-call-field`. If it is not configured, QuoteWake cannot apply that
-field-level opt-out filter.
-
-No custom call-history object is required today. The standard Task is the
-Salesforce activity record. QuoteWake writes the three follow-up fields above;
-it does not overwrite commercial Quote amount, status, expiration, or other
-business fields.
-
-Task subjects use `QuoteWake call outcome: <outcome>`; `unknown` adds
-`(human review)`. The description keeps the summary and next action on separate
-lines and includes the CALL-E call ID. A Task is created whenever QuoteWake
-has an accepted call that it can safely persist. Reliable terminal provider
-failures create a retryable `call_not_established` Task without a human-review
-marker; wait/parse errors without a reliable terminal state create an `unknown`
-human-review Task. Create failures without a confirmed `call_id` do not update
-Salesforce or create a Task.
-
-## Beginner onboarding: Salesforce to a safe dry-run
+## Onboarding
 
 Start with an available Salesforce Sales org. Use a sandbox, Developer Edition,
 or other non-production org for your first setup. Metadata deployment, demo
 seeding, and reset operations change Salesforce data; do not experiment in a
 production org. Salesforce also recommends a sandbox for API testing.
 
-Choose one data path before starting:
-
-- **Path A — demo data:** deploy QuoteWake metadata, then let the setup script
-  create its named demo Accounts, Contacts, Opportunities, Quotes, products,
-  and quote lines. This is the fastest path for a disposable org.
-- **Path B — existing data:** deploy metadata only, then enable and prepare
-  existing Quotes yourself. The setup script does not need to seed records.
-
-The steps through the first dry-run are common to both paths.
+The setup script provides a complete demo dataset, including Accounts, Contacts,
+Opportunities, Quotes, products, and quote lines. This is the recommended path
+for testing QuoteWake quickly in a disposable org.
 
 ### 1. Understand the two Salesforce identities
 
@@ -203,11 +85,43 @@ secret can request a token as that user.
 
 You need Python 3.11 or newer, [`uv`](https://docs.astral.sh/uv/), the
 [Salesforce CLI](https://developer.salesforce.com/tools/salesforcecli), and
-`jq`. From this QuoteWake directory:
+`jq`. The commands below target Debian, Ubuntu, and WSL. For macOS or Windows,
+use the installers linked from the official tool pages.
+
+Install the operating-system packages first:
 
 ```shell
+sudo apt-get update
+sudo apt-get install -y python3 python3-venv curl jq
+```
+
+Confirm that Python meets the project requirement:
+
+```shell
+python3 --version
+```
+
+Install `uv` with its official installer, then open a new terminal if the
+installer asks you to update your `PATH`:
+
+```shell
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv --version
+```
+
+Install the Salesforce CLI. The npm installation requires a supported Node.js
+and npm installation; if those tools are not available, use the platform
+installer from the [Salesforce CLI download page](https://developer.salesforce.com/tools/salesforcecli):
+
+```shell
+npm install --global @salesforce/cli
 sf --version
-jq --version
+```
+
+From this QuoteWake directory, create the project environment and local
+configuration:
+
+```shell
 uv sync
 cp .env.example .env
 chmod 600 .env
@@ -224,7 +138,7 @@ start from the standard Salesforce login URL:
 ```shell
 sf org login web \
   --instance-url https://login.salesforce.com \
-  --alias quotewake-admin \
+  --alias quotewake-dev \
   --set-default
 ```
 
@@ -238,14 +152,14 @@ hostname:
 export QUOTEWAKE_SANDBOX_URL="https://MyDomainName--SandboxName.sandbox.my.salesforce.com"
 sf org login web \
   --instance-url "$QUOTEWAKE_SANDBOX_URL" \
-  --alias quotewake-admin \
+  --alias quotewake-dev \
   --set-default
 ```
 
 After either login, verify the selected org:
 
 ```shell
-sf org display --target-org quotewake-admin
+sf org display --target-org quotewake-dev
 ```
 
 The browser login authorizes administrative CLI operations only. It does not
@@ -262,103 +176,41 @@ cannot reliably enable Quotes in every Sales org through metadata. The
 documents the same controls. QuoteWake requires Quotes related to Opportunities;
 it does not require the optional setting for Quotes without an Opportunity.
 
-### 5. Deploy QuoteWake metadata without seeding data
+### 5. Deploy QuoteWake metadata and provision the runtime user
 
-Run the setup script with no data option. It deploys the Quote and Contact
-fields plus `QuoteWake_User`, verifies the schema, and does not create demo
-business records:
-
-```shell
-./scripts/setup-salesforce.sh --target-org quotewake-admin
-```
-
-This deployment is separate from choosing Path A or Path B below. Do not add
-`--seed-data` yet.
-
-### 6. Create the dedicated jury user
-
-Use the administrator CLI target to run the idempotent provisioning script. It
-only supports a Developer Edition or sandbox and performs all read-only checks
-(authentication, org type, profile, Salesforce license availability, QuoteWake
-schema, existing-user conflicts, and permission-set metadata) before its first
-write. Start with a dry-run:
+Run the setup script with no data option and provide a dedicated runtime user
+email and globally unique Salesforce username. The script deploys the Quote and
+Contact fields, creates or reconciles the user with the standard
+`Minimum Access - Salesforce` profile, assigns `QuoteWake_User`, and prepares
+the QuoteWake External Client App. It does not create demo business records:
 
 ```shell
-./scripts/create-jury-user.sh \
-  --target-org quotewake-admin \
-  --email jury@example.com \
-  --username quotewake.jury@example.com \
-  --dry-run
+./scripts/setup-salesforce.sh \
+  --target-org quotewake-dev \
+  --runtime-user-email quotewake.runtime@example.com \
+  --runtime-user-username quotewake.runtime@example.com
 ```
 
-After reviewing the output, run the same command without `--dry-run`:
+This deployment only prepares the metadata. The demo records are created in
+step 9; do not add `--seed-data` yet.
 
-```shell
-./scripts/create-jury-user.sh \
-  --target-org quotewake-admin \
-  --email jury@example.com \
-  --username quotewake.jury@example.com
-```
+The created user's last name is `QuoteWake Runtime` and its alias is `qwrtuser`,
+so it is easy to identify in Salesforce. The standard profile remains
+`Minimum Access - Salesforce`; QuoteWake-specific access is isolated in the
+`QuoteWake_User` permission set. The script never creates a password or prints
+one; Salesforce sends the welcome/reset email for a newly created user.
 
-The script deploys `QuoteWake_Jury_User`, creates the user with the
-`Minimum Access - Salesforce` profile and the Salesforce user license, assigns
-the permission set, and asks Salesforce to send the password-reset/welcome
-email. It never generates, prints, stores, or accepts a password. If the
-matching user already exists, it reuses it safely; a different email, username,
-profile, or license is a hard conflict. Use `--resend-welcome` only when the
-existing jury user needs another reset email.
+### 6. Verify the External Client App and retrieve credentials
 
-`QuoteWake_Jury_User` is separate from the narrower `QuoteWake_User` runtime
-permission set. It grants the jury API and Lightning Sales UI access needed to
-inspect and edit the demo's commercial records while denying delete, View All,
-and Modify All:
+The setup script deploys `QuoteWake Integration` and configures its OAuth
+Client Credentials policy with the runtime user as **Run As**. It also
+pre-authorizes `QuoteWake_User` and enables only the `api` OAuth scope. Verify
+the generated app in **Setup → External Client Apps Manager**.
 
-| Resource | Jury access |
-| --- | --- |
-| System | API enabled and Lightning Sales app visible. |
-| `Account`, `Contact`, `Opportunity`, `Quote` | Read and edit selected commercial fields; create and delete denied. |
-| `OpportunityContactRole` | Read relationship and primary-contact fields. |
-| `QuoteLineItem` | Read and edit quantity, unit price, and description; create and delete denied. |
-| `Product2` | Read product name and unit fields. |
-| `Organization` | Read timezone, locale, and language settings. |
-| `Task` | Create, read, and edit follow-up activities; delete denied. |
-| UI tabs | Account, Contact, Opportunity, Quote, Product, and Task visible. |
-
-The user still needs record sharing for the Accounts, Contacts,
-Opportunities, Quotes, Opportunity Contact Roles, Quote Lines, and Products
-that the jury should inspect. A permission set does not override sharing; use
-org-wide defaults, sharing rules, teams, or explicit sharing to limit access to
-the intended demo records.
-
-The password-reset email contains the Salesforce UI sign-in path. The jury
-should set a unique password and complete MFA before testing. The UI username
-and password do not belong in `.env`.
-
-### 7. Create the External Client App
-
-Follow Salesforce's current
-[External Client App client-credentials procedure](https://help.salesforce.com/s/articleView?id=sf.configure_client_credentials_flow_for_external_client_apps.htm&language=en_US&type=5):
-
-1. In Setup, enter `External Client Apps Manager` in **Quick Find**, open it,
-   and select **New External Client App**.
-2. Enter a descriptive app name such as `QuoteWake Jury` and an administrator
-   contact email. Keep this app separate from any existing administrator or
-   developer integration app.
-3. Under **API (Enable OAuth Settings)**, select **Enable OAuth**. If the form
-   requires a callback URL, enter an HTTPS URL controlled by your organization;
-   the client-credentials flow does not redirect to it.
-4. Move **Manage user data via APIs (api)** into **Selected OAuth Scopes**. Do
-   not add broader scopes that QuoteWake does not use.
-5. Under flow enablement, select **Enable Client Credentials Flow**, acknowledge
-   the security warning, and create/save the app.
-6. Open the app's **Policies** tab, select **Edit**, set **Permitted Users** to
-   **Admin approved users are pre-authorized**, and set **Run As** to the
-   newly provisioned jury user. Save.
-7. Open the app's OAuth settings and select **Consumer Key and Secret** (the UI
-   can require identity verification). Store both values in a secret manager;
-   never paste them into source control. Anyone holding these two values can
-   obtain API tokens as the jury user, so share them only through a secret
-   manager or an encrypted handoff.
+Retrieve the **Consumer Key and Secret** from the app's OAuth settings (the UI
+can require identity verification). Store both values in a secret manager;
+never paste them into source control. Anyone holding these two values can
+obtain API tokens as the runtime user.
 
 All tokens from this flow inherit the Run As user's permissions and record
 access. Salesforce can take several minutes to make a new app usable.
@@ -366,11 +218,17 @@ access. Salesforce can take several minutes to make a new app usable.
 Get the org's My Domain URL from **Setup → My Domain**, or from the admin CLI:
 
 ```shell
-sf org display --target-org quotewake-admin
+sf org display --target-org quotewake-dev
 ```
 
 Use the `https://<my-domain>.my.salesforce.com` instance URL, not a Lightning
 UI URL and not a token endpoint path.
+
+### 7. Create a CALL-E API key
+
+Create a CALL-E API key from the [CALL-E API keys dashboard](https://dashboard.heycall-e.com/account/api-keys).
+Copy it to a secure location; it is shown only during creation and must never
+be committed to source control.
 
 ### 8. Configure `.env`
 
@@ -397,15 +255,13 @@ only with `--execute`. Use an API version supported by the org. In a
 single-currency org where `Quote.CurrencyIsoCode` is unavailable, set
 `SALESFORCE_CURRENCY_CODE` to the org's three-letter ISO currency code.
 
-### 9. Choose and prepare the data path
-
-#### Path A — create disposable demo data
+### 9. Create the demo data
 
 Seed the idempotent demo hierarchy after metadata and runtime access are ready:
 
 ```shell
 ./scripts/setup-salesforce.sh \
-  --target-org quotewake-admin \
+  --target-org quotewake-dev \
   --seed-data \
   --country-code US \
   --call-locale en_US
@@ -413,25 +269,19 @@ Seed the idempotent demo hierarchy after metadata and runtime access are ready:
 
 New demo Contacts receive fictional fixture numbers when `--test-phones` is
 omitted. Existing demo `Phone` and `MobilePhone` values are preserved. Use
-`--reset-data` only when intentionally starting a new demo generation: it
-deletes Tasks linked to the demo Quotes, resets their QuoteWake state, and
-changes the idempotency generation marker.
+To reset the demo before another test run, execute:
 
-#### Path B — use existing Salesforce data
+```shell
+./scripts/setup-salesforce.sh \
+  --target-org quotewake-dev \
+  --reset-data \
+  --country-code US \
+  --call-locale en_US
+```
 
-Do not run `--seed-data` or `--reset-data`. Prepare at least one existing Quote
-and its relationships so that all of these are true:
-
-- Quote status is `Presented` (or is included in
-  `QUOTEWAKE_ALLOWED_QUOTE_STATUSES`), `QuoteWake_Enabled__c` is selected, the
-  Quote is not expired, and its Opportunity is open.
-- The Quote belongs to an Opportunity with an Account and exactly one primary
-  Opportunity Contact Role.
-- That primary Contact has an authorized test phone in `MobilePhone` or `Phone`
-  and a supported `QuoteWake_Call_Locale__c` value.
-- The Account has `BillingCountryCode`; the Quote has usable totals and quote
-  lines; follow-up state is blank or a `Retry` is due.
-- The runtime user has field and sharing access to the complete record graph.
+`--reset-data` seeds or reconciles the demo hierarchy, deletes Tasks linked to
+the demo Quotes, resets their QuoteWake state, and changes the idempotency
+generation marker. Use it only when intentionally starting a new demo run.
 
 ### 10. Run the safe runtime test
 
@@ -493,118 +343,16 @@ a new provider request with the same Quote and attempt data. Omit it in normal
 runs. Use `--config /path/to/quotewake.toml` to select another TOML file; the
 default is [`quotewake.toml`](quotewake.toml).
 
-### Inspect or adjust QuoteWake state
+### Inspect QuoteWake state
 
 ```shell
-./scripts/query-quotes.sh --target-org quotewake-admin
-./scripts/update-quote.sh 0Q0123456789ABC --enabled true --attempt-count 1
-./scripts/update-quote.sh 0Q0123456789ABC --retry-in 1d2h30m
-./scripts/update-quote.sh 0Q0123456789ABC --clear-follow-up-status --clear-retry
+./scripts/query-quotes.sh --target-org quotewake-dev
 ```
 
 The query script opens `less -S` on an interactive terminal; press `q` to exit.
-The update script reads before and after changing only requested QuoteWake
-fields. Its `--follow-up-status` values are `In Progress`, `Retry`, `Completed`,
-and `Stopped`; retry durations use ordered `d`, `h`, `m`, and `s` components.
 
-### Basic troubleshooting
-
-| Symptom | Check |
-| --- | --- |
-| `Quote` is unavailable or metadata deployment fails | Enable Quotes manually first, confirm the admin CLI targets the intended org, then rerun metadata-only setup. |
-| OAuth `invalid_client` or authentication failure | Recheck the My Domain host, consumer key/secret, enabled Client Credentials Flow, and wait a few minutes after app changes. Do not use the Lightning URL. |
-| `INVALID_SESSION_ID` or insufficient access | Confirm the External Client App Run As user, API access, object/field permissions, and that `QuoteWake_User` plus the additional permissions are assigned to that user. |
-| No READY Quotes | Check status, enablement, expiration, retry date/attempt count, open Opportunity, one primary contact, phone/locale, Account country, and runtime sharing. Use `scripts/query-quotes.sh` for state. |
-| Query reports an inaccessible object or field | Add the missing least-privilege object/field permission to the runtime user; remember the included permission set is incomplete for related objects. |
-| Dry-run succeeds but live mode fails | Verify `CALLE_API_KEY`, authorized E.164 recipient, CALL-E connectivity, and logs. Do not repeatedly recreate an accepted call. |
-
-## Configuration and environment
-
-### TOML policy
-
-The shipped [`quotewake.toml`](quotewake.toml) contains the following policy
-shape and defaults:
-
-```toml
-[selection.initial_follow_up]
-minimum_delay = "0s"
-standard_delay = "0s"
-due_soon_window = "0s"
-
-[follow_up.retry]
-max_attempts = 3
-retry_delays = ["2d", "4d"]
-retry_outcomes = ["call_back_later", "call_not_established", "no_answer", "busy"]
-technical_failure_retry_delay = "30m"
-completed_outcomes = ["interested"]
-
-[call]
-wait_timeout_seconds = 600
-# Optional. The default prompt is used when this is omitted.
-prompt = "Follow up quote {quote_name} with {contact_name} at {account_name}."
-
-[logging]
-directory = "logs"
-format = "text"
-level = "DEBUG"
-max_bytes = 5242880
-backup_count = 5
-# Temporary, sensitive support diagnostics; enabled in this demo configuration.
-raw_calle_api = true
-```
-
-`max_attempts` includes the first accepted call attempt, so
-`retry_delays` must be an array of strict compact duration strings containing
-exactly `max_attempts - 1` values. Durations use ordered integer `d`, `h`, `m`,
-and `s` components, with each unit at most once (for example `1d2h30m15s`).
-Configuration accepts `0s` where a zero delay is useful. The
-`retry_outcomes` and `completed_outcomes` lists are validated against the
-fixed policy vocabulary shown in the table; unsupported or alternate mappings
-are rejected rather than silently ignored. The
-`[call].prompt` template may use only `{locale}`, `{region}`,
-`{contact_name}`, `{account_name}`, `{quote_name}`, `{quote_total}`,
-`{expiration_date}`, `{attempt_count}`, and `{quote_items}`. Fixed compliance
-rules are appended to every rendered prompt. Relative log directories are
-resolved from the application directory.
-
-`call.wait_timeout_seconds` is the maximum time in seconds that the SDK polls
-for a non-terminal CALL-E result; it does not delay a terminal response. For
-example, a terminal provider `failed` result finishes as soon as CALL-E reports
-it rather than using the full 600-second limit. QuoteWake
-keeps the official synchronous
-`create` + `wait_for_result` flow and uses a two-second polling interval.
-
-The shipped configuration uses `DEBUG`. At that level, the console shows the
-main completed Salesforce and CALL-E operations plus QuoteWake lifecycle
-events, together with bounded provider-boundary metadata. Lines use the form
-`timestamp [LEVEL] [Service] [event]: details`, with high-contrast service and
-event colors on interactive terminals. `NO_COLOR` disables ANSI colors, and
-rotating files never contain ANSI sequences. The internal run correlation ID
-is retained on records but omitted from human-readable lines.
-
-Set `logging.level = "DEBUG"` when detailed API boundaries are needed. DEBUG
-events record only safe operational metadata:
-Salesforce service/method/route, HTTP status, and elapsed time, plus CALL-E
-operation phase, Quote ID, idempotency key, call ID, provider status, and
-elapsed time. Query strings, SOQL, headers, request bodies, prompts,
-recipients, phone numbers, and raw provider results are not included unless
-the opt-in setting below is enabled. The CALL-E `wait_for_result` event is one
-aggregate wait boundary because the SDK performs polling internally; QuoteWake
-does not emit one log event per poll.
-
-For temporary support investigations, set `logging.raw_calle_api = true` while
-keeping `logging.level = "DEBUG"`. The shipped demo configuration intentionally
-does this so the CALL-E boundary is visible during a demonstration. QuoteWake
-then emits clearly labelled
-`call_e_raw_request` and `call_e_raw_response` events for CALL-E create and
-wait operations. These payloads are recursively sanitized: recipient values
-under `phone`/`phones` are intentionally preserved for support, while
-phone-like values in free text and all credentials are redacted. HTTP
-`Authorization`, API-key, and header fields are never logged. However, raw
-support logs can preserve recipient phone values and structured business data;
-protect `logs/quotewake.log`, do not enable this setting in production unless
-specifically required, and turn it off afterwards. The code default remains
-`false` even though the checked-in demo TOML enables it.
+To customize QuoteWake's TOML policy, call behavior, retry rules, or logging,
+see the [configuration and environment guide](doc/configuration-and-environment.md).
 
 ## Outcomes, retries, and write safety
 
@@ -765,30 +513,6 @@ checked-in demo [`quotewake.toml`](quotewake.toml) explicitly sets
 or controlled demonstration session. `--show-prompt` intentionally prints
 Salesforce-derived business context, so treat its output and the rotating
 `logs/quotewake.log` file as business data and protect them accordingly.
-
-## Current limitations
-
-- Candidate priority is oldest actionable follow-up date, with stable date/ID
-  tie-breakers; there is no scoring or ranking by customer value, Quote amount,
-  engagement, territory, consent, or capacity.
-- Exactly one primary Opportunity Contact Role is required. There is no contact
-  fallback, contact rotation, or multi-contact campaign.
-- Completed standard Tasks provide history, but there is no local database,
-  custom call-history object, Salesforce-side write deduplication ledger, or
-  analytics/ROI model.
-- The live path depends on CALL-E availability and credentials. Normal tests use
-  mocks and do not place calls or contact Salesforce.
-- QuoteWake currently does not add Salesforce Flow, Platform Events, Change Data
-  Capture, Agentforce, or Apex automation, and is not a Salesforce-native
-  package.
-
-## Possible extensions
-
-Future work can be selected from demonstrated operating needs: richer Quote
-priority signals, territory and calling-time policy, consent and suppression
-workflows, distributed coordination, provider rate controls, Salesforce-backed
-reporting, or Salesforce-native automation where it adds a clear workflow
-benefit.
 
 ## Tests
 

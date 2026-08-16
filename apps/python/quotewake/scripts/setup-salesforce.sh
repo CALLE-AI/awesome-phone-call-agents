@@ -9,8 +9,11 @@ TARGET_ORG=""
 SEED_DATA=false
 RESET_DATA=false
 ASSIGN_PERMISSIONS=false
+RUNTIME_USER_EMAIL=""
+RUNTIME_USER_USERNAME=""
 CHANGES_APPLIED=false
 DEMO_QUOTE_PREFIX='QuoteWake Demo - '
+EXTERNAL_CLIENT_APP='QuoteWake_Integration'
 TEST_PHONES=()
 COUNTRY_CODE='US'
 CALL_LOCALE='en_US'
@@ -53,6 +56,9 @@ Options:
   --reset-data             Seed the demo hierarchy, delete its Tasks, reset QuoteWake state,
                            and start a new idempotency generation.
   --assign-permissions     Assign QuoteWake_User to the current target-org user.
+  --runtime-user-email EMAIL       Create or reconcile the QuoteWake runtime user.
+  --runtime-user-username USERNAME  Globally unique username for the runtime user.
+                                   Both runtime-user options are required together.
   -h, --help               Show this help.
 
 Examples:
@@ -60,7 +66,9 @@ Examples:
   ./scripts/setup-salesforce.sh --reset-data \
     --country-code US \
     --call-locale en_US \
-    --test-phones +14155550100
+    --test-phones +14155550100 \
+    --runtime-user-email quotewake.runtime@example.com \
+    --runtime-user-username quotewake.runtime@example.com
 
   # Run from the scripts directory:
   ./setup-salesforce.sh --reset-data --country-code US --call-locale en_US \
@@ -153,6 +161,18 @@ while (($#)); do
             ASSIGN_PERMISSIONS=true
             shift
             ;;
+        --runtime-user-email)
+            (($# >= 2)) || fail "--runtime-user-email requires an email address."
+            [[ -z "$RUNTIME_USER_EMAIL" ]] || fail "--runtime-user-email may only be supplied once."
+            RUNTIME_USER_EMAIL="$2"
+            shift 2
+            ;;
+        --runtime-user-username)
+            (($# >= 2)) || fail "--runtime-user-username requires a username."
+            [[ -z "$RUNTIME_USER_USERNAME" ]] || fail "--runtime-user-username may only be supplied once."
+            RUNTIME_USER_USERNAME="$2"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -162,6 +182,11 @@ while (($#)); do
             ;;
     esac
 done
+
+if [[ -n "$RUNTIME_USER_EMAIL" || -n "$RUNTIME_USER_USERNAME" ]]; then
+    [[ -n "$RUNTIME_USER_EMAIL" && -n "$RUNTIME_USER_USERNAME" ]] || \
+        fail "--runtime-user-email and --runtime-user-username must be supplied together."
+fi
 
 if [[ "$RESET_DATA" == true ]]; then
     # Reset always seeds first so the hierarchy and its stable Quote identifiers exist.
@@ -268,9 +293,87 @@ fi
 ok "Quotes are enabled"
 
 info "Deploying QuoteWake fields and permission set..."
-(cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" --source-dir force-app/main/default/objects/Quote --source-dir force-app/main/default/objects/Contact --source-dir force-app/main/default/permissionsets --wait 30 --concise)
+    (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" --source-dir force-app/main/default/objects/Quote --source-dir force-app/main/default/objects/Contact --source-dir force-app/main/default/permissionsets --source-dir 'force-app/main/default/profiles/QuoteWake Runtime.profile-meta.xml' --wait 30 --concise)
 CHANGES_APPLIED=true
 ok "QuoteWake metadata deployment completed"
+
+if [[ -n "$RUNTIME_USER_EMAIL" ]]; then
+    USER_TARGET_ORG="$TARGET_ORG"
+    if [[ -z "$USER_TARGET_ORG" ]]; then
+        USER_TARGET_ORG="$ORG_USERNAME"
+    fi
+    info "Provisioning the dedicated QuoteWake runtime Salesforce user..."
+    "$SCRIPT_DIR/create-user.sh" \
+        --target-org "$USER_TARGET_ORG" \
+        --email "$RUNTIME_USER_EMAIL" \
+        --username "$RUNTIME_USER_USERNAME"
+    ok "Dedicated QuoteWake runtime Salesforce user is ready"
+fi
+
+configure_external_client_app() {
+    local permission_set_name policy_dir policy_file policy_error_file
+
+    [[ -n "$RUNTIME_USER_USERNAME" ]] || \
+        fail "A runtime username is required to configure the External Client App."
+
+    info "Deploying the QuoteWake External Client App OAuth settings..."
+    if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" \
+        --source-dir "force-app/main/default/externalClientApps/$EXTERNAL_CLIENT_APP.eca-meta.xml" \
+        --source-dir "force-app/main/default/extlClntAppGlobalOauthSets/$EXTERNAL_CLIENT_APP.ecaGlblOauth-meta.xml" \
+        --source-dir "force-app/main/default/extlClntAppOauthSettings/$EXTERNAL_CLIENT_APP.ecaOauth-meta.xml" \
+        --wait 30 --concise >/dev/null 2>&1); then
+        fail "QuoteWake External Client App deployment failed."
+    fi
+
+    permission_set_name="$(sf data query "${ORG_ARGS[@]}" \
+        --query "SELECT Name FROM PermissionSet WHERE Name = 'QuoteWake_User' LIMIT 1" \
+        --json | jq -r '.result.records[0].Name // empty')"
+    [[ -n "$permission_set_name" ]] || fail "Could not resolve the QuoteWake_User permission set."
+
+    # Salesforce CLI determines the metadata type from the source directory.
+    # Keep the generated policy in the corresponding source-format directory;
+    # placing the XML at the temporary directory root makes the deployment
+    # fail with an unhelpful generic error.
+    policy_dir="$(mktemp -d "$SALESFORCE_DIR/.quotewake-policy.XXXXXX")"
+    mkdir -p "$policy_dir/extlClntAppOauthPolicies"
+    policy_file="$policy_dir/extlClntAppOauthPolicies/${EXTERNAL_CLIENT_APP}_defaultPolicy.ecaOauthPlcy-meta.xml"
+    cat >"$policy_file" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtlClntAppOauthConfigurablePolicies xmlns="http://soap.sforce.com/2006/04/metadata">
+    <clientCredentialsFlowUser>$RUNTIME_USER_USERNAME</clientCredentialsFlowUser>
+    <commaSeparatedPermissionSet>$permission_set_name</commaSeparatedPermissionSet>
+    <externalClientApplication>$EXTERNAL_CLIENT_APP</externalClientApplication>
+    <ipRelaxationPolicyType>Enforce</ipRelaxationPolicyType>
+    <isClientCredentialsFlowEnabled>true</isClientCredentialsFlowEnabled>
+    <isGuestCodeCredFlowEnabled>false</isGuestCodeCredFlowEnabled>
+    <isTokenExchangeFlowEnabled>false</isTokenExchangeFlowEnabled>
+    <label>${EXTERNAL_CLIENT_APP}_defaultPolicy</label>
+    <permittedUsersPolicyType>AdminApprovedPreAuthorized</permittedUsersPolicyType>
+    <refreshTokenPolicyType>SpecificLifetime</refreshTokenPolicyType>
+    <refreshTokenValidityPeriod>365</refreshTokenValidityPeriod>
+    <refreshTokenValidityUnit>Days</refreshTokenValidityUnit>
+    <requiredSessionLevel>STANDARD</requiredSessionLevel>
+</ExtlClntAppOauthConfigurablePolicies>
+EOF
+
+    info "Configuring Client Credentials Run As user and pre-authorized permission set..."
+    policy_error_file="$(mktemp)"
+    if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" \
+        --source-dir "$policy_dir/extlClntAppOauthPolicies" --wait 30 --concise >"$policy_error_file" 2>&1); then
+        sed -n '1,120p' "$policy_error_file" >&2
+        rm -f "$policy_error_file"
+        rm -rf "$policy_dir"
+        fail "QuoteWake External Client App policy deployment failed."
+    fi
+    rm -f "$policy_error_file"
+    rm -rf "$policy_dir"
+    ok "QuoteWake External Client App is configured for $RUNTIME_USER_USERNAME"
+    info "Retrieve the Consumer Key and Secret from the External Client App OAuth settings and store them in .env or a secret manager."
+}
+
+if [[ -n "$RUNTIME_USER_EMAIL" ]]; then
+    configure_external_client_app
+fi
 
 if [[ "$ASSIGN_PERMISSIONS" == true ]]; then
     CURRENT_USER_ID="$(sf data query "${ORG_ARGS[@]}" --query "SELECT Id FROM User WHERE Username = '$ORG_USERNAME' LIMIT 1" --json | jq -r '.result.records[0].Id // empty')"

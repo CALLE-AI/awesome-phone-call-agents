@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts" / "create-jury-user.sh"
+SCRIPT = ROOT / "scripts" / "create-user.sh"
 PERMISSION_SET = (
     ROOT
     / "salesforce"
@@ -14,7 +14,7 @@ PERMISSION_SET = (
     / "main"
     / "default"
     / "permissionsets"
-    / "QuoteWake_Jury_User.permissionset-meta.xml"
+    / "QuoteWake_User.permissionset-meta.xml"
 )
 
 
@@ -41,17 +41,17 @@ def test_help_and_argument_validation_do_not_need_salesforce():
 
     invalid = run_script(
         "--target-org",
-        "jury-org",
+        "runtime-org",
         "--email",
         "not-an-email",
         "--username",
-        "jury@example.com",
+        "runtime@example.com",
     )
     assert invalid.returncode != 0
     assert "Invalid email" in invalid.stderr
 
 
-def test_permission_set_keeps_jury_access_separate_and_least_privileged():
+def test_permission_set_includes_quote_wake_runtime_api_access():
     root = ET.parse(PERMISSION_SET).getroot()
     namespace = "{http://soap.sforce.com/2006/04/metadata}"
     objects = {
@@ -59,24 +59,22 @@ def test_permission_set_keeps_jury_access_separate_and_least_privileged():
         for item in root.findall(f"{namespace}objectPermissions")
     }
 
-    assert root.findtext(f"{namespace}label") == "QuoteWake Jury User"
-    assert root.findtext(f"{namespace}license") == "Salesforce"
+    assert root.findtext(f"{namespace}label") == "QuoteWake User"
     user_permissions = {
         item.findtext(f"{namespace}name")
         for item in root.findall(f"{namespace}userPermissions")
     }
-    assert {"ApiEnabled", "LightningExperienceUser"} <= user_permissions
+    assert {"ApiEnabled"} <= user_permissions
     for object_name in ("Account", "Contact", "Opportunity", "Quote"):
         assert objects[object_name].findtext(f"{namespace}allowRead") == "true"
-        assert objects[object_name].findtext(f"{namespace}allowEdit") == "true"
+        assert objects[object_name].findtext(f"{namespace}allowEdit") == (
+            "true" if object_name == "Quote" else "false"
+        )
         assert objects[object_name].findtext(f"{namespace}allowDelete") == "false"
         assert objects[object_name].findtext(f"{namespace}viewAllRecords") == "false"
         assert objects[object_name].findtext(f"{namespace}modifyAllRecords") == "false"
     assert objects["Task"].findtext(f"{namespace}allowCreate") == "true"
     assert objects["Task"].findtext(f"{namespace}allowDelete") == "false"
-    assert objects["Product2"].findtext(f"{namespace}allowRead") == "true"
-    assert objects["OpportunityContactRole"].findtext(f"{namespace}allowRead") == "true"
-
     fields = {
         item.findtext(f"{namespace}field")
         for item in root.findall(f"{namespace}fieldPermissions")
@@ -86,11 +84,39 @@ def test_permission_set_keeps_jury_access_separate_and_least_privileged():
         "Quote.Follow_Up_Status__c",
         "Quote.Next_Follow_Up_At__c",
         "Quote.Attempt_Count__c",
+        "Quote.ExpirationDate",
+        "Quote.Status",
         "Contact.QuoteWake_Call_Locale__c",
-        "QuoteLineItem.Description",
+        "Contact.MobilePhone",
+        "Contact.Phone",
+        "Opportunity.AccountId",
     } <= fields
-    assert not any(field.startswith("Organization.") for field in fields)
-    assert "Organization" not in objects
+    assert {
+        "Task.ActivityDate",
+        "Task.Description",
+        "Task.WhatId",
+        "Task.WhoId",
+    } <= fields
+
+
+def test_user_provisioning_reconciles_contact_view_and_account_layout():
+    script = SCRIPT.read_text()
+
+    assert "--source-dir force-app/main/default/objects/Contact" in script
+    assert "profiles/$PROFILE_NAME.profile-meta.xml" in script
+    contact_list_view = (
+        ROOT
+        / "salesforce"
+        / "force-app"
+        / "main"
+        / "default"
+        / "objects"
+        / "Contact"
+        / "listViews"
+        / "All_Contacts.listView-meta.xml"
+    )
+    assert contact_list_view.exists()
+    assert "<fullName>All_Contacts</fullName>" in contact_list_view.read_text()
 
 
 def _fake_sf(tmp_path: Path) -> tuple[Path, Path]:
@@ -134,11 +160,11 @@ def test_dry_run_never_creates_assigns_or_resets(tmp_path: Path):
     fake, log = _fake_sf(tmp_path)
     result = run_script(
         "--target-org",
-        "jury-org",
+        "runtime-org",
         "--email",
-        "jury@example.com",
+        "runtime@example.com",
         "--username",
-        "quotewake.jury@example.com",
+        "quotewake.runtime@example.com",
         "--dry-run",
         env={
             **os.environ,
@@ -162,11 +188,11 @@ def test_real_mode_creates_assigns_and_requests_welcome_without_password(tmp_pat
     fake, log = _fake_sf(tmp_path)
     result = run_script(
         "--target-org",
-        "jury-org",
+        "runtime-org",
         "--email",
-        "jury@example.com",
+        "runtime@example.com",
         "--username",
-        "quotewake.jury@example.com",
+        "quotewake.runtime@example.com",
         env={
             **os.environ,
             "PATH": f"{fake.parent}:{os.environ['PATH']}",

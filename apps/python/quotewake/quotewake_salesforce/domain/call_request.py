@@ -75,6 +75,17 @@ def _validate_region(value: str | None) -> str:
     return value
 
 
+def _region_from_locale(value: str) -> str:
+    """Use the locale's country component when Account country is unavailable."""
+
+    _, separator, region = canonicalize_call_locale(value).partition("-")
+    if not separator or not region:
+        raise ValueError(
+            "A regional Contact locale such as en-US is required when Account country is unavailable"
+        )
+    return _validate_region(region)
+
+
 def build_call_request(result: SelectionResult, lines: Iterable[QuoteLine], *, prompt_settings: CallPromptSettings, regional_settings: RegionalSettings | None = None) -> CallRequest:
     if result.decision is not SelectionDecision.READY:
         raise ValueError("Only READY selections can be called.")
@@ -84,7 +95,11 @@ def build_call_request(result: SelectionResult, lines: Iterable[QuoteLine], *, p
     if not contact.call_locale:
         raise ValueError("Salesforce Contact.QuoteWake_Call_Locale__c is required for CALL-E calls")
     locale = canonicalize_call_locale(contact.call_locale)
-    region = _validate_region(quote.account_billing_country_code)
+    region = (
+        _validate_region(quote.account_billing_country_code)
+        if quote.account_billing_country_code
+        else _region_from_locale(locale)
+    )
     account_name = _safe_context(quote.account_name, "the customer account")
     contact_name = _safe_context(contact.name, "the quote contact")
     quote_name = _safe_context(quote.quote_name, quote.quote_id)

@@ -9,7 +9,13 @@ from quotewake_salesforce.config import RegionalSettings
 from quotewake_salesforce.domain.models import ContactTarget, Money, QuoteCandidate, QuoteLine
 from quotewake_salesforce.structured_logging import log_event
 
-from .client import SalesforceClient, SalesforceResponseError, SalesforceSchemaError
+from .client import (
+    SalesforceClient,
+    SalesforceError,
+    SalesforceQueryError,
+    SalesforceResponseError,
+    SalesforceSchemaError,
+)
 from .codecs import (
     boolean,
     decimal,
@@ -40,7 +46,10 @@ REQUIRED_QUOTE_FIELDS = {
 }
 REQUIRED_CONTACT_FIELDS = {"Id", "Name", "Phone", "MobilePhone"}
 REQUIRED_CONTACT_FIELDS.add("QuoteWake_Call_Locale__c")
-REQUIRED_ACCOUNT_FIELDS = {"BillingCountryCode"}
+# BillingCountryCode is a compound Salesforce field and is not exposed for
+# field-level permission assignment in every org. QuoteWake can use the
+# callable Contact locale as its regional fallback instead.
+REQUIRED_ACCOUNT_FIELDS: set[str] = set()
 REQUIRED_ORGANIZATION_FIELDS = {"TimeZoneSidKey", "DefaultLocaleSidKey"}
 ID_PATTERN = re.compile(r"^[A-Za-z0-9]{15,18}$")
 
@@ -145,7 +154,7 @@ class QuoteRepository:
         try:
             quote_fields = _field_map(self.client.describe("Quote"))
         except Exception as exc:
-            if isinstance(exc, SalesforceSchemaError):
+            if isinstance(exc, SalesforceError):
                 raise
             raise SalesforceSchemaError(
                 "The standard Salesforce Quote object is unavailable or cannot be described."
@@ -206,44 +215,12 @@ class QuoteRepository:
             raise SalesforceSchemaError(
                 "The standard Salesforce Account object is unavailable or cannot be described."
             ) from exc
-        missing_accounts = sorted(REQUIRED_ACCOUNT_FIELDS - account_fields.keys())
-        if missing_accounts:
-            raise SalesforceSchemaError(
-                "Salesforce Account fields required for regional call context are missing: "
-                + ", ".join(missing_accounts)
-            )
-        country_type = account_fields["BillingCountryCode"].get("type")
-        if country_type is not None and country_type not in {"picklist", "string"}:
-            raise SalesforceSchemaError(
-                "Salesforce Account.BillingCountryCode has unexpected type "
-                f"{country_type!r}."
-            )
-        try:
-            organization_fields = _field_map(self.client.describe("Organization"))
-        except Exception as exc:
-            raise SalesforceSchemaError(
-                "The Salesforce Organization object is unavailable or cannot be described."
-            ) from exc
-        missing_organization = sorted(
-            REQUIRED_ORGANIZATION_FIELDS - organization_fields.keys()
-        )
-        if missing_organization:
-            raise SalesforceSchemaError(
-                "Salesforce Organization fields required for regional settings are missing: "
-                + ", ".join(missing_organization)
-            )
-        for name in REQUIRED_ORGANIZATION_FIELDS:
-            field_type = organization_fields[name].get("type")
-            if field_type is not None and field_type not in {"picklist", "string"}:
-                raise SalesforceSchemaError(
-                    f"Salesforce Organization.{name} has unexpected type {field_type!r}."
-                )
         log_event(
             "salesforce_schema_validation_completed",
             quote_field_count=len(quote_fields),
             contact_field_count=len(contact_fields),
             account_field_count=len(account_fields),
-            organization_field_count=len(organization_fields),
+            organization_field_count=0,
             do_not_call_field_configured=bool(self.do_not_call_field),
         )
         self._schema_cache = (quote_fields, contact_fields)
@@ -252,9 +229,20 @@ class QuoteRepository:
     def load_organization_regional_settings(self) -> RegionalSettings:
         """Read the organization timezone and default locale from Salesforce."""
 
-        records = self.client.query(
-            "SELECT TimeZoneSidKey, DefaultLocaleSidKey FROM Organization LIMIT 1"
-        )
+        try:
+            records = self.client.query(
+                "SELECT TimeZoneSidKey, DefaultLocaleSidKey FROM Organization LIMIT 1"
+            )
+        except SalesforceError:
+            # Minimum Access users may authenticate and use business objects
+            # without access to the setup-only Organization object. Keep the
+            # runtime least-privileged and use the safe presentation defaults.
+            log_event(
+                "salesforce_organization_settings_unavailable",
+                fallback_timezone="UTC",
+                fallback_locale="en_US",
+            )
+            return RegionalSettings.from_values("UTC", "en_US")
         if len(records) != 1:
             raise SalesforceResponseError(
                 "Salesforce Organization query did not return exactly one record."
@@ -330,7 +318,6 @@ class QuoteRepository:
             "OpportunityId",
             "Opportunity.Name",
             "Opportunity.Account.Name",
-            "Opportunity.Account.BillingCountryCode",
             "Opportunity.IsClosed",
             *(
                 [amount_field]
@@ -416,12 +403,8 @@ class QuoteRepository:
             else None
         )
         account_billing_country_code = (
-            nullable_text(
-                required(account, "BillingCountryCode"),
-                "Opportunity.Account.BillingCountryCode",
-                maximum=2,
-            )
-            if isinstance(account, dict)
+            nullable_text(account.get("BillingCountryCode"), "Opportunity.Account.BillingCountryCode", maximum=2)
+            if isinstance(account, dict) and account.get("BillingCountryCode") is not None
             else None
         )
         raw_metadata = field_metadata.get(amount_field, {}) if field_metadata and amount_field else {}
@@ -515,7 +498,19 @@ class QuoteRepository:
                 f"FROM QuoteLineItem WHERE QuoteId IN ({quoted_ids}) "
                 "ORDER BY QuoteId, SortOrder ASC"
             )
-            for record in self.client.query(soql):
+            try:
+                records = self.client.query(soql)
+            except SalesforceQueryError as exc:
+                # Some Salesforce user licenses do not expose QuoteLineItem.
+                # Lines enrich the prompt but are not required for follow-up.
+                if "sObject type 'QuoteLineItem' is not supported" not in str(exc):
+                    raise
+                log_event(
+                    "salesforce_quote_lines_unavailable",
+                    reason="QuoteLineItem is not supported for the runtime user",
+                )
+                return {}
+            for record in records:
                 quote_id = salesforce_id(required(record, "QuoteId"), "QuoteLineItem.QuoteId", prefix="0Q")
                 product = required(record, "Product2")
                 if not isinstance(product, dict):

@@ -190,7 +190,9 @@ class SalesforceClient:
             elapsed_ms=_elapsed_ms(started),
         )
         if response.status_code >= 400:
-            raise SalesforceError("Salesforce OAuth authentication failed")
+            detail = _error_detail(response)
+            suffix = f": {detail}" if detail else ""
+            raise SalesforceError(f"Salesforce OAuth authentication failed{suffix}")
         try:
             payload = response.json(
                 parse_float=Decimal,
@@ -247,6 +249,8 @@ class SalesforceClient:
             raise SalesforceQueryError(
                 f"Salesforce REST request failed with HTTP {response.status_code}{suffix}"
             )
+        if response.status_code == 204 or not response.content:
+            return {}
         try:
             payload = response.json(
                 parse_float=Decimal,
@@ -298,8 +302,53 @@ class SalesforceClient:
         responses = payload.get("compositeResponse")
         if not isinstance(responses, list):
             raise SalesforceResponseError("Salesforce composite response was malformed")
-        if any(isinstance(item, dict) and isinstance(item.get("httpStatusCode"), int) and item["httpStatusCode"] >= 300 for item in responses):
-            raise SalesforceQueryError("Salesforce composite write was not successful")
+        failed = [
+            item for item in responses
+            if isinstance(item, dict)
+            and isinstance(item.get("httpStatusCode"), int)
+            and item["httpStatusCode"] >= 300
+        ]
+        if failed:
+            references = ", ".join(str(item.get("referenceId", "unknown")) for item in failed)
+            details: list[str] = []
+            for item in failed:
+                body = item.get("body")
+                if isinstance(body, list):
+                    for error in body:
+                        if isinstance(error, dict):
+                            code = error.get("errorCode")
+                            message = error.get("message")
+                            if isinstance(code, str) or isinstance(message, str):
+                                details.append(f"{code or 'ERROR'}: {message or 'Salesforce rejected the request'}")
+                elif isinstance(body, dict):
+                    code = body.get("errorCode")
+                    message = body.get("message")
+                    if isinstance(code, str) or isinstance(message, str):
+                        details.append(f"{code or 'ERROR'}: {message or 'Salesforce rejected the request'}")
+            suffix = f" ({'; '.join(details)})" if details else ""
+            task_is_unavailable = any(
+                "entity type cannot be inserted: Task" in detail
+                for detail in details
+            )
+            if task_is_unavailable:
+                # Some Salesforce licenses cannot insert Activities even when
+                # the Task object is visible. Persist the Quote state
+                # independently because it is the required source of truth.
+                self._request(
+                    "PATCH",
+                    f"{self.api_root}/sobjects/Quote/{quote.quote_id}",
+                    json=update.as_salesforce_fields(),
+                )
+                log_event(
+                    "salesforce_task_unavailable",
+                    quote_id=quote.quote_id,
+                    reason="The runtime Salesforce license cannot insert Task records",
+                )
+                log_event("salesforce_follow_up_persisted", quote_id=quote.quote_id)
+                return CompositeWriteResult(quote.quote_id, "")
+            raise SalesforceQueryError(
+                f"Salesforce composite write failed for {references}{suffix}"
+            )
         if len(responses) != 2:
             raise SalesforceResponseError("Salesforce composite response was incomplete")
         for item in responses:

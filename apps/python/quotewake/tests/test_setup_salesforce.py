@@ -32,6 +32,8 @@ def test_help_documents_regional_seed_options_without_external_dependencies():
     assert "new idempotency generation" in result.stdout
     assert "primary Opportunity Contact Role's Contact phone" in result.stdout
     assert "--test-phones +14155550100" in result.stdout
+    assert "--runtime-user-email quotewake.runtime@example.com" in result.stdout
+    assert "--runtime-user-username quotewake.runtime@example.com" in result.stdout
     assert "trailing backslash" in result.stdout
 
 
@@ -164,7 +166,39 @@ def test_setup_loads_timing_and_retry_policy_before_mutating_salesforce():
     assert "MAX_ATTEMPTS=\"$(jq -r '.max_attempts' <<<\"$TIMING_JSON\")\"" in script
     assert "Attempt_Count__c < $MAX_ATTEMPTS" in script
     assert "Attempt_Count__c < 3" not in script
+    assert "profiles/QuoteWake Runtime.profile-meta.xml" in script
     assert 'uv run --project "$APP_DIR" --directory "$APP_DIR" python -c' in script
+
+
+def test_runtime_user_options_are_required_together_and_provision_before_app_setup():
+    script = SCRIPT.read_text()
+
+    assert '[[ -n "$RUNTIME_USER_EMAIL" && -n "$RUNTIME_USER_USERNAME" ]]' in script
+    deployment = script.index('sf project deploy start')
+    provisioning = script.index('create-user.sh')
+    assert deployment < provisioning
+    assert '"$SCRIPT_DIR/create-user.sh"' in script
+    assert 'configure_external_client_app' in script
+
+
+def test_setup_declares_quote_wake_external_client_app_and_runtime_policy():
+    app_root = ROOT / "salesforce" / "force-app" / "main" / "default"
+    app = (app_root / "externalClientApps" / "QuoteWake_Integration.eca-meta.xml").read_text()
+    global_oauth = (
+        app_root
+        / "extlClntAppGlobalOauthSets"
+        / "QuoteWake_Integration.ecaGlblOauth-meta.xml"
+    ).read_text()
+    oauth = (app_root / "extlClntAppOauthSettings" / "QuoteWake_Integration.ecaOauth-meta.xml").read_text()
+    script = SCRIPT.read_text()
+
+    assert "<label>QuoteWake Integration</label>" in app
+    assert "<isClientCredentialsFlowEnabled>true</isClientCredentialsFlowEnabled>" in global_oauth
+    assert "<commaSeparatedOauthScopes>Api</commaSeparatedOauthScopes>" in oauth
+    assert "<clientCredentialsFlowUser>$RUNTIME_USER_USERNAME</clientCredentialsFlowUser>" in script
+    assert "<commaSeparatedPermissionSet>$permission_set_name</commaSeparatedPermissionSet>" in script
+    assert "AdminApprovedPreAuthorized" in script
+    assert '--target-org "$USER_TARGET_ORG"' in script
 
 
 def test_reset_uses_one_generation_marker_for_every_demo_quote():
