@@ -7,12 +7,16 @@ Pricing in guardrails.MODEL_PRICING_PER_MTOK must be kept in step with
 whichever provider/model is actually used, since LLMBudgetGuard depends on
 it to estimate real spend from real token counts.
 
-NOTE: the Gemini path is implemented against the documented google-genai
-API shape (client.models.generate_content, response.usage_metadata.{prompt_
-token_count,candidates_token_count}) but has not yet been exercised against
-a real Gemini call in this project — confirm it end-to-end before relying
-on it for a real screening run, the same way RealCallEClient's REST shape
-needed confirming (see caller.py).
+NOTE: the Gemini path originally targeted client.models.generate_content()
+with gemini-2.5-flash — a real run hit a real 404, since that model and
+method are deprecated ("no longer available to new users", Google's error
+pointed at https://ai.google.dev/gemini-api/docs/migrate-to-interactions).
+Switched to the Interactions API (client.interactions.create(), model
+gemini-3.6-flash, interaction.output_text, interaction.usage.total_
+{input,output}_tokens) per that migration guide — still unconfirmed against
+an actual successful real call in this project as of this fix, same
+"documented but not yet proven" caveat RealCallEClient's REST shape needed
+before its own real test (see caller.py).
 """
 import os
 from dataclasses import dataclass
@@ -52,18 +56,17 @@ def _call_gemini(prompt: str, model: str) -> LLMResponse:
     from google import genai  # imported after the key check — see _call_anthropic
 
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(model=model, contents=prompt)
-    usage = response.usage_metadata
+    interaction = client.interactions.create(model=model, input=prompt)
     return LLMResponse(
-        text=response.text,
-        input_tokens=usage.prompt_token_count,
-        output_tokens=usage.candidates_token_count,
+        text=interaction.output_text,
+        input_tokens=interaction.usage.total_input_tokens,
+        output_tokens=interaction.usage.total_output_tokens,
     )
 
 
 PROVIDERS = {
     "anthropic": {"call": _call_anthropic, "default_model": "claude-sonnet-5"},
-    "gemini": {"call": _call_gemini, "default_model": "gemini-2.5-flash"},
+    "gemini": {"call": _call_gemini, "default_model": "gemini-3.6-flash"},
 }
 
 

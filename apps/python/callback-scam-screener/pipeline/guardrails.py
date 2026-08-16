@@ -20,7 +20,7 @@ MODEL_PRICING_PER_MTOK = {
     "claude-sonnet-5": {"input": 3.00, "output": 15.00},
     "claude-opus-5": {"input": 15.00, "output": 75.00},
     "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
-    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
+    "gemini-3.6-flash": {"input": 0.75, "output": 3.75},  # rate through 2026-12-31; rises to 1.50/7.50 in 2027
 }
 DEFAULT_MODEL_PRICING = MODEL_PRICING_PER_MTOK["claude-sonnet-5"]
 
