@@ -196,6 +196,11 @@ the QuoteWake External Client App. It does not create demo business records:
 This deployment only prepares the metadata. The demo records are created in
 step 9; do not add `--seed-data` yet.
 
+The two `--runtime-user-*` options are for this initial setup step. They create
+or reconcile the dedicated runtime user and configure the External Client App's
+**Run As** user. Once this setup is complete, omit both options from later
+`--reset-data` runs; reset only prepares the demo records and QuoteWake state.
+
 The created user's last name is `QuoteWake Runtime` and its alias is `qwrtuser`,
 so it is easy to identify in Salesforce. The `QuoteWake Runtime` profile
 provides the minimal profile-level capabilities required for API access,
@@ -285,7 +290,10 @@ To reset the demo before another test run, execute:
 
 `--reset-data` seeds or reconciles the demo hierarchy, deletes Tasks linked to
 the demo Quotes, resets their QuoteWake state, and changes the idempotency
-generation marker. Use it only when intentionally starting a new demo run.
+generation marker. The runtime user and External Client App must already be
+configured by step 5; do not pass the `--runtime-user-*` options again unless
+you are provisioning or changing that integration. Use reset only when
+intentionally starting a new demo run.
 
 ### 10. Run the safe runtime test
 

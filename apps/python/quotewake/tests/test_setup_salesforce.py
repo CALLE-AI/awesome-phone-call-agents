@@ -34,6 +34,8 @@ def test_help_documents_regional_seed_options_without_external_dependencies():
     assert "--test-phones +14155550100" in result.stdout
     assert "--runtime-user-email quotewake.runtime@example.com" in result.stdout
     assert "--runtime-user-username quotewake.runtime@example.com" in result.stdout
+    assert "Initial setup: deploy metadata, provision the runtime user" in result.stdout
+    assert "Later demo reset: seed/reset data; runtime-user options are not needed." in result.stdout
     assert "trailing backslash" in result.stdout
 
 

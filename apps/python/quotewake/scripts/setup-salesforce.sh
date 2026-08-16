@@ -56,22 +56,24 @@ Options:
   --reset-data             Seed the demo hierarchy, delete its Tasks, reset QuoteWake state,
                            and start a new idempotency generation.
   --assign-permissions     Assign QuoteWake_User to the current target-org user.
-  --runtime-user-email EMAIL       Create or reconcile the QuoteWake runtime user.
+  --runtime-user-email EMAIL       Initial setup: create or reconcile the runtime user.
   --runtime-user-username USERNAME  Globally unique username for the runtime user.
-                                   Both runtime-user options are required together.
+                                   Both runtime-user options are required together;
+                                   omit both for later --reset-data runs.
   -h, --help               Show this help.
 
 Examples:
-  # Run from the QuoteWake root directory:
-  ./scripts/setup-salesforce.sh --reset-data \
-    --country-code US \
-    --call-locale en_US \
-    --test-phones +14155550100 \
+  # Initial setup: deploy metadata, provision the runtime user, and configure OAuth.
+  ./scripts/setup-salesforce.sh \
+    --target-org quotewake-dev \
     --runtime-user-email quotewake.runtime@example.com \
     --runtime-user-username quotewake.runtime@example.com
 
-  # Run from the scripts directory:
-  ./setup-salesforce.sh --reset-data --country-code US --call-locale en_US \
+  # Later demo reset: seed/reset data; runtime-user options are not needed.
+  ./scripts/setup-salesforce.sh --reset-data \
+    --target-org quotewake-dev \
+    --country-code US \
+    --call-locale en_US \
     --test-phones +14155550100
 
 The reset example updates all 10 demo Contacts to the authorized test number,
