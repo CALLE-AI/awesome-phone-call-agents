@@ -62,7 +62,7 @@ async function publicCall(call: Call) {
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 })
-  const url = new URL(request.url)
+  const url = new URL(request.url, 'https://connected.invalid')
 
   if (request.method === 'GET' && !url.searchParams.has('callId')) {
     const state = configured()
