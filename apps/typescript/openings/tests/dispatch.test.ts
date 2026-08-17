@@ -8,7 +8,7 @@ const SPEC: SearchSpec = {
   modality: "either",
   location: "Philadelphia, PA",
   need: "adult ADHD evaluation",
-  radiusMiles: 10,
+  specialty: "psychiatry",
 };
 
 function cand(id: string): Candidate {
@@ -53,6 +53,7 @@ describe("dispatchWave", () => {
       candidates,
       spec: SPEC,
       idempotencyPrefix: "watch",
+      watchId: "watch-test",
       targetOpen: 2,
       runKey: "r1",
       waveSize: 5,
@@ -77,6 +78,7 @@ describe("dispatchWave", () => {
       candidates,
       spec: SPEC,
       idempotencyPrefix: "watch",
+      watchId: "watch-test",
       targetOpen: 5,
       runKey: "r1",
     });
@@ -96,6 +98,7 @@ describe("dispatchWave", () => {
       candidates: candidates.slice(0, 3),
       spec: SPEC,
       idempotencyPrefix: "watch",
+      watchId: "watch-test",
       targetOpen: 1,
       runKey: "r1",
     });
@@ -113,12 +116,50 @@ describe("dispatchWave", () => {
       candidates: candidates.slice(0, 2),
       spec: SPEC,
       idempotencyPrefix: "watch",
+      watchId: "watch-test",
       targetOpen: 1,
       runKey: "r1",
       isOptedOut: (phone) => phone === "+1215555010",
     });
     expect(result.results.find((r) => r.candidateId === "0")?.verdict).toBe("blocked");
     expect(result.results.find((r) => r.candidateId === "1")?.verdict).toBe("unreachable");
+  });
+
+  it("stops at the per-run call cap without dialing the remaining candidates", async () => {
+    const caller = new FakeCaller([]); // all voicemail → unreachable, target never met
+    const result = await dispatchWave({
+      caller,
+      candidates,
+      spec: SPEC,
+      idempotencyPrefix: "watch",
+      watchId: "watch-test",
+      targetOpen: 5,
+      maxCalls: 3,
+      runKey: "r1",
+    });
+    expect(result.reason).toBe("call_cap_reached");
+    expect(result.results).toHaveLength(3);
+    expect(result.openFound).toBe(0);
+  });
+
+  it("does not count gate-blocked candidates against the call cap", async () => {
+    const caller = new FakeCaller([]);
+    const result = await dispatchWave({
+      caller,
+      candidates: candidates.slice(0, 4),
+      spec: SPEC,
+      idempotencyPrefix: "watch",
+      watchId: "watch-test",
+      targetOpen: 5,
+      maxCalls: 2,
+      runKey: "r1",
+      isOptedOut: (phone) => phone === "+1215555011",
+    });
+    // Wave 1 dials 0 and 1 (1 blocked) → 1 call placed; wave 2 dials 2 → 2
+    // placed; candidate 3 is never reached.
+    expect(result.reason).toBe("call_cap_reached");
+    expect(result.results).toHaveLength(3);
+    expect(result.results.find((r) => r.candidateId === "1")?.verdict).toBe("blocked");
   });
 
   it("propagates call errors as blocked results and stops the run", async () => {
@@ -133,6 +174,7 @@ describe("dispatchWave", () => {
       candidates: candidates.slice(0, 3),
       spec: SPEC,
       idempotencyPrefix: "watch",
+      watchId: "watch-test",
       targetOpen: 1,
       runKey: "r1",
     });

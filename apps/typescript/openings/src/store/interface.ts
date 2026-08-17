@@ -17,6 +17,7 @@ export interface Store {
     spec: SearchSpec;
     candidates: Candidate[];
     targetOpen: number;
+    maxCallsPerRun: number;
     idempotencyPrefix: string;
   }): Watch;
   getWatch(id: string): Watch | null;

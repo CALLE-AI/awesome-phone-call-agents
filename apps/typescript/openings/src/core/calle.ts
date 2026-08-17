@@ -8,6 +8,8 @@ export interface PlaceCallInput {
   candidate: Candidate;
   spec: SearchSpec;
   idempotencyKey: string;
+  /** Watch id recorded on the CALL-E-side metadata for traceability. */
+  watchId: string;
 }
 
 export interface PlaceCallOutput {
@@ -67,7 +69,7 @@ export class LiveCaller {
         recipient: recipientFor(input.candidate),
         resultSchema: CALL_E_RESULT_SCHEMA,
         metadata: {
-          watch_id: input.spec.location,
+          watch_id: input.watchId,
           candidate_id: input.candidate.id,
           idempotency_key: input.idempotencyKey,
         },

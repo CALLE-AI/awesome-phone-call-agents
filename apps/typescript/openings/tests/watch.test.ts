@@ -1,75 +1,152 @@
 import { describe, expect, it } from "vitest";
-import { FakeCaller } from "../src/core/calle";
-import { makeWatchService, statsFromResults } from "../src/core/watch";
-import type { Candidate, SearchSpec, Watch } from "../src/core/types";
+import { createApp } from "../src/app/app";
+import { FakeCaller, type PlaceCallInput, type PlaceCallOutput } from "../src/core/calle";
+import { cadenceForRun, statsFromResults } from "../src/core/watch";
+import type { Candidate, CallStructuredResult, SearchSpec } from "../src/core/types";
+import { MemoryStore } from "../src/store/memory";
 
 const SPEC: SearchSpec = {
   plan: "Aetna PPO",
   modality: "either",
   location: "Philadelphia, PA",
   need: "adult ADHD evaluation",
-  radiusMiles: 10,
+  specialty: "psychiatry",
 };
 
-const candidates: Candidate[] = Array.from({ length: 6 }, (_, i) => ({
-  id: String(i),
-  name: `Practice ${i}`,
-  phoneE164: `+121555501${i}`,
-  phoneDisplay: `(215) 555-01${i}`,
-  provenance: { kind: "paste", source: "test" },
-}));
-
-function watch(overrides: Partial<Watch> = {}): Watch {
+function cand(id: string, phone = `+121555501${id}`): Candidate {
   return {
-    id: "w1",
-    spec: SPEC,
-    candidates,
-    targetOpen: 2,
-    status: "active",
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-    idempotencyPrefix: "watch-w1",
-    ...overrides,
+    id,
+    name: `Practice ${id}`,
+    phoneE164: phone,
+    phoneDisplay: `(215) 555-01${id}`,
+    provenance: { kind: "paste", source: "test" },
   };
 }
 
-describe("makeWatchService", () => {
-  it("reports a next run when the target is not reached", async () => {
-    const caller = new FakeCaller([]); // all voicemail → unreachable
-    const service = makeWatchService({ caller, now: () => new Date("2026-01-01T00:00:00Z") });
-    const report = await service.run(watch(), 1);
-    expect(report.dispatch.reason).toBe("exhausted");
-    expect(report.nextRunAt).toBe("2026-01-01T01:00:00.000Z"); // +1h
+function voicemail(): CallStructuredResult {
+  return {
+    line_outcome: "voicemail",
+    accepts_plan: "unknown",
+    accepting_new_patients: "unknown",
+    soonest_appointment_stated: "",
+    wait_estimate_days: -1,
+    modality: "unknown",
+    evidence_quote: "voicemail; no answer.",
+  };
+}
+
+function open(): CallStructuredResult {
+  return {
+    line_outcome: "reached_staff",
+    accepts_plan: "yes",
+    accepting_new_patients: "yes",
+    soonest_appointment_stated: "this week",
+    wait_estimate_days: 3,
+    modality: "both",
+    evidence_quote: "we can see them this week.",
+  };
+}
+
+/** FakeCaller that records exactly which candidates were dialed. */
+class CountingCaller extends FakeCaller {
+  calls: string[] = [];
+
+  constructor(seeds: Array<{ candidateId: string; result: CallStructuredResult }> = []) {
+    super(seeds);
+  }
+
+  override async placeCall(input: PlaceCallInput): Promise<PlaceCallOutput> {
+    this.calls.push(input.candidate.id);
+    return super.placeCall(input);
+  }
+}
+
+describe("watch run lifecycle (app.runWatch)", () => {
+  it("marks the watch completed when the target number of openings is confirmed", async () => {
+    const store = new MemoryStore();
+    const caller = new CountingCaller([
+      { candidateId: "0", result: voicemail() },
+      { candidateId: "1", result: open() },
+    ]);
+    const app = createApp({ store, caller });
+
+    const watch = app.startWatch({ spec: SPEC, candidates: [cand("0"), cand("1")], targetOpen: 1, maxCallsPerRun: 10 });
+    const dispatch = await app.runWatch(watch.id, 1);
+
+    expect(dispatch.reason).toBe("target_reached");
+    expect(app.getWatch(watch.id)!.status).toBe("completed");
+    expect(caller.calls).toEqual(["0", "1"]);
   });
 
-  it("reports no next run when the target is reached", async () => {
-    const caller = new FakeCaller(
-      candidates.slice(0, 2).map((c) => ({
-        candidateId: c.id,
-        result: {
-          line_outcome: "reached_staff",
-          accepts_plan: "yes",
-          accepting_new_patients: "yes",
-          soonest_appointment_stated: "this week",
-          wait_estimate_days: 3,
-          modality: "both",
-          evidence_quote: "available",
-        },
-      })),
-    );
-    const service = makeWatchService({ caller });
-    const report = await service.run(watch(), 1);
-    expect(report.dispatch.reason).toBe("target_reached");
-    expect(report.nextRunAt).toBeUndefined();
+  it("respects opt-outs: a blocked practice is never dialed and consumes no call budget", async () => {
+    const store = new MemoryStore();
+    const caller = new CountingCaller();
+    const app = createApp({ store, caller });
+    // Candidate "2" is opted out; every call returns voicemail so the target is
+    // never reached. The cap of 3 must allow 3 real dials despite the blocked
+    // candidate sitting inside the budget window.
+    store.recordOptOut("+1215555012");
+
+    const candidates = [cand("0"), cand("1"), cand("2"), cand("3")];
+    const watch = app.startWatch({ spec: SPEC, candidates, targetOpen: 1, maxCallsPerRun: 3 });
+    const dispatch = await app.runWatch(watch.id, 1);
+
+    expect(dispatch.reason).toBe("exhausted");
+    expect(caller.calls).toEqual(["0", "1", "3"]);
+    expect(dispatch.results.find((r) => r.candidateId === "2")?.verdict).toBe("blocked");
+    expect(dispatch.results.find((r) => r.candidateId === "2")?.evidence).toBe("practice_opted_out");
   });
 
+  it("respects the cooldown window and does not re-dial a recently-called number", async () => {
+    const store = new MemoryStore();
+    const caller = new CountingCaller();
+    const app = createApp({ store, caller });
+    const watch = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1, maxCallsPerRun: 10 });
+
+    const first = await app.runWatch(watch.id, 1);
+    expect(first.results[0]!.verdict).toBe("unreachable");
+    expect(caller.calls).toEqual(["0"]);
+
+    // A second run within the 24h cooldown must not dial again.
+    const second = await app.runWatch(watch.id, 2);
+    expect(second.results[0]!.verdict).toBe("blocked");
+    expect(second.results[0]!.evidence).toBe("cooldown");
+    expect(caller.calls).toEqual(["0"]);
+  });
+
+  it("stops at the per-run call cap and reports call_cap_reached", async () => {
+    const store = new MemoryStore();
+    const caller = new CountingCaller();
+    const app = createApp({ store, caller });
+    const candidates = Array.from({ length: 12 }, (_, i) => cand(String(i)));
+
+    const watch = app.startWatch({ spec: SPEC, candidates, targetOpen: 1, maxCallsPerRun: 3 });
+    const dispatch = await app.runWatch(watch.id, 1);
+
+    expect(dispatch.reason).toBe("call_cap_reached");
+    expect(caller.calls).toHaveLength(3);
+    expect(dispatch.results).toHaveLength(3);
+  });
+
+  it("does not record a cooldown timestamp for a blocked candidate", async () => {
+    const store = new MemoryStore();
+    const caller = new CountingCaller();
+    const app = createApp({ store, caller });
+    store.recordOptOut("+1215555010");
+
+    const watch = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1, maxCallsPerRun: 5 });
+    await app.runWatch(watch.id, 1);
+    expect(store.lastCalledAt("+1215555010")).toBeNull();
+  });
+});
+
+describe("cadenceForRun", () => {
   it("uses the decaying cadence for later runs", () => {
-    const service = makeWatchService({ caller: new FakeCaller([]) });
-    expect(service.cadenceHours(1)).toBe(1);
-    expect(service.cadenceHours(2)).toBe(3);
-    expect(service.cadenceHours(5)).toBe(24);
-    expect(service.cadenceHours(6)).toBe(48);
-    expect(service.cadenceHours(99)).toBe(168);
+    expect(cadenceForRun(1)).toBe(1);
+    expect(cadenceForRun(2)).toBe(3);
+    expect(cadenceForRun(5)).toBe(24);
+    expect(cadenceForRun(6)).toBe(48);
+    expect(cadenceForRun(99)).toBe(168);
   });
 });
 

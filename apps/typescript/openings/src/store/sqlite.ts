@@ -47,6 +47,7 @@ export class SqliteStore implements Store {
         spec TEXT NOT NULL,
         candidates TEXT NOT NULL,
         target_open INTEGER NOT NULL,
+        max_calls_per_run INTEGER NOT NULL DEFAULT 10,
         status TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
@@ -79,6 +80,13 @@ export class SqliteStore implements Store {
         source_call_id TEXT
       );
     `);
+
+    // Pre-existing databases (created before the per-run call cap) lack the
+    // column. Add it idempotently so existing volumes keep working.
+    const cols = this.db.prepare("PRAGMA table_info(watches)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "max_calls_per_run")) {
+      this.db.exec("ALTER TABLE watches ADD COLUMN max_calls_per_run INTEGER NOT NULL DEFAULT 10");
+    }
   }
 
   createWatch(input: {
@@ -86,6 +94,7 @@ export class SqliteStore implements Store {
     spec: SearchSpec;
     candidates: Candidate[];
     targetOpen: number;
+    maxCallsPerRun: number;
     idempotencyPrefix: string;
   }): Watch {
     const now = new Date().toISOString();
@@ -94,6 +103,7 @@ export class SqliteStore implements Store {
       spec: input.spec,
       candidates: input.candidates,
       targetOpen: input.targetOpen,
+      maxCallsPerRun: input.maxCallsPerRun,
       status: "active",
       createdAt: now,
       updatedAt: now,
@@ -101,14 +111,15 @@ export class SqliteStore implements Store {
     };
     this.db
       .prepare(
-        `INSERT INTO watches (id, spec, candidates, target_open, status, created_at, updated_at, idempotency_prefix)
-         VALUES (@id, @spec, @candidates, @targetOpen, @status, @createdAt, @updatedAt, @idempotencyPrefix)`,
+        `INSERT INTO watches (id, spec, candidates, target_open, max_calls_per_run, status, created_at, updated_at, idempotency_prefix)
+         VALUES (@id, @spec, @candidates, @targetOpen, @maxCallsPerRun, @status, @createdAt, @updatedAt, @idempotencyPrefix)`,
       )
       .run({
         id: watch.id,
         spec: JSON.stringify(watch.spec),
         candidates: JSON.stringify(watch.candidates),
         targetOpen: watch.targetOpen,
+        maxCallsPerRun: watch.maxCallsPerRun,
         status: watch.status,
         createdAt: watch.createdAt,
         updatedAt: watch.updatedAt,
@@ -151,12 +162,18 @@ export class SqliteStore implements Store {
       `);
 
       for (const r of results) {
-        upsertCall.run(r.candidateId, r.completedAt);
+        // Cooldown is keyed by the number dialed, not the candidate id: the
+        // gate at dispatch time looks a number up by phoneE164. Only
+        // actually-placed calls record a timestamp; a blocked candidate was
+        // never dialed.
+        if (r.verdict !== "blocked") {
+          upsertCall.run(r.phoneE164 ?? r.candidateId, r.completedAt);
+        }
         if (r.verdict === "ghost") {
           insertFact.run(
             `fact-${watchId}-${r.candidateId}-${runNumber}`,
             r.candidateId,
-            r.candidateId,
+            r.phoneE164 ?? r.candidateId,
             "line_dead",
             "ghost",
             r.evidence,
@@ -227,6 +244,7 @@ interface WatchRow {
   spec: string;
   candidates: string;
   target_open: number;
+  max_calls_per_run: number | null;
   status: Watch["status"];
   created_at: string;
   updated_at: string;
@@ -250,6 +268,7 @@ function rowToWatch(row: WatchRow): Watch {
     spec: JSON.parse(row.spec) as SearchSpec,
     candidates: JSON.parse(row.candidates) as Candidate[],
     targetOpen: row.target_open,
+    maxCallsPerRun: row.max_calls_per_run ?? 10,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

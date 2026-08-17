@@ -25,7 +25,7 @@ const SPEC: SearchSpec = {
   modality: "either",
   location: process.env.OPENINGS_LOCATION ?? "Philadelphia, PA",
   need: process.env.OPENINGS_NEED ?? "adult ADHD evaluation",
-  radiusMiles: 20,
+  specialty: "psychiatry",
 };
 
 describe.skipIf(!runLive)("full-app live verification (n credits)", () => {
@@ -46,6 +46,7 @@ describe.skipIf(!runLive)("full-app live verification (n credits)", () => {
         spec: SPEC,
         candidates,
         targetOpen: 3,
+        maxCallsPerRun: SAMPLE_SIZE,
       });
 
       console.log(`[verify] watch id=${watch.id}`);

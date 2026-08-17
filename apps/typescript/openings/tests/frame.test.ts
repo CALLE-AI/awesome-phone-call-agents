@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  frameFromNppes,
   frameFromPaste,
   normalizeUsPhone,
   parsePastedRows,
@@ -49,5 +50,56 @@ describe("frameFromPaste", () => {
     expect(cands[0]!.provenance.kind).toBe("paste");
     expect(cands[0]!.provenance.source).toBe("alice");
     expect(provenanceLabel(cands[0]!.provenance)).toContain("alice");
+  });
+});
+
+describe("frameFromNppes", () => {
+  function stubFetch(urls: string[], results: unknown = []) {
+    return (async (url: string | URL | Request) => {
+      urls.push(String(url));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ results }),
+      } as Response;
+    }) as typeof fetch;
+  }
+
+  it("omits enumeration_type by default so organizations are not discarded", async () => {
+    const urls: string[] = [];
+    await frameFromNppes(
+      { city: "Philadelphia", state: "PA", taxonomy: "Psychiatry" },
+      { fetch: stubFetch(urls) },
+    );
+    expect(urls[0]).not.toContain("enumeration_type");
+  });
+
+  it("includes enumeration_type when explicitly requested", async () => {
+    const urls: string[] = [];
+    await frameFromNppes(
+      { city: "Philadelphia", state: "PA", taxonomy: "Psychiatry", enumerationType: "NPI-1" },
+      { fetch: stubFetch(urls) },
+    );
+    expect(urls[0]).toContain("enumeration_type=NPI-1");
+  });
+
+  it("labels a candidate with the taxonomy matching the filter, not an unrelated primary", async () => {
+    const fetchFn = stubFetch([], [
+      {
+        number: "1234567890",
+        basic: { organization_name: "Mind Clinic" },
+        addresses: [{ address_purpose: "LOCATION", telephone_number: "(215) 555-0100" }],
+        taxonomies: [
+          { desc: "Counselor, Mental Health", primary: true },
+          { desc: "Psychiatry & Neurology, Psychiatry", primary: false },
+        ],
+      },
+    ]);
+    const candidates = await frameFromNppes(
+      { city: "Philadelphia", state: "PA", taxonomy: "Psychiatry" },
+      { fetch: fetchFn },
+    );
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]!.specialty).toBe("Psychiatry & Neurology, Psychiatry");
   });
 });

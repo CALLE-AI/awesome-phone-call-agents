@@ -25,8 +25,10 @@ access report.
 
 ## What it does
 
-1. **Frame** — build the candidate list from the NPPES NPI Registry or pasted directory rows.
-   Every number carries provenance; no number is ever synthesized.
+1. **Frame** — build the candidate list from the NPPES NPI Registry by specialty and
+   city/state. Every number carries provenance; no number is ever synthesized.
+   (`parsePastedRows` / `frameFromPaste` are library helpers and are not wired into
+   the UI — a paste path that dials user-supplied numbers needs its own consent design.)
 2. **Gate** — the care request is screened for crisis language (stops the search and points to
    988) and for PHI (rejected; Openings never collects diagnosis or medication details).
 3. **Verify** — a wave engine dispatches calls in controlled waves and stops as soon as the
@@ -70,6 +72,12 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
 
 - In **live** mode, Openings places real outbound phone calls to the numbers in the candidate
   list. Each call begins by identifying itself as an automated assistant.
+- **Calls are scoped by specialty.** Only NPPES listings registered under the specialty you
+  choose are framed and dialed; the specialty is never inferred from the free-text need, and
+  the location must include a state — Openings never guesses which region to call.
+- **Every run is capped.** Each run places at most `maxCallsPerRun` calls (default 10, up to
+  40), even when the target number of openings is never reached. A run that hits the cap
+  stops early and reports `call_cap_reached` — it is never presented as "nobody is open".
 - **Live calls are slow.** Observed: a call spends 1–4 minutes in IVR/hold before a person
   answers (or voicemail picks up). `LiveCaller` therefore waits up to 6 minutes per call and
   the live test suites allow 8–15 minutes. Plan a small batch (5–10 numbers) for a demo run.

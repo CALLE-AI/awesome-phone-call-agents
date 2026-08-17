@@ -76,6 +76,8 @@ export type Verdict =
 
 export interface LineCallResult {
   candidateId: string;
+  /** E.164 number dialed, when a call was attempted. Used for cooldown tracking. */
+  phoneE164?: string;
   verdict: Verdict;
   /** Verbatim evidence quote, when available. */
   evidence: string;
@@ -113,8 +115,8 @@ export interface SearchSpec {
   location: string;
   /** Free-form care need shown to the practice, e.g. "adult ADHD evaluation". */
   need: string;
-  /** Maximum distance in miles for framing. */
-  radiusMiles: number;
+  /** Specialty id from the catalog; selects the NPPES taxonomy filter. */
+  specialty: string;
 }
 
 export interface Watch {
@@ -123,6 +125,8 @@ export interface Watch {
   candidates: Candidate[];
   /** Number of open practices to stop at. */
   targetOpen: number;
+  /** Hard cap on calls placed per run. Gate-blocked candidates do not count. */
+  maxCallsPerRun: number;
   status: "active" | "paused" | "completed" | "stopped";
   createdAt: string;
   updatedAt: string;
@@ -168,5 +172,3 @@ export const VERDICTS = [
   "blocked",
 ] as const;
 
-/** Decaying retry cadence in hours for a standing watch. */
-export const RETRY_CADENCE_HOURS = [1, 3, 7, 14, 24, 48, 72, 168] as const;

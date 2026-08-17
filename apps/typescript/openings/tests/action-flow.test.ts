@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { runWatchOnce, startWatch, stopWatch } from "../src/app/actions";
 import { __resetConfig } from "../src/app/config";
+import { parseCity, parseState } from "../src/core/location";
 
 // The action tests exercise the exact server-action boundary the browser
 // calls, but they hit the NPPES registry, so they are opt-in like the live
@@ -30,8 +31,9 @@ describe.skipIf(!runLive)("startWatch server action (opt-in network)", () => {
         plan: "Aetna PPO",
         location: "Philadelphia, PA",
         modality: "either",
-        radiusMiles: "20",
+        specialty: "psychiatry",
         targetOpen: "3",
+        maxCallsPerRun: "10",
       }),
     );
     expect(res.ok).toBe(true);
@@ -53,7 +55,12 @@ describe.skipIf(!runLive)("startWatch server action (opt-in network)", () => {
 
     const crisis = await startWatch(
       { ok: false, error: "" },
-      form({ need: "thinking about suicide", plan: "Aetna PPO", location: "Philadelphia, PA" }),
+      form({
+        need: "thinking about suicide",
+        plan: "Aetna PPO",
+        location: "Philadelphia, PA",
+        specialty: "psychiatry",
+      }),
     );
     expect(crisis.ok).toBe(false);
     if (crisis.ok) return;
@@ -61,10 +68,64 @@ describe.skipIf(!runLive)("startWatch server action (opt-in network)", () => {
 
     const phi = await startWatch(
       { ok: false, error: "" },
-      form({ need: "my diagnosis is depression", plan: "Aetna PPO", location: "Philadelphia, PA" }),
+      form({
+        need: "my diagnosis is depression",
+        plan: "Aetna PPO",
+        location: "Philadelphia, PA",
+        specialty: "psychiatry",
+      }),
     );
     expect(phi.ok).toBe(false);
     if (phi.ok) return;
     expect(phi.reason).toBe("phi");
+  });
+});
+
+describe("startWatch server action (offline)", () => {
+  it("rejects a location without a state before any network call", async () => {
+    process.env.OPENINGS_CALL_MODE = "dry-run";
+    process.env.OPENINGS_STORE = "memory";
+    __resetConfig();
+
+    const res = await startWatch(
+      { ok: false, error: "" },
+      form({
+        need: "adult ADHD evaluation",
+        plan: "Aetna PPO",
+        location: "Austin",
+        modality: "either",
+        specialty: "psychiatry",
+        targetOpen: "1",
+        maxCallsPerRun: "5",
+      }),
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.reason).toBe("validation");
+    expect(res.error).toContain("state");
+  });
+});
+
+describe("location parsing", () => {
+  it("parses a city and state code", () => {
+    expect(parseCity("Philadelphia, PA")).toBe("Philadelphia");
+    expect(parseState("Philadelphia, PA")).toBe("PA");
+  });
+
+  it("parses a full state name", () => {
+    expect(parseCity("Philadelphia, Pennsylvania")).toBe("Philadelphia");
+    expect(parseState("Philadelphia, Pennsylvania")).toBe("PA");
+  });
+
+  it("returns null instead of guessing when the state is missing", () => {
+    expect(parseCity("Austin")).toBe("Austin");
+    expect(parseState("Austin")).toBeNull();
+    expect(parseState("")).toBeNull();
+  });
+
+  it("rejects a bare state as a location", () => {
+    expect(parseCity("PA")).toBeNull();
+    expect(parseState("PA")).toBe("PA");
+    expect(parseCity("Texas")).toBeNull();
   });
 });

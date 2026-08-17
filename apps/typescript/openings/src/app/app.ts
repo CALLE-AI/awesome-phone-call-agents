@@ -9,7 +9,7 @@ import type {
   Watch,
   WatchStats,
 } from "../core/types";
-import { cadenceForRun, statsFromResults } from "../core/watch";
+import { statsFromResults } from "../core/watch";
 import type { Store } from "../store";
 import { newWatchId } from "../store";
 
@@ -26,6 +26,7 @@ export interface StartWatchInput {
   spec: SearchSpec;
   candidates: Candidate[];
   targetOpen: number;
+  maxCallsPerRun: number;
 }
 
 export interface WatchSummary {
@@ -49,6 +50,7 @@ export function createApp(deps: AppDeps) {
         spec: input.spec,
         candidates: input.candidates,
         targetOpen: input.targetOpen,
+        maxCallsPerRun: input.maxCallsPerRun,
         idempotencyPrefix,
       });
     },
@@ -89,7 +91,9 @@ export function createApp(deps: AppDeps) {
         candidates: watch.candidates,
         spec: watch.spec,
         idempotencyPrefix: watch.idempotencyPrefix,
+        watchId: watch.id,
         targetOpen: watch.targetOpen,
+        maxCalls: watch.maxCallsPerRun,
         runKey: `run-${runNumber}`,
         isOptedOut: (phone) => deps.store.isOptedOut(phone),
         lastCalledAt: (phone) => deps.store.lastCalledAt(phone),
@@ -135,12 +139,4 @@ export function emptyStats(): WatchStats {
     declined: 0,
     blocked: 0,
   };
-}
-
-export function nextRunHours(watch: Watch, results: LineCallResult[]): string | undefined {
-  const stats = statsFromResults(results);
-  if (stats.open >= watch.targetOpen) return undefined;
-  const runNumber = 1; // caller tracks the actual run number
-  const hours = cadenceForRun(runNumber);
-  return new Date(Date.now() + hours * 3_600_000).toISOString();
 }

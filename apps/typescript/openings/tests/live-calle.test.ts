@@ -12,7 +12,7 @@ const SPEC: SearchSpec = {
   modality: "either",
   location: "Philadelphia, PA",
   need: "adult ADHD evaluation",
-  radiusMiles: 20,
+  specialty: "psychiatry",
 };
 
 describe.skipIf(!runLive)("live CALL-E call (1 credit)", () => {
@@ -31,6 +31,7 @@ describe.skipIf(!runLive)("live CALL-E call (1 credit)", () => {
         candidate: target,
         spec: SPEC,
         idempotencyKey: `verify-${Date.now()}`,
+        watchId: "live-verify",
       });
 
       // This is the core thesis test: did the call complete and did we get a

@@ -22,6 +22,7 @@ export class MemoryStore implements Store {
     spec: SearchSpec;
     candidates: Candidate[];
     targetOpen: number;
+    maxCallsPerRun: number;
     idempotencyPrefix: string;
   }): Watch {
     const watch: Watch = {
@@ -29,6 +30,7 @@ export class MemoryStore implements Store {
       spec: input.spec,
       candidates: input.candidates,
       targetOpen: input.targetOpen,
+      maxCallsPerRun: input.maxCallsPerRun,
       status: "active",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -58,12 +60,17 @@ export class MemoryStore implements Store {
     this.lastRuns.set(watchId, new Date().toISOString());
     this.runResults.set(watchId, [...(this.runResults.get(watchId) ?? []), ...results]);
     for (const r of results) {
-      this.calls.set(r.candidateId, new Date(r.completedAt));
+      // Cooldown is keyed by the number dialed, not the candidate id: the gate
+      // at dispatch time looks a number up by phoneE164. Only actually-placed
+      // calls record a timestamp; a blocked candidate was never dialed.
+      if (r.verdict !== "blocked") {
+        this.calls.set(r.phoneE164 ?? r.candidateId, new Date(r.completedAt));
+      }
       if (r.verdict === "ghost") {
         this.facts.push({
           id: `fact-${this.facts.length}`,
           practiceId: r.candidateId,
-          phoneE164: r.candidateId,
+          phoneE164: r.phoneE164 ?? r.candidateId,
           factType: "line_dead",
           value: "ghost",
           evidence: r.evidence,

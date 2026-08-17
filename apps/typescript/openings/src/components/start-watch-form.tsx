@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { startWatch, type StartWatchState } from "@/app/actions";
+import { SPECIALTIES } from "@/core/specialties";
 
 const initialState: StartWatchState = { ok: false, error: "" };
 
@@ -40,6 +41,28 @@ export function StartWatchForm() {
         </p>
       </div>
 
+      <div>
+        <label htmlFor="specialty" className="mb-1.5 block text-sm font-medium text-zinc-300">
+          Specialty
+        </label>
+        <select
+          id="specialty"
+          name="specialty"
+          defaultValue="psychiatry"
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 focus:border-zinc-500 focus:outline-none"
+        >
+          {SPECIALTIES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1.5 text-xs text-zinc-500">
+          We only call listings registered under this specialty in NPPES, so we never dial the
+          wrong kind of practice.
+        </p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="plan" className="mb-1.5 block text-sm font-medium text-zinc-300">
@@ -57,7 +80,7 @@ export function StartWatchForm() {
         </div>
         <div>
           <label htmlFor="location" className="mb-1.5 block text-sm font-medium text-zinc-300">
-            City / state
+            City, state
           </label>
           <input
             id="location"
@@ -68,6 +91,9 @@ export function StartWatchForm() {
             className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
             autoComplete="off"
           />
+          <p className="mt-1.5 text-xs text-zinc-500">
+            A state is required — we never guess which region to call.
+          </p>
         </div>
       </div>
 
@@ -88,20 +114,6 @@ export function StartWatchForm() {
           </select>
         </div>
         <div>
-          <label htmlFor="radiusMiles" className="mb-1.5 block text-sm font-medium text-zinc-300">
-            Search radius (mi)
-          </label>
-          <input
-            id="radiusMiles"
-            name="radiusMiles"
-            type="number"
-            min={5}
-            max={100}
-            defaultValue={20}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 focus:border-zinc-500 focus:outline-none"
-          />
-        </div>
-        <div>
           <label htmlFor="targetOpen" className="mb-1.5 block text-sm font-medium text-zinc-300">
             Stop after finding
           </label>
@@ -115,6 +127,24 @@ export function StartWatchForm() {
             <option value="3">3 openings</option>
             <option value="5">5 openings</option>
           </select>
+        </div>
+        <div>
+          <label htmlFor="maxCallsPerRun" className="mb-1.5 block text-sm font-medium text-zinc-300">
+            Max calls per run
+          </label>
+          <select
+            id="maxCallsPerRun"
+            name="maxCallsPerRun"
+            defaultValue="10"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 focus:border-zinc-500 focus:outline-none"
+          >
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+          </select>
+          <p className="mt-1.5 text-xs text-zinc-500">
+            Each run places at most this many calls.
+          </p>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { runWatchOnce, stopWatch } from "@/app/actions";
 import { statsFromResults } from "@/core/watch";
 import { provenanceLabel as pl } from "@/core/frame";
+import { specialtyLabel } from "@/core/specialties";
 import type { LineCallResult, Watch } from "@/core/types";
 
 const VERDICT_META: Record<
@@ -31,6 +32,7 @@ export function WatchClient({
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState(watch.status);
   const [error, setError] = useState<string | null>(null);
+  const [lastReason, setLastReason] = useState<string | null>(null);
 
   const stats = statsFromResults(results);
 
@@ -42,6 +44,7 @@ export function WatchClient({
         return;
       }
       setError(null);
+      setLastReason(res.reason ?? null);
       // Refresh the latest results from the server.
       window.location.reload();
     });
@@ -61,8 +64,9 @@ export function WatchClient({
           <div>
             <h1 className="text-2xl font-semibold">Your watch</h1>
             <p className="mt-1 text-sm text-zinc-400">
-              {watch.spec.need} · {watch.spec.plan} · {watch.spec.location} · target{" "}
-              {watch.targetOpen} open
+              {watch.spec.need} · {specialtyLabel(watch.spec.specialty)} · {watch.spec.plan} ·{" "}
+              {watch.spec.location} · target {watch.targetOpen} open · up to{" "}
+              {watch.maxCallsPerRun} calls per run
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -108,6 +112,13 @@ export function WatchClient({
           Nothing has been called yet. Press <strong>Run now</strong> to dial the listed
           practices. Each call identifies itself as an automated assistant and asks only about
           plan acceptance and availability.
+        </p>
+      )}
+
+      {lastReason === "call_cap_reached" && (
+        <p role="status" className="rounded-lg border border-amber-700 bg-amber-950/40 p-4 text-sm text-amber-200">
+          The per-run call limit was reached before the target number of openings was confirmed.
+          This run stopped early — it is not a sign that nothing is open.
         </p>
       )}
 

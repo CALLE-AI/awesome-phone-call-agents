@@ -9,7 +9,7 @@ const SPEC: SearchSpec = {
   modality: "either",
   location: "Philadelphia, PA",
   need: "adult ADHD evaluation",
-  radiusMiles: 10,
+  specialty: "psychiatry",
 };
 
 function cand(id: string, name = `Practice ${id}`): Candidate {
@@ -33,7 +33,7 @@ describe("end-to-end watch lifecycle (fake caller, memory store)", () => {
     ]);
     const app = createApp({ store, caller });
 
-    const watch = app.startWatch({ spec: SPEC, candidates, targetOpen: 1 });
+    const watch = app.startWatch({ spec: SPEC, candidates, targetOpen: 1, maxCallsPerRun: 5 });
     expect(watch.status).toBe("active");
 
     const dispatch = await app.runWatch(watch.id, 1);
@@ -48,7 +48,7 @@ describe("end-to-end watch lifecycle (fake caller, memory store)", () => {
     expect(app.getWatch(watch.id)!.status).toBe("completed");
 
     // Opt-out is enforced: a fresh watch over the opted-out candidate blocks it.
-    const watch2 = app.startWatch({ spec: SPEC, candidates: [cand("2", "Opted Out Practice")], targetOpen: 1 });
+    const watch2 = app.startWatch({ spec: SPEC, candidates: [cand("2", "Opted Out Practice")], targetOpen: 1, maxCallsPerRun: 5 });
     store.recordOptOut("+1215555012");
     const second = await app.runWatch(watch2.id, 1);
     expect(second.results[0]!.verdict).toBe("blocked");
@@ -57,7 +57,7 @@ describe("end-to-end watch lifecycle (fake caller, memory store)", () => {
   it("stops a watch on request and refuses to run a stopped watch", async () => {
     const store = new MemoryStore();
     const app = createApp({ store, caller: new FakeCaller([]) });
-    const watch = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1 });
+    const watch = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1, maxCallsPerRun: 5 });
     expect(app.stopWatch(watch.id)).toBe(true);
 
     await expect(app.runWatch(watch.id, 1)).rejects.toThrow("watch_not_active");
@@ -67,8 +67,8 @@ describe("end-to-end watch lifecycle (fake caller, memory store)", () => {
   it("gives every watch a unique idempotency prefix, even for the same location", async () => {
     const store = new MemoryStore();
     const app = createApp({ store, caller: new FakeCaller([]) });
-    const w1 = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1 });
-    const w2 = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1 });
+    const w1 = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1, maxCallsPerRun: 5 });
+    const w2 = app.startWatch({ spec: SPEC, candidates: [cand("0")], targetOpen: 1, maxCallsPerRun: 5 });
     // Without this, CALL-E would deduplicate the second watch's calls against
     // the first watch's idempotency keys and return stale results instead of
     // placing fresh calls.

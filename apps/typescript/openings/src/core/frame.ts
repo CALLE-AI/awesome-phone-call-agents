@@ -68,18 +68,23 @@ export async function frameFromNppes(
     state: string;
     taxonomy: string;
     limit?: number;
+    /** Restrict to individuals (NPI-1) or organizations (NPI-2). Omit for both. */
+    enumerationType?: "NPI-1" | "NPI-2";
   },
   options: FrameNppesOptions = {},
 ): Promise<Candidate[]> {
   const fetchFn = options.fetch ?? DEFAULT_FETCH;
   const params = new URLSearchParams({
     version: "2.1",
-    enumeration_type: "NPI-1",
     city: query.city,
     state: query.state,
     limit: String(options.limit ?? query.limit ?? 40),
   });
   if (query.taxonomy) params.set("taxonomy_description", query.taxonomy);
+  // Omit the enumeration type unless explicitly requested: individuals and
+  // organizations both answer phones, and dropping NPI-2 organizations would
+  // bias the candidate set toward solo practitioners.
+  if (query.enumerationType) params.set("enumeration_type", query.enumerationType);
 
   const url = `https://npiregistry.cms.hhs.gov/api/?${params.toString()}`;
   const res = await fetchFn(url);
@@ -97,7 +102,12 @@ export async function frameFromNppes(
     const phone = location?.telephone_number ?? "";
     const e164 = normalizeUsPhone(phone);
     if (!e164) continue; // no usable number, skip; never guess
-    const taxonomy = (record.taxonomies ?? []).find((t) => t.primary)?.desc;
+    const requestedTaxonomy = query.taxonomy.toLowerCase();
+    const taxonomies = record.taxonomies ?? [];
+    // Prefer the taxonomy that matches the filter so the listing is labelled
+    // with what we actually asked for, not a record's unrelated primary.
+    const matched = taxonomies.find((t) => t.desc?.toLowerCase().includes(requestedTaxonomy));
+    const taxonomy = (matched ?? taxonomies.find((t) => t.primary))?.desc;
 
     candidates.push({
       id: `nppes-${record.number}`,

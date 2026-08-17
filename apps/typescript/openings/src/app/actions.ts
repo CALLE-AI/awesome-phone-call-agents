@@ -3,9 +3,11 @@
 import { z } from "zod";
 import { createApp } from "../app/app";
 import { getConfig } from "../app/config";
-import { buildTask, type Caller } from "../core/calle";
+import { buildTask } from "../core/calle";
 import { frameFromNppes } from "../core/frame";
+import { parseCity, parseState } from "../core/location";
 import { checkCrisis, containsPhi } from "../core/safety";
+import { SPECIALTY_IDS, specialtyLabel, taxonomyFor } from "../core/specialties";
 import type { Candidate, SearchSpec, Watch } from "../core/types";
 
 const MODALITY = z.enum(["in_person", "telehealth", "either"]);
@@ -15,8 +17,9 @@ const startWatchSchema = z.object({
   plan: z.string().min(2).max(80),
   location: z.string().min(2).max(120),
   modality: MODALITY.default("either"),
-  radiusMiles: z.coerce.number().int().min(5).max(100).default(20),
+  specialty: z.enum(SPECIALTY_IDS),
   targetOpen: z.coerce.number().int().min(1).max(5).default(3),
+  maxCallsPerRun: z.coerce.number().int().min(1).max(40).default(10),
 });
 
 export type StartWatchState =
@@ -25,7 +28,9 @@ export type StartWatchState =
 
 /**
  * Start a standing watch. The need statement is screened before anything
- * else happens: crisis language stops the search entirely.
+ * else happens: crisis language stops the search entirely. The location must
+ * name a state, because framing candidates against the wrong region means
+ * dialing the wrong region.
  */
 export async function startWatch(
   _prevState: StartWatchState,
@@ -56,6 +61,16 @@ export async function startWatch(
     };
   }
 
+  const city = parseCity(input.location);
+  const state = parseState(input.location);
+  if (!city || !state) {
+    return {
+      ok: false,
+      error: "Add a city and state to the location, for example \"Austin, TX\".",
+      reason: "validation",
+    };
+  }
+
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
 
@@ -63,9 +78,9 @@ export async function startWatch(
   try {
     candidates = await frameFromNppes(
       {
-        city: input.location.split(",")[0]?.trim() ?? input.location,
-        state: inferState(input.location),
-        taxonomy: "Psychiatry",
+        city,
+        state,
+        taxonomy: taxonomyFor(input.specialty),
         limit: 40,
       },
       { fetch: globalThis.fetch },
@@ -79,7 +94,11 @@ export async function startWatch(
   }
 
   if (candidates.length === 0) {
-    return { ok: false, error: "No providers found for that location.", reason: "validation" };
+    return {
+      ok: false,
+      error: `No ${specialtyLabel(input.specialty).toLowerCase()} listings with usable phone numbers found in ${city}, ${state}.`,
+      reason: "validation",
+    };
   }
 
   const spec: SearchSpec = {
@@ -87,10 +106,15 @@ export async function startWatch(
     modality: input.modality,
     location: input.location,
     need: input.need,
-    radiusMiles: input.radiusMiles,
+    specialty: input.specialty,
   };
 
-  const watch = app.startWatch({ spec, candidates, targetOpen: input.targetOpen });
+  const watch = app.startWatch({
+    spec,
+    candidates,
+    targetOpen: input.targetOpen,
+    maxCallsPerRun: input.maxCallsPerRun,
+  });
   return { ok: true, watch, simulated: config.callMode !== "live" };
 }
 
@@ -101,13 +125,15 @@ export async function stopWatch(id: string): Promise<{ ok: boolean }> {
 }
 
 /** Run one dispatch for a watch and return results (used by the UI first-run and scheduler). */
-export async function runWatchOnce(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function runWatchOnce(
+  id: string,
+): Promise<{ ok: boolean; error?: string; reason?: string }> {
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
   try {
     const state = app.getWatchRunState(id);
-    await app.runWatch(id, state.runCount + 1);
-    return { ok: true };
+    const dispatch = await app.runWatch(id, state.runCount + 1);
+    return { ok: true, reason: dispatch.reason };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "unknown error" };
   }
@@ -122,70 +148,5 @@ export async function optOut(phoneE164: string): Promise<{ ok: boolean }> {
 
 /** Preview the exact call task without dialing. */
 export async function previewTask(candidate: Candidate, spec: SearchSpec): Promise<string> {
-  const caller: Caller = { placeCall: () => Promise.reject(new Error("unused")) };
-  void caller;
   return buildTask(candidate, spec);
 }
-
-/** Best-effort state inference from a location string. Not critical-path. */
-function inferState(location: string): string {
-  const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
-  const last = parts[parts.length - 1];
-  if (last && /^[A-Za-z]{2}$/.test(last)) return last.toUpperCase();
-  if (last) {
-    const full = STATES[last.toLowerCase()];
-    if (full) return full;
-  }
-  return "PA";
-}
-
-const STATES: Record<string, string> = {
-  alabama: "AL",
-  alaska: "AK",
-  arizona: "AZ",
-  arkansas: "AR",
-  california: "CA",
-  colorado: "CO",
-  connecticut: "CT",
-  delaware: "DE",
-  florida: "FL",
-  georgia: "GA",
-  illinois: "IL",
-  indiana: "IN",
-  iowa: "IA",
-  kansas: "KS",
-  kentucky: "KY",
-  louisiana: "LA",
-  maine: "ME",
-  maryland: "MD",
-  massachusetts: "MA",
-  michigan: "MI",
-  minnesota: "MN",
-  mississippi: "MS",
-  missouri: "MO",
-  montana: "MT",
-  nebraska: "NE",
-  nevada: "NV",
-  "new hampshire": "NH",
-  "new jersey": "NJ",
-  "new mexico": "NM",
-  "new york": "NY",
-  "north carolina": "NC",
-  "north dakota": "ND",
-  ohio: "OH",
-  oklahoma: "OK",
-  oregon: "OR",
-  pennsylvania: "PA",
-  "rhode island": "RI",
-  "south carolina": "SC",
-  "south dakota": "SD",
-  tennessee: "TN",
-  texas: "TX",
-  utah: "UT",
-  vermont: "VT",
-  virginia: "VA",
-  washington: "WA",
-  "west virginia": "WV",
-  wisconsin: "WI",
-  wyoming: "WY",
-};
