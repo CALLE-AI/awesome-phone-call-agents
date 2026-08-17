@@ -162,6 +162,10 @@ Signing in is required to *request* a call, so there has to be a way back out �
 "email the maintainer" is not a mechanism. **Delete account** sits in the account sheet
 behind a typed `delete` confirmation, and calls `DELETE /api/auth/account`.
 
+This is also the answer for anyone who signed up only to review the app: trying it should
+not leave you holding an account, so the account you made to test with can be removed the
+moment you are done, along with everything collected under it.
+
 | Deleted immediately | Where it lived |
 |---|---|
 | Tab preferences | `atlas:prefs:<uid>` |
@@ -254,6 +258,12 @@ dry-run, so nothing is dialled.
 11. **Origin pinning** — start with `CALLE_BASE_URL=https://api.heycall-e.com.example.com`
     (or any non-official value). The boot log must warn, `realCalls` must be false, and an
     ask must return 503 rather than sending the key anywhere.
+12. **Clean up after yourself, if you signed in.** On a deploy with Supabase configured,
+    open the account sheet, press **Delete account** and type `delete`. The sign-in record,
+    the email address, the tab preferences and every private call result collected while
+    testing are deleted immediately, and the reply reports the counts. Trying this app should
+    not leave anyone holding an account they did not want. Public verified facts remain —
+    they never recorded who asked. See [Deleting an account](#deleting-an-account).
 
 `/api/health` reports which integrations are configured. `/api/cache-test` forces a
 real Redis round-trip and reports the verdict.
