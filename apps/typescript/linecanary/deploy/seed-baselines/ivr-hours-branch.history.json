@@ -1,0 +1,98 @@
+[
+  {
+    "checkId": "ivr-hours-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 14,
+      "secondsToFirstResponse": 14,
+      "turnCount": 4
+    },
+    "confidence": 0.93,
+    "callId": "call_mNyot744X5M8J6pdByON5w",
+    "at": "2026-08-03T19:37:30.771139Z",
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "hours_message",
+          "matches": "saturday"
+        },
+        "pass": true,
+        "actual": "We are open Monday to Friday, 8AM to 5PM, and Saturday, 9AM to noon.",
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "hours_message",
+          "contains": "9"
+        },
+        "pass": true,
+        "actual": "We are open Monday to Friday, 8AM to 5PM, and Saturday, 9AM to noon.",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  },
+  {
+    "checkId": "ivr-hours-branch",
+    "lineId": "dental-ivr",
+    "callStatus": "completed",
+    "timing": {
+      "secondsToAnswer": 14,
+      "secondsToFirstResponse": 14,
+      "turnCount": 4
+    },
+    "confidence": 0.93,
+    "callId": "call_UzLCSQ_7YNMsc3BmBIsdzQ",
+    "at": "2026-08-03T20:27:35.007846Z",
+    "transcript": [
+      {
+        "offsetSeconds": 0,
+        "speaker": "bot",
+        "text": "This is an automated test call from LineCanary,"
+      },
+      {
+        "offsetSeconds": 2,
+        "speaker": "bot",
+        "text": "monitoring this line on behalf of its owner."
+      },
+      {
+        "offsetSeconds": 14,
+        "speaker": "user",
+        "text": "Thank you for calling Sample Dental. This line is monitored. Canary ID, LC7391. For appointments, press 1. For opening hours, press 2. For billing questions, press 3."
+      },
+      {
+        "offsetSeconds": 22,
+        "speaker": "user",
+        "text": "We are open Monday to Friday, 8AM to 5PM, and Saturday, 9AM to noon."
+      }
+    ],
+    "status": "pass",
+    "assertions": [
+      {
+        "assertion": {
+          "path": "hours_message",
+          "matches": "saturday"
+        },
+        "pass": true,
+        "actual": "We are open Monday to Friday, 8AM to 5PM, and Saturday, 9AM to noon.",
+        "detail": "ok"
+      },
+      {
+        "assertion": {
+          "path": "hours_message",
+          "contains": "9"
+        },
+        "pass": true,
+        "actual": "We are open Monday to Friday, 8AM to 5PM, and Saturday, 9AM to noon.",
+        "detail": "ok"
+      }
+    ],
+    "timingViolations": [],
+    "confidenceViolation": null,
+    "failureCode": null
+  }
+]

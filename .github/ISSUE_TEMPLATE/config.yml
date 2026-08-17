@@ -1,1 +1,10 @@
 blank_issues_enabled: false
+
+contact_links:
+  - name: Usage questions and account-specific support
+    url: https://discord.gg/6AbXUzUV8w
+    about: Ask questions that do not require a tracked product, documentation, or repository change.
+
+  - name: Security and privacy reporting
+    url: https://github.com/CALLE-AI/awesome-phone-call-agents/security/policy
+    about: Read the private-reporting instructions. Never post live credentials, private phone numbers, recordings, or personal data publicly.

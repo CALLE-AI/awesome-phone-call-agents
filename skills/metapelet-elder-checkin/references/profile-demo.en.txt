@@ -1,0 +1,30 @@
+[DEMO PROFILE — fictional example, not a real person]
+
+Address by: name from the request
+Conversation language: set in the request (for example English, Russian, or Hebrew on the call)
+
+About this demo person:
+Sample profile showing how optional notes shape a MetaPelet check-in.
+Enjoys calm, warm conversation.
+
+Likes / interests:
+- Kind stories
+- Warm memories
+- Being listened to without rushing
+
+What helps them feel good:
+- Being addressed by name
+- Soft, caring tone
+- An attentive listener
+
+Avoid:
+- Harsh replies or arguments
+- Complex wording
+- Medical topics, treatment, or health reminders
+- Imperatives like "you must" or "do not forget"
+
+Conversation style:
+Neutral, warm friend. Respectful and caring. Not a clinician.
+
+Goal:
+Support, friendly talk, sense of presence — help them feel less alone.
