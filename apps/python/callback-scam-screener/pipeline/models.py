@@ -62,18 +62,22 @@ class ScreeningResult:
         who needs it to take further action on this specific case)."""
         number_dialed = self.call_metadata.number_dialed
         transcript = self.transcript
+        warnings = self.warnings
+        quotes = [t.quote for t in self.triggered_signals]
         if mask_numbers:
             transcript = mask_phone_number(transcript, number_dialed)
+            warnings = [mask_phone_number(w, number_dialed) for w in warnings]
+            quotes = [mask_phone_number(q, number_dialed) if q else q for q in quotes]
             number_dialed = mask_phone_number(number_dialed, number_dialed)
 
         return {
             "verdict": self.verdict,
             "score": self.score,
             "triggered_signals": [
-                {"id": t.id, "name": t.name, "category": t.category, "quote": t.quote}
-                for t in self.triggered_signals
+                {"id": t.id, "name": t.name, "category": t.category, "quote": q}
+                for t, q in zip(self.triggered_signals, quotes)
             ],
-            "warnings": self.warnings,
+            "warnings": warnings,
             "transcript": transcript,
             "structured_result": self.structured_result,
             "completion_confidence": self.completion_confidence,

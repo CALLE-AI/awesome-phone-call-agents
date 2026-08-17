@@ -84,6 +84,34 @@ def test_non_e164_number_is_refused(tmp_path):
         g.check("(800) 555-0187")
 
 
+def test_allowlist_construction_rejects_non_e164_entries(tmp_path):
+    with pytest.raises(GuardrailViolation, match="E.164"):
+        CallGuardrails(allowed_numbers={"(800) 555-0187"}, state_path=tmp_path / "state.json")
+
+
+def test_allowlist_does_not_alias_across_country_codes(tmp_path):
+    # Both numbers below share the same last-10-digit suffix (the Ofcom
+    # reserved mobile core "7700900123") but have different country codes,
+    # so they are genuinely different E.164 destinations. Before switching
+    # to exact-string matching, normalize_phone's last-10-digits comparison
+    # would have let country_b_number alias its way past an allowlist that
+    # only contained country_a_number.
+    country_a_number = "+17700900123"
+    country_b_number = "+447700900123"
+    g = CallGuardrails(allowed_numbers={country_a_number}, state_path=tmp_path / "state.json")
+    g.check(country_a_number)  # should not raise - exact allowlist match
+    with pytest.raises(GuardrailViolation, match="allowlist"):
+        g.check(country_b_number)  # different destination - must not alias in
+
+
+def test_already_screened_check_does_not_alias_across_country_codes(tmp_path):
+    country_a_number = "+17700900123"
+    country_b_number = "+447700900123"
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
+    g.record_call(country_a_number)
+    g.check(country_b_number)  # a genuinely different number - should not raise
+
+
 def test_blocks_redialing_the_same_number(tmp_path):
     g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
     g.check("+18005550187")

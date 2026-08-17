@@ -56,6 +56,16 @@ def test_recipient_binding_mismatch_raises_instead_of_scoring():
         run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
 
 
+def test_recipient_binding_does_not_alias_across_country_codes():
+    # "+447700900187" and "+17700900187" share the same last-10-digit
+    # suffix but are different E.164 destinations (different country
+    # codes) - normalize_phone's truncated comparison used to treat them
+    # as equal. The binding check must still catch this as a mismatch.
+    client = FakeCallClient(result=_completed_result("+447700900187"))
+    with pytest.raises(RuntimeError, match="mismatched recipient"):
+        run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+17700900187")
+
+
 def test_record_attempt_fires_before_dialing_so_a_crash_still_blocks_redial(tmp_path):
     guardrails = CallGuardrails(
         allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json"

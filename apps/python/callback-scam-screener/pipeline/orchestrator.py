@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Callable
 
 from .caller import CallEClient
-from .guardrails import CallGuardrails, mask_phone_number, normalize_phone, redact_phone_number
+from .guardrails import CallGuardrails, mask_phone_number, redact_phone_number
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
@@ -97,10 +97,12 @@ def run_pipeline(
     task = SCREENER_TASK_TEMPLATE.format(phone_number=dial_number)
     call_result = call_client.place_screening_call(dial_number, task)
 
-    # Recipient binding: the verdict below is only meaningful if it's about
-    # to score evidence from the number we actually intended to dial, not
-    # something a future refactor accidentally decoupled.
-    if normalize_phone(call_result.metadata.number_dialed) != normalize_phone(dial_number):
+    # Recipient binding: exact string comparison, not normalize_phone's
+    # last-10-digits form — that truncation drops the country code and can
+    # alias two different countries' numbers together, which would defeat
+    # the point of this check. Both sides are already-validated E.164 by
+    # construction, so exact comparison is correct here, not just simpler.
+    if call_result.metadata.number_dialed != dial_number:
         got = mask_phone_number(call_result.metadata.number_dialed, call_result.metadata.number_dialed)
         expected = mask_phone_number(dial_number, dial_number)
         raise RuntimeError(

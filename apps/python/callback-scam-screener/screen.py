@@ -166,11 +166,13 @@ def main() -> int:
     task_preview = SCREENER_TASK_TEMPLATE.format(phone_number=alert.phone_number)
 
     if not args.live:
+        shown_number = alert.phone_number if args.show_full_number else mask_phone_number(alert.phone_number, alert.phone_number)
+        shown_task = task_preview if args.show_full_number else mask_phone_number(task_preview, alert.phone_number)
         print("PREVIEW — no call will be placed. Add --live --confirm --to-phone <number> to place a real call.\n")
-        print("Phone number extracted:", alert.phone_number)
+        print("Phone number extracted:", shown_number)
         print("Claimed reason:", alert.claimed_reason)
         print("\nTask CALL-E would receive:\n")
-        print(task_preview)
+        print(shown_task)
         return EXIT_OK
 
     if not args.confirm:

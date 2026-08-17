@@ -42,14 +42,30 @@ class CallGuardrails:
         allowed_numbers, or pass unrestricted=True to affirmatively
         acknowledge this run may dial any number extracted from an email,
         without a pre-verified recipient. There is no silent "None means
-        unrestricted" default — a caller has to say which one it wants."""
+        unrestricted" default — a caller has to say which one it wants.
+
+        allowed_numbers is matched by exact, full E.164 string — not by
+        normalize_phone's last-10-digits form. Truncating to 10 digits
+        drops the country code, so two genuinely different numbers in
+        different countries can share the same last-10-digit suffix once
+        each one's own country-code prefix is discarded — an allowlist
+        built on that comparison could let an unauthorized destination
+        alias its way past it. Every entry must itself be valid E.164,
+        checked up front rather than failing silently later."""
         if allowed_numbers is None and not unrestricted:
             raise GuardrailViolation(
                 "No dev/test allowlist was given and unrestricted mode was not explicitly "
                 "requested — refusing to dial. Pass allowed_numbers=<set of numbers>, or "
                 "unrestricted=True if you intend to screen an arbitrary, unverified number."
             )
-        self.allowed_numbers = {normalize_phone(n) for n in allowed_numbers} if allowed_numbers is not None else None
+        if allowed_numbers is not None:
+            for n in allowed_numbers:
+                if not is_valid_e164(n):
+                    raise GuardrailViolation(
+                        f"{mask_phone_number(n, n)!r} in allowed_numbers is not a strict E.164 number "
+                        "(e.g. +18005550187) — refusing to build an ambiguous allowlist."
+                    )
+        self.allowed_numbers = set(allowed_numbers) if allowed_numbers is not None else None
         self.max_calls = max_calls
         self.state_path = state_path
         self._state = self._load_state()
@@ -75,19 +91,23 @@ class CallGuardrails:
                 f"{masked!r} is not a strict E.164 number (e.g. +18005550187) — "
                 "refusing to dial an ambiguously-formatted number."
             )
-        normalized = normalize_phone(phone_number)
 
-        if self.allowed_numbers is not None and normalized not in self.allowed_numbers:
+        # Exact string identity from here on — not normalize_phone's
+        # last-10-digits form, which can alias two different countries'
+        # numbers together (see __init__'s docstring). phone_number is
+        # already confirmed valid E.164 above, so exact comparison is both
+        # correct and unambiguous.
+        if self.allowed_numbers is not None and phone_number not in self.allowed_numbers:
             raise GuardrailViolation(
                 f"{masked} is not in the dev/test allowlist — refusing to dial."
             )
 
-        if normalized in self._state["called_numbers"]:
+        if phone_number in self._state["called_numbers"]:
             raise GuardrailViolation(
                 f"{masked} was already screened once — refusing to re-dial the same number."
             )
 
-        if normalized in self._state["attempted_numbers"]:
+        if phone_number in self._state["attempted_numbers"]:
             raise GuardrailViolation(
                 f"{masked} has a prior call attempt of unknown outcome — refusing to "
                 "dial again until this is resolved manually (check `calle call status`)."
@@ -103,17 +123,15 @@ class CallGuardrails:
         call is actually placed. Recorded this early — rather than only on
         success — so a crash, or a human re-running the same command after an
         ambiguous outcome, can't slip a duplicate real dial past check()."""
-        normalized = normalize_phone(phone_number)
-        if normalized not in self._state["attempted_numbers"]:
-            self._state["attempted_numbers"].append(normalized)
+        if phone_number not in self._state["attempted_numbers"]:
+            self._state["attempted_numbers"].append(phone_number)
             self._save_state()
 
     def record_call(self, phone_number: str) -> None:
-        normalized = normalize_phone(phone_number)
         self._state["calls_placed"] += 1
-        self._state["called_numbers"].append(normalized)
-        if normalized in self._state["attempted_numbers"]:
-            self._state["attempted_numbers"].remove(normalized)
+        self._state["called_numbers"].append(phone_number)
+        if phone_number in self._state["attempted_numbers"]:
+            self._state["attempted_numbers"].remove(phone_number)
         self._save_state()
 
 
