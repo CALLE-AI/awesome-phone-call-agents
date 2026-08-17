@@ -1,0 +1,14 @@
+{
+  "workflow_id": "wf-acme-vendor-outage-001",
+  "incident_id": "INC-2026-0810",
+  "support_phone": "+15555550100",
+  "authorized_support_contact": true,
+  "caller_business_name": "Acme Data Operations",
+  "provider_name": "ExampleCloud",
+  "affected_service": "managed ingestion endpoint",
+  "incident_summary": "Requests return elevated 503 responses and the public status page has no incident entry.",
+  "severity": "outage",
+  "observed_at_utc": "2026-08-10T01:20:00Z",
+  "region": "US",
+  "locale": "en-US"
+}
