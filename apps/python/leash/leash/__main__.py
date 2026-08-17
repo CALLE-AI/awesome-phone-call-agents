@@ -968,6 +968,8 @@ def cmd_demo(args: argparse.Namespace, style: Style) -> int:
             api_key="fake-key-the-local-server-ignores",
             base_url=server.url,
             create_timeout=1.5 if ambiguous else CREATE_TIMEOUT_SECONDS,
+            # The only place loopback is permitted, and the key here is a placeholder.
+            allow_loopback=True,
         )
         call_id = dispatch(
             supervisor,
@@ -1065,7 +1067,7 @@ def cmd_preflight(args: argparse.Namespace, style: Style) -> int:
     ))
     print()
 
-    supervisor = Supervisor(api_key=api_key, base_url=args.base_url)
+    supervisor = Supervisor(api_key=api_key)
     try:
         ok, detail = supervisor.preflight(job_id, minutes)
     except Exception as exc:  # noqa: BLE001
@@ -1187,7 +1189,7 @@ def cmd_live(args: argparse.Namespace, style: Style) -> int:
     print()
 
     state = LiveState()
-    supervisor = Supervisor(api_key=api_key, base_url=args.base_url)
+    supervisor = Supervisor(api_key=api_key)
     try:
         return _live_loop(
             args,
@@ -1452,7 +1454,6 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_pre.add_argument("--api-key-file", required=True, help="file holding the CALL-E API key")
-    p_pre.add_argument("--base-url", default="https://api.heycall-e.com", help="API base URL")
     p_pre.add_argument("--job-id", default=None, help="job identifier; a fresh nonce by default")
     p_pre.add_argument("--minutes", type=int, default=20, help="minutes named in the call script")
     p_pre.set_defaults(func=cmd_preflight)
@@ -1471,7 +1472,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_live.add_argument("--api-key-file", default=None, help="file holding the CALL-E API key")
     p_live.add_argument("--phone-file", default=None, help="file holding one E.164 number")
     p_live.add_argument("--lease", default=None, help="path to the lease JSON")
-    p_live.add_argument("--base-url", default="https://api.heycall-e.com", help="API base URL")
     p_live.add_argument("--first-wait", type=float, default=55.0,
                         help="seconds before the first poll (default: 55)")
     p_live.add_argument("--interval", type=float, default=6.0,

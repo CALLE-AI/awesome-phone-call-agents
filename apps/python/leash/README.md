@@ -36,6 +36,36 @@ python3 -m pytest        # 70 passing
 
 ---
 
+## Credential handling
+
+The CALL-E bearer key and the Google lease are the two secrets this app touches, and neither is
+allowed to move.
+
+**The key has exactly one destination.** `CALLE_ORIGIN` in `leash/supervisor.py` is an allowlist,
+not a default, and `Supervisor.__init__` refuses to construct against anything else. `live` and
+`preflight` take no base-URL option at all, so there is no operator-supplied string anywhere on the
+path that carries the key. The offline `demo` is the one caller that may point at a local fake
+server, it has to ask for that explicitly with `allow_loopback=True`, and the key it carries is a
+placeholder. A plaintext downgrade of the real host is refused along with everything else.
+
+The reasoning is that a default and an allowlist behave identically until something goes wrong. A
+default is a suggestion: any flag, environment variable, config file or wrapper script able to
+influence it redirects a live credential to a host of someone else's choosing, and the request still
+looks perfectly ordinary in a log. Pinning removes that class of mistake rather than documenting it.
+
+**The key is never rendered.** `Supervisor.__repr__` prints `api_key=<redacted>`, and no code path
+writes it to the journal, to stdout, or into an exception message.
+
+**The lease file is never echoed.** `leash/revoke.py` reads `client_id`, `client_secret` and
+`refresh_token` from a JSON file and reports them only as a client-id suffix and a hash prefix.
+Errors name the file and the missing key, never a value.
+
+**Destinations are strict E.164.** `+`, a non-zero country code, then eight to fifteen digits. An
+earlier revision admitted seven, which is shorter than any real international number and is the
+shape a typo takes rather than a subscriber. The floor exists because the cost of being wrong is a
+phone call to a stranger. The pre-flight sentinel `+1` is deliberately un-dialable and is rejected
+by the same rule.
+
 ## What actually happens
 
 1. **Mint the lease.** A human consents once at a browser. Google issues a refresh token carrying exactly one scope. That token, plus an expiry, is the lease. Nothing else in the system can create one.

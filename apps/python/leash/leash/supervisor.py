@@ -113,8 +113,55 @@ PROBE_JOB_ID = "probe-0000"
 PROBE_MINUTES = "1"
 
 # E.164: leading '+', no leading zero, 8-15 digits total (15 is the standard's maximum).
-# Used only on the real create path; the probe paths bypass it on purpose.
-_E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+#
+# The floor is 8 and not 7. An earlier revision of this file wrote {6,14}, which admits a
+# seven-digit destination -- shorter than any real international number, and the kind of
+# value that reaches a dialler as a typo rather than as a subscriber. Nothing downstream
+# would have caught it, and the cost of being wrong here is a call to a stranger. Used only
+# on the real create path; the probe paths bypass it on purpose.
+_E164 = re.compile(r"^\+[1-9]\d{7,14}$")
+
+#: The only origin the CALL-E bearer key may ever be sent to.
+#:
+#: This is an allowlist rather than a default because the two are not the same thing under
+#: attack. A default is a suggestion: anything that can influence a base URL -- a flag, an
+#: environment variable, a config file, a mis-set variable in a wrapper script -- redirects
+#: a live credential to a host of someone else's choosing, and the request still looks
+#: perfectly ordinary. Pinning the origin means the key has exactly one place it can go.
+CALLE_ORIGIN = "https://api.heycall-e.com"
+
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _origin_of(url: str) -> str:
+    parts = urllib.parse.urlsplit(str(url or ""))
+    return "%s://%s" % (parts.scheme, parts.netloc)
+
+
+class UntrustedOrigin(ValueError):
+    """Raised when a base URL is neither CALL-E nor a local fake server."""
+
+
+def assert_origin_allowed(base_url: str, *, allow_loopback: bool = False) -> str:
+    """Return base_url, or refuse to let the bearer key leave for an unknown host.
+
+    Loopback is permitted only when the caller explicitly asks for it, which in this
+    package is the bundled fake server and nothing else. The fake server is handed a
+    placeholder key, so even that path carries no real credential.
+    """
+    parts = urllib.parse.urlsplit(str(base_url or ""))
+    origin = _origin_of(base_url)
+    if origin == CALLE_ORIGIN:
+        return str(base_url).rstrip("/")
+    if allow_loopback and parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS:
+        return str(base_url).rstrip("/")
+    raise UntrustedOrigin(
+        "refusing to send the CALL-E key to %r.\n"
+        "  The only permitted origin is %s.\n"
+        "  A local fake server on http://127.0.0.1 is permitted for the offline demo,\n"
+        "  which never carries a real key." % (origin or base_url, CALLE_ORIGIN)
+    )
+
 
 _MAX_IDEMPOTENCY_KEY_LEN = 255
 
@@ -751,7 +798,8 @@ class Supervisor:
 
     def __init__(self, api_key: str, base_url: str = DEFAULT_BASE_URL,
                  session: HttpSession | None = None,
-                 create_timeout: float = CREATE_TIMEOUT_SECONDS) -> None:
+                 create_timeout: float = CREATE_TIMEOUT_SECONDS,
+                 allow_loopback: bool = False) -> None:
         # Injectable only so a fixture can force the ambiguous-create path in seconds
         # instead of the 45 s a real socket would take. Production callers never pass it.
         self._create_timeout = float(create_timeout)
@@ -759,7 +807,10 @@ class Supervisor:
         if not key:
             raise ValueError("api_key is required (CALL-E bearer key)")
         self._api_key = key
-        self.base_url = str(base_url or DEFAULT_BASE_URL).rstrip("/")
+        # Validated before the key is used for anything. An untrusted origin is a
+        # construction-time error, not a request-time one.
+        self.base_url = assert_origin_allowed(base_url or DEFAULT_BASE_URL,
+                                              allow_loopback=allow_loopback)
         self._session = session if session is not None else UrllibSession()
 
     def __repr__(self) -> str:
