@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import httpx
 
-from quotewake_salesforce.calle.client import CallEClient, idempotency_key
+from quotewake_salesforce.calle.client import CallEClient, idempotency_key, operation_binding_digest
 from quotewake_salesforce.domain.models import CallOutcomeKind, CallRequest, CallResult, ContactTarget, QuoteCandidate
 from quotewake_salesforce.domain.policy import FollowUpPolicies, RetryPolicy, calculate_next_follow_up
 from quotewake_salesforce.salesforce.client import SalesforceClient
@@ -23,8 +23,9 @@ def test_call_dry_run_does_not_construct_provider_client():
     with patch("calle.CalleClient", side_effect=AssertionError("SDK must not be constructed")):
         client = CallEClient(execute=False)
         result = client.preview(request, next_attempt=1)
-    assert result["idempotency_key"] == "quotewake-0Q0000000000001-1"
-    assert idempotency_key(request.quote_id, 1) == result["idempotency_key"]
+    digest = operation_binding_digest(request, next_attempt=1)
+    assert result["idempotency_key"] == idempotency_key(request.quote_id, 1, binding_digest=digest)
+    assert result["binding_digest"] == digest
 
 
 def test_technical_result_does_not_consume_business_attempt():

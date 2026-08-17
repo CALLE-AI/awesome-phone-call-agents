@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from dataclasses import replace
 
 import httpx
 import pytest
 
 from quotewake_salesforce.config import RegionalSettings
 from quotewake_salesforce.domain.models import CallOutcomeKind, CallResult, ContactTarget, FollowUpUpdate, QuoteCandidate
-from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceQueryError, SalesforceResponseError, SalesforceSchemaError
+from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceError, SalesforceQueryError, SalesforceResponseError, SalesforceSchemaError
 from quotewake_salesforce.salesforce.codecs import non_negative_integer, salesforce_id
 from quotewake_salesforce.salesforce.quotes import QuoteRepository, REQUIRED_QUOTE_FIELDS
 
@@ -91,6 +92,44 @@ class MockClient:
     pass
 
 
+def verified(result, quote, contact):
+    digest = "a" * 64
+    return replace(
+        result,
+        binding_digest=digest,
+        provider_key="quotewake-bound-call",
+        bound_phone=contact.phone,
+        bound_task="Conduct a verified call.",
+        bound_schema_digest="b" * 64,
+        bound_metadata=(
+            ("quotewake_binding_digest", digest),
+            ("quotewake_contact_id", contact.contact_id),
+            ("quotewake_opportunity_id", quote.opportunity_id),
+            ("quotewake_quote_id", quote.quote_id),
+        ),
+        binding_verified=True,
+    )
+
+
+def test_salesforce_write_rejects_unverified_result_before_network_call():
+    client = SalesforceClient("https://login.invalid", "id", "secret", "61.0")
+    quote = QuoteCandidate("0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None, datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0)
+    contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
+    result = CallResult(quote.quote_id, "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc))
+    with pytest.raises(SalesforceError, match="verified CALL-E binding"):
+        client.composite_write(quote, contact, FollowUpUpdate(1, "Completed", None), result, task_description="summary")
+
+
+def test_salesforce_write_rejects_verified_result_for_different_phone():
+    client = SalesforceClient("https://login.invalid", "id", "secret", "61.0")
+    quote = QuoteCandidate("0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None, datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0)
+    contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
+    result = verified(CallResult(quote.quote_id, "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc)), quote, contact)
+    other_contact = ContactTarget(contact.contact_id, contact.name, "+14155550102", False)
+    with pytest.raises(SalesforceError, match="Contact phone"):
+        client.composite_write(quote, other_contact, FollowUpUpdate(1, "Completed", None), result, task_description="summary")
+
+
 def test_single_currency_org_requires_explicit_iso_code():
     repository = QuoteRepository(MockClient())
 
@@ -113,7 +152,7 @@ def test_composite_payload_is_all_or_none_and_links_task():
     quote = QuoteCandidate("0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None, datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0)
     contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
     update = FollowUpUpdate(1, "Completed", None)
-    result = CallResult(quote.quote_id, "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc))
+    result = verified(CallResult(quote.quote_id, "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc)), quote, contact)
     written = client.composite_write(quote, contact, update, result, task_description="summary")
     assert written.task_id == "00T000000000001"
     payload = seen[-1].content.decode()
@@ -127,11 +166,12 @@ def test_composite_failure_is_not_silently_accepted():
             return httpx.Response(200, json={"access_token": "token", "instance_url": "https://instance.invalid"})
         return httpx.Response(200, json={"compositeResponse": [{"httpStatusCode": 400, "referenceId": "quoteUpdate", "body": {}}]})
     client = SalesforceClient("https://login.invalid", "id", "secret", "61.0", http_client=httpx.Client(transport=httpx.MockTransport(handler)))
+    quote = QuoteCandidate("0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None, datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0)
+    contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
+    result = verified(CallResult(quote.quote_id, "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc)), quote, contact)
     with pytest.raises(SalesforceQueryError):
         client.composite_write(
-            QuoteCandidate("0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None, datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0),
-            ContactTarget("003000000000001", "Contact", "+14155550101", False), FollowUpUpdate(1, "Completed", None),
-            CallResult("0Q0000000000001", "call-1", "completed", "interested", "high", None, "summary", "next", None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc)), task_description="summary",
+            quote, contact, FollowUpUpdate(1, "Completed", None), result, task_description="summary",
         )
 
 
@@ -156,11 +196,11 @@ def test_stop_quote_follow_up_is_atomic_quote_and_review_task_without_contact_pa
         datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0,
     )
     contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
-    result = CallResult(
+    result = verified(CallResult(
         quote.quote_id, "call-1", "completed", "stop_quote_follow_up", "unknown", None,
         "Do not call again", "Stop Quote follow-up", None, CallOutcomeKind.BUSINESS,
         datetime.now(timezone.utc),
-    )
+    ), quote, contact)
     client.composite_write(
         quote, contact, FollowUpUpdate(1, "Stopped", None), result,
         task_description="Review the request to stop Quote follow-up.",
@@ -199,11 +239,11 @@ def test_unknown_result_creates_human_review_task_in_same_composite():
         datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0,
     )
     contact = ContactTarget("003000000000001", "Contact", "+14155550101", False)
-    result = CallResult(
+    result = verified(CallResult(
         quote.quote_id, "call-1", "completed", "unknown", "unknown", None,
         "Insufficient evidence", "Human review", None, CallOutcomeKind.BUSINESS,
         datetime.now(timezone.utc),
-    )
+    ), quote, contact)
     client.composite_write(
         quote, contact, FollowUpUpdate(1, "Stopped", None), result,
         task_description="Review the call evidence.",
@@ -233,12 +273,12 @@ def test_call_not_established_task_does_not_request_human_review():
         "0Q0000000000001", "Demo", "Presented", Decimal("10"), "EUR", None,
         datetime.now(timezone.utc), "006000000000001", "Opportunity", "Account", False, True, None, None, 0,
     )
-    result = CallResult(
+    result = verified(CallResult(
         quote.quote_id, "call-1", "declined", "call_not_established", "unknown", None,
         "CALL-E reported that the call was not established.",
         "Retry the quote follow-up after the configured delay.",
         None, CallOutcomeKind.BUSINESS, datetime.now(timezone.utc),
-    )
+    ), quote, ContactTarget("003000000000001", "Contact", "+14155550101", False))
     client.composite_write(
         quote,
         ContactTarget("003000000000001", "Contact", "+14155550101", False),

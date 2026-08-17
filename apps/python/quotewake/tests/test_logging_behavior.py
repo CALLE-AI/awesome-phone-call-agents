@@ -8,7 +8,7 @@ import pytest
 
 from calle.errors import CalleAPIError, CalleTimeoutError
 
-from quotewake_salesforce.calle.client import CallEClient
+from quotewake_salesforce.calle.client import CallEClient, idempotency_key, operation_binding_digest, request_metadata, result_schema
 from quotewake_salesforce.domain.models import CallRequest
 from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceQueryError, _safe_route
 from quotewake_salesforce.structured_logging import (
@@ -40,6 +40,20 @@ def _capture_app_logs(caplog, level):
     logger.setLevel(level)
     logger.propagate = False
     return logger
+
+
+def bound_payload(payload):
+    digest = operation_binding_digest(REQUEST, next_attempt=1)
+    evidence = {
+        "id": "call-1",
+        "task": REQUEST.goal,
+        "recipient": {"phones": [REQUEST.phone], "locale": REQUEST.locale, "region": REQUEST.region},
+        "result_schema": result_schema(),
+        "metadata": {**request_metadata(REQUEST), "quotewake_binding_digest": digest},
+        "idempotency_key": idempotency_key(REQUEST.quote_id, 1, binding_digest=digest),
+    }
+    evidence.update(payload)
+    return evidence
 
 
 @pytest.mark.parametrize(
@@ -330,7 +344,7 @@ def test_call_e_debug_boundaries_are_safe_on_success(caplog):
     try:
         calls = Mock()
         calls.create.return_value = {"id": "call-1", "status": "accepted"}
-        calls.wait_for_result.return_value = {
+        calls.wait_for_result.return_value = bound_payload({
             "status": "completed",
             "task_completed": True,
             "structured_result": {
@@ -339,7 +353,7 @@ def test_call_e_debug_boundaries_are_safe_on_success(caplog):
                 "summary": "Customer wants a follow-up.",
                 "next_action": "Salesperson calls.",
             },
-        }
+        })
         result = CallEClient(execute=True, client=Mock(calls=calls)).execute(REQUEST, next_attempt=1)
         assert result.outcome == "interested"
     finally:
@@ -362,7 +376,10 @@ def test_call_e_debug_boundaries_are_safe_on_success(caplog):
         assert fields["service"] == "call_e"
         assert fields["phase"] in {"create", "wait"}
         assert fields["quote_id"] == REQUEST.quote_id
-        assert fields["idempotency_key"] == "quotewake-0Q0000000000001-1"
+        digest = operation_binding_digest(REQUEST, next_attempt=1)
+        assert fields["idempotency_key"] == idempotency_key(
+            REQUEST.quote_id, 1, binding_digest=digest
+        )
         if fields["phase"] == "wait":
             assert fields["aggregate"] is True
         assert "Call task contains customer details" not in rendered
@@ -410,7 +427,7 @@ def test_call_e_opt_in_raw_logs_are_redacted_and_keep_support_structure(caplog):
             "status": "accepted",
             "headers": {"Authorization": "Bearer api-secret-value"},
         }
-        calls.wait_for_result.return_value = {
+        calls.wait_for_result.return_value = bound_payload({
             "status": "failed",
             "failure_code": "call_not_ready",
             "task_completed": False,
@@ -421,7 +438,7 @@ def test_call_e_opt_in_raw_logs_are_redacted_and_keep_support_structure(caplog):
                 )
             },
             "api_key": "api-secret-value",
-        }
+        })
         result = CallEClient(
             execute=True,
             raw_calle_api=True,
@@ -481,10 +498,10 @@ def test_call_e_raw_logs_are_disabled_by_default_and_at_info(caplog):
         try:
             calls = Mock()
             calls.create.return_value = {"id": "call-1", "status": "accepted"}
-            calls.wait_for_result.return_value = {
+            calls.wait_for_result.return_value = bound_payload({
                 "status": "failed",
                 "failure_code": "call_not_ready",
-            }
+            })
             CallEClient(
                 execute=True,
                 raw_calle_api=raw_enabled,
@@ -532,10 +549,10 @@ def test_info_logging_filters_call_e_debug_boundaries(caplog):
     try:
         calls = Mock()
         calls.create.return_value = {"id": "call-1", "status": "accepted"}
-        calls.wait_for_result.return_value = {
+        calls.wait_for_result.return_value = bound_payload({
             "status": "failed",
             "task_completed": False,
-        }
+        })
         CallEClient(execute=True, client=Mock(calls=calls)).execute(REQUEST, next_attempt=1)
     finally:
         logger.removeHandler(caplog.handler)

@@ -11,9 +11,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import hashlib
+import json
 import logging
 import re
 import time
+from dataclasses import replace
 from typing import Any
 
 from quotewake_salesforce.config import validate_calle_base_url
@@ -271,6 +273,7 @@ def idempotency_key(
     next_attempt: int,
     retry_marker: datetime | None = None,
     suffix: str | None = None,
+    binding_digest: str | None = None,
 ) -> str:
     if isinstance(next_attempt, bool) or not isinstance(next_attempt, int) or next_attempt < 1:
         raise ValueError("next attempt must be positive")
@@ -283,7 +286,123 @@ def idempotency_key(
         key += "-" + hashlib.sha256(marker.encode("utf-8")).hexdigest()[:12]
     if suffix is not None:
         key += "-" + suffix
+    if binding_digest is not None:
+        if not isinstance(binding_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", binding_digest):
+            raise ValueError("binding digest must be a lowercase SHA-256 hex digest")
+        key += "-b" + binding_digest[:32]
     return key
+
+
+def _canonical_json(value: object) -> str:
+    """Serialize provider-bound values deterministically for fingerprinting."""
+
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def request_metadata(request: CallRequest) -> dict[str, str]:
+    """Return the QuoteWake metadata sent with every live CALL-E request."""
+
+    return {
+        "quotewake_quote_id": request.quote_id,
+        "quotewake_opportunity_id": request.opportunity_id,
+        "quotewake_contact_id": request.contact_id,
+    }
+
+
+def operation_binding_digest(
+    request: CallRequest,
+    *,
+    next_attempt: int,
+    retry_marker: datetime | None = None,
+    suffix: str | None = None,
+    metadata: dict[str, str] | None = None,
+    schema: dict[str, Any] | None = None,
+) -> str:
+    """Fingerprint every value that can change the outbound CALL-E operation."""
+
+    if isinstance(next_attempt, bool) or not isinstance(next_attempt, int) or next_attempt < 1:
+        raise ValueError("next attempt must be positive")
+    locale = canonicalize_call_locale(request.locale)
+    suffix = validate_idempotency_suffix(suffix)
+    if retry_marker is not None:
+        if retry_marker.tzinfo is None or retry_marker.utcoffset() is None:
+            raise ValueError("retry marker must be timezone-aware")
+        retry_value = retry_marker.astimezone(timezone.utc).isoformat()
+    else:
+        retry_value = None
+    operation = {
+        "version": 1,
+        "quote_id": request.quote_id,
+        "opportunity_id": request.opportunity_id,
+        "contact_id": request.contact_id,
+        "phone": request.phone,
+        "task": request.goal,
+        "locale": locale,
+        "region": request.region,
+        "result_schema": result_schema() if schema is None else schema,
+        "metadata": metadata if metadata is not None else request_metadata(request),
+        "next_attempt": next_attempt,
+        "retry_marker": retry_value,
+        "idempotency_suffix": suffix,
+    }
+    return hashlib.sha256(_canonical_json(operation).encode("utf-8")).hexdigest()
+
+
+def _bound_operation(
+    request: CallRequest,
+    *,
+    next_attempt: int,
+    retry_marker: datetime | None,
+    suffix: str | None,
+) -> tuple[str, dict[str, str]]:
+    metadata = request_metadata(request)
+    digest = operation_binding_digest(
+        request,
+        next_attempt=next_attempt,
+        retry_marker=retry_marker,
+        suffix=suffix,
+        metadata=metadata,
+    )
+    return digest, {**metadata, "quotewake_binding_digest": digest}
+
+
+def _verify_provider_binding(
+    request: CallRequest,
+    call_id: str,
+    payload: dict[str, Any],
+    *,
+    provider_key: str,
+    metadata: dict[str, str],
+) -> None:
+    """Reject a terminal result unless CALL-E echoes the initiated operation."""
+
+    returned_call_id = _extract_call_id(payload)
+    returned_metadata = payload.get("metadata")
+    returned_task = payload.get("task")
+    returned_key = payload.get("idempotency_key", payload.get("idempotencyKey"))
+    recipient = _first_recipient(payload)
+    returned_phones = recipient.get("phones") if recipient else None
+    returned_locale = recipient.get("locale") if recipient else None
+    returned_region = recipient.get("region") if recipient else None
+    returned_schema = payload.get("result_schema")
+    checks = (
+        (returned_call_id, call_id, "call ID"),
+        (returned_metadata, metadata, "metadata"),
+        (returned_task, request.goal, "task"),
+        (returned_phones, [request.phone], "recipient phone"),
+        (returned_locale, canonicalize_call_locale(request.locale), "recipient locale"),
+        (returned_region, request.region, "recipient region"),
+        (returned_schema, result_schema(), "result schema"),
+        (returned_key, provider_key, "provider key"),
+    )
+    for returned, expected, field in checks:
+        if returned is None or returned != expected:
+            raise CallEError(
+                f"CALL-E result binding does not match {field}",
+                classification="schema",
+                code="result_binding_mismatch",
+                reason="result_binding_mismatch",
+            )
 
 
 SUCCESS_STATUSES = frozenset({"completed", "succeeded", "success"})
@@ -823,6 +942,12 @@ class CallEClient:
         """Build a masked dry-run payload; it never constructs the SDK client."""
 
         locale = canonicalize_call_locale(request.locale)
+        binding_digest, metadata = _bound_operation(
+            request,
+            next_attempt=next_attempt,
+            retry_marker=retry_marker,
+            suffix=self.idempotency_suffix,
+        )
         return {
             "mode": "dry_run",
             "quote_id": request.quote_id,
@@ -833,7 +958,10 @@ class CallEClient:
                 next_attempt,
                 retry_marker,
                 self.idempotency_suffix,
+                binding_digest,
             ),
+            "binding_digest": binding_digest,
+            "metadata": metadata,
             "phone_configured": bool(request.phone),
             "task": request.goal,
         }
@@ -842,7 +970,19 @@ class CallEClient:
         if not self.execute_enabled:
             raise CallEError("live CALL-E execution requires --execute", code="execute_required", reason="execute_required")
         locale = canonicalize_call_locale(request.locale)
-        key = idempotency_key(request.quote_id, next_attempt, retry_marker, self.idempotency_suffix)
+        binding_digest, metadata = _bound_operation(
+            request,
+            next_attempt=next_attempt,
+            retry_marker=retry_marker,
+            suffix=self.idempotency_suffix,
+        )
+        key = idempotency_key(
+            request.quote_id,
+            next_attempt,
+            retry_marker,
+            self.idempotency_suffix,
+            binding_digest,
+        )
         sdk = self._sdk()
         create_started = time.perf_counter()
         _log_provider_boundary(
@@ -859,7 +999,7 @@ class CallEClient:
                 "task": request.goal,
                 "recipient": {"phones": [request.phone], "locale": locale, "region": request.region},
                 "result_schema": result_schema(),
-                "metadata": {"quotewake_quote_id": request.quote_id},
+                "metadata": metadata,
                 "idempotency_key": key,
             }
             self._log_raw_api(
@@ -1057,7 +1197,26 @@ class CallEClient:
                 diagnostic=_bounded_failure_diagnostic(details),
             )
         try:
-            return self._parse_result(request.quote_id, call_id, completed)
+            _verify_provider_binding(
+                request,
+                call_id,
+                completed,
+                provider_key=key,
+                metadata=metadata,
+            )
+            parsed = self._parse_result(request.quote_id, call_id, completed)
+            return replace(
+                parsed,
+                binding_digest=binding_digest,
+                provider_key=key,
+                bound_phone=request.phone,
+                bound_task=request.goal,
+                bound_schema_digest=hashlib.sha256(
+                    _canonical_json(result_schema()).encode("utf-8")
+                ).hexdigest(),
+                bound_metadata=tuple(sorted(metadata.items())),
+                binding_verified=True,
+            )
         except Exception as exc:
             details = failure_details(exc)
             _set_failure_attributes(
@@ -1259,6 +1418,8 @@ __all__ = [
     "idempotency_key",
     "normalize_error_code",
     "normalize_reason",
+    "operation_binding_digest",
+    "request_metadata",
     "result_schema",
     "validate_idempotency_suffix",
 ]

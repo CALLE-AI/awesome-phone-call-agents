@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-import logging
 import re
+import logging
 import time
 from typing import Any
 from urllib.parse import urlsplit
@@ -285,6 +285,27 @@ class SalesforceClient:
 
         if result.quote_id != quote.quote_id:
             raise SalesforceError("call result does not match Quote")
+        if not getattr(result, "binding_verified", False):
+            raise SalesforceError("call result has no verified CALL-E binding")
+        if result.bound_phone != contact.phone:
+            raise SalesforceError("call result does not match Contact phone")
+        if not isinstance(result.provider_key, str) or not result.provider_key:
+            raise SalesforceError("call result has no verified provider key")
+        if not isinstance(result.binding_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", result.binding_digest):
+            raise SalesforceError("call result has no verified binding digest")
+        if not isinstance(result.bound_task, str) or not result.bound_task:
+            raise SalesforceError("call result has no verified task binding")
+        if not isinstance(result.bound_schema_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", result.bound_schema_digest):
+            raise SalesforceError("call result has no verified schema binding")
+        metadata = dict(result.bound_metadata or ())
+        expected_metadata = {
+            "quotewake_quote_id": quote.quote_id,
+            "quotewake_opportunity_id": quote.opportunity_id,
+            "quotewake_contact_id": contact.contact_id,
+            "quotewake_binding_digest": result.binding_digest,
+        }
+        if metadata != expected_metadata:
+            raise SalesforceError("call result metadata does not match Salesforce records")
         occurred = result.occurred_at or datetime.now(timezone.utc)
         local_date = occurred.astimezone(business_timezone).date().isoformat()
         outcome = str(getattr(result, "outcome", "unknown")).strip() or "unknown"

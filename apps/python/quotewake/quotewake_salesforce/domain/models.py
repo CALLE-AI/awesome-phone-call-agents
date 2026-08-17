@@ -171,6 +171,13 @@ class CallResult:
     next_follow_up_at: datetime | None
     outcome_kind: CallOutcomeKind
     occurred_at: datetime | None = None
+    binding_digest: str | None = None
+    provider_key: str | None = None
+    bound_phone: str | None = None
+    bound_task: str | None = None
+    bound_schema_digest: str | None = None
+    bound_metadata: tuple[tuple[str, str], ...] | None = None
+    binding_verified: bool = False
 
 
 @dataclass(frozen=True)

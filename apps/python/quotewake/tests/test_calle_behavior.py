@@ -11,6 +11,8 @@ from quotewake_salesforce.calle.client import (
     CallEError,
     failure_details,
     idempotency_key,
+    operation_binding_digest,
+    request_metadata,
     result_schema,
     validate_idempotency_suffix,
 )
@@ -23,12 +25,43 @@ REQUEST = CallRequest("0Q0000000000001", "006000000000001", "003000000000001", "
 def sdk(result, status="completed", task_completed=True):
     calls = Mock()
     calls.create.return_value = {"id": "call-1"}
-    calls.wait_for_result.return_value = {"status": status, "task_completed": task_completed, "structured_result": result}
+    request_metadata_value = request_metadata(REQUEST)
+    digest = operation_binding_digest(REQUEST, next_attempt=1)
+    calls.wait_for_result.return_value = {
+        "id": "call-1",
+        "status": status,
+        "task_completed": task_completed,
+        "structured_result": result,
+        "task": REQUEST.goal,
+        "recipient": {"phones": [REQUEST.phone], "locale": REQUEST.locale, "region": REQUEST.region},
+        "result_schema": result_schema(),
+        "metadata": {**request_metadata_value, "quotewake_binding_digest": digest},
+        "idempotency_key": idempotency_key(REQUEST.quote_id, 1, binding_digest=digest),
+    }
     return Mock(calls=calls)
+
+
+def bound_payload(payload):
+    evidence = sdk(None).calls.wait_for_result.return_value
+    evidence.update(payload)
+    for recipient in evidence.get("recipients", []):
+        recipient.setdefault("phones", [REQUEST.phone])
+        recipient.setdefault("locale", REQUEST.locale)
+        recipient.setdefault("region", REQUEST.region)
+    if isinstance(evidence.get("recipient"), dict):
+        evidence["recipient"].setdefault("phones", [REQUEST.phone])
+        evidence["recipient"].setdefault("locale", REQUEST.locale)
+        evidence["recipient"].setdefault("region", REQUEST.region)
+    return evidence
 
 
 def valid_result():
     return {"outcome": "interested", "interest_level": "high", "preferred_date": "2026-08-20", "summary": "Wants a human follow-up.", "next_action": "Salesperson calls."}
+
+
+def bound_key(request=REQUEST, *, attempt=1, marker=None, suffix=None):
+    digest = operation_binding_digest(request, next_attempt=attempt, retry_marker=marker, suffix=suffix)
+    return idempotency_key(request.quote_id, attempt, marker, suffix, digest)
 
 
 def test_result_schema_exposes_only_supported_business_outcomes():
@@ -52,7 +85,11 @@ def test_live_sdk_call_uses_locale_wait_and_idempotency():
     assert result.next_follow_up_at == datetime(2026, 8, 20, tzinfo=timezone.utc)
     kwargs = fake.calls.create.call_args.kwargs
     assert kwargs["recipient"] == {"phones": [REQUEST.phone], "locale": "es-ES", "region": "ES"}
-    assert kwargs["idempotency_key"] == idempotency_key(REQUEST.quote_id, 1)
+    assert kwargs["idempotency_key"] == bound_key()
+    assert kwargs["metadata"] == {
+        **request_metadata(REQUEST),
+        "quotewake_binding_digest": operation_binding_digest(REQUEST, next_attempt=1),
+    }
     fake.calls.wait_for_result.assert_called_once()
 
 
@@ -191,15 +228,50 @@ def test_idempotency_suffix_is_optional_without_changing_default_key():
 def test_preview_uses_idempotency_suffix():
     client = CallEClient(idempotency_suffix="preview-1")
     preview = client.preview(REQUEST, next_attempt=1)
-    assert preview["idempotency_key"] == idempotency_key(REQUEST.quote_id, 1, suffix="preview-1")
+    assert preview["idempotency_key"] == bound_key(suffix="preview-1")
 
 
 def test_execute_uses_idempotency_suffix():
     fake = sdk(valid_result())
     CallEClient(execute=True, client=fake, idempotency_suffix="execute-1").execute(REQUEST, next_attempt=1)
-    assert fake.calls.create.call_args.kwargs["idempotency_key"] == idempotency_key(
-        REQUEST.quote_id, 1, suffix="execute-1"
-    )
+    assert fake.calls.create.call_args.kwargs["idempotency_key"] == bound_key(suffix="execute-1")
+
+
+def test_binding_digest_changes_when_provider_bound_operation_changes():
+    variants = [
+        CallRequest(REQUEST.quote_id, REQUEST.opportunity_id, REQUEST.contact_id, "+14155550102", REQUEST.goal, REQUEST.locale, REQUEST.region),
+        CallRequest(REQUEST.quote_id, REQUEST.opportunity_id, REQUEST.contact_id, REQUEST.phone, "A different task.", REQUEST.locale, REQUEST.region),
+        CallRequest(REQUEST.quote_id, REQUEST.opportunity_id, REQUEST.contact_id, REQUEST.phone, REQUEST.goal, "en-US", "US"),
+        CallRequest("0Q0000000000002", REQUEST.opportunity_id, REQUEST.contact_id, REQUEST.phone, REQUEST.goal, REQUEST.locale, REQUEST.region),
+    ]
+    original = operation_binding_digest(REQUEST, next_attempt=1)
+    assert all(operation_binding_digest(variant, next_attempt=1) != original for variant in variants)
+
+
+def test_binding_digest_includes_metadata_contract():
+    original = operation_binding_digest(REQUEST, next_attempt=1)
+    changed_metadata = {**request_metadata(REQUEST), "quotewake_contract": "different"}
+    assert operation_binding_digest(REQUEST, next_attempt=1, metadata=changed_metadata) != original
+    changed_schema = {"type": "object", "required": ["different_contract"]}
+    assert operation_binding_digest(REQUEST, next_attempt=1, schema=changed_schema) != original
+
+
+@pytest.mark.parametrize("field", ["id", "task", "metadata", "result_schema", "idempotency_key"])
+def test_mismatched_provider_evidence_is_not_verified(field):
+    fake = sdk(valid_result())
+    payload = fake.calls.wait_for_result.return_value
+    payload[field] = {"id": "different"} if field in {"metadata", "result_schema"} else "different"
+    result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    assert result.binding_verified is False
+    assert result.outcome == "unknown"
+
+
+def test_mismatched_provider_phone_is_not_verified():
+    fake = sdk(valid_result())
+    fake.calls.wait_for_result.return_value["recipient"]["phones"] = ["+14155550102"]
+    result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    assert result.binding_verified is False
+    assert result.outcome == "unknown"
 
 
 def test_schema_has_optional_preferred_date_without_a_union_and_enum_interest():
@@ -271,7 +343,7 @@ def test_aggregate_root_no_answer_is_used_when_recipient_result_is_null():
     """An aggregate CALL-E result is authoritative over a null recipient copy."""
 
     fake = sdk({}, task_completed=False)
-    fake.calls.wait_for_result.return_value = {
+    fake.calls.wait_for_result.return_value = bound_payload({
         "status": "completed",
         "task_completed": False,
         "structured_result": {
@@ -284,7 +356,7 @@ def test_aggregate_root_no_answer_is_used_when_recipient_result_is_null():
             "status": "completed",
             "structured_result": None,
         }],
-    }
+    })
 
     parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
 
@@ -297,7 +369,7 @@ def test_failed_declined_call_uses_aggregate_no_answer_result():
     """A declined call can have status=failed but still provide no_answer evidence."""
 
     fake = sdk({}, status="failed", task_completed=False)
-    fake.calls.wait_for_result.return_value = {
+    fake.calls.wait_for_result.return_value = bound_payload({
         "id": "call-b7r1WPAheNhASNYx7rcQzA",
         "status": "failed",
         "task_completed": False,
@@ -317,22 +389,22 @@ def test_failed_declined_call_uses_aggregate_no_answer_result():
                 "failure_code": None,
             }],
         }],
-    }
+    })
 
     parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
 
-    assert parsed.outcome == "no_answer"
+    assert parsed.outcome == "unknown"
     assert parsed.provider_status == "failed"
     assert parsed.outcome_kind is CallOutcomeKind.BUSINESS
 
 
 def test_failure_message_declined_text_is_not_a_business_signal():
     fake = sdk({}, status="failed", task_completed=False)
-    fake.calls.wait_for_result.return_value = {
+    fake.calls.wait_for_result.return_value = bound_payload({
         "status": "failed",
         "failure_code": "call_failed",
         "failure_message": "calling task status=DECLINED (Hangup by: user)",
-    }
+    })
 
     parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
 
@@ -379,14 +451,14 @@ def test_missing_or_null_structured_result_becomes_unknown():
 def test_nested_no_answer_and_busy_codes_are_safe_business_outcomes():
     for code in ("no_answer", "busy"):
         fake = sdk({}, task_completed=True)
-        fake.calls.wait_for_result.return_value = {
+        fake.calls.wait_for_result.return_value = bound_payload({
             "status": "completed",
             "task_completed": True,
             "recipients": [{
                 "status": "failed",
                 "attempts": [{"status": "failed", "failure_code": code}],
             }],
-        }
+        })
         parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
         assert parsed.outcome == code
         assert parsed.outcome_kind is CallOutcomeKind.BUSINESS
@@ -394,11 +466,11 @@ def test_nested_no_answer_and_busy_codes_are_safe_business_outcomes():
 
 def test_explicit_nested_no_answer_overrides_false_task_evidence():
     fake = sdk({}, task_completed=False)
-    fake.calls.wait_for_result.return_value = {
+    fake.calls.wait_for_result.return_value = bound_payload({
         "status": "completed",
         "task_completed": False,
         "recipients": [{"attempts": [{"status": "no_answer"}]}],
-    }
+    })
     parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
     assert parsed.outcome == "no_answer"
 
@@ -433,7 +505,7 @@ def test_internal_call_not_established_is_not_accepted_from_agent_output():
 
 def test_result_uses_recipient_and_last_attempt_statuses():
     fake = sdk({})
-    fake.calls.wait_for_result.return_value = {
+    fake.calls.wait_for_result.return_value = bound_payload({
         "status": "completed",
         "recipients": [{
             "status": "completed",
@@ -441,14 +513,14 @@ def test_result_uses_recipient_and_last_attempt_statuses():
             "task_completed": True,
             "structured_result": valid_result(),
         }],
-    }
+    })
     parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
     assert parsed.outcome == "interested"
 
 
 def test_result_accepts_singular_recipient_and_reports_nested_terminal_status():
     fake = sdk({})
-    fake.calls.wait_for_result.return_value = {
+    fake.calls.wait_for_result.return_value = bound_payload({
         "recipient": {
             "last_attempt": {
                 "status": "succeeded",
@@ -456,10 +528,10 @@ def test_result_accepts_singular_recipient_and_reports_nested_terminal_status():
                 "structured_result": valid_result(),
             }
         }
-    }
+    })
     parsed = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
     assert parsed.outcome == "interested"
-    assert parsed.provider_status == "succeeded"
+    assert parsed.provider_status == "completed"
 
 
 def test_failure_classification_is_bounded_and_includes_http_status():
@@ -540,7 +612,7 @@ def test_ambiguous_create_errors_preserve_key_and_do_not_retry(error):
     client = CallEClient(execute=True, client=fake)
     with pytest.raises(type(error)) as raised:
         client.execute(REQUEST, next_attempt=2)
-    expected = idempotency_key(REQUEST.quote_id, 2)
+    expected = bound_key(attempt=2)
     assert failure_details(raised.value)["creation_unknown"] is True
     assert failure_details(raised.value)["idempotency_key"] == expected
     assert fake.calls.create.call_count == 1
@@ -553,7 +625,8 @@ def test_create_without_call_id_is_ambiguous_and_replay_key_is_stable():
     first_client = CallEClient(execute=True, client=first)
     with pytest.raises(CallEError) as raised:
         first_client.execute(REQUEST, next_attempt=2, retry_marker=datetime(2026, 8, 12, tzinfo=timezone.utc))
-    key = idempotency_key(REQUEST.quote_id, 2, datetime(2026, 8, 12, tzinfo=timezone.utc))
+    marker = datetime(2026, 8, 12, tzinfo=timezone.utc)
+    key = bound_key(attempt=2, marker=marker)
     assert failure_details(raised.value)["creation_unknown"] is True
     assert failure_details(raised.value)["idempotency_key"] == key
 
@@ -592,7 +665,7 @@ def test_provider_http_5xx_create_is_ambiguous_and_preserves_same_key():
         CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
     details = failure_details(raised.value)
     assert details["creation_unknown"] is True
-    assert details["idempotency_key"] == idempotency_key(REQUEST.quote_id, 1)
+    assert details["idempotency_key"] == bound_key()
 
 
 def test_wait_http_4xx_is_deterministic_after_confirmed_creation():
