@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: leash
+Version: 0.1.0
+Summary: A phone call that can only take capability away: an unattended agent's Google credential is revoked unless twelve conditions hold.
+Requires-Python: >=3.11
+Provides-Extra: dev
+Requires-Dist: pytest==8.3.3; extra == "dev"
