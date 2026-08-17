@@ -96,7 +96,9 @@ ignored.
 
 To exercise the real sign-in path instead, point it at a free Supabase project (URL +
 anon key from Project Settings → API). Both values are public by design — there is no
-service-role key anywhere in this app.
+service-role key anywhere in this app. If you do, also run
+[`supabase/delete_own_account.sql`](supabase/delete_own_account.sql) once in that project's
+SQL editor — see [Deleting an account](#deleting-an-account).
 
 ### Turning real calls on
 
@@ -151,7 +153,50 @@ result of one confirmed request, so there is nothing to unsubscribe from.
 | Calls for today | The daily budget refuses further calls once `CALLE_DAILY_CALL_BUDGET` is reached. |
 | A specific pending request | Do not confirm it. An unconfirmed request never reserves budget and never reaches the API. |
 | A wrong or stale published fact | Press **Recheck** on the fact. Rechecking uses an hour-bucketed idempotency key so it produces a new call instead of replaying the original. |
+| One person's data | **Delete account** in the account sheet, or `DELETE /api/auth/account`. See [Deleting an account](#deleting-an-account). |
 | Everything stored | Facts, private results and budget counters all live under `calle:*` keys in Redis and can be deleted directly. |
+
+## Deleting an account
+
+Signing in is required to *request* a call, so there has to be a way back out — and
+"email the maintainer" is not a mechanism. **Delete account** sits in the account sheet
+behind a typed `delete` confirmation, and calls `DELETE /api/auth/account`.
+
+| Deleted immediately | Where it lived |
+|---|---|
+| Tab preferences | `atlas:prefs:<uid>` |
+| The cached token — the only record here that ever held the email address | `auth:tok:<sha256(token)>` |
+| Every private call result, with its questions and transcripts | `calle:priv:<uid>:*` |
+| In-flight dedupe locks | `calle:lock:<uid>:*` |
+| Call records belonging to that account | `calle:call:*`, filtered on the `uid` in the body |
+| The sign-in record itself | Supabase `auth.users` |
+
+**Public verified facts are kept, and that is not a loophole.** A shared entry carries no
+account id — none is stored on it, and none is ever sent to CALL-E — so there is nothing
+in one that identifies who asked. The answer belongs to the place and to every later
+visitor; deleting it would remove other people's facts to no privacy end. The
+confirmation panel says exactly this before asking for anything.
+
+Two things worth noting about how it is built:
+
+- **It adds no service-role key.** Deleting the `auth.users` row needs rights the anon key
+  does not have, and the usual answer — the admin API with a service-role key — would put a
+  credential that can read and rewrite every table into a web server so that one button
+  works. The delete lives in the database instead, as a `SECURITY DEFINER` function that
+  takes **no parameters**: the target is always `auth.uid()`, so no caller can reach another
+  row, and Postgres enforces that rather than application code remembering to check. The
+  server calls it with the user's own access token. Run
+  [`supabase/delete_own_account.sql`](supabase/delete_own_account.sql) once per project;
+  until then the endpoint answers 502 saying the function is not installed.
+- **Order, and not over-claiming.** Local records go first and the identity row last. If
+  Supabase refuses, the reply is a 502 stating that the stored data is gone but the login
+  remains. A success message shown over a still-existing account would be the worst outcome
+  available here.
+
+Finding `calle:priv:<uid>:*` requires key enumeration, so `store.js` grew `docScan` — Upstash
+`SCAN` with a bounded cursor loop, never `KEYS`, which blocks Redis — alongside a real
+`docDel`. Every other read in that file is by exact key on purpose; this is the one caller
+that cannot be.
 
 ## Credential handling
 

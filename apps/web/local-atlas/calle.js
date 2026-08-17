@@ -147,7 +147,7 @@ async function client(){
 
 /* Durable records live in store.js — see the note there on why this is not
    server.js's read-through cache. */
-const { docGet, docSet } = require('./store');
+const { docGet, docSet, docDel, docScan } = require('./store');
 
 const DAY = 86400e3;
 const faqKey = pk => 'calle:faq:' + pk;              // published answers for a place
@@ -1450,6 +1450,50 @@ async function getPrivate(uid, place){
   return mine.map(publicEntry);
 }
 
+/* ---- forget one account's calls ----
+   The deletion half of the Private Actions promise. If a private result is
+   yours, then asking for it to be gone has to be a thing you can do — otherwise
+   "yours" only ever meant "nobody else can read it".
+
+   Three key shapes hold something about a person, and all three are keyed or
+   filtered by uid:
+     calle:priv:<uid>:<placeKey>   the private results themselves
+     calle:lock:<uid>:...          in-flight dedupe locks
+     calle:call:<id>               call records, which carry uid in the body
+
+   The last one cannot be found from its key, so the day's call records are
+   scanned and read. That is deliberately the expensive path: it runs once, when
+   somebody asks to be forgotten, and it is the only way to remove the question
+   they asked and the transcript of the call they requested.
+
+   What is NOT deleted, and should not be: a public verified fact. Those carry
+   no uid — no account id is stored on them and none is sent to CALL-E — so
+   there is nothing in one that identifies who asked, and the answer belongs to
+   the place and to every later visitor rather than to the person who triggered
+   the call. Deleting them would remove other people's facts to no privacy end.
+
+   Returns counts rather than a boolean so the caller can tell the user what
+   actually happened. */
+async function forgetUser(uid){
+  if(!uid) return { private: 0, locks: 0, calls: 0 };
+  const priv = await docScan(privKey(uid, '*'));
+  const locks = await docScan(`calle:lock:${uid}:*`);
+
+  const callKeys = await docScan('calle:call:*');
+  const mine = [];
+  for(const k of callKeys){
+    let rec = null;
+    try{ rec = await docGet(k); }catch(e){ continue; }   // a read failure is not a reason to stop
+    if(rec && rec.uid === uid) mine.push(k);
+  }
+
+  return {
+    private: await docDel(priv),
+    locks: await docDel(locks),
+    calls: await docDel(mine)
+  };
+}
+
 /* Operator view — everything, transcripts included, behind the real-call code.
    This is where the call logs went when they came off the public page. */
 async function listCalls(place){
@@ -1461,7 +1505,7 @@ module.exports = {
   configured, askPlace, pollCall, handleWebhook, getFaq, getPrivate,
   placeKey, normalizeE164, validateQuestion, sanitizeQuestion, buildTask,
   realCallOk, realCallsPossible, templatesFor, moderateQuestion, suggestQuestions,
-  listCalls, publicEntry, summarizeCall,
+  listCalls, publicEntry, summarizeCall, forgetUser,
   /* Exported so the binding rules can be exercised directly against hand-built
      API records — the refusals are the part of this file most worth testing and
      the least reachable through a real call. */

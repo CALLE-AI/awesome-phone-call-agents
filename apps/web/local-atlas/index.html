@@ -21,6 +21,13 @@
     --sun:#FFC72C;
     --sky:#2E6F9E;
     --alert:#C8402F;
+    /* Destructive-action palette. Kept apart from --alert, which marks weather
+       and hazard warnings the app reports; this marks something the user is
+       about to do. */
+    --danger-ink:#9B2226;      /* text on --danger-bg */
+    --danger-solid:#9B2226;    /* button fill, always with white text */
+    --danger-line:#E6C3C3;
+    --danger-bg:#FDF5F4;
     --radius:14px;
     --surface:#ffffff;
     --surface-2:#F5F2EA;
@@ -37,6 +44,12 @@
     --sun:#FFC72C;
     --sky:#5BA3D0;
     --alert:#E4573F;
+    /* Light text, darker fill: the same colour cannot be both readable on the
+       panel and legible under white button text. */
+    --danger-ink:#F2A0A0;
+    --danger-solid:#8E3B38;
+    --danger-line:#4A2C2C;
+    --danger-bg:#241B1B;
     --surface:#1B211E;
     --surface-2:#202723;
     --shadow:0 10px 30px rgba(0,0,0,.5);
@@ -482,6 +495,19 @@
     border-radius:99px;padding:4px 10px;cursor:pointer;
   }
   .tabprefs-acts button:hover{border-color:var(--sign-green);color:var(--sign-green)}
+  /* Deletion. Muted until opened — an irreversible action should not compete for
+     attention with the tab checkboxes, and red on a closed link reads as a
+     warning about something that has already happened. */
+  .acct-danger{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  .acct-danger.open{
+    border:1.5px solid var(--danger-line);border-radius:10px;
+    padding:12px;background:var(--danger-bg);
+  }
+  .acct-danger h4{font-family:'Overpass',sans-serif;font-weight:800;font-size:.8rem;color:var(--danger-ink)}
+  .acct-danger .acct-form button.danger{
+    border-color:var(--danger-solid);background:var(--danger-solid);
+  }
+  .acct-danger .acct-form input{background:var(--surface)}
   .poicontrols{display:flex;gap:8px;margin:0 0 10px}
   .poicontrols input{
     flex:1;min-width:0;border:1.5px solid var(--line);border-radius:9px;
@@ -1143,7 +1169,7 @@
   </div>
   <div class="panel-head">
     <div class="head-top">
-      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v9.1</span></div>
+      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v9.2</span></div>
       <div>
         <button class="acct-btn" id="acctBtn" hidden>Sign in</button>
         <button class="hide-btn" id="themeToggle" aria-label="Toggle dark mode" title="Dark mode">◐</button>
@@ -1647,13 +1673,16 @@ async function savePrefs(hiddenTabs){
 }
 
 /* ---------------- account sheet ---------------- */
-const acctState = { step: 'email', email: '', msg: '', bad: false, busy: false };
+const acctState = { step: 'email', email: '', msg: '', bad: false, busy: false, deleting: false };
 
 /* `msg` is a parameter rather than something the caller sets beforehand,
    because opening the sheet resets its state — a message assigned first would
    be wiped by the open that was meant to display it. */
 function openAcct(msg, bad){
   acctState.step = state.user ? 'in' : 'email';
+  // never reopen mid-delete: the sheet should not come back with a confirmation
+  // box already showing from a decision somebody abandoned
+  acctState.deleting = false;
   // only ever a string: anything else is a caller mistake, and rendering it
   // stringified ("[object PointerEvent]") is worse than showing nothing
   acctState.msg = typeof msg === 'string' ? msg : '';
@@ -1662,6 +1691,43 @@ function openAcct(msg, bad){
   renderAcct();
 }
 const closeAcct = () => { $('acctSheet').hidden = true; };
+
+/* ---- delete account ----
+   Folded away behind a link rather than sitting next to Sign out, because the
+   two are one slip apart and only one of them is reversible. Opening it states
+   what goes and what stays before asking for anything, and the confirmation is
+   the word typed out: a second "Are you sure?" trains people to click through,
+   while typing is a deliberate act that cannot be muscle memory.
+
+   The honesty about public facts belongs here rather than only in a policy page.
+   Somebody deleting their account is entitled to know that the answers their
+   calls collected stay on the listings — and why that is not a loophole: those
+   entries never held an account id, so there is nothing of theirs left in one. */
+function renderDeleteAccount(){
+  if(!acctState.deleting)
+    return `<div class="acct-danger"><button class="acct-alt" id="acctDelOpen">Delete account</button></div>`;
+
+  return `
+    <div class="acct-danger open">
+      <h4>Delete your account</h4>
+      <div class="ask-note">
+        <b>Deleted immediately:</b> your sign-in record and email address, your tab
+        preferences, and every private call result you have collected — including the
+        questions and the call transcripts.<br>
+        <b>Kept:</b> verified facts on public listings. Those never stored who asked —
+        no account id is attached to one, and none is ever sent to CALL-E — so there is
+        nothing of yours in them, and other visitors are still relying on the answer.
+      </div>
+      <div class="ask-note">This cannot be undone. Type <b>delete</b> to confirm.</div>
+      <form class="acct-form" id="acctDelForm">
+        <input name="confirm" placeholder="delete" aria-label="Type delete to confirm"
+               autocomplete="off" spellcheck="false" required>
+        <button type="submit" class="danger"${acctState.busy ? ' disabled' : ''}>${
+          acctState.busy ? 'Deleting…' : 'Delete account'}</button>
+      </form>
+      <button class="acct-alt" id="acctDelCancel">Keep my account</button>
+    </div>`;
+}
 
 function renderAcct(){
   const el = $('acctInner');
@@ -1696,6 +1762,7 @@ function renderAcct(){
         </div>
       </div>
       ${msg}
+      ${renderDeleteAccount()}
       <div class="tabprefs-acts" style="margin-top:14px">
         <button id="acctClose2">Close</button>
       </div>`;
@@ -5539,6 +5606,37 @@ $('acctInner').addEventListener('submit', async ev=>{
       renderAcct();
     }
   }
+
+  if(f.id === 'acctDelForm'){
+    /* The typed word is checked here as well as being asked for: a disabled
+       button is a hint, this is the gate. Case- and space-insensitive, because
+       refusing "Delete " is pedantry rather than safety. */
+    if(String(f.confirm.value || '').trim().toLowerCase() !== 'delete'){
+      acctState.msg = 'Type the word delete to confirm.'; acctState.bad = true;
+      return renderAcct();
+    }
+    acctState.busy = true; acctState.msg = '';
+    renderAcct();
+    try{
+      const r = await fetch('/api/auth/account',
+        { method: 'DELETE', headers: await authHeaders() });
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok || !j.ok) throw new Error(j.error || 'The account could not be deleted.');
+      /* The session is dead server-side, so the local one has to go regardless
+         of what the UI does next — signOut also drops the private results held
+         on the POI objects, which outlive the sheet. */
+      acctState.busy = false; acctState.deleting = false;
+      await signOut();
+      acctState.step = 'email';
+      renderAcct();
+      refreshOpenAskPanels();
+      openAcct('Your account and all of your private call results have been deleted.');
+    }catch(e){
+      acctState.busy = false;
+      acctState.msg = e.message; acctState.bad = true;
+      renderAcct();
+    }
+  }
 });
 
 $('acctInner').addEventListener('click', async ev=>{
@@ -5554,6 +5652,17 @@ $('acctInner').addEventListener('click', async ev=>{
     renderAcct();
     refreshOpenAskPanels();
     return;
+  }
+  if(ev.target.closest('#acctDelOpen')){
+    acctState.deleting = true; acctState.msg = ''; acctState.bad = false;
+    renderAcct();
+    const i = $('acctInner').querySelector('#acctDelForm input');
+    if(i) i.focus();
+    return;
+  }
+  if(ev.target.closest('#acctDelCancel')){
+    acctState.deleting = false; acctState.msg = ''; acctState.bad = false;
+    return renderAcct();
   }
   const preset = ev.target.closest('[data-preset]');
   if(preset){

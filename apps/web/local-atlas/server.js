@@ -1379,6 +1379,46 @@ app.put('/api/auth/prefs', express.json({ limit: '4kb' }), auth.attachUser, auth
     catch(e){ res.status(502).json({ error: String(e.message || e) }); }
   });
 
+/* ---- delete an account ----
+   The counterpart to the privacy notice. Each module deletes what it owns —
+   auth.js its preferences and token cache, calle.js its private results, locks
+   and call records — and the reply reports counts rather than just "ok", because
+   a deletion the user cannot see the shape of is a promise, not a receipt.
+
+   Public verified facts are untouched and the reply says so: they carry no
+   account id, so there is nothing in one to identify who asked, and they belong
+   to the place and every later visitor rather than to the person whose question
+   started the call.
+
+   The identity row goes last. If Supabase refuses, this answers 502 with the
+   reason and admits our records are already gone — claiming success over a live
+   account would be the worst outcome available here. */
+app.delete('/api/auth/account', auth.attachUser, auth.requireUser, async (req, res) => {
+  const uid = req.user.id;
+  try{
+    const mine = await auth.forgetAccount(uid, auth.bearer(req));
+    const calls = await calle.forgetUser(uid);
+    const deleted = { ...mine, privateResults: calls.private, callRecords: calls.calls,
+                      locks: calls.locks };
+
+    /* A reviewer's account is this process's own fixture, not a row in anybody's
+       identity provider, so there is nothing further to delete. */
+    if(auth.REVIEW_MODE && uid === 'review-mode-local')
+      return res.json({ ok: true, deleted, identity: 'review-mode fixture; nothing to delete',
+                        publicFactsKept: true });
+
+    const gone = await auth.deleteSupabaseUser(auth.bearer(req));
+    if(!gone.ok)
+      return res.status(502).json({ ok: false, deleted, publicFactsKept: true,
+        error: 'Your stored data has been deleted, but the sign-in record could not be: '
+             + gone.reason + '. Nothing was lost — try again, or the data is already gone and only the login remains.' });
+
+    res.json({ ok: true, deleted, publicFactsKept: true });
+  }catch(e){
+    res.status(502).json({ ok: false, error: String(e.message || e) });
+  }
+});
+
 /* One account's private call results for one place. */
 app.post('/api/private-faq', express.json({ limit: '8kb' }), auth.attachUser, auth.requireUser,
   async (req, res) => {

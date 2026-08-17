@@ -21,7 +21,7 @@
    round; if it ever isn't, this is the only function that has to change. */
 
 const crypto = require('crypto');
-const { docGet, docSet } = require('./store');
+const { docGet, docSet, docDel } = require('./store');
 
 /* Render's dashboard accepts hyphens in variable names and calle.js already
    pays for that lesson — read both spellings here too. */
@@ -145,6 +145,60 @@ const cleanTabs = list => Array.isArray(list)
   ? [...new Set(list.filter(t => TAB_IDS.includes(t)))]
   : [];
 
+/* ---- deleting an account ----
+   Someone who signed in to make a call is owed a way back out, and "email
+   support" is not a mechanism. Two halves, and only one of them is ours.
+
+   Our half is small, because the address is barely here: preferences are keyed
+   by uid and hold nothing but tab visibility, and the only record that has ever
+   held the email is the brief token cache below. Everything about calls lives
+   under calle.js's keys — see forgetUser there — and the route calls both.
+
+   Supabase's half is the account row, and deleting it needs rights the anon key
+   does not have. The obvious route is the admin API with a service-role key,
+   and this app deliberately does not have one: a key that can read and rewrite
+   every table, added so that one button works, is a bad trade. So the delete
+   lives in the database instead, as a SECURITY DEFINER function that deletes
+   exactly `auth.users WHERE id = auth.uid()` — see supabase/delete_own_account.sql.
+   We call it with the *user's own* token, so the request carries no more
+   authority than the person making it. A caller can only ever delete themselves,
+   and that is enforced by Postgres rather than by this file being careful.
+
+   Order matters: our records go first. If the account row then fails to delete,
+   the user is told plainly rather than being shown a success message over a
+   still-existing account — an over-claimed deletion is the one outcome here
+   that is worse than an error. */
+async function deleteSupabaseUser(token){
+  if(!configured()) return { ok: false, reason: 'accounts are not configured' };
+  let r;
+  try{
+    r = await fetch(`${SUPA_URL}/rest/v1/rpc/delete_own_account`, {
+      method: 'POST',
+      headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + token,
+                 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+  }catch(e){ return { ok: false, reason: 'could not reach the identity provider' }; }
+  if(r.ok) return { ok: true };
+  /* 404 means the function was never installed, which is a deploy step somebody
+     skipped rather than a user error — say which, or this is unfixable from the
+     outside. */
+  const body = await r.text().catch(() => '');
+  if(r.status === 404)
+    return { ok: false, reason: 'delete_own_account() is not installed on this Supabase project' };
+  return { ok: false, reason: `identity provider refused the deletion (HTTP ${r.status})`,
+           detail: body.slice(0, 300) };
+}
+
+/* Drops our own records for a uid. Separate from the route so the order and the
+   counts are visible in one place. */
+async function forgetAccount(uid, token){
+  const prefs = await docDel(prefsKey(uid));
+  // the 60-second cache is the only record here that has ever held the address
+  const cached = token ? await docDel(tokKey(token)) : 0;
+  return { prefs, cachedTokens: cached };
+}
+
 async function setPrefs(uid, patch){
   const cur = await getPrefs(uid);
   const next = { ...cur };
@@ -156,6 +210,7 @@ async function setPrefs(uid, patch){
 
 module.exports = {
   configured, verifyToken, attachUser, requireUser, getPrefs, setPrefs, TAB_IDS,
+  forgetAccount, deleteSupabaseUser, bearer, REVIEW_MODE,
   /* Public config only — the anon key belongs in the browser by design. There
      is no service-role key anywhere in this app, and nothing here should ever
      become the place one gets added. */
