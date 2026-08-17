@@ -33,12 +33,12 @@ def test_template_has_exactly_two_slots():
 
 
 def test_rendered_task_carries_no_refused_register():
-    assert templates.BANNED.search(templates.render_task("LEASH-0001", "12")) is None
+    assert templates.BANNED.search(templates.render_task("nightly-tidy", "12")) is None
 
 
 @pytest.mark.parametrize(
     "job_id",
-    ["ok", "way-too-long-for-slot", "lower-case", "has space", "punct!", ""],
+    ["ok", "way-too-long-for-slot", "LEASH-0001", "has space", "punct!", "", "-lead"],
 )
 def test_malformed_job_id_is_rejected_before_rendering(job_id):
     with pytest.raises(ValueError):
@@ -48,15 +48,15 @@ def test_malformed_job_id_is_rejected_before_rendering(job_id):
 @pytest.mark.parametrize("minutes", ["-1", "12.5", "abcd", "", "1234"])
 def test_malformed_minutes_is_rejected_before_rendering(minutes):
     with pytest.raises(ValueError):
-        templates.render_task("LEASH-0001", minutes)
+        templates.render_task("nightly-tidy", minutes)
 
 
 @pytest.mark.parametrize(
     "smuggled",
     [
-        "OTP-1234",       # one-time-code register
-        "PIN-0000",       # credential register
-        "ALARM-9",        # emergency register
+        "otp-1234",       # one-time-code register
+        "pin-0000",       # credential register
+        "alarm-9",        # emergency register
     ],
 )
 def test_a_slot_value_cannot_smuggle_a_refused_word_into_the_task(smuggled):
@@ -75,7 +75,7 @@ def test_the_call_never_mentions_a_credential_or_a_secret():
     credential, a secret, or a code the caller is asked to recite. Both refused drafts
     of this project died on exactly those.
     """
-    task = templates.render_task("LEASH-0001", "12").lower()
+    task = templates.render_task("nightly-tidy", "12").lower()
     forbidden = (
         "credential", "token", "oauth", "password", "passcode",
         "confirmation code", "verification code", "access code", "one-time code",
@@ -89,6 +89,6 @@ def test_polarity_never_leaks_into_the_call_script():
     """'continue' is not approval. If an approval word appears in what we say aloud,
     the design has been misread -- and a reviewer will collapse this into an approval
     gate, which is the one thing it is not."""
-    task = templates.render_task("LEASH-0001", "12").lower()
+    task = templates.render_task("nightly-tidy", "12").lower()
     for word in ("approve", "approval", "authorise", "authorize", "sign-off", "permission"):
         assert word not in task

@@ -7,3 +7,6 @@ client_secret*.json
 __pycache__/
 .pytest_cache/
 .venv/
+
+# Runtime state written by demo/live runs. Never part of the source.
+.leash/

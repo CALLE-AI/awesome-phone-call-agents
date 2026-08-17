@@ -44,7 +44,13 @@ TASK_TEMPLATE_SHA256 = "4e971382408307404e8938186b01f2d50f98dac2abb56cee0eeade1c
 #: Substitution slots. Every value is regex-validated before rendering, so no
 #: caller-, agent-, or config-supplied free text can ever reach the task string.
 SLOTS = {
-    "JOB_ID": r"^[A-Z0-9-]{4,12}$",
+    # Lowercase deliberately. On a live call the voice agent read the uppercase id
+    # "LEASH-0001" out character by character -- "capitalized L, capitalized E,
+    # capitalized A, capitalized S, capitalized H, dash, zero, zero, zero, one" --
+    # which burned roughly twenty seconds at the top of the call. A lowercase
+    # hyphenated name is spoken as words. The template itself is unchanged and its
+    # hash still pins it; only the accepted shape of a slot VALUE is narrower here.
+    "JOB_ID": r"^[a-z0-9][a-z0-9-]{3,11}$",
     "MINUTES": r"^[0-9]{1,3}$"
 }
 
