@@ -149,15 +149,19 @@ def test_a_voicemail_arriving_as_completed_releases_the_lease():
 
 
 def test_a_reason_that_contradicts_the_choice_releases_the_lease():
-    """OBSERVED on a real call: the caller said "continue" twice and confirmed it, then
-    gave the reason "the job's done enough, take it back" -- a reason that means stop.
-    Extraction was faithful; the human was inconsistent. Trusting the enum alone would
-    have kept a live credential against the caller's actual intent."""
+    """OBSERVED on a live call of our own: the caller chose continue, confirmed it, and
+    then gave a reason that plainly meant stop. Extraction was faithful; the human was
+    inconsistent, and trusting the enum alone would have kept a live credential against
+    the caller's actual intent.
+
+    The call identifier and the caller's verbatim wording are withheld under the
+    repository privacy rule. The fixture below is invented and exercises the same
+    lexical class."""
     contradicted = dataclasses.replace(
         _keep(),
         structured_result={
             **_keep().structured_result,
-            "reason_sentence": "the jobs done enough, take it back.",
+            "reason_sentence": "shut it down, we are finished here.",
         },
     )
     verdict = _evaluate(contradicted)
@@ -168,7 +172,7 @@ def test_a_reason_that_contradicts_the_choice_releases_the_lease():
 @pytest.mark.parametrize(
     "reason",
     [
-        "the job's done enough, take it back.",       # curly-safe apostrophe
+        "we’re finished, don’t let it carry on.",   # curly apostrophes
         "don't let it rewrite anything",
         "do not let it continue",
         "shut it down please",

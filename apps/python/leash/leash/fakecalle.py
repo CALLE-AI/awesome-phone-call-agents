@@ -313,12 +313,13 @@ def _continue_clean(job: str, mins: str) -> _Terminal:
 def _stop_plain(job: str, mins: str) -> _Terminal:
     """Near verbatim from a real call. Two things in it are the reason it is kept as a fixture.
 
-    First, recognition returned "dot." where the person said "stop" -- and the agent's read-back
+    First, recognition returned a different single word where the person said "stop" -- the
+    token below is invented, since the real transcript is withheld -- and the agent's read-back
     ("You said stop. Is that correct?") recovered it. Second, the read-back and the reason arrive
     in the opposite order from the script; the agent reorders under pressure, so no parser may
     assume the turns follow the template.
     """
-    reason = "because i don't want it rewriting anything."
+    reason = "i would rather it left the repository alone for now."
     return _Terminal(
         status="completed",
         task_completed=True,
@@ -340,7 +341,7 @@ def _stop_plain(job: str, mins: str) -> _Terminal:
             _turn(40, "bot", _HEAR),
             _turn(40, "user", "yes."),
             _turn(45, "bot", _ASK),
-            _turn(45, "user", "dot."),
+            _turn(45, "user", "top."),
             _turn(53, "bot", _WHY),
             _turn(53, "user", reason),
             _turn(62, "bot", "You said stop.  Is that correct?"),
@@ -433,12 +434,12 @@ def _contradiction(job: str, mins: str) -> _Terminal:
 
     The caller said "continue" twice and answered "yes" to the read-back. Extraction was faithful:
     job_decision continue_job at 0.92, evidence agreeing. Then the reason came back in the
-    caller's own words -- "the jobs done enough, take it back" -- which means stop. Every field
+    caller's own words, which plainly mean stop. Every field
     agrees with every other field and the whole thing is still wrong, because the human was the
     inconsistent party. A gate that trusted the enum would have kept a live credential against the
     stated intent of the person holding the only power to end it.
     """
-    reason = "the jobs done enough, take it back."
+    reason = "shut it down, we are finished here."
     return _Terminal(
         status="completed",
         task_completed=True,

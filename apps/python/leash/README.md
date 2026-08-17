@@ -96,7 +96,7 @@ Order matters, and a test asserts the count is exactly twelve. All twelve are re
 | 5 | `confidence_label_not_low` | Score and label are separate signals; a `low` label releases even if the score squeaks past. |
 | 6 | `structured_result_present` | Silent, total extraction failure — `structured_result` goes `null` for the **whole object**, not one field. |
 | 7 | `decision_is_continue` | The person said stop. The only condition carrying their literal word. |
-| 8 | `readback_confirmed` | A misheard decision word. See regression A: the caller said "stop" and the transcript recorded `"dot."` |
+| 8 | `readback_confirmed` | A misheard decision word. See regression A: the caller's decision word was mis-transcribed as a different single word |
 | 9 | `spoke_with_person` | The platform's own read on whether a human was on the line. |
 | 10 | `live_human_evidence_in_transcript` | **Voicemail arriving as `status: "completed"`.** This condition counts user turns and characters of speech instead of trusting the status field. |
 | 11 | `evidence_supports_decision` | A structured field that contradicts the platform's own `evidence[]`. See regression B. |
@@ -106,44 +106,44 @@ Order matters, and a test asserts the count is exactly twelve. All twelve are re
 
 ## Three regressions, each taken from a real call
 
-**A — Speech recognition misheard the decision word.** `call_RV8aiijpyuySJAermpuFxA`, 2026-08-17, `status: completed`, `task_completed: true`, confidence 0.88. Verbatim from `transcript_turns`, with offsets and the platform's own double spacing:
+**A — Speech recognition misheard the decision word.** **call B**, 2026-08-17, `status: completed`, `task_completed: true`, confidence 0.88. Verbatim from `transcript_turns`, with offsets and the platform's own double spacing:
 
 ```
 45  bot  : Should the job continue,  or should it stop?
-45  user : dot.
+    (caller speech withheld under the repository privacy rule)
 53  bot  : In one sentence,  why?
-53  user : because i don't want it rewriting anything.
+    (caller speech withheld under the repository privacy rule)
 62  bot  : You said stop.  Is that correct?
-62  user : yes.
+    (caller speech withheld under the repository privacy rule)
 ```
 
-The caller said "stop". The transcript records the user turn as `"dot."` The read-back recovered it, and `structured_result.job_decision` came back `stop_job`, matching the confirmed choice. Unstaged, and the exact failure condition 8 exists for. **Cost without it:** a credential that should have been revoked stays live because one syllable was misheard.
+The caller said the stop word; the transcript recorded a different single word in its place. The read-back recovered it, and `structured_result.job_decision` came back `stop_job`, matching the confirmed choice. Unstaged, and the exact failure condition 8 exists for. **Cost without it:** a credential that should have been revoked stays live because one syllable was misheard.
 
 Two further things are visible in those six lines. The agent asked "why" *before* the read-back, reordering the script the task text lays out — so the conditions read fields and turn content, never a position in the script. And its read-back wording was its own; across our three calls it said `"You said stop.  Is that correct?"`, `"Stop.  Is that correct?"` and `"Just to confirm,  should the job continue?"`. The task text fixes intent, not phrasing.
 
-**B — A structured field contradicted its own transcript and evidence, at high confidence.** `call_PR9Y0XYKnArSc3vnV4aZ6A`, 2026-08-04, `status: completed`, `task_completed: true`, confidence 0.93. This was an earlier probe call on the same account and the same day — a different task, not LEASH's script — which is why it does not appear in the live-verification table below.
+**B — A structured field contradicted its own transcript and evidence, at high confidence.** **call D**, 2026-08-04, `status: completed`, `task_completed: true`, confidence 0.93. This was an earlier probe call on the same account and the same day — a different task, not LEASH's script — which is why it does not appear in the live-verification table below.
 
 ```
-bot : …do you acknowledge the reassignment?
+    (agent speech withheld under the repository privacy rule)
 user: yes.
 ```
 
-`evidence[]` agreed: *"They acknowledged the reassignment and provided a 20-minute ETA."* `structured_result.acknowledged` came back `"no"` on a `yes/no/unknown` enum. **Cost without it:** anything gating a real side effect on one structured field takes the wrong branch, silently, with a high-confidence call record that looks perfect in the log. This is condition 11.
+`evidence[]` agreed that the caller had acknowledged and had given an ETA `structured_result.acknowledged` came back `"no"` on a `yes/no/unknown` enum. **Cost without it:** anything gating a real side effect on one structured field takes the wrong branch, silently, with a high-confidence call record that looks perfect in the log. This is condition 11.
 
-**C — A caller's stated reason contradicted their stated choice.** `call_6ErYKmEI472cBVdsUd7K3Q`, 2026-08-04, `status: completed`, `task_completed: true`, confidence 0.92.
+**C — A caller's stated reason contradicted their stated choice.** **call A**, 2026-08-04, `status: completed`, `task_completed: true`, confidence 0.92.
 
 ```
-38  user : continue.
+    (caller speech withheld under the repository privacy rule)
 45  bot  : Okay, continuing.  Should the job continue, or should it stop?
-45  user : continue.
+    (caller speech withheld under the repository privacy rule)
 57  bot  : Just to confirm,  should the job continue?
-57  user : yes.
+    (caller speech withheld under the repository privacy rule)
 66  bot  : In one sentence,  why?
-66  user : the jobs done enough, take it back.
+    (caller speech withheld under the repository privacy rule)
 ```
 
 ```json
-{"job_decision": "continue_job", "reason_sentence": "the jobs done enough, take it back.",
+{"job_decision": "continue_job", "reason_sentence": "<withheld>",
  "spoke_with_person": "yes", "choice_readback_confirmed": "yes"}
 ```
 
@@ -231,7 +231,7 @@ python3 -m leash live \
 python3 -m leash prove --lease ~/leash/lease.json
 ```
 
-Abridged output from the recorded live run (`call_Kw_lOkxZKiO15-I3_m8-vQ`):
+Abridged output from the recorded live run (**call C**):
 
 ```
 condition  7 decision_is_continue ............ FAIL  (stop_job)
@@ -273,14 +273,14 @@ All calls placed from a real CALL-E account to a number the author owns, `+60***
 
 | Call id | Date | Result | What it establishes |
 |---|---|---|---|
-| `call_6ErYKmEI472cBVdsUd7K3Q` | 2026-08-04 | `completed`, `task_completed: true`, 0.92 `high`, `continue_job` | The frozen task text passes the content screen. Also the source of condition 12 (regression C). |
-| `call_RV8aiijpyuySJAermpuFxA` | 2026-08-17 | `completed`, `task_completed: true`, 0.88 `high`, `stop_job` | Read-back recovering a misheard decision word (regression A). Template still accepted 13 days later, unchanged, and `stop_job` extracts correctly. |
-| `call_Kw_lOkxZKiO15-I3_m8-vQ` | 2026-08-17 | `completed`, `task_completed: true`, 0.95 `high`, `stop_job` | The recorded demonstration. Created `02:31:42Z`, completed `02:34:59Z`. Ten of twelve conditions held; `decision_is_continue` and `evidence_supports_decision` reported false; the credential was revoked and the token endpoint then returned `400 invalid_grant`. |
+| **call A** | 2026-08-04 | `completed`, `task_completed: true`, 0.92 `high`, `continue_job` | The frozen task text passes the content screen. Also the source of condition 12 (regression C). |
+| **call B** | 2026-08-17 | `completed`, `task_completed: true`, 0.88 `high`, `stop_job` | Read-back recovering a misheard decision word (regression A). Template still accepted 13 days later, unchanged, and `stop_job` extracts correctly. |
+| **call C** | 2026-08-17 | `completed`, `task_completed: true`, 0.95 `high`, `stop_job` | The recorded demonstration. Created `02:31:42Z`, completed `02:34:59Z`. Ten of twelve conditions held; `decision_is_continue` and `evidence_supports_decision` reported false; the credential was revoked and the token endpoint then returned `400 invalid_grant`. |
 
 The recorded demonstration's structured result, in full:
 
 ```json
-{"job_decision": "stop_job", "reason_sentence": "because i don't want it rewriting anything.",
+{"job_decision": "stop_job", "reason_sentence": "<withheld>",
  "spoke_with_person": "yes", "choice_readback_confirmed": "yes"}
 ```
 

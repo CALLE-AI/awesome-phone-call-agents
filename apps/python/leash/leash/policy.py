@@ -251,9 +251,10 @@ _UNREADABLE_REASON = "no readable reason"
 _STOP_LEANING_REASON: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(pattern), label)
     for pattern, label in (
-        # The exact phrase from call_6ErYKmEI472cBVdsUd7K3Q, our own live call: the
+        # Derived from a live acceptance call of our own, where the caller chose
         # caller said "continue" twice, confirmed the read-back, then explained
-        # "the jobs done enough, take it back".
+        # continue and then gave a reason that plainly meant stop. The call identifier
+        # and the verbatim wording are withheld under the repository privacy rule.
         (r"\btake (?:it|that|them|the job|the lease) back\b", "take it back"),
         (r"\bdone enough\b", "done enough"),
         (r"\b(?:that is|it is|thats) enough\b", "that is enough"),
@@ -516,8 +517,9 @@ def _check_decision_is_continue(outcome: CallOutcome, min_confidence: float) -> 
 
 def _check_readback_confirmed(outcome: CallOutcome, min_confidence: float) -> Condition:
     # The read-back is its own condition because speech recognition is not reliable on
-    # this channel: on call_RV8aiijpyuySJAermpuFxA the caller's "stop" was transcribed as
-    # "dot", and only the agent repeating the choice back and getting a "yes" recovered
+    # this channel: on one of our live calls the caller's decision word was mis-transcribed as
+    # a different single word, and only the agent repeating the choice back and getting a
+    # "yes" recovered
     # the intent.
     return _enum_condition(
         outcome,
@@ -585,9 +587,9 @@ def _check_evidence_supports_decision(outcome: CallOutcome, min_confidence: floa
 def _check_reason_does_not_contradict_decision(outcome: CallOutcome, min_confidence: float) -> Condition:
     """The contradiction check: the reason has to agree with the word the caller chose.
 
-    On call_6ErYKmEI472cBVdsUd7K3Q, a real acceptance call to a real phone, the caller
+    On a live acceptance call of our own, to a phone we own, the caller
     said "continue" twice, confirmed the read-back, and then gave the reason "the jobs
-    done enough, take it back" at 0.92 confidence. Extraction was faithful; the person was
+    meant stop, at 0.92 confidence. Extraction was faithful; the person was
     the inconsistent party. A gate that trusted job_decision alone would have kept a live
     Google credential in an unattended agent against its owner's plainly stated intent.
 

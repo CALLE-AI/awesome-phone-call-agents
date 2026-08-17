@@ -78,20 +78,20 @@ out of a README.
 Every live call went to a number the author owns (+60\*\*\*\*\*\*\*22, region MY). No third party
 was called at any point. The three call ids below are the live calls this submission cites.
 
-- `call_6ErYKmEI472cBVdsUd7K3Q` (2026-08-04) — first confirmation that the frozen text passes the
+- **call A** (2026-08-04) — first confirmation that the frozen text passes the
   content screen. Completed, `task_completed` true, confidence 0.92, decision `continue_job`.
   The same call produced the inconsistency that became the twelfth condition: the author said
-  "continue" twice, confirmed the read-back, and then gave his reason as "the jobs done enough, take
+  "continue" twice, confirmed the read-back, and then gave a reason that plainly meant stop (wording withheld; see
   it back" — a reason that means stop. Extraction was faithful, and `reason_sentence` recorded the
   sentence word for word. The human was inconsistent. He decided a reason pointing away from the
   choice should end the lease, and wrote `reason_does_not_contradict_decision`. This was one call,
   not two: the acceptance and the inconsistency came out of the same three minutes.
-- `call_RV8aiijpyuySJAermpuFxA` (2026-08-17) — completed, confidence 0.88, decision `stop_job`. The
+- **call B** (2026-08-17) — completed, confidence 0.88, decision `stop_job`. The
   author said "stop"; speech recognition wrote the turn down as `dot.` The agent's read-back ("You
   said stop. Is that correct?") recovered it, and the structured result matched the confirmed
   choice. He heard this happen live and unstaged. It is why `readback_confirmed` is a condition and
   not a courtesy.
-- `call_Kw_lOkxZKiO15-I3_m8-vQ` is the recorded demonstration: completed, `task_completed` true,
+- **call C** is the recorded demonstration: completed, `task_completed` true,
   confidence 0.95, decision `stop_job`, created 2026-08-17T02:31:42Z, completed 02:34:59Z. Ten of
   the twelve conditions held. `decision_is_continue` and `evidence_supports_decision` did not. Both
   are conditions for the lease continuing, so on a stop call neither can hold — ten of twelve is
