@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AccessCall Intake Result",
+  "type": "object",
+  "required": [
+    "assistive_tech",
+    "barrier_category",
+    "severity",
+    "task_attempted",
+    "consent_followup",
+    "followup_contact_confirmed"
+  ],
+  "properties": {
+    "assistive_tech": {
+      "type": "string",
+      "enum": [
+        "screen_reader",
+        "switch_access",
+        "voice_control",
+        "screen_magnification",
+        "none",
+        "other"
+      ],
+      "description": "Primary assistive technology the caller reported using."
+    },
+    "assistive_tech_other": {
+      "type": "string",
+      "description": "Free-text detail when assistive_tech is 'other'."
+    },
+    "task_attempted": {
+      "type": "string",
+      "description": "The task the caller was trying to complete when they hit the barrier."
+    },
+    "barrier_category": {
+      "type": "string",
+      "enum": [
+        "perceivable",
+        "operable",
+        "understandable",
+        "robust",
+        "unclear"
+      ],
+      "description": "Loose mapping to WCAG POUR principles based on caller's description."
+    },
+    "barrier_description": {
+      "type": "string",
+      "description": "Caller's own description of what went wrong."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "blocked_entirely",
+        "workaround_needed",
+        "minor_annoyance"
+      ],
+      "description": "Caller-reported severity, maps to VPAT remediation priority."
+    },
+    "consent_followup": {
+      "type": "boolean",
+      "description": "Whether the caller consented to a follow-up call or email."
+    },
+    "followup_contact": {
+      "type": "string",
+      "description": "Contact info for follow-up, only populated if consent_followup is true."
+    },
+    "followup_contact_confirmed": {
+      "type": "boolean",
+      "description": "Whether the caller explicitly confirmed a spelled-back follow-up contact (e.g. email) as correct. Must be true for followup_contact to be considered valid. False if consent_followup is false, or if confirmation was never completed (e.g. the caller hung up mid-spelling) — a false value should be flagged for manual review rather than trusted as a delivery address."
+    }
+  },
+  "if": {
+    "required": ["followup_contact"]
+  },
+  "then": {
+    "properties": {
+      "followup_contact_confirmed": { "const": true }
+    }
+  },
+  "additionalProperties": false
+}

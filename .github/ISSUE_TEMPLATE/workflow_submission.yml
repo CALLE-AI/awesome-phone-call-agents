@@ -1,7 +1,7 @@
 name: Workflow resource submission
 description: Suggest a phone-call skill, runnable app, workflow plugin, adapter, scheduler recipe, or safety resource.
 title: "[Submission]: "
-labels: [submission]
+labels: [enhancement]
 body:
   - type: input
     id: name
