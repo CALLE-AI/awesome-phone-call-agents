@@ -59,3 +59,33 @@ def test_medium_signals_alone_stay_below_scam_threshold():
 def test_triggered_signals_only_include_present_ones():
     result = score(make_tags({"H3"}), CATALOG, "transcript", METADATA)
     assert [t.id for t in result.triggered_signals] == ["H3"]
+
+
+# --- outcome-aware scoring: a call that didn't produce real evidence must
+# never fall through to likely_legitimate just because no signals fired ---
+
+
+@pytest.mark.parametrize("bad_status", ["FAILED", "NO_ANSWER", "CANCELED", "DECLINED", "UNKNOWN"])
+def test_non_completed_call_is_inconclusive_even_with_zero_tags(bad_status):
+    metadata = CallMetadata(number_dialed="REDACTED", duration_seconds=0, timestamp="now", status=bad_status)
+    result = score(make_tags(set()), CATALOG, "", metadata)
+    assert result.verdict == "inconclusive"
+    assert result.score == 0
+    assert result.triggered_signals == []
+    assert any("scoreable evidence" in w for w in result.warnings)
+
+
+def test_empty_transcript_is_inconclusive_even_with_completed_status():
+    metadata = CallMetadata(number_dialed="REDACTED", duration_seconds=90, timestamp="now", status="COMPLETED")
+    result = score(make_tags(set()), CATALOG, "   ", metadata)  # whitespace-only
+    assert result.verdict == "inconclusive"
+    assert any("scoreable evidence" in w for w in result.warnings)
+
+
+def test_completed_call_with_zero_tags_is_still_likely_legitimate():
+    # Guards against over-correcting: a real, completed, clean call must
+    # still be able to reach likely_legitimate — only missing evidence
+    # should force inconclusive.
+    metadata = CallMetadata(number_dialed="REDACTED", duration_seconds=90, timestamp="now", status="COMPLETED")
+    result = score(make_tags(set()), CATALOG, "a real transcript", metadata)
+    assert result.verdict == "likely_legitimate"

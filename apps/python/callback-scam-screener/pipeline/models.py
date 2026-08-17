@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+from .guardrails import mask_phone_number
+
 
 @dataclass
 class Alert:
@@ -22,6 +24,12 @@ class CallMetadata:
     number_dialed: str
     duration_seconds: int
     timestamp: str
+    # Defaults keep every existing call site (tests, MockCallEClient callers
+    # that predate this field) meaning what they already meant: a normal,
+    # completed call. RealCallEClient always sets these explicitly from the
+    # real terminal status CALL-E reported.
+    status: str = "COMPLETED"
+    call_id: str | None = None
 
 
 @dataclass
@@ -45,7 +53,19 @@ class ScreeningResult:
     structured_result: dict | None = None
     completion_confidence: float | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self, mask_numbers: bool = True) -> dict:
+        """mask_numbers=True (the default) partially masks the dialed number
+        everywhere it appears in the output — call_metadata.number_dialed and
+        any occurrence within the transcript — so a full number doesn't end
+        up verbatim in a copy-pasted log, screenshot, or bug report by
+        default. Pass False to see the number in full (e.g. a SOC analyst
+        who needs it to take further action on this specific case)."""
+        number_dialed = self.call_metadata.number_dialed
+        transcript = self.transcript
+        if mask_numbers:
+            transcript = mask_phone_number(transcript, number_dialed)
+            number_dialed = mask_phone_number(number_dialed, number_dialed)
+
         return {
             "verdict": self.verdict,
             "score": self.score,
@@ -54,13 +74,15 @@ class ScreeningResult:
                 for t in self.triggered_signals
             ],
             "warnings": self.warnings,
-            "transcript": self.transcript,
+            "transcript": transcript,
             "structured_result": self.structured_result,
             "completion_confidence": self.completion_confidence,
             "call_metadata": {
-                "number_dialed": self.call_metadata.number_dialed,
+                "number_dialed": number_dialed,
                 "duration_seconds": self.call_metadata.duration_seconds,
                 "timestamp": self.call_metadata.timestamp,
+                "status": self.call_metadata.status,
+                "call_id": self.call_metadata.call_id,
             },
             "precheck": (
                 {

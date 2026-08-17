@@ -34,12 +34,21 @@ class CallGuardrails:
     def __init__(
         self,
         allowed_numbers: set[str] | None,
+        unrestricted: bool = False,
         max_calls: int = 20,  # matches the free-tier call allotment
         state_path: Path = DEFAULT_STATE_PATH,
     ):
-        """allowed_numbers=None means unrestricted (production mode) — pass an
-        explicit set of dev/test numbers during development so the pipeline
-        physically cannot dial a real, unreviewed number by accident."""
+        """Fails closed: pass an explicit set of dev/test numbers in
+        allowed_numbers, or pass unrestricted=True to affirmatively
+        acknowledge this run may dial any number extracted from an email,
+        without a pre-verified recipient. There is no silent "None means
+        unrestricted" default — a caller has to say which one it wants."""
+        if allowed_numbers is None and not unrestricted:
+            raise GuardrailViolation(
+                "No dev/test allowlist was given and unrestricted mode was not explicitly "
+                "requested — refusing to dial. Pass allowed_numbers=<set of numbers>, or "
+                "unrestricted=True if you intend to screen an arbitrary, unverified number."
+            )
         self.allowed_numbers = {normalize_phone(n) for n in allowed_numbers} if allowed_numbers is not None else None
         self.max_calls = max_calls
         self.state_path = state_path
@@ -47,13 +56,20 @@ class CallGuardrails:
 
     def _load_state(self) -> dict:
         if self.state_path.exists():
-            return json.loads(self.state_path.read_text(encoding="utf-8"))
-        return {"calls_placed": 0, "called_numbers": []}
+            state = json.loads(self.state_path.read_text(encoding="utf-8"))
+            state.setdefault("attempted_numbers", [])
+            return state
+        return {"calls_placed": 0, "called_numbers": [], "attempted_numbers": []}
 
     def _save_state(self) -> None:
         self.state_path.write_text(json.dumps(self._state, indent=2), encoding="utf-8")
 
     def check(self, phone_number: str) -> None:
+        if not is_valid_e164(phone_number):
+            raise GuardrailViolation(
+                f"{phone_number!r} is not a strict E.164 number (e.g. +18005550187) — "
+                "refusing to dial an ambiguously-formatted number."
+            )
         normalized = normalize_phone(phone_number)
 
         if self.allowed_numbers is not None and normalized not in self.allowed_numbers:
@@ -66,14 +82,33 @@ class CallGuardrails:
                 f"{phone_number} was already screened once — refusing to re-dial the same number."
             )
 
+        if normalized in self._state["attempted_numbers"]:
+            raise GuardrailViolation(
+                f"{phone_number} has a prior call attempt of unknown outcome — refusing to "
+                "dial again until this is resolved manually (check `calle call status`)."
+            )
+
         if self._state["calls_placed"] >= self.max_calls:
             raise GuardrailViolation(
                 f"Call budget of {self.max_calls} reached — refusing to place another call."
             )
 
+    def record_attempt(self, phone_number: str) -> None:
+        """Marks a number as having a dial attempt in progress, *before* the
+        call is actually placed. Recorded this early — rather than only on
+        success — so a crash, or a human re-running the same command after an
+        ambiguous outcome, can't slip a duplicate real dial past check()."""
+        normalized = normalize_phone(phone_number)
+        if normalized not in self._state["attempted_numbers"]:
+            self._state["attempted_numbers"].append(normalized)
+            self._save_state()
+
     def record_call(self, phone_number: str) -> None:
+        normalized = normalize_phone(phone_number)
         self._state["calls_placed"] += 1
-        self._state["called_numbers"].append(normalize_phone(phone_number))
+        self._state["called_numbers"].append(normalized)
+        if normalized in self._state["attempted_numbers"]:
+            self._state["attempted_numbers"].remove(normalized)
         self._save_state()
 
 
@@ -136,21 +171,64 @@ def normalize_phone(number: str) -> str:
     return "".join(ch for ch in number if ch.isdigit())[-10:]
 
 
-def redact_phone_number(text: str, phone_number: str) -> str:
-    """Best-effort redaction of a specific phone number from text before
-    it's sent to a third-party LLM API. Matches the number's core 10 digits
-    with an optional leading 0/country-code prefix and any separators
-    (spaces, dashes, parens, dots) between digits, since transcripts render
-    a spoken number as a digit sequence, not necessarily formatted the same
-    way it was dialed. This is defense-in-depth, not a mathematical
-    guarantee — it won't catch digits spelled out as words ("oh seven nine
-    five..."), which STT engines rarely do for phone numbers specifically
-    but could in principle."""
+# ITU-T E.164: a leading '+', then a country code that doesn't start with 0,
+# then up to 14 more digits (15 total). Deliberately strict — a caller must
+# supply an already-unambiguous, fully-qualified number (with country code)
+# rather than have this guess one from a bare national number.
+E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+def is_valid_e164(number: str) -> bool:
+    return bool(E164_RE.match(number.strip()))
+
+
+def mask_phone_number(text: str, phone_number: str) -> str:
+    """Partially masks occurrences of phone_number within text, keeping only
+    the last 2 digits visible (e.g. "+*********87") — enough for an analyst
+    to cross-check against a case reference without the full number ending
+    up verbatim in a screenshot, log line, or pasted bug report. Uses the
+    same separator-tolerant matching as redact_phone_number; unlike that
+    function this doesn't remove the number outright, since callers of this
+    one (printed/returned output) still want a masked-but-recognizable form,
+    not full redaction."""
+    pattern = _phone_number_pattern(phone_number)
+    if pattern is None:
+        return text
+
+    def _mask(match: re.Match) -> str:
+        raw_digits = re.sub(r"\D", "", match.group())
+        if len(raw_digits) <= 2:
+            return "*" * len(raw_digits)
+        return "+" + "*" * (len(raw_digits) - 2) + raw_digits[-2:]
+
+    return pattern.sub(_mask, text)
+
+
+def _phone_number_pattern(phone_number: str) -> re.Pattern | None:
+    """Shared by redact_phone_number and mask_phone_number: matches the
+    number's core 10 digits with an optional leading '(', an optional
+    leading +/country-code prefix, and any separators (spaces, dashes,
+    parens, dots) between digits — since transcripts render a spoken number
+    as a digit sequence, not necessarily formatted the same way it was
+    dialed. The leading optional open-paren match matters for loosely
+    formatted numbers like "(800) 555-0187": without it, the unmatched "("
+    was left behind in the output rather than consumed as part of the match."""
     digits = normalize_phone(phone_number)
     if not digits:
-        return text
+        return None
     spaced_digits = r"[\s\-.()]*".join(re.escape(d) for d in digits)
-    pattern = re.compile(r"(?:\+?\d{1,3}[\s\-.()]*)?" + spaced_digits)
+    return re.compile(r"\(?(?:\+?\d{1,3}[\s\-.()]*)?" + spaced_digits)
+
+
+def redact_phone_number(text: str, phone_number: str) -> str:
+    """Best-effort redaction of a specific phone number from text before
+    it's sent to a third-party LLM API. This is defense-in-depth, not a
+    mathematical guarantee — it won't catch digits spelled out as words
+    ("oh seven nine five..."), which STT engines rarely do for phone
+    numbers specifically but could in principle."""
+    pattern = _phone_number_pattern(phone_number)
+    if pattern is None:
+        return text
     return pattern.sub("[phone number redacted]", text)
 
 

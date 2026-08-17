@@ -54,7 +54,7 @@ Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), t
 
 ### Running it
 
-Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly — this app never guesses which number to dial. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
+Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly, in strict E.164 format (e.g. `+18005550187`, not `(800) 555-0187`) — this app never guesses which number to dial, and won't dial an ambiguously-formatted one. It also needs either `--allow-number` or `--unrestricted` — there is no silent unrestricted default. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
 
 ```bash
 export GEMINI_API_KEY="<your key>"
@@ -67,28 +67,32 @@ uv run python screen.py \
   --llm-provider gemini
 ```
 
-`--allow-number` builds an explicit dev/test allowlist enforced in code before dialing (see [`pipeline/guardrails.py`](pipeline/guardrails.py)) — omit it entirely only once you're intentionally running unrestricted.
+`--allow-number` builds an explicit dev/test allowlist enforced in code before dialing (see [`pipeline/guardrails.py`](pipeline/guardrails.py)), repeatable for more than one number. Once you're intentionally screening an arbitrary, unverified number in production, pass `--unrestricted` instead — this app refuses to run live without one or the other. Output is masked by default (e.g. `+*********87`); pass `--show-full-number` to see the dialed number in full.
 
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | 0 | Success — a verdict was returned, or the email correctly didn't meet the suspicious-alert bar |
-| 50 | Usage error or explicit refusal: missing `--confirm`, missing `--to-phone`, or `--to-phone` doesn't match the number extracted from the email |
+| 50 | Usage error or explicit refusal: missing `--confirm`/`--to-phone`, `--to-phone` doesn't match the number extracted from the email or isn't strict E.164, or neither `--allow-number` nor `--unrestricted` was given |
 | 51 | CALL-E's own platform guardrails rejected the call plan (e.g. a goal that isn't transparent about being an AI) |
-| 52 | Blocked by this app's own guardrails: dev/test allowlist, repeat-dial protection, call cap, or the daily LLM budget cap |
+| 52 | Blocked by this app's own guardrails: dev/test allowlist, repeat-dial protection, an unresolved prior attempt, call cap, or the daily LLM budget cap |
+| 53 | The call's outcome is ambiguous — a request that may have already dialed the phone (`call run`) timed out client-side. Not retried automatically (no idempotency key exists to make a retry safe); check `calle call status` or the CALL-E dashboard before trying again by hand |
 
 ## Side effects, credentials, data
 
 - One CALL-E call per `screen.py --live` run. No recurring schedule, nothing to clean up.
-- `--to-phone` is cross-checked against the number extracted from `--email` and refused on mismatch — this app never guesses a phone number to dial (see `docs/design-principles.md` Principle 3 in the parent repo).
+- `--to-phone` is cross-checked against the number extracted from `--email`, must be strict E.164, and is refused on mismatch or malformed input — this app never guesses a phone number to dial, and never normalizes or reformats one on its own (see `docs/design-principles.md` Principle 3 in the parent repo). The number actually dialed is this human-confirmed `--to-phone` value, not the raw, possibly loosely-formatted text the extraction regex found in the email body.
+- Dialing itself fails closed: `--live` refuses to run unless you pass either `--allow-number` (an explicit dev/test allowlist) or `--unrestricted` (an explicit acknowledgment that this run may dial any number extracted from an email, not a pre-verified one). There is no silent unrestricted default.
+- The request that actually places the call (`call run`) is never retried automatically on a timeout — the `calle` CLI has no idempotency key, so a blind retry after an ambiguous timeout could dial a second, real, duplicate call. A number with an unresolved attempt like this is also blocked from being re-dialed by a later run until it's checked manually (exit code 53; see Exit codes above). Requests with no side effect (`call plan`, `call status`) are still retried on timeout as before.
 - No API key is bundled or shared. CALL-E auth lives in your own local `~/.calle-mcp` token cache from `calle auth login`; your LLM provider's key (`GEMINI_API_KEY`/`GOOGLE_API_KEY` — see `--llm-provider`) is read from your own environment, and the app fails with a clear message rather than falling back to anything shared.
 - This app tries to cap LLM spend in code, checking a running total (tracked from the API's own reported token usage, not a pre-call estimate) before every call — see `pipeline/guardrails.LLMBudgetGuard`. It's an application-level guard, not a platform-enforced hard limit: it won't catch concurrent runs sharing one key, and its pricing table can drift out of date. Defaults to **$1.00/day**, a conservative starting point, not a statement about what CALL-E itself should cost you — override with `screen.py --daily-budget-usd <amount>`.
 - Call placement gets the same best-effort treatment (`pipeline/guardrails.CallGuardrails`), defaulting to 20/day to match CALL-E's free tier — override with `screen.py --max-calls-per-day <n>` if you're on a paid plan. Regardless of the cap, it refuses to re-dial a number already screened.
 - The Screener agent has no real account numbers, passwords, codes, or payment methods to disclose, and no tools to install software or move money — this is structural, not a prompt instruction a determined scammer could talk it out of.
 - The call opens by disclosing it may be recorded and reviewed, and asks the other party not to share sensitive personal, account, or payment details — see `docs/AGENT_PROMPTS.md` for the full prompt.
-- Transcripts and verdicts are returned to stdout as JSON; this app does not persist a record file or write anywhere outside the guardrail state files listed below.
-- The screened phone number is redacted from the transcript before it's sent to the LLM provider for tagging (`pipeline/guardrails.redact_phone_number`) — best-effort, not a mathematical guarantee: it catches the number rendered as digits with common separators (which is how transcripts render a spoken number), but not, say, digits spelled out as words. The full, unredacted transcript is still what's scored and printed locally; only the LLM-bound copy is scrubbed.
+- Transcripts and verdicts are returned to stdout as JSON; this app does not persist a record file or write anywhere outside the guardrail state files listed below. The dialed number is masked in this output by default (e.g. `+*********87`) in both `call_metadata.number_dialed` and anywhere it appears in the transcript — pass `--show-full-number` to see it in full; scoring itself always uses the real number internally regardless of this flag.
+- The screened phone number is redacted from the transcript before it's sent to the LLM provider for tagging (`pipeline/guardrails.redact_phone_number`) — best-effort, not a mathematical guarantee: it catches the number rendered as digits with common separators (which is how transcripts render a spoken number), but not, say, digits spelled out as words. The full, unredacted transcript is still what's used for scoring internally; only the LLM-bound copy and the final printed/returned output are scrubbed.
+- A call that fails, is canceled, gets no answer, or otherwise ends without a real transcript is never scored as `likely_legitimate` — the verdict logic requires a `COMPLETED` status and a non-empty transcript before it will evaluate signals at all; anything short of that returns `inconclusive` with a warning explaining why, since "nothing happened" is not the same as "nothing suspicious happened."
 
 ## Cancellation and rollback
 

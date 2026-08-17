@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Callable
 
 from .caller import CallEClient
-from .guardrails import CallGuardrails, redact_phone_number
+from .guardrails import CallGuardrails, normalize_phone, redact_phone_number
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
@@ -60,6 +60,7 @@ def run_pipeline(
     email_body: str,
     sender_domain: str,
     call_client: CallEClient,
+    to_phone: str | None = None,
     official_support_number: str | None = None,
     catalog_path: Path | None = None,
     guardrails: CallGuardrails | None = None,
@@ -68,7 +69,18 @@ def run_pipeline(
     """tagger defaults to the cheap offline keyword tagger so screen.py's
     --demo scenarios need no API key. Pass signal_catalog.tag_transcript_llm
     for real calls — the keyword tagger does not generalize to real speech
-    (see its docstring)."""
+    (see its docstring).
+
+    to_phone is the human-confirmed, already-validated E.164 number to
+    actually dial (screen.py's --to-phone, after it's been checked to match
+    the email). When omitted (preview/--demo), the raw regex-extracted
+    alert.phone_number is used instead purely for display/scoring — nothing
+    is dialed in those paths anyway. Dialing the confirmed value rather than
+    the loosely-formatted extracted text matters: the extraction regex finds
+    numbers in whatever format a real email happens to use (e.g. "(800)
+    555-0187"), which is not guaranteed to be a strict, unambiguous E.164
+    number — --to-phone is what a human actually typed and CALL-E's
+    guardrails validated."""
     alert = extract_alert(email_body, sender_domain)
     if alert is None:
         return None  # not flagged as suspicious — pipeline never dials
@@ -76,21 +88,33 @@ def run_pipeline(
     precheck = run_prechecks(alert, official_support_number)
     catalog = load_catalog(catalog_path)
 
-    if guardrails is not None:
-        guardrails.check(alert.phone_number)  # raises GuardrailViolation and stops before dialing
-
-    task = SCREENER_TASK_TEMPLATE.format(phone_number=alert.phone_number)
-    call_result = call_client.place_screening_call(alert.phone_number, task)
+    dial_number = to_phone or alert.phone_number
 
     if guardrails is not None:
-        guardrails.record_call(alert.phone_number)
+        guardrails.check(dial_number)  # raises GuardrailViolation and stops before dialing
+        guardrails.record_attempt(dial_number)  # before dialing, not after — see record_attempt's docstring
+
+    task = SCREENER_TASK_TEMPLATE.format(phone_number=dial_number)
+    call_result = call_client.place_screening_call(dial_number, task)
+
+    # Recipient binding: the verdict below is only meaningful if it's about
+    # to score evidence from the number we actually intended to dial, not
+    # something a future refactor accidentally decoupled.
+    if normalize_phone(call_result.metadata.number_dialed) != normalize_phone(dial_number):
+        raise RuntimeError(
+            f"Call result is for {call_result.metadata.number_dialed!r} but {dial_number!r} was requested "
+            "— refusing to score a verdict against a mismatched recipient."
+        )
+
+    if guardrails is not None:
+        guardrails.record_call(dial_number)
 
     # Redact the phone number before it reaches a third-party LLM API — the
     # transcript is speech-to-text of a real conversation, so if either party
     # ever said the number aloud it would otherwise be sent verbatim. The
     # unredacted transcript is still what's scored and returned below; this
     # redaction is scoped to the LLM call only.
-    redacted_transcript = redact_phone_number(call_result.transcript, alert.phone_number)
+    redacted_transcript = redact_phone_number(call_result.transcript, dial_number)
     tags = tagger(redacted_transcript, catalog)
 
     result = score(tags, catalog, call_result.transcript, call_result.metadata)

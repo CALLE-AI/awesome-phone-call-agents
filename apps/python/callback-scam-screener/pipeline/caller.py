@@ -28,6 +28,15 @@ PLAN_CLARIFICATION_RESPONSE = (
 )
 
 
+class AmbiguousCallOutcome(RuntimeError):
+    """Raised when a request that may have already dialed the phone (call
+    run) times out client-side. We cannot tell whether CALL-E's backend
+    placed the call or not, so this is never auto-retried — retrying would
+    risk a real duplicate dial with no idempotency key to dedupe it (the
+    calle CLI has no such flag, confirmed against its own --help). Surfaced
+    to a human to check `calle call status` before deciding what to do."""
+
+
 @dataclass
 class CallResult:
     transcript: str
@@ -110,8 +119,16 @@ class RealCallEClient(CallEClient):
             questions = "; ".join(plan.get("clarifying_questions") or []) or plan.get("confirm_summary")
             raise RuntimeError(questions)
 
+        # Not retryable: a timeout here means we don't know whether CALL-E's
+        # backend actually placed the call before our client gave up waiting.
+        # There is no idempotency key to make a safe retry (the calle CLI
+        # has no such flag — checked its --help directly), so a blind retry
+        # risks a real duplicate dial. Fail loudly instead of guessing.
         run = self._structured(
-            self._run_cli(["call", "run", "--plan-id", plan["plan_id"], "--confirm-token", plan["confirm_token"]])
+            self._run_cli(
+                ["call", "run", "--plan-id", plan["plan_id"], "--confirm-token", plan["confirm_token"]],
+                retryable=False,
+            )
         )
         run_id = run["run_id"]
 
@@ -133,12 +150,14 @@ class RealCallEClient(CallEClient):
                 number_dialed=phone_number,
                 duration_seconds=calling_meta.get("duration_seconds", 0),
                 timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                status=status.get("status", "UNKNOWN"),
+                call_id=run_id,
             ),
             structured_result=None,  # see class docstring — extraction-by-goal-text doesn't work
             completion_confidence=confidence.get("score"),
         )
 
-    def _run_cli(self, args: list[str]) -> dict:
+    def _run_cli(self, args: list[str], retryable: bool = True) -> dict:
         # subprocess.run(["calle", ...]) fails on Windows with FileNotFoundError:
         # npm installs global CLIs as calle.cmd, not a raw .exe, and CreateProcess
         # won't resolve that the way a shell does. shutil.which() finds it correctly
@@ -166,6 +185,20 @@ class RealCallEClient(CallEClient):
                 return json.loads(proc.stdout)
 
             transient = "timed out" in proc.stderr.lower() or "timed out" in proc.stdout.lower()
+
+            if transient and not retryable:
+                # This request may have side effects (it can place a real
+                # call) and there's no idempotency key to make a retry safe,
+                # so don't guess — surface it and let a human check
+                # `calle call status` before deciding what to do next.
+                raise AmbiguousCallOutcome(
+                    f"calle {' '.join(args)} timed out waiting for a response — CALL-E's backend may or may "
+                    "not have processed this request. Not retrying automatically, since this request can "
+                    "have a real side effect and there is no idempotency key to make a retry safe. Check "
+                    "`calle call status --run-id <id>` (if you have a run ID) or the CALL-E dashboard before "
+                    "trying again by hand."
+                )
+
             if transient and attempt <= self.max_request_retries:
                 time.sleep(2 * attempt)  # short backoff: 2s, then 4s
                 continue
@@ -195,5 +228,7 @@ class MockCallEClient(CallEClient):
                 number_dialed=phone_number,
                 duration_seconds=self._duration,
                 timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                status="COMPLETED",
+                call_id=None,
             ),
         )

@@ -5,6 +5,8 @@ from pipeline.guardrails import (
     CallGuardrails,
     GuardrailViolation,
     LLMBudgetGuard,
+    is_valid_e164,
+    mask_phone_number,
     normalize_phone,
     redact_phone_number,
 )
@@ -55,8 +57,13 @@ def test_redact_phone_number_handles_transcript_with_no_match():
 # --- CallGuardrails ---
 
 
+def test_no_allowlist_and_not_unrestricted_fails_closed(tmp_path):
+    with pytest.raises(GuardrailViolation, match="unrestricted"):
+        CallGuardrails(allowed_numbers=None, state_path=tmp_path / "state.json")
+
+
 def test_unrestricted_mode_allows_any_number(tmp_path):
-    g = CallGuardrails(allowed_numbers=None, state_path=tmp_path / "state.json")
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
     g.check("+18005550187")  # should not raise
 
 
@@ -71,16 +78,38 @@ def test_allowlist_permits_numbers_on_it(tmp_path):
     g.check("+18005550187")  # should not raise
 
 
+def test_non_e164_number_is_refused(tmp_path):
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
+    with pytest.raises(GuardrailViolation, match="E.164"):
+        g.check("(800) 555-0187")
+
+
 def test_blocks_redialing_the_same_number(tmp_path):
-    g = CallGuardrails(allowed_numbers=None, state_path=tmp_path / "state.json")
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
     g.check("+18005550187")
     g.record_call("+18005550187")
     with pytest.raises(GuardrailViolation, match="already screened"):
         g.check("+18005550187")
 
 
+def test_attempted_but_unresolved_number_blocks_redial(tmp_path):
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
+    g.check("+18005550187")
+    g.record_attempt("+18005550187")  # no record_call — outcome unknown, e.g. an ambiguous timeout
+    with pytest.raises(GuardrailViolation, match="unknown outcome"):
+        g.check("+18005550187")
+
+
+def test_record_call_clears_the_attempt_marker(tmp_path):
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
+    g.record_attempt("+18005550187")
+    g.record_call("+18005550187")
+    with pytest.raises(GuardrailViolation, match="already screened"):
+        g.check("+18005550187")  # blocked by "already screened", not "unknown outcome"
+
+
 def test_call_cap_is_enforced(tmp_path):
-    g = CallGuardrails(allowed_numbers=None, max_calls=2, state_path=tmp_path / "state.json")
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, max_calls=2, state_path=tmp_path / "state.json")
     g.check("+11111111111")
     g.record_call("+11111111111")
     g.check("+12222222222")
@@ -91,10 +120,54 @@ def test_call_cap_is_enforced(tmp_path):
 
 def test_call_state_persists_across_instances(tmp_path):
     state_path = tmp_path / "state.json"
-    CallGuardrails(allowed_numbers=None, state_path=state_path).record_call("+18005550187")
-    g2 = CallGuardrails(allowed_numbers=None, state_path=state_path)
+    CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=state_path).record_call("+18005550187")
+    g2 = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=state_path)
     with pytest.raises(GuardrailViolation, match="already screened"):
         g2.check("+18005550187")
+
+
+# --- is_valid_e164 ---
+
+
+@pytest.mark.parametrize("valid_number", ["+18005550187", FICTIONAL_UK_MOBILE, "+442079460000"])
+def test_is_valid_e164_accepts_well_formed_numbers(valid_number):
+    assert is_valid_e164(valid_number)
+
+
+@pytest.mark.parametrize(
+    "invalid_number",
+    ["(800) 555-0187", "8005550187", "+0000000000", "+1", "not a number"],
+)
+def test_is_valid_e164_rejects_malformed_numbers(invalid_number):
+    assert not is_valid_e164(invalid_number)
+
+
+# --- mask_phone_number ---
+
+
+def test_mask_phone_number_hides_all_but_last_two_digits():
+    masked = mask_phone_number("Call me at +18005550187 anytime.", "+18005550187")
+    assert "18005550187" not in masked
+    assert masked.endswith("87 anytime.")
+    assert "*" in masked
+
+
+def test_mask_phone_number_leaves_unrelated_text_alone():
+    text = "Caller: your case reference is 12345678."
+    assert mask_phone_number(text, "+18005550187") == text
+
+
+def test_mask_phone_number_consumes_a_leading_open_paren():
+    # Regression: "(800) 555-0187" used to leave a stray "(" in front of the
+    # mask because the leading paren wasn't part of the matched substring.
+    masked = mask_phone_number("(800) 555-0187", "(800) 555-0187")
+    assert not masked.startswith("(")
+    assert masked.endswith("87")
+
+
+def test_redact_phone_number_consumes_a_leading_open_paren():
+    redacted = redact_phone_number("(800) 555-0187", "(800) 555-0187")
+    assert redacted == "[phone number redacted]"
 
 
 # --- LLMBudgetGuard ---

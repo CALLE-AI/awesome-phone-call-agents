@@ -4,8 +4,29 @@ from .models import CallMetadata, ScreeningResult, SignalTag
 
 REMOTE_ACCESS_SIGNAL_ID = "C1"
 
+# The only call status that represents real, scoreable evidence. Anything
+# else (FAILED, NO_ANSWER, DECLINED, CANCELED/CANCELLED, VOICEMAIL, BUSY,
+# EXPIRED, or an unrecognized/UNKNOWN status) means no real conversation
+# happened — scoring it would silently produce a verdict with zero evidence
+# behind it.
+SCOREABLE_CALL_STATUS = "COMPLETED"
+
 
 def score(tags: list[SignalTag], catalog: dict, transcript: str, call_metadata: CallMetadata) -> ScreeningResult:
+    if call_metadata.status != SCOREABLE_CALL_STATUS or not transcript.strip():
+        return ScreeningResult(
+            verdict="inconclusive",
+            score=0,
+            triggered_signals=[],
+            warnings=[
+                f"Call did not produce scoreable evidence (status={call_metadata.status!r}, "
+                f"transcript_length={len(transcript.strip())}) — no signals were evaluated. This is not the "
+                "same as a clean call; escalate to a human rather than treating it as cleared."
+            ],
+            transcript=transcript,
+            call_metadata=call_metadata,
+        )
+
     triggered = [t for t in tags if t.present]
     critical_hits = [t for t in triggered if t.category == "critical"]
     high_hits = [t for t in triggered if t.category == "high"]

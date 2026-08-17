@@ -10,8 +10,14 @@ dialed.
 
 Live mode requires --live, --confirm, and --to-phone matching the number
 extracted from the email exactly (this app never guesses which number to
-dial). It places exactly one real CALL-E call and scores the real transcript
-with your own ANTHROPIC_API_KEY — see docs/CONCEPT.md for full design notes.
+dial) and in strict E.164 format. It also requires either --allow-number
+(dev/test allowlist) or --unrestricted (explicit acknowledgment this may
+dial any number extracted from the email) — there is no silent unrestricted
+default. It places exactly one real CALL-E call and scores the real
+transcript with your own --llm-provider's API key (default: gemini, reads
+GEMINI_API_KEY/GOOGLE_API_KEY) — see docs/CONCEPT.md for full design notes.
+Printed output masks the dialed number by default; pass --show-full-number
+to see it in full.
 
 Usage:
   python screen.py --demo remote_access
@@ -27,8 +33,15 @@ import sys
 import warnings
 from pathlib import Path
 
-from pipeline.caller import MockCallEClient, RealCallEClient
-from pipeline.guardrails import BudgetExceeded, CallGuardrails, GuardrailViolation, LLMBudgetGuard, normalize_phone
+from pipeline.caller import AmbiguousCallOutcome, MockCallEClient, RealCallEClient
+from pipeline.guardrails import (
+    BudgetExceeded,
+    CallGuardrails,
+    GuardrailViolation,
+    LLMBudgetGuard,
+    is_valid_e164,
+    normalize_phone,
+)
 from pipeline.llm_providers import PROVIDERS as LLM_PROVIDERS
 from pipeline.orchestrator import SCREENER_TASK_TEMPLATE, run_pipeline
 from pipeline.signal_catalog import tag_transcript_llm
@@ -48,6 +61,7 @@ EXIT_NOT_SUSPICIOUS = 0  # a clean, correctly-not-flagged email is not an error
 EXIT_USAGE_OR_REFUSAL = 50
 EXIT_CALLE_REJECTED_PLAN = 51
 EXIT_BUDGET_OR_GUARDRAIL = 52
+EXIT_AMBIGUOUS_CALL_OUTCOME = 53
 
 
 def main() -> int:
@@ -69,8 +83,21 @@ def main() -> int:
         "--allow-number",
         action="append",
         default=None,
-        help="Add a number to the dev/test allowlist enforced before dialing. Repeatable. "
-        "Omit entirely to run unrestricted (production mode).",
+        help="Add a number to the dev/test allowlist enforced before dialing. Repeatable. If omitted, "
+        "--unrestricted must be passed instead — there is no silent unrestricted default.",
+    )
+    parser.add_argument(
+        "--unrestricted",
+        action="store_true",
+        help="Required alongside --live when --allow-number is omitted: explicitly acknowledges this run may "
+        "dial any number extracted from the email, not just a pre-verified dev/test number.",
+    )
+    parser.add_argument(
+        "--show-full-number",
+        action="store_true",
+        help="Print the dialed phone number in full in the JSON output instead of the default masked form "
+        "(e.g. +*********87). Only the printed/returned output is affected — scoring always uses the real "
+        "number internally.",
     )
     parser.add_argument(
         "--daily-budget-usd",
@@ -158,11 +185,30 @@ def main() -> int:
             file=sys.stderr,
         )
         return EXIT_USAGE_OR_REFUSAL
+    if not is_valid_e164(args.to_phone):
+        print(
+            f"--to-phone ({args.to_phone}) is not a strict E.164 number (e.g. +18005550187) — refusing to "
+            "dial an ambiguously-formatted number.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE_OR_REFUSAL
+    if not args.allow_number and not args.unrestricted:
+        print(
+            "Refusing to place a live call without either --allow-number (dev/test allowlist) or "
+            "--unrestricted (explicit acknowledgment that this may dial any number extracted from the email).",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE_OR_REFUSAL
 
-    guardrails = CallGuardrails(
-        allowed_numbers=set(args.allow_number) if args.allow_number else None,
-        max_calls=args.max_calls_per_day,
-    )
+    try:
+        guardrails = CallGuardrails(
+            allowed_numbers=set(args.allow_number) if args.allow_number else None,
+            unrestricted=args.unrestricted,
+            max_calls=args.max_calls_per_day,
+        )
+    except GuardrailViolation as e:
+        print(f"Refusing to place this call: {e}", file=sys.stderr)
+        return EXIT_BUDGET_OR_GUARDRAIL
     budget = LLMBudgetGuard(daily_limit_usd=args.daily_budget_usd)
     tagger = functools.partial(
         tag_transcript_llm, provider=args.llm_provider, model=args.llm_model, budget=budget
@@ -175,6 +221,7 @@ def main() -> int:
                 email_body=email_body,
                 sender_domain=args.sender_domain,
                 call_client=RealCallEClient(request_timeout_seconds=args.calle_request_timeout_seconds),
+                to_phone=args.to_phone,
                 official_support_number=args.official_number,
                 guardrails=guardrails,
                 tagger=tagger,
@@ -184,6 +231,12 @@ def main() -> int:
     except (GuardrailViolation, BudgetExceeded) as e:
         print(f"Refusing to place this call: {e}", file=sys.stderr)
         return EXIT_BUDGET_OR_GUARDRAIL
+    except AmbiguousCallOutcome as e:
+        print(
+            f"Call outcome is ambiguous, not retried automatically: {e}",
+            file=sys.stderr,
+        )
+        return EXIT_AMBIGUOUS_CALL_OUTCOME
     except RuntimeError as e:
         print(f"CALL-E would not plan this call: {e}", file=sys.stderr)
         return EXIT_CALLE_REJECTED_PLAN
@@ -192,7 +245,7 @@ def main() -> int:
         print("Email did not meet the suspicious-alert threshold — no call placed.")
         return EXIT_NOT_SUSPICIOUS
 
-    print(json.dumps(result.to_dict(), indent=2))
+    print(json.dumps(result.to_dict(mask_numbers=not args.show_full_number), indent=2))
     return EXIT_OK
 
 
