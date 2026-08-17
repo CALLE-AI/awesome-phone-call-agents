@@ -181,6 +181,15 @@ def main() -> int:
     if not args.to_phone:
         print("Refusing to place a live call without --to-phone.", file=sys.stderr)
         return EXIT_USAGE_OR_REFUSAL
+    # Intentionally still digit-based/format-tolerant here, not exact-string
+    # like the allowlist and recipient-binding checks: alert.phone_number is
+    # whatever loosely-formatted text the extraction regex found in the raw
+    # email (often with no explicit country code at all, e.g. "(800)
+    # 555-0187"), so exact E.164 comparison would reject the very case this
+    # check exists to allow - a human confirming, via --to-phone, the number
+    # they can already see in the email. This is a "does this match what's
+    # in the email" sanity check, not the authorization boundary; that's the
+    # allowlist/--unrestricted gate below, which is exact.
     if normalize_phone(args.to_phone) != normalize_phone(alert.phone_number):
         print(
             f"--to-phone ({mask_phone_number(args.to_phone, args.to_phone)}) does not match the number "
