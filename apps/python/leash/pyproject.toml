@@ -1,0 +1,18 @@
+[project]
+name = "leash"
+version = "0.1.0"
+description = "A phone call that can only take capability away: an unattended agent's Google credential is revoked unless twelve conditions hold."
+requires-python = ">=3.11"
+dependencies = [
+    "calle-ai==0.6.0",
+    "google-auth==2.35.0",
+    "google-auth-oauthlib==1.2.1",
+    "requests==2.32.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.3"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
