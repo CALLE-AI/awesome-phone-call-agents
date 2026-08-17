@@ -1,0 +1,9 @@
+# Never commit anything that can dial a phone or touch an account.
+*.env
+lease.env
+token.json
+client_secret*.json
+*.log
+__pycache__/
+.pytest_cache/
+.venv/
