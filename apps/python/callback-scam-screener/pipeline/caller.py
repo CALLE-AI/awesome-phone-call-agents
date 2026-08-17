@@ -5,6 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 
+from .guardrails import mask_phone_number
 from .models import CallMetadata
 
 TERMINAL_STATUSES = {
@@ -100,7 +101,9 @@ class RealCallEClient(CallEClient):
         self.max_request_retries = max_request_retries
 
     def place_screening_call(self, phone_number: str, task: str, result_schema: dict | None = None) -> CallResult:
-        plan = self._structured(self._run_cli(["call", "plan", "--to-phone", phone_number, "--goal", task]))
+        plan = self._structured(
+            self._run_cli(["call", "plan", "--to-phone", phone_number, "--goal", task], mask=phone_number)
+        )
         if not plan.get("ready_to_run"):
             # One automatic refinement round with a fixed, pre-written answer —
             # not a general chat loop. See PLAN_CLARIFICATION_RESPONSE.
@@ -112,12 +115,13 @@ class RealCallEClient(CallEClient):
                         "--to-phone", phone_number,  # required on every plan call, even continuations
                         "--goal", task,  # also required on every plan call — confirmed via a real "Missing required --goal"
                         "--user-input", PLAN_CLARIFICATION_RESPONSE,
-                    ]
+                    ],
+                    mask=phone_number,
                 )
             )
         if not plan.get("ready_to_run"):
-            questions = "; ".join(plan.get("clarifying_questions") or []) or plan.get("confirm_summary")
-            raise RuntimeError(questions)
+            questions = "; ".join(plan.get("clarifying_questions") or []) or plan.get("confirm_summary") or ""
+            raise RuntimeError(mask_phone_number(questions, phone_number))
 
         # Not retryable: a timeout here means we don't know whether CALL-E's
         # backend actually placed the call before our client gave up waiting.
@@ -128,6 +132,7 @@ class RealCallEClient(CallEClient):
             self._run_cli(
                 ["call", "run", "--plan-id", plan["plan_id"], "--confirm-token", plan["confirm_token"]],
                 retryable=False,
+                mask=phone_number,
             )
         )
         run_id = run["run_id"]
@@ -138,7 +143,7 @@ class RealCallEClient(CallEClient):
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Call run {run_id} did not reach a terminal status within {self.poll_timeout_seconds}s")
             time.sleep(self.poll_interval_seconds)
-            status = self._structured(self._run_cli(["call", "status", "--run-id", run_id]))
+            status = self._structured(self._run_cli(["call", "status", "--run-id", run_id], mask=phone_number))
 
         result = status.get("result") or {}
         calling_meta = ((result.get("extracted") or {}).get("calling")) or {}
@@ -157,7 +162,15 @@ class RealCallEClient(CallEClient):
             completion_confidence=confidence.get("score"),
         )
 
-    def _run_cli(self, args: list[str], retryable: bool = True) -> dict:
+    def _run_cli(self, args: list[str], retryable: bool = True, mask: str | None = None) -> dict:
+        # mask is best-effort, applied only to what we constructed ourselves
+        # (the joined args) and to CALL-E's own stderr/stdout — it catches
+        # the common digit-sequence renderings the same way redact_phone_number
+        # does, not a guarantee CALL-E's own error text never phrases the
+        # number some other way.
+        def _masked(s: str) -> str:
+            return mask_phone_number(s, mask) if mask else s
+
         # subprocess.run(["calle", ...]) fails on Windows with FileNotFoundError:
         # npm installs global CLIs as calle.cmd, not a raw .exe, and CreateProcess
         # won't resolve that the way a shell does. shutil.which() finds it correctly
@@ -192,9 +205,9 @@ class RealCallEClient(CallEClient):
                 # so don't guess — surface it and let a human check
                 # `calle call status` before deciding what to do next.
                 raise AmbiguousCallOutcome(
-                    f"calle {' '.join(args)} timed out waiting for a response — CALL-E's backend may or may "
-                    "not have processed this request. Not retrying automatically, since this request can "
-                    "have a real side effect and there is no idempotency key to make a retry safe. Check "
+                    f"calle {_masked(' '.join(args))} timed out waiting for a response — CALL-E's backend may "
+                    "or may not have processed this request. Not retrying automatically, since this request "
+                    "can have a real side effect and there is no idempotency key to make a retry safe. Check "
                     "`calle call status --run-id <id>` (if you have a run ID) or the CALL-E dashboard before "
                     "trying again by hand."
                 )
@@ -204,8 +217,8 @@ class RealCallEClient(CallEClient):
                 continue
 
             raise RuntimeError(
-                f"calle {' '.join(args)} exited {proc.returncode} after {attempt} attempt(s).\n"
-                f"stderr: {proc.stderr.strip()}\nstdout: {proc.stdout.strip()}"
+                f"calle {_masked(' '.join(args))} exited {proc.returncode} after {attempt} attempt(s).\n"
+                f"stderr: {_masked(proc.stderr.strip())}\nstdout: {_masked(proc.stdout.strip())}"
             )
 
     @staticmethod

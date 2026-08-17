@@ -11,10 +11,14 @@ from pipeline.guardrails import find_unsafe_phone_numbers
 APP_ROOT = Path(__file__).resolve().parent.parent
 SCAN_SUFFIXES = {".py", ".md", ".json", ".txt", ".toml"}
 SKIP_DIR_NAMES = {".venv", "__pycache__", ".pytest_cache", ".git"}
-# Local, gitignored runtime artifacts — never committed, so scanning them
-# only adds noise (e.g. a dollar-amount string can coincidentally look
-# phone-shaped once its decimal point is stripped).
-SKIP_FILE_NAMES = {".call_guardrail_state.json", ".llm_budget_state.json"}
+# .llm_budget_state.json is gitignored and only ever holds a date and a
+# dollar amount — skipped because a spend value can coincidentally look
+# phone-shaped once its decimal point is stripped, not because it's exempt
+# from mattering. .call_guardrail_state.json is deliberately NOT in this
+# list, even though it's also gitignored: it's the one file in this app
+# most likely to accumulate a real dialed number during actual use, so it
+# stays in scope as a backstop in case .gitignore is ever bypassed.
+SKIP_FILE_NAMES = {".llm_budget_state.json"}
 
 
 def test_no_unsafe_phone_numbers_in_source_tree():

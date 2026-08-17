@@ -65,26 +65,31 @@ class CallGuardrails:
         self.state_path.write_text(json.dumps(self._state, indent=2), encoding="utf-8")
 
     def check(self, phone_number: str) -> None:
+        # Masked in every message below (not just the final JSON output) —
+        # these GuardrailViolation messages get printed to stderr on a
+        # refusal, which is exactly the kind of output that ends up pasted
+        # into a bug report or shared log.
+        masked = mask_phone_number(phone_number, phone_number)
         if not is_valid_e164(phone_number):
             raise GuardrailViolation(
-                f"{phone_number!r} is not a strict E.164 number (e.g. +18005550187) — "
+                f"{masked!r} is not a strict E.164 number (e.g. +18005550187) — "
                 "refusing to dial an ambiguously-formatted number."
             )
         normalized = normalize_phone(phone_number)
 
         if self.allowed_numbers is not None and normalized not in self.allowed_numbers:
             raise GuardrailViolation(
-                f"{phone_number} is not in the dev/test allowlist — refusing to dial."
+                f"{masked} is not in the dev/test allowlist — refusing to dial."
             )
 
         if normalized in self._state["called_numbers"]:
             raise GuardrailViolation(
-                f"{phone_number} was already screened once — refusing to re-dial the same number."
+                f"{masked} was already screened once — refusing to re-dial the same number."
             )
 
         if normalized in self._state["attempted_numbers"]:
             raise GuardrailViolation(
-                f"{phone_number} has a prior call attempt of unknown outcome — refusing to "
+                f"{masked} has a prior call attempt of unknown outcome — refusing to "
                 "dial again until this is resolved manually (check `calle call status`)."
             )
 

@@ -39,10 +39,27 @@ def test_call_run_timeout_raises_without_retrying(mock_run, mock_which):
     mock_run.side_effect = [_completed_proc(PLAN_READY), _timed_out_proc()]
 
     client = RealCallEClient(max_request_retries=2)
-    with pytest.raises(AmbiguousCallOutcome, match="Not retrying automatically"):
+    with pytest.raises(AmbiguousCallOutcome, match="Not retrying automatically") as exc_info:
         client.place_screening_call("+18005550187", "task text")
 
     assert mock_run.call_count == 2  # plan (1) + run (1, no retries) — not 1 + 3
+    assert "8005550187" not in str(exc_info.value)  # the dialed number must not leak into the error text
+
+
+@patch("pipeline.caller.time.sleep")
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
+def test_exhausted_retry_error_does_not_leak_the_phone_number(mock_run, mock_which, mock_sleep):
+    # call plan times out on every attempt (1 + max_request_retries), so the
+    # generic RuntimeError fires — it echoes back the CLI args and CALL-E's
+    # own stderr/stdout, both of which can contain the dialed number.
+    mock_run.side_effect = [_timed_out_proc(), _timed_out_proc(), _timed_out_proc()]
+
+    client = RealCallEClient(max_request_retries=2)
+    with pytest.raises(RuntimeError) as exc_info:
+        client.place_screening_call("+18005550187", "task text mentioning +18005550187")
+
+    assert "8005550187" not in str(exc_info.value)
 
 
 @patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")

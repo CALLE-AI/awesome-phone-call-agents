@@ -40,6 +40,7 @@ from pipeline.guardrails import (
     GuardrailViolation,
     LLMBudgetGuard,
     is_valid_e164,
+    mask_phone_number,
     normalize_phone,
 )
 from pipeline.llm_providers import PROVIDERS as LLM_PROVIDERS
@@ -150,7 +151,7 @@ def main() -> int:
         if result is None:
             print("Email did not meet the suspicious-alert threshold — no call placed.")
             return EXIT_NOT_SUSPICIOUS
-        print(json.dumps(result.to_dict(), indent=2))
+        print(json.dumps(result.to_dict(mask_numbers=not args.show_full_number), indent=2))
         return EXIT_OK
 
     if not args.email or not args.sender_domain:
@@ -180,15 +181,16 @@ def main() -> int:
         return EXIT_USAGE_OR_REFUSAL
     if normalize_phone(args.to_phone) != normalize_phone(alert.phone_number):
         print(
-            f"--to-phone ({args.to_phone}) does not match the number extracted from the email "
-            f"({alert.phone_number}) — refusing to guess which number to dial.",
+            f"--to-phone ({mask_phone_number(args.to_phone, args.to_phone)}) does not match the number "
+            f"extracted from the email ({mask_phone_number(alert.phone_number, alert.phone_number)}) — "
+            "refusing to guess which number to dial.",
             file=sys.stderr,
         )
         return EXIT_USAGE_OR_REFUSAL
     if not is_valid_e164(args.to_phone):
         print(
-            f"--to-phone ({args.to_phone}) is not a strict E.164 number (e.g. +18005550187) — refusing to "
-            "dial an ambiguously-formatted number.",
+            f"--to-phone ({mask_phone_number(args.to_phone, args.to_phone)}) is not a strict E.164 number "
+            "(e.g. +18005550187) — refusing to dial an ambiguously-formatted number.",
             file=sys.stderr,
         )
         return EXIT_USAGE_OR_REFUSAL

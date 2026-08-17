@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Callable
 
 from .caller import CallEClient
-from .guardrails import CallGuardrails, normalize_phone, redact_phone_number
+from .guardrails import CallGuardrails, mask_phone_number, normalize_phone, redact_phone_number
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
@@ -101,8 +101,10 @@ def run_pipeline(
     # to score evidence from the number we actually intended to dial, not
     # something a future refactor accidentally decoupled.
     if normalize_phone(call_result.metadata.number_dialed) != normalize_phone(dial_number):
+        got = mask_phone_number(call_result.metadata.number_dialed, call_result.metadata.number_dialed)
+        expected = mask_phone_number(dial_number, dial_number)
         raise RuntimeError(
-            f"Call result is for {call_result.metadata.number_dialed!r} but {dial_number!r} was requested "
+            f"Call result is for {got!r} but {expected!r} was requested "
             "— refusing to score a verdict against a mismatched recipient."
         )
 
