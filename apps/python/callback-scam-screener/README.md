@@ -54,7 +54,13 @@ Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), t
 
 ### Running it
 
-Live mode needs `--live`, `--confirm`, and `--to-phone` matching the number extracted from the email exactly, in strict E.164 format (e.g. `+18005550187`, not `(800) 555-0187`) — this app never guesses which number to dial, and won't dial an ambiguously-formatted one. It also needs either `--allow-number` or `--unrestricted` — there is no silent unrestricted default. The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
+Live mode requires all of the following:
+
+- `--live` and `--confirm` — both required together; `--confirm` is explicit intent, never implied by `--live` alone.
+- `--to-phone` matching the number extracted from the email exactly, in strict E.164 format (e.g. `+18005550187`, not `(800) 555-0187`) — this app never guesses which number to dial, and won't dial an ambiguously-formatted one.
+- Either `--allow-number` (a dev/test allowlist) or `--unrestricted` (an explicit acknowledgment this may dial an arbitrary, unverified number) — there is no silent unrestricted default.
+
+The example below points at `samples/suspicious_email.txt`, so `+18005550187` is the same fictional reserved number that email already contains, not a real one — replace both the email and the phone number with your own before running this for real, and never dial a number you don't own or aren't authorized to call:
 
 ```bash
 export GEMINI_API_KEY="<your key>"
@@ -96,7 +102,7 @@ uv run python screen.py \
 
 ## Cancellation and rollback
 
-`screen.py`'s preview mode and `--demo` mode have no side effects — nothing to cancel. Once a live call is placed, this app cannot cancel it mid-call; use the CALL-E dashboard if it exposes a cancel action. There is no recurring schedule anywhere in this app to disable. The two local state files (`.call_guardrail_state.json`, `.llm_budget_state.json`) can be deleted at any time to reset the daily caps early — they hold nothing but counters and a date, no call content.
+`screen.py`'s preview mode and `--demo` mode have no side effects — nothing to cancel. Once a live call is placed, this app cannot cancel it mid-call; use the CALL-E dashboard if it exposes a cancel action. There is no recurring schedule anywhere in this app to disable. The two local state files can be deleted at any time to reset the daily caps early: `.llm_budget_state.json` holds only a date and a spend total, and `.call_guardrail_state.json` holds call counters plus the numbers already screened or attempted (as digits, not full call content — no transcript or conversation data). Both are gitignored and never committed.
 
 ## Validation
 

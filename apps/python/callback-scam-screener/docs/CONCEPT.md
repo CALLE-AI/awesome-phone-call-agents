@@ -39,8 +39,10 @@ This isn't a nice-to-have — it's the thing that makes the agent safe to point 
 
 ## Guardrails
 
-- One screening call per flagged number — no repeat dialing.
-- Full call logging for audit (transcript + signals + verdict retained).
+- Dialing fails closed: a live run needs either an explicit dev/test allowlist or an explicit acknowledgment that it may call an arbitrary, unverified number — there's no default that dials without one or the other. The number dialed is validated as strict E.164 first.
+- One screening call per flagged number — no repeat dialing, and a number with an unresolved (timed-out) attempt is blocked from a retry until checked manually rather than silently redialed.
+- A call that fails, is canceled, or produces no real transcript is never treated as equivalent to a clean call — it's reported as inconclusive, not `likely_legitimate`, since no screening evidence was actually gathered.
+- Full call logging for audit (transcript + signals + verdict retained), with the dialed number masked by default in what's printed or returned.
 - Clear disclosure framing in the script so the call doesn't itself read as impersonation or harassment if the number turns out to belong to a real business.
 - Aware that recording/analyzing calls has jurisdiction-specific consent requirements — script accounts for this rather than assuming one-party consent everywhere.
 
