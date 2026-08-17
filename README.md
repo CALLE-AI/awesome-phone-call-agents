@@ -130,6 +130,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`linecanary-monitor`](skills/linecanary-monitor/) - Synthetic monitoring for phone lines and deployed voice agents: scheduled test calls, structured assertions, baseline diffing, and CI gating via the linecanary app.
 - [`mobilize`](skills/mobilize/) - Get a required number of confirmed responses from a consented pool within a deadline by dispatching parallel wave calls that stop the moment the need is met.
 - [`outbound-call-skill-creator`](skills/outbound-call-skill-creator/) - Creator skill for generating focused outbound phone-call workflow skills from Google Forms, TikTok Ads, Notion, Airtable, local CSV files, or custom sources.
+- [`metapelet-elder-checkin`](skills/metapelet-elder-checkin/) - Consent-based outbound wellbeing check-in for older adults using the MetaPelet non-medical companion persona; returns mood, topics, and repeat-call interest.
 - [`service-dispatch-call`](skills/service-dispatch-call/) - Service dispatch workflow that asks a vendor about availability, ETA, and cost, returns a schema-validated result, and routes any commitment to human approval.
 - [`calle-script-advisor`](skills/calle-script-advisor/) - Drafts and lints CALL-E call task text and result schemas for clarity, safety, and extraction quality before a call is placed.
 - [`verify-by-phone`](skills/verify-by-phone/) - Single disclosed verification call that checks a directory listing against the published line, grounds every answer in a transcript span, and abstains instead of guessing when the call does not establish one.
@@ -175,6 +176,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`apps/typescript/broker-login-client-standalone`](apps/typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
 | [`apps/python/oauth-login-client`](apps/python/oauth-login-client/) | Python | CALL-E OAuth login client for MCP Streamable HTTP. |
+| [`apps/python/metapelet-checkin`](apps/python/metapelet-checkin/) | Python | Preview-first runner for one MetaPelet-style CALL-E check-in with structured post-call summary. |
 | [`apps/typescript/oauth-login-client`](apps/typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`apps/typescript/vibehub-founder-relay`](apps/typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/typescript/ringer`](apps/typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
