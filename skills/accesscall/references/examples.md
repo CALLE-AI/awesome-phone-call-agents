@@ -2,7 +2,7 @@
 
 [#accesscall-examples](#accesscall-examples)
 
-Setup, validation, and behavior scenarios for the `accesscall` skill, based on real end-to-end test calls.
+Setup, validation, and behavior scenarios for the `accesscall` skill.
 
 ## Setup Verification
 
@@ -37,19 +37,27 @@ Parsed result validates cleanly against `references/intake-result.schema.json`. 
 
 ## Scenario 2: Transcription error caught by contact confirmation
 
-[#scenario-2-transcription-error-caught](#scenario-2-transcription-error-caught)
+[#scenario-2-contact-confirmation](#scenario-2-contact-confirmation)
 
-Real test call transcript excerpt:
+This synthetic scenario demonstrates the required confirmation flow. The intended follow-up address is `contact@example.com`.
 
-```
-Bot: Please spell the email address letter by letter, including the domain.
-Caller: J-E-R-L-Y-N at D-E-S-I-G-N-L-A-D-Y dot com
-Bot: I heard an email starting with J-E-R-L-Y-N at A-T-D-E-S-I-G-N-L-A-D-Y dot com. Is that right?
-```
+Example exchange:
 
-The speech-to-text layer inserted a duplicate "at" into the domain. The bot's letter-by-letter read-back surfaced this for the caller to catch before the call ended, this is the confirmation mechanism working as designed.
+> **Bot:** Please spell your email address one character at a time.
+>
+> **Caller:** c-o-n-t-a-c-t at e-x-a-m-p-l-e dot c-o-m.
+>
+> **Bot:** I heard c-o-n-t-a-c-t-t at e-x-a-m-p-l-e dot c-o-m. Is that correct?
+>
+> **Caller:** No. It is c-o-n-t-a-c-t at e-x-a-m-p-l-e dot c-o-m.
+>
+> **Bot:** I heard c-o-n-t-a-c-t at e-x-a-m-p-l-e dot c-o-m. Is that correct?
+>
+> **Caller:** Yes, that is correct.
 
-**Known limitation, not a fix:** in one live test, the caller confirmed "correct" to a garbled domain without catching the error themselves. The mechanism prevents the bot from silently guessing wrong and moving on; it does not guarantee the human catches every error in a fast phone exchange. Document this to end users rather than presenting the mechanism as fully reliable.
+Set `followup_contact_confirmed: true` only after the caller explicitly confirms the final spell-back. Until then, keep it `false` and do not include the contact in a VPAT insertion.
+
+Letter-by-letter spell-back reduces transcription risk, but it does not guarantee that every address is captured correctly.
 
 ## Scenario 3: Ambiguous or unclear barrier category
 

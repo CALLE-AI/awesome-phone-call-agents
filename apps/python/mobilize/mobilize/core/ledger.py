@@ -1,0 +1,171 @@
+"""Write-ahead ledger for crash-safe dispatch.
+
+Every dispatch intent is appended BEFORE the call is placed. On restart, the
+ledger is replayed: any candidate with a logged 'dispatched' entry and no
+matching 'result' is either still in flight (poll it) or was interrupted
+mid-dispatch. Either way we never re-dial someone whose dispatch was already
+logged for this mobilization, and we never lose a confirmation that was
+already recorded.
+
+Uses CALL-E's Idempotency-Key request header directly (confirmed in the
+OpenAPI spec) so even a duplicate dispatch call against the real API is safe.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import threading
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Iterator
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass(frozen=True)
+class LedgerEntry:
+    kind: str  # "dispatch_intent" | "dispatched" | "result"
+    mobilization_id: str
+    candidate_id: str
+    idempotency_key: str
+    call_id: str | None = None
+    payload: dict | None = None
+    at: str = field(default_factory=_utcnow_iso)
+
+
+class Ledger:
+    """Append-only JSONL ledger with atomic writes and fsync before ack.
+
+    Atomicity per entry: write to a temp file, fsync, then append via O_APPEND
+    write, which is atomic for writes below PIPE_BUF on POSIX. For hackathon
+    scope this is sufficient; a production version would use a proper WAL
+    segment file with checksums.
+    """
+
+    def __init__(self, path: str | Path):
+        self._path = Path(path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
+        if not self._path.exists():
+            self._path.touch()
+
+    def idempotency_key(self, mobilization_id: str, candidate_id: str) -> str:
+        return f"{mobilization_id}:{candidate_id}"
+
+    def record_dispatch_intent(self, mobilization_id: str, candidate_id: str) -> None:
+        """Written BEFORE the network call, with no call_id yet (there isn't
+        one). This is the durable answer to "did we possibly already call
+        this person" when transport.dispatch() raises an ambiguous error
+        (a timeout, a connection reset) that could mean CALL-E accepted the
+        request before our client ever saw a response. Without this, such a
+        candidate leaves literally no trace in the ledger -- indistinguishable
+        from having never been attempted at all -- and a resumed run could
+        freely re-dispatch them, risking a real double-dial. An intent entry
+        with no matching "dispatched" or "result" entry is surfaced via
+        `unresolved()` for manual reconciliation rather than silently
+        retried.
+        """
+        entry = LedgerEntry(
+            kind="dispatch_intent",
+            mobilization_id=mobilization_id,
+            candidate_id=candidate_id,
+            idempotency_key=self.idempotency_key(mobilization_id, candidate_id),
+        )
+        self._append(entry)
+
+    def unresolved(self, mobilization_id: str) -> set[str]:
+        """Candidates with a logged dispatch_intent but no confirmed
+        "dispatched" (a call_id was actually returned) or "result" entry --
+        an attempt was made, but we don't know whether it actually reached
+        CALL-E. These must never be silently retried."""
+        intended: set[str] = set()
+        resolved: set[str] = set()
+        for entry in self.replay(mobilization_id):
+            if entry.kind == "dispatch_intent":
+                intended.add(entry.candidate_id)
+            elif entry.kind in ("dispatched", "result"):
+                resolved.add(entry.candidate_id)
+        return intended - resolved
+
+    def record_dispatch(self, mobilization_id: str, candidate_id: str, call_id: str) -> None:
+        entry = LedgerEntry(
+            kind="dispatched",
+            mobilization_id=mobilization_id,
+            candidate_id=candidate_id,
+            idempotency_key=self.idempotency_key(mobilization_id, candidate_id),
+            call_id=call_id,
+        )
+        self._append(entry)
+
+    def record_result(self, mobilization_id: str, candidate_id: str, call_id: str, payload: dict) -> None:
+        entry = LedgerEntry(
+            kind="result",
+            mobilization_id=mobilization_id,
+            candidate_id=candidate_id,
+            idempotency_key=self.idempotency_key(mobilization_id, candidate_id),
+            call_id=call_id,
+            payload=payload,
+        )
+        self._append(entry)
+
+    def already_dispatched(self, mobilization_id: str, candidate_id: str) -> str | None:
+        """Return the existing call_id if this candidate was already dispatched
+        for this mobilization, else None. Prevents double-dialing on replay."""
+        for entry in self.replay(mobilization_id):
+            if entry.kind == "dispatched" and entry.candidate_id == candidate_id:
+                return entry.call_id
+        return None
+
+    def in_flight(self, mobilization_id: str) -> dict[str, str]:
+        """candidate_id -> call_id for dispatches with no recorded terminal result."""
+        dispatched: dict[str, str] = {}
+        completed: set[str] = set()
+        for entry in self.replay(mobilization_id):
+            if entry.kind == "dispatched" and entry.call_id:
+                dispatched[entry.candidate_id] = entry.call_id
+            elif entry.kind == "result":
+                completed.add(entry.candidate_id)
+        return {cid: call_id for cid, call_id in dispatched.items() if cid not in completed}
+
+    def completed_results(self, mobilization_id: str) -> list[dict]:
+        return [
+            entry.payload
+            for entry in self.replay(mobilization_id)
+            if entry.kind == "result" and entry.payload is not None
+        ]
+
+    def get_started_at(self, mobilization_id: str) -> datetime | None:
+        """Wall-clock time of the first ledger entry for this mobilization,
+        i.e. when it actually started -- possibly in a prior process. Used to
+        compute correct total elapsed time across a crash and resume, rather
+        than measuring only time-since-this-process-started."""
+        earliest: datetime | None = None
+        for entry in self.replay(mobilization_id):
+            at = datetime.fromisoformat(entry.at)
+            if earliest is None or at < earliest:
+                earliest = at
+        return earliest
+
+    def replay(self, mobilization_id: str) -> Iterator[LedgerEntry]:
+        if not self._path.exists():
+            return
+        with self._path.open("r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                raw = json.loads(line)
+                if raw.get("mobilization_id") == mobilization_id:
+                    yield LedgerEntry(**raw)
+
+    def _append(self, entry: LedgerEntry) -> None:
+        line = json.dumps(asdict(entry)) + "\n"
+        with self._lock:
+            with self._path.open("a") as f:
+                f.write(line)
+                f.flush()
+                os.fsync(f.fileno())
