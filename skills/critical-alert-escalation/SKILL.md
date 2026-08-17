@@ -47,7 +47,7 @@ Runs CALL-E's standard sequence for each contact, in chain order, until acknowle
 
 - **disclosure**: the AI-identification line prepended to every call goal.
 
-> CALL-E returns its own outcome envelope (`{ task_completed, confidence, evidence }` + a `summary`). Map `acknowledged = task_completed && confidence high`; keep `summary` as `notes`. Treat low confidence as not acknowledged.
+> CALL-E returns its own outcome envelope (`{ task_completed, confidence, evidence }` + a `summary`). **Authoritative ack only:** `acknowledged = task_completed === true AND confidence ≥ threshold AND evidence present`. A bare `acknowledged: true` in the payload is **not** sufficient and is ignored. Keep `summary` as `notes`. Anything else — low confidence, missing evidence, `task_completed !== true`, a terminal-negative status — is *not acknowledged* (fail toward escalation).
 
 ## Guardrails & safety (non-negotiable)
 
@@ -57,8 +57,16 @@ Phone calls have real-world side effects. This skill enforces:
 - **AI disclosure on every call.** The goal opens with an identification line, e.g. `"This is an automated readiness assistant calling on behalf of <org>."`
 - **Consent.** Responders opt into the on-call chain in advance; this skill is for people who expect these calls, not the public.
 - **Human decides.** The call delivers a classification + recommendation and requests acknowledgment. It never makes the operational or medical decision. For health/readiness use, language stays non-diagnostic (state the flag and recommendation; do not diagnose).
-- **Fail toward escalation** (see operating principle) — ambiguity advances the chain, never silently closes the alert.
+- **Fail toward escalation** (see operating principle) — a *resolvable* negative (declined/no-answer/voicemail/low-confidence) advances the chain, never silently closes the alert.
 - **Nothing hidden.** Every attempt (reached/declined/acknowledged) is logged with responder, timestamp, and structured result. Escalations are visible to the alert owner.
+
+These are enforced in `scripts/run_escalation.ts` (not just documented) and covered by no-call unit tests in `scripts/run_escalation.test.ts`:
+
+- **E.164 only.** A number that doesn't match `^\+[1-9]\d{1,14}$` is rejected before dialing.
+- **Dry-run by default.** A live call requires **both** the env opt-in `CALLE_LIVE=1` **and** an explicit `confirmLiveCall` on the run. Without both, the skill previews the chain and places no call — it is impossible to dial live without both.
+- **Stable idempotency.** A deterministic key per `(alertId, contact, attempt)` is passed to `plan_call`/`run_call`, so a retry with the same inputs can't double-dial.
+- **Ambiguous-leg reconciliation.** A leg with no terminal outcome is re-polled (`get_call_run`) to a terminal state; if it still can't be resolved, the skill **stops and flags for review** rather than advancing on a guess.
+- **Between-legs status check.** Before each leg, the skill checks the alert isn't already acknowledged/resolved out-of-band; if it is, it halts.
 
 ## Setup
 

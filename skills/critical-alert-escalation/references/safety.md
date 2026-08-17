@@ -26,6 +26,23 @@ and escalation calls are, by design, high-stakes. These rules are non-negotiable
 - **No exposed secrets.** Auth is the CALL-E CLI browser-login state — no API keys
   in code, config, or logs. Do not print tokens or personal data.
 
+## Enforced in code (not just policy)
+
+`scripts/run_escalation.ts` makes these executable, with no-call tests in
+`scripts/run_escalation.test.ts`:
+
+- **E.164 validation** — a number failing `^\+[1-9]\d{1,14}$` is rejected before dialing.
+- **Dry-run by default** — a live call requires BOTH `CALLE_LIVE=1` and an explicit
+  `confirmLiveCall`; without both, the chain is previewed and nothing is dialed.
+- **Stable idempotency** — a deterministic key per `(alertId, contact, attempt)` on
+  `plan_call`/`run_call` prevents a retry from double-dialing.
+- **Ambiguous-leg reconciliation** — a non-terminal outcome is re-polled to terminal;
+  if unresolved, the run stops and flags rather than advancing on a guess.
+- **Between-legs alert-status check** — before each leg, an already-acknowledged/resolved
+  alert halts the chain.
+- **Authoritative ack** — acknowledged requires `task_completed === true` AND confidence
+  ≥ threshold AND evidence; a bare `acknowledged:true` is not sufficient.
+
 ## Cancellation / rollback
 
 This is a recurring, multi-leg workflow. To stop an in-progress escalation, mark

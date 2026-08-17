@@ -11,10 +11,15 @@ every attempt logged with its structured acknowledgment.
 - Guardrails: allowlist-only, AI disclosure, non-diagnostic language, human-in-the-loop
 - Lifecycle: `plan_call → run_call → get_call_run` via the `calle` CLI (browser-login auth)
 
-The mapping from CALL-E's outcome envelope to an acknowledgment boolean
-(`acknowledged = task_completed && confidence high`, terminal-negative → not
-acknowledged) is implemented in [`../scripts/run_escalation.ts`](../scripts/run_escalation.ts)
-and covered by [`../scripts/run_escalation.test.ts`](../scripts/run_escalation.test.ts).
+The mapping from CALL-E's outcome envelope to an acknowledgment boolean is
+authoritative-ack-only (`acknowledged = task_completed === true AND confidence ≥
+threshold AND evidence`; a bare `acknowledged:true` is not sufficient;
+terminal-negative / ambiguous → not acknowledged) and is implemented in
+[`../scripts/run_escalation.ts`](../scripts/run_escalation.ts) and covered by
+[`../scripts/run_escalation.test.ts`](../scripts/run_escalation.test.ts). The same
+file enforces E.164 validation, a dry-run-by-default live gate (`CALLE_LIVE=1` +
+explicit confirmation), stable per-`(alertId, contact, attempt)` idempotency keys,
+ambiguous-leg reconciliation, and the between-legs alert-status check.
 
 Source: https://github.com/CALLE-AI/awesome-phone-call-agents (this repo) ·
 reference build: Juliet (Strands Agents + Bedrock AgentCore).
