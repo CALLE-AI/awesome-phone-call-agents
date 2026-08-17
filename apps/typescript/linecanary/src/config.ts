@@ -8,6 +8,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { maskPhone } from "./alert.js";
 import type { JsonSchema } from "./types.js";
 
 export class ConfigError extends Error {}
@@ -167,7 +168,7 @@ function parseLine(value: unknown, index: number): LineConfig {
   }
   const phone = asString(record.phone, `${where}.phone`);
   if (!E164.test(phone)) {
-    fail(`${where} phone ${phone} is not E.164 (+15550100 style).`);
+    fail(`${where} phone ${maskPhone(phone)} is not E.164 (+15550100 style).`);
   }
   if (record.ownership === undefined) {
     fail(`${where} (${id}) has no ownership block. LineCanary only calls lines you own or are authorized to monitor.`);

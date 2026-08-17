@@ -84,7 +84,8 @@ test("rejects phones that are not E.164", () => {
   (raw.lines as { phone: string }[])[0].phone = "555-0100";
   assert.throws(() => loadConfig(writeConfig(raw)), (error: unknown) => {
     assert.ok(error instanceof ConfigError);
-    assert.match(error.message, /555-0100/);
+    assert.match(error.message, /phone ••• is not E\.164/);
+    assert.doesNotMatch(error.message, /555-0100/);
     return true;
   });
 });

@@ -16,7 +16,7 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { exitCode, formatReport, sendSlack } from "./alert.js";
+import { exitCode, formatReport, maskPhone, sendSlack } from "./alert.js";
 import { openStore } from "./baseline.js";
 import { createSdkPort, DEFAULT_BASE_URL, type CallePort } from "./calle.js";
 import { ConfigError, loadConfig, type Config } from "./config.js";
@@ -167,7 +167,7 @@ async function commandVerify(flags: Flags): Promise<number> {
   }
   if (line.ownership.method === "greeting_code" && !flags.live) {
     process.stdout.write(
-      `DRY RUN — no call placed. verify would place one greeting-code verification call to ${line.phone} (${line.id}).\n` +
+      `DRY RUN — no call placed. verify would place one greeting-code verification call to ${maskPhone(line.phone)} (${line.id}).\n` +
         `Prerequisite: the line's greeting must announce the code ${line.ownership.code} (e.g. 'Canary ID, ${spellOutCode(line.ownership.code)}'). ` +
         `Only someone who controls the line can place it — that is the proof.\n` +
         `Re-run with --live to place it: linecanary verify ${line.id} --live\n`,
@@ -356,7 +356,7 @@ async function commandDiscover(flags: Flags): Promise<number> {
   }
   if (!flags.live) {
     process.stdout.write(
-      `DRY RUN — no call placed. discover would place one mapping call to ${line.phone} (${line.id}).\n` +
+      `DRY RUN — no call placed. discover would place one mapping call to ${maskPhone(line.phone)} (${line.id}).\n` +
         `Re-run with --live to place it: linecanary discover ${lineId} --live\n`,
     );
     return 0;

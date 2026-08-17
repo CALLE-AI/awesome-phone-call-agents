@@ -73,13 +73,56 @@ discussing something else is not an answer to a question nobody asked.
 
 An agreement is reported when the transcript shows somebody agreeing to the thing
 the report would print. It is anchored twice: to the turn where the caller raised
-the arrangement, plus to the time itself, which has to be named in the agreeing turn
-or in the turn either side of it. Booking language on its own proves nothing. An
+the arrangement, plus to the time itself, which has to have been named by the moment
+the callee spoke, either in the agreeing turn or in the caller's proposal before it.
+Booking language on its own proves nothing. An
 agreement about some other time reads `unconfirmed`, not `committed` and not
 `outside_authorized_window`, because both of those would print or act on a time off
 the extraction alone. The note quotes what they did say, so nobody reads
 `unconfirmed` as nothing having happened. Any confirmation code goes with the
 agreement.
+
+Both bindings look backwards only. A turn is evidence for what it was answering.
+Nothing said after it can be that. A caller who proposes Wednesday, hears no, then
+proposes Thursday has not been refused Thursday. A callee who reads out a second
+reference number after agreeing to the first appointment has not given that number for
+this one. The cost is a call where the only precise form of the time or the reference is
+in a later turn: that reads as not named, so the report gives less than the extraction
+claimed rather than more.
+
+Raising the arrangement takes two things at once in one clause, not one word anywhere in
+the turn. The clause has to be about the arrangement, which is booking language or the time the
+extraction reported. It also has to put that to the callee, which is one of two things and
+not a third. A genuine request, meaning booking language phrased as a question or a
+request. Or a concrete proposal, meaning a clause that names the offered time itself. A
+statement that only carries the word appointment, confirm or availability raises nothing,
+and neither does one that adds an unrelated weekday: "our appointment desk is open Monday",
+said between a question and its answer, offers no slot, so it must not make that answer a
+reply to the arrangement. That is why the proposal half is the offered time and not any
+weekday. It is also why a first-person purpose statement such as "I am calling to book an
+appointment" is not an ask: it says why the caller rang and puts no question to the callee.
+
+One clause, because a turn is not one thing put to the callee. "I am calling to book an
+appointment. Do you accept Aetna?" is a purpose statement and then an insurance question,
+and the question mark belongs to the insurance question. Lending it to the booking words in
+front of it reported a refused appointment in a call where no slot had been put to anybody.
+So the request form and the booking language have to be in the same clause. Where one turn
+does put two things to them the answer belongs to whichever was asked last: "could you
+hold Thursday at nine forty? Do you accept Aetna?" then "no, we do not take that plan" is a
+no about insurance and no answer at all about the slot. Clauses are split on a sentence end,
+a semicolon, a colon, a comma, a dash or a line break, because speech splices two
+utterances with a comma as often as it writes a full stop.
+
+A time the caller states rather than asks still counts when it is the offered time, so
+"Thursday the thirteenth at nine forty would suit her" is an anchor and the tightening does
+not cost real proposals. The proposal arm reads the whole turn as well as the clause, so the
+day check still sees every day the turn named and "Wednesday, at nine forty" is not read as
+Thursday at nine forty. One rule, used by all three bindings, so it cannot hold on the
+agreement and not on the refusal or the confirmation code. It fails closed the other way: an
+ask this does not catch leaves the evidence unbound, so the commitment reads `unconfirmed`.
+A request whose booking word sits on the far side of a comma from its question form, "about
+the appointment, could you do Thursday?", is one of those. A turn that names the reported
+time anchors on the proposal arm whatever its punctuation.
 
 The time is matched as a wall clock, in the forms a transcript carries. When a turn
 names a day or a weekday it has to be the claimed one, so the same time on another
@@ -87,13 +130,60 @@ authorized day is not reported as this one. A turn that names no day is taken as
 day the caller had already established.
 
 Everything else the report prints off the extraction is held to the same standard. A
-confirmation code has to have been read out around the agreement or the report drops
-it and says it did. A time no callee turn named is not read back as an offer, so the
+confirmation code has to have been read out by the time the agreement was made or the
+report drops it and says it did. A time no callee turn named is not read back as an
+offer, so the
 next step says "another time" rather than a time nobody said. An agreement with no
 time at all cannot be checked against the windows, so it reads `unconfirmed` too.
 CALL-E's own note is printed with its name on it, because nothing here checked that
-sentence. The one claim left standing on the extraction alone is
-`declined_by_callee`, which says less than the extraction did rather than more.
+sentence. A reported refusal is held to the same standard as a reported agreement:
+`declined_by_callee` needs either a turn that refuses the arrangement or the business
+refusing to deal with an automated caller at all. Without one the commitment reads
+`unconfirmed` and the next step says nothing is settled either way, because telling
+somebody their errand was turned down is a claim about their errand and not a
+formatting choice. With one, the note quotes the turn. Either way a refusal does not
+settle the errand: a booking that was refused is not a goal met, so the outcome is
+`partially_met` at best.
+
+A refusal is bound the same two ways an agreement is, because refusal words prove
+nothing on their own. "No, we do not take that plan" refuses a question and says
+nothing about the booking, which may have been held in the same call. So the turn has
+to be answering the arrangement: what the caller last put to the callee before it has
+to be the arrangement rather than one of the questions. Statements do not change the
+subject. A caller reading out a date of birth between the two leaves the refusal
+answering the appointment it followed. So does a statement that only mentions the
+appointment. Then the time is bound too. When the extraction
+reports a datetime, that datetime has to have been named by the moment the callee spoke,
+in the refusing turn or in the caller's proposal before it, which is what the agreement
+side already requires. Two times
+proposed on one call is otherwise a way for a no to one of them to be read as a no
+to the other in either order. It is also a way for either to be read as a no to the
+errand. A refusal aimed
+somewhere else is quoted in the
+report as what was actually turned down, so `unconfirmed` never reads as nothing
+having been said.
+
+When the extraction reports no time there is nothing to bind to, so the prompt anchor
+stands alone. That is the same asymmetry on the agreement side, where an agreement with
+no time cannot be held against the authorized windows either and reads `unconfirmed`.
+The time binding fails closed. `offered_datetime` is contracted as the time that was
+agreed or offered, so on a refused errand it can name a time that was discussed rather
+than the one that was turned down. Where it does, the refusal reads as being about
+something else, the commitment comes back `unconfirmed` and the note quotes the refusal.
+That says less than the call held, which is the direction to be wrong in: a real refusal
+reported as unsettled costs a phone call to check, a refusal of one option reported as a
+refusal of another costs somebody a slot that still stands.
+
+When both claims have a turn behind them, one agreeing and one refusing the same
+arrangement, the report stands behind neither. The commitment reads `unconfirmed`,
+the note quotes both turns and the next step says a person has to read the transcript
+and call, because reporting the agreement would book something the callee took back
+and reporting the refusal would drop a slot they may be holding. A confirmation code
+belongs to an agreement that stands, so it is dropped there too.
+
+The refusal patterns are narrow on purpose. Missing a real refusal costs a softer
+report that says the outcome is unknown. Inventing one costs the person a fact about
+their own errand, so the checks are built to be wrong in the first direction.
 
 When nothing supports the claim, the report says not answered or `unconfirmed` and
 notes that CALL-E claimed otherwise. It will sometimes be too strict, in two ways.
@@ -110,11 +200,14 @@ lost connection, a timeout, a server error. The call may be ringing right now.
 
 In that case the app reconciles under the same idempotency key first, which returns
 the existing call rather than placing a second one. If it still cannot read the
-call, the outcome is `outcome_unknown` with exit code 40. The report says the
-outcome is not known instead of saying nothing was said. Running the same errand
-file again reads the same call back, because the key covers the content of the
-call. Editing the file first makes it a different call, so the next step says not
-to.
+call, the outcome is `outcome_unknown` with exit code 40. Getting the call back is
+the only thing that settles it. A refusal to the reconciliation, a definite one such
+as 401 or 402 included, can be decided before the idempotency lookup ever happens,
+so it says nothing about the request that went unanswered and the call stays
+unknown. The report says the outcome is not known instead of saying nothing was
+said. Running the same errand file again reads the same call back, because the key
+covers the content of the call. Editing the file first makes it a different call, so
+the next step says not to.
 
 A call CALL-E has not finished with lands in the same place. Only a terminal status
 is read as a result: `completed`, `failed` or `canceled`, which is every terminal
@@ -127,8 +220,18 @@ verdict, no commitment and no privacy finding. Reading a call in flight as a res
 is how a call still ringing gets reported as an errand that is done. The next step
 is the same: run the same errand file again and it reads that same call back.
 
-A refusal is different. When CALL-E declines to create the call at all, nothing was
-placed, the outcome is `api_error` and the report can say so plainly.
+A refusal on the first attempt is different. CALL-E declined to create the call and
+nothing was placed, so the outcome is `api_error` and the report can say so plainly.
+
+A call that ended before the conversation did is the other way round. `failed` and
+`canceled` are terminal, so there is a transcript to read. A line that dropped after
+the slot was held carries the whole errand: the questions, the answers and the
+agreement. That status is not read as nobody having answered. What was said comes
+from the transcript and the notes name the status as `call_failed` or
+`call_canceled` with the failure code beside it. The outcome is never `goal_met`,
+because a call that ended early may have been cut off partway through. A call with
+nobody on its transcript is still read from its failure code, which is where
+`voicemail` and `not_reached` come from.
 
 ## Who you may call
 

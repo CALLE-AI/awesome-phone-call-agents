@@ -1,0 +1,6 @@
+private/
+your-search.json
+private-report.json
+private-report-*.json
+*.checkpoint.json
+.*.lostline-*.tmp

@@ -92,6 +92,8 @@ test("init → verify → live run → regression → exit codes", { timeout: 12
     const dryVerify = await cli(["verify", "main-office", "--config", configPath], env);
     assert.equal(dryVerify.code, 0, dryVerify.stderr);
     assert.match(dryVerify.stdout, /DRY RUN/);
+    assert.match(dryVerify.stdout, /\+••••••00/);
+    assert.doesNotMatch(dryVerify.stdout, /\+15550100/);
     assert.match(dryVerify.stdout, /Prerequisite: the line's greeting must announce the code LC-7391/);
     assert.match(dryVerify.stdout, /L C 7 3 9 1/);
 

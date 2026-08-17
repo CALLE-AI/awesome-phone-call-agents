@@ -1,0 +1,12 @@
+{
+  "name": "elevenlabs",
+  "endpoint": "https://api.elevenlabs.io/v1/text-to-speech/{voice}",
+  "method": "POST",
+  "authHeader": "xi-api-key",
+  "authEnv": "ELEVENLABS_API_KEY",
+  "bodyTemplate": "{\"text\":\"{text}\",\"model_id\":\"eleven_multilingual_v2\"}",
+  "audio": { "kind": "body" },
+  "format": "mp3",
+  "maxChars": 4000,
+  "languages": ["en-US", "en-GB", "en-IN", "hi-IN", "ta-IN", "de-DE", "fr-FR", "es-ES", "pt-BR", "ja-JP"]
+}

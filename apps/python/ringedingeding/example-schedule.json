@@ -1,0 +1,90 @@
+{
+  "_note": "Fictional data. The numbers are in the +1 555-0100..555-0199 range, which is reserved for fiction and belongs to nobody.",
+  "kind": "schedule",
+  "question": "Which evening works for the club meeting?",
+  "slots": [
+    "Tue 19:00",
+    "Wed 19:00",
+    "Thu 19:00"
+  ],
+  "participants": [
+    {
+      "id": "ana",
+      "name": "Ana",
+      "phone": "+15550100101"
+    },
+    {
+      "id": "ben",
+      "name": "Ben",
+      "phone": "+15550100102"
+    },
+    {
+      "id": "cleo",
+      "name": "Cleo",
+      "phone": "+15550100103"
+    },
+    {
+      "id": "dara",
+      "name": "Dara",
+      "phone": "+15550100104"
+    },
+    {
+      "id": "emil",
+      "name": "Emil",
+      "phone": "+15550100105"
+    },
+    {
+      "id": "fay",
+      "name": "Fay",
+      "phone": "+15550100106"
+    }
+  ],
+  "answers": [
+    {
+      "participant_id": "ana",
+      "status": "completed",
+      "raw": "Tuesday and Wednesday are both fine. Thursday I have choir.",
+      "stances": {
+        "Tue 19:00": "works",
+        "Wed 19:00": "works",
+        "Thu 19:00": "cannot"
+      }
+    },
+    {
+      "participant_id": "ben",
+      "status": "completed",
+      "raw": "Tuesday works. Wednesday too, I think.",
+      "stances": {
+        "Tue 19:00": "works",
+        "Wed 19:00": "works"
+      }
+    },
+    {
+      "participant_id": "cleo",
+      "status": "completed",
+      "raw": "Tuesday is good for me.",
+      "stances": {
+        "Tue 19:00": "works"
+      }
+    },
+    {
+      "participant_id": "dara",
+      "status": "completed",
+      "raw": "Tuesday yes, Wednesday yes, Thursday no idea yet.",
+      "stances": {
+        "Tue 19:00": "works",
+        "Wed 19:00": "works"
+      }
+    },
+    {
+      "participant_id": "emil",
+      "status": "declined",
+      "raw": "Please take me off the list for this one."
+    },
+    {
+      "participant_id": "fay",
+      "status": "no_answer",
+      "raw": ""
+    }
+  ]
+}
