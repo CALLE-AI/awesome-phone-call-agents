@@ -83,6 +83,23 @@ answer. The default falls that way deliberately: a wrong or missing code must ne
 silently place a real call. One `live` flag decides it, and every later branch reads
 that flag rather than re-deriving the decision.
 
+## Refuse because the operator said so
+
+`CALLE_DRY_RUN=1` means *not today, whatever else is configured*, and a switch like that
+is only worth having if it cannot be talked around. So it is enforced in two places
+rather than one:
+
+- **the decision** — dry run is the first term of the predicate `live` is built from, so
+  a deploy holding both a key and a correct access code still simulates;
+- **the transport** — `client()` is the single chokepoint every authenticated request
+  goes through, and it refuses to construct the SDK client at all. Dry mode makes no
+  credentialed request of any kind, not merely no call.
+
+The same chokepoint refuses when `CALLE_BASE_URL` is not one of the two official CALL-E
+HTTPS origins, so a misconfigured host cannot be sent the API key either. In both cases
+`/api/health` reports `realCalls: false` and the unlock endpoint rejects even a correct
+code: an affordance the server has already decided not to honour should not be offered.
+
 ## What is left
 
 After all of the above, the calls that do happen are: a question nobody has asked

@@ -32,7 +32,6 @@ const dashed = n => 'CALL-E-' + n.replace(/_/g, '-');
 const calleEnv = n => env('CALLE_' + n, dashed(n));
 
 const CALLE_KEY = calleEnv('API_KEY');
-const CALLE_BASE = calleEnv('BASE_URL');                      // override for staging
 const WEBHOOK_TOKEN = calleEnv('WEBHOOK_TOKEN');
 // Render injects RENDER_EXTERNAL_URL, which is exactly the public origin the
 // webhook has to be reachable on, so it works as the default.
@@ -48,25 +47,60 @@ const PRIVATE_TTL_DAYS = parseInt(calleEnv('PRIVATE_TTL_DAYS') || '30', 10);
 const CALLER_ID = calleEnv('CALLER_IDENTITY') || 'Local Atlas, a local guide website';
 const ACCESS_CODE = calleEnv('ACCESS_CODE');
 const REAL_CODE = env('REAL_CALL_ACCESS_CODE', 'REAL-CALL-ACCESS-CODE');
-/* ---- Goals path (optional, experimental) ----
-   Set CALLE_GOAL_ID to route live calls through a published Goal instead of
-   the one-off Calls API. The only reason to want this is the voice: per the
-   spec, "region, callee locale, and runtime profile come from the published
-   Goal", and there is no voice field on CreateCallRequest at all.
-
-   It is a switch rather than a migration because the trade is real. GoalRun is
-   `additionalProperties: false` over {object, id, goal_id, run_id, run_spec,
-   status, result, error, created_at, completed_at} — no transcript, no
-   summary, no attempts, and `run_id` is documented as correlation-only. So a
-   Goal buys a fixed accent and costs the call log, and it moves the call
-   script out of this file and into the dashboard, where it is neither
-   reviewed nor version-controlled. Worth measuring before adopting. */
-const GOAL_ID = calleEnv('GOAL_ID');
 
 const SIM_FORCE = calleEnv('SIM_OUTCOME');                    // pin a sim outcome for demos
 const SIM_MS = parseInt(calleEnv('SIM_DURATION_MS') || '18000', 10);
 
-const configured = () => !!CALLE_KEY || DRY_RUN;
+/* ---- pinned credential origin ----
+   The API key is a bearer credential, so the host it is sent to is part of the
+   secret's blast radius: one mistyped or injected CALLE_BASE_URL would hand the
+   key to whoever owns that name. So the override is an allowlist of the two
+   origins CALL-E itself publishes — the SDK's own default and the staging
+   mirror in its README — and not a free-form URL.
+
+   An unrecognised value is a configuration error, never a fallback to the
+   default: silently dialling production because staging was misspelled is the
+   kind of "helpful" that spends credits on the wrong account. It disables the
+   credentialed client outright and says so at boot. */
+const CALLE_ORIGINS = ['https://api.heycall-e.com', 'https://test-api.heycall-e.com'];
+
+function officialOrigin(raw){
+  const s = String(raw || '').trim().replace(/\/+$/, '');
+  if(!s) return { ok: true, baseUrl: '' };                    // unset ⇒ SDK default
+  let u;
+  try{ u = new URL(s); }catch(e){ return { ok: false }; }
+  if(u.protocol !== 'https:') return { ok: false };
+  if(u.username || u.password) return { ok: false };          // no credentials in the authority
+  if(u.port) return { ok: false };
+  if(u.search || u.hash) return { ok: false };
+  if(u.pathname !== '/' && u.pathname !== '') return { ok: false };
+  // exact origin match — never hostname.endsWith(), which api.heycall-e.com.evil.example passes
+  if(!CALLE_ORIGINS.includes(u.origin)) return { ok: false };
+  return { ok: true, baseUrl: u.origin };
+}
+
+const BASE = officialOrigin(calleEnv('BASE_URL'));
+if(!BASE.ok)
+  console.warn('CALLE_BASE_URL is not an official CALL-E origin — real calls are disabled. ' +
+               'Allowed: ' + CALLE_ORIGINS.join(', '));
+
+/* Configured means "the feature can run at all", which includes the simulator.
+   Dry run stays part of it: a keyless deploy with DRY_RUN=1 is the walkthrough
+   configuration, and the whole simulated pipeline is reachable without a
+   credential. What dry run does NOT do any more is permit a real call. */
+const configured = () => (!!CALLE_KEY && BASE.ok) || DRY_RUN;
+
+/* Whether a real call is possible *at all* on this deploy: a key to dial with,
+   a pinned origin to send it to, a code to unlock it, and dry run off. Every
+   claim the app makes about live calls — /api/health, the unlock form, the UI
+   affordance — reads this one predicate, so none of them can advertise a door
+   with nothing behind it. */
+const realCallsPossible = () =>
+  !DRY_RUN && BASE.ok && !!CALLE_KEY && !!(REAL_CODE || ACCESS_CODE);
+
+if(DRY_RUN && CALLE_KEY)
+  console.warn('CALLE_DRY_RUN=1: the CALL-E key is present and deliberately ignored. ' +
+               'No call is placed and no credentialed request is made.');
 
 /* ---- real-call gate ----
    Simulated calls are free, harmless, and open to everyone — they are how the
@@ -77,8 +111,13 @@ const configured = () => !!CALLE_KEY || DRY_RUN;
 
    This is the *server-side* check and the only one that counts — hiding the
    affordance in the UI protects nothing, since /api/ask-place is a public URL.
-   With no code configured, no request can ever reach the real API. */
+   With no code configured, no request can ever reach the real API.
+
+   It answers only "is this the code". Whether a real call may happen at all is
+   realCallsPossible() above, and both have to hold — so dry run, a missing key
+   or an unpinned origin each override a correct code on their own. */
 const crypto = require('crypto');
+const sha256 = s => crypto.createHash('sha256').update(String(s)).digest('hex');
 function realCallOk(code){
   const supplied = String(code || '');
   if(!supplied) return false;
@@ -89,14 +128,20 @@ function realCallOk(code){
   return [REAL_CODE, ACCESS_CODE].some(c => c && crypto.timingSafeEqual(given, h(c)));
 }
 
-/* ---- SDK handle (lazy + memoised) ---- */
+/* ---- SDK handle (lazy + memoised) ----
+   The single chokepoint for every authenticated request this app makes — create,
+   get, webhook re-read, poll. That is what makes dry run an isolation boundary
+   rather than a branch: refusing here means no credentialed traffic leaves the
+   process in dry mode, whatever a caller believes it is doing. */
 let _client = null;
 async function client(){
+  if(DRY_RUN) throw new Error('CALLE_DRY_RUN=1: no credentialed CALL-E request is made');
+  if(!BASE.ok) throw new Error('CALLE_BASE_URL is not an official CALL-E origin');
   if(_client) return _client;
   if(!CALLE_KEY) throw new Error('CALLE_API_KEY not set');
   const { CalleClient } = await import('@call-e/calle');
-  _client = new CalleClient(CALLE_BASE ? { apiKey: CALLE_KEY, baseUrl: CALLE_BASE }
-                                       : { apiKey: CALLE_KEY });
+  _client = new CalleClient(BASE.baseUrl ? { apiKey: CALLE_KEY, baseUrl: BASE.baseUrl }
+                                         : { apiKey: CALLE_KEY });
   return _client;
 }
 
@@ -682,6 +727,17 @@ const SIM_SHAPE = {
   unreachable: 'The line reaches a recorded voicemail greeting. The agent leaves no message and hangs up.'
 };
 
+/* Keep a quote traceable to the words it is a quote of: hand back the model's
+   own if it binds (see evidenceCheck), otherwise the longest thing the staff
+   member actually said. */
+function groundQuote(quote, turns){
+  const staff = turns.filter(t => t.speaker === 'user');
+  if(quoteBinds(quote, staff)) return quote;
+  const longest = staff.map(t => String(t.text || ''))
+    .sort((a, b) => b.length - a.length)[0] || '';
+  return longest.slice(0, 200);
+}
+
 async function simulate({ place, question, outcome }){
   if(!AI_KEY) return simFallback({ place, question, outcome });
   const prompt = [
@@ -722,7 +778,10 @@ async function simulate({ place, question, outcome }){
       result: {
         answer_status: outcome,
         answer: outcome === 'answered' ? String(j.answer || '').slice(0, 300) : 'unknown',
-        evidence_quote: String(j.evidence_quote || '').slice(0, 200),
+        /* A published answer has to quote the transcript it came from, and the
+           model happily paraphrases the dialogue it just wrote. Since it wrote
+           both halves, fix it here rather than downgrading a fact later. */
+        evidence_quote: groundQuote(String(j.evidence_quote || '').slice(0, 200), turns),
         staff_confidence: ['certain', 'hedged', 'unknown'].includes(j.staff_confidence)
           ? j.staff_confidence : 'unknown'
       }
@@ -779,13 +838,11 @@ async function reserveBudget(){
 /* ---- public API ---- */
 
 /* ---- private-call context ----
-   A private call is the same call with a visit attached. The Goal path pins its
-   own input schema to {question, business_name, business_address,
-   caller_identity}, so there is nowhere to put a date and a time as variables —
-   sending extra ones gets the Run rejected before it dials. The context is
-   therefore folded into the question text before validation and moderation,
-   which has the useful side effect of making both paths identical and of
-   showing the user the exact composed sentence on the confirmation screen. */
+   A private call is the same call with a visit attached. The visit context is
+   folded into the question text before validation and moderation rather than
+   carried as a separate field, so the sentence the agent reads out is the exact
+   sentence shown on the confirmation screen, and so the moderation gauntlet
+   sees the whole of what will be said on the phone. */
 const INTENT_PREFIX = {
   visit: 'I am planning to visit',
   group: 'I am planning a group visit'
@@ -800,6 +857,7 @@ function composePrivateQuestion({ question, intent, visitAt }){
 
 async function askPlace({ place, question, templateId, accessCode, confirmed, force,
                          isPrivate, uid, intent, visitAt }){
+  if(!BASE.ok) return { error: 'CALL-E is misconfigured on this server.', status: 503 };
   if(!configured()) return { error: 'CALL-E is not configured on this server.', status: 503 };
   /* Belt and braces: the route already requires a user before it gets here, but
      a private record with no owner would be a private record nobody can read
@@ -809,8 +867,10 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
   /* Simulate unless the caller proved they may spend a credit. Note which way
      the default falls: a wrong or missing code produces a clearly-labelled
      simulated answer, never a silent real call. Every later branch reads
-     `live`, so there is exactly one place where that decision is made. */
-  const live = !!CALLE_KEY && realCallOk(accessCode);
+     `live`, so there is exactly one place where that decision is made — and
+     dry run is the first term, so a deploy holding both a key and the code
+     still cannot dial while the flag is set. */
+  const live = realCallsPossible() && realCallOk(accessCode);
 
   /* Two paths in, and they are not equally trusted. A template is resolved
      from a fixed table by id, so no user text reaches the call script.
@@ -944,41 +1004,15 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
   const idemKey = `local-atlas:${isPrivate ? uid + ':' : ''}${pk}:${qh}` +
     (force ? `:r${Math.floor(Date.now() / 3600e3)}` : '');
 
-  /* A Goal pins its own task text and schemas, so all we may send is a phone
-     number and flat scalar variables. Note what does NOT move: the question is
-     still sanitised, validated and model-moderated above before it gets here,
-     so the injection defence stays in this repo even though the script does
-     not. Idempotency-Key is required on this path, not optional. */
-  if(GOAL_ID){
-    const run = await c.goals.run({
-      goalId: GOAL_ID,
-      phone,
-      variables: {
-        question: v.question,
-        business_name: place.name,
-        business_address: place.addr || '',
-        caller_identity: CALLER_ID
-      },
-      idempotencyKey: idemKey
-    });
-    pending.callId = run.id;
-    pending.goalRunId = run.id;
-    pending.state = run.status;
-    await docSet(callKey(run.id), pending, DAY);
-    await docSet(lockKey(pk, qh, isPrivate ? uid : ''), { callId: run.id }, 10 * 60e3);
-    return { status: 202, callId: run.id, state: run.status, viaGoal: true };
-  }
-
   const task = buildTask({ place, question: v.question, phone });
   const call = await c.calls.create({
     task,
     recipient: { phone, region: 'US', locale: 'en-US' },
     resultSchema: RESULT_SCHEMA,
-    // echoed back on the call and the webhook, so a delivery we did not
-    // initiate can be told apart from one we did
-    /* No account id goes to CALL-E — only the fact that this result is not
-       ours to publish, which is what ingest() needs to fail safe if our own
-       pending record is ever lost. See the fallback in ingest(). */
+    /* Echoed back on the call and on the webhook, and checked field by field
+       against our own record before anything is published — see bindResult().
+       No account id goes to CALL-E; `visibility` carries only the fact that a
+       result is not ours to publish. */
     metadata: { app: 'local-atlas', place_key: pk, q_hash: qh, question: v.question,
       visibility: isPrivate ? 'private' : 'public' },
     ...(webhookUrl() ? { webhookUrl: webhookUrl() } : {})
@@ -986,6 +1020,11 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
 
   pending.callId = call.id;
   pending.state = call.status;
+  /* The script we sent, fingerprinted. GET /v1/calls/{id} echoes `task` back, so
+     comparing hashes later proves the transcript we are about to believe came
+     from this exact script — the disclosure, the single question, the rule that
+     the agent books nothing — and not from some other call in the account. */
+  pending.taskHash = sha256(task);
   await docSet(callKey(call.id), pending, DAY);
   await docSet(lockKey(pk, qh, isPrivate ? uid : ''), { callId: call.id }, 10 * 60e3);
   return { status: 202, callId: call.id, state: call.status };
@@ -1016,12 +1055,18 @@ async function pollCall(callId, uid){
     if(Date.now() - pending.createdAt < SIM_MS)
       return { status: 200, state: 'in_progress', callId };
     const sim = pending.sim;
-    const entry = await publish(pending, sim.result, {
+    /* A simulated result is bound by construction — we generated the transcript
+       and the answer together, in this process, for this record — but it still
+       goes through the same evidence check as a real one, so the simulator can
+       never be the way an ungrounded answer reaches the shared list. */
+    const ev = evidenceCheck(sim.result, sim.turns);
+    const entry = await publish(pending, ev.result, {
       summary: sim.summary || 'Simulated call',
-      taskCompleted: sim.result.answer_status === 'answered',
+      taskCompleted: ev.result.answer_status === 'answered',
       confidence: { score: 1, label: 'high' },
       transcript: sim.turns,
       simulated: true,
+      bound: true,
       status: 'completed'
     });
     return { status: 200, state: 'done', entry: publicEntry(entry) };
@@ -1029,87 +1074,153 @@ async function pollCall(callId, uid){
 
   const c = await client();
 
-  /* Goal Runs are a different resource with a different terminal signal: the
-     spec says to branch on result/error being non-null rather than on status,
-     and "when both are null, continue polling". They also never webhook — a
-     Run takes only {phone, variables} — so polling is the whole story here. */
-  if(pending.goalRunId){
-    const run = await c.goals.getRun(GOAL_ID, pending.goalRunId);
-    if(run.result === null && run.error === null)
-      return { status: 200, state: run.status || 'in_progress', callId };
-    return { status: 200, state: 'done', entry: publicEntry(await ingestGoalRun(pending, run)) };
-  }
-
   const call = await c.calls.get(callId);
   if(call.status === 'queued' || call.status === 'in_progress')
     return { status: 200, state: call.status, callId };
   return { status: 200, state: 'done', entry: publicEntry(await ingest(call)) };
 }
 
-/* A Run reports failure as a typed code instead of a transcript we can read,
-   so the mapping to answer_status is a judgement rather than an extraction.
-   Anything that isn't clearly "nobody picked up" or "they declined" becomes
-   unknown, which expires in a day and is retryable — the same treatment the
-   Calls path gives an inconclusive call. */
-const GOAL_ERR_STATUS = {
-  no_answer: 'unreachable',
-  call_failed: 'unreachable',
-  declined: 'refused',
-  timed_out: 'unknown',
-  canceled: 'unknown',
-  result_invalid: 'unknown',
-  result_unavailable: 'unknown',
-  result_failed: 'unknown'
+/* ---- what makes a fact "verified" ----
+   A published entry says "confirmed by phone". Everything below exists so that
+   sentence is checkable rather than assumed. The API record arrives by two
+   routes — an unsigned webhook naming an id, and our own poll — and in both
+   cases it is a document about a call, not proof that it was *our* call. So
+   before anything is published, the record has to bind to the request we made,
+   on every axis that could otherwise be substituted:
+
+     call       our own pending record exists for this id
+     terminal   the call is finished, and CALL-E did not judge the task failed
+     task       the script it ran hashes to the script we sent
+     recipient  the number dialled is the number we meant to dial
+     metadata   app, place, question hash and visibility all match our record
+     evidence   an answered fact is backed by staff words in the transcript
+
+   Any failure is a refusal, not a downgrade of the checks: we drop the result
+   and log why. Losing an answer costs the asker a retry. Publishing an unbound
+   one costs the claim every other entry on the page depends on. */
+
+const TERMINAL = ['completed', 'failed', 'canceled'];
+
+/* Punctuation- and case-insensitive so a quote can be compared to the words it
+   was taken from: CALL-E returns "We open at nine." against a turn reading
+   "we open at nine on weekdays", and the simulator's own fallback quotes clip a
+   sentence mid-dash. Same normalisation shape as qHash, spaces kept. */
+const flatten = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/* A fragment shorter than this matches half the English language by accident,
+   so it binds nothing on its own — but a quote that is *exactly* one whole turn
+   is unambiguous however short ("Yes, we do."), so that binds regardless. */
+const MIN_QUOTE = 12;
+const quoteBinds = (quote, staffTurns) => {
+  const q = flatten(quote);
+  if(!q) return false;
+  if(staffTurns.some(t => flatten(t.text) === q)) return true;
+  return q.length >= MIN_QUOTE && flatten(staffTurns.map(t => t.text).join(' ')).includes(q);
 };
 
-async function ingestGoalRun(pending, run){
-  const r = run.result || {};
-  const err = run.error || null;
-  return publish(pending, {
-    answer_status: err ? (GOAL_ERR_STATUS[err.code] || 'unknown')
-                       : (r.answer_status || 'unknown'),
-    answer: String(r.answer || ''),
-    evidence_quote: String(r.evidence_quote || ''),
-    staff_confidence: r.staff_confidence || 'unknown'
-  }, {
-    summary: err ? err.message : String(r.summary || ''),
-    taskCompleted: !err,
-    // no transcript on this resource — the panel simply omits the call log
-    transcript: [],
-    failureCode: err ? err.code : null,
-    failureMessage: err ? err.message : null,
-    viaGoal: true,
-    status: run.status
-  });
+/* Is this answer backed by something a staff member actually said? Returns the
+   result to publish — unchanged when it binds, downgraded when it does not, so
+   there is exactly one place that decides what an unsupported answer becomes. */
+function evidenceCheck(result, transcript){
+  const r = { ...(result || {}) };
+  if(r.answer_status !== 'answered') return { ok: true, result: r };
+
+  const staff = (transcript || []).filter(t => t && t.speaker === 'user');
+  if(!staff.length)
+    // an answer with nobody answering. Not a fact about the place at all.
+    return { ok: false, reason: 'answered with no staff turn in the transcript',
+             result: { ...r, answer_status: 'unknown', answer: '', evidence_quote: '' } };
+
+  if(quoteBinds(r.evidence_quote, staff)) return { ok: true, result: r };
+
+  /* Somebody picked up and spoke, so the call happened and is worth reporting —
+     but the answer is not traceable to what they said, so it is not a verified
+     fact. `unclear` is exactly that outcome, and it expires tomorrow. */
+  return { ok: false, reason: 'evidence quote is not grounded in the transcript',
+           result: { ...r, answer_status: 'unclear', answer: '', evidence_quote: '' } };
+}
+
+/* All the non-evidence bindings. Returns { ok, reason } — the caller refuses on
+   !ok rather than publishing anything at all. */
+function bindResult(pending, call){
+  const no = reason => ({ ok: false, reason });
+  if(!pending || !pending.callId) return no('no stored request for this call id');
+  if(pending.callId !== call.id) return no('call id does not match the stored request');
+  if(!pending.placeKey || !pending.qHash) return no('stored request is missing its place');
+
+  if(!TERMINAL.includes(call.status)) return no(`call is not terminal (${call.status})`);
+
+  /* GET echoes back the task submitted at create time, so this is the check that
+     the transcript below belongs to our script — disclosure, single question,
+     books-nothing rule and all — rather than to some other call in the account. */
+  if(!pending.taskHash) return no('stored request has no task fingerprint');
+  if(sha256(call.task || '') !== pending.taskHash) return no('task does not match the script we sent');
+
+  const m = call.metadata || {};
+  if(m.app !== 'local-atlas') return no('metadata.app is not this app');
+  if(String(m.place_key || '') !== pending.placeKey) return no('metadata place_key mismatch');
+  if(String(m.q_hash || '') !== pending.qHash) return no('metadata q_hash mismatch');
+  if(String(m.question || '') !== String(pending.question || '')) return no('metadata question mismatch');
+  const visibility = pending.private ? 'private' : 'public';
+  if(String(m.visibility || '') !== visibility) return no('metadata visibility mismatch');
+  /* Kept as its own refusal rather than folded into the line above: a private
+     result reaching the shared list is the one outcome this feature must never
+     produce, and it should be legible as its own rule. */
+  if(m.visibility === 'private' && !pending.uid)
+    return no('private call record is missing its owner');
+
+  /* The number, not the position in the array. recipients[0] is whoever the API
+     happened to list first; the attempt we read the transcript from has to be an
+     attempt on the line we asked for. */
+  const dialled = normalizeE164(pending.phone);
+  if(!dialled) return no('stored request has no dialled number');
+  const recipient = (call.recipients || []).find(rc =>
+    (rc.phones || []).some(p => normalizeE164(p) === dialled) ||
+    (rc.attempts || []).some(a => normalizeE164(a.phone) === dialled));
+  if(!recipient) return no('no recipient matches the number we dialled');
+  const attempt = (recipient.attempts || [])
+    .filter(a => normalizeE164(a.phone) === dialled).slice(-1)[0] || null;
+
+  return { ok: true, attempt };
 }
 
 /* Turn a terminal CALL-E record into a published FAQ entry (or a recorded
-   failure). Single funnel for both webhook and poll so they cannot diverge. */
+   failure). Single funnel for both webhook and poll so they cannot diverge, and
+   the only door into publish() for anything that came off the network. */
 async function ingest(call){
-  const pending = (await docGet(callKey(call.id))) || {
-    callId: call.id,
-    placeKey: String(call.metadata?.place_key || ''),
-    qHash: String(call.metadata?.q_hash || ''),
-    question: String(call.metadata?.question || ''),
-    placeName: '', placeAddr: '', phone: '', createdAt: Date.now()
-  };
-  if(!pending.placeKey || !pending.qHash) throw new Error('call is missing place metadata');
-  /* The reconstructed record above has no owner, so a private call whose stored
-     record was lost would publish to the shared list — the one outcome this
-     feature must never produce. Drop the result instead: losing a private
-     answer costs the user a retry, publishing it costs them the promise. */
-  if(!pending.uid && call.metadata?.visibility === 'private')
-    throw new Error('private call record is missing its owner; refusing to publish');
+  const pending = await docGet(callKey(call.id));
+  const bound = bindResult(pending, call);
+  if(!bound.ok){
+    console.warn(`calle: refusing to publish ${call.id}: ${bound.reason}`);
+    /* Nothing to attach the refusal to — the id is not one of ours, or the
+       record is gone. There is no honest record to write, so write none. */
+    if(!pending || pending.callId !== call.id) throw new Error('unbound result: ' + bound.reason);
+    /* It *is* our request, so the person waiting on it is told their call
+       finished with no answer. The result itself is recorded unbound, which is
+       what keeps it out of the shared list — see publish(). */
+    return publish(pending, { answer_status: 'unknown', answer: '', evidence_quote: '' }, {
+      summary: '', taskCompleted: false, transcript: [],
+      failureCode: 'unbound_result', failureMessage: bound.reason,
+      bound: false, status: call.status
+    });
+  }
 
   const r = call.structuredResult || {};
-  const attempt = call.recipients?.[0]?.attempts?.slice(-1)[0] || null;
-  return publish(pending, r, {
+  const transcript = bound.attempt?.transcriptTurns || [];
+  /* CALL-E's own judgement that the task did not complete is enough to keep an
+     answer off the shared list, whatever the structured result claims. `null`
+     means it has no judgement yet and is not a verdict. */
+  const ev = call.taskCompleted === false
+    ? { result: { ...r, answer_status: 'unknown', answer: '', evidence_quote: '' } }
+    : evidenceCheck(r, transcript);
+
+  return publish(pending, ev.result, {
     summary: call.summary || '',
     taskCompleted: call.taskCompleted,
     confidence: call.completionConfidence || null,
-    transcript: attempt?.transcriptTurns || [],
+    transcript,
     failureCode: call.failureCode || null,
     failureMessage: call.failureMessage || null,
+    bound: true,
     status: call.status
   });
 }
@@ -1212,7 +1323,6 @@ async function publish(pending, result, meta){
     // carried into the FAQ entry so the panel can say so out loud; a simulated
     // answer presented as a real one is the one thing this feature must not do
     simulated: !!meta.simulated,
-    viaGoal: !!meta.viaGoal,
     callId: pending.callId,
     collectedAt: now,
     // only a real answer earns a long life; everything else is retryable soon
@@ -1234,7 +1344,12 @@ async function publish(pending, result, meta){
      later step that could promote it: "never added to the public listing" is
      enforced by there being no code path that adds it. It also carries the
      visit context back, because a private answer about Thursday at 2pm is
-     worth much less once you have forgotten which visit you asked about. */
+     worth much less once you have forgotten which visit you asked about.
+
+     This branch is deliberately ahead of the bound check below: a private entry
+     is one person's record of a call they requested, not a claim on anyone
+     else's page, and an unbound result arrives here with its answer already
+     stripped — so what gets stored is the outcome, never an unverified fact. */
   if(pending.private){
     entry.private = true;
     entry.intent = pending.intent || '';
@@ -1243,14 +1358,22 @@ async function publish(pending, result, meta){
     const mine = (await docGet(pkey)) || [];
     await docSet(pkey, [entry, ...mine.filter(e => e.qHash !== entry.qHash)].slice(0, 20),
       PRIVATE_TTL_DAYS * DAY);
-  }else if(entry.answerStatus === 'unreachable'){
-    /* Voicemail, an automated menu, a disconnected line or nobody picking up.
-       That is a fact about one attempt, not a fact about the place, and it has
-       no business in a list headed "Confirmed by phone" — nothing was.
+  }else if(entry.answerStatus === 'unreachable' || !meta.bound){
+    /* Two things land here and both are "returned to the asker, never shared".
 
-       It is still returned to the person who asked, from the call record
-       written below, because they are owed the outcome of a call they
-       requested. It just never becomes a shared answer. Note the lock release
+       `unreachable` is voicemail, an automated menu, a disconnected line or
+       nobody picking up. That is a fact about one attempt, not a fact about the
+       place, and it has no business in a list headed "Confirmed by phone" —
+       nothing was.
+
+       `!meta.bound` is the fail-closed rule, and it is checked here so that the
+       shared list has exactly one gate rather than a rule every caller has to
+       remember: a result that did not bind to a request we made (see
+       bindResult) cannot be written to a place's public answers by any path,
+       whatever else it claims about itself.
+
+       Either way the record below is still written, because the person who
+       asked is owed the outcome of a call they requested, and the lock release
        further down still applies, so the number can be tried again shortly. */
   }else{
     const key = faqKey(pending.placeKey);
@@ -1269,11 +1392,15 @@ async function publish(pending, result, meta){
 
 /* Webhook body is unsigned and therefore untrusted: take the id, verify the
    shared-secret path token, then re-read the call from the API and store that.
-   A forged POST can at worst cost us one authenticated GET. */
+   A forged POST can at worst cost us one authenticated GET — and now not even
+   that, since an id we have no pending record for is refused before the GET. */
 async function handleWebhook({ token, body }){
   if(!WEBHOOK_TOKEN || token !== WEBHOOK_TOKEN) return { status: 401, error: 'bad token' };
   const id = String(body?.data?.id || '');
   if(!/^call_[\w-]+$/.test(id)) return { status: 400, error: 'bad call id' };
+  /* An id nobody here asked about cannot produce anything publishable — see
+     bindResult — so there is no reason to spend a request finding that out. */
+  if(!await docGet(callKey(id))) return { status: 200, ignored: 'no such request' };
   const c = await client();
   const call = await c.calls.get(id);
   if(call.status === 'queued' || call.status === 'in_progress')
@@ -1282,47 +1409,13 @@ async function handleWebhook({ token, body }){
   return { status: 200 };
 }
 
-/* Read-only. Lets us confirm a Goal's id and inspect the input/result schemas
-   it publishes before pointing CALLE_GOAL_ID at it — the variables we send
-   have to match its pinned input_schema exactly or the Run is rejected before
-   it dials. Gated on the real-call code because it is account information. */
-async function listGoals(){
-  if(!CALLE_KEY) return { error: 'CALLE_API_KEY not set', status: 503 };
-  const c = await client();
-  const list = await c.goals.list({ limit: 20 });
-  return { status: 200, items: (list.data || []).map(g => ({
-    id: g.id, title: g.title, description: g.description, status: g.status,
-    runSpecVersion: g.publishedRunSpec?.version,
-    inputSchema: g.publishedRunSpec?.inputSchema,
-    resultSchema: g.publishedRunSpec?.resultSchema
-  })) };
-}
-
-/* Booleans and a count — no account data, so this needs no access code and can
-   be checked from anywhere. It answers the one question the dashboard's status
-   label and the authoring agent's claims disagree about: does the configured
-   Goal actually resolve as published? goals.list() returns only active, listed
-   Goals that have a published RunSpec, so membership in it *is* the proof. */
-async function goalStatus(){
-  if(!GOAL_ID) return { configured: false, published: false };
-  if(!CALLE_KEY) return { configured: true, published: false, error: 'no api key' };
-  try{
-    const c = await client();
-    const list = await c.goals.list({ limit: 50 });
-    const ids = (list.data || []).map(g => g.id);
-    return { configured: true, published: ids.includes(GOAL_ID), goalsVisible: ids.length };
-  }catch(e){
-    return { configured: true, published: false, error: e.code || String(e.message || e) };
-  }
-}
-
 /* What a visitor is allowed to see. The transcript, the number we dialled and
    the raw failure text stay server-side: they are operator data, and shipping
    a stranger's phone conversation to every visitor of the page is not a
    feature. `callSummary` exists precisely so this list has nothing to hide
    behind. Storage keeps everything — see listCalls for the operator view. */
 const PUBLIC_FIELDS = ['qHash', 'question', 'topic', 'answer', 'answerStatus', 'evidenceQuote',
-  'staffConfidence', 'source', 'simulated', 'viaGoal', 'collectedAt', 'expiresAt',
+  'staffConfidence', 'source', 'simulated', 'collectedAt', 'expiresAt',
   'callSummary', 'confidence',
   /* Private entries travel through the same serialiser — these three are what
      the Private Actions tab needs to show a result next to the visit it was
@@ -1367,16 +1460,19 @@ async function listCalls(place){
 module.exports = {
   configured, askPlace, pollCall, handleWebhook, getFaq, getPrivate,
   placeKey, normalizeE164, validateQuestion, sanitizeQuestion, buildTask,
-  realCallOk, templatesFor, moderateQuestion, suggestQuestions, listGoals, goalStatus,
+  realCallOk, realCallsPossible, templatesFor, moderateQuestion, suggestQuestions,
   listCalls, publicEntry, summarizeCall,
+  /* Exported so the binding rules can be exercised directly against hand-built
+     API records — the refusals are the part of this file most worth testing and
+     the least reachable through a real call. */
+  bindResult, evidenceCheck,
   simulate, simFallback, simOutcome, TEMPLATES, RESULT_SCHEMA, openerFor, placeNoun, DISCLOSURE,
   info: () => ({
     configured: configured(), dryRun: DRY_RUN, webhook: !!webhookUrl(),
-    /* Whether a real call is possible *at all* on this deploy — needs both a
-       key to dial with and a code to unlock. The UI offers the unlock only
+    /* Whether a real call is possible *at all* on this deploy: a key, a pinned
+       origin, an unlock code, and dry run off. The UI offers the unlock only
        when this is true, so it can't advertise a door with nothing behind it. */
-    realCalls: !!CALLE_KEY && !!(REAL_CODE || ACCESS_CODE), moderation: !!AI_KEY,
-    viaGoal: !!GOAL_ID,
+    realCalls: realCallsPossible(), moderation: !!AI_KEY,
     budget: DAILY_BUDGET, ttlDays: FAQ_TTL_DAYS
   })
 };

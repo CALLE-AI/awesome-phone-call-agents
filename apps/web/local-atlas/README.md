@@ -76,20 +76,23 @@ screen. A simulated answer is never presented as a real one.
 
 Each flag does one thing:
 
-- **`CALLE_DRY_RUN=1`** makes the feature *configured* without a credential. Be precise
-  about what it is not: it is not a no-dial switch and never consults `live`. The
-  condition that cannot dial is the absence of `CALLE_API_KEY`, because `live` is
-  `!!CALLE_KEY && realCallOk(accessCode)` — a deploy holding a key and the access code
-  places real calls with dry-run set.
+- **`CALLE_DRY_RUN=1`** makes the feature *configured* without a credential, and places
+  no call. It is a hard switch, enforced in two places rather than one: `live` reads it
+  first, so a deploy holding both a key and a correct access code still simulates; and
+  `client()` — the single chokepoint every authenticated request goes through — refuses
+  to construct the SDK client at all, so dry mode makes no credentialed request of any
+  kind. `/api/health` reports `calle.realCalls: false` and `/api/ask-access` rejects even
+  a correct code, so nothing in the UI offers an unlock that would not be honoured.
 - **`REVIEW_MODE=1`** runs call requests as a fixed local reviewer. Requesting a call
   normally requires an account, so without it `/api/ask-place` answers
   `503 auth_unconfigured` and the feature is unreachable on a machine with no identity
   provider. Reading existing facts never needed an account.
 
-Review mode applies **only** when Supabase is unconfigured *and* no `CALLE_API_KEY` is
-set. Any real deployment fails at least one of those, so the bypass is inert there and
-cannot reach a live call; with Supabase configured the request still returns 401. The
-server logs a line at boot whenever it is on, and says so if the flag was ignored.
+Review mode applies **only** when Supabase is unconfigured *and* the server cannot dial
+— no `CALLE_API_KEY`, or `CALLE_DRY_RUN=1`. Any real deployment fails at least one of
+those, so the bypass is inert there; with Supabase configured the request still returns
+401. The server logs a line at boot whenever it is on, and says so if the flag was
+ignored.
 
 To exercise the real sign-in path instead, point it at a free Supabase project (URL +
 anon key from Project Settings → API). Both values are public by design — there is no
@@ -108,7 +111,18 @@ DEMO_PLACE_PHONE=+12015550123   # a line you own — see below
 The code is compared with a SHA-256 digest and `timingSafeEqual` (hashed first, so a
 length mismatch cannot throw and leak the length). This check is server-side and is
 the only one that counts — `/api/ask-place` is a public URL, so hiding the button
-would protect nothing.
+would protect nothing. It answers only "is this the code": whether a real call may
+happen at all is a separate predicate, and dry run, a missing key or an unrecognised
+`CALLE_BASE_URL` each override a correct code on their own.
+
+`CALLE_BASE_URL` is an allowlist, not a URL field. The API key is a bearer credential,
+so the host it is sent to is part of the secret's blast radius; only the two origins
+CALL-E publishes are accepted (`https://api.heycall-e.com` and the staging mirror
+`https://test-api.heycall-e.com`), matched exactly on `URL.origin` — never a suffix
+test — and additionally requiring https, no userinfo, no explicit port and no path.
+Anything else is a configuration error rather than a fallback to production: the server
+warns at boot, reports `realCalls: false`, refuses to build the credentialed client, and
+answers 503 to an ask.
 
 Point real calls at a line you own. `DEMO_PLACE_PHONE` injects a clearly-labelled test
 listing for exactly that: the number is never committed, that variable is also the on
@@ -121,7 +135,7 @@ a different colour on the map.
 | Action | Effect |
 |---|---|
 | Confirming a live request | **A real phone rings.** One CALL-E credit is spent. |
-| A completed public call | A fact is written to the place's shared list and shown to every later visitor for up to `CALLE_FAQ_TTL_DAYS`. |
+| A completed public call | A fact is written to the place's shared list and shown to every later visitor for up to `CALLE_FAQ_TTL_DAYS` — but only if the result binds to the request that produced it (see [Safety rules](#safety-rules)). |
 | A completed private call | A record is written under the requesting account only, for up to `CALLE_PRIVATE_TTL_DAYS`. It is never copied to the shared list. |
 | Any call attempt | A daily budget counter is incremented and kept for 48 hours. |
 | Server start | A keep-alive self-ping every 10 minutes and a cache pre-warm every 6 hours. Neither places calls. |
@@ -155,7 +169,8 @@ storing anything, because CALL-E deliveries are unsigned.
 | Explicit user intent | Server-enforced 428 confirmation showing the exact question, opener, disclosure and number. Unconfirmed requests cannot reach the API. |
 | E.164 phone numbers | `normalizeE164()` converts provider display formats and drops extensions; anything it cannot resolve is not callable. |
 | Masking numbers in samples | All samples in this directory use the reserved fictional 555-01xx range. The number shown in the UI is the place's own published listing number. |
-| No credential exposure | Environment only; server-side proxying; no service-role key. |
+| No credential exposure | Environment only; server-side proxying; no service-role key. The API key is only ever sent to an official CALL-E HTTPS origin — `CALLE_BASE_URL` is an allowlist, and an unrecognised value disables the credentialed client rather than falling back. |
+| Results bound to the request that produced them | Nothing is published unless it binds on all six axes: we hold a stored request for that call id, the call is terminal and not judged failed, `sha256(call.task)` matches the script we sent, the transcript comes from an attempt on the number *we* dialled, every metadata field matches our record, and an `answered` fact quotes something a staff member actually said. Failures fail closed — an ungrounded quote is recorded as `unclear` with the answer dropped, an answer with no staff turn as `unknown`, and anything unbound never reaches a place's shared list. Since webhook deliveries are unsigned, this is what stops a POST naming an arbitrary call id from publishing a "confirmed by phone" fact; an id we have no request for is dropped before the API read. |
 | No hidden recurring schedules | None exist. One confirmed request, one call. |
 | No duplicate jobs | A 10-minute in-flight lock plus a CALL-E idempotency key, both namespaced by account on the private path. |
 | Clear cancellation | See "Stopping and rolling back" above. |
@@ -186,6 +201,14 @@ dry-run, so nothing is dialled.
    distinct question is refused with a budget message.
 9. **Gates** — with `CALLE_DRY_RUN=0` and a real key, confirm that a place listed
    closed, and any request outside 10:00–20:00 Eastern, are both refused.
+10. **Dry run beats a valid unlock** — start with a real key, a correct
+    `REAL_CALL_ACCESS_CODE` *and* `CALLE_DRY_RUN=1`. `/api/health` must report
+    `calle.realCalls: false`, `POST /api/ask-access` must answer `{"ok":false}` for the
+    correct code, and an ask with that code in `x-atlas-access` must return
+    `202 simulated` with no confirmation step — the live path is never reached.
+11. **Origin pinning** — start with `CALLE_BASE_URL=https://api.heycall-e.com.example.com`
+    (or any non-official value). The boot log must warn, `realCalls` must be false, and an
+    ask must return 503 rather than sending the key anywhere.
 
 `/api/health` reports which integrations are configured. `/api/cache-test` forces a
 real Redis round-trip and reports the verdict.

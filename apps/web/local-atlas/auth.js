@@ -44,21 +44,23 @@ const configured = () => !!SUPA_URL && !!SUPA_ANON;
    repository sees the map and the already-collected facts and never the thing
    worth reviewing. REVIEW_MODE=1 attaches a fixed local reviewer instead.
 
-   Note what it is NOT gated on. CALLE_DRY_RUN looks like the safety flag and
-   is not one: `live` is `!!CALLE_KEY && realCallOk(accessCode)`, which never
-   consults it, so a deploy with a key and the access code dials real numbers
-   with dry-run set. The condition that actually cannot dial is the absence of
-   a key, so that is the one used here.
+   What it is gated on is the inability to dial, not the intent not to. Two
+   conditions produce that, and either will do: no CALL-E key at all, or
+   CALLE_DRY_RUN=1, which calle.js enforces both at the decision (`live` reads
+   it first) and at the transport (the credentialed client refuses to exist).
+   Absent accounts is the third condition and is required — a deploy with a
+   Supabase project has real users, and a fixed local reviewer has no business
+   in it.
 
-   All three must hold, and any real deployment fails at least two of them:
-   accounts configured, or a CALL-E key present, and the flag is off by
-   default. */
+   The flag is off by default, and any real deployment fails at least one of
+   the conditions above. */
+const DRY_RUN = env('CALLE_DRY_RUN', 'CALL-E-DRY-RUN') === '1';
 const REVIEW_MODE = env('REVIEW_MODE') === '1'
   && !configured()
-  && !env('CALLE_API_KEY', 'CALL-E-API-KEY');
+  && (!env('CALLE_API_KEY', 'CALL-E-API-KEY') || DRY_RUN);
 const REVIEW_USER = { id: 'review-mode-local', email: 'reviewer@localhost' };
 if(env('REVIEW_MODE') === '1' && !REVIEW_MODE)
-  console.warn('REVIEW_MODE ignored: it only applies with no Supabase project and no CALL-E API key.');
+  console.warn('REVIEW_MODE ignored: it only applies with no Supabase project, and with either no CALL-E API key or CALLE_DRY_RUN=1.');
 else if(REVIEW_MODE)
   console.warn('REVIEW_MODE on: call requests run as a local reviewer. Every call is simulated.');
 

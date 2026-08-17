@@ -32,6 +32,11 @@ Nothing from the request body is persisted. `CALLE_WEBHOOK_TOKEN` — a long ran
 string in the path — is what makes the endpoint unguessable, which is the only
 protection available when payloads cannot be verified.
 
+Re-reading the record is necessary but not sufficient, because the record the API
+returns is a document *about* a call, not proof that it was **our** call. An id we hold
+no stored request for is dropped before step 2, and what comes back from step 2 still has
+to bind — see [Binding a result to its request](#binding-a-result-to-its-request).
+
 ## Idempotency keys are derived from the authorization
 
 The key is `local-atlas:<account?>:<placeKey>:<questionHash>` — properties of *what was
@@ -89,6 +94,31 @@ sent to the browser. What a reader sees is a short written note about how the ca
 went, grounded in the transcript. Publishing a stranger's phone conversation as
 listing content is not something a directory entry should do.
 
+## Binding a result to its request
+
+A published entry says *confirmed by phone*, so that claim is checked rather than
+assumed. `bindResult()` requires all six of these before anything is published, and any
+failure is a refusal:
+
+| Binding | What must hold |
+|---|---|
+| **call** | we hold a stored request for this exact call id |
+| **terminal** | the call is in a terminal state, and CALL-E did not judge the task failed |
+| **task** | `sha256(call.task)` matches the script we sent — same disclosure, same single question |
+| **recipient** | the transcript is read from an attempt on the number *we* dialled, not `recipients[0]` |
+| **metadata** | `app`, `place_key`, `q_hash`, `question` and `visibility` all match our record |
+| **evidence** | an `answered` fact quotes something a staff member actually said |
+
+The evidence test compares `evidence_quote` to the `user` turns of the transcript,
+case- and punctuation-insensitively; a quote binds if it is exactly one whole turn, or a
+substring of at least 12 characters. Failures downgrade rather than invent: no staff turn
+makes it `unknown`, an ungrounded quote makes it `unclear` with the answer dropped, and
+any other binding failure publishes nothing and logs the reason. `publish()` is the one
+gate — it will not write to a place's shared list unless the result is marked bound.
+
+Losing an answer costs the asker a retry. Publishing an unbound one costs the claim every
+other entry on the page depends on.
+
 ## The two-turn opening
 
 The agent's first line, the disclosure, and the confirmation preview are all built from
@@ -116,21 +146,27 @@ category strings are not usable raw — live values include "arts and entertainm
 "psychic and astrologer", and "your psychic and astrologer" is worse than saying
 nothing specific at all.
 
-## The optional Goals path
+## Why there is no Goals path
 
-`CALLE_GOAL_ID` routes calls through a published Goal instead of the one-off Calls API.
-The only reason to want it is voice: region, callee locale and runtime profile come
-from the Goal, and there is no voice field on `CreateCallRequest`.
+An earlier version could route calls through a published Goal (`CALLE_GOAL_ID`) for the
+sake of voice: region, callee locale and runtime profile come from the Goal, and there is
+no voice field on `CreateCallRequest`.
 
-It is a switch rather than a migration because the trade is real. `GoalRun` is
-`additionalProperties: false` over a fixed shape — no transcript, no summary, no
-attempts. A Goal buys a fixed accent and costs the call log, and it moves the script
-into a dashboard where it is neither reviewed nor version-controlled. The injection
-defence stays in this repository either way: the question is sanitised, validated and
-moderated before anything is sent.
+It was removed rather than exempted. `GoalRun` is `additionalProperties: false` over a
+fixed shape — no transcript, no summary, no attempts — so a Goal result can never satisfy
+the evidence binding above: there is nothing to check the answer against. A code path
+whose only possible output is an unbound fact is not worth keeping for an accent, and a
+Goal also moves the call script into a dashboard where it is neither reviewed nor
+version-controlled.
 
-## Lazy client
+## Lazy client, and the one chokepoint
 
 `@call-e/calle` is ESM-only and this server is CommonJS, so the SDK is reached through
 a dynamic `import()` rather than a top-level require. It is also lazy on purpose: a
 deploy without `CALLE_API_KEY` must still boot and serve the map.
+
+Being the *only* way to an authenticated request — create, get, poll, webhook re-read —
+is what lets one function decide whether any credentialed traffic leaves the process at
+all. `client()` refuses outright under `CALLE_DRY_RUN=1`, and refuses when
+`CALLE_BASE_URL` is not an official CALL-E origin, so neither of those is a branch a
+caller can miss.

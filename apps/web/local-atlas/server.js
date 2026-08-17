@@ -1425,9 +1425,12 @@ app.post('/api/ask-place', express.json({ limit: '8kb' }), auth.attachUser, auth
   });
 
 /* Lets the unlock form tell a wrong code from a working one without having to
-   start a call to find out. Reveals only whether the code matches. */
+   start a call to find out. Reveals only whether the code unlocks anything —
+   and on a deploy that will simulate regardless (dry run, no key, an unpinned
+   origin) the answer is no, because accepting a code there would promise a real
+   call the server has already decided not to place. */
 app.post('/api/ask-access', express.json({ limit: '2kb' }), (req, res) => {
-  res.json({ ok: calle.realCallOk((req.body || {}).code || '') });
+  res.json({ ok: calle.realCallsPossible() && calle.realCallOk((req.body || {}).code || '') });
 });
 
 /* Question chips for one place: Gemini's place-specific suggestions first, then
@@ -1450,24 +1453,6 @@ app.post('/api/calle/calls', express.json({ limit: '8kb' }), async (req, res) =>
     if(!p.name) return res.status(400).json({ error: 'place required' });
     res.json({ items: await calle.listCalls(p) });
   }catch(e){ res.status(calleErrStatus(e)).json(calleErrBody(e)); }
-});
-
-/* Booleans only, so it needs no code — it exists to settle whether the
-   configured Goal is actually published, which the dashboard label and the
-   authoring agent disagree about. */
-app.get('/api/calle/goal-status', async (req, res) => {
-  try{ res.json(await calle.goalStatus()); }
-  catch(e){ res.status(502).json(calleErrBody(e)); }
-});
-
-/* Account information, so it sits behind the same code that unlocks dialling. */
-app.get('/api/calle/goals', async (req, res) => {
-  try{
-    if(!calle.realCallOk(req.get('x-atlas-access') || ''))
-      return res.status(401).json({ error: 'access code required' });
-    const r = await calle.listGoals();
-    res.status(r.status || 200).json(r);
-  }catch(e){ res.status(502).json({ error: String(e.message || e) }); }
 });
 
 /* Polling stays open to anonymous callers — a public call in flight is nobody's

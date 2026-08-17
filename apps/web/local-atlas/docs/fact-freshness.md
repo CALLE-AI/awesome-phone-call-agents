@@ -42,6 +42,15 @@ Every stored answer carries `evidence_quote` — the words the staff member actu
 used, capped at 200 characters — displayed next to the paraphrase. A reader who
 distrusts the summary can read the sentence it came from.
 
+That only means something if the quote is checked against the transcript rather than
+taken on trust, so it is. An `answered` fact requires at least one staff turn in the
+transcript, plus a quote that either matches one turn exactly or appears in the staff
+turns as a substring of twelve characters or more — compared case- and
+punctuation-insensitively, since a quote is usually clipped mid-sentence. An answer with
+no staff turn behind it is recorded as `unknown`; a quote that appears nowhere becomes
+`unclear` with the answer dropped. Both expire tomorrow and both describe what actually
+happened, which an unsupported answer carrying a 90-day life would not.
+
 What is *not* published is the raw transcript. It is kept server-side for the call log;
 what a reader sees is a short written note about how the call went. A stranger's phone
 conversation is not listing content, and a transcript published verbatim is a privacy
