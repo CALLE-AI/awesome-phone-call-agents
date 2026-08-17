@@ -30,7 +30,7 @@ what may be remembered, scheduled, or shared outside the conversation.
 | Surface | Purpose |
 | --- | --- |
 | Self-service companion experience | First-call booking, consent state, approved memories, live metrics, call history, and the next agreed call |
-| Protected browser-to-CALL-E workflow | Server-side `@call-e/calle` import, one-call dispatch, status polling, strict results, and no browser credential |
+| Protected browser-to-CALL-E workflow | Server-side `@call-e/calle` import pinned to the official HTTPS origin, one-call dispatch, status polling, evidence-bound results, and no browser credential |
 | End-to-end judge mode | A labelled fixture exercises the same post-call transition without placing a real call |
 | Preview CLI | Redacted no-call plan for operator inspection |
 | Live CLI | Opt-in CALL-E call path behind three consent gates and an environment switch |
@@ -88,7 +88,7 @@ books an event, promises a service, diagnoses, monitors risk, or pretends to be 
 
 The post-call policy is intentionally small:
 
-1. Opt-out cancels the companion cadence.
+1. Opt-out cancels already queued QStash messages carrying that participant's hashed cadence label.
 2. Missing consent stores no conversation content.
 3. An explicit community-introduction request enters operator review.
 4. An explicit reminder request for a verified event enters reminder review.
@@ -134,8 +134,9 @@ prospective pilot target, not a result.
 
 - Development, tests, builds, and `call:preview` place no real calls.
 - `call:live` can place one real call only when its environment switch and consent gates pass.
-- The participant chooses the next time in conversation; an opt-out suppresses every future call.
-- An in-call opt-out always becomes cancellation before any other follow-through.
+- The participant chooses the next time in conversation. Before a replacement is queued, Connected cancels every pending QStash message carrying that participant's hashed cadence label.
+- An evidence-bound in-call opt-out calls QStash's cancellation API before any other follow-through. The live companion panel's **Cancel future calls** control uses an authenticated `DELETE /api/connected` request with the participant id to provide the same cancellation path outside a call.
+- Cancellation applies to messages still queued or retrying in QStash. It cannot recall a delivery that has already reached `/api/dispatch`; that boundary is stated rather than hidden.
 - Replaying the same authorized `runId` produces the same idempotency key.
 
 ## Privacy and boundaries
@@ -175,9 +176,13 @@ Then deploy from this directory using the included `vercel.json`:
 npx vercel --prod
 ```
 
-The API key never enters browser JavaScript. The first live call requires contact consent, approved AI
-disclosure, an E.164 number, the private access code, and a fresh one-call confirmation. On completion,
-CALL-E extracts `next_call_at`; the server queues an authenticated, delayed QStash message to
+The API key never enters browser JavaScript. Every credentialed SDK client is pinned to
+`https://api.heycall-e.com`; deployment input cannot redirect the CALL-E credential to another origin.
+The first live call requires contact consent, approved AI disclosure, an E.164 number, the private
+access code, and a fresh one-call confirmation. On completion, Connected accepts structured output
+only after exact call id, task text, single recipient, metadata, completed attempt, non-empty evidence,
+`status=completed`, and `taskCompleted=true` all match the original authorization. CALL-E then extracts
+`next_call_at`; the server cancels any older message with the participant's hashed cadence label and queues an authenticated, delayed QStash message to
 `/api/dispatch`, which creates the next CALL-E conversation at the time the older adult chose. The
 source call id and CALL-E idempotency key protect retries from creating duplicate calls. QStash's
 `Upstash-Not-Before` delivery is the serverless clock; no person has to trigger the next call.

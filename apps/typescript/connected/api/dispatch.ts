@@ -1,5 +1,5 @@
 import { CalleClient } from '@call-e/calle'
-import { buildCallInput } from '../server/calle.js'
+import { buildCallInput, OFFICIAL_CALLE_ORIGIN } from '../server/calle.js'
 import { assertLiveAuthorized, idempotencyKey, parseCheckInRequest } from '../server/contract.js'
 
 function json(body: unknown, status = 200): Response {
@@ -15,7 +15,7 @@ export async function POST(request: Request): Promise<Response> {
     assertLiveAuthorized(checkIn)
     const apiKey = process.env.CALLE_API_KEY
     if (!apiKey) throw new Error('CALL-E is not configured.')
-    const client = new CalleClient({ apiKey, baseUrl: process.env.CALLE_BASE_URL || 'https://api.heycall-e.com' })
+    const client = new CalleClient({ apiKey, baseUrl: OFFICIAL_CALLE_ORIGIN })
     const input = buildCallInput(checkIn)
     const call = await client.calls.create(input as never, { idempotencyKey: idempotencyKey(checkIn, input) })
     return json({ id: call.id, status: call.status }, 202)

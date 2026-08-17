@@ -93,6 +93,23 @@ export default function App() {
     }
   }
 
+  async function cancelFutureCalls() {
+    if (!operatorToken) { setError('Enter the deployment’s private program access code first.'); return }
+    setRunning(true); setError(''); setPhase('Cancelling queued companion calls…')
+    try {
+      const response = await fetch('/api/connected', {
+        method: 'DELETE', headers: { 'content-type': 'application/json', 'x-connected-access-token': operatorToken },
+        body: JSON.stringify({ participantId: person.id }),
+      })
+      const body = await response.json() as { cancelled?: number; state?: string; error?: string }
+      if (!response.ok) throw new Error(body.error || 'Queued companion calls could not be cancelled.')
+      updateParticipant({ active: false, action: 'Cadence cancelled', next: 'No future call scheduled' })
+      setPhase(`Cadence cancelled · ${body.cancelled ?? 0} queued call${body.cancelled === 1 ? '' : 's'} removed`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Cancellation failed safely.'); setPhase('Cancellation not confirmed')
+    } finally { setRunning(false) }
+  }
+
   return (
     <main>
       <header className="topbar">
@@ -174,7 +191,7 @@ export default function App() {
         {enrolOpen ? <form className="enrol-form" onSubmit={enrolParticipant}><h3>Book your first companion call</h3><p>Choose a comfortable time. After that, you and Connected agree each next call together.</p><div className="form-grid"><label>Your name<input required value={newProfile.name} onChange={(event) => setNewProfile({...newProfile, name: event.target.value})}/></label><label>Your phone number<input required placeholder="+353…" value={newProfile.phone} onChange={(event) => setNewProfile({...newProfile, phone: event.target.value})}/></label><label>When should we call?<input required value={newProfile.window} onChange={(event) => setNewProfile({...newProfile, window: event.target.value})}/></label><label>Conversation language<input required value={newProfile.locale} onChange={(event) => setNewProfile({...newProfile, locale: event.target.value})}/></label></div><div className="consent-note"><ShieldCheck/>I agree to this first call. Connected will always say it is AI and ask before remembering anything.</div><div className="modal-actions"><button type="button" className="secondary" onClick={() => setEnrolOpen(false)}>See demo first</button><button className="primary">Book my call</button></div></form> : <>
           <div className="mode-tabs"><button className={mode === 'demo' ? 'active' : ''} onClick={() => setMode('demo')}>Hear the story unfold</button><button className={mode === 'live' ? 'active' : ''} onClick={() => setMode('live')}>Live CALL-E companion</button></div>
           <div className="workspace-grid"><div className="call-contract"><h3>Conversation contract</h3><dl><div><dt>Approved openings</dt><dd>{person.memories.length ? person.memories.join(' · ') : 'None yet—start fresh'}</dd></div><div><dt>Next topic</dt><dd>{person.nextTopic}</dd></div><div><dt>Verified events</dt><dd>{eventOptions.map((event) => event.title).join(' · ')}</dd></div><div><dt>Boundaries</dt><dd>No advice, booking, diagnosis, or invented personal detail</dd></div></dl><label>Participant phone<input placeholder="+353…" value={person.phone} onChange={(event) => updateParticipant({phone: event.target.value})}/></label></div>
-            <div className="run-panel"><h3>{mode === 'demo' ? 'One conversation, end to end' : 'One protected live companion call'}</h3><div className="phase"><span className={running ? 'phase-dot running' : 'phase-dot'}/><b>{phase}</b></div>{mode === 'live' && <><label>Program access code<input type="password" value={operatorToken} onChange={(event) => setOperatorToken(event.target.value)} autoComplete="off"/></label><label className="confirm"><input type="checkbox" checked={oneCallApproved} onChange={(event) => setOneCallApproved(event.target.checked)}/> I approve exactly one CALL-E companion call to {maskPhone(person.phone)} in this window.</label></>} {error && <p className="error">{error}</p>}<button className="primary full" disabled={running} onClick={mode === 'demo' ? runDemo : runLive}>{running ? 'Companion call unfolding…' : mode === 'demo' ? 'Experience the companion call' : 'Start one companion call'} <ArrowRight size={16}/></button><small>{mode === 'demo' ? 'A labelled simulation shows the conversation’s impact on memory, metrics, and requested connections.' : 'Requires protected CALL-E credentials on Vercel.'}</small></div></div>
+            <div className="run-panel"><h3>{mode === 'demo' ? 'One conversation, end to end' : 'One protected live companion call'}</h3><div className="phase"><span className={running ? 'phase-dot running' : 'phase-dot'}/><b>{phase}</b></div>{mode === 'live' && <><label>Program access code<input type="password" value={operatorToken} onChange={(event) => setOperatorToken(event.target.value)} autoComplete="off"/></label><label className="confirm"><input type="checkbox" checked={oneCallApproved} onChange={(event) => setOneCallApproved(event.target.checked)}/> I approve exactly one CALL-E companion call to {maskPhone(person.phone)} in this window.</label></>} {error && <p className="error">{error}</p>}<button className="primary full" disabled={running} onClick={mode === 'demo' ? runDemo : runLive}>{running ? 'Companion call unfolding…' : mode === 'demo' ? 'Experience the companion call' : 'Start one companion call'} <ArrowRight size={16}/></button>{mode === 'live' && <button className="secondary full" disabled={running} onClick={cancelFutureCalls}>Cancel future calls</button>}<small>{mode === 'demo' ? 'A labelled simulation shows the conversation’s impact on memory, metrics, and requested connections.' : 'Requires protected CALL-E credentials on Vercel.'}</small></div></div>
           <button className="enrol-link" onClick={() => setEnrolOpen(true)}><Plus size={15}/> Book my own first call</button>
         </>}
       </section></div>}
