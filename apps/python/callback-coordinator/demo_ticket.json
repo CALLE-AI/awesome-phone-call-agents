@@ -1,0 +1,22 @@
+{
+  "mode": "execute",
+  "creates_phone_call": true,
+  "workflow_id": "demo-live-2026-999",
+  "idempotency_key": "callback-triage-demo-live-2026-999",
+  "call_id": "call_BOfHnz5j7Q2DQSipeBRkBA",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.82,
+    "label": "high"
+  },
+  "disposition": "needs_human",
+  "needs_human": true,
+  "reason": "right_person_unconfirmed",
+  "contact_reason": "service_coordination",
+  "urgent": "no",
+  "voicemail_allowed": "yes",
+  "route_to": "Service Scheduling",
+  "action": "Queue for service scheduling callback.",
+  "evidence_summary": "After the AI callback disclosure, the person asked to continue, said they wanted to book an appointment, stated it was not really urgent, and agreed voicemail was acceptable; they did not clearly confirm they were the intended recipient."
+}
