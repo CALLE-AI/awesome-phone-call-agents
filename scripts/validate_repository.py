@@ -32,6 +32,18 @@ CLI_REFERENCE_SENTENCE = "CALL-E CLI parameters and command flags are documented
 TEXT_SUFFIXES = {".md", ".mjs", ".py", ".ts", ".json", ".toml", ".yaml", ".yml"}
 SKIP_TEXT_FILES = {"uv.lock"}
 SKIP_TEXT_DIRS = {".venv", "node_modules", ".pytest_cache", "__pycache__", ".mypy_cache", ".ruff_cache"}
+EMAIL_ADDRESS_RE = re.compile(
+    r"(?<![A-Za-z0-9.!#$%&'*+/=?^_`{|}~-])"
+    r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+    r"(?P<domain>[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)"
+    r"(?![A-Za-z0-9-])"
+)
+ALLOWED_SKILL_EXAMPLE_EMAIL_DOMAINS = {
+    "example.com",
+    "example.net",
+    "example.org",
+}
 OUTBOUND_CALL_SKILL_CHECKER = ROOT / "skills" / "outbound-call-skill-creator" / "scripts" / "check-generated-skill.mjs"
 OUTBOUND_MCP_ROUTE = "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
 OUTBOUND_SOURCE_FAMILY_README_TERMS = {
@@ -164,6 +176,112 @@ def iter_skill_dirs() -> list[Path]:
     if not skill_dirs:
         fail("No skills found in skills/.")
     return skill_dirs
+
+
+def find_disallowed_email_locations(text: str) -> list[tuple[int, int]]:
+    """Return line and column locations without retaining matched addresses."""
+    locations: list[tuple[int, int]] = []
+    for match in EMAIL_ADDRESS_RE.finditer(text):
+        domain = match.group("domain")
+        top_level_label = domain.rsplit(".", 1)[-1]
+        if not any(character.isalpha() for character in top_level_label):
+            continue
+        if domain.casefold() in ALLOWED_SKILL_EXAMPLE_EMAIL_DOMAINS:
+            continue
+        line = text.count("\n", 0, match.start()) + 1
+        previous_newline = text.rfind("\n", 0, match.start())
+        column = match.start() - previous_newline
+        locations.append((line, column))
+    return locations
+
+
+def iter_skill_example_and_script_text_files() -> list[tuple[Path, str]]:
+    files: list[tuple[Path, str]] = []
+    for skill_dir in iter_skill_dirs():
+        examples_path = skill_dir / "references" / "examples.md"
+        files.append((examples_path, read(examples_path)))
+
+        scripts_dir = skill_dir / "scripts"
+        if not scripts_dir.is_dir():
+            continue
+        for path in sorted(candidate for candidate in scripts_dir.rglob("*") if candidate.is_file()):
+            relative_parts = path.relative_to(scripts_dir).parts
+            if path.is_symlink() or any(part in SKIP_TEXT_DIRS for part in relative_parts):
+                continue
+            if path.name in SKIP_TEXT_FILES:
+                continue
+            try:
+                data = path.read_bytes()
+            except OSError:
+                fail(f"Could not read skill script: {path.relative_to(ROOT)}")
+            if b"\0" in data:
+                continue
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            files.append((path, text))
+    return files
+
+
+def format_disallowed_email_failure(
+    locations: list[tuple[Path, int, int]],
+) -> str:
+    rendered_locations = "\n".join(
+        f"- {path.as_posix()}:{line}" for path, line, _column in locations
+    )
+    return (
+        "Non-example email address found in skill examples or scripts:\n"
+        f"{rendered_locations}\n"
+        "Skill examples and scripts may only use example.com, example.net, or example.org."
+    )
+
+
+def validate_skill_email_checker() -> None:
+    allowed_text = "\n".join(
+        [
+            "contact@example.com",
+            "SUPPORT@EXAMPLE.NET",
+            "first.last+followup@example.org",
+            "Multiple addresses: one@example.com and two@example.net.",
+            "Package reference: @scope/package",
+            "Version marker: package@1.2.3",
+        ]
+    )
+    if find_disallowed_email_locations(allowed_text):
+        fail("Skill email checker rejected an allowed example domain.")
+
+    disallowed_domain = "example." + "invalid"
+    disallowed_address = "contact@" + disallowed_domain
+    disallowed_cases = [
+        disallowed_address,
+        "contact@" + "sub.example.com",
+        "contact@" + "example.test",
+        disallowed_address.upper(),
+        f"safe@example.com and {disallowed_address}",
+    ]
+    for case in disallowed_cases:
+        if not find_disallowed_email_locations(case):
+            fail("Skill email checker accepted a disallowed example domain.")
+
+    locations = find_disallowed_email_locations(f"Header\n{disallowed_address}\n")
+    if locations != [(2, 1)]:
+        fail("Skill email checker reported an incorrect location.")
+
+    message = format_disallowed_email_failure(
+        [(Path("skills/example/scripts/check.js"), 2, 1)]
+    )
+    if disallowed_address in message:
+        fail("Skill email checker failure message exposed a matched address.")
+
+
+def validate_skill_example_and_script_emails() -> None:
+    violations: list[tuple[Path, int, int]] = []
+    for path, text in iter_skill_example_and_script_text_files():
+        for line, column in find_disallowed_email_locations(text):
+            violations.append((path.relative_to(ROOT), line, column))
+    if violations:
+        fail(format_disallowed_email_failure(violations))
 
 
 def validate_readme() -> None:
@@ -9299,6 +9417,8 @@ Runtime parameters still allowed: date window and approved source instance ident
 
 def main() -> None:
     validate_expected_files()
+    validate_skill_email_checker()
+    validate_skill_example_and_script_emails()
     validate_readme()
     validate_repository_name_references()
     validate_english_only()

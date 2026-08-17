@@ -20,7 +20,7 @@
  *     order ID). That's an accepted tradeoff for a PII-redaction fallback --
  *     a missed real phone number is worse than an over-redacted non-number.
  *     Digit runs shorter than 7 (e.g. a bare 4-digit year) are left alone.
- *   - email addresses (e.g. "jerlyn@designlady.com" -> "[redacted email]")
+ *   - email addresses (e.g. "contact@example.com" -> "[redacted email]")
  *
  * KNOWN LIMITATION: this does not attempt to detect or redact spoken street
  * addresses. Unlike phone numbers and emails, mailing addresses have no
