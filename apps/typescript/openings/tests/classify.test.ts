@@ -38,10 +38,15 @@ describe("classifyResult", () => {
     expect(classifyResult(base({ accepts_plan: "yes" }))).toBe("waitlist");
   });
 
-  it("does not guess open when the plan question was unanswered", () => {
+  it("marks a reached person with no plan answer as inconclusive, never open or unreachable", () => {
+    // reached_staff + accepts_plan unknown (accepting_new_patients unknown)
+    expect(classifyResult(base({}))).toBe("inconclusive");
+    // reached_staff + accepts_plan unknown, but they are not accepting new patients
+    expect(classifyResult(base({ accepting_new_patients: "no" }))).toBe("not_accepting");
+    // reached_staff + accepts_plan unknown, new patients yes but plan still unknown
     const r = classifyResult(base({ accepting_new_patients: "yes" }));
+    expect(r).toBe("inconclusive");
     expect(r).not.toBe("open");
-    expect(["unreachable", "not_accepting"]).toContain(r);
   });
 
   it("treats voicemail as unreachable, never as a verdict", () => {

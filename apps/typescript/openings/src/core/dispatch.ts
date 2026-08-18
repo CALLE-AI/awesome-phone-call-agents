@@ -108,10 +108,12 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
           };
           return { result, placed: true };
         } catch (err) {
-          hitError = err instanceof Error ? err.message : String(err);
+          const msg = err instanceof Error ? err.message : String(err);
+          hitError = msg;
           // A call may have been created before it failed; count it against
-          // the budget conservatively.
-          return { result: blockedResult(candidate, "call_error"), placed: true };
+          // the budget conservatively. Distinct from `blocked` (which means
+          // we deliberately did not dial).
+          return { result: errorResult(candidate, msg), placed: true };
         }
       }),
     );
@@ -143,6 +145,18 @@ function blockedResult(candidate: Candidate, reason: string): LineCallResult {
     candidateId: candidate.id,
     verdict: "blocked",
     evidence: reason,
+    raw: null,
+    completedAt: new Date().toISOString(),
+  };
+}
+
+function errorResult(candidate: Candidate, message: string): LineCallResult {
+  return {
+    candidateId: candidate.id,
+    phoneE164: candidate.phoneE164,
+    verdict: "error",
+    evidence: "call_error",
+    summary: message,
     raw: null,
     completedAt: new Date().toISOString(),
   };

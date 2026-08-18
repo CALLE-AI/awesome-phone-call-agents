@@ -136,7 +136,9 @@ export function emptyStats(): WatchStats {
     notAccepting: 0,
     ghost: 0,
     unreachable: 0,
+    inconclusive: 0,
     declined: 0,
+    error: 0,
     blocked: 0,
   };
 }

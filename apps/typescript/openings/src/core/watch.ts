@@ -17,7 +17,9 @@ export function statsFromResults(results: DispatchResult["results"]): WatchStats
     notAccepting: 0,
     ghost: 0,
     unreachable: 0,
+    inconclusive: 0,
     declined: 0,
+    error: 0,
     blocked: 0,
   };
   for (const r of results) {
@@ -41,9 +43,16 @@ export function statsFromResults(results: DispatchResult["results"]): WatchStats
       case "unreachable":
         stats.unreachable += 1;
         break;
+      case "inconclusive":
+        stats.inconclusive += 1;
+        stats.reached += 1;
+        break;
       case "declined":
         stats.declined += 1;
         stats.reached += 1;
+        break;
+      case "error":
+        stats.error += 1;
         break;
       case "blocked":
         stats.blocked += 1;

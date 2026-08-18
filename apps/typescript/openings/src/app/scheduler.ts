@@ -37,8 +37,10 @@ export function createScheduler(app: App, deps: { now?: () => Date; intervalMs?:
     timer = setInterval(() => {
       void tick();
     }, intervalMs);
-    // Don't keep the process alive purely for the scheduler.
-    if (typeof timer.unref === "function") timer.unref();
+    // Keep the interval referenced so the standalone scheduler process stays
+    // alive. An unref'd interval leaves an empty event loop, which would make
+    // `node dist-scheduler/scheduler.js` exit immediately and, under the
+    // container's `wait -n` CMD, take the whole app down with it.
   }
 
   function stop(): void {

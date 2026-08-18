@@ -21,9 +21,3 @@ primary_region = "sin"
 [[mounts]]
   source = "openings_data"
   destination = "/data"
-
-[checks]
-  [checks.http_get]
-    port = 3000
-    path = "/"
-    interval = "30s"

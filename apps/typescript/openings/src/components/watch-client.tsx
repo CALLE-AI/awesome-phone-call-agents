@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { runWatchOnce, stopWatch } from "@/app/actions";
+import { runWatchOnce, stopWatch, watchState } from "@/app/actions";
 import { statsFromResults } from "@/core/watch";
 import { provenanceLabel as pl } from "@/core/frame";
 import { specialtyLabel } from "@/core/specialties";
@@ -15,8 +15,10 @@ const VERDICT_META: Record<
   waitlist: { label: "Waitlist", className: "text-amber-400", dot: "bg-amber-400" },
   not_accepting: { label: "Not accepting", className: "text-orange-400", dot: "bg-orange-400" },
   ghost: { label: "Ghost listing", className: "text-red-400", dot: "bg-red-400" },
-  unreachable: { label: "Unreachable", className: "text-zinc-500", dot: "bg-zinc-500" },
+  unreachable: { label: "No one answered", className: "text-zinc-500", dot: "bg-zinc-500" },
+  inconclusive: { label: "Reached, no answer", className: "text-sky-400", dot: "bg-sky-400" },
   declined: { label: "Declined to answer", className: "text-zinc-400", dot: "bg-zinc-400" },
+  error: { label: "Call failed", className: "text-rose-400", dot: "bg-rose-400" },
   blocked: { label: "Not called", className: "text-zinc-600", dot: "bg-zinc-600" },
 };
 
@@ -33,6 +35,7 @@ export function WatchClient({
   const [status, setStatus] = useState(watch.status);
   const [error, setError] = useState<string | null>(null);
   const [lastReason, setLastReason] = useState<string | null>(null);
+  const [calling, setCalling] = useState(false);
 
   const stats = statsFromResults(results);
 
@@ -45,9 +48,27 @@ export function WatchClient({
       }
       setError(null);
       setLastReason(res.reason ?? null);
-      // Refresh the latest results from the server.
-      window.location.reload();
+      setCalling(true);
+      void pollUntilDone(runCount);
     });
+  }
+
+  async function pollUntilDone(startRunCount: number) {
+    for (let i = 0; i < 150; i++) {
+      await new Promise((r) => setTimeout(r, 4000));
+      const s = await watchState(watch.id);
+      if (!s.ok) {
+        setError("Watch not found.");
+        setCalling(false);
+        return;
+      }
+      if (s.status !== "active" || s.runCount > startRunCount) {
+        window.location.reload();
+        return;
+      }
+    }
+    setCalling(false);
+    window.location.reload();
   }
 
   function stop() {
@@ -81,10 +102,10 @@ export function WatchClient({
             {status === "active" && (
               <button
                 onClick={runNow}
-                disabled={pending}
+                disabled={pending || calling}
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
               >
-                {pending ? "Calling…" : "Run now"}
+                {pending || calling ? "Calling…" : "Run now"}
               </button>
             )}
             {status === "active" && (
@@ -104,7 +125,7 @@ export function WatchClient({
         <Stat label="Called" value={stats.called} />
         <Stat label="Open" value={stats.open} accent="text-emerald-400" />
         <Stat label="Ghost listings" value={stats.ghost} accent="text-red-400" />
-        <Stat label="Unreachable" value={stats.unreachable} accent="text-zinc-500" />
+        <Stat label="No answer" value={stats.unreachable} accent="text-zinc-500" />
       </section>
 
       {status === "active" && runCount === 0 && results.length === 0 && (
@@ -112,6 +133,13 @@ export function WatchClient({
           Nothing has been called yet. Press <strong>Run now</strong> to dial the listed
           practices. Each call identifies itself as an automated assistant and asks only about
           plan acceptance and availability.
+        </p>
+      )}
+
+      {calling && (
+        <p role="status" className="rounded-lg border border-emerald-800 bg-emerald-950/40 p-4 text-sm text-emerald-200">
+          Calls are being placed. This can take a few minutes while practices answer or go to
+          voicemail — the page will refresh automatically when results arrive.
         </p>
       )}
 
@@ -153,6 +181,9 @@ export function WatchClient({
                     </div>
                     {r.evidence && (
                       <p className="mt-1 text-sm italic text-zinc-400">&ldquo;{r.evidence}&rdquo;</p>
+                    )}
+                    {r.summary && (
+                      <p className="mt-1 text-xs text-zinc-500">{r.summary}</p>
                     )}
                   </div>
                 </li>

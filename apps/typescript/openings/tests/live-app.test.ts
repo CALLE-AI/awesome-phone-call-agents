@@ -62,7 +62,7 @@ describe.skipIf(!runLive)("full-app live verification (n credits)", () => {
       expect(dispatch.results.length).toBe(candidates.length);
       for (const r of dispatch.results) {
         expect(
-          ["open", "waitlist", "not_accepting", "ghost", "unreachable", "declined", "blocked"],
+          ["open", "waitlist", "not_accepting", "ghost", "unreachable", "inconclusive", "declined", "error", "blocked"],
         ).toContain(r.verdict);
       }
 

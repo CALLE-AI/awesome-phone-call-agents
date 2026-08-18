@@ -124,19 +124,56 @@ export async function stopWatch(id: string): Promise<{ ok: boolean }> {
   return { ok: app.stopWatch(id) };
 }
 
-/** Run one dispatch for a watch and return results (used by the UI first-run and scheduler). */
+/**
+ * Watches with an in-flight dispatch run. Server actions run in the long-lived
+ * server process (not serverless), so this set is shared across requests on the
+ * same machine and prevents double-dispatch on a double click.
+ */
+const runningWatches = new Set<string>();
+
+/**
+ * Kick off one dispatch run for a watch. Live calls spend minutes in IVR/hold,
+ * so this returns immediately and runs the dispatch in the background; the UI
+ * polls {@link watchState} and reloads when the run has recorded results.
+ */
 export async function runWatchOnce(
   id: string,
 ): Promise<{ ok: boolean; error?: string; reason?: string }> {
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
-  try {
-    const state = app.getWatchRunState(id);
-    const dispatch = await app.runWatch(id, state.runCount + 1);
-    return { ok: true, reason: dispatch.reason };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "unknown error" };
+
+  if (runningWatches.has(id)) {
+    return { ok: true, reason: "already_running" };
   }
+  const watch = app.getWatch(id);
+  if (!watch) return { ok: false, error: "watch_not_found" };
+
+  const state = app.getWatchRunState(id);
+  const runNumber = state.runCount + 1;
+
+  runningWatches.add(id);
+  void app
+    .runWatch(id, runNumber)
+    .catch((err) => {
+      console.error(`[runWatch] background run failed for ${id}:`, err);
+    })
+    .finally(() => runningWatches.delete(id));
+
+  return { ok: true, reason: "started" };
+}
+
+/**
+ * Lightweight state for the run-in-progress poll. Never places a call.
+ */
+export async function watchState(
+  id: string,
+): Promise<{ ok: boolean; runCount: number; status: string; running: boolean; error?: string }> {
+  const config = getConfig();
+  const app = createApp({ store: config.store, caller: config.caller });
+  const watch = app.getWatch(id);
+  if (!watch) return { ok: false, runCount: 0, status: "missing", running: false, error: "watch_not_found" };
+  const { runCount } = app.getWatchRunState(id);
+  return { ok: true, runCount, status: watch.status, running: runningWatches.has(id) };
 }
 
 export async function optOut(phoneE164: string): Promise<{ ok: boolean }> {

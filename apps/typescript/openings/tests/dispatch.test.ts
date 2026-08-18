@@ -162,7 +162,7 @@ describe("dispatchWave", () => {
     expect(result.results.find((r) => r.candidateId === "1")?.verdict).toBe("blocked");
   });
 
-  it("propagates call errors as blocked results and stops the run", async () => {
+  it("records call failures as an error verdict and stops the run", async () => {
     const failing: typeof FakeCaller = class extends FakeCaller {
       override async placeCall(): Promise<never> {
         throw new Error("boom");
@@ -180,5 +180,6 @@ describe("dispatchWave", () => {
     });
     expect(result.reason).toBe("error");
     expect(result.error).toBe("boom");
+    expect(result.results[0]!.verdict).toBe("error");
   });
 });

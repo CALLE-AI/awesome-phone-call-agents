@@ -19,9 +19,9 @@ the Pennsylvania ACA marketplace (8,306 behavioral-health providers) found:
 
 Directory data cannot be trusted; only a phone call establishes the truth. At CALL-E's cost
 per call, calling every listing — repeatedly — becomes affordable for the first time. Every
-call returns a verdict (open / waitlist / not accepting / ghost / unreachable) with a quoted
-evidence line the user can inspect. Dead and misrouted lines accumulate into a verifiable
-access report.
+call returns a verdict (open / waitlist / not accepting / ghost / no answer / reached-but-no-
+answer / call failed) with a quoted evidence line and CALL-E's post-call summary the user can
+inspect. Dead and misrouted lines accumulate into a verifiable access report.
 
 ## What it does
 

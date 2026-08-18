@@ -5,7 +5,9 @@ import type { CallStructuredResult, Verdict } from "./types";
  *
  * Deliberately pure: no I/O, no model calls. The classification logic is
  * auditable and unit-testable against a truth table. Unknown is never
- * upgraded to a confident verdict — an unverifiable call is `unreachable`.
+ * upgraded to a confident verdict: a voicemail is `unreachable`, and reaching
+ * a person without a plan/availability answer is `inconclusive` — never
+ * `open`, and never `unreachable` (a human did answer).
  */
 export function classifyResult(r: CallStructuredResult): Verdict {
   switch (r.line_outcome) {
@@ -13,7 +15,7 @@ export function classifyResult(r: CallStructuredResult): Verdict {
       return classifyReachedStaff(r);
     case "voicemail":
     case "ivr_dead_end":
-      // We could not verify anything. Do not guess.
+      // No person was reached. Do not guess.
       return "unreachable";
     case "disconnected":
       // The number does not exist in service. The listing is a ghost.
@@ -29,10 +31,12 @@ export function classifyResult(r: CallStructuredResult): Verdict {
 }
 
 function classifyReachedStaff(r: CallStructuredResult): Verdict {
-  // If we reached a person but could not learn whether they accept the plan,
-  // the answer is not actionable for the user's plan. Be honest.
+  // We reached a person but could not learn whether they accept the plan.
+  // The call reached a human, so it is not "unreachable" — but there is no
+  // actionable answer yet, so it is "inconclusive" (retry) unless we at least
+  // learned that they are not accepting new patients.
   if (r.accepts_plan === "unknown") {
-    return r.accepting_new_patients === "no" ? "not_accepting" : "unreachable";
+    return r.accepting_new_patients === "no" ? "not_accepting" : "inconclusive";
   }
 
   if (r.accepts_plan === "no" || r.accepts_plan === "out_of_network_only") {

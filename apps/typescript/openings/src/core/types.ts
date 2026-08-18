@@ -64,14 +64,24 @@ export interface CallStructuredResult {
   evidence_quote: string;
 }
 
-/** Classification of one directory listing, computed locally, never in-prompt. */
+/**
+ * Classification of one directory listing, computed locally, never in-prompt.
+ *
+ * - `unreachable` means no person was reached (voicemail, closed office, IVR
+ *   dead end, or no usable outcome).
+ * - `inconclusive` means a person answered but plan/availability were not
+ *   confirmed before the call ended — retry, never a confident verdict.
+ * - `error` means the call could not be placed at all (SDK/API failure).
+ */
 export type Verdict =
   | "open"
   | "waitlist"
   | "not_accepting"
   | "ghost"
   | "unreachable"
+  | "inconclusive"
   | "declined"
+  | "error"
   | "blocked";
 
 export interface LineCallResult {
@@ -150,7 +160,9 @@ export interface WatchStats {
   notAccepting: number;
   ghost: number;
   unreachable: number;
+  inconclusive: number;
   declined: number;
+  error: number;
   blocked: number;
 }
 
@@ -168,7 +180,9 @@ export const VERDICTS = [
   "not_accepting",
   "ghost",
   "unreachable",
+  "inconclusive",
   "declined",
+  "error",
   "blocked",
 ] as const;
 
