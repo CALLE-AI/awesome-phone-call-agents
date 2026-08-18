@@ -1578,18 +1578,47 @@ const calleErrStatus = e =>
 app.post('/api/ask-place', express.json({ limit: '8kb' }), auth.attachUser, auth.requireUser,
   async (req, res) => {
     try{
-      const { place, question, templateId, confirmed, force,
-              isPrivate, intent, visitAt } = req.body || {};
+      const { place, question, templateId, confirmed, force, isPrivate } = req.body || {};
       if(!place || !place.name || place.lat == null || place.lon == null)
         return res.status(400).json({ error: 'place {name, lat, lon, phone} required' });
       const r = await calle.askPlace({ place, question, templateId,
         confirmed: confirmed === true, force: force === true,
         isPrivate: isPrivate === true, uid: req.user.id,
-        intent: String(intent || ''), visitAt: String(visitAt || ''),
         accessCode: req.get('x-atlas-access') || '' });
       res.status(r.status || 200).json(r);
     }catch(e){ res.status(calleErrStatus(e)).json(calleErrBody(e)); }
   });
+
+/* One question, two or three places, one CALL-E task with several recipients —
+   see the round section in calle.js. requireUser for the same reason a private
+   ask has it, and more so: a round has no public form at all, so a round
+   without an owner is a record nobody could ever read.
+
+   There is deliberately no polling route of its own. A round is polled through
+   /api/ask-place/:id like everything else, because pollCall routes on the
+   stored request rather than on which URL the client happened to use. */
+app.post('/api/ask-around', express.json({ limit: '16kb' }), auth.attachUser, auth.requireUser,
+  async (req, res) => {
+    try{
+      const { places, question, templateId, confirmed } = req.body || {};
+      if(!Array.isArray(places) || !places.length)
+        return res.status(400).json({ error: 'places[] required' });
+      if(places.some(p => !p || !p.name || p.lat == null || p.lon == null))
+        return res.status(400).json({ error: 'each place needs {name, lat, lon, phone}' });
+      const r = await calle.askAround({ places, question, templateId,
+        confirmed: confirmed === true,
+        uid: req.user.id, accessCode: req.get('x-atlas-access') || '' });
+      res.status(r.status || 200).json(r);
+    }catch(e){ res.status(calleErrStatus(e)).json(calleErrBody(e)); }
+  });
+
+/* Every round this account has run. Not per-place, because a round is not about
+   one place — it is the one record here that belongs to the question rather
+   than to any listing. */
+app.get('/api/rounds', auth.attachUser, auth.requireUser, async (req, res) => {
+  try{ res.json({ items: await calle.getRounds(req.user.id) }); }
+  catch(e){ res.status(502).json({ error: String(e.message || e) }); }
+});
 
 /* Lets the unlock form tell a wrong code from a working one without having to
    start a call to find out. Reveals only whether the code unlocks anything —

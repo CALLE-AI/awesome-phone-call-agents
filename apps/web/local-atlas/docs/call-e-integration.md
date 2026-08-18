@@ -52,6 +52,12 @@ Two details that were not obvious:
 - **The account belongs in the key on the private path.** Otherwise two people asking
   the same place the same question privately share one call, and one of them reads a
   result collected for somebody else.
+- **Anything the key stamps into metadata must be derived from the same inputs.** A
+  round carries a `round_id` in its metadata and checks it on the way back. When that id
+  was random, a replayed call returned stamped with the *previous* round's id, failed to
+  bind, and recorded an empty round for a request that was perfectly legitimate. The id
+  is now derived from owner, question, place set and hour — the same inputs as the key —
+  so the two can never disagree.
 
 ## The question never reaches the script unsanitised
 
@@ -121,6 +127,42 @@ which is why the webhook, the poll and the simulator cannot diverge on this.
 
 Losing an answer costs the asker a retry. Publishing an unbound one costs the claim every
 other entry on the page depends on.
+
+## One task, several recipients
+
+A comparison — "which of these three has the shortest wait?" — is one question whose
+answer only exists once all three have been asked. CALL-E models that directly, so it is
+one call task rather than a loop:
+
+```js
+await calle.calls.create({
+  task,                                   // names no business: it is read to all of them
+  recipients: targets.map(t => ({ phone: t.phone, region: 'US', locale: 'en-US' })),
+  recipientResultSchema: RESULT_SCHEMA,   // each business answers for itself
+  resultSchema: ROUND_SCHEMA,             // the call-level result compares them
+  metadata: { app: 'local-atlas', kind: 'round', round_id: roundId, /* … */ }
+}, { idempotencyKey: 'local-atlas:' + roundId });
+```
+
+The binding table above still applies, one level down. **A per-place answer is bound to
+that recipient**: the transcript is read from an attempt on the number we meant to dial,
+the recipient's own `status` must be `completed` — the recipient-level twin of the
+call-level completion rule — and the quote must appear in that recipient's own transcript.
+Each surviving answer then goes through the same `publish()` as everything else, so a
+round opens no new door into storage.
+
+**The call-level result is treated as a different kind of claim,** because it is one. No
+staff member said it. So it is bound to the recipients we actually dialled — a
+`best_place` naming a business outside the round, or one that never answered, is dropped —
+it rides on the call-level completion gate rather than any recipient's, and the UI labels
+it derived rather than quoting it.
+
+Two rules that are about the people answering rather than the data. The task carries an
+extra instruction — never mention, compare, name or hint that anyone else is being
+called — because the businesses did not agree to be ranked against each other, and the
+person picking up is entitled to a straight question. And rounds share the per-place
+in-flight lock with single asks, so no number is dialled twice for the same question by
+the same person.
 
 ## The two-turn opening
 

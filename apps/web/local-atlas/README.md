@@ -23,6 +23,12 @@ keeping. Each one is stored with the words the staff member actually said, the d
 it was collected, and an expiry — so the next visitor reads a fact rather than
 triggering a call, and the call that *is* placed pays for itself many times over.
 
+The exception proves the same point. One question that genuinely needs several calls —
+"which of these three has the shortest wait?" — is placed as a single task with
+`recipients[]`, a `recipientResultSchema` per business and a call-level `resultSchema`
+that compares them, rather than as three separate calls stitched together afterwards.
+See [Asking several places at once](#asking-several-places-at-once).
+
 See [`docs/calls-not-placed.md`](docs/calls-not-placed.md) and
 [`docs/fact-freshness.md`](docs/fact-freshness.md) for those two patterns on their own,
 and [`docs/call-e-integration.md`](docs/call-e-integration.md) for how the integration is wired.
@@ -45,6 +51,39 @@ The agent opens with `Hi — is now a good moment for one quick question about y
 `Thanks — I'm an AI assistant, calling for someone who's planning a visit and couldn't
 ring you themselves.` The disclosure is unconditional, always precedes the question,
 and the agent may never deny being an AI if asked.
+
+## Asking several places at once
+
+"Which of these three has the shortest wait?" is not three questions. It is one
+question whose answer only exists once all three have been asked, so Private Actions
+can put the same question to the place you are looking at and the two nearest of the
+same kind — as **one CALL-E task**, not a loop over the single-call path:
+
+| Field | What it carries |
+|---|---|
+| `recipients[]` | one task, several lines dialled |
+| `recipientResultSchema` | each business gets its own structured answer, on the same schema a single call uses |
+| `resultSchema` | the call-level result compares them |
+
+The division of labour is the point. **Each place's answer is a fact about that place**
+and passes the same checks as any other fact here: that recipient's own dial must be
+`status: completed` — the recipient-level twin of the call-level completion rule — and
+the answer must quote that recipient's own transcript. It then becomes one of the
+asker's private per-place records through the same `publish()` everything else uses.
+
+**The comparison is not a fact anybody said.** It is bound to the places actually
+dialled: a `best_place` naming a business this round did not call, or one that never
+answered, is dropped rather than shown, and what remains is labelled on screen as
+derived rather than quoted.
+
+Rounds are private by construction, with no public form at all — a ranking is a
+judgement about businesses that never agreed to be compared. Two rules follow: the
+confirmation names **every** line that will ring, because "we'll call 3 nearby places"
+is not consent to ring three specific strangers; and rule 16 of the round script
+forbids the agent from mentioning, comparing, or hinting that anyone else is being
+called. Each call is one straight question to one business. Rounds and single asks
+share a per-place lock, so the same number cannot be dialled twice for the same
+question, and the budget is reserved for the whole round or not at all.
 
 ## Setup
 
@@ -171,7 +210,8 @@ moment you are done, along with everything collected under it.
 | Tab preferences | `atlas:prefs:<uid>` |
 | The cached token — the only record here that ever held the email address | `auth:tok:<sha256(token)>` |
 | Every private call result, with its questions and transcripts | `calle:priv:<uid>:*` |
-| In-flight dedupe locks | `calle:lock:<uid>:*` |
+| Every comparison round, and the index of them | `calle:round:<uid>:*`, `calle:rounds:<uid>` |
+| In-flight dedupe locks | `calle:lock:<uid>:*`, `calle:rlock:<uid>:*` |
 | Call records belonging to that account | `calle:call:*`, filtered on the `uid` in the body |
 | The sign-in record itself | Supabase `auth.users` |
 
@@ -215,14 +255,14 @@ storing anything, because CALL-E deliveries are unsigned.
 
 | Requirement | How this app meets it |
 |---|---|
-| Explicit user intent | Server-enforced 428 confirmation showing the exact question, opener, disclosure and number. Unconfirmed requests cannot reach the API. |
+| Explicit user intent | Server-enforced 428 confirmation showing the exact question, opener, disclosure and number. Unconfirmed requests cannot reach the API. A round confirms every line it will ring, by name and number — a count is not consent. |
 | E.164 phone numbers | `normalizeE164()` converts provider display formats and drops extensions; anything it cannot resolve is not callable. |
 | Masking numbers in samples | All samples in this directory use the reserved fictional 555-01xx range. The number shown in the UI is the place's own published listing number. |
 | No credential exposure | Environment only; server-side proxying; no service-role key. The API key is only ever sent to an official CALL-E HTTPS origin — `CALLE_BASE_URL` is an allowlist, and an unrecognised value disables the credentialed client rather than falling back. |
 | Results bound to the request that produced them | Nothing is published unless it binds on all seven axes: we hold a stored request for that call id, the call is terminal, it ended `completed` with CALL-E affirming `taskCompleted`, `sha256(call.task)` matches the script we sent, the transcript comes from an attempt on the number *we* dialled, every metadata field matches our record, and an `answered` fact quotes something a staff member actually said. Failures fail closed — an ungrounded quote is recorded as `unclear` with the answer dropped, an answer with no staff turn as `unknown`, an answer from a call that failed, was cancelled or carries no completion verdict as `unknown`, and anything unbound never reaches a place's shared list. Since webhook deliveries are unsigned, this is what stops a POST naming an arbitrary call id from publishing a "confirmed by phone" fact; an id we have no request for is dropped before the API read. |
 | No server-side request forgery | `/api/fetch` (the deals scanner's page reader) judges the *resolved* address rather than the hostname, refuses anything in loopback, RFC1918, link-local — where cloud metadata lives — carrier-NAT, multicast or reserved space, and follows redirects by hand so every hop is revalidated instead of trusted. The guard is the socket's own `lookup`, so the address checked is the address connected to; literal addresses are checked separately, since a socket given an IP never resolves anything. |
 | No hidden recurring schedules | None exist. One confirmed request, one call. |
-| No duplicate jobs | A 10-minute in-flight lock plus a CALL-E idempotency key, both namespaced by account on the private path. |
+| No duplicate jobs | A 10-minute in-flight lock plus a CALL-E idempotency key, both namespaced by account on the private path. Rounds and single asks share the per-place lock, so one number cannot be dialled twice for the same question; a round id is derived from the same inputs as its idempotency key, so a replayed call still binds to the request that made it. |
 | Clear cancellation | See "Stopping and rolling back" above. |
 | Medical, legal, financial and emergency boundaries | Questions about accounts, orders, refunds, lawsuits, card numbers, SSNs and personal contact details are refused before a call. Questions must be answerable factually by whoever picks up the phone; opinions and advice-shaped questions are refused. Known gap: there is no explicit emergency-services block, because the app only ever dials a number published on a place listing it is already showing. |
 

@@ -388,26 +388,58 @@
     border-left:3px solid var(--sky);background:var(--surface);border-radius:0 7px 7px 0;
     font-size:.76rem;line-height:1.55;color:var(--ink-soft);
   }
-  .priv-opt{
-    display:flex;gap:9px;align-items:flex-start;padding:9px 10px;margin-bottom:7px;
+  .priv-round{
+    display:flex;gap:9px;align-items:flex-start;padding:9px 10px;margin:9px 0 0;
     border:1.5px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer;
   }
-  .priv-opt[data-on="1"]{border-color:var(--sky)}
-  .priv-opt input{margin-top:3px;accent-color:var(--sky)}
-  .priv-opt b{display:block;font-family:'Overpass',sans-serif;font-weight:700;font-size:.84rem;color:var(--ink)}
-  .priv-opt span{display:block;font-size:.76rem;line-height:1.45;color:var(--ink-soft);margin-top:2px}
-  .priv-when{display:flex;gap:9px;margin:9px 0}
-  .priv-when label{flex:1;min-width:0}
+  .priv-round[data-on="1"]{border-color:var(--sky)}
+  .priv-round input{margin-top:3px;accent-color:var(--sky)}
+  .priv-round b{display:block;font-family:'Overpass',sans-serif;font-weight:700;font-size:.84rem;color:var(--ink)}
+  .priv-round span{display:block;font-size:.76rem;line-height:1.45;color:var(--ink-soft);margin-top:2px}
+  .priv-chips{margin-bottom:9px}
+  .confirm-list{list-style:none;margin:6px 0;padding:0;display:grid;gap:4px}
+  .confirm-list li{
+    display:flex;justify-content:space-between;gap:9px;padding:5px 8px;
+    border:1px solid var(--line);border-radius:7px;background:var(--surface-2);font-size:.78rem;
+  }
+  .confirm-list span{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--ink-soft)}
+  /* ---- a comparison round ---- */
+  .round-card{
+    border:1.5px solid var(--line);border-radius:11px;padding:10px 11px;margin-bottom:9px;
+    background:var(--surface);
+  }
+  .round-head{display:flex;align-items:center;gap:7px;font-size:.86rem;color:var(--ink)}
+  .round-head b{font-family:'Overpass',sans-serif;font-weight:700}
+  .round-q{
+    font-family:'IBM Plex Mono',monospace;font-size:.6rem;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--ink-soft);margin:3px 0 8px;
+  }
+  .round-verdict{
+    border-left:3px solid var(--sky);background:var(--surface-2);border-radius:0 8px 8px 0;
+    padding:7px 10px;margin-bottom:9px;
+  }
+  .round-verdict b{display:block;font-family:'Overpass',sans-serif;font-size:.9rem;margin:2px 0}
+  .round-verdict span{display:block;font-size:.78rem;line-height:1.5;color:var(--ink-soft)}
+  .round-verdict.flat{border-left-color:var(--line)}
+  .round-tag{
+    font-family:'IBM Plex Mono',monospace!important;font-size:.56rem!important;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--ink-soft);
+  }
+  .round-row{padding:7px 0;border-top:1px solid var(--line)}
+  .round-name{font-family:'Overpass',sans-serif;font-weight:700;font-size:.82rem;color:var(--ink)}
+  .round-ans{font-size:.82rem;line-height:1.5;margin-top:2px}
+  .round-ans.muted{color:var(--ink-soft)}
+  .round-row.ok .round-name{color:var(--ink)}
   .field-label{
     display:block;font-family:'IBM Plex Mono',monospace;font-size:.58rem;
     text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:3px;
   }
-  .priv-when input,.priv-when select,.priv-q textarea{
+  .priv-q textarea{
     width:100%;border:1.5px solid var(--line);border-radius:9px;padding:7px 9px;
     font:inherit;font-size:.82rem;background:var(--surface);color:var(--ink);
   }
   .priv-q textarea{min-height:62px;resize:vertical;line-height:1.5}
-  .priv-when input:focus,.priv-when select:focus,.priv-q textarea:focus{border-color:var(--sky);outline:none}
+  .priv-q textarea:focus{border-color:var(--sky);outline:none}
   .priv-disc{
     display:flex;gap:8px;align-items:flex-start;margin:9px 0;
     font-family:'IBM Plex Mono',monospace;font-size:.6rem;line-height:1.6;color:var(--ink-soft);
@@ -1169,7 +1201,7 @@
   </div>
   <div class="panel-head">
     <div class="head-top">
-      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v9.3</span></div>
+      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v9.5</span></div>
       <div>
         <button class="acct-btn" id="acctBtn" hidden>Sign in</button>
         <button class="hide-btn" id="themeToggle" aria-label="Toggle dark mode" title="Dark mode">◐</button>
@@ -3430,7 +3462,7 @@ function factHTML(e, idx, it){
      whose answer lands on the public listing. The privacy of an entry travels
      on the button that reasks it. */
   const recheck = `<button class="ask-again${answered && !stale ? ' quiet' : ''}" data-idx="${idx}"
-      data-q="${esc(e.question)}"${e.private ? ` data-priv="1" data-intent="${esc(e.intent || '')}" data-visit="${esc(e.visitAt || '')}"` : ''}
+      data-q="${esc(e.question)}"${e.private ? ' data-priv="1"' : ''}
       title="Places a fresh call and replaces this answer"
       >${answered && !stale ? 'Recheck' : 'Ask again'}</button>`;
 
@@ -3517,7 +3549,7 @@ function renderAsk(it, box, idx){
             <span class="seg-ico">${ICON.lock}</span> Private Actions${priv.length ? ` <span class="segcount">${priv.length}</span>` : ''}
           </button>
         </div>
-        ${seg === 'facts' ? factsPaneHTML(it, idx, faq, chips) : privatePaneHTML(it, idx, priv)}
+        ${seg === 'facts' ? factsPaneHTML(it, idx, faq, chips) : privatePaneHTML(it, idx, priv, chips)}
         <div class="ask-err" hidden></div>
         ${askModeHTML(it)}
       </div>
@@ -3548,21 +3580,46 @@ function factsPaneHTML(it, idx, faq, chips){
     </div>`;
 }
 
-/* Two intents rather than a blank box. "What should we ask?" with no framing
-   produces either nothing or an essay; naming the two things people actually
-   phone ahead about gets a usable question and tells the agent enough about
-   the visit to make the answer worth having. */
-function privatePaneHTML(it, idx, priv){
-  const intent = it._intent || 'visit';
-  const d = new Date(Date.now() + 86400e3);          // tomorrow, the common case
-  const dv = it._visitDate || d.toISOString().slice(0, 10);
-  const tv = it._visitTime || '14:00';
-  const times = [];
-  for(let h = 8; h <= 20; h++){
-    const hh = String(h).padStart(2, '0') + ':00';
-    const ampm = (h % 12 === 0 ? 12 : h % 12) + ':00 ' + (h < 12 ? 'AM' : 'PM');
-    times.push(`<option value="${hh}"${hh === tv ? ' selected' : ''}>${ampm}</option>`);
-  }
+/* ---- who else gets asked ----
+   A round needs two or three places, and picking them is the app's job rather
+   than a selection UI's: you are already looking at one place, and the useful
+   comparison is against the ones you would plausibly go to instead. So the
+   nearest few of the same kind are proposed by name, and nothing dials until
+   those names have been agreed to.
+
+   The filter is deliberately strict — a callable number, not the anchor, not
+   known-closed, same kind — because every place that survives it is a real
+   phone that will ring. */
+function nearbyPeers(it, limit = 2){
+  const byDist = list => list
+    .map(p => ({ p, d: haversine(it.lat, it.lon, p.lat, p.lon) }))
+    .sort((a, b) => a.d - b.d)
+    .map(x => ({ ...x.p, _dist: x.d }));
+
+  const pool = (state.currentPOIs || [])
+    .filter(p => p !== it && p.phone && canAsk(p) && openState(p) !== false);
+  /* Same kind first, because "which of these three" only means anything among
+     comparable places. But `kind` is a provider's free-text label — "Italian
+     Restaurant" and "Restaurant" are the same street to a hungry person and two
+     different strings here — so an exact match alone would leave the feature
+     invisible on most listings. The rest of the tab, which is already a
+     category, tops it up; every name is shown and confirmed before anything
+     rings, so a loose neighbour costs a glance, not a call. */
+  const same = pool.filter(p => (p.kind || '') === (it.kind || ''));
+  const rest = pool.filter(p => !same.includes(p));
+  return [...byDist(same), ...byDist(rest)].slice(0, limit);
+}
+
+const peerDist = d => d < 0.2 ? 'next door' : d.toFixed(1) + ' mi away';
+
+/* Recommended questions or your own — the same two ways in as the public side,
+   and nothing else. This pane used to open with a visit date, an approximate
+   time and a choice of two "intents", all of which were folded into the
+   sentence read down the phone. It made a one-question feature look like a
+   booking form, and none of it was ever needed to ask a question. */
+function privatePaneHTML(it, idx, priv, chips){
+  const peers = SIGNED_IN() ? nearbyPeers(it) : [];
+  const round = !!it._round && peers.length >= 1;
 
   return `
     <div class="ask-sec">
@@ -3575,28 +3632,23 @@ function privatePaneHTML(it, idx, priv){
         to the public listing.</span>
     </div>
     ${!SIGNED_IN() ? signInPrompt('A private call') : `
-      <label class="priv-opt" data-on="${intent === 'visit' ? 1 : 0}">
-        <input type="radio" name="intent-${idx}" value="visit"${intent === 'visit' ? ' checked' : ''}>
-        <span><b>Check before my visit</b>
-          <span>Confirm today's conditions, an accessibility need, or a specific amenity.</span></span>
-      </label>
-      <label class="priv-opt" data-on="${intent === 'group' ? 1 : 0}">
-        <input type="radio" name="intent-${idx}" value="group"${intent === 'group' ? ' checked' : ''}>
-        <span><b>Plan a group visit</b>
-          <span>Ask about groups, busy times, parking, or where caregivers can meet.</span></span>
-      </label>
+      ${chips.length ? `<div class="ask-chips priv-chips">` +
+        chips.map(s=>`<button type="button" data-pq="${esc(s.text)}">${esc(s.text)}</button>`).join('') +
+        `</div>` : ''}
       <form class="priv-form">
-        <div class="priv-when">
-          <label><span class="field-label">Visit date</span>
-            <input type="date" name="date" value="${esc(dv)}"></label>
-          <label><span class="field-label">Approx. time</span>
-            <select name="time">${times.join('')}</select></label>
-        </div>
         <div class="priv-q">
           <span class="field-label">What should we ask?</span>
           <textarea name="q" maxlength="240"
             placeholder="Is the sensory play equipment working today, and is the accessible restroom nearby open?">${esc(it._q || '')}</textarea>
         </div>
+        ${peers.length ? `
+        <label class="priv-round" data-on="${round ? 1 : 0}">
+          <input type="checkbox" name="round"${round ? ' checked' : ''}>
+          <span><b>Ask ${peers.length} nearby ${peers.length === 1 ? 'place' : 'places'} the same thing</b>
+            <span>One call task, ${peers.length + 1} lines, and the answers side by side —
+              ${peers.map(p=>esc(p.name) + ' (' + peerDist(p._dist) + ')').join(', ')}.
+              Uses ${peers.length + 1} of today's call budget.</span></span>
+        </label>` : ''}
         <div class="priv-disc">
           <span class="lede-ico">${ICON.eye}</span>
           <span>CALL-E will identify itself as an automated assistant and ask only what you
@@ -3604,11 +3656,50 @@ function privatePaneHTML(it, idx, priv){
         </div>
         <button type="submit" class="priv-go">${ICON.clip} Review private call</button>
       </form>`}
+    ${SIGNED_IN() && (it._rounds || []).length ? `<div class="priv-result">
+        <div class="ask-sec"><h5>Your comparisons</h5>
+          <span class="tag">Visible only to you</span></div>
+        ${it._rounds.map(roundHTML).join('')}
+      </div>` : ''}
     ${SIGNED_IN() && priv.length ? `<div class="priv-result">
         <div class="ask-sec"><h5>Your private results</h5>
           <span class="tag">Visible only to you</span></div>
         ${priv.map(e=>factHTML(e, idx, it)).join('')}
       </div>` : ''}`;
+}
+
+/* ---- a finished round ----
+   Three answers and, when the answers support one, a verdict. The verdict is
+   visibly a different kind of thing from the answers above it: those are quoted
+   from the people who said them, this is a reading of them. Labelling it as
+   derived is not a disclaimer, it is the difference between the two claims. */
+function roundHTML(r){
+  const v = r.verdict || {};
+  const answered = (r.places || []).filter(p => p.answerStatus === 'answered');
+  return `<div class="round-card">
+      <div class="round-head">
+        <span class="fact-ico">${ICON.phone}</span>
+        <b>${esc(r.question)}</b>
+        ${r.simulated ? `<span class="faq-sim">simulated</span>` : ''}
+      </div>
+      <div class="round-q">Asked of ${r.places.length} places · ${factAge(r.collectedAt)}</div>
+      ${v.bestPlace ? `<div class="round-verdict">
+          <span class="round-tag">Derived from the ${answered.length} answers</span>
+          <b>${esc(v.bestPlace)}</b>
+          ${v.reason ? `<span>${esc(v.reason)}</span>` : ''}
+        </div>`
+        : (v.reason ? `<div class="round-verdict flat">
+          <span class="round-tag">Derived from the answers</span>
+          <span>${esc(v.reason)}</span></div>` : '')}
+      ${(r.places || []).map(p => `
+        <div class="round-row${p.answerStatus === 'answered' ? ' ok' : ''}">
+          <div class="round-name">${esc(p.name)}</div>
+          ${p.answerStatus === 'answered'
+            ? `<div class="round-ans">${esc(p.answer)}</div>
+               ${p.evidenceQuote ? `<div class="faq-quote">“${esc(p.evidenceQuote)}”</div>` : ''}`
+            : `<div class="round-ans muted">${esc(ASK_FAIL[p.answerStatus] || ASK_FAIL.unknown)}</div>`}
+        </div>`).join('')}
+    </div>`;
 }
 
 /* After a sign-in or sign-out, any place panel already on screen is showing the
@@ -3660,9 +3751,17 @@ function renderConfirm(it, box, idx, ask, preview){
   panel.querySelectorAll('.ask-form, .ask-chips, .priv-form').forEach(n=>{ n.hidden = true; });
   panel.insertAdjacentHTML('beforeend', `
     <div class="ask-confirm">
-      <div class="ask-confirm-h">This will ring a real phone</div>
-      ${ask.isPrivate ? `<div class="priv-badge" style="margin-bottom:6px"><span class="seg-ico">${ICON.lock}</span> Private — the result is yours alone</div>` : ''}
-      <div class="ask-note">Calling ${esc(preview.placeName || it.name)} on ${esc(prettyPhone(preview.phone))}. The agent opens with:</div>
+      <div class="ask-confirm-h">This will ring ${preview.recipients ? preview.recipients.length + ' real phones' : 'a real phone'}</div>
+      ${ask.isPrivate || ask._round ? `<div class="priv-badge" style="margin-bottom:6px"><span class="seg-ico">${ICON.lock}</span> Private — the result is yours alone</div>` : ''}
+      ${preview.recipients ? `
+      <div class="ask-note">Calling each of these once, and spending
+        ${preview.credits} of today's call budget:</div>
+      <ul class="confirm-list">${preview.recipients.map(rc=>
+        `<li><b>${esc(rc.name)}</b><span>${esc(prettyPhone(rc.phone))}</span></li>`).join('')}</ul>
+      ${preview.dropped && preview.dropped.length ? `<div class="ask-note">Not calling
+        ${preview.dropped.map(d=>esc(d.name) + ' (' + esc(d.why) + ')').join(', ')}.</div>` : ''}
+      <div class="ask-note">Nobody is told that anyone else is being asked. The agent opens with:</div>`
+      : `<div class="ask-note">Calling ${esc(preview.placeName || it.name)} on ${esc(prettyPhone(preview.phone))}. The agent opens with:</div>`}
       <div class="faq-quote">“${esc(preview.opener)}”</div>
       ${preview.disclosure ? `<div class="ask-note">Once they say it's a good moment, it says who it is — always, whether or not they ask:</div>
       <div class="faq-quote">“${esc(preview.disclosure)}”</div>` : ''}
@@ -3693,7 +3792,26 @@ async function loadAsk(it, box, idx){
      because /api/place-faq is public and cacheable and this one is neither.
      Skipped entirely when signed out — there is nothing to ask for. */
   it._priv = SIGNED_IN() ? await loadPrivate(it) : [];
+  it._rounds = SIGNED_IN() ? await loadRounds(it) : [];
   renderAsk(it, box, idx);
+}
+
+/* A round is not a fact about a place, so it has no per-place key to fetch by.
+   It is filed under the place it was started from — the one whose panel was
+   open when someone asked "and what about the others?" — which is also the only
+   place it makes sense to find it again. */
+async function loadRounds(it){
+  try{
+    const h = await authHeaders();
+    const r = await fetchT('/api/rounds', { headers: h }, 9000);
+    if(!r.ok) return [];
+    const items = (await r.json()).items || [];
+    /* Any place in the round, not just the one it was started from. A
+       comparison is about all of them, the dedupe lock can hand back a round
+       somebody anchored elsewhere, and a card that exists but appears on no
+       panel is indistinguishable from a lost result. */
+    return items.filter(x => (x.places || []).some(p => p.name === it.name));
+  }catch(e){ return []; }
 }
 
 /* ---- keeping an open panel honest ----
@@ -3733,8 +3851,12 @@ async function revalidateAsk(it, box, idx){
 
 async function loadPrivate(it){
   try{
+    /* No bearer-token check here. On a review deploy there is no token and
+       still a user — the server attaches the reviewer — so refusing to ask
+       would hide a reviewer's own private results from them. A deploy with real
+       accounts answers 401 when nobody is signed in, which lands on the same
+       empty list. */
     const h = await authHeaders({ 'content-type': 'application/json' });
-    if(!h.Authorization) return [];
     const r = await fetchT('/api/private-faq', { method:'POST', headers: h,
       body: JSON.stringify(askPlaceBody(it)) }, 9000);
     if(!r.ok) return [];
@@ -3987,12 +4109,108 @@ async function submitAsk(it, box, idx, payload){
     return;
   }
   if(!j.callId){ if(btn) btn.disabled = false; return askError(box, j.error || 'The call could not be started.'); }
+  /* A round already covers this place and question, so the id handed back
+     answers with a comparison rather than one entry — poll it as what it is. */
+  if(j.round) return waitForRound(it, box, idx, j.callId, payload.question || payload._label || '');
   /* Asked here rather than on load: the user has just chosen to place a call,
      which is the one moment where "may we tell you when this is done?" is an
      obviously reasonable question. Not awaited — a pending permission dialog
      must not delay the waiting state. */
   askNotifyPermission();
   waitForAnswer(it, box, idx, j.callId, payload.question || payload._label || '');
+}
+
+/* ---- asking several places at once ----
+   Deliberately a separate path from submitAsk rather than a flag on it. The two
+   differ in what they send (a list of places, not one), what comes back (a
+   comparison, not an entry), and what the confirmation has to show (three
+   numbers, not one) — and the one thing they must never do is blur into each
+   other, because the difference between them is two more strangers' phones
+   ringing. */
+async function submitRound(it, box, idx, places, payload, confirmed){
+  const form = box.querySelector('.priv-form');
+  const btn = form && form.querySelector('button');
+  if(btn) btn.disabled = true;
+  const err = box.querySelector('.ask-err');
+  if(err){ err.hidden = true; err.textContent = ''; }
+
+  const { _label, _round, ...ask } = payload;
+  const willDial = confirmed === true || !askLive();
+  liveNote(box, willDial ? `Calling ${places.length} places…` : 'Checking the question…',
+    places.map(p=>p.name).join(', '), willDial);
+
+  let j = {};
+  try{
+    const r = await fetchT('/api/ask-around', { method:'POST', headers: await askHeaders(),
+      body: JSON.stringify({ places: places.map(askPlaceBody), ...ask,
+                             confirmed: confirmed === true }) },
+      confirmed ? 60000 : 25000);
+    j = await r.json().catch(()=>({}));
+    if(btn) btn.disabled = false;
+    if(r.status === 428 && j.needsConfirm)
+      return renderConfirm(it, box, idx, { ...payload, _round: places }, j.preview);
+    if(r.status === 401 && j.code === 'auth_required'){
+      askError(box, 'Sign in to request a call.', false, true);
+      return openAcct();
+    }
+    if(r.status === 401) return askError(box, j.error || 'This feature is locked.', true);
+    if(!r.ok && r.status !== 202)
+      return askError(box, (j.error || ('Request failed (' + r.status + ')')) + (j.code ? ` [${j.code}]` : ''));
+  }catch(e){
+    if(btn) btn.disabled = false;
+    /* No blind retry here, unlike submitAsk. That recovery is safe for one call
+       because the dedupe lock and the idempotency key make a repeat free; for a
+       round it would be a second guess at three phones, and the round lock is
+       written after the create. Ask them to reopen instead. */
+    return askError(box, 'Lost the connection while starting the round. Reopen this panel in a moment to see whether it went out.');
+  }
+
+  if(!j.callId) return askError(box, j.error || 'The round could not be started.');
+  askNotifyPermission();
+  waitForRound(it, box, idx, j.callId, _label || '');
+  /* Said after the waiting state is up, so it reads as a note about a round
+     that is running rather than as a failure. Only the simulated path can
+     arrive here with anything to say — a live round showed the same list on
+     the confirmation screen a moment ago. */
+  if((j.dropped || []).length)
+    askError(box, `Calling ${(j.recipients || []).length}: not ${j.dropped.map(d=>`${d.name} (${d.why})`).join(', ')}.`, false, true);
+}
+
+function waitForRound(it, box, idx, callId, label){
+  liveNote(box, 'Calling and comparing…', label);
+  clearTimeout(it._askTimer);
+  const started = Date.now();
+  flashTitle('☎ Calling…');
+
+  const tick = async ()=>{
+    if(!box.isConnected){ hideCallOverlay(); return stopFlashTitle(); }
+    try{
+      const r = await fetchT('/api/ask-place/' + encodeURIComponent(callId),
+        { headers: await authHeaders() }, 9000);
+      const j = await r.json().catch(()=>({}));
+      if(j.state === 'done' && j.round){
+        it._rounds = [j.round, ...(it._rounds || []).filter(x=>x.roundId !== j.round.roundId)];
+        it._seg = 'private';
+        renderAsk(it, box, idx);
+        const answered = (j.round.places || []).filter(p=>p.answerStatus === 'answered').length;
+        finishCallOverlay(answered ? 'Answers received' : 'Round finished',
+          `${answered} of ${j.round.places.length} answered`, !!answered);
+        stopFlashTitle();
+        return;
+      }
+    }catch(e){}
+    /* Three lines, and CALL-E may work through them one at a time, so this is
+       three calls' worth of patience rather than one. The webhook has landed the
+       result server-side regardless; this only decides how long the page waits
+       before saying so. */
+    if(Date.now() - started > 420000){
+      stopFlashTitle();
+      renderAsk(it, box, idx);
+      return askError(box, 'The round is taking longer than expected. Reopen this panel shortly to see the answers.');
+    }
+    it._askTimer = setTimeout(tick, 5000);
+  };
+  it._askTimer = setTimeout(tick, 5000);
 }
 
 /* A finished call lands in exactly one of the two lists, and the entry itself
@@ -4096,30 +4314,25 @@ contentEl.addEventListener('submit', ev=>{
 
   const q = (form.elements.q.value || '').trim();
   if(!q) return askError(box, 'Say what we should ask them.');
-
-  const date = form.elements.date.value || '';
-  const time = form.elements.time.value || '';
   // remembered so a validation bounce doesn't wipe what was typed
-  it._visitDate = date; it._visitTime = time; it._q = q;
+  it._q = q;
 
-  submitAsk(it, box, idx, {
-    isPrivate: true, question: q, intent: it._intent || 'visit',
-    visitAt: visitPhrase(date, time)
-  });
+  /* If what is in the box is still, word for word, one of the recommended
+     questions, send it as the template it came from. Matching the text rather
+     than remembering the click means editing one word correctly turns it back
+     into free text — and it is the difference between a question this app wrote
+     and one a stranger typed, which is what decides whether it needs checking. */
+  const tpl = (it._sugg || []).find(s => s.id && s.text === q);
+  const ask = tpl ? { templateId: tpl.id } : { question: q };
+
+  const wantsRound = !!(form.elements.round && form.elements.round.checked);
+  if(wantsRound){
+    const peers = nearbyPeers(it);
+    if(!peers.length) return askError(box, 'No nearby place of the same kind has a callable number right now.');
+    return submitRound(it, box, idx, [it, ...peers], { ...ask, _label: q });
+  }
+  submitAsk(it, box, idx, { isPrivate: true, ...ask, _label: q });
 });
-
-/* "on Thursday 13 August at about 2pm" — a phrase that can be read out, with
-   the year dropped because nobody says it and a missing date simply omitted
-   rather than guessed. */
-function visitPhrase(date, time){
-  if(!date) return '';
-  const [h, m] = String(time || '14:00').split(':').map(Number);
-  const d = new Date(date + 'T00:00:00');
-  if(isNaN(d)) return '';
-  const day = d.toLocaleDateString('en-US', { weekday:'long', day:'numeric', month:'long' });
-  const hh = (h % 12 === 0 ? 12 : h % 12) + (m ? ':' + String(m).padStart(2, '0') : '');
-  return `on ${day} at about ${hh}${h < 12 ? 'am' : 'pm'}`;
-}
 
 contentEl.addEventListener('click', ev=>{
   const ab = ev.target.closest('.ask-btn');
@@ -4154,23 +4367,33 @@ contentEl.addEventListener('click', ev=>{
     return;
   }
   if(ev.target.closest('.ask-signin')) return openAcct();
-  const opt = ev.target.closest('.priv-opt');
-  if(opt && state.currentPOIs){
-    const box = opt.closest('.ask-box');
+  /* A recommended question on the private side fills the box rather than
+     dialling on the spot. The public chips ask immediately because the answer
+     is shared and reusable; a private call is yours alone and worth a second
+     look before it rings, and it may still be the question you want to send to
+     three places at once. */
+  const pchip = ev.target.closest('.priv-chips button');
+  if(pchip){
+    const form = pchip.closest('.ask-card-body')?.querySelector('.priv-form');
+    const box = pchip.closest('.ask-box');
+    const idx = box ? +box.id.split('-')[1] : -1;
+    const it = (state.currentPOIs || [])[idx];
+    if(form && form.elements.q){
+      form.elements.q.value = pchip.dataset.pq || '';
+      if(it) it._q = form.elements.q.value;
+      form.elements.q.focus();
+    }
+    return;
+  }
+  /* Remembered on the POI, because the checkbox lives in HTML that gets rebuilt
+     from scratch on every re-render. */
+  const rnd = ev.target.closest('.priv-round input');
+  if(rnd && state.currentPOIs){
+    const box = rnd.closest('.ask-box');
     const idx = box ? +box.id.split('-')[1] : -1;
     const it = state.currentPOIs[idx];
-    const input = opt.querySelector('input');
-    if(it && box && input){
-      it._intent = input.value;
-      /* Keep what is already typed — re-rendering the pane to move a radio
-         button should not cost someone their question. */
-      const f = box.querySelector('.priv-form');
-      if(f){ it._visitDate = f.elements.date.value; it._visitTime = f.elements.time.value; }
-      const typed = f ? f.elements.q.value : '';
-      renderAsk(it, box, idx);
-      const f2 = box.querySelector('.priv-form');
-      if(f2 && typed) f2.elements.q.value = typed;
-    }
+    const label = rnd.closest('.priv-round');
+    if(it){ it._round = rnd.checked; if(label) label.dataset.on = rnd.checked ? 1 : 0; }
     return;
   }
   const chip = ev.target.closest('.ask-chips button');
@@ -4190,11 +4413,8 @@ contentEl.addEventListener('click', ev=>{
     const it = state.currentPOIs[idx];
     if(it && box) submitAsk(it, box, idx, {
       question: again.dataset.q, force: true,
-      /* A private entry is reasked privately. The composed question already
-         contains the visit, so these ride along only so the stored record keeps
-         saying which visit it was about. */
-      ...(again.dataset.priv ? { isPrivate: true, intent: again.dataset.intent || 'visit',
-                                 visitAt: again.dataset.visit || '' } : {})
+      // a private entry is reasked privately
+      ...(again.dataset.priv ? { isPrivate: true } : {})
     });
     return;
   }
@@ -4225,7 +4445,9 @@ contentEl.addEventListener('click', ev=>{
       const card = box.querySelector('.ask-confirm');
       if(card) card.remove();
       box.querySelectorAll('.ask-form, .ask-chips, .priv-form').forEach(n=>{ n.hidden = false; });
-      submitAsk(it, box, idx, { ...ask, confirmed: true, _label: ask.question || '' });
+      // the round carries its own place list, so it goes back the way it came
+      if(ask._round) submitRound(it, box, idx, ask._round, ask, true);
+      else submitAsk(it, box, idx, { ...ask, confirmed: true, _label: ask.question || '' });
     }
     return;
   }

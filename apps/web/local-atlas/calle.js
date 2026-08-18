@@ -827,36 +827,33 @@ function simFallback({ place, question, outcome }){
 
 /* ---- budget + dedupe ----
    Anything that can dial passes through here first. */
-async function reserveBudget(){
+/* `n` is the number of lines that will actually ring, so a round of three
+   reserves three. All-or-nothing on purpose: half a round is a round that
+   answers a comparison question with a comparison it cannot make. */
+async function reserveBudget(n = 1){
   const k = budgetKey();
   const used = (await docGet(k)) || 0;
-  if(used >= DAILY_BUDGET) return false;
-  await docSet(k, used + 1, 2 * DAY);
+  if(used + n > DAILY_BUDGET) return false;
+  await docSet(k, used + n, 2 * DAY);
   return true;
 }
 
 /* ---- public API ---- */
 
-/* ---- private-call context ----
-   A private call is the same call with a visit attached. The visit context is
-   folded into the question text before validation and moderation rather than
-   carried as a separate field, so the sentence the agent reads out is the exact
-   sentence shown on the confirmation screen, and so the moderation gauntlet
-   sees the whole of what will be said on the phone. */
-const INTENT_PREFIX = {
-  visit: 'I am planning to visit',
-  group: 'I am planning a group visit'
-};
+/* ---- what a private ask is ----
+   A private ask used to compose a visit into the question — an intent prefix
+   and a date/time phrase folded in before validation, so the agent said "I am
+   planning to visit on Thursday at about 2pm" before asking. That is gone: it
+   made the form a booking screen for a feature that books nothing, and it put a
+   claim about the caller's plans into a stranger's ear to no purpose. A private
+   ask is now the same question anyone else could ask, kept private because of
+   where the answer is stored rather than because of how it is phrased.
 
-function composePrivateQuestion({ question, intent, visitAt }){
-  const q = String(question || '').trim();
-  const lead = INTENT_PREFIX[intent] || INTENT_PREFIX.visit;
-  const when = String(visitAt || '').trim();
-  return when ? `${lead} ${when}. ${q}` : q;
-}
+   `intent` and `visitAt` survive only in PUBLIC_FIELDS, so records collected
+   while the form asked for them still render what they were asked about. */
 
 async function askPlace({ place, question, templateId, accessCode, confirmed, force,
-                         isPrivate, uid, intent, visitAt }){
+                         isPrivate, uid }){
   if(!BASE.ok) return { error: 'CALL-E is misconfigured on this server.', status: 503 };
   if(!configured()) return { error: 'CALL-E is not configured on this server.', status: 503 };
   /* Belt and braces: the route already requires a user before it gets here, but
@@ -874,19 +871,20 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
 
   /* Two paths in, and they are not equally trusted. A template is resolved
      from a fixed table by id, so no user text reaches the call script.
-     Free text runs the full gauntlet: sanitise, deny-list, then model check. */
+     Free text runs the full gauntlet: sanitise, deny-list, then model check.
+
+     Private asks used to be barred from the template path, because a private
+     question carried a composed visit and so was never a fixed string. Now that
+     it is just the question, a recommended one is the same fixed string here as
+     it is on the public side, and there is no reason to pay for a model check
+     on text this app wrote itself. */
   let v;
-  if(templateId && !isPrivate){
+  if(templateId){
     const t = TEMPLATES.find(x => x.id === templateId);
     if(!t) return { error: 'Unknown question template.', status: 400 };
     v = { ok: true, question: t.text };
   }else{
-    /* A private ask always goes through the full gauntlet, template or not: the
-       visit context is free text either way, so there is no version of this
-       request that is a fixed string from our own table. */
-    v = validateQuestion(isPrivate
-      ? composePrivateQuestion({ question, intent, visitAt })
-      : question);
+    v = validateQuestion(question);
     if(!v.ok) return { error: v.error, status: 400 };
     const mod = await moderateQuestion(v.question, place);
     if(!mod.allowed) return { error: mod.reason, status: 400, moderated: true };
@@ -946,7 +944,11 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
   }
 
   const lock = await docGet(lockKey(pk, qh, isPrivate ? uid : ''));
-  if(lock) return { status: 202, callId: lock.callId, state: 'in_progress', deduped: true };
+  /* `round` rides along because a round holds this same lock for each of its
+     places: the caller is being handed a call id that will answer with a
+     comparison rather than a single entry, and it has to know that to poll it. */
+  if(lock) return { status: 202, callId: lock.callId, state: 'in_progress',
+                    deduped: true, ...(lock.round ? { round: true } : {}) };
 
   /* ---- the confirmation step ----
      A live call makes a stranger's phone ring, so it does not happen on one
@@ -976,7 +978,7 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
     // carried so publish() knows where the result belongs, and so topicFor can
     // use the fixed label table instead of paying for a model call
     templateId: templateId || '',
-    ...(isPrivate ? { private: true, uid, intent: intent || 'visit', visitAt: visitAt || '' } : {})
+    ...(isPrivate ? { private: true, uid } : {})
   };
 
   if(!live){
@@ -1044,6 +1046,10 @@ async function pollCall(callId, uid){
      record is unreadable by anyone but its owner, and answers 404 rather than
      403 so the id itself doesn't confirm that a private call exists. */
   if(pending.private && pending.uid !== uid) return { error: 'Unknown call id.', status: 404 };
+  /* A round is polled through the same id and the same route, because to the
+     page it is the same thing: a call it is waiting on. Everything past this
+     line assumes one place and one answer. */
+  if(pending.round) return pollRound(pending, uid);
   if(pending.state === 'done') return { status: 200, state: 'done', entry: publicEntry(pending.entry) };
 
   /* Branch on the record, not on DRY_RUN: with the real-call code in play a
@@ -1394,8 +1400,6 @@ async function publish(pending, result, meta){
      stripped — so what gets stored is the outcome, never an unverified fact. */
   if(pending.private){
     entry.private = true;
-    entry.intent = pending.intent || '';
-    entry.visitAt = pending.visitAt || '';
     const pkey = privKey(pending.uid, pending.placeKey);
     const mine = (await docGet(pkey)) || [];
     await docSet(pkey, [entry, ...mine.filter(e => e.qHash !== entry.qHash)].slice(0, 20),
@@ -1447,12 +1451,14 @@ async function handleWebhook({ token, body }){
   if(!/^call_[\w-]+$/.test(id)) return { status: 400, error: 'bad call id' };
   /* An id nobody here asked about cannot produce anything publishable — see
      bindResult — so there is no reason to spend a request finding that out. */
-  if(!await docGet(callKey(id))) return { status: 200, ignored: 'no such request' };
+  const pending = await docGet(callKey(id));
+  if(!pending) return { status: 200, ignored: 'no such request' };
   const c = await client();
   const call = await c.calls.get(id);
   if(call.status === 'queued' || call.status === 'in_progress')
     return { status: 200, ignored: 'not terminal' };
-  await ingest(call);
+  // one webhook, two record shapes; the stored request says which this is
+  await (pending.round ? ingestRound(call) : ingest(call));
   return { status: 200 };
 }
 
@@ -1497,6 +1503,571 @@ async function getPrivate(uid, place){
   return mine.map(publicEntry);
 }
 
+/* ================= asking several places at once =================
+   "Which of these three has the shortest wait?" is not three questions. It is
+   one question whose answer only exists once all three have been asked, and it
+   is the shape of request this app was missing: everything above collects a
+   fact about *a* place, and nothing compares places.
+
+   CALL-E models this directly, so this uses the API as intended rather than
+   looping over the single-call path three times:
+
+     recipients[]            one call task, several lines dialled
+     recipientResultSchema   each business gets its own structured answer
+     resultSchema            the call-level result compares them
+
+   The division of labour is the point. Each place's answer is a fact about that
+   place and is checked exactly like every other fact here — the recipient's own
+   dial must have completed, and the answer must quote that recipient's own
+   transcript. The comparison across them is not a fact anybody said; it is a
+   reading of three answers, so it is bound to the places we actually dialled,
+   labelled as derived, and dropped entirely if it names a business we did not
+   call.
+
+   Rounds are private by construction. A comparison is a judgement about
+   businesses that never agreed to be ranked against each other, and it belongs
+   to the person who asked for it, not to a public page about any one of them.
+   The individual answers do become that person's private per-place records —
+   through publish(), so they pass every gate the single-call path does. */
+
+const ROUND_MIN = 2, ROUND_MAX = 3;
+const roundKey = (uid, id) => `calle:round:${uid}:${id}`;
+const roundListKey = uid => `calle:rounds:${uid}`;
+/* Keyed by the set, not the anchor: asking the same question of a different
+   trio is a different round, and asking it of the same trio twice inside ten
+   minutes is a double-click. */
+const roundLockKey = (uid, qh, sig) => `calle:rlock:${uid}:${qh}:${sig}`;
+const roundSig = keys => sha256([...keys].sort().join('|')).slice(0, 16);
+
+/* The call-level result: what the three answers add up to. `comparable` exists
+   so the model has somewhere honest to put "these cannot be ranked" — two
+   places quoting a wait in minutes and one saying "depends on the night" is the
+   normal case, not a failure, and forcing a winner out of that would be
+   inventing one. */
+const ROUND_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['comparable', 'best_place', 'reason'],
+  properties: {
+    comparable: {
+      type: 'string',
+      enum: ['yes', 'partial', 'no'],
+      description: 'Use yes when every business gave an answer that can be compared on the same terms. Use partial when only some did. Use no when the answers cannot be ranked against each other, including when only one business answered.'
+    },
+    best_place: {
+      type: 'string',
+      description: 'The exact name of the business whose answer is best for the caller, copied verbatim from the recipient list. Write an empty string if comparable is no, or if no business stands out.'
+    },
+    reason: {
+      type: 'string',
+      description: 'One or two plain sentences saying what each business said, using only what they actually said. Name them. Do not add detail nobody stated, and do not recommend anything beyond what the answers support.'
+    }
+  }
+};
+
+/* The single-question script, rewritten for a task that will be read to several
+   different businesses. Two differences from buildTask, and both matter:
+
+   it names nobody — CALL-E dials each recipient itself, so a task that opened
+   with "Call Rosa's on +1..." would be read at the other two as well;
+
+   rule 16 — the agent must never mention that anyone else is being called. The
+   businesses did not agree to be compared, the person on the phone is being
+   asked a straight question, and "we're also ringing your competitors" turns a
+   quick question into a negotiation. */
+function buildRoundTask({ noun, question }){
+  const opener = `Hi — is now a good moment for one quick question about your ${noun}?`;
+  return [
+    `Call the business on the number given for this recipient.`,
+    ``,
+    `You are an automated assistant calling on behalf of a customer of ${CALLER_ID}, who asked this question and cannot make the call themselves.`,
+    ``,
+    `Use American English vocabulary and an ordinary conversational pace. You are calling a local US business.`,
+    ``,
+    `Follow these rules exactly:`,
+    `1. When they pick up, they will almost certainly announce the business first — something like "Good morning, how can I help you?". Let them finish that greeting before you say a single word. Do not start speaking the moment the line connects.`,
+    `2. Your first words are exactly this, and nothing more: "${opener}". Do not introduce yourself yet. Do not explain who you are calling for. Say that one line and then stop and wait for their reply.`,
+    `3. Before you have asked your question: if they say it is a bad moment or ask you to call back, thank them, say you will try another time, and end the call. Do not push.`,
+    `4. As soon as they indicate it is a good moment, say exactly this before anything else: "${DISCLOSURE}". Say it even if they did not ask who you are. Never ask your question before you have said it. If at any point they ask whether you are a real person, a bot, a recording, or AI, say plainly and immediately that you are an AI assistant. Never deny it, never deflect the question, and never claim or imply that you are a person.`,
+    `5. Then ask exactly this one question and nothing else: "${question}"`,
+    `6. If their answer is ambiguous, you may ask at most one short clarifying follow-up. Do not ask anything unrelated.`,
+    `7. Never guess, infer, or fill in an answer they did not give. "I don't know" and "we're not sure" are valid outcomes — record them as unclear.`,
+    `8. Let them finish. Never speak while they are speaking, and never end the call while they are mid-sentence. If they pause and then keep going, let them keep going. If they add detail you did not ask for, hear them out — being cut off mid-thought is rude and it is how a person decides an automated caller is not worth talking to.`,
+    `9. Never repeat, summarise, paraphrase, or read back what they just told you. They already know what they said, and you do not need to confirm it for accuracy. Never refer to them in the third person — you are speaking TO them, not about them. If they ask whether that answered your question, just say yes and thank them.`,
+    `10. Once they have clearly finished answering — including if they say they do not know — say a brief thank you and goodbye, and end the call. Do not wait for more. Do not ask "are you there", "hello", or "is anyone there". Do not repeat or re-ask the question. Do not fill the silence with small talk. Silence after a complete answer means they have finished speaking, not that they have gone away.`,
+    `11. Never say you will "try again later" or call back once they have answered. That ending is only for rule 3, before the question is asked.`,
+    `12. Do not negotiate, book, order, hold, cancel, or promise anything, and do not give out or collect personal or payment details.`,
+    `13. If they ask who the customer is, say truthfully that you do not have their details — the question came in through the listing on ${CALLER_ID}. Never invent a name, a booking, or a reason on their behalf.`,
+    `14. If you reach voicemail, an automated menu, or a disconnected line, end the call without leaving a message.`,
+    `15. Aim to keep the whole call under two minutes, but never cut someone off to meet that — rule 8 wins.`,
+    /* The rule that only exists because this task has several recipients. */
+    `16. The same question is being put to more than one business. Never say so, never mention, compare, name, or hint at any other business, and never suggest the caller is shopping around. Each call is one straight question to one business. If they ask whether you are calling anyone else, say you are not able to discuss other calls, and return to thanking them.`
+  ].join('\n');
+}
+
+/* A round's per-place answer is published on the same terms as any other fact
+   here, one level down: the *recipient's* own dial has to have completed.
+   `pending`, `in_progress`, `failed` and `skipped` are each a refusal, for the
+   same reason a failed call is — see completionCheck, of which this is the
+   recipient-level twin. */
+function recipientCheck(rc){
+  const st = rc && rc.status;
+  if(st !== 'completed') return { ok: false, reason: `recipient ended ${st || 'with no status'}, not completed` };
+  return { ok: true };
+}
+
+/* All the non-evidence bindings for a round. The single-call twin is
+   bindResult(); what differs is that there is no one place_key to match, so the
+   round id carries that role and the recipients are matched by number below. */
+function bindRound(pending, call){
+  const no = reason => ({ ok: false, reason });
+  if(!pending || !pending.round) return no('no stored round for this call id');
+  if(pending.callId !== call.id) return no('call id does not match the stored round');
+  if(!pending.roundId || !pending.qHash) return no('stored round is missing its identity');
+  if(!TERMINAL.includes(call.status)) return no(`call is not terminal (${call.status})`);
+  if(!pending.taskHash) return no('stored round has no task fingerprint');
+  if(sha256(call.task || '') !== pending.taskHash) return no('task does not match the script we sent');
+
+  const m = call.metadata || {};
+  if(m.app !== 'local-atlas') return no('metadata.app is not this app');
+  if(String(m.kind || '') !== 'round') return no('metadata kind is not a round');
+  if(String(m.round_id || '') !== pending.roundId) return no('metadata round_id mismatch');
+  if(String(m.q_hash || '') !== pending.qHash) return no('metadata q_hash mismatch');
+  if(String(m.question || '') !== String(pending.question || '')) return no('metadata question mismatch');
+  /* A round has no public form, so this is not a visibility check so much as a
+     statement that a record claiming otherwise is not one of ours. */
+  if(String(m.visibility || '') !== 'private') return no('a round is private by construction');
+  if(!pending.uid) return no('round record is missing its owner');
+  return { ok: true };
+}
+
+/* The verdict is the one part of a round nobody said out loud, so it is bound
+   to the places we dialled before it is stored: a `best_place` naming a
+   business that is not in this round is dropped rather than shown, and so is a
+   winner that never actually answered. Losing the comparison leaves three real
+   answers on screen; keeping an unbound one would put a recommendation under
+   this app's name that no call supports. */
+function bindVerdict(raw, results){
+  const r = raw || {};
+  const comparable = ['yes', 'partial', 'no'].includes(r.comparable) ? r.comparable : 'no';
+  const reason = String(r.reason || '').slice(0, 400);
+  const name = String(r.best_place || '').trim();
+  if(!name) return { comparable, bestPlace: '', reason };
+
+  const match = results.find(x => flatten(x.name) === flatten(name));
+  if(!match)
+    return { comparable, bestPlace: '', reason,
+             note: 'a suggested winner was dropped: it named a business this round did not call' };
+  if(match.answerStatus !== 'answered')
+    return { comparable, bestPlace: '', reason,
+             note: 'a suggested winner was dropped: that business did not answer the question' };
+  return { comparable, bestPlace: match.name, reason };
+}
+
+/* ---- the request ---- */
+async function askAround({ places, question, templateId, accessCode, confirmed, uid }){
+  if(!BASE.ok) return { error: 'CALL-E is misconfigured on this server.', status: 503 };
+  if(!configured()) return { error: 'CALL-E is not configured on this server.', status: 503 };
+  /* Same reasoning as the private single call, and stronger: a round has no
+     public form at all, so a round with no owner is a record nobody can read. */
+  if(!uid) return { error: 'Sign in to ask several places at once.', status: 401 };
+
+  const live = realCallsPossible() && realCallOk(accessCode);
+
+  const list = Array.isArray(places) ? places.slice(0, ROUND_MAX) : [];
+  if(list.length < ROUND_MIN)
+    return { error: `Pick at least ${ROUND_MIN} places to compare.`, status: 400 };
+
+  /* One sentence, resolved once, read to every recipient — and resolved the
+     same two ways a single ask is. A recommended question is a fixed string
+     from our own table whether it goes to one place or three, so it does not
+     pay for a model check; anything typed runs the full gauntlet. */
+  let v;
+  if(templateId){
+    const t = TEMPLATES.find(x => x.id === templateId);
+    if(!t) return { error: 'Unknown question template.', status: 400 };
+    v = { ok: true, question: t.text };
+  }else{
+    v = validateQuestion(question);
+    if(!v.ok) return { error: v.error, status: 400 };
+    const mod = await moderateQuestion(v.question, list[0]);
+    if(!mod.allowed) return { error: mod.reason, status: 400, moderated: true };
+  }
+
+  const ownLine = normalizeE164(process.env.DEMO_PLACE_PHONE || '');
+  const seen = new Set();
+  const targets = [];
+  const dropped = [];
+  for(const p of list){
+    const phone = normalizeE164(p.phone);
+    if(!phone){ dropped.push({ name: p.name, why: 'no callable number' }); continue; }
+    // the same line twice is one call, not two, and it would spend two credits
+    if(seen.has(phone)){ dropped.push({ name: p.name, why: 'same number as another place' }); continue; }
+    if(live && phone !== ownLine && p.openNow === false){
+      dropped.push({ name: p.name, why: 'closed right now' });
+      continue;
+    }
+    seen.add(phone);
+    targets.push({ placeKey: placeKey(p), name: p.name, addr: p.addr || '', phone });
+  }
+
+  if(targets.length < ROUND_MIN)
+    return { status: 409, error: dropped.length
+      ? `Only ${targets.length} of these can be called right now (${dropped.map(d => `${d.name}: ${d.why}`).join('; ')}). A comparison needs at least ${ROUND_MIN}.`
+      : `A comparison needs at least ${ROUND_MIN} callable places.`, dropped };
+
+  const hourET = (Number(new Date().toISOString().slice(11, 13)) + 24 - 5) % 24;
+  const allOwnLine = targets.every(t => !!ownLine && t.phone === ownLine);
+  if(live && !allOwnLine && (hourET < 10 || hourET >= 20))
+    return { error: 'Calls are only placed between 10am and 8pm Eastern, so a real person is not rung at an unreasonable hour. Try again during the day.', status: 409, outsideWindow: true };
+
+  const qh = qHash(v.question);
+  const sig = roundSig(targets.map(t => t.placeKey));
+
+  const lock = await docGet(roundLockKey(uid, qh, sig));
+  if(lock) return { status: 202, callId: lock.callId, roundId: lock.roundId,
+                    state: 'in_progress', deduped: true };
+
+  /* A round and a single ask are separately deduplicated, which left one line
+     able to ring twice for the same question: ask Rosa's privately, then start
+     a round that includes Rosa's, and the same number is dialled again minutes
+     later by the same person. The two paths share the per-place lock below so
+     that cannot happen — a place already being asked this question is dropped
+     from the round rather than dialled a second time. */
+  const busy = [];
+  for(const t of targets.slice()){
+    if(await docGet(lockKey(t.placeKey, qh, uid))){
+      busy.push(t);
+      targets.splice(targets.indexOf(t), 1);
+      dropped.push({ name: t.name, why: 'already being asked this' });
+    }
+  }
+  if(targets.length < ROUND_MIN)
+    return { status: 409, error: busy.length
+      ? `${busy.map(b => b.name).join(' and ')} ${busy.length > 1 ? 'are' : 'is'} already being asked this question. Wait for that to finish, or ask something else.`
+      : `A comparison needs at least ${ROUND_MIN} callable places.`, dropped };
+
+  /* The confirmation carries every number that will ring, not just a count.
+     "We'll call 3 nearby places" is not consent to ring three specific
+     strangers; the names and the numbers are the thing being agreed to. */
+  if(live && !confirmed)
+    return { status: 428, needsConfirm: true, preview: {
+      question: v.question, disclosure: DISCLOSURE, callerIdentity: CALLER_ID,
+      opener: `Hi — is now a good moment for one quick question about your ${placeNoun(list[0])}?`,
+      recipients: targets.map(t => ({ name: t.name, phone: t.phone, addr: t.addr })),
+      credits: targets.length, dropped
+    } };
+
+  if(!await reserveBudget(targets.length))
+    return { error: `A round of ${targets.length} needs ${targets.length} of today's call budget, and there isn't that much left. Try again tomorrow.`, status: 429 };
+
+  /* Derived, not random, and this is load-bearing. CALL-E replays a call for a
+     repeated Idempotency-Key, and the round id is checked against the record's
+     metadata before anything is stored — so a random id would mean a replayed
+     call came back stamped with the *previous* round's id, failed to bind, and
+     recorded an empty round for a request that was perfectly legitimate. Same
+     inputs inside the same hour therefore derive the same id, which is exactly
+     the window in which the key is replayed. */
+  const bucket = Math.floor(Date.now() / 3600e3);
+  const roundId = 'rnd_' + sha256(`${uid}|${qh}|${sig}|${bucket}`).slice(0, 16);
+  const noun = placeNoun(list[0]);
+  const pending = {
+    round: true, roundId, callId: '', uid, private: true,
+    question: v.question, qHash: qh, templateId: templateId || '',
+    places: targets, sig, noun,
+    createdAt: Date.now(), state: 'queued'
+  };
+
+  if(!live){
+    pending.callId = 'call_sim_' + Math.random().toString(36).slice(2, 10);
+    pending.state = 'in_progress';
+    pending.sim = await simulateRound({ targets, places: list, question: v.question, noun });
+    await docSet(callKey(pending.callId), pending, DAY);
+    await holdRound(pending);
+    return { status: 202, callId: pending.callId, roundId, state: 'in_progress',
+             simulated: true, recipients: targets.map(t => t.name), dropped };
+  }
+
+  const c = await client();
+  const task = buildRoundTask({ noun, question: v.question });
+  const call = await c.calls.create({
+    task,
+    /* The feature, in one field: CALL-E dials all of them against this one
+       script and reports each separately. */
+    recipients: targets.map(t => ({ phone: t.phone, region: 'US', locale: 'en-US' })),
+    /* Each business gets its own structured answer, on exactly the schema a
+       single call uses — which is what lets a round's results go through the
+       same evidence check and land in the same private per-place records. */
+    recipientResultSchema: RESULT_SCHEMA,
+    resultSchema: ROUND_SCHEMA,
+    metadata: { app: 'local-atlas', kind: 'round', round_id: roundId, q_hash: qh,
+      question: v.question, visibility: 'private' },
+    ...(webhookUrl() ? { webhookUrl: webhookUrl() } : {})
+    /* Keyed on the derived round id, so the key and the id it stamps into the
+       metadata always move together. */
+  }, { idempotencyKey: 'local-atlas:' + roundId });
+
+  pending.callId = call.id;
+  pending.state = call.status;
+  pending.taskHash = sha256(task);
+  await docSet(callKey(call.id), pending, DAY);
+  await holdRound(pending);
+  /* `dropped` travels with the acceptance, not only with the confirmation.
+     A simulated round has no confirmation step, so this is the only chance to
+     say that the trio the button offered became a pair — and a round that
+     quietly asks fewer places than it promised is the kind of small dishonesty
+     the rest of this feature exists to avoid. */
+  return { status: 202, callId: call.id, roundId, state: call.status,
+           recipients: targets.map(t => t.name), dropped };
+}
+
+/* One round holds three locks' worth of ground: its own, so the same trio is
+   not asked twice, and each place's own, so a single ask for the same question
+   dedupes against it instead of dialling. `round: true` travels with the
+   per-place ones because askPlace hands the stored call id straight back to the
+   client, and a client that polls a round expecting one answer waits forever. */
+async function holdRound(pending){
+  await docSet(roundLockKey(pending.uid, pending.qHash, pending.sig),
+    { callId: pending.callId, roundId: pending.roundId }, 10 * 60e3);
+  for(const t of pending.places)
+    await docSet(lockKey(t.placeKey, pending.qHash, pending.uid),
+      { callId: pending.callId, round: true }, 10 * 60e3);
+}
+
+async function releaseRound(pending){
+  await docSet(roundLockKey(pending.uid, pending.qHash, pending.sig), null, 1000);
+  for(const t of pending.places)
+    await docSet(lockKey(t.placeKey, pending.qHash, pending.uid), null, 1000);
+}
+
+/* ---- turning a finished round into records ----
+   Single funnel for the webhook and the poll, the same way ingest() is, and it
+   leans on the same two gates rather than inventing softer ones: publish() for
+   each place's answer, and the bindings above for the round itself. */
+async function ingestRound(call){
+  const pending = await docGet(callKey(call.id));
+  const bound = bindRound(pending, call);
+  if(!bound.ok){
+    console.warn(`calle: refusing to record round ${call.id}: ${bound.reason}`);
+    if(!pending || pending.callId !== call.id) throw new Error('unbound round: ' + bound.reason);
+    return storeRound(pending, { results: [], verdict: null, bound: false,
+      failureMessage: bound.reason, status: call.status });
+  }
+
+  const results = [];
+  for(const place of pending.places){
+    /* By number, not by position: recipients[] is whatever order the API
+       returned, and the answer we are about to attribute to this business has
+       to have come from a dial of this business's line. */
+    const rc = (call.recipients || []).find(x =>
+      (x.phones || []).some(p => normalizeE164(p) === place.phone) ||
+      (x.attempts || []).some(a => normalizeE164(a.phone) === place.phone));
+    if(!rc){
+      results.push({ ...place, answerStatus: 'unknown', answer: '', evidenceQuote: '',
+        note: 'no recipient in the call record matches this number' });
+      continue;
+    }
+    const attempt = (rc.attempts || [])
+      .filter(a => normalizeE164(a.phone) === place.phone).slice(-1)[0] || null;
+    const transcript = attempt?.transcriptTurns || [];
+    const comp = recipientCheck(rc);
+    const ev = comp.ok
+      ? evidenceCheck(rc.structuredResult || {}, transcript)
+      : { ok: false, reason: comp.reason, result: withoutAnswer(rc.structuredResult || {}) };
+    if(!ev.ok) console.warn(`calle: round ${pending.roundId} — ${place.name}: ${ev.reason}`);
+
+    /* Each answer becomes one of this account's private per-place records, via
+       the same publish() every other fact goes through. The call id carries a
+       suffix so three places writing at once cannot overwrite each other's call
+       record — or the round's, which lives under the unsuffixed id. */
+    const entry = await publish({
+      callId: `${call.id}:${results.length}`, placeKey: place.placeKey, qHash: pending.qHash,
+      question: pending.question, placeName: place.name, phone: place.phone,
+      private: true, uid: pending.uid,
+      roundId: pending.roundId, templateId: pending.templateId || ''
+    }, ev.result, {
+      summary: rc.summary || '', taskCompleted: comp.ok, status: comp.ok ? 'completed' : 'failed',
+      transcript, bound: true,
+      confidence: call.completionConfidence || null,
+      failureCode: attempt?.failureCode || null,
+      failureMessage: attempt?.failureMessage || null
+    });
+    results.push({ ...place, answerStatus: entry.answerStatus, answer: entry.answer,
+      evidenceQuote: entry.evidenceQuote, staffConfidence: entry.staffConfidence,
+      callSummary: entry.callSummary, hasTranscript: !!transcript.length });
+  }
+
+  /* The verdict rides on the call-level gate, not the recipient one: it is a
+     statement about the round as a whole, so the round as a whole has to have
+     completed before it is shown. */
+  const comp = completionCheck(call.status, call.taskCompleted);
+  const verdict = comp.ok ? bindVerdict(call.structuredResult, results) : null;
+  if(!comp.ok) console.warn(`calle: round ${pending.roundId}: no verdict — ${comp.reason}`);
+
+  return storeRound(pending, { results, verdict, bound: true,
+    summary: call.summary || '', status: call.status,
+    failureMessage: comp.ok ? '' : comp.reason });
+}
+
+/* One private record per round, written where only its owner can read it — the
+   same place shape the per-place private answers live in, and deleted by the
+   same account deletion. */
+async function storeRound(pending, { results, verdict, bound, summary, status, failureMessage, simulated }){
+  const record = {
+    roundId: pending.roundId, callId: pending.callId,
+    question: pending.question,
+    collectedAt: Date.now(), createdAt: pending.createdAt,
+    places: results,
+    verdict: verdict || null,
+    simulated: !!simulated,
+    summary: summary || '',
+    status: status || '',
+    failureMessage: failureMessage || '',
+    bound: !!bound
+  };
+  await docSet(roundKey(pending.uid, pending.roundId), record, PRIVATE_TTL_DAYS * DAY);
+
+  // a short index, so the Private Actions tab can list rounds without a scan
+  const idx = (await docGet(roundListKey(pending.uid))) || [];
+  await docSet(roundListKey(pending.uid),
+    [pending.roundId, ...idx.filter(x => x !== pending.roundId)].slice(0, 40),
+    PRIVATE_TTL_DAYS * DAY);
+
+  await docSet(callKey(pending.callId), { ...pending, state: 'done', roundDone: true }, DAY);
+  await releaseRound(pending);
+  return record;
+}
+
+/* ---- the simulated round ----
+   Same reason as the single-call simulator: CALL-E has no sandbox, and a
+   feature nobody can try without spending three credits on three strangers is a
+   feature nobody will try. Each place gets its own simulated call from the
+   existing simulator, so the per-place results are the same shape a real round
+   produces; only the verdict is assembled here. */
+async function simulateRound({ targets, places, question, noun }){
+  const calls = [];
+  for(let i = 0; i < targets.length; i++){
+    const t = targets[i];
+    const sim = await simulate({
+      place: places[i] || { name: t.name },
+      question,
+      outcome: simOutcome(t.placeKey, qHash(question) + ':round')
+    });
+    calls.push({ target: t, sim });
+  }
+
+  const answered = calls
+    .filter(c => c.sim.result.answer_status === 'answered')
+    .map(c => ({ name: c.target.name, answer: c.sim.result.answer }));
+
+  let verdict = { comparable: 'no', best_place: '', reason: '' };
+  if(answered.length === 1){
+    verdict = { comparable: 'no', best_place: '',
+      reason: `Only ${answered[0].name} answered, so there is nothing to compare it against.` };
+  }else if(answered.length > 1){
+    verdict = (await simVerdict(question, answered, noun)) || {
+      comparable: 'partial', best_place: answered[0].name,
+      reason: answered.map(a => `${a.name}: ${a.answer}`).join(' ')
+    };
+  }
+  return { calls, verdict };
+}
+
+/* The simulator's stand-in for the call-level result. Gemini reads the answers
+   the same way CALL-E's resultSchema would; without a key the caller falls back
+   to a plain recital, which is honest if unexciting. */
+async function simVerdict(question, answered, noun){
+  if(!AI_KEY) return null;
+  try{
+    const txt = await geminiText([
+      `Someone asked several local ${noun} businesses the same question by phone.`,
+      `Question: ${question}`,
+      '',
+      'Answers:',
+      ...answered.map(a => `- ${a.name}: ${a.answer}`),
+      '',
+      'Decide which answer is best for the caller. Return JSON only, no code fence:',
+      '{"comparable":"yes|partial|no","best_place":"<exact name from the list, or empty>",',
+      ' "reason":"one or two sentences naming what each said"}',
+      'Use "no" and an empty best_place if the answers cannot be ranked on the same terms.',
+      'Never name a business that is not in the list. Never add a fact nobody stated.'
+    ].join('\n'), { maxOutputTokens: 220, temperature: 0.2 });
+    const j = JSON.parse(txt.replace(/^```(?:json)?|```$/g, '').trim());
+    return (j && typeof j === 'object') ? j : null;
+  }catch(e){ return null; }
+}
+
+/* Poll fallback for a round, mirroring pollCall. */
+async function pollRound(pending, uid){
+  if(pending.uid !== uid) return { error: 'Unknown call id.', status: 404 };
+  if(pending.state === 'done' || pending.roundDone){
+    const rec = await docGet(roundKey(pending.uid, pending.roundId));
+    if(rec) return { status: 200, state: 'done', round: publicRound(rec) };
+  }
+
+  if(pending.sim){
+    if(Date.now() - pending.createdAt < SIM_MS)
+      return { status: 200, state: 'in_progress', callId: pending.callId, roundId: pending.roundId };
+    const results = [];
+    for(const c of pending.sim.calls){
+      /* Same evidence check a real round runs; the simulator is not a way for
+         an ungrounded answer to reach even a private record. */
+      const ev = evidenceCheck(c.sim.result, c.sim.turns);
+      const entry = await publish({
+        callId: `${pending.callId}:${results.length}`, placeKey: c.target.placeKey,
+        qHash: pending.qHash, question: pending.question, placeName: c.target.name,
+        phone: c.target.phone, private: true, uid: pending.uid,
+        roundId: pending.roundId, templateId: pending.templateId || ''
+      }, ev.result, {
+        summary: c.sim.summary || 'Simulated call',
+        taskCompleted: ev.result.answer_status !== 'unreachable',
+        status: 'completed', transcript: c.sim.turns, bound: true, simulated: true,
+        confidence: { score: 1, label: 'high' }
+      });
+      results.push({ ...c.target, answerStatus: entry.answerStatus, answer: entry.answer,
+        evidenceQuote: entry.evidenceQuote, staffConfidence: entry.staffConfidence,
+        callSummary: entry.callSummary, hasTranscript: !!(c.sim.turns || []).length });
+    }
+    const rec = await storeRound(pending, {
+      results, verdict: bindVerdict(pending.sim.verdict, results),
+      bound: true, simulated: true, status: 'completed', summary: 'Simulated round'
+    });
+    return { status: 200, state: 'done', round: publicRound(rec) };
+  }
+
+  const c = await client();
+  const call = await c.calls.get(pending.callId);
+  if(call.status === 'queued' || call.status === 'in_progress')
+    return { status: 200, state: call.status, callId: pending.callId, roundId: pending.roundId };
+  return { status: 200, state: 'done', round: publicRound(await ingestRound(call)) };
+}
+
+/* What the owner of a round is allowed to see. Transcripts stay server-side for
+   the same reason they do on the public path — they are somebody's actual words
+   — and the per-place `callSummary` is what the screen reads from. */
+const publicRound = r => ({
+  roundId: r.roundId, question: r.question,
+  collectedAt: r.collectedAt, simulated: r.simulated, verdict: r.verdict,
+  failureMessage: r.failureMessage || '',
+  places: (r.places || []).map(p => ({
+    name: p.name, addr: p.addr, placeKey: p.placeKey,
+    answerStatus: p.answerStatus, answer: p.answer, evidenceQuote: p.evidenceQuote,
+    staffConfidence: p.staffConfidence, callSummary: p.callSummary,
+    hasTranscript: !!p.hasTranscript, note: p.note || ''
+  }))
+});
+
+async function getRounds(uid){
+  if(!uid) return [];
+  const ids = (await docGet(roundListKey(uid))) || [];
+  const out = [];
+  for(const id of ids){
+    const r = await docGet(roundKey(uid, id));
+    if(r) out.push(publicRound(r));
+  }
+  return out;
+}
+
 /* ---- forget one account's calls ----
    The deletion half of the Private Actions promise. If a private result is
    yours, then asking for it to be gone has to be a thing you can do — otherwise
@@ -1505,7 +2076,8 @@ async function getPrivate(uid, place){
    Three key shapes hold something about a person, and all three are keyed or
    filtered by uid:
      calle:priv:<uid>:<placeKey>   the private results themselves
-     calle:lock:<uid>:...          in-flight dedupe locks
+     calle:round:<uid>:<roundId>   comparison rounds, and calle:rounds:<uid>, their index
+     calle:lock:<uid>:...          in-flight dedupe locks, calle:rlock:<uid>:... for rounds
      calle:call:<id>               call records, which carry uid in the body
 
    The last one cannot be found from its key, so the day's call records are
@@ -1524,7 +2096,9 @@ async function getPrivate(uid, place){
 async function forgetUser(uid){
   if(!uid) return { private: 0, locks: 0, calls: 0 };
   const priv = await docScan(privKey(uid, '*'));
-  const locks = await docScan(`calle:lock:${uid}:*`);
+  const rounds = [...await docScan(roundKey(uid, '*')), roundListKey(uid)];
+  const locks = [...await docScan(`calle:lock:${uid}:*`),
+                 ...await docScan(`calle:rlock:${uid}:*`)];
 
   const callKeys = await docScan('calle:call:*');
   const mine = [];
@@ -1536,6 +2110,7 @@ async function forgetUser(uid){
 
   return {
     private: await docDel(priv),
+    rounds: await docDel(rounds),
     locks: await docDel(locks),
     calls: await docDel(mine)
   };
@@ -1556,7 +2131,8 @@ module.exports = {
   /* Exported so the binding rules can be exercised directly against hand-built
      API records — the refusals are the part of this file most worth testing and
      the least reachable through a real call. */
-  bindResult, evidenceCheck, completionCheck,
+  bindResult, evidenceCheck, completionCheck, bindRound, bindVerdict, recipientCheck,
+  askAround, getRounds, buildRoundTask, ROUND_SCHEMA, ROUND_MIN, ROUND_MAX,
   simulate, simFallback, simOutcome, TEMPLATES, RESULT_SCHEMA, openerFor, placeNoun, DISCLOSURE,
   info: () => ({
     configured: configured(), dryRun: DRY_RUN, webhook: !!webhookUrl(),

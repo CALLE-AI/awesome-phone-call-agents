@@ -109,6 +109,14 @@ const bearer = req => {
    default path through here is "no user, carry on". */
 async function attachUser(req, res, next){
   try{ req.user = await verifyToken(bearer(req)); }catch(e){ req.user = null; }
+  /* Review mode has to reach here too, not just requireUser. A private result
+     is written under the reviewer's id by the route that placed the call, and
+     then read back by routes that only attach a user — polling a call in
+     flight, listing your own private answers. With the reviewer attached on
+     only half of those, everything a reviewer asked privately was written
+     correctly and then reported as "Unknown call id", which is the same
+     symptom as a broken feature and was the only thing wrong with it. */
+  if(!req.user && REVIEW_MODE) req.user = REVIEW_USER;
   next();
 }
 
