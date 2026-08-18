@@ -35,6 +35,7 @@ Current apps:
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/vibehub-founder-relay`](typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`typescript/ringer`](typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
+| [`python/call-sentinel`](python/call-sentinel/) | Python | Phone-call quality and anomaly-detection agent that scores spam/scam risk from a transcript, emits a masked incident report, and exposes 7 MCP tools for monitoring and reviewing calls. No-call, no-credential dry-run mode by default. |
 
 Suggested grouping:
 
