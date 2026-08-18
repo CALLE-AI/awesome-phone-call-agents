@@ -140,9 +140,37 @@ await calle.calls.create({
   recipients: targets.map(t => ({ phone: t.phone, region: 'US', locale: 'en-US' })),
   recipientResultSchema: RESULT_SCHEMA,   // each business answers for itself
   resultSchema: ROUND_SCHEMA,             // the call-level result compares them
-  metadata: { app: 'local-atlas', kind: 'round', round_id: roundId, /* … */ }
+  metadata: { app: 'local-atlas', kind: 'round', round_id: roundId, /* … */
+    // the number-to-name mapping, on the provider's side of the call
+    recipients: targets.map(t => ({ phone: t.phone, name: t.name })) }
 }, { idempotencyKey: 'local-atlas:' + roundId });
 ```
+
+**One script, several businesses, so the question must suit all of them.** Screening it
+against the place whose panel happened to be open would clear "is the rooftop terrace open
+tonight?" on the strength of the one business with a rooftop, then read it down the phone
+to two that have none. Two rules, cheap first: a question that **names** a recipient is
+refused structurally, because naming a business makes the question about that business;
+then the model screens it **once per recipient**, failing closed on the first refusal and
+saying which business refused it. The opener's noun is the one they share, falling back to
+the generic `place` when they share none.
+
+**A recipient has to be identifiable in the result, or the comparison cannot bind.** The
+task names nobody and the request carries phone, region and locale — so asking the schema
+for "the exact business name, copied from the recipient list" asks for something the model
+was never shown, and a guessed name binds to nothing. The winner is identified by phone
+number instead, the one identifier the request and the record share; `metadata.recipients`
+carries the number-to-name mapping so it exists provider-side too, and is checked field
+for field on the way back, making it a binding as well as a mapping. A name is still
+accepted where a provider surfaces one. Numbers appearing in the model's sentence are
+rendered back as business names, and a number belonging to nobody in the round is removed
+rather than shown.
+
+If the call-level result identifies nobody at all, the answers are compared on this side
+instead, from the per-place results already checked — a comparison that silently never
+appears is, for the feature it headlines, the same as not having built it. It is the same
+class of claim either way, derived rather than quoted, and the stored record notes which
+side produced it.
 
 The binding table above still applies, one level down. **A per-place answer is bound to
 that recipient**: the transcript is read from an attempt on the number we meant to dial,

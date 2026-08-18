@@ -65,6 +65,14 @@ same kind — as **one CALL-E task**, not a loop over the single-call path:
 | `recipientResultSchema` | each business gets its own structured answer, on the same schema a single call uses |
 | `resultSchema` | the call-level result compares them |
 
+One script goes to several businesses, so the question has to be answerable by all of them
+and specific to none. A question that **names** one of them is refused structurally — naming a
+business makes the question about that business. Anything typed is then screened by the model **once
+per recipient**, failing closed on the first refusal and saying which business refused it. The
+opener's noun has to be true of everyone too, so it is the noun they share, falling back to the
+generic `place` when they do not share one — a round of a restaurant and its neighbours must not
+open "one quick question about your restaurant" at a hardware store.
+
 The division of labour is the point. **Each place's answer is a fact about that place**
 and passes the same checks as any other fact here: that recipient's own dial must be
 `status: completed` — the recipient-level twin of the call-level completion rule — and
@@ -72,9 +80,20 @@ the answer must quote that recipient's own transcript. It then becomes one of th
 asker's private per-place records through the same `publish()` everything else uses.
 
 **The comparison is not a fact anybody said.** It is bound to the places actually
-dialled: a `best_place` naming a business this round did not call, or one that never
+dialled: a winner identifying a business this round did not call, or one that never
 answered, is dropped rather than shown, and what remains is labelled on screen as
 derived rather than quoted.
+
+**The winner is identified by phone number, not by name.** The task names no business —
+one script is read to all of them — so there is nothing in the conversation from which a
+name could be known, and a schema asking for "the exact name from the recipient list" was
+asking for something the model had never been shown. The number is the one identifier the
+request and the record share. `metadata.recipients` carries the number-to-name mapping so
+it exists on the provider's side too, and it is checked against our own places on the way
+back, which makes it a binding as well as a mapping. If the call-level result still
+identifies nobody, the answers are compared on this side instead, from the per-place
+results already checked — the same kind of claim either way, and the record notes which
+side produced it.
 
 Rounds are private by construction, with no public form at all — a ranking is a
 judgement about businesses that never agreed to be compared. Two rules follow: the

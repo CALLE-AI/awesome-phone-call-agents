@@ -1539,31 +1539,83 @@ const roundListKey = uid => `calle:rounds:${uid}`;
 const roundLockKey = (uid, qh, sig) => `calle:rlock:${uid}:${qh}:${sig}`;
 const roundSig = keys => sha256([...keys].sort().join('|')).slice(0, 16);
 
-/* The call-level result: what the three answers add up to. `comparable` exists
-   so the model has somewhere honest to put "these cannot be ranked" — two
-   places quoting a wait in minutes and one saying "depends on the night" is the
-   normal case, not a failure, and forcing a winner out of that would be
-   inventing one. */
+/* The call-level result: what the answers add up to. `comparable` exists so the
+   model has somewhere honest to put "these cannot be ranked" — two places
+   quoting a wait in minutes and one saying "depends on the night" is the normal
+   case, not a failure, and forcing a winner out of that would be inventing one.
+
+   The winner is identified by **phone number**, and that is not a style choice.
+   The task names no business, because one script is read to all of them, so
+   there is nothing in the conversation from which a business name could be
+   known — a schema demanding "the exact name, copied from the recipient list"
+   was asking for something the model had never been shown, and a name it could
+   only guess at is a name that cannot bind. The number is the one identifier
+   the request and the record actually share. `metadata.recipients` carries the
+   number-to-name mapping so the mapping exists on the provider's side of the
+   call too, and `best_place` stays as an optional second channel for a provider
+   that does surface names. */
 const ROUND_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['comparable', 'best_place', 'reason'],
+  required: ['comparable', 'best_recipient_phone', 'reason'],
   properties: {
     comparable: {
       type: 'string',
       enum: ['yes', 'partial', 'no'],
-      description: 'Use yes when every business gave an answer that can be compared on the same terms. Use partial when only some did. Use no when the answers cannot be ranked against each other, including when only one business answered.'
+      description: 'Use yes when every recipient gave an answer that can be compared on the same terms. Use partial when only some did. Use no when the answers cannot be ranked against each other, including when only one recipient answered.'
+    },
+    best_recipient_phone: {
+      type: 'string',
+      description: 'The phone number of the recipient whose answer is best for the caller, in the same E.164 form it was dialled in (for example +12015550123). This is the only reliable way to identify a recipient here, because the call script names no business. Write an empty string if comparable is no, or if no recipient stands out.'
     },
     best_place: {
       type: 'string',
-      description: 'The exact name of the business whose answer is best for the caller, copied verbatim from the recipient list. Write an empty string if comparable is no, or if no business stands out.'
+      description: 'Optional. The business name of that same recipient if — and only if — it is known from metadata.recipients. Never guess a name from the conversation; write an empty string instead.'
     },
     reason: {
       type: 'string',
-      description: 'One or two plain sentences saying what each business said, using only what they actually said. Name them. Do not add detail nobody stated, and do not recommend anything beyond what the answers support.'
+      description: 'One or two plain sentences saying what each recipient said, using only what they actually said. Refer to them by phone number if you do not have their names. Do not add detail nobody stated, and do not recommend anything beyond what the answers support.'
     }
   }
 };
+
+/* The noun the opener uses, which one script says to all of them. Taking the
+   anchor's — the place whose panel was open — meant a round of a restaurant and
+   two of its neighbours opened "one quick question about your restaurant" at a
+   hardware store the moment the neighbours were not restaurants. So the noun
+   has to be true of every recipient: shared when they agree, and otherwise the
+   fallback placeNoun already reaches for, which is warm, fits anything, and is
+   never wrong about anybody. */
+function sharedNoun(targets){
+  const nouns = [...new Set((targets || []).map(t => t.noun || 'place'))];
+  return nouns.length === 1 ? nouns[0] : 'place';
+}
+
+/* Does this question name this business? Compared on the flattened forms, so
+   punctuation and case do not decide it, and only on the distinctive part of
+   the name: "Rosa's Trattoria" is named by "rosa s trattoria" and by "rosa s",
+   while the bare word "trattoria" is a kind of restaurant rather than a
+   business, and a question about trattorias generally is a fair thing to ask
+   three of them. Words this short or this common are dropped for the same
+   reason — "The Kitchen" would otherwise make every question about kitchens
+   anchor-specific. */
+const NAME_STOPWORDS = new Set(['the', 'and', 'cafe', 'bar', 'grill', 'kitchen', 'restaurant',
+  'pizza', 'pizzeria', 'trattoria', 'bistro', 'diner', 'deli', 'bakery', 'coffee', 'house',
+  'park', 'playground', 'museum', 'center', 'centre', 'shop', 'store', 'market', 'company', 'co']);
+
+function namesBusiness(question, name){
+  const q = ' ' + flatten(question) + ' ';
+  const full = flatten(name);
+  if(!full) return false;
+  if(q.includes(' ' + full + ' ')) return true;
+  /* The leading distinctive words, taken together — enough that "Rosa's" alone
+     does not trip on a customer called Rosa, and that a two-word name is
+     matched as the pair it is. */
+  const parts = full.split(' ').filter(w => w.length > 2 && !NAME_STOPWORDS.has(w));
+  if(!parts.length) return false;
+  const lead = parts.slice(0, 2).join(' ');
+  return q.includes(' ' + lead + ' ');
+}
 
 /* The single-question script, rewritten for a task that will be read to several
    different businesses. Two differences from buildTask, and both matter:
@@ -1638,6 +1690,18 @@ function bindRound(pending, call){
      statement that a record claiming otherwise is not one of ours. */
   if(String(m.visibility || '') !== 'private') return no('a round is private by construction');
   if(!pending.uid) return no('round record is missing its owner');
+
+  /* The recipient mapping has to be the one we sent, or the verdict below is
+     bound to somebody else's list. Compared as a set of number-to-name pairs,
+     since the order recipients come back in is the API's business, not ours.
+     Absent entirely on rounds placed before this shipped, which bind on
+     everything else and simply have no mapping to check. */
+  if(m.recipients !== undefined){
+    const pair = r => `${normalizeE164(r.phone) || ''}|${flatten(r.name)}`;
+    const sent = pending.places.map(pair).sort().join(',');
+    const back = (Array.isArray(m.recipients) ? m.recipients : []).map(pair).sort().join(',');
+    if(sent !== back) return no('metadata recipient mapping does not match the places we dialled');
+  }
   return { ok: true };
 }
 
@@ -1650,14 +1714,29 @@ function bindRound(pending, call){
 function bindVerdict(raw, results){
   const r = raw || {};
   const comparable = ['yes', 'partial', 'no'].includes(r.comparable) ? r.comparable : 'no';
-  const reason = String(r.reason || '').slice(0, 400);
-  const name = String(r.best_place || '').trim();
-  if(!name) return { comparable, bestPlace: '', reason };
+  /* The numbers are ours and the names are ours; the sentence is the model's.
+     Reading a phone number back to somebody who never typed one is noise, so
+     any number in the reason is swapped for the business it belongs to — and
+     one that belongs to nobody in this round is not left on screen to be
+     wondered about. */
+  let reason = String(r.reason || '').slice(0, 400);
+  for(const x of results)
+    reason = reason.split(x.phone).join(x.name);
+  reason = reason.replace(/\+?\d[\d\s().-]{8,}\d/g, 'another of them');
 
-  const match = results.find(x => flatten(x.name) === flatten(name));
+  /* Phone first, because it is the identifier the request and the record share.
+     A name is accepted as a second channel when the provider surfaces one, and
+     neither is taken on trust: both are matched against the recipients this
+     round actually dialled. */
+  const phone = normalizeE164(r.best_recipient_phone || '');
+  const name = String(r.best_place || '').trim();
+  if(!phone && !name) return { comparable, bestPlace: '', reason };
+
+  const match = results.find(x => (phone && normalizeE164(x.phone) === phone) ||
+                                  (name && flatten(x.name) === flatten(name)));
   if(!match)
     return { comparable, bestPlace: '', reason,
-             note: 'a suggested winner was dropped: it named a business this round did not call' };
+             note: 'a suggested winner was dropped: it identified a business this round did not call' };
   if(match.answerStatus !== 'answered')
     return { comparable, bestPlace: '', reason,
              note: 'a suggested winner was dropped: that business did not answer the question' };
@@ -1678,22 +1757,6 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
   if(list.length < ROUND_MIN)
     return { error: `Pick at least ${ROUND_MIN} places to compare.`, status: 400 };
 
-  /* One sentence, resolved once, read to every recipient — and resolved the
-     same two ways a single ask is. A recommended question is a fixed string
-     from our own table whether it goes to one place or three, so it does not
-     pay for a model check; anything typed runs the full gauntlet. */
-  let v;
-  if(templateId){
-    const t = TEMPLATES.find(x => x.id === templateId);
-    if(!t) return { error: 'Unknown question template.', status: 400 };
-    v = { ok: true, question: t.text };
-  }else{
-    v = validateQuestion(question);
-    if(!v.ok) return { error: v.error, status: 400 };
-    const mod = await moderateQuestion(v.question, list[0]);
-    if(!mod.allowed) return { error: mod.reason, status: 400, moderated: true };
-  }
-
   const ownLine = normalizeE164(process.env.DEMO_PLACE_PHONE || '');
   const seen = new Set();
   const targets = [];
@@ -1708,13 +1771,52 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
       continue;
     }
     seen.add(phone);
-    targets.push({ placeKey: placeKey(p), name: p.name, addr: p.addr || '', phone });
+    targets.push({ placeKey: placeKey(p), name: p.name, addr: p.addr || '',
+      phone, kind: p.kind || '', noun: placeNoun(p) });
   }
 
   if(targets.length < ROUND_MIN)
     return { status: 409, error: dropped.length
       ? `Only ${targets.length} of these can be called right now (${dropped.map(d => `${d.name}: ${d.why}`).join('; ')}). A comparison needs at least ${ROUND_MIN}.`
       : `A comparison needs at least ${ROUND_MIN} callable places.`, dropped };
+
+  /* ---- one sentence, every recipient ----
+     A round sends one script to several businesses, so the question has to be
+     answerable by all of them and specific to none. Screening it against the
+     place whose panel happened to be open would clear "is the rooftop bar open
+     tonight?" on the strength of the one business that has a rooftop, and then
+     read it down the phone to two that do not.
+
+     Two rules, in the cheap-first order everything else here uses. The
+     structural one first: a question that names one of the businesses is
+     about that business by construction, and cannot be asked of the others.
+     Then the model, once per recipient, failing closed on the first refusal
+     and naming which business refused it — the same screen a single ask gets,
+     run as many times as there are people who will hear it.
+
+     Templates skip both, as they do everywhere: they are fixed strings from
+     our own table, written to be answerable by any business in a category. */
+  let v;
+  if(templateId){
+    const t = TEMPLATES.find(x => x.id === templateId);
+    if(!t) return { error: 'Unknown question template.', status: 400 };
+    v = { ok: true, question: t.text };
+  }else{
+    v = validateQuestion(question);
+    if(!v.ok) return { error: v.error, status: 400 };
+
+    const named = targets.find(t => namesBusiness(v.question, t.name));
+    if(named)
+      return { status: 400, moderated: true,
+        error: `A question you send to several places cannot name one of them. Ask about ${named.name} on its own, or reword this so any of them could answer it.` };
+
+    for(const t of targets){
+      const mod = await moderateQuestion(v.question, t);
+      if(!mod.allowed)
+        return { status: 400, moderated: true,
+          error: targets.length > 1 ? `${mod.reason} (checked against ${t.name})` : mod.reason };
+    }
+  }
 
   const hourET = (Number(new Date().toISOString().slice(11, 13)) + 24 - 5) % 24;
   const allOwnLine = targets.every(t => !!ownLine && t.phone === ownLine);
@@ -1753,7 +1855,7 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
   if(live && !confirmed)
     return { status: 428, needsConfirm: true, preview: {
       question: v.question, disclosure: DISCLOSURE, callerIdentity: CALLER_ID,
-      opener: `Hi — is now a good moment for one quick question about your ${placeNoun(list[0])}?`,
+      opener: `Hi — is now a good moment for one quick question about your ${sharedNoun(targets)}?`,
       recipients: targets.map(t => ({ name: t.name, phone: t.phone, addr: t.addr })),
       credits: targets.length, dropped
     } };
@@ -1770,18 +1872,17 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
      the window in which the key is replayed. */
   const bucket = Math.floor(Date.now() / 3600e3);
   const roundId = 'rnd_' + sha256(`${uid}|${qh}|${sig}|${bucket}`).slice(0, 16);
-  const noun = placeNoun(list[0]);
   const pending = {
     round: true, roundId, callId: '', uid, private: true,
     question: v.question, qHash: qh, templateId: templateId || '',
-    places: targets, sig, noun,
+    places: targets, sig, noun: sharedNoun(targets),
     createdAt: Date.now(), state: 'queued'
   };
 
   if(!live){
     pending.callId = 'call_sim_' + Math.random().toString(36).slice(2, 10);
     pending.state = 'in_progress';
-    pending.sim = await simulateRound({ targets, places: list, question: v.question, noun });
+    pending.sim = await simulateRound({ targets, places: list, question: v.question, noun: pending.noun });
     await docSet(callKey(pending.callId), pending, DAY);
     await holdRound(pending);
     return { status: 202, callId: pending.callId, roundId, state: 'in_progress',
@@ -1789,7 +1890,7 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
   }
 
   const c = await client();
-  const task = buildRoundTask({ noun, question: v.question });
+  const task = buildRoundTask({ noun: pending.noun, question: v.question });
   const call = await c.calls.create({
     task,
     /* The feature, in one field: CALL-E dials all of them against this one
@@ -1801,7 +1902,14 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
     recipientResultSchema: RESULT_SCHEMA,
     resultSchema: ROUND_SCHEMA,
     metadata: { app: 'local-atlas', kind: 'round', round_id: roundId, q_hash: qh,
-      question: v.question, visibility: 'private' },
+      question: v.question, visibility: 'private',
+      /* The number-to-name mapping, on the provider's side of the call. The
+         task cannot carry it — one script, several businesses, and rule 16
+         forbids naming any of them out loud — so this is where a recipient
+         stops being an anonymous phone number in the record we read back. It is
+         checked field for field on the way back like every other metadata
+         value, which makes it a binding as well as a mapping. */
+      recipients: targets.map(t => ({ phone: t.phone, name: t.name })) },
     ...(webhookUrl() ? { webhookUrl: webhookUrl() } : {})
     /* Keyed on the derived round id, so the key and the id it stamps into the
        metadata always move together. */
@@ -1901,8 +2009,28 @@ async function ingestRound(call){
      statement about the round as a whole, so the round as a whole has to have
      completed before it is shown. */
   const comp = completionCheck(call.status, call.taskCompleted);
-  const verdict = comp.ok ? bindVerdict(call.structuredResult, results) : null;
+  let verdict = comp.ok ? bindVerdict(call.structuredResult, results) : null;
   if(!comp.ok) console.warn(`calle: round ${pending.roundId}: no verdict — ${comp.reason}`);
+
+  /* If the call-level result identified nobody — the provider may not surface
+     recipient identity to whatever produces it, and a comparison that silently
+     never appears is the same as not having built one — the answers are
+     compared here instead, from the per-place results already checked above.
+     It is the same class of claim either way, derived rather than quoted, and
+     `source` records which side of the wire produced it. */
+  if(comp.ok && verdict && !verdict.bestPlace){
+    const answered = results.filter(p => p.answerStatus === 'answered');
+    if(answered.length >= 2){
+      const local = await compareAnswers(pending.question,
+        answered.map(p => ({ name: p.name, answer: p.answer })), pending.noun);
+      if(local){
+        const bound = bindVerdict(local, results);
+        if(bound.bestPlace || (!verdict.reason && bound.reason))
+          verdict = { ...bound, source: 'local' };
+      }
+    }
+  }
+  if(verdict && !verdict.source) verdict.source = 'call';
 
   return storeRound(pending, { results, verdict, bound: true,
     summary: call.summary || '', status: call.status,
@@ -1965,7 +2093,7 @@ async function simulateRound({ targets, places, question, noun }){
     verdict = { comparable: 'no', best_place: '',
       reason: `Only ${answered[0].name} answered, so there is nothing to compare it against.` };
   }else if(answered.length > 1){
-    verdict = (await simVerdict(question, answered, noun)) || {
+    verdict = (await compareAnswers(question, answered, noun)) || {
       comparable: 'partial', best_place: answered[0].name,
       reason: answered.map(a => `${a.name}: ${a.answer}`).join(' ')
     };
@@ -1973,10 +2101,12 @@ async function simulateRound({ targets, places, question, noun }){
   return { calls, verdict };
 }
 
-/* The simulator's stand-in for the call-level result. Gemini reads the answers
-   the same way CALL-E's resultSchema would; without a key the caller falls back
-   to a plain recital, which is honest if unexciting. */
-async function simVerdict(question, answered, noun){
+/* Comparing answers on this side of the wire. Two callers: the simulator, which
+   has no provider to ask, and a real round whose call-level result identified
+   nobody. Names are safe to use here in a way they are not in the call script —
+   nothing is being read to anybody, these are answers already collected — so
+   this asks for a name and the caller binds it back against the round. */
+async function compareAnswers(question, answered, noun){
   if(!AI_KEY) return null;
   try{
     const txt = await geminiText([
@@ -2029,7 +2159,7 @@ async function pollRound(pending, uid){
         callSummary: entry.callSummary, hasTranscript: !!(c.sim.turns || []).length });
     }
     const rec = await storeRound(pending, {
-      results, verdict: bindVerdict(pending.sim.verdict, results),
+      results, verdict: { ...bindVerdict(pending.sim.verdict, results), source: 'local' },
       bound: true, simulated: true, status: 'completed', summary: 'Simulated round'
     });
     return { status: 200, state: 'done', round: publicRound(rec) };
