@@ -13,6 +13,7 @@ from quotewake_salesforce.domain.models import CallRequest
 from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceQueryError, _safe_route
 from quotewake_salesforce.structured_logging import (
     _ReadableFormatter,
+    _mask_identifier,
     _redact_log_value,
     configure_logging,
     log_event,
@@ -101,6 +102,15 @@ def test_structured_events_redact_phone_and_secret_values(caplog):
     rendered = repr([getattr(record, "quotewake_fields", {}) for record in caplog.records])
     assert "+14155550101" not in rendered
     assert "super-secret" not in rendered
+
+
+def test_readable_logs_mask_quote_provider_and_idempotency_identifiers():
+    assert _mask_identifier("0Q0bm0000033oTBCAY", key="quote_id") == "0Q0…BCAY"
+    assert _mask_identifier("call_1iQ2hYGDnwvbiNCBui32Pw", key="call_id") == "cal…32Pw"
+    assert _mask_identifier(
+        "quotewake-0Q0bm0000033oTBCAY-1-d9de810d21eb-bc1a8d298e093326e443956a8eb1a4bbf",
+        key="idempotency_key",
+    ) == "quotewake-0Q0…BCAY-1-[digest-redacted]"
 
 
 @pytest.mark.parametrize(

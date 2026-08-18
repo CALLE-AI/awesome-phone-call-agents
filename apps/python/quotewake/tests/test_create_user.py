@@ -65,7 +65,14 @@ def test_permission_set_includes_quote_wake_runtime_api_access():
         for item in root.findall(f"{namespace}userPermissions")
     }
     assert {"ApiEnabled"} <= user_permissions
-    for object_name in ("Account", "Contact", "Opportunity", "Quote"):
+    for object_name in (
+        "Account",
+        "Contact",
+        "Opportunity",
+        "Product2",
+        "Quote",
+        "QuoteLineItem",
+    ):
         assert objects[object_name].findtext(f"{namespace}allowRead") == "true"
         assert objects[object_name].findtext(f"{namespace}allowEdit") == (
             "true" if object_name == "Quote" else "false"

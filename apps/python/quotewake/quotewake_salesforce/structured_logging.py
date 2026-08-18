@@ -44,6 +44,9 @@ _LABELS = {
     "error_type": "error type",
 }
 _HIDDEN_RENDER_FIELDS = frozenset({"run_id"})
+_IDENTIFIER_FIELDS = frozenset(
+    {"quote_id", "call_id", "provider_call_id", "task_id", "idempotency_key"}
+)
 _PHONE_SEPARATOR_PATTERN = r"(?:[^\S\r\n]|[.\-\u2010-\u2015\u2212])"
 _PHONE_LIKE_PATTERN = re.compile(
     rf"(?<!\w)(?<!\d[.\-\u2010-\u2015\u2212])(?<!\d[^\S\r\n])"
@@ -93,6 +96,24 @@ def _colorize_with_service(text: str, service_tag: str) -> str:
 
     color = _SERVICE_TAG_COLORS.get(service_tag)
     return f"{color}{text}{_ANSI_RESET}" if color is not None else text
+
+
+def _mask_identifier(value: object, *, key: str) -> object:
+    """Keep a short diagnostic fingerprint without logging full identifiers."""
+
+    if not isinstance(value, str) or not value:
+        return value
+
+    def mask_token(token: str) -> str:
+        if len(token) <= 6:
+            return "[id-redacted]"
+        return f"{token[:3]}…{token[-4:]}"
+
+    if key == "idempotency_key":
+        parts = value.split("-")
+        if len(parts) >= 4:
+            return f"{parts[0]}-{mask_token(parts[1])}-{parts[2]}-[digest-redacted]"
+    return mask_token(value)
 
 
 def _stream_supports_color(stream: object) -> bool:
@@ -152,6 +173,8 @@ class _ReadableFormatter(logging.Formatter):
         for name, value in fields.items():
             if value is None or name in _HIDDEN_RENDER_FIELDS:
                 continue
+            if name in _IDENTIFIER_FIELDS:
+                value = _mask_identifier(value, key=name)
             label = _LABELS.get(name, name.replace("_", " "))
             details.append(f"{label} {value}")
         message = "; ".join(details) or event.replace("_", " ").capitalize() + "."
