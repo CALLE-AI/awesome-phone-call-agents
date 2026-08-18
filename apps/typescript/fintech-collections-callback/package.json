@@ -1,0 +1,25 @@
+{
+  "name": "fintech-collections-callback",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-gated CALL-E app that places compliant payment-reminder phone calls to overdue fintech accounts and returns structured collections outcomes.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "tsx src/client.ts",
+    "dry-run": "tsx src/client.ts",
+    "live": "tsx src/client.ts --live",
+    "build": "tsc",
+    "start": "node dist/client.js",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
