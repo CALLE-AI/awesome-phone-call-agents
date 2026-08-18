@@ -205,7 +205,7 @@ def test_accepted_unknown_result_is_persisted_and_consumes_attempt(capsys):
     assert update.attempt_count == 1
     assert update.follow_up_status == "Stopped"
     assert fake_sf.composite_write.call_args.args[3].call_id == "call-unknown"
-    assert "CALLED (unknown)" in capsys.readouterr().out
+    assert "ATTEMPTED (unknown)" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -273,6 +273,22 @@ def test_retryable_outcome_before_limit_keeps_original_task_action(outcome):
     assert persisted.args[2].follow_up_status == "Retry"
     assert f"Next action:\n{original_action}" in persisted.kwargs["task_description"]
     assert persisted.args[3] is result
+
+
+def test_no_answer_summary_is_labeled_as_attempted_not_answered(capsys):
+    env, regional, timing, policies, fake_sf, repository = setup()
+    result = CallResult(
+        "0Q0000000000001", "call-no-answer", "completed", "no_answer", "unknown",
+        None, "No answer.", "Retry later.", None, CallOutcomeKind.BUSINESS,
+        datetime.now(timezone.utc),
+    )
+    fake_calle = Mock()
+    fake_calle.execute.return_value = result
+    with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient", return_value=fake_calle):
+        assert main(["--execute"]) == 0
+    output = capsys.readouterr().out
+    assert "ATTEMPTED (no_answer)" in output
+    assert "CALLED (no_answer)" not in output
 
 
 def test_non_retryable_outcome_keeps_original_task_action_when_stopped():

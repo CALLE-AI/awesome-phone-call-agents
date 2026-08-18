@@ -64,9 +64,14 @@ def _print_call_summary(calls: list[tuple[object, object]], *, regional_settings
             if quote.amount is not None
             else "amount unavailable"
         )
+        disposition = (
+            "ATTEMPTED"
+            if result.outcome in {"call_back_later", "call_not_established", "no_answer", "busy", "unknown"}
+            else "CALLED"
+        )
         print(
             f"Quote {mask_identifier(quote.quote_id, key='quote_id')}: {quote.quote_name} | {amount} | "
-            f"CALLED ({result.outcome})"
+            f"{disposition} ({result.outcome})"
         )
 
 
@@ -382,7 +387,13 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                             file=sys.stderr,
                         )
                         break
-                    log_event("quote_processed", quote_id=quote.quote_id, outcome=result.outcome)
+                    log_event(
+                        "quote_processed",
+                        quote_id=quote.quote_id,
+                        outcome=result.outcome,
+                        follow_up_status=update.follow_up_status,
+                        attempt_count=update.attempt_count,
+                    )
                     called_quotes.append((quote, result))
             finally:
                 calle.close()
