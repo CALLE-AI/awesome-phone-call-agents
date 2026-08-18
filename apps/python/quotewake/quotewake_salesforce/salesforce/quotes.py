@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import logging
 from typing import Any
 
 from quotewake_salesforce.config import RegionalSettings
@@ -507,6 +508,7 @@ class QuoteRepository:
                     raise
                 log_event(
                     "salesforce_quote_lines_unavailable",
+                    level=logging.DEBUG,
                     reason="QuoteLineItem is not supported for the runtime user",
                 )
                 return {}
