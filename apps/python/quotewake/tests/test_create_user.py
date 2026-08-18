@@ -69,6 +69,8 @@ def test_permission_set_includes_quote_wake_runtime_api_access():
         "Account",
         "Contact",
         "Opportunity",
+        "Pricebook2",
+        "PricebookEntry",
         "Product2",
         "Quote",
         "QuoteLineItem",
@@ -97,6 +99,8 @@ def test_permission_set_includes_quote_wake_runtime_api_access():
         "Contact.MobilePhone",
         "Contact.Phone",
         "Opportunity.AccountId",
+        "Product2.QuantityUnitOfMeasure",
+        "QuoteLineItem.TotalPrice",
     } <= fields
     assert {
         "Task.ActivityDate",
