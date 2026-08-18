@@ -194,10 +194,10 @@ backup_count = 2
         self.assertGreaterEqual(settings.backup_count, 0)
         self.assertFalse(settings.raw_calle_api)
 
-    def test_shipped_logging_configuration_enables_debug_support_diagnostics(self) -> None:
+    def test_shipped_logging_configuration_uses_info_level_and_support_diagnostics(self) -> None:
         settings = load_logging_settings(Path(__file__).parents[1] / "quotewake.toml")
 
-        self.assertEqual(settings.level, "DEBUG")
+        self.assertEqual(settings.level, "INFO")
         self.assertTrue(settings.raw_calle_api)
 
     def test_logging_raw_calle_api_is_explicit_boolean(self) -> None:

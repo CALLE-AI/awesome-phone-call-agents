@@ -31,7 +31,7 @@ completed_outcomes = ["interested"]
 # Relative directories are resolved from the QuoteWake application directory.
 directory = "logs"
 format = "text"
-level = "DEBUG"
+level = "INFO"
 max_bytes = 5242880
 backup_count = 5
 # Keep provider payloads opt-in and redact sensitive values in every log.
