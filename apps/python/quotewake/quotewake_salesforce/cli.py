@@ -228,7 +228,7 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
     try:
         prompt_settings = load_call_prompt(Path(args.config))
         settings = load_logging_settings(Path(args.config))
-        configure_logging(level=settings.level, log_format=settings.format, log_directory=settings.directory, max_bytes=settings.max_bytes, backup_count=settings.backup_count)
+        configure_logging(level=settings.level, log_format=settings.format, log_directory=settings.directory, max_bytes=settings.max_bytes, backup_count=settings.backup_count, redact_sensitive=settings.redact_sensitive)
         with log_context(run_id=run_id):
             env = load_environment(require_calle=args.execute)
             timing = load_initial_follow_up_timing(Path(args.config))

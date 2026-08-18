@@ -56,7 +56,7 @@ validate_duration() {
     seconds="${BASH_REMATCH[4]}"
     for part in "$days" "$hours" "$minutes" "$seconds"; do
         [[ -n "$part" ]] || continue
-        number="${part::-1}"
+        number="${part%?}"
         [[ "$number" =~ ^0+$ ]] || has_positive=true
     done
     [[ "$has_positive" == true ]] || \

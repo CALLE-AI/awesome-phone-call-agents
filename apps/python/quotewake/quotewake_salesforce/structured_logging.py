@@ -29,6 +29,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _LOG_CONTEXT: ContextVar[dict[str, Any]] = ContextVar(
     "quotewake_log_context", default={}
 )
+_REDACT_SENSITIVE: ContextVar[bool] = ContextVar(
+    "quotewake_redact_sensitive", default=False
+)
 _LABELS = {
     "run_id": "run",
     "quote_id": "quote",
@@ -187,10 +190,13 @@ def configure_logging(
     log_directory: str | Path = DEFAULT_LOG_DIRECTORY,
     max_bytes: int = DEFAULT_LOG_MAX_BYTES,
     backup_count: int = DEFAULT_LOG_BACKUP_COUNT,
+    redact_sensitive: bool = False,
 ) -> logging.Logger:
     """Configure standard-library logging with rotating text output."""
 
     log_level = _log_level(level)
+    if not isinstance(redact_sensitive, bool):
+        raise ValueError("redact_sensitive must be a boolean.")
     normalized_format = log_format.lower()
     if normalized_format != "text":
         raise ValueError(f"Unknown log format: {log_format}")
@@ -231,6 +237,7 @@ def configure_logging(
         application_logger.addHandler(handler)
     application_logger.setLevel(log_level)
     application_logger.propagate = False
+    _REDACT_SENSITIVE.set(redact_sensitive)
     return application_logger
 
 
@@ -291,7 +298,9 @@ def log_event(
     event_fields.update(
         {
             key: _redact_log_value(
-                key, value, preserve_phone_fields=preserve_phone_fields
+                key,
+                value,
+                preserve_phone_fields=preserve_phone_fields and not _REDACT_SENSITIVE.get(),
             )
             for key, value in fields.items()
         }

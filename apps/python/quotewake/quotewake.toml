@@ -34,6 +34,6 @@ format = "text"
 level = "DEBUG"
 max_bytes = 5242880
 backup_count = 5
-# Temporary support diagnostics for the demo; payloads are sanitized but can
-# still contain sensitive recipient and business data.
+# Keep provider payloads opt-in and redact sensitive values in every log.
 raw_calle_api = true
+redact_sensitive = true

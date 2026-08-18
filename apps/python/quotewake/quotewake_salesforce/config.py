@@ -198,6 +198,7 @@ class LoggingSettings:
     max_bytes: int = 5 * 1024 * 1024
     backup_count: int = 5
     raw_calle_api: bool = False
+    redact_sensitive: bool = False
 
 
 def _logging_string(
@@ -320,6 +321,7 @@ def load_logging_settings(path: Path) -> LoggingSettings:
     max_bytes = _logging_integer(logging_table, "max_bytes", 5 * 1024 * 1024, minimum=1)
     backup_count = _logging_integer(logging_table, "backup_count", 5, minimum=0)
     raw_calle_api = _logging_boolean(logging_table, "raw_calle_api", False)
+    redact_sensitive = _logging_boolean(logging_table, "redact_sensitive", False)
     return LoggingSettings(
         directory=directory,
         format=log_format.lower(),
@@ -327,6 +329,7 @@ def load_logging_settings(path: Path) -> LoggingSettings:
         max_bytes=max_bytes,
         backup_count=backup_count,
         raw_calle_api=raw_calle_api,
+        redact_sensitive=redact_sensitive,
     )
 
 

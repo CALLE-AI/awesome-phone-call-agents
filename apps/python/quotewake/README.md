@@ -8,8 +8,6 @@ attempt history, and next actions where they already manage the sales process.
 
 ## Product demo
 
-[📹 Watch the QuoteWake teaser](media/teaser.mp4)
-
 ## Who it is for
 
 QuoteWake is for any sales or commercial team that manages Quotes, Accounts,
@@ -521,12 +519,12 @@ suppression rules, and lawful calling process before live use.
 
 Credentials are never written to application logs; phone-like values are
 redacted in normal events and error logs use exception types and bounded
-reasons. The **code default** for raw CALL-E payload logging is `false`, but the
-checked-in demo [`quotewake.toml`](quotewake.toml) explicitly sets
-`logging.raw_calle_api = true`. Change it to `false` outside a temporary support
-or controlled demonstration session. `--show-prompt` intentionally prints
-Salesforce-derived business context, so treat its output and the rotating
-`logs/quotewake.log` file as business data and protect them accordingly.
+reasons. The checked-in demo keeps `logging.raw_calle_api = true` with
+`logging.redact_sensitive = true`. Raw provider payloads are an explicit support
+diagnostic and must remain disabled outside a controlled session. `--show-prompt`
+intentionally prints Salesforce-derived business context, so treat its output
+and the rotating `logs/quotewake.log` file as business data and protect them
+accordingly.
 
 ## Tests
 

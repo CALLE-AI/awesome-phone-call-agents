@@ -106,7 +106,7 @@ parse_country_code() {
     local value="$1"
     [[ "$value" =~ ^[A-Za-z]{2}$ ]] || \
         fail "Invalid country code '$value'. Use an ISO 3166-1 alpha-2 code, for example ES."
-    COUNTRY_CODE="${value^^}"
+    COUNTRY_CODE="$(printf '%s' "$value" | LC_ALL=C tr '[:lower:]' '[:upper:]')"
 }
 
 parse_call_locale() {
@@ -115,11 +115,11 @@ parse_call_locale() {
         fail "Invalid call locale '$value'. Use a locale such as en_US or en-US."
 
     language="${value%%[-_]*}"
-    language="${language,,}"
+    language="$(printf '%s' "$language" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
     if [[ "$value" == *[-_]* ]]; then
         region="${value#*[-_]}"
         if [[ "$region" =~ ^[A-Za-z]{2}$ ]]; then
-            region="${region^^}"
+            region="$(printf '%s' "$region" | LC_ALL=C tr '[:lower:]' '[:upper:]')"
         fi
         # Salesforce's locale field uses the CLDR underscore spelling.  The
         # QuoteWake domain boundary converts this to BCP-47 for CALL-E.
