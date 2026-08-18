@@ -116,6 +116,13 @@ def _mask_identifier(value: object, *, key: str) -> object:
     return mask_token(value)
 
 
+def mask_identifier(value: object, *, key: str) -> str:
+    """Return the safe display form used by logs and CLI diagnostics."""
+
+    masked = _mask_identifier(value, key=key)
+    return str(masked) if masked is not None else "unknown"
+
+
 def _stream_supports_color(stream: object) -> bool:
     """Return whether a console stream should receive ANSI color sequences."""
 
@@ -367,4 +374,5 @@ __all__ = [
     "log_event",
     "log_exception",
     "logger",
+    "mask_identifier",
 ]

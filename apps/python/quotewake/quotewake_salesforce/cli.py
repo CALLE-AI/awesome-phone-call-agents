@@ -27,13 +27,13 @@ from quotewake_salesforce.domain.selection import evaluate_quote, validate_calla
 from quotewake_salesforce.presentation import format_money
 from quotewake_salesforce.salesforce.client import SalesforceClient, SalesforceError
 from quotewake_salesforce.salesforce.quotes import QuoteRepository, _active_picklist_values
-from quotewake_salesforce.structured_logging import configure_logging, log_event, log_exception, log_context
+from quotewake_salesforce.structured_logging import configure_logging, log_event, log_exception, log_context, mask_identifier
 
 
 def _print_selection(result: SelectionResult, *, regional_settings=None) -> None:
     quote = result.quote
     amount = format_money(quote.money or quote.amount, quote.currency_code, regional_settings=regional_settings) if quote.amount is not None else "amount unavailable"
-    print(f"Quote {quote.quote_id}: {quote.quote_name} | {amount} | {result.decision.value} ({result.reason.value})")
+    print(f"Quote {mask_identifier(quote.quote_id, key='quote_id')}: {quote.quote_name} | {amount} | {result.decision.value} ({result.reason.value})")
 
 
 def _follow_up_sort_key(selected: SelectionResult) -> tuple[object, object, str]:
@@ -65,7 +65,7 @@ def _print_call_summary(calls: list[tuple[object, object]], *, regional_settings
             else "amount unavailable"
         )
         print(
-            f"Quote {quote.quote_id}: {quote.quote_name} | {amount} | "
+            f"Quote {mask_identifier(quote.quote_id, key='quote_id')}: {quote.quote_name} | {amount} | "
             f"CALLED ({result.outcome})"
         )
 
@@ -120,7 +120,7 @@ def _call_error_message(error: BaseException) -> str:
     message = "CALL-E " + ", ".join(parts)
     if details["creation_unknown"]:
         key = details.get("idempotency_key")
-        suffix = f" ({key})" if isinstance(key, str) and key else ""
+        suffix = f" ({mask_identifier(key, key='idempotency_key')})" if isinstance(key, str) and key else ""
         message += (
             ". Creation outcome is unknown; the call may already exist. "
             "Reconcile or replay with the same idempotency key" + suffix + "; "
@@ -129,7 +129,7 @@ def _call_error_message(error: BaseException) -> str:
     elif details["result_unknown"]:
         call_id = details.get("provider_call_id") or "unknown"
         message += (
-            f". CALL-E accepted call {call_id}, terminal result is unknown; "
+            f". CALL-E accepted call {mask_identifier(call_id, key='call_id')}, terminal result is unknown; "
             "reconcile this call before any new attempt."
         )
     elif details["code"] == "call_not_ready":
@@ -279,11 +279,11 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                     quote = selected.quote
                     try:
                         request = build_call_request(selected, lines.get(quote.quote_id, []), prompt_settings=prompt_settings, regional_settings=regional)
-                        print(f"Quote {quote.quote_id} prompt:\n{request.goal}\n")
+                        print(f"Quote {mask_identifier(quote.quote_id, key='quote_id')} prompt:\n{request.goal}\n")
                     except Exception as exc:
                         failures += 1
                         log_exception("quote_prompt_failed", exc, quote_id=quote.quote_id)
-                        print(f"[ERROR] Quote {quote.quote_id} prompt failed ({type(exc).__name__})", file=sys.stderr)
+                        print(f"[ERROR] Quote {mask_identifier(quote.quote_id, key='quote_id')} prompt failed ({type(exc).__name__})", file=sys.stderr)
                 print(
                     f"Evaluated: {len(selections)}; READY: {len(ready)}; "
                     f"selected for processing: {len(selected_for_processing)}; "
@@ -319,7 +319,7 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                         next_attempt = quote.attempt_count + 1
                         retry_marker = quote.next_follow_up_at
                         if not args.execute:
-                            print(f"[DRY-RUN] {quote.quote_id}: {calle.preview(request, next_attempt=next_attempt, retry_marker=retry_marker)['idempotency_key']}")
+                            print(f"[DRY-RUN] {mask_identifier(quote.quote_id, key='quote_id')}: {mask_identifier(calle.preview(request, next_attempt=next_attempt, retry_marker=retry_marker)['idempotency_key'], key='idempotency_key')}")
                             continue
                         result = calle.execute(request, next_attempt=next_attempt, retry_marker=retry_marker)
                         update = calculate_next_follow_up(quote, result, policies)
@@ -350,9 +350,9 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                             error_type=type(exc).__name__,
                         )
                         if args.execute and hasattr(exc, "classification"):
-                            print(f"[ERROR] Quote {quote.quote_id} failed: {_call_error_message(exc)}", file=sys.stderr)
+                            print(f"[ERROR] Quote {mask_identifier(quote.quote_id, key='quote_id')} failed: {_call_error_message(exc)}", file=sys.stderr)
                         else:
-                            print(f"[ERROR] Quote {quote.quote_id} failed ({type(exc).__name__})", file=sys.stderr)
+                            print(f"[ERROR] Quote {mask_identifier(quote.quote_id, key='quote_id')} failed ({type(exc).__name__})", file=sys.stderr)
                         continue
 
                     # A completed CALL-E result without a Salesforce write would
@@ -377,7 +377,7 @@ def salesforce_dry_run_main(argv: Sequence[str]) -> int:
                             phase="persist",
                         )
                         print(
-                            f"[ERROR] Quote {quote.quote_id} persistence failed ({type(exc).__name__}); "
+                            f"[ERROR] Quote {mask_identifier(quote.quote_id, key='quote_id')} persistence failed ({type(exc).__name__}); "
                             "aborting remaining calls",
                             file=sys.stderr,
                         )

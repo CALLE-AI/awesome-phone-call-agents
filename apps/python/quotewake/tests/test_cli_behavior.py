@@ -147,7 +147,7 @@ def test_max_calls_limits_execute_without_processing_deferred_quotes(capsys):
     output = capsys.readouterr().out
     assert "Call results:" in output
     assert (
-        "Quote 0Q0000000000001: Demo | €10.00 | CALLED (interested)"
+            "Quote 0Q0…0001: Demo | €10.00 | CALLED (interested)"
         in output
     )
     assert "0Q0000000000002: Demo | €10.00 | CALLED" not in output
@@ -319,8 +319,8 @@ def test_show_prompt_respects_limit_without_constructing_calle(capsys):
     with patch("quotewake_salesforce.cli.load_environment", return_value=env), patch("quotewake_salesforce.cli.load_initial_follow_up_timing", return_value=timing), patch("quotewake_salesforce.cli.load_follow_up_policies", return_value=policies), patch("quotewake_salesforce.cli.SalesforceClient", return_value=fake_sf), patch("quotewake_salesforce.cli.QuoteRepository", return_value=repository), patch("quotewake_salesforce.cli.CallEClient") as calle_class:
         assert main(["--show-prompt", "--max-calls", "1"]) == 0
     rendered = capsys.readouterr().out
-    assert "Quote 0Q0000000000001 prompt:" in rendered
-    assert "Quote 0Q0000000000002 prompt:" not in rendered
+    assert "Quote 0Q0…0001 prompt:" in rendered
+    assert "Quote 0Q0…0002 prompt:" not in rendered
     assert "deferred by limit: 1" in rendered
     repository.load_quote_lines.assert_called_once_with(["0Q0000000000001"])
     calle_class.assert_not_called()
@@ -423,7 +423,7 @@ def test_cli_wait_result_unknown_reconciles_call_without_replaying_creation():
     )
     message = _call_error_message(error)
     assert message.endswith(
-        "CALL-E accepted call call-123, terminal result is unknown; "
+        "CALL-E accepted call cal…-123, terminal result is unknown; "
         "reconcile this call before any new attempt."
     )
     assert "same idempotency key" not in message

@@ -382,21 +382,27 @@ def _verify_provider_binding(
     returned_key = payload.get("idempotency_key", payload.get("idempotencyKey"))
     recipient = _first_recipient(payload)
     returned_phones = recipient.get("phones") if recipient else None
+    if returned_phones is None and recipient and recipient.get("phone") is not None:
+        returned_phones = [recipient["phone"]]
     returned_locale = recipient.get("locale") if recipient else None
     returned_region = recipient.get("region") if recipient else None
     returned_schema = payload.get("result_schema")
+    # The CALL-E create response is the authoritative binding for the
+    # idempotency key and request metadata. The later GET result may omit
+    # those request fields, so missing optional echoes are valid; an echo that
+    # is present must still match exactly.
     checks = (
-        (returned_call_id, call_id, "call ID"),
-        (returned_metadata, metadata, "metadata"),
-        (returned_task, request.goal, "task"),
-        (returned_phones, [request.phone], "recipient phone"),
-        (returned_locale, canonicalize_call_locale(request.locale), "recipient locale"),
-        (returned_region, request.region, "recipient region"),
-        (returned_schema, result_schema(), "result schema"),
-        (returned_key, provider_key, "provider key"),
+        (returned_call_id, call_id, "call ID", False),
+        (returned_metadata, metadata, "metadata", True),
+        (returned_task, request.goal, "task", True),
+        (returned_phones, [request.phone], "recipient phone", True),
+        (returned_locale, canonicalize_call_locale(request.locale), "recipient locale", True),
+        (returned_region, request.region, "recipient region", True),
+        (returned_schema, result_schema(), "result schema", True),
+        (returned_key, provider_key, "provider key", True),
     )
-    for returned, expected, field in checks:
-        if returned is None or returned != expected:
+    for returned, expected, field, optional in checks:
+        if (returned is None and not optional) or (returned is not None and returned != expected):
             raise CallEError(
                 f"CALL-E result binding does not match {field}",
                 classification="schema",

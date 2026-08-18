@@ -274,6 +274,19 @@ def test_mismatched_provider_phone_is_not_verified():
     assert result.outcome == "unknown"
 
 
+def test_result_without_optional_request_echoes_uses_call_id_binding():
+    fake = sdk(valid_result())
+    fake.calls.wait_for_result.return_value = {
+        "id": "call-1",
+        "status": "completed",
+        "task_completed": True,
+        "structured_result": valid_result(),
+    }
+    result = CallEClient(execute=True, client=fake).execute(REQUEST, next_attempt=1)
+    assert result.binding_verified is True
+    assert result.outcome == "interested"
+
+
 def test_schema_has_optional_preferred_date_without_a_union_and_enum_interest():
     schema = result_schema()
     assert "preferred_date" not in schema["required"]
