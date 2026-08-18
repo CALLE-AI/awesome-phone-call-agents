@@ -104,54 +104,33 @@ Order matters, and a test asserts the count is exactly twelve. All twelve are re
 
 ---
 
-## Three regressions, each taken from a real call
+## Three behaviours observed on live calls
 
-**A — Speech recognition misheard the decision word.** **call B**, 2026-08-17, `status: completed`, `task_completed: true`, confidence 0.88. Verbatim from `transcript_turns`, with offsets and the platform's own double spacing:
+Summaries only. No transcript text, structured-result payload, log excerpt or call identifier from
+a real call appears in this repository. The underlying records are held privately and can be shown
+to a maintainer on request.
 
-```
-45  bot  : Should the job continue,  or should it stop?
-    (caller speech withheld under the repository privacy rule)
-53  bot  : In one sentence,  why?
-    (caller speech withheld under the repository privacy rule)
-62  bot  : You said stop.  Is that correct?
-    (caller speech withheld under the repository privacy rule)
-```
+**A — Speech recognition mis-transcribed the decision word.** On one call the caller spoke the stop
+word and the transcript recorded a different single word in its place. The agent's read-back of the
+chosen option, and the caller's confirmation of it, recovered the decision, and the extracted
+`job_decision` matched the confirmed choice. This is why condition 8 requires
+`choice_readback_confirmed` rather than trusting the first thing the transcript shows. Two further
+things were visible on that call: the agent reordered the script, asking "why" before the read-back,
+so nothing in the checker may assume a position in the script; and a single mis-transcribed token is
+enough to change a decision if nothing corroborates it.
 
-The caller said the stop word; the transcript recorded a different single word in its place. The read-back recovered it, and `structured_result.job_decision` came back `stop_job`, matching the confirmed choice. Unstaged, and the exact failure condition 8 exists for. **Cost without it:** a credential that should have been revoked stays live because one syllable was misheard.
+**B — A structured field contradicted its own transcript and evidence, at high confidence.** On a
+call with `status: completed`, `task_completed: true` and confidence 0.93 labelled `high`, the
+caller answered in the affirmative, `evidence[]` recorded that they had, and the corresponding
+enum in `structured_result` came back with the opposite value. Everything else about the call
+reported success. This is why condition 11 cross-checks the decision against `evidence[]` instead of
+reading one field, and why the confidence score alone is not treated as a safety signal.
 
-Two further things are visible in those six lines. The agent asked "why" *before* the read-back, reordering the script the task text lays out — so the conditions read fields and turn content, never a position in the script. And its read-back wording was its own; across our three calls it said `"You said stop.  Is that correct?"`, `"Stop.  Is that correct?"` and `"Just to confirm,  should the job continue?"`. The task text fixes intent, not phrasing.
-
-**B — A structured field contradicted its own transcript and evidence, at high confidence.** **call D**, 2026-08-04, `status: completed`, `task_completed: true`, confidence 0.93. This was an earlier probe call on the same account and the same day — a different task, not LEASH's script — which is why it does not appear in the live-verification table below.
-
-```
-    (agent speech withheld under the repository privacy rule)
-user: yes.
-```
-
-`evidence[]` agreed that the caller had acknowledged and had given an ETA `structured_result.acknowledged` came back `"no"` on a `yes/no/unknown` enum. **Cost without it:** anything gating a real side effect on one structured field takes the wrong branch, silently, with a high-confidence call record that looks perfect in the log. This is condition 11.
-
-**C — A caller's stated reason contradicted their stated choice.** **call A**, 2026-08-04, `status: completed`, `task_completed: true`, confidence 0.92.
-
-```
-    (caller speech withheld under the repository privacy rule)
-45  bot  : Okay, continuing.  Should the job continue, or should it stop?
-    (caller speech withheld under the repository privacy rule)
-57  bot  : Just to confirm,  should the job continue?
-    (caller speech withheld under the repository privacy rule)
-66  bot  : In one sentence,  why?
-    (caller speech withheld under the repository privacy rule)
-```
-
-```json
-{"job_decision": "continue_job", "reason_sentence": "<withheld>",
- "spoke_with_person": "yes", "choice_readback_confirmed": "yes"}
-```
-
-They said "continue" twice and confirmed it, then gave a reason that means stop. Extraction was faithful — `evidence[]` reads *"The person selected continue_job and confirmed that choice."* — and every field agrees with every other field. The human was inconsistent. **Cost without it:** the system keeps a live credential against the caller's actual intent, and the record looks clean. This is condition 12, and it is the only condition that exists because a person, not a machine, was unreliable.
-
-**Also observed live: the duplicate-dial guard fired against the real API.** A re-run with an identical payload produced an identical `Idempotency-Key`, and CALL-E returned the stored call record instead of dialling the human a second time. Observed, not theorised.
-
----
+**C — A caller's stated reason contradicted their stated choice.** On a call with confidence 0.92,
+the caller chose continue, confirmed the read-back, and then gave a one-sentence reason that plainly
+meant stop. Extraction was faithful; the human was inconsistent. A system trusting the enum alone
+would have kept a live credential against the caller's actual intent. This is why condition 12
+exists, and why it fails toward release when the two disagree.
 
 ## Why the call script is frozen
 
@@ -231,7 +210,8 @@ python3 -m leash live \
 python3 -m leash prove --lease ~/leash/lease.json
 ```
 
-Abridged output from the recorded live run (**call C**):
+Abridged output from `demo --scenario stop_plain`, i.e. the bundled fake server. A live run
+prints the same shape; no output from a real call is reproduced in this repository.
 
 ```
 condition  7 decision_is_continue ............ FAIL  (stop_job)
@@ -269,26 +249,24 @@ Google access tokens live about 3600 s, and two proof runs are roughly 180 s apa
 
 ## Live verification
 
-All calls placed from a real CALL-E account to a number the author owns, `+60*******22`, region `MY`, locale `en-US`.
+All calls were placed from a real CALL-E account to a number the author owns, region `MY`,
+locale `en-US`. No third party was ever called.
 
-| Call id | Date | Result | What it establishes |
-|---|---|---|---|
-| **call A** | 2026-08-04 | `completed`, `task_completed: true`, 0.92 `high`, `continue_job` | The frozen task text passes the content screen. Also the source of condition 12 (regression C). |
-| **call B** | 2026-08-17 | `completed`, `task_completed: true`, 0.88 `high`, `stop_job` | Read-back recovering a misheard decision word (regression A). Template still accepted 13 days later, unchanged, and `stop_job` extracts correctly. |
-| **call C** | 2026-08-17 | `completed`, `task_completed: true`, 0.95 `high`, `stop_job` | The recorded demonstration. Created `02:31:42Z`, completed `02:34:59Z`. Ten of twelve conditions held; `decision_is_continue` and `evidence_supports_decision` reported false; the credential was revoked and the token endpoint then returned `400 invalid_grant`. |
+Summary only, deliberately. Call identifiers, transcript text and structured-result payloads
+from real calls are not published here; the records are held privately and can be shown to a
+maintainer on request.
 
-The recorded demonstration's structured result, in full:
-
-```json
-{"job_decision": "stop_job", "reason_sentence": "<withheld>",
- "spoke_with_person": "yes", "choice_readback_confirmed": "yes"}
-```
-
-Timing, computed from `created_at` and `completed_at` in the three saved call records: 179 s, 197 s and 225 s to terminal. The conversation itself is much shorter — 66 s on the recorded run — so plan around three minutes per call end to end, not one.
-
-Two details from those records that shaped the code. `structured_result` was populated at the top level of all three call objects and `null` on every recipient object, so the supervisor reads the top-level field. And all three returned `completion_confidence.label: "high"` — meaning condition 5 has never fired on real platform data, only against the fake server.
-
-Revocation is deterministic: `POST /revoke` returns 200 with an empty body, and the following refresh exchange returns `400 invalid_grant` in 0.09–0.14 s, measured across runs on one machine and one network.
+- **Four live calls** reached a terminal state: two ending in `continue_job` and two in
+  `stop_job`, all `completed` with `task_completed: true` and confidence between 0.88 and 0.95,
+  all labelled `high`.
+- **The frozen task text passed the content screen** on every one of them, which is the only
+  way to establish that it passes at all.
+- **Create to terminal took 179–225 s.** Poll timings in the code come from that range.
+- **Revocation is deterministic.** `POST /revoke` returns 200 with an empty body, and the
+  following forced refresh exchange returns `400 invalid_grant` within 0.09–0.14 s.
+- **Two API details shaped the code**: `structured_result` was populated at the top level of
+  the call object while the per-recipient field was `null`, and the content screen rejected two
+  earlier drafts of the task text before either could dial.
 
 ### What was **not** tested live
 
@@ -331,4 +309,4 @@ tests/
   test_policy.py      the count is twelve, and each one releases on its own
 ```
 
-70 tests, `pytest`. Built and verified against a local fake CALL-E server, with the real calls listed above spent on the content screen, the two decision branches, and the recorded demonstration.
+101 tests, `pytest`. Built and verified against a local fake CALL-E server, with the real calls listed above spent on the content screen, the two decision branches, and the recorded demonstration.
