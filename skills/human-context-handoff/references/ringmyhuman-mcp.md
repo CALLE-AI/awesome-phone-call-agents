@@ -49,7 +49,8 @@ from the signed-in account's verified contacts.
   "alternatives": ["Start a guided test", "Configure call settings first"],
   "urgency": "normal",
   "client_request_id": "onboarding-choice-example-v1",
-  "ringflow_id": "flow_example"
+  "ringflow_id": "flow_default",
+  "response_deadline": "2030-01-15T09:45:00Z"
 }
 ```
 
@@ -61,3 +62,55 @@ The MCP request returns promptly after durable acceptance. Progress
 notifications, when supported by both the client and server, apply only while a
 single MCP operation remains active. The complete telephone lifecycle uses the
 durable request ID and status polling.
+
+## Mapping to the portable contract
+
+RingMyHuman implements the acknowledgement, polling, and terminal rules in
+[`result-contract.md`](result-contract.md), but names some fields differently
+and nests the decision. Adapters should map them as follows.
+
+### Acknowledgement
+
+| Portable contract | RingMyHuman |
+| --- | --- |
+| `request_id` | `request_id` |
+| `status` | `status` (`queued`) |
+| `poll_after_seconds` | `poll_after_seconds` |
+| `status_operation` | `status_tool` (`get_human_help_status`) |
+
+### Terminal result
+
+RingMyHuman returns the outcome under a nested `decision` object:
+
+```json
+{
+  "request_id": "req_example_01",
+  "status": "completed",
+  "terminal": true,
+  "last_updated_at": "2030-01-15T09:30:00Z",
+  "decision": {
+    "decision": "approved",
+    "selected_action": "Escalate to Ops support.",
+    "instructions": "Keep inbox services running while Ops investigates.",
+    "summary": "The human chose escalation and asked that processing continue.",
+    "answered_by": "connected_human",
+    "decided_at": "2030-01-15T09:29:51Z",
+    "unanswered_follow_up_questions": []
+  }
+}
+```
+
+| Portable contract | RingMyHuman |
+| --- | --- |
+| `choice` | `decision.selected_action` (see note) |
+| `rationale` | `decision.summary` |
+| `constraints` | `decision.instructions` |
+| `answered_by` | `decision.answered_by` |
+| `last_updated_at` | `last_updated_at` |
+| `terminal` | `terminal` |
+
+**Note on choice IDs.** RingMyHuman accepts `recommended_action` and
+`alternatives` as human-readable strings and returns `selected_action` as
+prose, not as a stable ID. A host using this skill must match the returned text
+back to one previewed choice and fail closed when the match is not unambiguous.
+Do not infer a branch from a partial or fuzzy match.
