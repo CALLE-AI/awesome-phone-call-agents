@@ -1062,7 +1062,10 @@ async function pollCall(callId, uid){
     const ev = evidenceCheck(sim.result, sim.turns);
     const entry = await publish(pending, ev.result, {
       summary: sim.summary || 'Simulated call',
-      taskCompleted: ev.result.answer_status === 'answered',
+      /* The same thing CALL-E's flag means on a real call: the agent got its
+         question asked and the call ran its course. A simulated `unreachable`
+         is voicemail or nobody home, and that task did not complete. */
+      taskCompleted: ev.result.answer_status !== 'unreachable',
       confidence: { score: 1, label: 'high' },
       transcript: sim.turns,
       simulated: true,
@@ -1089,7 +1092,8 @@ async function pollCall(callId, uid){
    on every axis that could otherwise be substituted:
 
      call       our own pending record exists for this id
-     terminal   the call is finished, and CALL-E did not judge the task failed
+     terminal   the call is finished
+     completed  it finished by completing, and CALL-E says the task was done
      task       the script it ran hashes to the script we sent
      recipient  the number dialled is the number we meant to dial
      metadata   app, place, question hash and visibility all match our record
@@ -1100,6 +1104,31 @@ async function pollCall(callId, uid){
    one costs the claim every other entry on the page depends on. */
 
 const TERMINAL = ['completed', 'failed', 'canceled'];
+
+/* Terminal is not the same as successful, and this is the difference.
+   `failed` and `canceled` are terminal — the call is over and the person who
+   asked is owed that outcome — but a call that dropped, errored out or was
+   cancelled mid-sentence is not a source, whatever its structured result went
+   on to claim. Neither is a `completed` call that CALL-E itself will not say
+   completed its task: `false` is a verdict against, and `null`/`undefined` is
+   no verdict at all, which is not the same as a verdict for.
+
+   So publishing an answer takes an affirmative on both axes. Anything else is
+   still recorded and still returned to the asker — it just cannot become a
+   fact on a page headed "Confirmed by phone". */
+function completionCheck(status, taskCompleted){
+  if(status !== 'completed')
+    return { ok: false, reason: `call ended ${status || 'with no status'}, not completed` };
+  if(taskCompleted === false)
+    return { ok: false, reason: 'CALL-E judged the task not completed' };
+  if(taskCompleted !== true)
+    return { ok: false, reason: 'CALL-E returned no task-completion verdict' };
+  return { ok: true };
+}
+
+/* One place decides what an answer that cannot be published becomes, so the
+   downgrade is identical wherever it is applied. */
+const withoutAnswer = r => ({ ...r, answer_status: 'unknown', answer: '', evidence_quote: '' });
 
 /* Punctuation- and case-insensitive so a quote can be compared to the words it
    was taken from: CALL-E returns "We open at nine." against a turn reading
@@ -1128,7 +1157,7 @@ function evidenceCheck(result, transcript){
   if(!staff.length)
     // an answer with nobody answering. Not a fact about the place at all.
     return { ok: false, reason: 'answered with no staff turn in the transcript',
-             result: { ...r, answer_status: 'unknown', answer: '', evidence_quote: '' } };
+             result: withoutAnswer(r) };
 
   if(quoteBinds(r.evidence_quote, staff)) return { ok: true, result: r };
 
@@ -1206,12 +1235,10 @@ async function ingest(call){
 
   const r = call.structuredResult || {};
   const transcript = bound.attempt?.transcriptTurns || [];
-  /* CALL-E's own judgement that the task did not complete is enough to keep an
-     answer off the shared list, whatever the structured result claims. `null`
-     means it has no judgement yet and is not a verdict. */
-  const ev = call.taskCompleted === false
-    ? { result: { ...r, answer_status: 'unknown', answer: '', evidence_quote: '' } }
-    : evidenceCheck(r, transcript);
+  /* Whether the call itself completed is checked in publish() — one gate for
+     both this path and the simulator — so all that is left here is whether the
+     words back the answer. */
+  const ev = evidenceCheck(r, transcript);
 
   return publish(pending, ev.result, {
     summary: call.summary || '',
@@ -1309,6 +1336,21 @@ async function topicFor(question, templateId){
 
 async function publish(pending, result, meta){
   const now = Date.now();
+
+  /* The completion gate, here rather than in ingest() so that every route to a
+     published entry passes it: a result only stays `answered` if the call it
+     came from actually completed and CALL-E affirms the task was done. A
+     failed, cancelled or unjudged call still gets an entry — the asker is owed
+     the outcome — but it carries no answer, so nothing downstream can present
+     it as a confirmed fact. See completionCheck. */
+  const comp = completionCheck(meta.status, meta.taskCompleted);
+  if(!comp.ok && result.answer_status === 'answered'){
+    console.warn(`calle: refusing to publish an answer for ${pending.callId}: ${comp.reason}`);
+    result = withoutAnswer(result);
+    meta = { ...meta, failureCode: meta.failureCode || 'incomplete_call',
+             failureMessage: meta.failureMessage || comp.reason };
+  }
+
   const answered = result.answer_status === 'answered';
   const entry = {
     qHash: pending.qHash,
@@ -1358,8 +1400,8 @@ async function publish(pending, result, meta){
     const mine = (await docGet(pkey)) || [];
     await docSet(pkey, [entry, ...mine.filter(e => e.qHash !== entry.qHash)].slice(0, 20),
       PRIVATE_TTL_DAYS * DAY);
-  }else if(entry.answerStatus === 'unreachable' || !meta.bound){
-    /* Two things land here and both are "returned to the asker, never shared".
+  }else if(entry.answerStatus === 'unreachable' || !meta.bound || !comp.ok){
+    /* Three things land here and all are "returned to the asker, never shared".
 
        `unreachable` is voicemail, an automated menu, a disconnected line or
        nobody picking up. That is a fact about one attempt, not a fact about the
@@ -1371,6 +1413,11 @@ async function publish(pending, result, meta){
        remember: a result that did not bind to a request we made (see
        bindResult) cannot be written to a place's public answers by any path,
        whatever else it claims about itself.
+
+       `!comp.ok` is the same rule for the call itself rather than the result:
+       a call that did not complete, or that CALL-E will not affirm completed
+       its task, says nothing about the place. Its answer has already been
+       stripped above; this keeps the record of it off the shared list too.
 
        Either way the record below is still written, because the person who
        asked is owed the outcome of a call they requested, and the lock release
@@ -1509,7 +1556,7 @@ module.exports = {
   /* Exported so the binding rules can be exercised directly against hand-built
      API records — the refusals are the part of this file most worth testing and
      the least reachable through a real call. */
-  bindResult, evidenceCheck,
+  bindResult, evidenceCheck, completionCheck,
   simulate, simFallback, simOutcome, TEMPLATES, RESULT_SCHEMA, openerFor, placeNoun, DISCLOSURE,
   info: () => ({
     configured: configured(), dryRun: DRY_RUN, webhook: !!webhookUrl(),

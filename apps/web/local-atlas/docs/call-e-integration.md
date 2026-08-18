@@ -97,13 +97,14 @@ listing content is not something a directory entry should do.
 ## Binding a result to its request
 
 A published entry says *confirmed by phone*, so that claim is checked rather than
-assumed. `bindResult()` requires all six of these before anything is published, and any
-failure is a refusal:
+assumed. `bindResult()` and `publish()` require all seven of these before anything is
+published, and any failure is a refusal:
 
 | Binding | What must hold |
 |---|---|
 | **call** | we hold a stored request for this exact call id |
-| **terminal** | the call is in a terminal state, and CALL-E did not judge the task failed |
+| **terminal** | the call has finished; queued and in-progress records are left to settle |
+| **completed** | it finished by *completing*, and CALL-E affirms `taskCompleted` — `failed`, `canceled`, a `false` verdict and no verdict at all are each a refusal |
 | **task** | `sha256(call.task)` matches the script we sent — same disclosure, same single question |
 | **recipient** | the transcript is read from an attempt on the number *we* dialled, not `recipients[0]` |
 | **metadata** | `app`, `place_key`, `q_hash`, `question` and `visibility` all match our record |
@@ -112,9 +113,11 @@ failure is a refusal:
 The evidence test compares `evidence_quote` to the `user` turns of the transcript,
 case- and punctuation-insensitively; a quote binds if it is exactly one whole turn, or a
 substring of at least 12 characters. Failures downgrade rather than invent: no staff turn
-makes it `unknown`, an ungrounded quote makes it `unclear` with the answer dropped, and
-any other binding failure publishes nothing and logs the reason. `publish()` is the one
-gate — it will not write to a place's shared list unless the result is marked bound.
+makes it `unknown`, an ungrounded quote makes it `unclear` with the answer dropped, an
+answer from a call that did not complete makes it `unknown`, and any other binding failure
+publishes nothing and logs the reason. `publish()` is the one gate — it will not write to a
+place's shared list unless the result is marked bound and the call it came from completed,
+which is why the webhook, the poll and the simulator cannot diverge on this.
 
 Losing an answer costs the asker a retry. Publishing an unbound one costs the claim every
 other entry on the page depends on.

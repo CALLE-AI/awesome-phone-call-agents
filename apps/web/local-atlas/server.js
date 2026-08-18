@@ -10,6 +10,10 @@
    the next user's. */
 const express = require('express');
 const path = require('path');
+const dns = require('dns');
+const net = require('net');
+const http = require('http');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -632,19 +636,142 @@ app.get('/api/reddit', async (req, res) => {
   }catch(e){ res.status(502).json({ error: String(e.message || e) }); }
 });
 
-/* ---- generic page fetch for the deals scanner ---- */
+/* ---- generic page fetch for the deals scanner ----
+   This endpoint takes a URL from anyone and fetches it from inside our network,
+   which is the shape of every SSRF. Three things make that safe, and all three
+   are needed:
+
+     1. the address, not the name. A hostname check can be walked straight past
+        by `deals.example.com  A  169.254.169.254`, by decimal and octal spellings
+        of a v4 address, and by every v4-mapped v6 form of localhost. So what is
+        judged is the resolved IP, and a name that resolves anywhere private is
+        refused whatever it is called.
+     2. every hop. `redirect: 'follow'` checked the URL the caller handed us and
+        then let the *server* pick the next one — a public URL is allowed to
+        answer `302 Location: http://169.254.169.254/latest/meta-data/`. Redirects
+        are followed by hand here so each target goes through the same check as
+        the first.
+     3. the address we checked is the address we connect to. The guard is
+        installed as the socket's own `lookup`, so there is no window between
+        resolving a name and connecting to it for a second answer to arrive
+        (DNS rebinding); the connection can only go to an address that passed. */
+const MAX_HOPS = 4;
+const FETCH_TIMEOUT = 10000;
+const FETCH_MAX_BYTES = 500000;
+
+/* Everything that is not a public destination: loopback, the RFC1918 ranges,
+   link-local — which is where the cloud metadata service lives on 169.254.169.254
+   — carrier NAT, multicast and reserved space. Unparseable means refused. */
+function isBlockedIp(ip){
+  if(net.isIPv4(ip)){
+    const [a, b] = ip.split('.').map(Number);
+    if(a === 0 || a === 10 || a === 127) return true;            // this-host, private, loopback
+    if(a === 169 && b === 254) return true;                      // link-local + metadata
+    if(a === 172 && b >= 16 && b <= 31) return true;             // private
+    if(a === 192 && b === 168) return true;                      // private
+    if(a === 192 && b === 0) return true;                        // protocol assignments
+    if(a === 100 && b >= 64 && b <= 127) return true;            // carrier-grade NAT
+    if(a >= 224) return true;                                    // multicast, reserved, broadcast
+    return false;
+  }
+  if(net.isIPv6(ip)){
+    const s = ip.toLowerCase().replace(/^\[|\]$/g, '');
+    /* ::ffff:127.0.0.1 and ::ffff:7f00:1 are the same address wearing different
+       clothes, and both reach loopback. Judge the v4 address inside. */
+    const dotted = s.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if(dotted) return isBlockedIp(dotted[1]);
+    const hex = s.match(/^::ffff:([\da-f]{1,4}):([\da-f]{1,4})$/);
+    if(hex){
+      const n = (parseInt(hex[1], 16) << 16) | parseInt(hex[2], 16);
+      return isBlockedIp([n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.'));
+    }
+    if(s === '::' || s === '::1') return true;                   // unspecified, loopback
+    if(/^f[cd]/.test(s)) return true;                            // unique local fc00::/7
+    if(/^fe[89ab]/.test(s)) return true;                         // link-local fe80::/10
+    if(/^ff/.test(s)) return true;                               // multicast
+    return false;
+  }
+  return true;
+}
+
+/* Drop-in for net.connect's `lookup`. Resolves as usual, refuses if any answer
+   is private, and hands back only the answers it checked. */
+function guardedLookup(hostname, options, cb){
+  dns.lookup(hostname, { ...options, all: true }, (err, addrs) => {
+    if(err) return cb(err);
+    const list = Array.isArray(addrs) ? addrs : [addrs];
+    const bad = list.find(a => isBlockedIp(a.address));
+    if(bad) return cb(new Error(`blocked address ${bad.address} for ${hostname}`));
+    if(options && options.all) return cb(null, list);
+    cb(null, list[0].address, list[0].family);
+  });
+}
+
+function checkedUrl(raw, base){
+  const u = base ? new URL(raw, base) : new URL(raw);
+  if(!/^https?:$/.test(u.protocol)) throw new Error('bad protocol: ' + u.protocol);
+  if(!u.hostname) throw new Error('no host');
+  /* A literal address never reaches the guard above, because a socket given an
+     IP has nothing to resolve and so never calls `lookup` — so literals are
+     judged here instead. The URL parser has already folded every alternative
+     spelling into a plain one by this point (`0177.0.0.1` and `2130706433` both
+     parse as `127.0.0.1`), which is why one check covers all of them. */
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  if(net.isIP(host) && isBlockedIp(host)) throw new Error('blocked address ' + host);
+  return u;
+}
+
+function requestOnce(u){
+  return new Promise((resolve, reject) => {
+    const req = (u.protocol === 'https:' ? https : http).request(u, {
+      lookup: guardedLookup,
+      /* Identity, so the size cap below counts the bytes we actually keep and
+         the body needs no decoding to be text. */
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; local-atlas)',
+                 'Accept-Encoding': 'identity' },
+      timeout: FETCH_TIMEOUT
+    }, resolve);
+    req.on('timeout', () => req.destroy(new Error('timed out')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function readCapped(res, maxBytes){
+  return new Promise((resolve, reject) => {
+    let out = '';
+    res.setEncoding('utf8');
+    res.on('data', c => {
+      if(out.length >= maxBytes) return;
+      out += c.slice(0, maxBytes - out.length);
+      if(out.length >= maxBytes) res.destroy();
+    });
+    res.on('end', () => resolve(out));
+    res.on('close', () => resolve(out));
+    res.on('error', reject);
+  });
+}
+
+async function guardedFetchText(raw){
+  let u = checkedUrl(raw);
+  for(let hop = 0; ; hop++){
+    const res = await requestOnce(u);
+    const code = res.statusCode;
+    if(code >= 300 && code < 400 && res.headers.location){
+      res.resume();                                   // drain, we only want the header
+      if(hop >= MAX_HOPS) throw new Error('too many redirects');
+      u = checkedUrl(res.headers.location, u);        // ← the hop the old code trusted
+      continue;
+    }
+    if(code < 200 || code >= 300){ res.resume(); throw new Error('HTTP ' + code); }
+    return readCapped(res, FETCH_MAX_BYTES);
+  }
+}
+
 app.get('/api/fetch', async (req, res) => {
   try{
-    const u = new URL(String(req.query.url || ''));
-    if(!/^https?:$/.test(u.protocol)) throw new Error('bad protocol');
-    if(/^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[)/.test(u.hostname))
-      throw new Error('blocked host');
-    const txt = await cached('f:' + u.href, 3600e3, async () => {
-      const rr = await fetch(u.href, { redirect: 'follow',
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; local-atlas)' } });
-      if(!rr.ok) throw new Error('HTTP ' + rr.status);
-      return (await rr.text()).slice(0, 500000);
-    });
+    const u = checkedUrl(String(req.query.url || ''));
+    const txt = await cached('f:' + u.href, 3600e3, () => guardedFetchText(u.href));
     res.type('text/plain').send(txt);
   }catch(e){ res.status(502).send('fetch failed: ' + String(e.message || e)); }
 });
