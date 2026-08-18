@@ -71,8 +71,13 @@ def test_convert_without_lead_tz_uses_company_tz():
 
 
 def test_available_slots_with_conflict():
-    day = date(2026, 8, 17)
-    items = [_timed("2026-08-17T10:00:00-04:00", "2026-08-17T10:30:00-04:00")]
+    day = date.today() + timedelta(days=7)
+    items = [
+        _timed(
+            f"{day.isoformat()}T10:00:00-04:00",
+            f"{day.isoformat()}T10:30:00-04:00",
+        )
+    ]
     service = FakeCalendarService(items)
     slots = app.get_available_slots(service, day, NEW_YORK)
     assert len(slots) == 15
@@ -82,14 +87,16 @@ def test_available_slots_with_conflict():
 
 
 def test_all_day_event_blocks_everything():
-    day = date(2026, 8, 17)
-    service = FakeCalendarService([_all_day("2026-08-17", "2026-08-18")])
+    day = date.today() + timedelta(days=7)
+    service = FakeCalendarService(
+        [_all_day(day.isoformat(), (day + timedelta(days=1)).isoformat())]
+    )
     slots = app.get_available_slots(service, day, NEW_YORK)
     assert slots == []
 
 
 def test_slots_shown_in_lead_timezone():
-    day = date(2026, 8, 17)
+    day = date.today() + timedelta(days=7)
     service = FakeCalendarService([])
     slots = app.get_available_slots(service, day, NEW_YORK, lead_tz=KOLKATA)
     first_company = datetime.combine(day, datetime.min.time()).replace(
