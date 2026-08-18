@@ -35,6 +35,7 @@ Current apps:
 | [`typescript/oauth-login-client`](typescript/oauth-login-client/) | TypeScript | CALL-E OAuth login client for MCP Streamable HTTP. |
 | [`typescript/vibehub-founder-relay`](typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`typescript/ringer`](typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
+| [`typescript/caucus`](typescript/caucus/) | TypeScript | Neutral shuttle-diplomacy mediator for two-party money disputes: recorded consent from both parties before any substantive call, alternating rounds that relay each side's offer with verbatim transcript evidence, a compile-time-plus-runtime taint proof that one party's private data never enters the other's call, dual attestation by a six-digit code derived from a SHA-256 digest of the exact terms, and a hash-chained ledger any case can be rebuilt and re-verified from. |
 
 Suggested grouping:
 

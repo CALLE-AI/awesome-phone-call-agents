@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Caucus — replay of a real mediated case (masked)</title>
+  <!-- data: favicon keeps the page fully offline (no /favicon.ico request). -->
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <!-- Two facing chevrons: the shuttle, one color per party. -->
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <path class="mark-a" d="M10.5 5 4 12l6.5 7" />
+        <path class="mark-b" d="M13.5 5 20 12l-6.5 7" />
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">Caucus</span>
+        <span class="brand-sub">shuttle mediation over recorded calls</span>
+      </div>
+    </div>
+    <div class="topbar-tools">
+      <label class="case-picker" id="case-picker" hidden>
+        <span class="picker-label">Case</span>
+        <select id="case-select" aria-label="Select case"></select>
+      </label>
+      <span class="source-badge" id="source-badge" hidden></span>
+    </div>
+  </header>
+
+  <main id="main">
+    <p class="status-line" id="loading">A neutral AI mediator phoned each party separately over CALL-E — a $1,200 deposit dispute settled at $700 for ~$0.55 in calls. Loading the case ledger… (this page needs JavaScript; the same data is in <code>case.json</code>)</p>
+    <section class="error-panel" id="error" hidden></section>
+    <div id="case-root" hidden></div>
+  </main>
+
+  <footer class="page-foot">
+    <p>
+      Read-only view rebuilt from the hash-chained case ledger.
+      Phone numbers are masked to their last four digits; party-private intake data never enters this page.
+      Both parties in this real case were role-played by the operator on two separate phones —
+      real telephony, real ASR, scripted humans.
+    </p>
+    <p>
+      <a href="https://github.com/Biniyoyo/caucus">github.com/Biniyoyo/caucus</a> ·
+      <a href="https://github.com/CALLE-AI/awesome-phone-call-agents/pull/164">community PR</a> ·
+      built on <a href="https://www.heycall-e.com/">CALL-E</a>
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
