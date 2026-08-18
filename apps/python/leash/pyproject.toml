@@ -3,12 +3,15 @@ name = "leash"
 version = "0.1.0"
 description = "A phone call that can only take capability away: an unattended agent's Google credential is revoked unless twelve conditions hold."
 requires-python = ">=3.11"
-dependencies = [
-    "calle-ai==0.6.0",
-    "google-auth==2.35.0",
-    "google-auth-oauthlib==1.2.1",
-    "requests==2.32.3",
-]
+# None. Every module in this package imports only the standard library, which is why
+# `run_demo.sh` works on a clean checkout with nothing installed and why a reviewer can
+# exercise the whole supervisor without a build step.
+#
+# An earlier revision declared calle-ai, google-auth, google-auth-oauthlib and requests.
+# Nothing imported any of them: the CALL-E calls and the Google token exchange both go
+# through urllib.request directly, deliberately, so the raw HTTP is visible in the
+# on-camera proof. Declaring an SDK this app does not use overstated what it depends on.
+dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest==8.3.3"]

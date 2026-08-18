@@ -17,7 +17,7 @@ WHAT IS REAL HERE AND WHAT IS RECONSTRUCTED
       - the envelope: id/object/status/task/recipients[]/structured_result/summary/
         task_completed/completion_confidence/evidence[]/metadata/failure_code/failure_message/
         created_at/completed_at, and recipients[].attempts[].transcript_turns[]
-      - the `stop_plain` and `contradiction` transcripts, near verbatim, including the
+      - the `stop_plain` and `contradiction` transcripts, written for this fixture, including the
         speech-recognition artefacts
       - the ordering fact that makes the free pre-flight free: result_schema is validated
         before recipients
@@ -78,7 +78,7 @@ __all__ = ["FakeCalle", "SCENARIOS", "DEFAULT_SCENARIO"]
 # fixture in the set that keeps a credential alive, and making it the thing you get by omitting
 # an argument would mean every accident -- a forgotten flag, a mistyped scenario, a copy-pasted
 # constructor -- lands on the permissive branch. `stop_plain` is also the most honest default
-# available: it is near verbatim from a real call.
+# available: it is synthetic, written to the shape the API returns.
 DEFAULT_SCENARIO = "stop_plain"
 
 # One line each, so the CLI and the README can list them without duplicating prose.
@@ -89,7 +89,7 @@ SCENARIOS: dict[str, str] = {
     ),
     "stop_plain": (
         "Live person says stop; recognition hears 'dot' and the read-back recovers it "
-        "(near verbatim from a real call)."
+        "(synthetic; written to the shape the API returns, not copied from a call)."
     ),
     "unclear_answer": (
         "Live person hesitates and asks the caller to decide; job_decision comes back "
@@ -100,8 +100,8 @@ SCENARIOS: dict[str, str] = {
         "corrected the read-back."
     ),
     "contradiction": (
-        "job_decision 'continue_job' at 0.92 while the reason sentence means stop -- verbatim "
-        "from a real call; the human was the inconsistent party, not the extractor."
+        "job_decision 'continue_job' at 0.92 while the reason sentence means stop -- synthetic "
+        "modelled on the API contract; the human was the inconsistent party, not the extractor."
     ),
     "low_confidence": (
         "Same clean continue, completion_confidence 0.61 / low -- fails the confidence floor."
@@ -311,14 +311,15 @@ def _continue_clean(job: str, mins: str) -> _Terminal:
 
 
 def _stop_plain(job: str, mins: str) -> _Terminal:
-    """Near verbatim from a real call. Two things in it are the reason it is kept as a fixture.
+    """Synthetic. Two behaviours it reproduces are the reason it is kept as a fixture.
 
-    First, recognition returned "dot." where the person said "stop" -- and the agent's read-back
+    First, recognition returned a different single word where the person said "stop" -- the
+    token below is invented, since the real transcript is withheld -- and the agent's read-back
     ("You said stop. Is that correct?") recovered it. Second, the read-back and the reason arrive
     in the opposite order from the script; the agent reorders under pressure, so no parser may
     assume the turns follow the template.
     """
-    reason = "because i don't want it rewriting anything."
+    reason = "i would rather it left the repository alone for now."
     return _Terminal(
         status="completed",
         task_completed=True,
@@ -340,7 +341,7 @@ def _stop_plain(job: str, mins: str) -> _Terminal:
             _turn(40, "bot", _HEAR),
             _turn(40, "user", "yes."),
             _turn(45, "bot", _ASK),
-            _turn(45, "user", "dot."),
+            _turn(45, "user", "top."),
             _turn(53, "bot", _WHY),
             _turn(53, "user", reason),
             _turn(62, "bot", "You said stop.  Is that correct?"),
@@ -429,16 +430,16 @@ def _readback_denied(job: str, mins: str) -> _Terminal:
 
 
 def _contradiction(job: str, mins: str) -> _Terminal:
-    """Verbatim from a real call, and the single most useful object in this repository.
+    """Modelled on the API contract, and the single most useful object in this repository.
 
     The caller said "continue" twice and answered "yes" to the read-back. Extraction was faithful:
     job_decision continue_job at 0.92, evidence agreeing. Then the reason came back in the
-    caller's own words -- "the jobs done enough, take it back" -- which means stop. Every field
+    caller's own words, which plainly mean stop. Every field
     agrees with every other field and the whole thing is still wrong, because the human was the
     inconsistent party. A gate that trusted the enum would have kept a live credential against the
     stated intent of the person holding the only power to end it.
     """
-    reason = "the jobs done enough, take it back."
+    reason = "shut it down, we are finished here."
     return _Terminal(
         status="completed",
         task_completed=True,
