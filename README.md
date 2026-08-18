@@ -126,6 +126,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`voice-preflight`](skills/voice-preflight/) - Hear a call task spoken by your own text-to-speech provider before a real person does, then refuse a script whose critical line would not survive being spoken.
 - [`dollar-consent-first-callback`](skills/dollar-consent-first-callback/) - Consent-first owner escalation after a local safety gate blocks an extreme-risk developer action; call results never grant destructive permission.
 - [`forgerelay-supplier-clarification`](skills/forgerelay-supplier-clarification/) - Safe, approval-gated CALL-E workflow for collecting missing manufacturing RFQ details from authorized supplier contacts.
+- [`human-context-handoff`](skills/human-context-handoff/) - Ask a verified human one bounded product, workflow, preference, or operations question, then resume an agent only from a durable structured result.
 - [`google-form-callback`](skills/google-form-callback/) - Google Form response workflow for safe one-off callback calls with dry-runs, scheduling plans, and Sheets writeback. See the [workflow guide](docs/google-form-callback/).
 - [`linecanary-monitor`](skills/linecanary-monitor/) - Synthetic monitoring for phone lines and deployed voice agents: scheduled test calls, structured assertions, baseline diffing, and CI gating via the linecanary app.
 - [`mobilize`](skills/mobilize/) - Get a required number of confirmed responses from a consented pool within a deadline by dispatching parallel wave calls that stop the moment the need is met.
