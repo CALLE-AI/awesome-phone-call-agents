@@ -158,3 +158,35 @@ dist-scheduler/ esbuild output for the standalone scheduler (gitignored)
   with a unit-tested truth table; unknown is never upgraded to a confident verdict.
 - **Structured results are strict.** `result_schema` uses enums with `unknown` and an
   evidence field; the SDK's `structuredResult` is re-validated with zod on receipt.
+
+## Go-to-market & roadmap
+
+Openings is built to grow past the hackathon, not to be a one-off demo.
+
+### Initial users
+
+1. **Care navigators, case managers, and patient advocates** who book appointments all day.
+2. **Individuals on marketplace plans** trying to find a provider who actually answers.
+3. **Payers and health systems** that want to know which listed providers are reachable.
+
+### Go-to-market
+
+Start where directory rot hurts most — **behavioral health** — in a single metro, then expand
+specialty by specialty. The product works as a wedge in two directions:
+
+- **Demand side:** "stop dialing twenty numbers — Openings calls and keeps watching until a
+  slot opens."
+- **Supply side:** the access report (dead lines, wrong entities, misrouted numbers) is
+  directory-health data that payers, health systems, and state marketplaces already want but
+  don't have. Every ghost we find is a listing someone can fix.
+
+### Roadmap
+
+- **Phase 1 (hackathon):** NPPES framing, honest local classification, the standing watch,
+  dry-run and live modes, deployment, and the access report.
+- **Phase 2:** multiple directory sources plus a consent-gated paste/CSV import; SMS/email
+  alerts when a slot opens; business-hours-aware scheduling; more specialties and
+  payer-specific verification.
+- **Phase 3:** payer/provider-facing directory-health reports; multi-user accounts and
+  scheduling integrations; booking handoff (Openings never books on the caller's behalf);
+  HIPAA hardening for navigator and employer use.
