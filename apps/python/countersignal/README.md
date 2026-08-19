@@ -95,7 +95,7 @@ python countersignal.py \
 
 The `--allow` value must exactly match the selected recipient. The production base URL is pinned to the official CALL-E HTTPS origin; plain HTTP is accepted only for an explicit loopback test server. The CALL-E SDK is imported only after the live gates pass.
 
-A production deployment should additionally persist the authorized call intent before crossing the network boundary and reconcile an ambiguous submission outcome instead of redialing. This repository's production-workflow guide is the reference for that next hardening layer. CounterSignal's current contribution focuses on the experiment protocol and evidence/decision integrity that are unique to this use case.
+Before crossing the real-call boundary, CounterSignal now reserves the exact stable intent in SQLite. Once CALL-E returns a call ID, that ID is bound to the reservation. If a timeout or exception leaves the outcome ambiguous, the ledger moves to `outcome_unknown` and the same intent cannot automatically redial. This follows the repository's production-workflow rule that an unknown submission outcome is a state to reconcile, not permission to create another call.
 
 ## Experiment contract
 
@@ -154,7 +154,7 @@ Legal/compliance obligations for outbound research calls vary by jurisdiction an
 
 ## Tests
 
-The initial deterministic suite covers:
+The deterministic suite covers:
 
 - protocol-hash stability and drift detection;
 - no-call preview and masking;
@@ -165,7 +165,9 @@ The initial deterministic suite covers:
 - disconfirming-evidence priority;
 - frozen support-rule behavior and claim boundary;
 - invalid experiment rejection; and
-- idempotency separation by protocol and recipient.
+- idempotency separation by protocol and recipient;
+- durable duplicate-intent prevention; and
+- ambiguous provider outcome -> `outcome_unknown` with no blind redial.
 
 All tests run without credentials, network access, or a real phone call.
 
