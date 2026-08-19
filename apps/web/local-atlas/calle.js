@@ -195,7 +195,13 @@ function normalizeE164(raw){
    normalisation. What did survive was every number on earth: the reserved UK
    example `+447700900123` normalises perfectly well, and this app covers the US
    and Canada. Premium rate is the other one worth naming, because it is the shape
-   of abuse where the person who picks up profits from the call. */
+   of abuse where the person who picks up profits from the call.
+
+   900 is an area code; 976 is an *exchange* — the middle three digits, as in
+   +1 (212) 976-xxxx — so the two have to be matched in different positions.
+   Written as `(900|976)` at first, which is wrong in both directions at once:
+   it blocked 976 as an area code, which is not one, and let every real 976
+   exchange straight through. Corrected upstream by a CALL-E maintainer. */
 const PREMIUM_NANP = /^\+1(?:900\d{7}|\d{3}976\d{4})$/;
 function dialable(e164){
   if(!e164) return { ok: false, why: 'that is not a phone number we can dial' };
@@ -1010,7 +1016,7 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
      the same reason it is exempt from the courtesy rules: we own it. */
   if(live && !isOwnLine && !verified)
     return { status: 422, unverified: true,
-      error: `We couldn't confirm ${place.name}'s number against its listing just now, so no call was placed. This app only dials a number it can read back from the listing itself.` };
+      error: `We couldn't confirm ${place.name}'s number against its listing, so no call was placed. This app only dials a number it served for that listing itself. Reopen the place and try again — a listing left open for half a day goes stale.` };
 
   /* ---- don't dial a closed business ----
      The app already knows whether a place is open — `openNow` comes from
@@ -2423,7 +2429,7 @@ module.exports = {
   /* Exported so the binding rules can be exercised directly against hand-built
      API records — the refusals are the part of this file most worth testing and
      the least reachable through a real call. */
-  bindResult, evidenceCheck, completionCheck, localHour, zoneFor, countryOf, insideCallingWindow, bindRound, bindVerdict, recipientCheck,
+  bindResult, evidenceCheck, completionCheck, dialable, localHour, zoneFor, countryOf, insideCallingWindow, bindRound, bindVerdict, recipientCheck,
   askAround, getRounds, buildRoundTask, ROUND_SCHEMA, ROUND_MIN, ROUND_MAX,
   simulate, simFallback, simOutcome, TEMPLATES, RESULT_SCHEMA, openerFor, placeNoun, DISCLOSURE,
   info: () => ({

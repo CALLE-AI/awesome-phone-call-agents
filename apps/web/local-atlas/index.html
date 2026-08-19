@@ -1201,7 +1201,7 @@
   </div>
   <div class="panel-head">
     <div class="head-top">
-      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v10.0</span></div>
+      <div class="brand"><h1>Local Atlas</h1><span>US · CA</span><span class="ver">v10.3</span></div>
       <div>
         <button class="acct-btn" id="acctBtn" hidden>Sign in</button>
         <button class="hide-btn" id="themeToggle" aria-label="Toggle dark mode" title="Dark mode">◐</button>
@@ -2557,6 +2557,11 @@ function bucketize(elements){
       website: t.website || t['contact:website'] || '',
       hours:   t.opening_hours || '',
       phone:   t.phone || t['contact:phone'] || '',
+      /* The OSM element this came from, carried so the server can ask
+         Overpass for this one object and read the number back itself before
+         dialling it. Without it an OSM listing is unprovable and cannot be
+         called live — and a third of them carry a phone. */
+      osmId:   (e.type ? e.type[0] : '') + (e.id ?? ''),
       wiki:    t.wikipedia || '',
       addr:    [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' '),
       cuisine: (t.cuisine || '').replaceAll(';', ', ').replaceAll('_',' ') } });
@@ -3337,6 +3342,8 @@ const ASK_CODE_KEY = 'atlasAskCode';
    that is closed — see the courtesy window in calle.js. */
 const askPlaceBody = it => ({
   name: it.name, lat: it.lat, lon: it.lon, phone: it.phone || '',
+  // lets the server re-read this listing's number from the source it came from
+  osmId: it.osmId || '',
   addr: it.addr || '', kind: it.kind || '', gid: it.gid || '', fsqId: it.fsqId || '',
   openNow: openState(it),
   hours: todayHours(it),
