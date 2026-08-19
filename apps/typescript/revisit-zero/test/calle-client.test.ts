@@ -4,21 +4,27 @@ import { describe, expect, it, vi } from "vitest";
 import failedVisitsJson from "../examples/failed-visits.json" with { type: "json" };
 import { GOLDEN_RESULT } from "../demo/fake-calle.js";
 import {
+  buildProviderDispatchBinding,
+  createProviderIdempotencyKey,
   LiveCalleClient,
   type CallRequest,
   type CalleClientPort,
 } from "../src/calle-client.js";
 import type { FailedVisitCase } from "../src/case.js";
-import { createCallPreview, digestPreviewContent } from "../src/preview.js";
+import { createApprovalReceipt, createCallPreview, digestPreviewContent } from "../src/preview.js";
 import { buildProviderRecipientResultSchema, type StructuredCallResult } from "../src/result-schema.js";
 
 const failedVisit = (failedVisitsJson as FailedVisitCase[])[0]!;
-const preview = createCallPreview(failedVisit).content;
+const previewRecord = createCallPreview(failedVisit);
+const preview = previewRecord.content;
+const approval = createApprovalReceipt(previewRecord, "test-operator", new Date("2026-08-12T00:00:00Z"));
+const dispatchBinding = buildProviderDispatchBinding(failedVisit.recipient.phoneE164, preview, approval);
 const request: CallRequest = {
   caseId: failedVisit.id,
   recipientPhoneE164: failedVisit.recipient.phoneE164,
   preview,
-  idempotencyKey: "one-call-case-key",
+  approval,
+  idempotencyKey: createProviderIdempotencyKey(dispatchBinding),
 };
 const configuration = {
   apiKey: "offline-test-key",
@@ -27,6 +33,27 @@ const configuration = {
 };
 
 describe("controlled live CALL-E adapter", () => {
+  it("binds the provider idempotency key to normalized recipient, task, locale, schema, and approval", () => {
+    const original = buildProviderDispatchBinding(`  ${failedVisit.recipient.phoneE164}  `, preview, approval);
+    expect(original.recipient.phoneE164).toBe(failedVisit.recipient.phoneE164);
+    const originalKey = createProviderIdempotencyKey(original);
+    const mutations = [
+      { ...structuredClone(original), recipient: { ...original.recipient, phoneE164: "+61491570156" } },
+      { ...structuredClone(original), task: `${original.task}\nChanged approved task` },
+      { ...structuredClone(original), recipient: { ...original.recipient, locale: "en-NZ" as "en-AU" } },
+      { ...structuredClone(original), recipientResultSchema: { ...original.recipientResultSchema, title: "Changed schema" } },
+      { ...structuredClone(original), approval: { ...original.approval, approvedBy: "different-operator" } },
+    ];
+    expect(mutations.map(createProviderIdempotencyKey)).not.toContain(originalKey);
+  });
+
+  it("rejects a provider key that is not bound to the exact approved dispatch", async () => {
+    const harness = makeHarness();
+    const outcome = await client(harness.port).startOneCall({ ...request, idempotencyKey: "case-only-key" });
+    expect(outcome).toMatchObject({ kind: "REJECTED_BEFORE_START", reason: expect.stringContaining("exact approved dispatch") });
+    expect(harness.create).not.toHaveBeenCalled();
+  });
+
   it("sends one recipient, recipient schema, audit metadata, fingerprint, and idempotency key", async () => {
     const harness = makeHarness();
     const outcome = await client(harness.port).startOneCall(request);

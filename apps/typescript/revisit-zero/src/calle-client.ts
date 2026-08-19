@@ -3,14 +3,32 @@ import type {
   CallRecipient,
   CreateCallInput,
 } from "@call-e/calle";
-import { digestPreviewContent, type CallPreviewContent } from "./preview.js";
+import { createHash } from "node:crypto";
+import {
+  canonicalJson,
+  digestPreviewContent,
+  type ApprovalReceipt,
+  type CallPreviewContent,
+} from "./preview.js";
 import { buildProviderRecipientResultSchema, normalizeProviderStructuredResult } from "./result-schema.js";
 
 export interface CallRequest {
   caseId: string;
   recipientPhoneE164: string;
   preview: CallPreviewContent;
+  approval: ApprovalReceipt;
   idempotencyKey: string;
+}
+
+export interface ProviderDispatchBinding {
+  recipient: {
+    phoneE164: string;
+    region: "AU";
+    locale: "en-AU";
+  };
+  task: string;
+  recipientResultSchema: Record<string, unknown>;
+  approval: ApprovalReceipt;
 }
 
 export type CallOutcome =
@@ -96,23 +114,32 @@ export class LiveCalleClient implements CalleTransport {
       return { kind: "REJECTED_BEFORE_START", reason: "Recipient does not match the configured consenting test recipient." };
     }
 
-    const task = buildCalleTask(request.preview);
-    const requestFingerprint = digestPreviewContent(request.preview);
-    let recipientResultSchema: Record<string, unknown>;
+    let binding: ProviderDispatchBinding;
     try {
-      recipientResultSchema = buildProviderRecipientResultSchema(request.preview.visitWindows.map((window) => window.id));
+      binding = buildProviderDispatchBinding(request.recipientPhoneE164, request.preview, request.approval);
     } catch (error) {
       return {
         kind: "REJECTED_BEFORE_START",
-        reason: error instanceof Error ? error.message : "The approved visit-window schema is invalid.",
+        reason: error instanceof Error ? error.message : "The exact approved provider dispatch payload is invalid.",
       };
     }
+    const expectedIdempotencyKey = createProviderIdempotencyKey(binding);
+    if (request.idempotencyKey !== expectedIdempotencyKey) {
+      return { kind: "REJECTED_BEFORE_START", reason: "The provider idempotency key does not match the exact approved dispatch payload." };
+    }
+
+    const { task, recipientResultSchema } = binding;
+    const requestFingerprint = digestPreviewContent(request.preview);
     let created: Call;
     try {
       const client = await this.#getClient();
       created = await client.calls.create({
         task,
-        recipients: [{ phones: [request.recipientPhoneE164], region: "AU", locale: "en-AU" }],
+        recipients: [{
+          phones: [binding.recipient.phoneE164],
+          region: binding.recipient.region,
+          locale: binding.recipient.locale,
+        }],
         recipientResultSchema,
         metadata: {
           workflow: "revisit-zero",
@@ -165,6 +192,29 @@ export class LiveCalleClient implements CalleTransport {
     this.#clientPromise ??= this.#loadClient(this.#configuration);
     return this.#clientPromise;
   }
+}
+
+export function buildProviderDispatchBinding(
+  recipientPhoneE164: string,
+  preview: CallPreviewContent,
+  approval: ApprovalReceipt,
+): ProviderDispatchBinding {
+  return {
+    recipient: {
+      phoneE164: recipientPhoneE164.trim(),
+      region: "AU",
+      locale: "en-AU",
+    },
+    task: buildCalleTask(preview),
+    recipientResultSchema: buildProviderRecipientResultSchema(preview.visitWindows.map((window) => window.id)),
+    approval: structuredClone(approval),
+  };
+}
+
+export function createProviderIdempotencyKey(binding: ProviderDispatchBinding): string {
+  return createHash("sha256")
+    .update(`revisit-zero-approved-dispatch-v2\u0000${canonicalJson(binding)}`)
+    .digest("hex");
 }
 
 async function loadSdkClient(configuration: LiveCalleConfiguration): Promise<CalleClientPort> {

@@ -10,7 +10,7 @@ Last verified: 2026-08-16 (Australia/Melbourne)
 | --- | --- | --- |
 | Reproducible install | **Verified** | `npm ci` completed in the clean upstream-integrated copy. |
 | Static/type check | **Verified** | `npm run check` exited 0. This standalone app uses TypeScript's strict check as its static gate and has no separate lint script. |
-| Focused tests | **Verified** | `npm test`: 5 files, 63 tests passed. Adapter: 32/32; focused adapter + validation: 41/41. |
+| Focused tests | **Verified** | `npm test`: 6 files, 71 tests passed. Adapter: 34/34; focused adapter + validation: 43/43; live authorization: 6/6. |
 | Credential-free demo | **Verified** | `npm run demo`: exactly 3 cases, 1 fake call, 0 real side effects. |
 | Production build | **Verified** | `npm run build`: server compilation and Vite 7.3.6 production bundle passed. |
 | Production server/API | **Verified** | Built server returned HTTP 200 for `/` and `/api/health`; cases → preview → exact approval → fake result → export completed from the shared workflow. A repeated execution returned the same call/idempotency references with `duplicatePrevented: true`. |

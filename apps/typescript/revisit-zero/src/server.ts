@@ -7,6 +7,12 @@ import type { CalleTransport } from "./calle-client.js";
 import { LiveCalleClient } from "./calle-client.js";
 import type { FailedVisitCase } from "./case.js";
 import { maskPhone } from "./case.js";
+import {
+  authorizeLiveDispatch,
+  LiveDispatchAuthorizationError,
+  requireLiveDispatchConfiguration,
+  type LiveDispatchAuthorization,
+} from "./live-authorization.js";
 import { createApprovalReceipt } from "./preview.js";
 import { decideLocalExport, RevisitZeroWorkflow, type WorkflowRun } from "./workflow.js";
 import { FakeCalleTransport } from "../demo/fake-calle.js";
@@ -15,6 +21,7 @@ const moduleParent = fileURLToPath(new URL("..", import.meta.url));
 const appDirectory = basename(normalize(moduleParent)) === "dist" ? dirname(moduleParent) : moduleParent;
 const fixtureCases = JSON.parse(await readFile(join(appDirectory, "examples", "failed-visits.json"), "utf8")) as FailedVisitCase[];
 const transport = createTransport(process.env);
+const liveDispatchAuthorization = transport.mode === "live" ? requireLiveDispatchConfiguration(process.env) : null;
 const liveWindow = transport.mode === "live" ? requireCurrentLiveWindow(process.env, new Date()) : null;
 const cases = transport.mode === "live"
   ? fixtureCases.map((failedVisit) => ({
@@ -33,7 +40,8 @@ const server = createServer(async (request, response) => {
   try {
     await route(request, response);
   } catch (error) {
-    const status = error instanceof HttpError ? error.status : 500;
+    const status = error instanceof HttpError || error instanceof LiveDispatchAuthorizationError ? error.status : 500;
+    if (status === 401) response.setHeader("WWW-Authenticate", "Bearer realm=\"revisit-zero-live-dispatch\"");
     sendJson(response, status, {
       error: status === 500 ? "INTERNAL_ERROR" : error instanceof Error ? error.message : "REQUEST_FAILED",
     });
@@ -82,18 +90,19 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   }
   if (method === "POST" && parts[0] === "api" && parts[1] === "cases" && parts[3] === "call") {
     const failedVisit = requireCase(parts[2]);
+    const approvedBy = requireDispatchOperator(request, transport.mode, liveDispatchAuthorization);
     const body = await readJsonBody(request);
-    const approvedBy = requireShortString(body.approvedBy, "approvedBy");
     const previewDigest = requireShortString(body.previewDigest, "previewDigest");
     const now = new Date();
     const prepared = workflow.prepare(failedVisit, now);
-    let approval = prepared.preview ? createApprovalReceipt(prepared.preview, approvedBy, now) : null;
-    if (approval && approval.previewDigest !== previewDigest) approval = { ...approval, previewDigest };
+    const approval = prepared.preview && prepared.preview.digest === previewDigest
+      ? createApprovalReceipt(prepared.preview, approvedBy, now)
+      : null;
     const run = await workflow.execute(failedVisit, approval, {
       now,
       liveControl: {
         liveModeEnabled: process.env.CALLE_LIVE_ENABLED === "true",
-        explicitOperatorLiveApproval: body.explicitLiveApproval === true,
+        explicitOperatorLiveApproval: transport.mode === "live" && liveDispatchAuthorization !== null,
       },
     });
     runs.set(failedVisit.id, run);
@@ -122,6 +131,16 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   }
   if (method !== "GET" && method !== "HEAD") throw new HttpError(404, "NOT_FOUND");
   await serveUi(url.pathname, response, method === "HEAD");
+}
+
+function requireDispatchOperator(
+  request: IncomingMessage,
+  mode: CalleTransport["mode"],
+  authorization: LiveDispatchAuthorization | null,
+): string {
+  if (mode === "fake") return "demo-operator";
+  if (!authorization) throw new LiveDispatchAuthorizationError(403, "LIVE_DISPATCH_NOT_AUTHORIZED");
+  return authorizeLiveDispatch(request.headers.authorization, authorization);
 }
 
 function createTransport(environment: NodeJS.ProcessEnv): CalleTransport {

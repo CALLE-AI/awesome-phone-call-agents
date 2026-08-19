@@ -1,5 +1,9 @@
-import { createHash } from "node:crypto";
-import type { CalleTransport, CallOutcome } from "./calle-client.js";
+import {
+  buildProviderDispatchBinding,
+  createProviderIdempotencyKey,
+  type CalleTransport,
+  type CallOutcome,
+} from "./calle-client.js";
 import type { DecisionReason, Disposition, FailedVisitCase, PreCallAssessment } from "./case.js";
 import { maskPhone } from "./case.js";
 import { decideRebookReadiness } from "./decision.js";
@@ -148,9 +152,24 @@ export class RevisitZeroWorkflow {
 
     const approvedPreview = prepared.preview;
 
-    const idempotencyReference = createHash("sha256")
-      .update(`revisit-zero-one-call-per-case-v1\u0000${failedVisit.id}`)
-      .digest("hex");
+    let idempotencyReference: string;
+    try {
+      idempotencyReference = createProviderIdempotencyKey(buildProviderDispatchBinding(
+        failedVisit.recipient.phoneE164,
+        approvedPreview.content,
+        approval,
+      ));
+    } catch (error) {
+      return {
+        ...baseRun(failedVisit, prepared.assessment, "EXACT_CONTENT_APPROVED", baseTimeline),
+        disposition: "AUTOMATION_BLOCKED",
+        decisionReasons: [{
+          code: "APPROVED_DISPATCH_INVALID",
+          message: error instanceof Error ? error.message : "The exact approved provider dispatch payload is invalid.",
+        }],
+        unresolvedFields: [],
+      };
+    }
 
     return this.ledger.runOnce(failedVisit.id, idempotencyReference, async () => {
       const timeline = [...baseTimeline,
@@ -163,6 +182,7 @@ export class RevisitZeroWorkflow {
           caseId: failedVisit.id,
           recipientPhoneE164: failedVisit.recipient.phoneE164,
           preview: approvedPreview.content,
+          approval,
           idempotencyKey: idempotencyReference,
         });
       } catch (error) {

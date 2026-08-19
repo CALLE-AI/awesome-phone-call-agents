@@ -80,7 +80,7 @@ Final dispositions are `READY_FOR_REBOOK_REVIEW`, `NOT_READY`, `MANUAL_REVIEW`, 
 
 ## Exact approval and duplicate prevention
 
-The preview digest covers the complete case snapshot, recipient, objective, allowed questions, visit windows, and guardrails. Editing any bound value invalidates the approval. The provider idempotency key is stable for the case and is reserved before invoking the transport; the approved preview digest also travels as a request fingerprint so an idempotent record for different content is quarantined rather than reused as success.
+The preview digest covers the complete case snapshot, recipient, objective, allowed questions, visit windows, and guardrails. Editing any bound value invalidates the approval. The provider idempotency key is a SHA-256 digest of the normalized recipient, exact generated task, locale, closed result schema, and server-attributed approval receipt. It is reserved before invoking the transport; the approved preview digest also travels as a request fingerprint so an idempotent record for different content is quarantined rather than reused as success.
 
 The in-memory ledger prevents duplicate invocation during the local run. The live adapter is implemented to send the same stable key to CALL-E. A timeout, lost response, HTTP 408/409/429/5xx, missing call identifier, or incomplete provider result becomes a reconciliation record. RevisitZero never creates a fresh key or automatically redials.
 
@@ -122,15 +122,17 @@ export CALLE_API_KEY="<CALL-E server API key>"
 export CALLE_TEST_RECIPIENT_E164="<consenting test recipient in E.164>"
 export CALLE_LIVE_WINDOW_START="<current ISO-8601 timestamp with offset>"
 export CALLE_LIVE_WINDOW_END="<ISO-8601 timestamp no more than four hours later>"
+export REVISIT_ZERO_LIVE_OPERATOR_ID="<server-authorized operator identifier>"
+export REVISIT_ZERO_LIVE_DISPATCH_TOKEN="<random secret with at least 32 characters>"
 npm run build
 npm run start:prod
 ```
 
-Optional `CALLE_BASE_URL` is accepted only when it is exactly `https://api.heycall-e.com`; arbitrary credential destinations are refused. In live mode the configured test number and short current call window replace the fictional values **before** preview generation, so both are content-bound to the operator approval. The operator must then review the masked recipient and exact content, click **Approve this exact call**, and click **Start one approved live CALL-E call**.
+Optional `CALLE_BASE_URL` is accepted only when it is exactly `https://api.heycall-e.com`; arbitrary credential destinations are refused. In live mode the configured test number and short current call window replace the fictional values **before** preview generation, so both are content-bound to the operator approval. The operator must then review the masked recipient and exact content, click **Approve this exact call**, enter the separately delivered live-dispatch token, and click **Start one approved live CALL-E call**. The server authenticates the Bearer token, attributes the approval to `REVISIT_ZERO_LIVE_OPERATOR_ID`, and derives the live-approval gate itself; client-supplied identity or live-approval fields are not trusted. Keep the dispatch token out of shell history, screenshots, logs, source files, and browser storage.
 
 On 2026-08-16, one participant-authorised controlled-live test completed at the provider. RevisitZero rejected the returned structured result because an opt-out assertion conflicted with its outcome, produced `MANUAL_REVIEW`, blocked export, and prevented a duplicate call. This verified the live boundary and fail-closed behavior, but it was not a successful golden-path end-to-end result. The corrective pass removed the redundant provider field, added exact outcome rules to the approved preview and task, and added regression coverage. No second real call was placed. No transcript, real phone number, credential, or provider payload is included in the repository.
 
-The full suite contains 63 tests across five files. Of those, 32 isolated adapter tests verify the installed `@call-e/calle@0.2.2` request shape, supported provider-schema subset, non-redundant `recipientResultSchema`, exact outcome instructions, local opt-out derivation, fingerprint/idempotency metadata, completed structured results, recipient binding, official base URL, error mapping, and zero create retry; the focused adapter-plus-validation run passes 41 tests. Regression coverage reproduces the observed opt-out/outcome conflict and verifies `MANUAL_REVIEW`, unavailable export, and duplicate prevention. The Calls contract leaves `failureCode` unconstrained, so every failed or cancelled Calls state—including candidate strings such as `no_answer`, `declined`, `voicemail`, `busy`, and `expired`—is quarantined as `AMBIGUOUS` for reconciliation rather than treated as verified `UNREACHED`. Unknown, mixed, or contradictory failure strings fail closed the same way. These offline tests do not contact CALL-E.
+The full suite contains 71 tests across six files. Of those, 34 isolated adapter tests verify the installed `@call-e/calle@0.2.2` request shape, exact dispatch-bound idempotency, supported provider-schema subset, non-redundant `recipientResultSchema`, exact outcome instructions, local opt-out derivation, fingerprint/idempotency metadata, completed structured results, recipient binding, official base URL, error mapping, and zero create retry; the focused adapter-plus-validation run passes 43 tests. Six authorization cases verify server-configured operator attribution, missing/invalid credential rejection, and fail-closed live configuration. Regression coverage reproduces the observed opt-out/outcome conflict and verifies `MANUAL_REVIEW`, unavailable export, and duplicate prevention. The Calls contract leaves `failureCode` unconstrained, so every failed or cancelled Calls state—including candidate strings such as `no_answer`, `declined`, `voicemail`, `busy`, and `expired`—is quarantined as `AMBIGUOUS` for reconciliation rather than treated as verified `UNREACHED`. Unknown, mixed, or contradictory failure strings fail closed the same way. These offline tests do not contact CALL-E.
 
 Official references: [CALL-E integrations](https://github.com/CALLE-AI/call-e-integrations), [CALL-E developer documentation](https://docs.heycall-e.com/), and the [`@call-e/calle` package](https://www.npmjs.com/package/@call-e/calle).
 
@@ -163,7 +165,7 @@ python3 scripts/validate_repository.py
 
 - English-only desktop prototype with exactly three fictional demo cases.
 - One authorised recipient and at most one controlled call per case.
-- In-memory ledger and suppression only; no production persistence, auth, multi-tenancy, or concurrency across processes.
+- Single-operator Bearer authorization for controlled live dispatch; no production identity provider, durable ledger/suppression, multi-tenancy, or concurrency across processes.
 - No appointment booking, field-service/retailer/CRM integration, landlord/body-corporate calling, gate-code collection, uploads, diagnosis, ML, analytics, SMS/email, inbound calling, multilingual flow, bulk calling, or mobile app.
 - Stops at a local export packet and requires a human for every downstream decision.
 

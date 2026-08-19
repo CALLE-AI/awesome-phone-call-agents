@@ -58,6 +58,10 @@ p { color: #46554f; font-size: 0.88rem; line-height: 1.55; }
 .helper-text { margin: 9px 0 0; color: #708079; font-size: 0.72rem; }
 .invalidation-cue { display: flex; flex-direction: column; gap: 3px; margin: 10px 0; padding: 9px 10px; border: 1px solid #e7cd96; border-radius: 7px; background: #fff9eb; color: #6f531c; font-size: 0.69rem; line-height: 1.4; }
 .invalidation-cue strong { color: #6a4700; font-size: 0.7rem; }
+.credential-field { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; color: #31463d; font-size: 0.7rem; font-weight: 700; }
+.credential-field input { width: 100%; box-sizing: border-box; border: 1px solid #aebdb6; border-radius: 7px; padding: 9px 10px; background: #fff; color: #203a30; font: inherit; font-weight: 500; }
+.credential-field input:focus { outline: 2px solid #84b8a4; outline-offset: 1px; }
+.credential-field small { color: #66786f; font-size: 0.64rem; font-weight: 500; line-height: 1.4; }
 
 .status-badge { display: inline-flex; align-items: center; width: fit-content; max-width: 100%; min-height: 23px; padding: 4px 8px; border: 1px solid; border-radius: 999px; font-size: 0.61rem; font-weight: 900; letter-spacing: 0.045em; line-height: 1.2; overflow-wrap: anywhere; }
 .status-badge--positive { border-color: #9bcbb1; background: #e7f5ec; color: #12623f; }

@@ -122,6 +122,7 @@ export default function App() {
   const [approvedDigest, setApprovedDigest] = useState<string | null>(null);
   const [run, setRun] = useState<WorkflowRun | null>(null);
   const [mode, setMode] = useState<HealthResponse["mode"]>("fake");
+  const [liveDispatchToken, setLiveDispatchToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportState, setExportState] = useState<ExportState>("pending");
@@ -152,6 +153,7 @@ export default function App() {
     setPreviewResponse(null);
     setApprovedDigest(null);
     setRun(null);
+    setLiveDispatchToken("");
     setExportState("pending");
     setExportPacket(null);
     setError(null);
@@ -194,14 +196,14 @@ export default function App() {
     try {
       const response = await fetch(`/api/cases/${encodeURIComponent(selectedCase.id)}/call`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          approvedBy: "demo-operator",
-          previewDigest: approvedDigest,
-          explicitLiveApproval: mode === "live",
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(mode === "live" ? { Authorization: `Bearer ${liveDispatchToken}` } : {}),
+        },
+        body: JSON.stringify({ previewDigest: approvedDigest }),
       });
       setRun(await readJson<WorkflowRun>(response));
+      setLiveDispatchToken("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "The controlled call workflow failed");
     } finally {
@@ -327,8 +329,10 @@ export default function App() {
               approved={approved}
               busy={busy}
               completed={Boolean(run)}
+              liveDispatchToken={liveDispatchToken}
               mode={mode}
               onApprove={() => setApprovedDigest(preview.digest)}
+              onLiveDispatchTokenChange={setLiveDispatchToken}
               onRun={() => { void executeCall(); }}
               preview={preview}
             />

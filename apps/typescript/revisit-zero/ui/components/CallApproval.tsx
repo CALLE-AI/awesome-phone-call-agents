@@ -16,11 +16,23 @@ interface CallApprovalProps {
   approved: boolean;
   completed: boolean;
   busy: boolean;
+  liveDispatchToken: string;
   onApprove: () => void;
+  onLiveDispatchTokenChange: (value: string) => void;
   onRun: () => void;
 }
 
-export function CallApproval({ preview, mode, approved, completed, busy, onApprove, onRun }: CallApprovalProps) {
+export function CallApproval({
+  preview,
+  mode,
+  approved,
+  completed,
+  busy,
+  liveDispatchToken,
+  onApprove,
+  onLiveDispatchTokenChange,
+  onRun,
+}: CallApprovalProps) {
   return (
     <section className="stack-card" aria-labelledby="approval-title">
       <div className="section-heading">
@@ -59,12 +71,28 @@ export function CallApproval({ preview, mode, approved, completed, busy, onAppro
         <span>Any edit to the case, recipient, objective, allowed questions or visit windows invalidates this receipt.</span>
       </div>
 
+      {mode === "live" && approved && (
+        <label className="credential-field">
+          <span>Live dispatch credential</span>
+          <input
+            autoComplete="off"
+            disabled={completed || busy}
+            onChange={(event) => onLiveDispatchTokenChange(event.target.value)}
+            placeholder="Enter the server-authorized operator token"
+            spellCheck={false}
+            type="password"
+            value={liveDispatchToken}
+          />
+          <small>Held only in this page's memory and sent as a Bearer credential; it is never included in call metadata or exports.</small>
+        </label>
+      )}
+
       {!approved ? (
         <button className="button button--primary" disabled={busy} onClick={onApprove} type="button">
           Approve this exact call
         </button>
       ) : (
-        <button className="button button--primary" disabled={completed || busy} onClick={onRun} type="button">
+        <button className="button button--primary" disabled={completed || busy || (mode === "live" && !liveDispatchToken)} onClick={onRun} type="button">
           {completed ? "Result recorded — no redial" : busy ? "Running one controlled attempt…" : mode === "fake" ? "Run fake CALL-E transport" : "Start one approved live CALL-E call"}
         </button>
       )}
