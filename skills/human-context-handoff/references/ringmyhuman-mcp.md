@@ -90,9 +90,9 @@ RingMyHuman returns the outcome under a nested `decision` object:
   "last_updated_at": "2030-01-15T09:30:00Z",
   "decision": {
     "decision": "approved",
-    "selected_action": "Escalate to Ops support.",
-    "instructions": "Keep inbox services running while Ops investigates.",
-    "summary": "The human chose escalation and asked that processing continue.",
+    "selected_action": "Start a guided test",
+    "instructions": "Show call settings immediately after the guided test.",
+    "summary": "The human chose the guided test before configuring call settings.",
     "answered_by": "connected_human",
     "decided_at": "2030-01-15T09:29:51Z",
     "unanswered_follow_up_questions": []
@@ -102,7 +102,7 @@ RingMyHuman returns the outcome under a nested `decision` object:
 
 | Portable contract | RingMyHuman |
 | --- | --- |
-| `choice` | `decision.selected_action` (see note) |
+| `choice` | the stored choice ID matched exactly from `decision.selected_action` (see note) |
 | `rationale` | `decision.summary` |
 | `constraints` | `decision.instructions` |
 | `answered_by` | `decision.answered_by` |
