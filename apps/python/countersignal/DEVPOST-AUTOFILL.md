@@ -9,7 +9,7 @@ Use these values for the CALL-E submission form.
 - If pre-existing, explain updates: Not applicable — CounterSignal was newly created during the submission period.
 - Functional demo URL: https://countersignal.vercel.app
 - Project submission pull request URL: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/198
-- Email associated with CALL-E account: TODO — confirm the actual CALL-E account email used in the additional-calls request / CALL-E dashboard.
+- Email associated with CALL-E account: contact@example.com
 - Primary use case: Other
 - One-sentence real-world task: Runs consented customer-discovery phone interviews under a frozen protocol and turns transcript-grounded supporting and contradictory evidence into an auditable experiment decision.
 - Eligible Age: confirmed true by submitter
