@@ -1,5 +1,6 @@
 import copy
 import json
+from pathlib import Path
 
 import countersignal as c
 
@@ -156,3 +157,49 @@ def test_schema_requires_exact_fields():
 
 def test_serializable_preview_for_reviewer():
     json.dumps(c.preview(experiment(), recipient()))
+
+
+def test_ledger_prevents_duplicate_intent(tmp_path):
+    ledger = c.ReservationLedger(tmp_path / "ledger.sqlite3")
+    key = c.idempotency_key(experiment(), recipient())
+    assert ledger.claim(key) is True
+    assert ledger.claim(key) is False
+    ledger.mark(key, "accepted", "call_123")
+    assert ledger.get(key) == ("accepted", "call_123", None)
+
+
+def test_ambiguous_provider_outcome_blocks_blind_redial(tmp_path):
+    class BrokenCalls:
+        def create(self, **kwargs):
+            return {"id": "call_123"}
+
+        def wait_for_result(self, call_id, *, timeout_seconds, interval_seconds):
+            raise TimeoutError("ambiguous")
+
+    ledger = c.ReservationLedger(tmp_path / "ledger.sqlite3")
+    try:
+        c.execute(experiment(), recipient(), BrokenCalls(), ledger)
+    except RuntimeError as exc:
+        assert "outcome is unknown" in str(exc)
+    else:
+        raise AssertionError("expected ambiguous outcome")
+
+    state = ledger.get(c.idempotency_key(experiment(), recipient()))
+    assert state is not None
+    assert state[0] == "outcome_unknown"
+    assert state[1] == "call_123"
+
+    try:
+        c.execute(experiment(), recipient(), BrokenCalls(), ledger)
+    except RuntimeError as exc:
+        assert "already reserved" in str(exc)
+    else:
+        raise AssertionError("duplicate call should be blocked")
+
+
+def test_judge_console_is_explicitly_no_call_and_contains_decision_states():
+    html = (Path(__file__).with_name("judge-console.html")).read_text(encoding="utf-8")
+    assert "Deterministic reviewer mode · NO CALL" in html
+    assert "hypothesis_weakened" in html
+    assert "Silence never enters the answered denominator" in html
+    assert "fetch(" not in html
