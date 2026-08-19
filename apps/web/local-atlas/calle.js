@@ -604,6 +604,7 @@ const openerFor = place =>
 const DISCLOSURE = `Thanks — I'm an AI assistant, calling for someone who's planning a visit and couldn't ring you themselves.`;
 
 function buildTask({ place, question, phone }){
+  const loc = localeLines(countryOf(place));
   return [
     `Call ${place.name}${place.addr ? ` at ${place.addr}` : ''} on ${phone}.`,
     ``,
@@ -613,7 +614,7 @@ function buildTask({ place, question, phone }){
        voice region is fixed by a published Goal, so it is a dashboard setting,
        not a task instruction. This line stays only for vocabulary and pace,
        which the wording does plausibly influence. */
-    `Use American English vocabulary and an ordinary conversational pace. You are calling a local US business.`,
+    `${loc.voice} ${loc.where}`,
     ``,
     `Follow these rules exactly:`,
     /* The agent was starting to speak the instant the line connected, talking
@@ -825,6 +826,63 @@ function simFallback({ place, question, outcome }){
     'Staff confirmed.');
 }
 
+/* ---- what time is it where the phone is ----
+   The courtesy window exists so a stranger is not rung at an unreasonable hour.
+   That hour is theirs, not ours, so it has to be measured where they are — and
+   it was not: the clock was Eastern for every call, with a hardcoded -5 that is
+   an hour out for the eight months of the year Eastern spends on daylight time.
+   For a business in Vancouver, "10am Eastern" is 7am, which is exactly the call
+   the rule exists to prevent; at the other end it refused calls at 6pm Pacific,
+   which is nobody's idea of late. Hawaii was four hours further out again.
+
+   Longitude gives the zone and `Intl` gives the hour, which is what makes
+   daylight time somebody else's problem rather than an arithmetic bug waiting
+   for March. The bands are ragged where real zone borders are ragged, so a
+   place within an hour's drive of one may be judged by its neighbour's clock —
+   affordable against a window that already keeps an hour of margin at each end,
+   and against the alternative of shipping a timezone database. */
+function zoneFor(lat, lon){
+  if(lat < 23 && lon < -150) return 'Pacific/Honolulu';
+  if(lat > 51 && lon < -129) return 'America/Anchorage';
+  if(lon < -115) return 'America/Los_Angeles';
+  // Arizona keeps standard time all year, and is big enough to be worth the exception
+  if(lat > 31 && lat < 37.1 && lon > -115 && lon < -109) return 'America/Phoenix';
+  if(lon < -101.5) return 'America/Denver';
+  if(lon < -87.5) return 'America/Chicago';
+  if(lon < -67) return 'America/New_York';
+  if(lon < -59) return 'America/Halifax';
+  return 'America/St_Johns';
+}
+
+/* Falls back to the offset longitude implies — off by an hour under daylight
+   time, never off by five — rather than refusing to judge at all. */
+function localHour(lat, lon){
+  const utcHour = new Date().getUTCHours();
+  if(!Number.isFinite(lat) || !Number.isFinite(lon)) return (utcHour + 19) % 24;
+  try{
+    const h = new Intl.DateTimeFormat('en-US',
+      { timeZone: zoneFor(lat, lon), hour: 'numeric', hour12: false }).format(new Date());
+    const n = Number(h);
+    if(Number.isFinite(n)) return n % 24;
+  }catch(e){}
+  return (utcHour + Math.round(lon / 15) + 24) % 24;
+}
+
+const CALL_FROM = 10, CALL_UNTIL = 20;
+const insideCallingWindow = place => {
+  const h = localHour(Number(place.lat), Number(place.lon));
+  return h >= CALL_FROM && h < CALL_UNTIL;
+};
+
+/* ---- US or Canada ----
+   The app covers both, and the call did not: every recipient was sent as
+   `region: 'US'` with an `en-US` locale, and the script announced "you are
+   calling a local US business" to businesses in Ontario. The client knows which
+   it geocoded, so it sends it; anything else is treated as US, which is what
+   this did for everyone before. */
+const countryOf = place => String(place && place.country || '').toUpperCase() === 'CA' ? 'CA' : 'US';
+const localeFor = cc => cc === 'CA' ? 'en-CA' : 'en-US';
+
 /* ---- budget + dedupe ----
    Anything that can dial passes through here first. */
 /* `n` is the number of lines that will actually ring, so a round of three
@@ -908,16 +966,14 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
 
      The courtesy window is the part that isn't about credits. A place can be
      open at 06:30 and still not want an automated call then, and "technically
-     open" is not the same as "a reasonable moment to ring a stranger". Callers
-     are US/Canada by construction (normalizeE164 only accepts NANP or E.164),
-     but the clock we have is the server's, so this is deliberately generous
-     rather than precise. */
+     open" is not the same as "a reasonable moment to ring a stranger". The hour
+     that matters is the one on their wall, so it is read from their own
+     coordinates — see localHour. */
   if(live && !isOwnLine && place.openNow === false)
     return { error: `${place.name} looks closed right now. We'll only call while they're open — try again during opening hours.`, status: 409, closed: true };
 
-  const hourET = (Number(new Date().toISOString().slice(11, 13)) + 24 - 5) % 24;
-  if(live && !isOwnLine && (hourET < 10 || hourET >= 20))
-    return { error: 'Calls are only placed between 10am and 8pm Eastern, so a real person is not rung at an unreasonable hour. Try again during the day.', status: 409, outsideWindow: true };
+  if(live && !isOwnLine && !insideCallingWindow(place))
+    return { error: `It's ${localHour(Number(place.lat), Number(place.lon))}:00 where ${place.name} is. Calls are only placed between 10am and 8pm local time, so a real person is not rung at an unreasonable hour.`, status: 409, outsideWindow: true };
 
   const pk = placeKey(place), qh = qHash(v.question);
 
@@ -968,9 +1024,6 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
       placeName: place.name, callerIdentity: CALLER_ID
     } };
 
-  if(!await reserveBudget())
-    return { error: 'Daily call budget reached. Try again tomorrow.', status: 429 };
-
   const pending = {
     callId: '', placeKey: pk, qHash: qh, question: v.question,
     placeName: place.name, placeAddr: place.addr || '', phone,
@@ -993,6 +1046,16 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
     return { status: 202, callId: pending.callId, state: 'in_progress', simulated: true };
   }
 
+  /* Reserved here, past the simulator, because the budget caps money spent
+     ringing strangers and a simulated call rings nobody. It used to sit above
+     that branch, so a demo — or a reviewer working through the flow, which is
+     the whole point of review mode — spent the day's real-call allowance on
+     calls that never happened, and then told the next person a budget they had
+     not used was exhausted. Sitting after the confirmation gate is still
+     deliberate: an abandoned confirmation costs nothing. */
+  if(!await reserveBudget())
+    return { error: 'Daily call budget reached. Try again tomorrow.', status: 429 };
+
   const c = await client();
 
   /* CALL-E replays a call for a repeated Idempotency-Key, so a forced recheck
@@ -1009,7 +1072,10 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
   const task = buildTask({ place, question: v.question, phone });
   const call = await c.calls.create({
     task,
-    recipient: { phone, region: 'US', locale: 'en-US' },
+    /* The place's own country, not a constant. This app covers Canada, and a
+       Canadian number sent as a US recipient is a claim about somebody else's
+       business that we already knew was false. */
+    recipient: { phone, region: countryOf(place), locale: localeFor(countryOf(place)) },
     resultSchema: RESULT_SCHEMA,
     /* Echoed back on the call and on the webhook, and checked field by field
        against our own record before anything is published — see bindResult().
@@ -1591,6 +1657,29 @@ function sharedNoun(targets){
   return nouns.length === 1 ? nouns[0] : 'place';
 }
 
+/* Same rule as the noun, for the same reason: one script, so a claim it makes
+   has to be true of everyone hearing it. A round that straddles the border says
+   neither country rather than picking the anchor's. */
+function sharedCountry(targets){
+  const cc = [...new Set((targets || []).map(t => t.country || 'US'))];
+  return cc.length === 1 ? cc[0] : '';
+}
+
+/* The two lines of the script that assert where the callee is. Getting them
+   from one place means a Canadian business is not told it is American, and that
+   the agent is not asked for American vocabulary on a call to Halifax. */
+function localeLines(cc){
+  if(cc === 'CA') return {
+    where: 'You are calling a local Canadian business.',
+    voice: 'Use Canadian English vocabulary and spelling, and an ordinary conversational pace.' };
+  if(cc === 'US') return {
+    where: 'You are calling a local US business.',
+    voice: 'Use American English vocabulary and an ordinary conversational pace.' };
+  return {
+    where: 'You are calling a local business in the United States or Canada.',
+    voice: 'Use plain North American English and an ordinary conversational pace.' };
+}
+
 /* Does this question name this business? Compared on the flattened forms, so
    punctuation and case do not decide it, and only on the distinctive part of
    the name: "Rosa's Trattoria" is named by "rosa s trattoria" and by "rosa s",
@@ -1627,14 +1716,15 @@ function namesBusiness(question, name){
    businesses did not agree to be compared, the person on the phone is being
    asked a straight question, and "we're also ringing your competitors" turns a
    quick question into a negotiation. */
-function buildRoundTask({ noun, question }){
+function buildRoundTask({ noun, question, country }){
+  const loc = localeLines(country === undefined ? 'US' : country);
   const opener = `Hi — is now a good moment for one quick question about your ${noun}?`;
   return [
     `Call the business on the number given for this recipient.`,
     ``,
     `You are an automated assistant calling on behalf of a customer of ${CALLER_ID}, who asked this question and cannot make the call themselves.`,
     ``,
-    `Use American English vocabulary and an ordinary conversational pace. You are calling a local US business.`,
+    `${loc.voice} ${loc.where}`,
     ``,
     `Follow these rules exactly:`,
     `1. When they pick up, they will almost certainly announce the business first — something like "Good morning, how can I help you?". Let them finish that greeting before you say a single word. Do not start speaking the moment the line connects.`,
@@ -1770,9 +1860,18 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
       dropped.push({ name: p.name, why: 'closed right now' });
       continue;
     }
+    /* Per place, not per round. The window is about the hour on the callee's
+       own wall, and a round is free to reach across a timezone line — rare,
+       since these are neighbours, but a round that dialled Vancouver at 7am
+       because the anchor was in Toronto is exactly the call this prevents. */
+    if(live && phone !== ownLine && !insideCallingWindow(p)){
+      dropped.push({ name: p.name, why: `it's ${localHour(Number(p.lat), Number(p.lon))}:00 there` });
+      continue;
+    }
     seen.add(phone);
     targets.push({ placeKey: placeKey(p), name: p.name, addr: p.addr || '',
-      phone, kind: p.kind || '', noun: placeNoun(p) });
+      phone, kind: p.kind || '', noun: placeNoun(p),
+      lat: Number(p.lat), lon: Number(p.lon), country: countryOf(p) });
   }
 
   if(targets.length < ROUND_MIN)
@@ -1818,11 +1917,6 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
     }
   }
 
-  const hourET = (Number(new Date().toISOString().slice(11, 13)) + 24 - 5) % 24;
-  const allOwnLine = targets.every(t => !!ownLine && t.phone === ownLine);
-  if(live && !allOwnLine && (hourET < 10 || hourET >= 20))
-    return { error: 'Calls are only placed between 10am and 8pm Eastern, so a real person is not rung at an unreasonable hour. Try again during the day.', status: 409, outsideWindow: true };
-
   const qh = qHash(v.question);
   const sig = roundSig(targets.map(t => t.placeKey));
 
@@ -1860,9 +1954,6 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
       credits: targets.length, dropped
     } };
 
-  if(!await reserveBudget(targets.length))
-    return { error: `A round of ${targets.length} needs ${targets.length} of today's call budget, and there isn't that much left. Try again tomorrow.`, status: 429 };
-
   /* Derived, not random, and this is load-bearing. CALL-E replays a call for a
      repeated Idempotency-Key, and the round id is checked against the record's
      metadata before anything is stored — so a random id would mean a replayed
@@ -1889,13 +1980,22 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
              simulated: true, recipients: targets.map(t => t.name), dropped };
   }
 
+  /* Past the simulator for the same reason the single call is: the budget
+     caps money spent ringing strangers, and a simulated round rings three
+     nobodies. All or nothing — half a round answers a comparison question with
+     a comparison it cannot make. */
+  if(!await reserveBudget(targets.length))
+    return { error: `A round of ${targets.length} needs ${targets.length} of today's call budget, and there isn't that much left. Try again tomorrow.`, status: 429 };
+
   const c = await client();
-  const task = buildRoundTask({ noun: pending.noun, question: v.question });
+  const task = buildRoundTask({ noun: pending.noun, question: v.question,
+    country: sharedCountry(targets) });
   const call = await c.calls.create({
     task,
     /* The feature, in one field: CALL-E dials all of them against this one
        script and reports each separately. */
-    recipients: targets.map(t => ({ phone: t.phone, region: 'US', locale: 'en-US' })),
+    recipients: targets.map(t => ({ phone: t.phone, region: t.country,
+      locale: localeFor(t.country) })),
     /* Each business gets its own structured answer, on exactly the schema a
        single call uses — which is what lets a round's results go through the
        same evidence check and land in the same private per-place records. */
@@ -2261,7 +2361,7 @@ module.exports = {
   /* Exported so the binding rules can be exercised directly against hand-built
      API records — the refusals are the part of this file most worth testing and
      the least reachable through a real call. */
-  bindResult, evidenceCheck, completionCheck, bindRound, bindVerdict, recipientCheck,
+  bindResult, evidenceCheck, completionCheck, localHour, zoneFor, countryOf, insideCallingWindow, bindRound, bindVerdict, recipientCheck,
   askAround, getRounds, buildRoundTask, ROUND_SCHEMA, ROUND_MIN, ROUND_MAX,
   simulate, simFallback, simOutcome, TEMPLATES, RESULT_SCHEMA, openerFor, placeNoun, DISCLOSURE,
   info: () => ({

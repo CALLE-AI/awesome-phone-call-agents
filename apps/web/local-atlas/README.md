@@ -15,7 +15,7 @@ Most phone-call workflows are about placing a call well. This one is mostly abou
 - opinions, compound questions and account-specific questions are refused before
   they can spend a credit
 - a business listed as closed is not called
-- nothing is dialled outside 10:00–20:00 Eastern
+- nothing is dialled outside 10:00–20:00 **local to the business being called**
 - an in-flight lock plus an idempotency key mean one question is one call
 
 What is left after all of that is a small number of calls whose answers are worth
@@ -94,6 +94,31 @@ back, which makes it a binding as well as a mapping. If the call-level result st
 identifies nobody, the answers are compared on this side instead, from the per-place
 results already checked — the same kind of claim either way, and the record notes which
 side produced it.
+
+## Canada is not a US call
+
+The app covers both countries and the call did not: every recipient went out as
+`region: 'US'` with an `en-US` locale, and the script told the person answering in Ottawa
+that "you are calling a local US business", in American vocabulary. NANP numbers dial
+either way, so nothing failed loudly — it was just wrong about somebody else's business,
+on a call they did not ask for.
+
+The client already knows which country it geocoded, since a US ZIP and a Canadian postal
+code take different lookup paths, so it sends it with the place. The server uses it for the
+recipient's `region` and `locale`, and for the two lines of the script that assert where
+the callee is. A round straddling the border claims neither country rather than the
+anchor's, on the same rule that decides the opener's noun.
+
+The calling window follows the same principle one step further: the hour that matters is
+the one on the callee's wall, so it is read from the listing's own coordinates rather than
+from a single Eastern clock — which had made "10am Eastern" a 7am call in Vancouver and a
+4am one in Honolulu, while refusing civil calls at 6pm Pacific.
+
+Known limit: the agent speaks English to Québec businesses. The question, the disclosure
+and the result extraction are all English, so a `fr-CA` locale on its own would pair a
+French voice with an English question — worse than the honest version.
+
+## Rounds are private
 
 Rounds are private by construction, with no public form at all — a ranking is a
 judgement about businesses that never agreed to be compared. Two rules follow: the
@@ -281,6 +306,7 @@ storing anything, because CALL-E deliveries are unsigned.
 | Results bound to the request that produced them | Nothing is published unless it binds on all seven axes: we hold a stored request for that call id, the call is terminal, it ended `completed` with CALL-E affirming `taskCompleted`, `sha256(call.task)` matches the script we sent, the transcript comes from an attempt on the number *we* dialled, every metadata field matches our record, and an `answered` fact quotes something a staff member actually said. Failures fail closed — an ungrounded quote is recorded as `unclear` with the answer dropped, an answer with no staff turn as `unknown`, an answer from a call that failed, was cancelled or carries no completion verdict as `unknown`, and anything unbound never reaches a place's shared list. Since webhook deliveries are unsigned, this is what stops a POST naming an arbitrary call id from publishing a "confirmed by phone" fact; an id we have no request for is dropped before the API read. |
 | No server-side request forgery | `/api/fetch` (the deals scanner's page reader) judges the *resolved* address rather than the hostname, refuses anything in loopback, RFC1918, link-local — where cloud metadata lives — carrier-NAT, multicast or reserved space, and follows redirects by hand so every hop is revalidated instead of trusted. The guard is the socket's own `lookup`, so the address checked is the address connected to; literal addresses are checked separately, since a socket given an IP never resolves anything. |
 | No hidden recurring schedules | None exist. One confirmed request, one call. |
+| Country-correct calls | The recipient region, the locale and the two lines of the script that say where the callee is all follow the place, so a Canadian business is not dialled as a US one or told it is American. The calling window is read from the listing's own coordinates, not from one Eastern clock. |
 | No duplicate jobs | A 10-minute in-flight lock plus a CALL-E idempotency key, both namespaced by account on the private path. Rounds and single asks share the per-place lock, so one number cannot be dialled twice for the same question; a round id is derived from the same inputs as its idempotency key, so a replayed call still binds to the request that made it. |
 | Clear cancellation | See "Stopping and rolling back" above. |
 | Medical, legal, financial and emergency boundaries | Questions about accounts, orders, refunds, lawsuits, card numbers, SSNs and personal contact details are refused before a call. Questions must be answerable factually by whoever picks up the phone; opinions and advice-shaped questions are refused. Known gap: there is no explicit emergency-services block, because the app only ever dials a number published on a place listing it is already showing. |
@@ -306,10 +332,15 @@ dry-run, so nothing is dialled.
 6. **Reuse** — ask the same question again. It returns the stored answer without a new
    call.
 7. **Recheck** — press Recheck on that fact and confirm a new call is started.
-8. **Budget** — set `CALLE_DAILY_CALL_BUDGET=1`, restart, and confirm the second
+8. **Budget** — this one only bites on the live path, by design: a simulated call rings
+   nobody, so it reserves nothing. Reviewing in dry run, expect to ask as often as you
+   like and see `calle:budget:<date>` stay empty. To watch the ceiling work, set
+   `CALLE_DAILY_CALL_BUDGET=1` with a real key and access code, and confirm the second
    distinct question is refused with a budget message.
 9. **Gates** — with `CALLE_DRY_RUN=0` and a real key, confirm that a place listed
-   closed, and any request outside 10:00–20:00 Eastern, are both refused.
+   closed is refused, and that the calling window is judged **where the business is**:
+   a listing on the west coast is callable at 6pm Pacific and refused at 7am Pacific,
+   whatever time it is on the server or in New York.
 10. **Dry run beats a valid unlock** — start with a real key, a correct
     `REAL_CALL_ACCESS_CODE` *and* `CALLE_DRY_RUN=1`. `/api/health` must report
     `calle.realCalls: false`, `POST /api/ask-access` must answer `{"ok":false}` for the
