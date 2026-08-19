@@ -14,6 +14,9 @@ const dns = require('dns');
 const net = require('net');
 const http = require('http');
 const https = require('https');
+/* Only for the counter probe on /api/cache-test — the app's own records live
+   in store.js, and this file's cache() is a separate, lossier thing. */
+const store = require('./store');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -116,7 +119,24 @@ app.get('/api/cache-test', async (req, res) => {
     const j = r.ok ? await r.json() : null;
     const ms = Date.now() - t0;
     await fetch(`${RURL}/del/${probe}`, { method: 'POST', headers: { Authorization: 'Bearer ' + RTOK } }).catch(()=>{});
-    return res.json({ ...out, roundTripMs: ms,
+
+    /* The counter path, checked separately, because it is the one every real
+       call goes through and it uses a different Redis verb from everything
+       above. A budget reservation that throws would refuse every live call, and
+       "the cache is fine" would not have told us. */
+    let counter = 'not tested';
+    try{
+      const ck = 'diag:incr:' + Date.now();
+      const a = await store.docIncr(ck, 2, 20000);
+      const b = await store.docIncr(ck, -1, 20000);
+      const back = await store.docGet(ck);
+      await store.docDel(ck);
+      counter = (a === 2 && b === 1 && Number(back) === 1)
+        ? 'OK — atomic counter works, so budget reservation does'
+        : `WRONG: incr=${a} decr=${b} readBack=${back}`;
+    }catch(e){ counter = 'ERROR ' + String(e.message || e); }
+
+    return res.json({ ...out, roundTripMs: ms, counter,
       verdict: j?.result === 'str:ping' ? 'OK — shared cache is live' : 'WROTE BUT READ BACK WRONG VALUE' });
   }catch(e){ res.json({ ...out, verdict: 'ERROR ' + String(e.message || e) }); }
 });
@@ -1570,6 +1590,54 @@ function calleErrBody(e){
 const calleErrStatus = e =>
   (e && Number.isInteger(e.status) && e.status >= 400 && e.status < 600) ? e.status : 502;
 
+/* ---- the number has to come from the listing, not from the request ----
+   `place` arrives in the request body, and until now every field in it was
+   taken at face value — including the number to dial. The UI only ever sends
+   back a listing it was shown, but the UI is not the gate: an account holder
+   who also has the real-call access code could post any `place` they liked,
+   with `openNow: true` and `confirmed: true`, and have this app ring a number of
+   their choosing while presenting itself as calling on behalf of a visitor.
+
+   That also quietly falsified the one sentence the safety notes lean on — that
+   the app "only ever dials a number published on a place listing it is already
+   showing" — which is the reason given for not carrying an emergency-number
+   block. A claim that only the client enforces is not a property of the system.
+
+   So the server looks the number up again itself, by the provider id the
+   listing carries, and dials what the provider says rather than what the caller
+   sent. Cached for a day: this is the same lookup the details panel already
+   makes, and a business's number is not news. */
+const GOOG_PHONE_MASK = 'id,nationalPhoneNumber,internationalPhoneNumber';
+async function listedPhone(place){
+  const gid = String((place && place.gid) || '');
+  const fsqId = String((place && place.fsqId) || '');
+  try{
+    if(gid && GOOG) return await cached('lp:g:' + gid, 86400e3, async () => {
+      const rr = await fetch(`${GOOG_BASE}/places/${encodeURIComponent(gid)}`,
+        { headers: { 'X-Goog-Api-Key': GOOG, 'X-Goog-FieldMask': GOOG_PHONE_MASK } });
+      if(!rr.ok) throw new Error('Google Places: ' + await googErr(rr));
+      const j = await rr.json();
+      return j.nationalPhoneNumber || j.internationalPhoneNumber || '';
+    });
+    if(fsqId && FSQ) return await cached('lp:f:' + fsqId, 86400e3, async () => {
+      const rr = await fetch(`${FSQ_BASE}/places/${encodeURIComponent(fsqId)}?fields=tel`,
+        { headers: FSQ_HDRS() });
+      if(!rr.ok) throw new Error('FSQ ' + rr.status);
+      return (await rr.json()).tel || '';
+    });
+  }catch(e){
+    /* A lookup that fails is not a lookup that succeeded. Returning null sends
+       this down the unverified path, where a live call is refused. */
+    console.warn('listedPhone failed:', String(e.message || e));
+    return null;
+  }
+  return null;                       // no provider id: nothing to check against
+}
+
+/* Set on the server, always, so a `listedPhone` invented by a caller cannot
+   survive the spread and be mistaken for one we looked up. */
+const withListedPhone = async place => ({ ...place, listedPhone: await listedPhone(place) });
+
 /* Every path through here can spend a CALL-E credit, so every path through
    here needs a name attached — that is the whole reason this app grew accounts.
    Note that requireUser sits in front of *both* kinds of ask: a new verified
@@ -1581,7 +1649,7 @@ app.post('/api/ask-place', express.json({ limit: '8kb' }), auth.attachUser, auth
       const { place, question, templateId, confirmed, force, isPrivate } = req.body || {};
       if(!place || !place.name || place.lat == null || place.lon == null)
         return res.status(400).json({ error: 'place {name, lat, lon, phone} required' });
-      const r = await calle.askPlace({ place, question, templateId,
+      const r = await calle.askPlace({ place: await withListedPhone(place), question, templateId,
         confirmed: confirmed === true, force: force === true,
         isPrivate: isPrivate === true, uid: req.user.id,
         accessCode: req.get('x-atlas-access') || '' });
@@ -1605,7 +1673,8 @@ app.post('/api/ask-around', express.json({ limit: '16kb' }), auth.attachUser, au
         return res.status(400).json({ error: 'places[] required' });
       if(places.some(p => !p || !p.name || p.lat == null || p.lon == null))
         return res.status(400).json({ error: 'each place needs {name, lat, lon, phone}' });
-      const r = await calle.askAround({ places, question, templateId,
+      const r = await calle.askAround({ places: await Promise.all(places.map(withListedPhone)),
+        question, templateId,
         confirmed: confirmed === true,
         uid: req.user.id, accessCode: req.get('x-atlas-access') || '' });
       res.status(r.status || 200).json(r);

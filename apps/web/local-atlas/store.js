@@ -31,6 +31,42 @@ async function docSet(key, val, ttlMs){
   if(!r.ok) throw new Error('store SET HTTP ' + r.status);
 }
 
+/* ---- atomic counter ----
+   `docGet` then `docSet` is three steps with two awaits between them, and every
+   await is a chance for another request to read the same number before either
+   writes. For most records here that costs nothing — they are keyed per call id
+   and nobody else is touching them. For a counter it costs the thing the
+   counter is for: ten concurrent requests against a cap of five all read zero,
+   all decide there is room, and the last write leaves the total at one.
+
+   INCRBY is one round trip that both reads and writes, so there is no window.
+   The caller adds first and puts it back if the total came out over the cap —
+   the total can therefore be briefly too high, never briefly too low, which
+   makes a concurrent request refuse rather than overspend. */
+async function docIncr(key, by, ttlMs){
+  if(!RURL){
+    /* Nothing is awaited between the read and the write, so on one thread this
+       is as atomic as the Redis path. */
+    const hit = mem.get(key);
+    const live = hit && hit.exp > Date.now();
+    const next = (live ? Number(hit.v) || 0 : 0) + by;
+    mem.set(key, { v: next, exp: ttlMs ? Date.now() + ttlMs : (live ? hit.exp : Date.now() + 86400e3) });
+    return next;
+  }
+  const r = await fetch(`${RURL}/incrby/${encodeURIComponent(key)}/${Math.round(by)}`,
+    { method: 'POST', headers: { Authorization: 'Bearer ' + RTOK } });
+  if(!r.ok) throw new Error('store INCRBY HTTP ' + r.status);
+  const j = await r.json();
+  /* INCRBY does not set an expiry, and a counter that never expires is a budget
+     that never resets. Set on every call rather than only on creation: one
+     extra round trip a handful of times a day, against the alternative of a
+     race deciding whether the key ever gets a TTL at all. */
+  if(ttlMs) await fetch(
+    `${RURL}/expire/${encodeURIComponent(key)}/${Math.max(1, Math.round(ttlMs / 1000))}`,
+    { method: 'POST', headers: { Authorization: 'Bearer ' + RTOK } }).catch(()=>{});
+  return Number(j.result) || 0;
+}
+
 /* ---- deletion ----
    Added for account deletion, and a real DEL rather than the `docSet(k, null)`
    trick used to release a lock: someone asking to be forgotten is owed the
@@ -78,4 +114,4 @@ async function docScan(pattern, limit = 5000){
   return [...found].slice(0, limit);
 }
 
-module.exports = { docGet, docSet, docDel, docScan, configured: () => !!RURL };
+module.exports = { docGet, docSet, docIncr, docDel, docScan, configured: () => !!RURL };

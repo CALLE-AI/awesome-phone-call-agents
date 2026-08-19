@@ -147,7 +147,7 @@ async function client(){
 
 /* Durable records live in store.js — see the note there on why this is not
    server.js's read-through cache. */
-const { docGet, docSet, docDel, docScan } = require('./store');
+const { docGet, docSet, docIncr, docDel, docScan } = require('./store');
 
 const DAY = 86400e3;
 const faqKey = pk => 'calle:faq:' + pk;              // published answers for a place
@@ -184,6 +184,26 @@ function normalizeE164(raw){
   if(s.length === 10) return '+1' + s;                        // NANP: US + Canada
   if(s.length === 11 && s[0] === '1') return '+' + s;
   return '';
+}
+
+/* ---- what this app is allowed to dial ----
+   normalizeE164 answers "is this a phone number". This answers "is this a
+   number this app has any business ringing", which is a much shorter list.
+
+   Emergency and service codes were already unreachable — 911, 988 and 411 are
+   three digits and E.164 wants at least seven, so they never survived
+   normalisation. What did survive was every number on earth: the reserved UK
+   example `+447700900123` normalises perfectly well, and this app covers the US
+   and Canada. Premium rate is the other one worth naming, because it is the shape
+   of abuse where the person who picks up profits from the call. */
+const PREMIUM_NANP = /^\+1(?:900\d{7}|\d{3}976\d{4})$/;
+function dialable(e164){
+  if(!e164) return { ok: false, why: 'that is not a phone number we can dial' };
+  if(!/^\+1\d{10}$/.test(e164))
+    return { ok: false, why: 'this app only calls US and Canadian numbers' };
+  if(PREMIUM_NANP.test(e164))
+    return { ok: false, why: 'that matches a common premium-rate number pattern' };
+  return { ok: true };
 }
 
 const qHash = q => normalizeQuestion(q).replace(/[^a-z0-9]/g, '').slice(0, 60);
@@ -887,12 +907,27 @@ const localeFor = cc => cc === 'CA' ? 'en-CA' : 'en-US';
    Anything that can dial passes through here first. */
 /* `n` is the number of lines that will actually ring, so a round of three
    reserves three. All-or-nothing on purpose: half a round is a round that
-   answers a comparison question with a comparison it cannot make. */
+   answers a comparison question with a comparison it cannot make.
+
+   Claim first, check second, put it back if it did not fit. The obvious order —
+   read the total, compare it to the cap, write the new total — cannot hold a
+   cap at all once two requests overlap: both read the same number, both decide
+   there is room, and the later write erases the earlier one. Ten concurrent
+   asks against a cap of five all succeeded, and the counter finished on one.
+
+   Adding first inverts every one of those failures. The increment is atomic, so
+   no two requests can be handed the same slot; a request that overshoots
+   subtracts what it added; and in the moment between those two steps the total
+   reads high rather than low, so a third request refuses a call it could have
+   had instead of placing one it could not. A budget that is occasionally a
+   little too strict is a budget. */
 async function reserveBudget(n = 1){
   const k = budgetKey();
-  const used = (await docGet(k)) || 0;
-  if(used + n > DAILY_BUDGET) return false;
-  await docSet(k, used + n, 2 * DAY);
+  const total = await docIncr(k, n, 2 * DAY);
+  if(total > DAILY_BUDGET){
+    await docIncr(k, -n, 2 * DAY);
+    return false;
+  }
   return true;
 }
 
@@ -948,8 +983,18 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
     if(!mod.allowed) return { error: mod.reason, status: 400, moderated: true };
   }
 
-  const phone = normalizeE164(place.phone);
+  /* The number the *server* read back from the listing wins over the one in the
+     request. See listedPhone() in server.js: the request body is the caller's
+     account of what a listing says, and a call is not something to place on
+     somebody's account of anything. A simulated call keeps the submitted
+     number, because nothing rings and the demo must work with no provider keys
+     configured at all. */
+  const verified = normalizeE164(place.listedPhone);
+  const phone = verified || normalizeE164(place.phone);
   if(!phone) return { error: 'No callable public phone number is listed for this place.', status: 422 };
+
+  const can = dialable(phone);
+  if(!can.ok) return { error: `We can't call that number — ${can.why}.`, status: 422 };
 
   /* Both courtesy rules below exist to protect a stranger who did not opt in.
      Neither applies to the demo line, because we own it — and this is keyed on
@@ -957,6 +1002,15 @@ async function askPlace({ place, question, templateId, accessCode, confirmed, fo
      could set on a real business to call it at 3am. */
   const ownLine = normalizeE164(process.env.DEMO_PLACE_PHONE || '');
   const isOwnLine = !!ownLine && phone === ownLine;
+
+  /* Fail closed, and only where it costs something. A live call must dial a
+     number this server looked up for itself; anything else — a listing with no
+     provider id, a provider that would not answer, a number invented in the
+     request body — does not ring. The operator's own demo line is exempt for
+     the same reason it is exempt from the courtesy rules: we own it. */
+  if(live && !isOwnLine && !verified)
+    return { status: 422, unverified: true,
+      error: `We couldn't confirm ${place.name}'s number against its listing just now, so no call was placed. This app only dials a number it can read back from the listing itself.` };
 
   /* ---- don't dial a closed business ----
      The app already knows whether a place is open — `openNow` comes from
@@ -1852,8 +1906,16 @@ async function askAround({ places, question, templateId, accessCode, confirmed, 
   const targets = [];
   const dropped = [];
   for(const p of list){
-    const phone = normalizeE164(p.phone);
+    // same rule as a single ask: the server's own reading of the listing wins
+    const verified = normalizeE164(p.listedPhone);
+    const phone = verified || normalizeE164(p.phone);
     if(!phone){ dropped.push({ name: p.name, why: 'no callable number' }); continue; }
+    const can = dialable(phone);
+    if(!can.ok){ dropped.push({ name: p.name, why: can.why }); continue; }
+    if(live && phone !== ownLine && !verified){
+      dropped.push({ name: p.name, why: 'its number could not be confirmed against the listing' });
+      continue;
+    }
     // the same line twice is one call, not two, and it would spend two credits
     if(seen.has(phone)){ dropped.push({ name: p.name, why: 'same number as another place' }); continue; }
     if(live && phone !== ownLine && p.openNow === false){
