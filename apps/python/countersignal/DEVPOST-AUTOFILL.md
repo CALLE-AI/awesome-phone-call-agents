@@ -8,14 +8,14 @@ Use these values for the CALL-E submission form.
 - App status: Newly created
 - If pre-existing, explain updates: Not applicable — CounterSignal was newly created during the submission period.
 - Functional demo URL: https://countersignal.vercel.app
-- Project submission pull request URL: TODO — required upstream PR into CALLE-AI/awesome-phone-call-agents
-- Email associated with CALL-E account: TODO — must be confirmed from the actual CALL-E account, not inferred from Devpost
+- Project submission pull request URL: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/198
+- Email associated with CALL-E account: TODO — confirm the actual CALL-E account email used in the additional-calls request / CALL-E dashboard.
 - Primary use case: Other
 - One-sentence real-world task: Runs consented customer-discovery phone interviews under a frozen protocol and turns transcript-grounded supporting and contradictory evidence into an auditable experiment decision.
-- Eligible Age: user must affirm truthfully at submission
-- Country eligibility: user must affirm truthfully at submission
-- Conflict of interest: user must affirm truthfully at submission
-- Demo video URL: TODO — public YouTube or Vimeo, under 3 minutes
+- Eligible Age: confirmed true by submitter
+- Country eligibility: confirmed true by submitter
+- Conflict of interest: confirmed true by submitter
+- Demo video URL: TODO — public YouTube or Vimeo, about 3 minutes
 
 ## Testing instructions
 1. Clone branch `agent/countersignal` and enter `apps/python/countersignal`.
