@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -379,27 +380,84 @@ def validate_base_url(value: str) -> str:
     raise ValueError("base URL must be CALL-E production or an explicit loopback test server")
 
 
+class ReservationLedger:
+    """Durable one-intent/one-call reservation for consequential real-call retries."""
+
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = path
+        with sqlite3.connect(path) as db:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS calls "
+                "(key TEXT PRIMARY KEY, state TEXT NOT NULL, call_id TEXT, detail TEXT)"
+            )
+
+    def claim(self, key: str) -> bool:
+        try:
+            with sqlite3.connect(self.path) as db:
+                db.execute("INSERT INTO calls(key, state) VALUES (?, 'reserved')", (key,))
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def mark(
+        self, key: str, state: str, call_id: str | None = None, detail: str | None = None
+    ) -> None:
+        with sqlite3.connect(self.path) as db:
+            db.execute(
+                "UPDATE calls SET state=?, call_id=COALESCE(?, call_id), detail=? WHERE key=?",
+                (state, call_id, detail, key),
+            )
+
+    def get(self, key: str) -> tuple[str, str | None, str | None] | None:
+        with sqlite3.connect(self.path) as db:
+            row = db.execute(
+                "SELECT state, call_id, detail FROM calls WHERE key=?", (key,)
+            ).fetchone()
+        return row if row else None
+
+
 def execute(
     experiment: Experiment,
     recipient: Recipient,
     calls: CallsAPI,
+    ledger: ReservationLedger,
     timeout_seconds: int = 600,
 ) -> dict[str, Any]:
-    created = calls.create(
-        **call_arguments(experiment, recipient),
-        idempotency_key=idempotency_key(experiment, recipient),
-    )
-    call_id = created.get("id")
-    if not isinstance(call_id, str) or not call_id:
-        raise RuntimeError("CALL-E create response did not contain a call id")
-    completed = calls.wait_for_result(call_id, timeout_seconds=timeout_seconds, interval_seconds=2)
-    return {
-        "call_id": call_id,
-        "classification": classify_call(
-            experiment, recipient, completed, expected_call_id=call_id
-        ),
-        "provider_result": completed,
-    }
+    key = idempotency_key(experiment, recipient)
+    if not ledger.claim(key):
+        state = ledger.get(key)
+        raise RuntimeError(
+            f"call already reserved; reconcile existing state {state[0] if state else 'unknown'}"
+        )
+    accepted_call_id: str | None = None
+    try:
+        created = calls.create(
+            **call_arguments(experiment, recipient),
+            idempotency_key=key,
+        )
+        call_id = created.get("id")
+        if not isinstance(call_id, str) or not call_id:
+            raise RuntimeError("CALL-E create response did not contain a call id")
+        accepted_call_id = call_id
+        ledger.mark(key, "accepted", call_id)
+        completed = calls.wait_for_result(
+            call_id, timeout_seconds=timeout_seconds, interval_seconds=2
+        )
+        result = {
+            "call_id": call_id,
+            "classification": classify_call(
+                experiment, recipient, completed, expected_call_id=call_id
+            ),
+            "provider_result": completed,
+        }
+        ledger.mark(key, "completed", call_id)
+        return result
+    except Exception as exc:
+        ledger.mark(key, "outcome_unknown", accepted_call_id, type(exc).__name__)
+        raise RuntimeError(
+            "CALL-E outcome is unknown; reconcile the existing reservation before any retry"
+        ) from exc
 
 
 def mask_phone(phone: str) -> str:
@@ -432,6 +490,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--confirm-one-reviewed-recipient", action="store_true")
     parser.add_argument("--allow", action="append", default=[])
     parser.add_argument("--timeout-seconds", type=int, default=600)
+    parser.add_argument("--database", type=Path, default=Path("data/countersignal.sqlite3"))
     args = parser.parse_args(argv)
     try:
         experiment = parse_experiment(_load(args.experiment))
@@ -451,7 +510,9 @@ def main(argv: list[str] | None = None) -> int:
         from calle import CalleClient
 
         with CalleClient(api_key=key, base_url=validate_base_url(os.environ.get("CALLE_BASE_URL", DEFAULT_BASE_URL))) as client:
-            payload = execute(experiment, recipient, client.calls, args.timeout_seconds)
+            payload = execute(
+                experiment, recipient, client.calls, ReservationLedger(args.database), args.timeout_seconds
+            )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
