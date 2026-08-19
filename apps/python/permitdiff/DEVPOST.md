@@ -16,6 +16,12 @@ Applicant-side construction teams already have permit portals. The expensive cas
 
 A generic AI phone caller is not enough. If it calls every time, it creates unnecessary interruptions and cost. If it treats what one staff member says on the phone as authoritative permit state, it creates a worse failure: apparent automation that silently transfers legal/administrative authority to an unverified conversation.
 
+The workflow complexity is visible in current municipal systems. Los Angeles Bureau of Engineering instructs staff to review its “Unprocessed Permits” queue several times during the day. Fairfax County publishes permit processing metrics and explicitly tells applicants to contact the department when a current task exceeds the shown timeframe. Miami exposes permit state across iBuild and ProjectDox, with separate plan-history, review-status, event, routing-slip, comments, and review-detail views, plus an email escalation path when a user cannot access project status. San Diego publishes an explicit mapping between internal workflow task status and applicant-visible record status.
+
+References: [Los Angeles A-Permit staff workflow](https://permitmanual.engineering.lacity.gov/construction-permits/technical-procedures/01-b-how-process-permit-staff-review), [Fairfax County development-review metrics](https://www.fairfaxcounty.gov/plan2build/development-review-metrics), [City of Miami permit-status workflow](https://www.miami.gov/Permits-Construction/Permitting-Resources/Track-the-Status-of-a-Permit-Application), and [City of San Diego workflow/status mapping](https://www.sandiego.gov/development-services/permits/workflowrecord-status-mapping-and-definitions).
+
+These sources do **not** prove that every contractor repeatedly calls permit offices or that PermitDiff saves time. They establish that real permitting environments contain queues, time thresholds, multiple status layers, and applicant escalation paths — exactly the exception class this project is designed to reconcile. Pilot impact must still be measured separately.
+
 ## Solution
 
 PermitDiff first evaluates a deterministic no-call gate against a frozen portal snapshot. Fresh record with no explicit conflict means no call. A future/inconsistent timestamp fails closed for data review. Only staleness or an explicit applicant-side discrepancy makes one authorized CALL-E call eligible.
@@ -50,7 +56,7 @@ For real users, the measurable unit is manual exception-handling time displaced 
 
 IncidentBridge gathers vendor-support evidence during an outage. PermitDiff reconciles a frozen municipal/public record against one bounded factual office call. Its trigger is record staleness/conflict, its identity includes the snapshot hash, its output is a record diff, and its downstream authority remains with the municipality or authorized human process.
 
-The architectural distinction from a generic office caller is stronger: PermitDiff tries not to call. A fresh record is a successful no-call outcome, not an incomplete workflow.
+The architectural distinction from a generic office caller is stronger: PermitDiff tries not to call. A fresh record is a successful no-call outcome, not an incomplete workflow. A current search of the official contribution repository found no directly overlapping permit/municipal reconciliation contribution; the substantive novelty remains the no-call gate plus snapshot-bound evidence and non-transferable authority.
 
 ## Product experience
 
@@ -75,7 +81,7 @@ This three-state sequence should be the centre of the demo. Showing only a succe
 
 ## Demo video outline — target 2:25
 
-**0:00–0:18 — Problem.** Show the console. Explain that portals solve the normal case; stale/conflicting records create manual exception work.
+**0:00–0:18 — Problem.** Show the console. Explain that portals solve the normal case; stale/conflicting records create manual exception work. Briefly show one municipal workflow reference rather than a market-size slide.
 
 **0:18–0:42 — State 1: do not call.** Click Fresh record. Show `CALL-E NOT CALLED` and `no_call_needed`. State that product value begins with avoiding unnecessary calls.
 
@@ -97,7 +103,8 @@ This three-state sequence should be the centre of the demo. Showing only a succe
 4. Architecture/preview showing snapshot hash and exact destination binding.
 5. Ambiguous-outcome/SQLite duplicate protection.
 6. Test/CI proof.
-7. Optional authorized live result only if it exists and can be privacy-minimized.
+7. One concise municipal-workflow evidence slide/reference.
+8. Optional authorized live result only if it exists and can be privacy-minimized.
 
 ## Official CALL-E form fields
 
@@ -117,7 +124,7 @@ This three-state sequence should be the centre of the demo. Showing only a succe
 ## Current evidence status
 
 - Initial deterministic suite: 15 passing tests, plus reviewer-console contract coverage added later.
-- Repository-level `Validate` workflow: passed on staging heads tested so far.
+- Repository-level `Validate` workflow: passed on staging heads tested before this evidence-only documentation update.
 - Staging PR: open, draft, mergeable.
 - Authorized real permit pilot: not yet obtained.
 - Real CALL-E PermitDiff calls: none should be claimed unless an applicant-side participant with authority over the exact permit case explicitly authorizes the inquiry.
