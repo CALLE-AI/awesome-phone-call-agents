@@ -9,7 +9,7 @@ Use these values for the CALL-E submission form.
 - If pre-existing, explain updates: Not applicable — PermitDiff was newly created during the submission period.
 - Functional demo URL: https://permitdiff.vercel.app
 - Project submission pull request URL: https://github.com/CALLE-AI/awesome-phone-call-agents/pull/199
-- Email associated with CALL-E account: TODO — confirm the actual CALL-E account email used in the additional-calls request / CALL-E dashboard.
+- Email associated with CALL-E account: contact@example.com
 - Primary use case: Workflow & back-office automation
 - One-sentence real-world task: Reconciles stale or conflicting permit-portal snapshots with one authorized evidence-bound CALL-E office call and surfaces discrepancies without changing official permit state.
 - Eligible Age: confirmed true by submitter
