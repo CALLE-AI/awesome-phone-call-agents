@@ -205,6 +205,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 
 ### Safety patterns
 
+- [`Production workflow guide`](docs/production-workflows.md) - Application-owned state, stable idempotency, durable webhook processing, result verification, retry ownership, and privacy-minimized audit patterns for consequential phone workflows.
 - [`Safety reference`](skills/call-reminder/references/safety.md) - Consent, E.164 phone-number handling, credential boundaries, cancellation, duplicate-job prevention, and medical reminder boundaries.
 - [`Dispatch safety reference`](skills/service-dispatch-call/references/safety.md) - Purpose-bound authorization, third-party privacy on outbound calls, the commitment boundary between gathering an answer and accepting it, and retention limits on transcripts and spoken values.
 - [`Ambiguous outcome handling`](skills/service-dispatch-call/references/ambiguous-outcomes.md) - Why an unknown call outcome is a state to reconcile rather than an error to retry, and how client timeouts cause duplicate calls.
