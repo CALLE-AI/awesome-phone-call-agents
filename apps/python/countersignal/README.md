@@ -103,7 +103,7 @@ python countersignal.py \
   --allow +14155550123
 ```
 
-The `--allow` value must exactly match the selected recipient. The production base URL is pinned to the official CALL-E HTTPS origin; plain HTTP is accepted only for an explicit loopback test server. The CALL-E SDK is imported only after the live gates pass.
+The `--allow` value must exactly match the selected recipient. The production base URL is pinned to the official CALL-E HTTPS origin; plain HTTP is accepted only for an explicit loopback test server. The CALL-E SDK is imported only after the live gates pass. A loopback test server receives only a fixed non-secret test key; `CALLE_API_KEY` is required and used only for the production origin.
 
 Before crossing the real-call boundary, CounterSignal reserves the exact stable intent in SQLite. Once CALL-E returns a call ID, that ID is bound to the reservation. If a timeout or exception leaves the outcome ambiguous, the ledger moves to `outcome_unknown` and the same intent cannot automatically redial. This follows the repository's production-workflow rule that an unknown submission outcome is a state to reconcile, not permission to create another call.
 

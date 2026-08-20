@@ -159,6 +159,22 @@ def test_serializable_preview_for_reviewer():
     json.dumps(c.preview(experiment(), recipient()))
 
 
+def test_loopback_never_receives_the_real_api_key(monkeypatch):
+    monkeypatch.setenv("CALLE_API_KEY", "real-production-secret")
+    assert c.validate_base_url("http://127.0.0.1:8123") == "http://127.0.0.1:8123"
+    assert c.api_key_for_base_url("http://127.0.0.1:8123") == c.LOOPBACK_TEST_API_KEY
+
+
+def test_production_requires_the_real_api_key(monkeypatch):
+    monkeypatch.delenv("CALLE_API_KEY", raising=False)
+    try:
+        c.api_key_for_base_url(c.DEFAULT_BASE_URL)
+    except ValueError as exc:
+        assert "production" in str(exc)
+    else:
+        raise AssertionError("production execution should require CALLE_API_KEY")
+
+
 def test_ledger_prevents_duplicate_intent(tmp_path):
     ledger = c.ReservationLedger(tmp_path / "ledger.sqlite3")
     key = c.idempotency_key(experiment(), recipient())
