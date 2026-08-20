@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-function isAuthRequired(): boolean {
-  return Boolean(process.env.OPENINGS_AUTH_TOKEN || process.env.OPENINGS_BASIC_AUTH);
-}
-
 function getToken(): string | undefined {
   // OPENINGS_AUTH_TOKEN is the primary shared secret; OPENINGS_BASIC_AUTH="user:pass" also supported
   if (process.env.OPENINGS_AUTH_TOKEN) return process.env.OPENINGS_AUTH_TOKEN;
