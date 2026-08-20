@@ -159,6 +159,7 @@ def test_missing_quote_does_not_update(tmp_path: Path):
         (QUOTE_ID, "--retry-in", "1h2d"),
         (QUOTE_ID, "--retry-in", "0s"),
         (QUOTE_ID, "--retry-at", "2026-08-13T10:30:00+01:00"),
+        (QUOTE_ID, "--retry-at", "2026-02-30T10:30:00Z"),
         (QUOTE_ID, "--retry-in", "1h", "--follow-up-status", "Completed"),
         (QUOTE_ID, "--follow-up-status", "Completed", "--clear-follow-up-status"),
     ],

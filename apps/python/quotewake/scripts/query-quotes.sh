@@ -57,7 +57,7 @@ QUERY="SELECT Id, Name, Status, Follow_Up_Status__c, Next_Follow_Up_At__c, Attem
 if [[ -t 1 ]] && command -v less >/dev/null 2>&1; then
     # -S chops long rows instead of wrapping them, so the terminal can scroll
     # horizontally to the right-hand columns.
-    sf data query "${ORG_ARGS[@]}" --query "$QUERY" --result-format human | less -S -R
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "$QUERY" --result-format human | less -S -R
 else
-    sf data query "${ORG_ARGS[@]}" --query "$QUERY" --result-format human
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "$QUERY" --result-format human
 fi

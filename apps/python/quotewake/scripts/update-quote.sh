@@ -65,17 +65,27 @@ validate_duration() {
 
 validate_retry_at() {
     local value="$1"
-    local base timezone normalized
+    local base normalized
 
     [[ "$value" =~ ^([1-9][0-9]{3}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})(Z|\+00:00)$ ]] || \
         fail "Invalid --retry-at '$value'. Use UTC ISO 8601 with Z or +00:00."
     base="${BASH_REMATCH[1]}"
-    timezone="${BASH_REMATCH[2]}"
 
     # A round trip rejects impossible calendar dates and clock values before
-    # Salesforce CLI is inspected. The timezone is deliberately restricted to
-    # UTC above, so normalization only needs to replace +00:00 with Z.
-    normalized="$(date -u -d "$value" +%Y-%m-%dT%H:%M:%S 2>/dev/null)" || \
+    # Salesforce CLI is inspected. Python is already required by QuoteWake and
+    # avoids choosing between incompatible GNU and BSD date command syntax.
+    normalized="$(python3 - "$base" 2>/dev/null <<'PY'
+import sys
+from datetime import datetime
+
+value = sys.argv[1]
+try:
+    parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+except ValueError:
+    raise SystemExit(1)
+print(parsed.strftime("%Y-%m-%dT%H:%M:%S"))
+PY
+)" || \
         fail "Invalid --retry-at '$value'. The date or time is not valid."
     [[ "$normalized" == "$base" ]] || \
         fail "Invalid --retry-at '$value'. The date or time is not valid."
@@ -259,7 +269,7 @@ fi
 
 SOQL="SELECT Id, Name, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c FROM Quote WHERE Id = '$QUOTE_ID' LIMIT 1"
 
-if ! BEFORE_JSON="$(sf data query "${ORG_ARGS[@]}" --query "$SOQL" --json)"; then
+if ! BEFORE_JSON="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "$SOQL" --json)"; then
     fail "Salesforce query failed for Quote $QUOTE_ID."
 fi
 
@@ -323,11 +333,11 @@ if [[ "$ATTEMPT_SET" == true ]]; then
     append_value "Attempt_Count__c=$ATTEMPT_VALUE"
 fi
 
-if ! sf data update record "${ORG_ARGS[@]}" --sobject Quote --record-id "$QUOTE_ID" --values "$VALUES" --json >/dev/null; then
+if ! sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Quote --record-id "$QUOTE_ID" --values "$VALUES" --json >/dev/null; then
     fail "Salesforce update failed for Quote $QUOTE_ID."
 fi
 
-if ! AFTER_JSON="$(sf data query "${ORG_ARGS[@]}" --query "$SOQL" --json)"; then
+if ! AFTER_JSON="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "$SOQL" --json)"; then
     fail "Salesforce post-update query failed for Quote $QUOTE_ID."
 fi
 if ! jq -e '.result.records[0] // empty' <<<"$AFTER_JSON" >/dev/null 2>&1; then

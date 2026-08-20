@@ -68,7 +68,7 @@ def test_call_request_canonicalizes_salesforce_locale_for_calle():
 
 
 def test_phone_normalization_and_masking_are_conservative():
-    assert normalize_phone("0014155550121") == "+14155550101"
+    assert normalize_phone("0014155550101") == "+14155550101"
     assert normalize_phone("4155550101") is None
     assert mask_phone("+14155550101") == "+14******101"
 

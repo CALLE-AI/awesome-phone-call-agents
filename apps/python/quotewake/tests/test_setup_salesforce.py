@@ -1,6 +1,7 @@
+import json
 import os
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -75,8 +76,43 @@ def test_seed_writes_regional_options_to_accounts_and_contacts():
 def test_demo_quotes_expire_in_three_months():
     script = SCRIPT.read_text()
 
-    assert "ExpirationDate=$(date -u -d '+3 months' +%Y-%m-%d)" in script
+    assert "calendar.monthrange(year, month)" in script
+    assert "ExpirationDate=$QUOTE_EXPIRATION_DATE" in script
     assert "+30 days" not in script
+    assert "date -u" not in script
+
+
+def test_utc_date_helper_computes_consistent_eligibility_values():
+    script = SCRIPT.read_text()
+    start = script.index("utc_date_value() {")
+    end = script.index("\n}\n\non_error", start) + 2
+    helper = script[start:end]
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'{helper}\nutc_date_value "$@"',
+            "utc-date-test",
+            "eligibility",
+            "3600",
+            "1800",
+            "86400",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    values = json.loads(result.stdout)
+    query_now = datetime.strptime(values["query_now"], "%Y-%m-%dT%H:%M:%SZ")
+    standard_cutoff = datetime.strptime(values["standard_cutoff"], "%Y-%m-%dT%H:%M:%SZ")
+    minimum_cutoff = datetime.strptime(values["minimum_cutoff"], "%Y-%m-%dT%H:%M:%SZ")
+    assert query_now - standard_cutoff == timedelta(hours=1)
+    assert query_now - minimum_cutoff == timedelta(minutes=30)
+    assert values["today"] == query_now.date().isoformat()
+    assert values["due_soon_date"] == (query_now + timedelta(days=1)).date().isoformat()
 
 
 def test_reset_preserves_existing_contact_phone_without_explicit_test_phones():
@@ -214,7 +250,7 @@ def test_reset_uses_one_generation_marker_for_every_demo_quote():
     script = SCRIPT.read_text()
 
     assert "RESET_GENERATION_AT=''" in script
-    assert script.count('RESET_GENERATION_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"') == 1
+    assert script.count('RESET_GENERATION_AT="$(utc_date_value reset-marker)"') == 1
     assert "Follow_Up_Status__c= Next_Follow_Up_At__c=$RESET_GENERATION_AT Attempt_Count__c=0" in script
     assert "generation $RESET_GENERATION_AT" in script
 
@@ -229,7 +265,7 @@ def test_reset_generation_changes_call_key_but_normal_seed_reuses_it():
     assert idempotency_key("0Q0000000000001", 1, first_generation) == first_key
 
     script = SCRIPT.read_text()
-    seed_update = "sf data update record \"${ORG_ARGS[@]}\" --sobject Quote --record-id \"$existing_id\" --values \"$structural_values\""
+    seed_update = 'sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Quote --record-id "$existing_id" --values "$structural_values"'
     assert seed_update in script
     assert 'create_values="$structural_values QuoteWake_Enabled__c=true Attempt_Count__c=0"' in script
 
@@ -239,3 +275,17 @@ def test_generation_marker_does_not_change_initial_status_null_readiness_query()
 
     assert "Follow_Up_Status__c = null AND (LastModifiedDate <= $INITIAL_STANDARD_CUTOFF" in script
     assert "Follow_Up_Status__c = null AND Next_Follow_Up_At__c" not in script
+
+
+def test_optional_salesforce_arguments_use_bash_3_nounset_safe_expansion():
+    scripts = [
+        ROOT / "scripts" / "create-user.sh",
+        ROOT / "scripts" / "query-quotes.sh",
+        ROOT / "scripts" / "setup-salesforce.sh",
+        ROOT / "scripts" / "update-quote.sh",
+    ]
+
+    for path in scripts:
+        expansions = [line for line in path.read_text().splitlines() if "ORG_ARGS[@]" in line]
+        assert expansions
+        assert all('${ORG_ARGS[@]+"${ORG_ARGS[@]}"}' in line for line in expansions)

@@ -160,7 +160,7 @@ sf_json() {
 soql_json() {
     local query="$1"
     local response
-    response="$(sf_json data query "${ORG_ARGS[@]}" --query "$query")" || return 1
+    response="$(sf_json data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "$query")" || return 1
     jq -e '.status == 0 and (.result | type == "object")' <<<"$response" >/dev/null || return 1
     printf '%s\n' "$response"
 }
@@ -178,7 +178,7 @@ query_one_json() {
 preflight_org() {
     local display organization is_scratch
 
-    display="$(sf_json org display "${ORG_ARGS[@]}")" || \
+    display="$(sf_json org display ${ORG_ARGS[@]+"${ORG_ARGS[@]}"})" || \
         fail "Salesforce CLI is not authenticated for target '$TARGET_ORG'."
     if [[ "$(jq -r '.status // 0' <<<"$display")" != "0" ]]; then
         fail "Salesforce CLI could not validate target '$TARGET_ORG'."
@@ -262,7 +262,7 @@ preflight_schema() {
 
 preflight_metadata() {
     info "Validating QuoteWake user permissions and Salesforce UI metadata without saving it to Salesforce..."
-    if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" \
+    if ! (cd "$SALESFORCE_DIR" && sf project deploy start ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
         --source-dir "force-app/main/default/permissionsets/$PERMISSION_SET.permissionset-meta.xml" \
         --source-dir force-app/main/default/objects/Contact \
         --source-dir "force-app/main/default/profiles/$PROFILE_NAME.profile-meta.xml" \
@@ -312,7 +312,7 @@ print_plan() {
 
 deploy_permission_set() {
     info "Deploying $PERMISSION_SET and Salesforce UI metadata..."
-    if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" \
+    if ! (cd "$SALESFORCE_DIR" && sf project deploy start ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
         --source-dir "force-app/main/default/permissionsets/$PERMISSION_SET.permissionset-meta.xml" \
         --source-dir force-app/main/default/objects/Contact \
         --source-dir "force-app/main/default/profiles/$PROFILE_NAME.profile-meta.xml" \
@@ -326,7 +326,7 @@ create_or_reactivate_user() {
     local response values
     if [[ "$USER_EXISTS" == true ]]; then
         if [[ "$USER_ACTIVE" != true ]]; then
-            if ! sf data update record "${ORG_ARGS[@]}" --sobject User --record-id "$USER_ID" \
+            if ! sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject User --record-id "$USER_ID" \
                 --values "IsActive=true" >/dev/null 2>&1; then
                 fail "Could not reactivate the existing QuoteWake runtime user."
             fi
@@ -336,7 +336,7 @@ create_or_reactivate_user() {
     fi
 
     values="Username='$RUNTIME_USERNAME' Email='$RUNTIME_EMAIL' LastName='QuoteWake Runtime' Alias=qwrtuser ProfileId=$PROFILE_ID IsActive=true EmailEncodingKey=UTF-8 LanguageLocaleKey=$ORG_LANGUAGE LocaleSidKey=$ORG_LOCALE TimeZoneSidKey=$ORG_TIMEZONE"
-    if ! response="$(sf data create record "${ORG_ARGS[@]}" --sobject User --values "$values" --json 2>/dev/null)"; then
+    if ! response="$(sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject User --values "$values" --json 2>/dev/null)"; then
         fail "Could not create the QuoteWake runtime Salesforce user."
     fi
     USER_ID="$(jq -r '.result.id // empty' <<<"$response")"
@@ -353,7 +353,7 @@ assign_permission_set() {
     count="$(jq -r '.result.totalSize // 0' <<<"$response")"
     [[ "$count" =~ ^[0-9]+$ ]] || fail "Salesforce returned an invalid permission-set assignment response."
     if (( count == 0 )); then
-        if ! sf org assign permset "${ORG_ARGS[@]}" --name "$PERMISSION_SET" \
+        if ! sf org assign permset ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --name "$PERMISSION_SET" \
             --on-behalf-of "$RUNTIME_USERNAME" >/dev/null 2>&1; then
             fail "Could not assign $PERMISSION_SET to the QuoteWake runtime user."
         fi
@@ -372,7 +372,7 @@ send_welcome_email() {
     # this process's output, arguments, or environment.
     if ! sf api request rest \
         "/services/data/v${ORG_API_VERSION}/sobjects/User/${USER_ID}/password" \
-        "${ORG_ARGS[@]}" --method DELETE \
+        ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --method DELETE \
         --body '{"mode":"raw","raw":""}' >/dev/null 2>&1; then
         fail "User provisioning completed, but Salesforce could not send the password-reset email. Re-run with --resend-welcome."
     fi

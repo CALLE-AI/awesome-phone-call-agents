@@ -24,6 +24,42 @@ ok() { printf '[OK] %s\n' "$1"; }
 create_msg() { printf '[CREATE] %s\n' "$1" >&2; }
 fail() { printf '[ERROR] %s\n' "$1" >&2; exit 1; }
 
+utc_date_value() {
+    local operation="$1"
+    shift
+    python3 - "$operation" "$@" <<'PY'
+import calendar
+import json
+import sys
+from datetime import datetime, timedelta, timezone
+
+operation = sys.argv[1]
+now = datetime.now(timezone.utc)
+if operation == "today":
+    print(now.date().isoformat())
+elif operation == "add-months":
+    months = int(sys.argv[2])
+    month_index = now.year * 12 + now.month - 1 + months
+    year, zero_based_month = divmod(month_index, 12)
+    month = zero_based_month + 1
+    day = min(now.day, calendar.monthrange(year, month)[1])
+    print(now.date().replace(year=year, month=month, day=day).isoformat())
+elif operation == "reset-marker":
+    print(now.isoformat(timespec="milliseconds").replace("+00:00", "Z"))
+elif operation == "eligibility":
+    standard_seconds, minimum_seconds, due_soon_seconds = map(int, sys.argv[2:5])
+    print(json.dumps({
+        "query_now": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "standard_cutoff": (now - timedelta(seconds=standard_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "minimum_cutoff": (now - timedelta(seconds=minimum_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "due_soon_date": (now + timedelta(seconds=due_soon_seconds)).date().isoformat(),
+        "today": now.date().isoformat(),
+    }))
+else:
+    raise SystemExit(f"Unknown UTC date operation: {operation}")
+PY
+}
+
 on_error() {
     printf '\n[ERROR] Command failed: %s\n' "$BASH_COMMAND" >&2
     if [[ "$CHANGES_APPLIED" == true ]]; then
@@ -95,7 +131,7 @@ parse_test_phones() {
         phone="${phone%"${phone##*[![:space:]]}"}"
         [[ "$phone" =~ ^\+[1-9][0-9]{7,14}$ ]] || \
         fail "Invalid test phone '$phone'. Use E.164 format, for example +14155550100."
-        for existing in "${TEST_PHONES[@]}"; do
+        for existing in ${TEST_PHONES[@]+"${TEST_PHONES[@]}"}; do
             [[ "$existing" != "$phone" ]] || fail "Duplicate test phone: $phone"
         done
         TEST_PHONES+=("$phone")
@@ -257,7 +293,7 @@ else
 fi
 
 ORG_ERROR_FILE="$(mktemp)"
-if ! ORG_JSON="$(sf org display "${ORG_ARGS[@]}" --json 2>"$ORG_ERROR_FILE")"; then
+if ! ORG_JSON="$(sf org display ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --json 2>"$ORG_ERROR_FILE")"; then
     printf '[ERROR] sf org display failed: %s\n' "$(tr '\n' ' ' <"$ORG_ERROR_FILE")" >&2
     rm -f "$ORG_ERROR_FILE"
     fail "Salesforce authentication is missing or the target org is unreachable. Run 'sf org login web --alias quotewake-dev --set-default' and retry."
@@ -274,20 +310,20 @@ printf '[INFO] Org username: %s\n' "$ORG_USERNAME"
 printf '[INFO] Org ID: %s\n' "$ORG_ID"
 ok "Salesforce connection verified"
 
-QUOTE_SCHEMA="$(sf sobject describe "${ORG_ARGS[@]}" --sobject Quote --json 2>/dev/null)" || \
+QUOTE_SCHEMA="$(sf sobject describe ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Quote --json 2>/dev/null)" || \
     fail "The standard Quote object is unavailable in this org. No Salesforce changes were attempted."
 [[ "$(jq -r '.result.name // empty' <<<"$QUOTE_SCHEMA")" == "Quote" ]] || \
     fail "Salesforce did not return the standard Quote object metadata."
 ok "Quote object available"
 
 info "Enabling standard Quotes through deployable QuoteSettings metadata..."
-if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" --source-dir force-app/main/default/settings --wait 30 --concise); then
+if ! (cd "$SALESFORCE_DIR" && sf project deploy start ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --source-dir force-app/main/default/settings --wait 30 --concise); then
     printf '[ERROR] Salesforce rejected QuoteSettings deployment.\n' >&2
     printf '[ERROR] Manual step: Setup -> Quote Settings -> check Enable Quotes -> Save, then rerun this script.\n' >&2
     exit 1
 fi
 CHANGES_APPLIED=true
-if ! sf data query "${ORG_ARGS[@]}" --query "SELECT Id FROM Quote LIMIT 1" --result-format csv >/dev/null; then
+if ! sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Id FROM Quote LIMIT 1" --result-format csv >/dev/null; then
     printf '[ERROR] The Quote object is still not queryable after QuoteSettings deployment.\n' >&2
     printf '[ERROR] Manual step: Setup -> Quote Settings -> check Enable Quotes -> Save, then rerun this script.\n' >&2
     exit 1
@@ -295,7 +331,7 @@ fi
 ok "Quotes are enabled"
 
 info "Deploying QuoteWake fields and permission set..."
-    (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" --source-dir force-app/main/default/objects/Quote --source-dir force-app/main/default/objects/Contact --source-dir force-app/main/default/permissionsets --source-dir 'force-app/main/default/profiles/QuoteWake Runtime.profile-meta.xml' --wait 30 --concise)
+    (cd "$SALESFORCE_DIR" && sf project deploy start ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --source-dir force-app/main/default/objects/Quote --source-dir force-app/main/default/objects/Contact --source-dir force-app/main/default/permissionsets --source-dir 'force-app/main/default/profiles/QuoteWake Runtime.profile-meta.xml' --wait 30 --concise)
 CHANGES_APPLIED=true
 ok "QuoteWake metadata deployment completed"
 
@@ -319,7 +355,7 @@ configure_external_client_app() {
         fail "A runtime username is required to configure the External Client App."
 
     info "Deploying the QuoteWake External Client App OAuth settings..."
-    if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" \
+    if ! (cd "$SALESFORCE_DIR" && sf project deploy start ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
         --source-dir "force-app/main/default/externalClientApps/$EXTERNAL_CLIENT_APP.eca-meta.xml" \
         --source-dir "force-app/main/default/extlClntAppGlobalOauthSets/$EXTERNAL_CLIENT_APP.ecaGlblOauth-meta.xml" \
         --source-dir "force-app/main/default/extlClntAppOauthSettings/$EXTERNAL_CLIENT_APP.ecaOauth-meta.xml" \
@@ -327,7 +363,7 @@ configure_external_client_app() {
         fail "QuoteWake External Client App deployment failed."
     fi
 
-    permission_set_name="$(sf data query "${ORG_ARGS[@]}" \
+    permission_set_name="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
         --query "SELECT Name FROM PermissionSet WHERE Name = 'QuoteWake_User' LIMIT 1" \
         --json | jq -r '.result.records[0].Name // empty')"
     [[ -n "$permission_set_name" ]] || fail "Could not resolve the QuoteWake_User permission set."
@@ -360,7 +396,7 @@ EOF
 
     info "Configuring Client Credentials Run As user and pre-authorized permission set..."
     policy_error_file="$(mktemp)"
-    if ! (cd "$SALESFORCE_DIR" && sf project deploy start "${ORG_ARGS[@]}" \
+    if ! (cd "$SALESFORCE_DIR" && sf project deploy start ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
         --source-dir "$policy_dir/extlClntAppOauthPolicies" --wait 30 --concise >"$policy_error_file" 2>&1); then
         sed -n '1,120p' "$policy_error_file" >&2
         rm -f "$policy_error_file"
@@ -378,14 +414,14 @@ if [[ -n "$RUNTIME_USER_EMAIL" ]]; then
 fi
 
 if [[ "$ASSIGN_PERMISSIONS" == true ]]; then
-    CURRENT_USER_ID="$(sf data query "${ORG_ARGS[@]}" --query "SELECT Id FROM User WHERE Username = '$ORG_USERNAME' LIMIT 1" --json | jq -r '.result.records[0].Id // empty')"
+    CURRENT_USER_ID="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Id FROM User WHERE Username = '$ORG_USERNAME' LIMIT 1" --json | jq -r '.result.records[0].Id // empty')"
     [[ -n "$CURRENT_USER_ID" ]] || fail "Could not resolve the authenticated Salesforce user ID for permission assignment."
-    PERMISSION_ASSIGNMENT_ID="$(sf data query "${ORG_ARGS[@]}" --query "SELECT Id FROM PermissionSetAssignment WHERE AssigneeId = '$CURRENT_USER_ID' AND PermissionSet.Name = 'QuoteWake_User' LIMIT 1" --json | jq -r '.result.records[0].Id // empty')"
+    PERMISSION_ASSIGNMENT_ID="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Id FROM PermissionSetAssignment WHERE AssigneeId = '$CURRENT_USER_ID' AND PermissionSet.Name = 'QuoteWake_User' LIMIT 1" --json | jq -r '.result.records[0].Id // empty')"
     if [[ -n "$PERMISSION_ASSIGNMENT_ID" ]]; then
         ok "QuoteWake_User is already assigned"
     else
         info "Assigning QuoteWake_User to the current authenticated Salesforce user..."
-        sf org assign permset "${ORG_ARGS[@]}" --name QuoteWake_User
+        sf org assign permset ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --name QuoteWake_User
         ok "QuoteWake_User assigned"
     fi
 fi
@@ -404,13 +440,13 @@ verify_fields() {
 }
 
 info "Verifying QuoteWake fields..."
-QUOTE_SCHEMA="$(sf sobject describe "${ORG_ARGS[@]}" --sobject Quote --json)"
+QUOTE_SCHEMA="$(sf sobject describe ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Quote --json)"
 verify_fields "$QUOTE_SCHEMA"
 
 required_create_fields() {
     local object="$1"
     local schema
-    schema="$(sf sobject describe "${ORG_ARGS[@]}" --sobject "$object" --json)"
+    schema="$(sf sobject describe ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject "$object" --json)"
     jq -r '.result.fields[] | select(.createable == true and .nillable == false and .defaultedOnCreate == false) | .name' <<<"$schema"
 }
 
@@ -429,11 +465,11 @@ ensure_product() {
     existing_id="$(query_id "SELECT Id FROM Product2 WHERE ProductCode = '$product_code' LIMIT 1")"
     values="Name='$name' ProductCode=$product_code Description='$description' IsActive=true"
     if [[ -n "$existing_id" ]]; then
-        sf data update record "${ORG_ARGS[@]}" --sobject Product2 --record-id "$existing_id" --values "$values" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Product2 --record-id "$existing_id" --values "$values" >/dev/null
         printf '%s\n' "$existing_id"
     else
         create_msg "Product2: $name"
-        sf data create record "${ORG_ARGS[@]}" --sobject Product2 --values "$values" --json | jq -r '.result.id'
+        sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Product2 --values "$values" --json | jq -r '.result.id'
     fi
 }
 
@@ -442,11 +478,11 @@ ensure_pricebook_entry() {
     existing_id="$(query_id "SELECT Id FROM PricebookEntry WHERE Pricebook2Id = '$PRICEBOOK_ID' AND Product2Id = '$product_id' LIMIT 1")"
     values="Pricebook2Id=$PRICEBOOK_ID Product2Id=$product_id UnitPrice=$unit_price IsActive=true"
     if [[ -n "$existing_id" ]]; then
-        sf data update record "${ORG_ARGS[@]}" --sobject PricebookEntry --record-id "$existing_id" --values "UnitPrice=$unit_price IsActive=true" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject PricebookEntry --record-id "$existing_id" --values "UnitPrice=$unit_price IsActive=true" >/dev/null
         printf '%s\n' "$existing_id"
     else
         create_msg "PricebookEntry: $product_id"
-        sf data create record "${ORG_ARGS[@]}" --sobject PricebookEntry --values "$values" --json | jq -r '.result.id'
+        sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject PricebookEntry --values "$values" --json | jq -r '.result.id'
     fi
 }
 
@@ -456,27 +492,27 @@ ensure_quote_line() {
     existing_id="$(query_id "SELECT Id FROM QuoteLineItem WHERE QuoteId = '$quote_id' AND PricebookEntryId = '$pricebook_entry_id' LIMIT 1")"
     values="QuoteId=$quote_id PricebookEntryId=$pricebook_entry_id Product2Id=$product_id Quantity=$quantity UnitPrice=$unit_price Description='$description'"
     if [[ -n "$existing_id" ]]; then
-        sf data update record "${ORG_ARGS[@]}" --sobject QuoteLineItem --record-id "$existing_id" --values "Quantity=$quantity UnitPrice=$unit_price Description='$description'" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject QuoteLineItem --record-id "$existing_id" --values "Quantity=$quantity UnitPrice=$unit_price Description='$description'" >/dev/null
     else
         create_msg "QuoteLineItem: $description"
-        sf data create record "${ORG_ARGS[@]}" --sobject QuoteLineItem --values "$values" >/dev/null
+        sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject QuoteLineItem --values "$values" >/dev/null
     fi
 }
 
 query_id() {
     local query="$1"
-    sf data query "${ORG_ARGS[@]}" --query "$query" --json | jq -r '.result.records[0].Id // empty'
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "$query" --json | jq -r '.result.records[0].Id // empty'
 }
 
 ensure_record() {
     local object="$1" name="$2" values="$3" existing_id
     existing_id="$(query_id "SELECT Id FROM $object WHERE Name = '$name' LIMIT 1")"
     if [[ -n "$existing_id" ]]; then
-        sf data update record "${ORG_ARGS[@]}" --sobject "$object" --record-id "$existing_id" --values "$values" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject "$object" --record-id "$existing_id" --values "$values" >/dev/null
         printf '%s\n' "$existing_id"
     else
         create_msg "$object: $name"
-        sf data create record "${ORG_ARGS[@]}" --sobject "$object" --values "$values" --json | jq -r '.result.id'
+        sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject "$object" --values "$values" --json | jq -r '.result.id'
     fi
 }
 
@@ -494,14 +530,14 @@ ensure_contact() {
             # override the requested demo destination.
             values="$values Phone=$phone MobilePhone=$phone"
         fi
-        sf data update record "${ORG_ARGS[@]}" --sobject Contact --record-id "$existing_id" --values "$values" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Contact --record-id "$existing_id" --values "$values" >/dev/null
         printf '%s\n' "$existing_id"
     else
         create_msg "Contact: $first_name $last_name"
         # New Contacts need a safe fixture fallback unless an authorized test
         # number was explicitly supplied.
         values="FirstName='$first_name' LastName='$last_name' AccountId=$account_id Email=$email Phone=$phone MobilePhone=$phone QuoteWake_Call_Locale__c='$CALL_LOCALE'"
-        sf data create record "${ORG_ARGS[@]}" --sobject Contact --values "$values" --json | jq -r '.result.id'
+        sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Contact --values "$values" --json | jq -r '.result.id'
     fi
 }
 
@@ -509,15 +545,15 @@ ensure_primary_contact_role() {
     local opportunity_id="$1" contact_id="$2" existing_id
     existing_id="$(query_id "SELECT Id FROM OpportunityContactRole WHERE OpportunityId = '$opportunity_id' AND ContactId = '$contact_id' LIMIT 1")"
     if [[ -n "$existing_id" ]]; then
-        sf data update record "${ORG_ARGS[@]}" --sobject OpportunityContactRole --record-id "$existing_id" --values "IsPrimary=true Role='Decision Maker'" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject OpportunityContactRole --record-id "$existing_id" --values "IsPrimary=true Role='Decision Maker'" >/dev/null
     else
         create_msg "OpportunityContactRole: $opportunity_id -> $contact_id"
-        sf data create record "${ORG_ARGS[@]}" --sobject OpportunityContactRole --values "OpportunityId=$opportunity_id ContactId=$contact_id IsPrimary=true Role='Decision Maker'" >/dev/null
+        sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject OpportunityContactRole --values "OpportunityId=$opportunity_id ContactId=$contact_id IsPrimary=true Role='Decision Maker'" >/dev/null
     fi
 }
 
 demo_quote_ids() {
-    sf data query "${ORG_ARGS[@]}" \
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
         --query "SELECT Id FROM Quote WHERE Name LIKE '${DEMO_QUOTE_PREFIX}%'" \
         --json | jq -r '.result.records[]?.Id // empty'
 }
@@ -534,12 +570,12 @@ reset_demo_data() {
         [[ -z "$quote_id" ]] && continue
         # Query each Quote explicitly because WhatId is polymorphic; this keeps
         # the delete scope limited to Tasks whose WhatId is a demo Quote.
-        quote_task_ids="$(sf data query "${ORG_ARGS[@]}" \
+        quote_task_ids="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
             --query "SELECT Id FROM Task WHERE WhatId = '$quote_id'" \
             --json | jq -r '.result.records[]?.Id // empty')"
         while IFS= read -r task_id; do
             [[ -z "$task_id" ]] && continue
-            sf data delete record "${ORG_ARGS[@]}" --sobject Task --record-id "$task_id" >/dev/null
+            sf data delete record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Task --record-id "$task_id" >/dev/null
             deleted_tasks=$((deleted_tasks + 1))
         done <<<"$quote_task_ids"
     done <<<"$quote_ids"
@@ -549,7 +585,7 @@ reset_demo_data() {
     reset_quotes=0
     while IFS= read -r quote_id; do
         [[ -z "$quote_id" ]] && continue
-        sf data update record "${ORG_ARGS[@]}" \
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} \
             --sobject Quote \
             --record-id "$quote_id" \
             --values "QuoteWake_Enabled__c=true Follow_Up_Status__c= Next_Follow_Up_At__c=$RESET_GENERATION_AT Attempt_Count__c=0" \
@@ -577,10 +613,10 @@ if [[ "$SEED_DATA" == true ]]; then
 
     PRICEBOOK_ID="$(query_id "SELECT Id FROM Pricebook2 WHERE IsStandard = true LIMIT 1")"
     [[ -n "$PRICEBOOK_ID" ]] || fail "No standard Price Book was found. Create or activate the standard Price Book in Setup, then retry."
-    PRICEBOOK_ACTIVE="$(sf data query "${ORG_ARGS[@]}" --query "SELECT IsActive FROM Pricebook2 WHERE Id = '$PRICEBOOK_ID'" --json | jq -r '.result.records[0].IsActive')"
+    PRICEBOOK_ACTIVE="$(sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT IsActive FROM Pricebook2 WHERE Id = '$PRICEBOOK_ID'" --json | jq -r '.result.records[0].IsActive')"
     if [[ "$PRICEBOOK_ACTIVE" != "true" ]]; then
         info "Activating the standard Price Book discovered in this org..."
-        sf data update record "${ORG_ARGS[@]}" --sobject Pricebook2 --record-id "$PRICEBOOK_ID" --values "IsActive=true" >/dev/null
+        sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Pricebook2 --record-id "$PRICEBOOK_ID" --values "IsActive=true" >/dev/null
     fi
 
     PRODUCT_LABOR="$(ensure_product QW-LABOR "QuoteWake Demo - Electrical Installation Labor" "Fictional demo labor line for electrical installation work.")"
@@ -595,7 +631,8 @@ if [[ "$SEED_DATA" == true ]]; then
     PBE_CABLING="$(ensure_pricebook_entry "$PRODUCT_CABLING" 120)"
     PBE_SOLAR="$(ensure_pricebook_entry "$PRODUCT_SOLAR" 2000)"
 
-    TODAY="$(date -u +%Y-%m-%d)"
+    TODAY="$(utc_date_value today)"
+    QUOTE_EXPIRATION_DATE="$(utc_date_value add-months 3)"
 
     info "Creating or updating QuoteWake demo hierarchy..."
     ACCOUNT_1="$(ensure_record Account 'QuoteWake Demo - Instalaciones Sol y Mar S.L.' "Name='QuoteWake Demo - Instalaciones Sol y Mar S.L.' Phone=+14155550100 BillingCountryCode=$COUNTRY_CODE")"
@@ -648,16 +685,16 @@ if [[ "$SEED_DATA" == true ]]; then
         local name="$1" opportunity_id="$2" quote_status="$3"
         local existing_id structural_values create_values
         existing_id="$(query_id "SELECT Id FROM Quote WHERE Name = '$name' LIMIT 1")"
-        structural_values="Name='$name' OpportunityId=$opportunity_id Pricebook2Id=$PRICEBOOK_ID ExpirationDate=$(date -u -d '+3 months' +%Y-%m-%d) Status='$quote_status'"
+        structural_values="Name='$name' OpportunityId=$opportunity_id Pricebook2Id=$PRICEBOOK_ID ExpirationDate=$QUOTE_EXPIRATION_DATE Status='$quote_status'"
         create_values="$structural_values QuoteWake_Enabled__c=true Attempt_Count__c=0"
         if [[ -n "$existing_id" ]]; then
             # A normal seed repairs the demo hierarchy without erasing call
             # progress. Use --reset-data when a clean QuoteWake state is wanted.
-            sf data update record "${ORG_ARGS[@]}" --sobject Quote --record-id "$existing_id" --values "$structural_values" >/dev/null
+            sf data update record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Quote --record-id "$existing_id" --values "$structural_values" >/dev/null
             printf '%s\n' "$existing_id"
         else
             create_msg "Quote: $name"
-            sf data create record "${ORG_ARGS[@]}" --sobject Quote --values "$create_values" --json | jq -r '.result.id'
+            sf data create record ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --sobject Quote --values "$create_values" --json | jq -r '.result.id'
         fi
     }
 
@@ -698,28 +735,29 @@ if [[ "$RESET_DATA" == true ]]; then
     # Keep one UTC generation marker for all demo Quotes in this reset. The
     # millisecond precision makes consecutive resets produce different
     # retry-marker values while remaining a Salesforce DateTime value.
-    RESET_GENERATION_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
+    RESET_GENERATION_AT="$(utc_date_value reset-marker)"
     reset_demo_data
 fi
 
 info "Verifying QuoteWake fields and querying Quotes..."
-sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, OpportunityId, Status, Subtotal, GrandTotal, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c FROM Quote ORDER BY CreatedDate DESC" --result-format human
+sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Id, Name, OpportunityId, Status, Subtotal, GrandTotal, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c FROM Quote ORDER BY CreatedDate DESC" --result-format human
 if [[ "$RESET_DATA" == true ]]; then
     printf '[VERIFY] Reset generation marker (UTC): %s; Follow_Up_Status__c remains blank so the initial READY branch is eligible.\n' "$RESET_GENERATION_AT"
 fi
 if [[ "$SEED_DATA" == true ]]; then
     printf '[VERIFY] Demo Account country and Contact CALL-E locale (phone values omitted):\n'
-    sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, BillingCountryCode FROM Account WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Name" --result-format human
-    sf data query "${ORG_ARGS[@]}" --query "SELECT Id, Name, Account.Name FROM Opportunity WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Account.Name, Name" --result-format human
-    sf data query "${ORG_ARGS[@]}" --query "SELECT Opportunity.Name, Contact.Name, Contact.QuoteWake_Call_Locale__c, IsPrimary FROM OpportunityContactRole WHERE Opportunity.Name LIKE 'QuoteWake Demo - %' ORDER BY Opportunity.Name" --result-format human
-    sf data query "${ORG_ARGS[@]}" --query "SELECT Quote.Name, Product2.Name, Description, Quantity, UnitPrice, TotalPrice FROM QuoteLineItem WHERE Quote.Name LIKE 'QuoteWake Demo - %' ORDER BY Quote.Name, Product2.Name" --result-format human
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Id, Name, BillingCountryCode FROM Account WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Name" --result-format human
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Id, Name, Account.Name FROM Opportunity WHERE Name LIKE 'QuoteWake Demo - %' ORDER BY Account.Name, Name" --result-format human
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Opportunity.Name, Contact.Name, Contact.QuoteWake_Call_Locale__c, IsPrimary FROM OpportunityContactRole WHERE Opportunity.Name LIKE 'QuoteWake Demo - %' ORDER BY Opportunity.Name" --result-format human
+    sf data query ${ORG_ARGS[@]+"${ORG_ARGS[@]}"} --query "SELECT Quote.Name, Product2.Name, Description, Quantity, UnitPrice, TotalPrice FROM QuoteLineItem WHERE Quote.Name LIKE 'QuoteWake Demo - %' ORDER BY Quote.Name, Product2.Name" --result-format human
 fi
 printf '\n[VERIFY] Actionable QuoteWake SOQL (MAX_ATTEMPTS=%s from follow-up policy):\n' "$MAX_ATTEMPTS"
-QUERY_NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-INITIAL_STANDARD_CUTOFF="$(date -u -d "-$STANDARD_DELAY_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)"
-INITIAL_MINIMUM_CUTOFF="$(date -u -d "-$MINIMUM_DELAY_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)"
-DUE_SOON_DATE="$(date -u -d "+$DUE_SOON_SECONDS seconds" +%Y-%m-%d)"
-TODAY="$(date -u +%Y-%m-%d)"
+ELIGIBILITY_DATES="$(utc_date_value eligibility "$STANDARD_DELAY_SECONDS" "$MINIMUM_DELAY_SECONDS" "$DUE_SOON_SECONDS")"
+QUERY_NOW="$(jq -r '.query_now' <<<"$ELIGIBILITY_DATES")"
+INITIAL_STANDARD_CUTOFF="$(jq -r '.standard_cutoff' <<<"$ELIGIBILITY_DATES")"
+INITIAL_MINIMUM_CUTOFF="$(jq -r '.minimum_cutoff' <<<"$ELIGIBILITY_DATES")"
+DUE_SOON_DATE="$(jq -r '.due_soon_date' <<<"$ELIGIBILITY_DATES")"
+TODAY="$(jq -r '.today' <<<"$ELIGIBILITY_DATES")"
 printf '%s\n' "SELECT Id, Name, OpportunityId, LastModifiedDate, ExpirationDate, QuoteWake_Enabled__c, Follow_Up_Status__c, Next_Follow_Up_At__c, Attempt_Count__c FROM Quote WHERE QuoteWake_Enabled__c = true AND Status = 'Presented' AND Opportunity.IsClosed = false AND (ExpirationDate = null OR ExpirationDate >= $TODAY) AND (Attempt_Count__c = null OR Attempt_Count__c < $MAX_ATTEMPTS) AND ((Follow_Up_Status__c = null AND (LastModifiedDate <= $INITIAL_STANDARD_CUTOFF OR (LastModifiedDate <= $INITIAL_MINIMUM_CUTOFF AND ExpirationDate != null AND ExpirationDate <= $DUE_SOON_DATE))) OR (Follow_Up_Status__c = 'Retry' AND Next_Follow_Up_At__c != null AND Next_Follow_Up_At__c <= $QUERY_NOW)) ORDER BY Next_Follow_Up_At__c ASC NULLS FIRST, LastModifiedDate ASC"
 
 ok "QuoteWake Salesforce MVP setup finished"
