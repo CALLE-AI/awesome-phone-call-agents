@@ -1,0 +1,274 @@
+# Outcome code map for call-outcome-reconciler.
+#
+# This file is the ONLY place where upstream CALL-E status values are given a
+# semantic meaning. No mapping logic lives anywhere else. To track upstream
+# changes, edit this file; no code path needs to change.
+#
+# Canonical outcome and result semantics are defined upstream by CALL-E. This
+# table is a conservative client-side reading of the public contract. Where the
+# public contract does not document a value, this table does not invent one:
+# the observation resolves to `unresolved` with the raw payload preserved.
+#
+# After editing, run:
+#   node skills/call-outcome-reconciler/scripts/sync-mapping.mjs
+
+schema_version: 1
+map_version: "2026-08-06"
+upstream_contract_ref: "https://docs.heycall-e.com/openapi/calle.openapi.yaml"
+upstream_contract_version: "0.6.0"
+
+# ---------------------------------------------------------------------------
+# Surfaces
+#
+# A CALL-E status value is only meaningful together with the surface it was
+# read from. The same word carries different vocabularies on different
+# surfaces, so every observation and every entry below is keyed by surface.
+# Matching never compares an observation to an entry from another surface.
+#
+# `polling.terminal_values` is an operational signal (when to stop polling).
+# It is deliberately NOT a semantic claim: a value can be terminal for polling
+# and still have no documented meaning, in which case it resolves to
+# `unresolved`.
+# ---------------------------------------------------------------------------
+surfaces:
+  rest.calls:
+    title: "Calls API (REST)"
+    documented: true
+    contract_ref: "https://docs.heycall-e.com/openapi/calle.openapi.yaml#/components/schemas/CallStatus"
+    status_field: status
+    note: >-
+      CallStatus is a documented five-value enum. The accompanying
+      `failure_code` field is typed as a nullable string with no published
+      enum, so a `failed` status carries no documented reason.
+    polling:
+      non_terminal_values: [queued, in_progress]
+      terminal_values: [completed, failed, canceled]
+      terminal_values_source: "CallStatus enum, calle.openapi.yaml v0.6.0"
+
+  rest.goal_runs:
+    title: "Goal Runs API (REST) error codes"
+    documented: true
+    contract_ref: "https://docs.heycall-e.com/openapi/calle.openapi.yaml#/components/schemas/GoalRunError"
+    status_field: code
+    note: >-
+      GoalRunError.code is the only place CALL-E publishes an enumerated
+      failure vocabulary. Semantic failure outcomes are therefore reachable
+      only from this surface.
+    polling:
+      non_terminal_values: []
+      terminal_values:
+        [
+          call_failed,
+          no_answer,
+          declined,
+          timed_out,
+          canceled,
+          result_invalid,
+          result_unavailable,
+          result_failed,
+        ]
+      terminal_values_source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  mcp.get_call_run:
+    title: "MCP get_call_run tool result"
+    documented: false
+    contract_ref: null
+    status_field: status
+    note: >-
+      The MCP tool-call surface reports uppercase status values that do not
+      appear in the published OpenAPI contract or on the documentation site.
+      Terminal values below are recorded from observed client behaviour in this
+      repository, not from a published contract, and are used only to decide
+      when to stop polling. No entry on this surface is `documented: true`, so
+      every observation here resolves to `unresolved` with raw preserved.
+    polling:
+      non_terminal_values: []
+      terminal_values:
+        [
+          BUSY,
+          CANCELED,
+          CANCELLED,
+          COMPLETED,
+          DECLINED,
+          EXPIRED,
+          FAILED,
+          NO_ANSWER,
+          VOICEMAIL,
+        ]
+      terminal_values_source: >-
+        apps/python/batch-runner/client.py TERMINAL_STATUSES (observed client
+        behaviour in this repository, not a published contract)
+
+# ---------------------------------------------------------------------------
+# Entries: documented cases only.
+#
+# Every entry here must carry `documented: true` and a `source`. The loader
+# rejects the file if an entry is marked `documented: false` — undocumented
+# observations belong in `unmappable` below, which never produces a semantic
+# outcome.
+# ---------------------------------------------------------------------------
+entries:
+  - id: rest.calls.completed
+    surface: rest.calls
+    match:
+      status: completed
+    outcome: completed
+    documented: true
+    source: "CallStatus enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.calls.canceled
+    surface: rest.calls
+    match:
+      status: canceled
+    outcome: cancelled
+    documented: true
+    source: "CallStatus enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.goal_runs.no_answer
+    surface: rest.goal_runs
+    match:
+      code: no_answer
+    outcome: not_connected
+    documented: true
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.goal_runs.declined
+    surface: rest.goal_runs
+    match:
+      code: declined
+    outcome: declined
+    documented: true
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.goal_runs.canceled
+    surface: rest.goal_runs
+    match:
+      code: canceled
+    outcome: cancelled
+    documented: true
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+# ---------------------------------------------------------------------------
+# Unmappable: values that ARE published but carry no documented outcome
+# meaning, or whose documented meaning does not determine a call outcome.
+#
+# These never produce a semantic outcome. They exist so that `explain` can say
+# precisely why no mapping applied, instead of reporting a generic miss.
+# ---------------------------------------------------------------------------
+unmappable:
+  - id: rest.calls.failed
+    surface: rest.calls
+    match:
+      status: failed
+    reason: undocumented_failure_detail
+    note: >-
+      CallStatus.failed is documented, but the accompanying `failure_code` is
+      typed only as a nullable string with no published enum, so no documented
+      reason exists for the failure.
+    source: "CallTask.failure_code, calle.openapi.yaml v0.6.0"
+    issue_ref: 89
+
+  - id: rest.goal_runs.call_failed
+    surface: rest.goal_runs
+    match:
+      code: call_failed
+    reason: ambiguous_documented_code
+    note: >-
+      Documented as a generic call failure. The contract does not state whether
+      media was established, so this cannot be resolved to `not_connected` or
+      `infrastructure_failure` without inference.
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+    issue_ref: 89
+
+  - id: rest.goal_runs.timed_out
+    surface: rest.goal_runs
+    match:
+      code: timed_out
+    reason: ambiguous_documented_code
+    note: >-
+      Documented, but the contract does not state whether the timeout occurred
+      before or after media was established.
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.goal_runs.result_invalid
+    surface: rest.goal_runs
+    match:
+      code: result_invalid
+    reason: result_error_not_call_outcome
+    note: >-
+      Describes the goal-run result payload, not how the call itself ended.
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.goal_runs.result_unavailable
+    surface: rest.goal_runs
+    match:
+      code: result_unavailable
+    reason: result_error_not_call_outcome
+    note: >-
+      Describes the goal-run result payload, not how the call itself ended.
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  - id: rest.goal_runs.result_failed
+    surface: rest.goal_runs
+    match:
+      code: result_failed
+    reason: result_error_not_call_outcome
+    note: >-
+      Describes the goal-run result payload, not how the call itself ended.
+    source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+# ---------------------------------------------------------------------------
+# Consistency guards: documented self-contradictions.
+#
+# A guard fires before mapping. When it matches, the observation resolves to
+# `unresolved` with the guard's reason, even if an entry above would otherwise
+# have matched. Guards encode contradictions that are visible in the payload
+# itself; they never infer intent.
+#
+# Supported predicates: `equals`, `in`, `absent`, `absent_or_empty`.
+# ---------------------------------------------------------------------------
+consistency_guards:
+  - id: guard.declined_without_media
+    surface: mcp.get_call_run
+    when:
+      - field: status
+        equals: DECLINED
+      - field: duration_seconds
+        equals: 0
+    reason: inconsistent_payload
+    note: >-
+      A zero-duration DECLINED carries no evidence that a person heard the call
+      and refused it. It is indistinguishable from a pre-media transport
+      failure, so it is not resolved to `declined`.
+    issue_ref: 82
+
+  - id: guard.completed_without_duration
+    surface: rest.calls
+    when:
+      - field: status
+        equals: completed
+      - field: duration_seconds
+        equals: 0
+    reason: inconsistent_payload
+    note: >-
+      A completed call with zero duration contradicts itself. The contract
+      states terminal states are published only after the post-call outcome is
+      available, so a zero-duration completion is not treated as a completion.
+    issue_ref: 82
+
+# ---------------------------------------------------------------------------
+# Outcomes this table can currently produce.
+#
+# `infrastructure_failure` is intentionally listed and intentionally
+# unreachable: CALL-E publishes no code that documents a pre-media or transport
+# failure. That absence is the reason such failures are presently surfaced as
+# callee-declined (issue #82). The slot exists so that a future documented code
+# can be mapped here by editing this file alone.
+# ---------------------------------------------------------------------------
+outcome_coverage:
+  reachable: [completed, not_connected, declined, cancelled, unresolved]
+  unreachable:
+    - outcome: infrastructure_failure
+      note: >-
+        No published CALL-E code documents a pre-media or transport failure.
+      issue_ref: 82
