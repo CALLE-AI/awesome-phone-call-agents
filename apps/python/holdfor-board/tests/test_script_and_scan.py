@@ -14,6 +14,8 @@ from holdfor import redflags
 from holdfor.checkin import (
     CLOSING,
     DECLINED,
+    HANGING_UP,
+    PRACTICE_NAME,
     DISCLOSURE,
     NEVER_ASK_PROMISE,
     RESULT_SCHEMA_PATH,
@@ -511,3 +513,37 @@ def test_the_schema_can_express_a_decline():
 
     assert schema["properties"]["declined"]["type"] == "boolean"
     assert schema["required"] == ["stop_condition"]
+
+
+# --- the promises the opening has to make ----------------------------------------
+
+
+def test_the_practice_is_named_as_the_prd_names_it():
+    """One name, and the PRD picked it. ADR 0006 and the fixtures both say Fieldgate.
+
+    PRACTICE_NAME names the Practice; its value is the trading name she hears on the
+    telephone. CONTEXT.md's "avoid: surgery" governs repository prose, not the words
+    an 82 year old is spoken to in.
+    """
+    assert PRACTICE_NAME == "Fieldgate Surgery"
+    assert PRACTICE_NAME in DISCLOSURE
+
+
+def test_hanging_up_ends_the_calls_and_she_is_told_so():
+    """The sentence ADR 0006 is built on, said before she has a reason to want it.
+
+    The call platform offers to redial a hang-up in forty five minutes. We suppress
+    that, and this promise is what entitles us to: without it, suppression is a
+    preference, and with it, redialling would break a promise made aloud.
+    """
+    text = build_task_text(MARGARET, False, "Wednesday")
+
+    assert HANGING_UP in text
+    assert "put the phone down" in HANGING_UP
+    assert "won't ring you again" in HANGING_UP
+
+
+def test_nothing_in_the_hang_up_promise_is_read_aloud_as_punctuation():
+    """Same rule as every other spoken line: no typography a speech engine may say."""
+    for character in "-–—()[]/*":
+        assert character not in HANGING_UP

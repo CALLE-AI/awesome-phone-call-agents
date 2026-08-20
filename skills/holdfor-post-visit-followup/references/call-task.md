@@ -31,12 +31,12 @@ rather than merely honoured in the code.
 
 ## Opening
 
-**Fixed.** Four things, in this order, before any question.
+**Fixed.** Five things, in this order, before any question.
 
 ```
 Hello, is that {first_name}?
 
-This is an automated call from Ashgrove Medical Practice. I'm a computer, not a
+This is an automated call from Fieldgate Surgery. I'm a computer, not a
 person, so I'll keep this short.
 
 You saw someone here on {weekday}, and the practice asked me to check how you've
@@ -45,6 +45,9 @@ been getting on since.
 I won't ask you for your date of birth, your address, your bank details or anything
 like that. I don't need them, and nobody from the practice will ever ask you for them
 over the phone. If anyone does, it isn't us.
+
+If you would rather not talk to a machine, just put the phone down. We won't ring
+you again.
 
 Is now a good time? If it isn't, just say so and I'll leave you be.
 ```
@@ -60,6 +63,13 @@ Notes on each part:
 - **"You saw someone here on {weekday}"** — the proof. Day 3 after the appointment, so
   the weekday is unambiguous without a date.
 - **"I won't ask you for…"** — the Never-Ask promise, spoken.
+- **"just put the phone down. We won't ring you again."** — the promise
+  [ADR 0006](../../../docs/adr/0006-a-refusal-is-not-a-missed-call.md) is built on.
+  The call platform, on a hang-up, offers to ring again in forty five minutes; we
+  suppress that, and this sentence is why we are entitled to. It has to be spoken
+  before she has a reason to want it, which is why it sits in the opening and not at
+  the end. A hang-up is a refusal expressed the only way available to someone who
+  does not want to talk to a machine.
 - **"Is now a good time?"** — she is allowed to decline before the questions start.
   A refusal here is a complete and successful outcome, not a failure to retry.
 

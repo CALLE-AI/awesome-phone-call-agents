@@ -59,6 +59,15 @@ test to pass.
   it claims to come from is rejected as a Stop Condition rather than spoken.
 - **`idempotency_key` is `UNIQUE` in the schema.** Two check-in requests for the same
   appointment produce one call attempt, not two.
+- **A refusal is never redialled.** The call says out loud that hanging up ends the
+  calls for good, so a `DECLINED` outcome is filed as `declined` rather than
+  `not_reached`, and `may_redial()` returns `False` for every outcome. The call
+  platform's own repair logic offers a retry; see
+  `docs/adr/0006-a-refusal-is-not-a-missed-call.md` for why we refuse it.
+- **A refusal is not a Stop Condition.** A patient who hangs up produces no answers
+  and no Stop Condition. A patient who answers but cannot be understood produces a
+  Stop Condition. The board shows those differently because they mean opposite
+  things to the practice.
 - **Consent is a hard gate.** A patient with `consent_to_call = false` is refused with
   `409 {"refused": "no_consent"}` before any provider call is made.
 

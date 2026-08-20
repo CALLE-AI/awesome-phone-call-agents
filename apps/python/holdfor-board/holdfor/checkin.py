@@ -7,7 +7,8 @@ from datetime import date
 from pathlib import Path
 
 from . import db, redflags
-from .extract import extract
+from .extract import extract, no_answers
+from .outcomes import connected, review_status_for
 from .models import (
     CallKind,
     CallRequest,
@@ -23,7 +24,7 @@ NO_CONSENT = "no_consent"
 DECLINED = "declined"
 OUTSIDE_READING_WINDOW = "outside_reading_window"
 
-PRACTICE_NAME = "Ashgrove Medical Practice"
+PRACTICE_NAME = "Fieldgate Surgery"
 
 SKILL_DIR = (
     Path(__file__).resolve().parents[4] / "skills" / "holdfor-post-visit-followup"
@@ -61,6 +62,10 @@ def result_schema() -> dict:
 DISCLOSURE = (
     f"This is an automated call from {PRACTICE_NAME}. I'm a computer, not a person, "
     "so I'll keep this short."
+)
+HANGING_UP = (
+    "If you would rather not talk to a machine, just put the phone down. We won't "
+    "ring you again."
 )
 NEVER_ASK_PROMISE = (
     "I won't ask you for your date of birth, your address, your bank details or "
@@ -122,7 +127,8 @@ def build_task_text(
         f'3. "You saw someone here on {weekday}, and the practice asked me to check '
         'how you\'ve been getting on since."',
         f'4. "{NEVER_ASK_PROMISE}"',
-        '5. "Is now a good time? If it isn\'t, just say so and I\'ll leave you be."',
+        f'5. "{HANGING_UP}"',
+        '6. "Is now a good time? If it isn\'t, just say so and I\'ll leave you be."',
         "",
         "If she says it is not a good time, thank her, say you will leave her be, and "
         "end the call. That is a complete outcome. Do not ask again and do not "
@@ -313,10 +319,23 @@ def run(conn: sqlite3.Connection, provider, appointment_id: int) -> int:
     )
     run_id = provider.place(request)
     result = provider.poll(run_id)
-    extraction = recover_carried_words(
-        result, extract(result, appointment.medication_changed)
-    )
-    stop_condition, stop_reason = settle_stop_condition(result, extraction)
+    if connected(result.outcome):
+        extraction = recover_carried_words(
+            result, extract(result, appointment.medication_changed)
+        )
+        stop_condition, stop_reason = settle_stop_condition(result, extraction)
+    else:
+        # No conversation happened, so there is nothing for the scanner to read and
+        # nothing to map. ADR 0006: a refusal carries no Stop Condition.
+        extraction = no_answers()
+        stop_condition, stop_reason = False, None
+
+    status = review_status_for(result.outcome)
+    if stop_reason == DECLINED:
+        # She answered, heard the opening, and asked us not to go on. ADR 0006 files a
+        # hang-up as `declined`; saying it in words is the same refusal, said more
+        # politely, and belongs on the board the same way rather than in the queue.
+        status = ReviewStatus.DECLINED
 
     conn.execute(
         """
@@ -349,7 +368,7 @@ def run(conn: sqlite3.Connection, provider, appointment_id: int) -> int:
             extraction.carried_words_turn,
             int(stop_condition),
             stop_reason,
-            ReviewStatus.NEEDS_REVIEW.value,
+            status.value,
             db.now_iso(),
         ),
     )

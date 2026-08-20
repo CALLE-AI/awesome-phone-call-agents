@@ -3,7 +3,7 @@
 *.sqlite3
 .env
 /transcripts/
-audio/
+/audio/
 __pycache__/
 .pytest_cache/
 .venv/

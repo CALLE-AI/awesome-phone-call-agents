@@ -115,6 +115,34 @@ agent   Thank you Margaret. Someone at the surgery will look at this
         appointment out for you. You won't need to ring us.
 ```
 
+### What she sees before we speak
+
+The Never-Ask Rule governs what the agent says once the call is answered. It does
+nothing about the two seconds before that, when all she has is a number on a screen —
+and that is where the first live call on this project failed.
+
+The call was placed to a team member's own phone. She knew it was coming, because she
+had typed the command herself thirty seconds earlier. She heard a word or two and hung
+up, because an unfamiliar number ringing out of nowhere reads as a scam. The platform
+recorded `DECLINED`, zero duration, no transcript.
+
+An 82-year-old has less warning than that, not more. Three things follow:
+
+**The number is not the surgery's.** CALL-E lists Malaysia as a `Local` line region and
+Indonesia as `International`, but *local* means the platform's local number, not ours.
+So `"ring us back on the number that called you"` is not available to us, which is
+part of why the voicemail message below carries the surgery's real number instead.
+
+**We cannot see the caller ID.** No field in the call result reports the number the
+Patient saw. It is not observable, and therefore not testable and not claimable — it
+must not appear as an assertion in the pitch.
+
+**The mitigation is not technical.** The Patient is told at the appointment: *we will
+ring you on Thursday afternoon, you do not need to do anything, and we will never ask
+you for details over the phone.* This is one sentence spoken by a receptionist, and it
+converts an unknown caller into an expected one. It is a precondition of the product
+working, not a nice-to-have, and any practice deploying this has to do it.
+
 ### The four questions
 
 | # | Question | Field |
@@ -141,10 +169,27 @@ placed unless a Reviewer will be there to catch what comes back the same day.* A
 whose result nobody can read should not be made. Weekends are excluded for the same
 reason, and a day-3 date landing on a weekend shifts to the next weekday.
 
-### When nobody answers
+### When she does not answer, and when she refuses
 
-One attempt, then `not_reached` on the board. If an answering machine picks up, the
-agent leaves one fixed message.
+One attempt. Never two — and the board records *which* of these happened, because they
+mean opposite things to the practice.
+
+| What happened | Status | What the Practice should read into it |
+| --- | --- | --- |
+| Answered, then hung up | `declined` | She does not want these calls. |
+| Nobody picked up, or voicemail | `not_reached` | She has not been reached yet. |
+
+The call platform collapses both into a retry offer — it proposed ringing back in
+forty-five minutes after the refusal described above. We suppress that, because the
+agent has just promised out loud that hanging up ends the calls for good.
+[`ADR 0006`](../adr/0006-a-refusal-is-not-a-missed-call.md) records why, and
+`holdfor/outcomes.py` is the only place the mapping lives.
+
+A refusal is also not a Stop Condition: there are no answers to map and no red-flag
+phrase to match. A Patient who answers and *cannot be understood* does raise one. On
+the board those look different, deliberately.
+
+If an answering machine picks up, the agent leaves one fixed message.
 
 ```text
 "This is Fieldgate Surgery. There's nothing to worry about — we were
@@ -311,7 +356,7 @@ SQLite, seed data, not a real clinical system.
 | `patient` | first name, surname, DOB, E.164 phone, `consent_to_call` |
 | `appointment` | patient, `seen_on`, type, `medication_changed`, `followup_booked` |
 | `call_attempt` | kind (`checkin`/`rebooking`), CALL-E `run_id`, state, transcript ref, idempotency key |
-| `review_item` | the four bounded answers, stop-condition flag, Carried Words span, status |
+| `review_item` | the four bounded answers, stop-condition flag, Carried Words span, status (`needs_review` / `auto_closed` / `released` / `closed` / `rang_manually` / `reception_declined` / `not_reached` / `declined`) |
 | `release` | reviewer name, timestamp, Booking Envelope, approved Carried Words |
 
 `consent_to_call` is a hard gate, checked before anything crosses the real-call
@@ -414,6 +459,9 @@ Done means done Friday.
 | Hold duration ceiling is unknown | Never state a hold length in the pitch. Demo the waiting behaviour for 20 seconds and jump-cut. |
 | The simulated patient reads as an actor | Script the pacing, not the persona. Caption it "simulated patient" on screen. Never perform an elderly voice — a bad impression is worse than a flat read. |
 | Someone deletes the deterministic scan as redundant | [ADR 0005](../adr/0005-stop-conditions-are-enforced-twice.md) exists precisely to stop this. |
+| The Patient hangs up before the agent finishes its first sentence | **Observed, not hypothetical** — it happened on the first live call, to a team member who knew the call was coming. Mitigated outside the software: the practice tells her at the appointment that the call is coming. See [What she sees before we speak](#what-she-sees-before-we-speak). |
+| The platform rings a Patient back after she refused | Suppressed in `holdfor/outcomes.py`; `may_redial()` returns `False` for every outcome. [ADR 0006](../adr/0006-a-refusal-is-not-a-missed-call.md) |
+| The demo hangs up on camera for the same reason the first live call did | Brief the simulated patient to stay on the line. Do not discover this while recording. |
 
 ## The demo — three minutes
 
@@ -442,5 +490,5 @@ skills/holdfor-post-visit-followup/    SKILL.md + references/ (safety, result-sc
 apps/python/holdfor-board/             FastAPI + SQLite + the board
 docs/holdfor-post-visit-followup/      this PRD
 CONTEXT.md                             glossary
-docs/adr/                              0001–0004
+docs/adr/                              0001–0006
 ```

@@ -4,12 +4,12 @@
     {
       "index": 0,
       "speaker": "agent",
-      "text": "Hello, is that Alan? This is an automated call from Fieldgate Surgery, following up on your appointment. I am not able to take questions, but the practice will read everything you tell me. If you would rather not talk now, just hang up and we will not call again."
+      "text": "Hello, is that Derek? This is an automated call from Fieldgate Surgery, following up on your appointment. I am not able to take questions, but the practice will read everything you tell me. If you would rather not talk now, just hang up and we will not call again."
     },
     {
       "index": 1,
       "speaker": "other",
-      "text": "Yes. Yes, hello."
+      "text": "Right. Yes, carry on."
     },
     {
       "index": 2,
@@ -19,7 +19,7 @@
     {
       "index": 3,
       "speaker": "other",
-      "text": "Worse, if I'm honest. It's the mornings mostly."
+      "text": "About the same, really. No worse anyway."
     },
     {
       "index": 4,
@@ -29,7 +29,7 @@
     {
       "index": 5,
       "speaker": "other",
-      "text": "I'm taking it, but I'm not sure I've got the timing right. The pharmacist said one thing and the letter said another."
+      "text": "No. I've still got the old box and the new one and I've been taking both, which I don't think is right."
     },
     {
       "index": 6,
@@ -39,7 +39,7 @@
     {
       "index": 7,
       "speaker": "other",
-      "text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway."
+      "text": "Just that nobody has told me to stop the old tablets."
     },
     {
       "index": 8,
@@ -49,7 +49,7 @@
     {
       "index": 9,
       "speaker": "other",
-      "text": "Yes, please. Mornings are difficult though, if that can be helped."
+      "text": "I don't know. If someone could just tell me which one to take, that would do."
     },
     {
       "index": 10,
@@ -58,11 +58,11 @@
     }
   ],
   "structured": {
-    "feeling": "worse",
-    "medication_ok": "unsure",
-    "wants_seen": "yes",
-    "carried_words_text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway.",
-    "carried_words_turn": 7,
+    "feeling": "same",
+    "medication_ok": "no",
+    "wants_seen": "unsure",
+    "carried_words_text": "I've still got the old box and the new one and I've been taking both, which I don't think is right.",
+    "carried_words_turn": 5,
     "stop_condition": false,
     "stop_reason": null
   },

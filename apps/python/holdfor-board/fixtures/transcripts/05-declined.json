@@ -1,20 +1,8 @@
 {
   "state": "terminal_verified",
+  "outcome": "DECLINED",
   "turns": [
-    {"index": 0, "speaker": "agent", "text": "Hello, is that Derek?"},
-    {"index": 1, "speaker": "other", "text": "Yes, who's this?"},
-    {"index": 2, "speaker": "agent", "text": "This is an automated call from Fieldgate Surgery. I'm a computer, not a person, so I'll keep this short. You saw someone here on Tuesday, and the practice asked me to check how you've been getting on since. I won't ask you for your date of birth, your address, your bank details or anything like that. I don't need them, and nobody from the practice will ever ask you for them over the phone. If anyone does, it isn't us. Is now a good time? If it isn't, just say so and I'll leave you be."},
-    {"index": 3, "speaker": "other", "text": "Not now, no. I've got the district nurse due any minute."},
-    {"index": 4, "speaker": "agent", "text": "Of course. I'll leave you be. Thank you, Derek."}
+    {"index": 0, "speaker": "agent", "text": "Hello, is that Derek? This is an automated call from Fieldgate Surgery."}
   ],
-  "structured": {
-    "feeling": null,
-    "medication_ok": null,
-    "wants_seen": null,
-    "carried_words_text": null,
-    "carried_words_turn": null,
-    "stop_condition": false,
-    "stop_reason": null,
-    "declined": true
-  }
+  "structured": null
 }
