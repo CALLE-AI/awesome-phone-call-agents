@@ -24,7 +24,7 @@ export function createScheduler(app: App, deps: { now?: () => Date; intervalMs?:
         const hours = cadenceForRun(runCount);
         const dueAt = lastRunAt ? new Date(lastRunAt).getTime() + hours * 3_600_000 : 0;
         if (now().getTime() >= dueAt) {
-          await app.runWatch(watch.id, runCount + 1);
+          await app.runScheduledOnce(watch.id, runCount + 1);
         }
       }
     } finally {

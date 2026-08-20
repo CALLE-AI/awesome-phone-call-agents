@@ -72,6 +72,14 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
 
 - In **live** mode, Openings places real outbound phone calls to the numbers in the candidate
   list. Each call begins by identifying itself as an automated assistant.
+- **All pages and actions that can create, run, stop, or reveal results are gated by
+  authentication.** Set `OPENINGS_AUTH_TOKEN` (or `OPENINGS_BASIC_AUTH=user:pass`) and
+  every request must present it as `Authorization: Bearer <token>` (or Basic) or as a
+  `openings_auth` cookie or `?token=` query param. Without it, the app returns 401.
+- **An explicit recipient authorization is required before any live call.** The start-watching
+  form requires you to check "I authorize calls to the providers matching my search" — a public
+  NPPES listing alone is never treated as consent. The server rejects the request if that box is
+  not checked.
 - **Calls are scoped by specialty.** Only NPPES listings registered under the specialty you
   choose are framed and dialed; the specialty is never inferred from the free-text need, and
   the location must include a state — Openings never guesses which region to call.
@@ -84,11 +92,23 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
 - **Off-hours results are honest.** A call that reaches a closed office returns
   `structured_result: null` → classified `unreachable`, with the CALL-E summary capturing
   "call back Monday 9am" style guidance. Run business-hours batches for positive signals.
-- Calls are dispatched in **waves**, never all at once. The CALL-E API does not support
-  client-side cancellation of an in-flight call; stopping a watch stops future waves, not a
-  call already dialing.
+- Calls are dispatched in **waves**, never all at once (manual "Run now" may place a small
+  wave; the host scheduler places **exactly one provider call per tick**, per the repository
+  architecture rule). The CALL-E API does not support client-side cancellation of an in-flight
+  call; stopping a watch stops future waves, not a call already dialing.
+- **Verified availability only.** An `open` verdict that would stop a watch is only treated
+  as verified when it comes from a terminal `completed` call bound to the exact task, recipient
+  phones, and watch id. Anything else stays advisory (`inconclusive`) and never stops the watch.
+- **Fail-closed on ambiguity.** A provider timeout, `error` verdict, or any non-terminal result
+  immediately stops the current wave and marks the watch `stopped` so neither the current run
+  nor later scheduled ticks can continue dialing with fresh keys.
+- **Phone numbers are masked** in watch and report UI (`+1 (***) ***-1234`); full numbers are
+  never rendered in summaries.
 - Every practice is called at most once per cooldown window (24h by default) and never again
   once it opts out.
+- **CALL-E credentials are pinned.** `CALLE_API_KEY` is only ever sent to `https://api.heycall-e.com`
+  (loopback `http` only for local fake-server tests with an injected fetch); any other
+  `CALLE_BASE_URL` is rejected before the key is sent.
 - The scheduler is **disabled** in fake and dry-run modes.
 
 ## Dry-run / preview behavior

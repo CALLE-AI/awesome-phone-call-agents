@@ -34,6 +34,7 @@ describe.skipIf(!runLive)("startWatch server action (opt-in network)", () => {
         specialty: "psychiatry",
         targetOpen: "3",
         maxCallsPerRun: "10",
+        authorizeRecipients: "on",
       }),
     );
     expect(res.ok).toBe(true);
@@ -60,6 +61,7 @@ describe.skipIf(!runLive)("startWatch server action (opt-in network)", () => {
         plan: "Aetna PPO",
         location: "Philadelphia, PA",
         specialty: "psychiatry",
+        authorizeRecipients: "on",
       }),
     );
     expect(crisis.ok).toBe(false);
@@ -73,6 +75,7 @@ describe.skipIf(!runLive)("startWatch server action (opt-in network)", () => {
         plan: "Aetna PPO",
         location: "Philadelphia, PA",
         specialty: "psychiatry",
+        authorizeRecipients: "on",
       }),
     );
     expect(phi.ok).toBe(false);
@@ -97,6 +100,7 @@ describe("startWatch server action (offline)", () => {
         specialty: "psychiatry",
         targetOpen: "1",
         maxCallsPerRun: "5",
+        authorizeRecipients: "on",
       }),
     );
     expect(res.ok).toBe(false);

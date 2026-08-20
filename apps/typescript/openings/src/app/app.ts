@@ -79,7 +79,8 @@ export function createApp(deps: AppDeps) {
 
     /**
      * Execute one watch run: dispatch a wave, record results, and report
-     * whether a next run is scheduled.
+     * whether a next run is scheduled. This is used for manual "Run now"
+     * triggered by the user (may place up to maxCallsPerRun calls).
      */
     async runWatch(id: string, runNumber: number): Promise<DispatchResult> {
       const watch = deps.store.getWatch(id);
@@ -103,6 +104,45 @@ export function createApp(deps: AppDeps) {
 
       if (dispatch.reason === "target_reached") {
         deps.store.updateWatchStatus(watch.id, "completed");
+      } else if (dispatch.reason === "error") {
+        // Fail-closed: an ambiguous provider error/timeout stops the watch
+        // so later scheduled ticks do not keep dialing with fresh keys.
+        deps.store.updateWatchStatus(watch.id, "stopped");
+      }
+      return dispatch;
+    },
+
+    /**
+     * Host-scheduler entry point: exactly one provider call per scheduled tick,
+     * per the repository architecture rule. The scheduler owns recurrence; the
+     * provider handles one call per run. This keeps scheduled waves from
+     * re-dialling a whole batch on every decaying cadence tick.
+     */
+    async runScheduledOnce(id: string, runNumber: number): Promise<DispatchResult> {
+      const watch = deps.store.getWatch(id);
+      if (!watch) throw new Error("watch_not_found");
+      if (watch.status !== "active") throw new Error("watch_not_active");
+
+      const dispatch = await dispatchWave({
+        caller: deps.caller,
+        candidates: watch.candidates,
+        spec: watch.spec,
+        idempotencyPrefix: watch.idempotencyPrefix,
+        watchId: watch.id,
+        targetOpen: watch.targetOpen,
+        maxCalls: 1,
+        waveSize: 1,
+        runKey: `run-${runNumber}`,
+        isOptedOut: (phone) => deps.store.isOptedOut(phone),
+        lastCalledAt: (phone) => deps.store.lastCalledAt(phone),
+      });
+
+      deps.store.recordRun(watch.id, runNumber, dispatch.results);
+
+      if (dispatch.reason === "target_reached") {
+        deps.store.updateWatchStatus(watch.id, "completed");
+      } else if (dispatch.reason === "error") {
+        deps.store.updateWatchStatus(watch.id, "stopped");
       }
       return dispatch;
     },

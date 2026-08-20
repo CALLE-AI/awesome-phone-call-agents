@@ -93,8 +93,22 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
             idempotencyKey,
             watchId,
           });
-          const verdict: Verdict =
-            output.result == null ? "unreachable" : classifyResult(output.result);
+          // Require a terminal verified result bound to the exact call/task/recipient/watch
+          // before any availability can be treated as verified. Unverified or
+          // non-terminal results are ambiguous and must fail-closed: they become
+          // an `error` verdict that stops the current wave and the watch.
+          const isVerifiedTerminal =
+            output.verified && output.completed && output.calleStatus === "completed" && output.result !== null;
+          if (!isVerifiedTerminal) {
+            const reason = !output.verified
+              ? "unverified_result"
+              : !output.completed || output.calleStatus !== "completed"
+                ? `not_terminal:${output.calleStatus ?? "unknown"}`
+                : "missing_result";
+            hitError = hitError ?? `${reason}:${candidate.id}`;
+            return { result: errorResult(candidate, reason), placed: true };
+          }
+          const verdict: Verdict = classifyResult(output.result!);
           const result: LineCallResult = {
             candidateId: candidate.id,
             phoneE164: candidate.phoneE164,
@@ -125,6 +139,7 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
       if (result.verdict === "open") openFound += 1;
     }
 
+    if (hitError) break;
     if (openFound >= targetOpen) {
       break;
     }

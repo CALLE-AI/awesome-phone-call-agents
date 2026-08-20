@@ -173,3 +173,22 @@ export function provenanceLabel(p: Provenance): string {
       return "Imported CSV";
   }
 }
+
+/**
+ * Mask a US E.164 number for display. Keeps the last 4 digits so the user can
+ * still distinguish listings, but never exposes the full number in a summary.
+ * Example: +12155550100 -> +1 (***) ***-0100
+ */
+export function maskE164(phoneE164: string): string {
+  if (!US_E164.test(phoneE164)) return "***-****";
+  const last4 = phoneE164.slice(-4);
+  return `+1 (***) ***-${last4}`;
+}
+
+/** Mask a raw display number (best-effort); falls back to maskE164 when possible. */
+export function maskDisplay(phoneDisplay: string, phoneE164: string): string {
+  const masked = maskE164(phoneE164);
+  // Preserve a hint of the original formatting length, but not the digits.
+  if (phoneDisplay && phoneDisplay.trim()) return masked;
+  return masked;
+}

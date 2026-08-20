@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createApp } from "../app/app";
+import { requireAuth } from "./auth";
 import { getConfig } from "../app/config";
 import { buildTask } from "../core/calle";
 import { frameFromNppes } from "../core/frame";
@@ -20,6 +21,7 @@ const startWatchSchema = z.object({
   specialty: z.enum(SPECIALTY_IDS),
   targetOpen: z.coerce.number().int().min(1).max(5).default(3),
   maxCallsPerRun: z.coerce.number().int().min(1).max(40).default(10),
+  authorizeRecipients: z.string().optional(),
 });
 
 export type StartWatchState =
@@ -36,6 +38,7 @@ export async function startWatch(
   _prevState: StartWatchState,
   formData: FormData,
 ): Promise<StartWatchState> {
+  await requireAuth();
   const parsed = startWatchSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input", reason: "validation" };
@@ -67,6 +70,20 @@ export async function startWatch(
     return {
       ok: false,
       error: "Add a city and state to the location, for example \"Austin, TX\".",
+      reason: "validation",
+    };
+  }
+
+  // Explicit recipient authorization is required for every watch. A public
+  // directory listing alone is not consent to dial. The user must check the
+  // authorization box, which is an affirmative statement for this exact search
+  // and its framed recipients. This is enforced even in dry-run so the
+  // authorization habit is not bypassed, and it is mandatory for live calls.
+  if (input.authorizeRecipients !== "on") {
+    return {
+      ok: false,
+      error:
+        "You must authorize the recipients for this search. Check the authorization box to confirm these are numbers you are authorized to have Openings call on your behalf.",
       reason: "validation",
     };
   }
@@ -119,6 +136,7 @@ export async function startWatch(
 }
 
 export async function stopWatch(id: string): Promise<{ ok: boolean }> {
+  await requireAuth();
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
   return { ok: app.stopWatch(id) };
@@ -139,6 +157,7 @@ const runningWatches = new Set<string>();
 export async function runWatchOnce(
   id: string,
 ): Promise<{ ok: boolean; error?: string; reason?: string }> {
+  await requireAuth();
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
 
@@ -168,6 +187,7 @@ export async function runWatchOnce(
 export async function watchState(
   id: string,
 ): Promise<{ ok: boolean; runCount: number; status: string; running: boolean; error?: string }> {
+  await requireAuth();
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
   const watch = app.getWatch(id);
@@ -177,6 +197,7 @@ export async function watchState(
 }
 
 export async function optOut(phoneE164: string): Promise<{ ok: boolean }> {
+  await requireAuth();
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
   app.optOut(phoneE164);
@@ -185,5 +206,6 @@ export async function optOut(phoneE164: string): Promise<{ ok: boolean }> {
 
 /** Preview the exact call task without dialing. */
 export async function previewTask(candidate: Candidate, spec: SearchSpec): Promise<string> {
+  await requireAuth();
   return buildTask(candidate, spec);
 }

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { runWatchOnce, stopWatch, watchState } from "@/app/actions";
 import { statsFromResults } from "@/core/watch";
-import { provenanceLabel as pl } from "@/core/frame";
+import { maskE164, provenanceLabel as pl } from "@/core/frame";
 import { specialtyLabel } from "@/core/specialties";
 import type { LineCallResult, Watch } from "@/core/types";
 
@@ -174,7 +174,7 @@ export function WatchClient({
                       <span className={`text-sm ${meta.className}`}>{meta.label}</span>
                     </div>
                     <div className="mt-0.5 text-xs text-zinc-500">
-                      {candidate?.phoneDisplay ?? candidate?.phoneE164}
+                      {candidate ? maskE164(candidate.phoneE164) : "***-****"}
                       {" · "}
                       {candidate ? pl(candidate.provenance) : ""}
                       {r.calleCallId ? ` · ${r.calleCallId}` : ""}

@@ -148,6 +148,25 @@ export function StartWatchForm() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-zinc-700 bg-zinc-950 p-3">
+        <label className="flex items-start gap-2 text-sm text-zinc-300">
+          <input
+            id="authorizeRecipients"
+            name="authorizeRecipients"
+            type="checkbox"
+            value="on"
+            required
+            className="mt-0.5 h-4 w-4 rounded border-zinc-600"
+          />
+          <span>
+            I authorize Openings to place calls to the providers matching my search (specialty,
+            city, and state) as framed from NPPES, up to the per-run call limit. I understand
+            these are real phone calls to the numbers shown and that a public directory listing
+            alone is not authorization — my check here is the authorization for this watch.
+          </span>
+        </label>
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           type="submit"

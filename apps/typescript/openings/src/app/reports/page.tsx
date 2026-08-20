@@ -1,10 +1,12 @@
 import { createApp } from "@/app/app";
+import { requireAuth } from "@/app/auth";
 import { getConfig } from "@/app/config";
-import { provenanceLabel } from "@/core/frame";
+import { maskE164, provenanceLabel } from "@/core/frame";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
+  await requireAuth();
   const config = getConfig();
   const app = createApp({ store: config.store, caller: config.caller });
   const facts = app.listFacts();
@@ -54,7 +56,7 @@ export default async function ReportsPage() {
               <li key={f.id} className="p-4">
                 <div className="flex items-baseline gap-2 text-sm">
                   <span className="font-medium">{f.practiceId}</span>
-                  <span className="text-zinc-500">{f.phoneE164}</span>
+                  <span className="text-zinc-500">{maskE164(f.phoneE164)}</span>
                 </div>
                 <p className="mt-1 text-sm italic text-zinc-400">&ldquo;{f.evidence}&rdquo;</p>
                 <p className="mt-1 text-xs text-zinc-600">

@@ -1,6 +1,8 @@
 import { StartWatchForm } from "@/components/start-watch-form";
+import { requireAuth } from "./auth";
 
-export default function HomePage() {
+export default async function HomePage() {
+  await requireAuth();
   return (
     <div className="space-y-10">
       <section className="space-y-3">

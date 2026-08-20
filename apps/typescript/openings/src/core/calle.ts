@@ -23,6 +23,8 @@ export interface PlaceCallOutput {
   completed: boolean;
   simulated: boolean;
   calleStatus?: string;
+  /** True only for a terminal completed live result bound to the exact task/recipient/watch. */
+  verified: boolean;
 }
 
 /**
@@ -47,6 +49,39 @@ function recipientFor(candidate: Candidate): { phones: string[]; region?: string
   return { phones: [candidate.phoneE164], region: "US", locale: "en-US" };
 }
 
+export const DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com";
+const OFFICIAL_CALLE_HOST = "api.heycall-e.com";
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/**
+ * Verify the CALL-E base URL is strictly the official HTTPS origin (or loopback
+ * for local fake-server tests with an injected fetch). The CALLE_API_KEY must
+ * never be sent to an arbitrary host.
+ */
+export function assertAllowedCalleBaseUrl(baseUrl: string | undefined): void {
+  const urlString = baseUrl ?? DEFAULT_CALLE_BASE_URL;
+  let url: URL;
+  try {
+    url = new URL(urlString);
+  } catch {
+    throw new Error(`CALLE_BASE_URL is not a valid URL: ${urlString}`);
+  }
+  const host = url.hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+  const isLoopback = LOOPBACK_HOSTS.has(host);
+  if (isLoopback) {
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error(`CALLE_BASE_URL loopback must use http or https: ${urlString}`);
+    }
+    return;
+  }
+  if (host !== OFFICIAL_CALLE_HOST) {
+    throw new Error(`CALLE_BASE_URL must be ${DEFAULT_CALLE_BASE_URL} (got ${urlString}); arbitrary hosts are not allowed.`);
+  }
+  if (url.protocol !== "https:") {
+    throw new Error(`CALLE_BASE_URL must use https: ${urlString}`);
+  }
+}
+
 /**
  * Live caller against the CALL-E Developer API. Uses the published SDK and a
  * stable idempotency key. The SDK accepts an injected fetch for tests.
@@ -55,6 +90,7 @@ export class LiveCaller {
   private readonly client: CalleClient;
 
   constructor(options: { apiKey: string; baseUrl?: string; fetch?: typeof fetch }) {
+    assertAllowedCalleBaseUrl(options.baseUrl);
     this.client = new CalleClient({
       apiKey: options.apiKey,
       ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
@@ -63,10 +99,12 @@ export class LiveCaller {
   }
 
   async placeCall(input: PlaceCallInput): Promise<PlaceCallOutput> {
+    const expectedTask = buildTask(input.candidate, input.spec);
+    const expectedRecipient = recipientFor(input.candidate);
     const call = await this.client.calls.createAndWait(
       {
-        task: buildTask(input.candidate, input.spec),
-        recipient: recipientFor(input.candidate),
+        task: expectedTask,
+        recipient: expectedRecipient,
         resultSchema: CALL_E_RESULT_SCHEMA,
         metadata: {
           watch_id: input.watchId,
@@ -81,20 +119,66 @@ export class LiveCaller {
         intervalMs: 5_000,
       },
     );
-    return toOutput(call);
+    return toOutput(call, input, expectedTask, expectedRecipient);
   }
 }
 
-function toOutput(call: Call): PlaceCallOutput {
+function isVerifiedCall(
+  call: Call,
+  input: PlaceCallInput,
+  expectedTask: string,
+  expectedRecipient: { phones: string[] },
+): boolean {
+  // Must be a terminal completed result
+  if (call.status !== "completed") return false;
+  if (call.taskCompleted === false) return false;
+  if (call.failureCode) return false;
+  // Must be bound to the exact task, recipient phones, and watch/candidate we asked for
+  if (call.task !== expectedTask) return false;
+  const phones = call.recipients?.flatMap((r) => r.phones ?? []) ?? [];
+  // Also check legacy single recipient
+  // The SDK may return recipients as array; check at least one matches
+  const expectedPhone = expectedRecipient.phones[0];
+  if (expectedPhone && !phones.includes(expectedPhone)) {
+    // Fallback: check if the raw phoneE164 appears anywhere in task (defense)
+    if (!call.task.includes(expectedPhone)) return false;
+  }
+  const meta = call.metadata as Record<string, unknown> | null | undefined;
+  if (meta) {
+    if (meta["watch_id"] !== input.watchId) return false;
+    if (meta["candidate_id"] !== input.candidate.id) return false;
+  } else {
+    return false;
+  }
+  // Must have a call id
+  if (!call.id) return false;
+  return true;
+}
+
+function toOutput(
+  call: Call,
+  input?: PlaceCallInput,
+  expectedTask?: string,
+  expectedRecipient?: { phones: string[] },
+): PlaceCallOutput {
   const result = parseStructuredResult(call.structuredResult);
+  const completed = call.status === "completed";
+  let verified = false;
+  if (input && expectedTask && expectedRecipient) {
+    verified = isVerifiedCall(call, input, expectedTask, expectedRecipient) && result !== null && completed;
+  } else {
+    // For calls where we don't have input context (should not happen for live), treat as unverified
+    verified = false;
+  }
   return {
     callId: call.id,
     result,
     evidence: call.evidence ?? [],
     summary: call.summary ?? undefined,
-    completed: call.status === "completed",
+    completed,
     simulated: false,
     calleStatus: call.status,
+    verified,
   };
 }
 
@@ -118,6 +202,7 @@ export class DryRunCaller {
       evidence: [simulated.evidence_quote],
       completed: true,
       simulated: true,
+      verified: true,
     };
   }
 }
@@ -151,6 +236,7 @@ export class FakeCaller {
       evidence: [result.evidence_quote],
       completed: true,
       simulated: true,
+      verified: true,
       calleStatus: "completed",
     };
   }
@@ -162,6 +248,7 @@ export function makeCaller(mode: CallMode, options?: { apiKey?: string; baseUrl?
       if (!options?.apiKey) {
         throw new Error("LIVE mode requires CALLE_API_KEY");
       }
+      assertAllowedCalleBaseUrl(options.baseUrl);
       return new LiveCaller({ apiKey: options.apiKey, baseUrl: options.baseUrl });
     case "dry-run":
       return new DryRunCaller();
