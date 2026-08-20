@@ -178,8 +178,10 @@ export function provenanceLabel(p: Provenance): string {
  * Mask a US E.164 number for display. Keeps the last 4 digits so the user can
  * still distinguish listings, but never exposes the full number in a summary.
  * Example: +12155550100 -> +1 (***) ***-0100
+ * Idempotent: already-masked values are returned as-is.
  */
 export function maskE164(phoneE164: string): string {
+  if (phoneE164.includes("***")) return phoneE164;
   if (!US_E164.test(phoneE164)) return "***-****";
   const last4 = phoneE164.slice(-4);
   return `+1 (***) ***-${last4}`;
