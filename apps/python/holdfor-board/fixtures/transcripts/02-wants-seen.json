@@ -1,0 +1,25 @@
+{
+  "state": "terminal_verified",
+  "turns": [
+    {"index": 0, "speaker": "agent", "text": "Hello, is that Margaret?"},
+    {"index": 1, "speaker": "other", "text": "Yes, speaking."},
+    {"index": 2, "speaker": "agent", "text": "This is an automated call from Fieldgate Surgery. I'm a computer, not a person, so I'll keep this short. You saw someone here on Monday, and the practice asked me to check how you've been getting on since. I won't ask you for your date of birth, your address, your bank details or anything like that. I don't need them, and nobody from the practice will ever ask you for them over the phone. If anyone does, it isn't us. Is now a good time? If it isn't, just say so and I'll leave you be."},
+    {"index": 3, "speaker": "other", "text": "Yes, go on."},
+    {"index": 4, "speaker": "agent", "text": "Since Monday, are you feeling better, about the same, or worse?"},
+    {"index": 5, "speaker": "other", "text": "Worse, if I'm honest. Not as good as last week."},
+    {"index": 6, "speaker": "agent", "text": "Is there anything worrying you?"},
+    {"index": 7, "speaker": "other", "text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway."},
+    {"index": 8, "speaker": "agent", "text": "Would you like the surgery to see you again?"},
+    {"index": 9, "speaker": "other", "text": "Yes, please. I'd like someone to look at it."},
+    {"index": 10, "speaker": "agent", "text": "Thank you, Margaret. Someone at the practice will read this today, and if you need another appointment they'll sort that out for you, so you won't have to ring in and wait on hold. Take care."}
+  ],
+  "structured": {
+    "feeling": "worse",
+    "medication_ok": "not_asked",
+    "wants_seen": "yes",
+    "carried_words_text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway.",
+    "carried_words_turn": 7,
+    "stop_condition": false,
+    "stop_reason": null
+  }
+}

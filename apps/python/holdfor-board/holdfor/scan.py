@@ -18,6 +18,7 @@ from . import redflags
 from .models import Turn
 
 RED_FLAG_PHRASE = "red_flag_phrase"
+NO_TRANSCRIPT = "no_transcript"
 UNMAPPABLE = "unmappable"
 REPEATED_NON_ANSWER = "repeated_non_answer"
 THIRD_PARTY = "third_party"
@@ -111,7 +112,19 @@ def scan(
     Runs on every finished transcript, whatever the agent reported about itself. The
     order of checks decides only which reason a Reviewer sees first; a red flag is
     checked first because it is the one that cannot wait behind a null field.
+
+    No transcript is flagged before anything else is considered. A missing transcript
+    is not a clean call: there is nothing left to check the agent's own account
+    against, so the structured result is the only thing saying the call went well and
+    it is exactly the thing this layer exists not to trust. Flagging rather than
+    raising is deliberate too. A raise here would leave the call_attempt row stranded
+    in `reserved`, and `idempotency_key` is UNIQUE, so the Patient could never be rung
+    again about that appointment.
     """
+    if not transcript:
+        return True, NO_TRANSCRIPT
+
+    extracted = extracted or {}
     patient = _patient_turns(transcript)
 
     for turn in patient:
@@ -166,6 +179,9 @@ def extract_carried_words(transcript: list[Turn]) -> tuple[str, int] | None:
     tidied or invented quote would put words in her mouth to a third party — and
     there is nothing so useful about a quote that it is worth that.
     """
+    if not transcript:
+        return None
+
     turn = _answer_to_question_three(transcript)
     if turn is None:
         return None

@@ -13,6 +13,7 @@ import pytest
 from holdfor import redflags
 from holdfor.checkin import (
     CLOSING,
+    DECLINED,
     DISCLOSURE,
     NEVER_ASK_PROMISE,
     RESULT_SCHEMA_PATH,
@@ -36,6 +37,7 @@ from holdfor.models import (
 )
 from holdfor.scan import (
     CLINICAL_QUESTION,
+    NO_TRANSCRIPT,
     RED_FLAG_PHRASE,
     THIRD_PARTY,
     UNMAPPABLE,
@@ -409,3 +411,103 @@ def test_recovery_leaves_a_refused_extraction_alone():
     refused = clean_extraction(stop_condition=True, stop_reason=NOT_VERBATIM)
 
     assert recover_carried_words(as_result(transcript), refused) is refused
+
+
+# --- a transcript that never arrived ---------------------------------------------
+
+
+def test_a_missing_transcript_is_flagged_rather_than_trusted():
+    """No transcript is not a clean call — there is nothing left to check.
+
+    A provider can return a structured result and no turns: a call that rang out, or
+    one polled before the transcript was ready. The agent's own account is then the
+    only thing saying the call went well, and that is the one thing this layer exists
+    not to trust.
+    """
+    assert scan(None, ALL_SET) == (True, NO_TRANSCRIPT)
+    assert scan([], ALL_SET) == (True, NO_TRANSCRIPT)
+
+
+def test_a_missing_transcript_flags_instead_of_raising():
+    """A raise here would strand the attempt row.
+
+    `call_attempt.idempotency_key` is UNIQUE, so a row left in `reserved` by an
+    exception can never be retried, and the Patient would never be rung again about
+    that appointment. Flagging keeps the failure visible and the record recoverable.
+    """
+    assert scan(None, None) == (True, NO_TRANSCRIPT)
+    assert extract_carried_words(None) is None
+    assert extract_carried_words([]) is None
+
+
+# --- she said it was not a good time ---------------------------------------------
+
+
+DECLINE = turns(
+    ("agent", "Hello, is that Derek?"),
+    ("other", "Yes, who's this?"),
+    ("agent", "Is now a good time? If it isn't, just say so and I'll leave you be."),
+    ("other", "Not now, no. I've got the district nurse due any minute."),
+    ("agent", "Of course. I'll leave you be. Thank you, Derek."),
+)
+
+
+def declined_result() -> CallResult:
+    return CallResult(
+        state=CallState.TERMINAL_VERIFIED,
+        transcript=DECLINE,
+        structured={"declined": True, "stop_condition": False},
+    )
+
+
+def no_answers() -> Extraction:
+    """What extraction makes of a call that never reached a question."""
+    return clean_extraction(
+        feeling=None,
+        medication_ok=None,
+        wants_seen=None,
+        stop_condition=True,
+        stop_reason="extraction_failed",
+    )
+
+
+def test_a_decline_is_not_a_stop_condition():
+    """She was asked, she answered, and the answer was no.
+
+    A Stop Condition is one of five surfaces in CONTEXT.md and a decline is none of
+    them. Routing it through the scanner labels her "unmappable" on the strength of
+    questions nobody put to her.
+    """
+    assert settle_stop_condition(declined_result(), no_answers()) == (False, DECLINED)
+
+
+def test_a_decline_is_not_reported_as_a_failure():
+    """"unmappable" and "extraction_failed" both say the system broke. It did not."""
+    flagged, reason = settle_stop_condition(declined_result(), no_answers())
+
+    assert flagged is False
+    assert reason not in {UNMAPPABLE, "extraction_failed"}
+
+
+def test_a_decline_carries_no_quote_of_her():
+    """Nothing she said on the way to declining becomes Carried Words."""
+    settled = recover_carried_words(declined_result(), no_answers())
+
+    assert settled.carried_words_text is None
+    assert settled.carried_words_turn is None
+
+
+def test_the_prompt_asks_the_agent_to_report_a_decline():
+    """The prompt calls a decline a complete outcome; the result has to be able to."""
+    text = build_task_text(MARGARET, False, "Wednesday")
+
+    assert "leave you be" in text
+    assert "declined" in text
+
+
+def test_the_schema_can_express_a_decline():
+    """With feeling and wants_seen unconditionally required, it could not."""
+    schema = result_schema()
+
+    assert schema["properties"]["declined"]["type"] == "boolean"
+    assert schema["required"] == ["stop_condition"]

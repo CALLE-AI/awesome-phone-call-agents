@@ -7,23 +7,43 @@
   "properties": {
     "feeling": {
       "description": "Answer to 'Since {weekday}, are you feeling better, about the same, or worse?'. Use unsure when she answered but the answer maps to none of the three.",
-      "enum": ["better", "same", "worse", "unsure"]
+      "enum": [
+        "better",
+        "same",
+        "worse",
+        "unsure"
+      ]
     },
     "medication_ok": {
       "description": "Answer to 'Are you getting on alright with what they gave you?'. Must be not_asked when the appointment did not change her medication, because the question is then never put to her.",
-      "enum": ["yes", "no", "unsure", "not_asked"]
+      "enum": [
+        "yes",
+        "no",
+        "unsure",
+        "not_asked"
+      ]
     },
     "wants_seen": {
       "description": "Answer to 'Would you like the surgery to see you again?'. This does not book anything and does not authorise a Rebooking Call; only a Release does that.",
-      "enum": ["yes", "no", "unsure"]
+      "enum": [
+        "yes",
+        "no",
+        "unsure"
+      ]
     },
     "carried_words_text": {
       "description": "A verbatim substring of one patient turn, taken from the answer to 'Is there anything worrying you?'. Never summarised, corrected, tidied or generated. Null when no clean span exists — null is a valid and expected answer, and is safer than a paraphrase, because this string is later spoken aloud to reception in the patient's name.",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "carried_words_turn": {
       "description": "The index of the transcript turn carried_words_text was taken from. Required whenever carried_words_text is set, so the span can be checked against the turn it claims to come from.",
-      "type": ["integer", "null"]
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "stop_condition": {
       "description": "True if the agent ended the call early and read the Safety Line. Advisory only. A false value does not clear the call: the scanner runs over every finished transcript regardless.",
@@ -31,7 +51,10 @@
     },
     "stop_reason": {
       "description": "Which surface condition the agent matched, when it stopped. Not a severity grade and not a judgement about the patient.",
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "enum": [
         "red_flag_phrase",
         "unmappable",
@@ -40,7 +63,35 @@
         "clinical_question",
         null
       ]
+    },
+    "declined": {
+      "description": "True when she was reached but said it was not a good time. A decline is a complete outcome, not a Stop Condition and not a failure: she was asked, she answered, and the answer was no. The bounded fields are then absent because the questions were never put to her, which is why they are required only when this is not set. Never set this because a call went badly; that is what stop_condition is for.",
+      "type": "boolean"
     }
   },
-  "required": ["feeling", "wants_seen", "stop_condition"]
+  "required": [
+    "stop_condition"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "declined": {
+              "const": true
+            }
+          },
+          "required": [
+            "declined"
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "feeling",
+          "wants_seen"
+        ]
+      }
+    }
+  ]
 }

@@ -63,6 +63,22 @@ Notes on each part:
 - **"Is now a good time?"** — she is allowed to decline before the questions start.
   A refusal here is a complete and successful outcome, not a failure to retry.
 
+## When she declines
+
+Set `declined` to `true`, leave the four answers out, and do **not** set
+`stop_condition`. Then stop.
+
+The distinction is not bookkeeping. A **Stop Condition** is one of five surfaces
+listed in `CONTEXT.md`, and "not now" is none of them. Recorded as a Stop Condition, a
+decline arrives on the board as a flagged **Review Item** reading `unmappable` — the
+label for an answer that could not be mapped, applied to questions nobody put to her.
+A Reviewer then reads it as something needing attention and rings her back, which is
+the one thing she asked us not to do. The call that cannot ask is only trustworthy if
+the no is also honoured.
+
+So the absent answers carry no meaning here. They are absent because the questions
+were never asked, and `declined` is what says so.
+
 ## The four questions
 
 Asked one at a time, at her pace. The agent waits. It does not stack two questions

@@ -20,6 +20,7 @@ from .models import (
 from .scan import RED_FLAG_PHRASE, extract_carried_words, scan
 
 NO_CONSENT = "no_consent"
+DECLINED = "declined"
 OUTSIDE_READING_WINDOW = "outside_reading_window"
 
 PRACTICE_NAME = "Ashgrove Medical Practice"
@@ -125,7 +126,8 @@ def build_task_text(
         "",
         "If she says it is not a good time, thank her, say you will leave her be, and "
         "end the call. That is a complete outcome. Do not ask again and do not "
-        "persuade her.",
+        "persuade her. Return declined set to true and leave the answers out; do not "
+        "set stop_condition, because nothing went wrong.",
         "",
         "QUESTIONS — one at a time, in this order:",
         f'1. "Since {weekday}, are you feeling better, about the same, or worse?" '
@@ -212,7 +214,17 @@ def settle_stop_condition(result, extraction) -> tuple[bool, str | None]:
     A red flag always takes the reason slot, because it is what a Reviewer must see
     first. Otherwise an existing, more specific reason is kept — a fabricated quote
     tells a Reviewer something that "unmappable" would bury.
+
+    A decline returns before any of that. She was reached and she said not now, so
+    there are no answers to map and their absence says nothing about her health.
+    Routing it through the scanner would label her "unmappable", put a flagged Review
+    Item in front of a Reviewer, and invite exactly the callback she declined. The
+    prompt already calls a decline a complete outcome; this is that same call being
+    recorded as one.
     """
+    if result.structured and result.structured.get("declined"):
+        return False, DECLINED
+
     flagged, reason = scan(
         result.transcript,
         {
