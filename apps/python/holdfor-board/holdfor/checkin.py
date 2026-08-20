@@ -1,34 +1,87 @@
 from __future__ import annotations
 
+import json
 import sqlite3
+from dataclasses import replace
+from datetime import date
+from pathlib import Path
 
-from . import db
+from . import db, redflags
 from .extract import extract
 from .models import (
     CallKind,
     CallRequest,
     CallState,
     CheckinScope,
+    Extraction,
     Patient,
     ReviewStatus,
 )
+from .scan import RED_FLAG_PHRASE, extract_carried_words, scan
 
 NO_CONSENT = "no_consent"
 OUTSIDE_READING_WINDOW = "outside_reading_window"
 
-RESULT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "feeling": {"enum": ["better", "same", "worse", "unsure"]},
-        "medication_ok": {"enum": ["yes", "no", "unsure", "not_asked"]},
-        "wants_seen": {"enum": ["yes", "no", "unsure"]},
-        "carried_words_text": {"type": ["string", "null"]},
-        "carried_words_turn": {"type": ["integer", "null"]},
-        "stop_condition": {"type": "boolean"},
-        "stop_reason": {"type": ["string", "null"]},
-    },
-    "required": ["feeling", "wants_seen", "stop_condition"],
-}
+PRACTICE_NAME = "Ashgrove Medical Practice"
+
+SKILL_DIR = (
+    Path(__file__).resolve().parents[4] / "skills" / "holdfor-post-visit-followup"
+)
+RESULT_SCHEMA_PATH = SKILL_DIR / "result-schema.json"
+
+WEEKDAYS = (
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+)
+
+
+def result_schema() -> dict:
+    """The published schema, read from the skill rather than restated here.
+
+    One shape, two consumers. A schema copied into the app would drift from the one
+    the skill documents, and the drift would show up as a field the board cannot read.
+    """
+    return json.loads(RESULT_SCHEMA_PATH.read_text(encoding="utf-8"))
+
+
+# Pinned by tests. Each of these sentences carries a promise to the person on the
+# line, so none of them is phrasing that may be improved in passing. The authored
+# source is skills/holdfor-post-visit-followup/references/call-task.md.
+#
+# No dashes, no parentheses, no typography in anything spoken. These strings are read
+# aloud by a text-to-speech engine, and punctuation it cannot pronounce is punctuation
+# it may say out loud or pause in the wrong place for. Prose in the surrounding
+# instructions is free to use whatever it likes; a spoken line is not.
+DISCLOSURE = (
+    f"This is an automated call from {PRACTICE_NAME}. I'm a computer, not a person, "
+    "so I'll keep this short."
+)
+NEVER_ASK_PROMISE = (
+    "I won't ask you for your date of birth, your address, your bank details or "
+    "anything like that. I don't need them, and nobody from the practice will ever "
+    "ask you for them over the phone. If anyone does, it isn't us."
+)
+CLOSING = (
+    "Someone at the practice will read this today, and if you need another "
+    "appointment they'll sort that out for you, so you won't have to ring in and "
+    "wait on hold."
+)
+SAFETY_LINE = (
+    "Thank you for telling me. That's something a person needs to hear, not a "
+    "computer, so I'm going to stop here rather than get it wrong. Please ring 111 "
+    "and tell them what you've just told me. They're there day and night, and "
+    "they'll decide what happens next. If it feels like an emergency, ring 999. "
+    "I'm letting the practice know we spoke, and someone there will see this today."
+)
+
+
+def weekday_of(seen_on: str) -> str:
+    return WEEKDAYS[date.fromisoformat(seen_on).weekday()]
 
 
 class Refused(Exception):
@@ -47,25 +100,132 @@ def preflight(patient: Patient) -> str | None:
     return None
 
 
-def build_task_text(scope: CheckinScope, medication_changed: bool) -> str:
+def build_task_text(
+    scope: CheckinScope, medication_changed: bool, weekday: str
+) -> str:
+    """Render the authored script for one Patient.
+
+    The red-flag phrases come from the same loader `scan()` uses. They are not
+    hand-copied here, because a prompt list and a scanner list that were maintained
+    separately would eventually disagree, and the call where they disagreed would be
+    the one that needed both.
+    """
     lines = [
-        f"Call {scope.first_name} on behalf of Ashgrove Medical Practice.",
-        "Open by naming the practice and saying this is a follow-up on a recent appointment.",
-        "Say you cannot answer questions and that the practice will read every answer.",
-        "Say that hanging up ends the calls for good.",
-        "Never ask them to confirm their surname, date of birth, address or any other detail.",
-        "Ask whether they feel better, about the same, or worse.",
+        f"You are calling {scope.first_name} on behalf of {PRACTICE_NAME}, three days "
+        "after an appointment. Speak slowly and plainly. Ask one question at a time "
+        "and wait. Do not fill silence, and do not stack two questions together.",
+        "",
+        "OPENING — say these, in this order, before asking anything:",
+        f'1. "Hello, is that {scope.first_name}?"',
+        f'2. "{DISCLOSURE}"',
+        f'3. "You saw someone here on {weekday}, and the practice asked me to check '
+        'how you\'ve been getting on since."',
+        f'4. "{NEVER_ASK_PROMISE}"',
+        '5. "Is now a good time? If it isn\'t, just say so and I\'ll leave you be."',
+        "",
+        "If she says it is not a good time, thank her, say you will leave her be, and "
+        "end the call. That is a complete outcome. Do not ask again and do not "
+        "persuade her.",
+        "",
+        "QUESTIONS — one at a time, in this order:",
+        f'1. "Since {weekday}, are you feeling better, about the same, or worse?" '
+        "-> feeling",
     ]
     if medication_changed:
         lines.append(
-            "Ask whether they are managing to take the changed medication as prescribed."
+            '2. "Are you getting on alright with what they gave you?" -> medication_ok'
+        )
+    else:
+        lines.append(
+            "2. Skipped. Her medication was not changed, so do not ask about it. "
+            'Record medication_ok as "not_asked".'
         )
     lines += [
-        "Ask whether there is anything they would like the practice to know.",
-        "Ask whether they would like to be seen again about this.",
-        "Close by saying someone at the practice will read this today.",
+        '3. "Is there anything worrying you?" -> her own words, verbatim',
+        '4. "Would you like the surgery to see you again?" -> wants_seen',
+        "",
+        "Question 3 is the only source of the quote. Store a substring of what she "
+        "actually said, with the turn it came from. Never summarise it, correct her "
+        "English, or write a quote she did not say. If there is no clean span, record "
+        "nothing — that is a valid answer, and a person will read the call instead.",
+        "",
+        f'CLOSING — say: "Thank you, {scope.first_name}. {CLOSING} Take care."',
+        "",
+        "NEVER ask her to confirm her surname, date of birth, address, postcode, NHS "
+        "number, or anything resembling payment. You do not need any of it. If she "
+        "offers such a detail, do not repeat it back and do not record it.",
+        "",
+        "NEVER answer anything clinical. You have no clinical knowledge and no access "
+        "to her record. Do not reassure her, do not alarm her, and do not say whether "
+        "something sounds normal or serious.",
+        "",
+        "STOP the call and read the line below, word for word, if any of these "
+        "happens: she says anything on the list that follows; she asks you for "
+        "clinical advice; somebody else comes on the line; or you have asked the same "
+        "question three times without a usable answer.",
+        "",
+        "Stop if she says anything like:",
+        redflags.prompt_block(),
+        "",
+        "THE LINE, word for word, then end the call:",
+        f'"{SAFETY_LINE}"',
+        "",
+        "Read it exactly. Do not add to it, do not adapt it to what she said, and do "
+        "not offer an opinion on what she told you.",
     ]
     return "\n".join(lines)
+
+
+def recover_carried_words(result, extraction) -> Extraction:
+    """Find her words deterministically when the agent chose none.
+
+    Only fills a gap; it never overrides a span the agent already returned, and it
+    never touches a refused extraction — a call refused for a fabricated quote does
+    not get a better quote grafted onto it.
+
+    The gap is worth closing because a Review Item with no quote gives a Reviewer
+    less to release, and the second call is then one where she has to explain herself
+    a third time. The recovered span is sliced out of her own turn, so nothing here
+    can produce words she did not say.
+    """
+    if extraction.stop_reason is not None:
+        return extraction
+    if extraction.carried_words_text is not None:
+        return extraction
+
+    found = extract_carried_words(result.transcript)
+    if found is None:
+        return extraction
+
+    text, index = found
+    return replace(extraction, carried_words_text=text, carried_words_turn=index)
+
+
+def settle_stop_condition(result, extraction) -> tuple[bool, str | None]:
+    """Reconcile what the agent said about itself with what the transcript shows.
+
+    The scanner runs whatever the agent reported, and a call the agent completed
+    cleanly can still be flagged here. That asymmetry is the whole point of
+    docs/adr/0005-stop-conditions-are-enforced-twice.md: the prompt layer serves the
+    Patient, this layer serves the Practice, and only one of them can be the record.
+
+    A red flag always takes the reason slot, because it is what a Reviewer must see
+    first. Otherwise an existing, more specific reason is kept — a fabricated quote
+    tells a Reviewer something that "unmappable" would bury.
+    """
+    flagged, reason = scan(
+        result.transcript,
+        {
+            "feeling": extraction.feeling,
+            "medication_ok": extraction.medication_ok,
+            "wants_seen": extraction.wants_seen,
+        },
+    )
+    if not flagged:
+        return extraction.stop_condition, extraction.stop_reason
+    if reason == RED_FLAG_PHRASE or extraction.stop_reason is None:
+        return True, reason
+    return True, extraction.stop_reason
 
 
 def _transcript_path(provider, run_id: str) -> str | None:
@@ -131,13 +291,20 @@ def run(conn: sqlite3.Connection, provider, appointment_id: int) -> int:
     attempt_id = cursor.lastrowid
     request = CallRequest(
         to_e164=patient.phone_e164,
-        task_text=build_task_text(patient.checkin_scope(), appointment.medication_changed),
-        result_schema=RESULT_SCHEMA,
+        task_text=build_task_text(
+            patient.checkin_scope(),
+            appointment.medication_changed,
+            weekday_of(appointment.seen_on),
+        ),
+        result_schema=result_schema(),
         idempotency_key=key,
     )
     run_id = provider.place(request)
     result = provider.poll(run_id)
-    extraction = extract(result, appointment.medication_changed)
+    extraction = recover_carried_words(
+        result, extract(result, appointment.medication_changed)
+    )
+    stop_condition, stop_reason = settle_stop_condition(result, extraction)
 
     conn.execute(
         """
@@ -168,8 +335,8 @@ def run(conn: sqlite3.Connection, provider, appointment_id: int) -> int:
             extraction.wants_seen.value if extraction.wants_seen else None,
             extraction.carried_words_text,
             extraction.carried_words_turn,
-            int(extraction.stop_condition),
-            extraction.stop_reason,
+            int(stop_condition),
+            stop_reason,
             ReviewStatus.NEEDS_REVIEW.value,
             db.now_iso(),
         ),

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Check-in Call result",
+  "description": "What one Check-in Call is permitted to return. Four bounded answers, a verbatim quote or nothing, and the agent's own report of whether it stopped early. The agent's stop report is advisory: the deterministic scanner over the finished transcript is the authority. See docs/adr/0005-stop-conditions-are-enforced-twice.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "feeling": {
+      "description": "Answer to 'Since {weekday}, are you feeling better, about the same, or worse?'. Use unsure when she answered but the answer maps to none of the three.",
+      "enum": ["better", "same", "worse", "unsure"]
+    },
+    "medication_ok": {
+      "description": "Answer to 'Are you getting on alright with what they gave you?'. Must be not_asked when the appointment did not change her medication, because the question is then never put to her.",
+      "enum": ["yes", "no", "unsure", "not_asked"]
+    },
+    "wants_seen": {
+      "description": "Answer to 'Would you like the surgery to see you again?'. This does not book anything and does not authorise a Rebooking Call; only a Release does that.",
+      "enum": ["yes", "no", "unsure"]
+    },
+    "carried_words_text": {
+      "description": "A verbatim substring of one patient turn, taken from the answer to 'Is there anything worrying you?'. Never summarised, corrected, tidied or generated. Null when no clean span exists — null is a valid and expected answer, and is safer than a paraphrase, because this string is later spoken aloud to reception in the patient's name.",
+      "type": ["string", "null"]
+    },
+    "carried_words_turn": {
+      "description": "The index of the transcript turn carried_words_text was taken from. Required whenever carried_words_text is set, so the span can be checked against the turn it claims to come from.",
+      "type": ["integer", "null"]
+    },
+    "stop_condition": {
+      "description": "True if the agent ended the call early and read the Safety Line. Advisory only. A false value does not clear the call: the scanner runs over every finished transcript regardless.",
+      "type": "boolean"
+    },
+    "stop_reason": {
+      "description": "Which surface condition the agent matched, when it stopped. Not a severity grade and not a judgement about the patient.",
+      "type": ["string", "null"],
+      "enum": [
+        "red_flag_phrase",
+        "unmappable",
+        "repeated_non_answer",
+        "third_party",
+        "clinical_question",
+        null
+      ]
+    }
+  },
+  "required": ["feeling", "wants_seen", "stop_condition"]
+}
