@@ -490,5 +490,5 @@ skills/holdfor-post-visit-followup/    SKILL.md + references/ (safety, result-sc
 apps/python/holdfor-board/             FastAPI + SQLite + the board
 docs/holdfor-post-visit-followup/      this PRD
 CONTEXT.md                             glossary
-docs/adr/                              0001–0004
+docs/adr/                              0001–0006
 ```
