@@ -46,6 +46,17 @@ pnpm install
 pnpm check        # typecheck + lint + tests (default suite needs no credentials, no network)
 ```
 
+Optional access control for a public deployment:
+
+```bash
+# Require a shared secret on every page and every mutating action.
+# When set, clients must send `Authorization: Bearer <token>` (or Basic with the
+# token as the password) or have a `openings_auth` cookie or `?token=` query param.
+OPENINGS_AUTH_TOKEN=your-long-random-secret
+# Alternative Basic form:
+# OPENINGS_BASIC_AUTH=admin:your-long-random-secret
+```
+
 ## Running
 
 | Mode | Config | What happens |
@@ -143,6 +154,11 @@ mode supports concurrent processes safely.
 - Build: `pnpm build:scheduler` → bundles `dist-scheduler/scheduler.js` with esbuild.
 - Run: `node dist-scheduler/scheduler.js` (the Docker image runs it alongside the server).
 - The scheduler **no-ops unless `OPENINGS_CALL_MODE=live`** — it never calls in dry-run/fake.
+- **One provider call per tick.** Per the repository architecture rule, the host scheduler
+  handles recurrence and the provider handles one call per scheduled run. Each tick places
+  at most one real provider call (the next eligible candidate respecting cooldown/opt-out),
+  not a wave. Manual "Run now" may place a small wave up to `maxCallsPerRun`; scheduled ticks
+  do not.
 
 ## Deployment
 
@@ -152,9 +168,12 @@ scheduler to Fly.io:
 ```bash
 fly launch --no-deploy
 fly volumes create openings_data --size 1 --region sin
-fly secrets set CALLE_API_KEY=... OPENINGS_CALL_MODE=live
+fly secrets set CALLE_API_KEY=... OPENINGS_CALL_MODE=live OPENINGS_AUTH_TOKEN=your-secret
 fly deploy
 ```
+
+Set `OPENINGS_AUTH_TOKEN` (or `OPENINGS_BASIC_AUTH=user:pass`) to gate all pages and
+actions behind authentication; otherwise the app is open (local dev/tests).
 
 ## Repository structure
 

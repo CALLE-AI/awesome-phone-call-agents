@@ -51,12 +51,12 @@ function recipientFor(candidate: Candidate): { phones: string[]; region?: string
 
 export const DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com";
 const OFFICIAL_CALLE_HOST = "api.heycall-e.com";
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 /**
- * Verify the CALL-E base URL is strictly the official HTTPS origin (or loopback
- * for local fake-server tests with an injected fetch). The CALLE_API_KEY must
- * never be sent to an arbitrary host.
+ * Verify the CALL-E base URL is strictly the official HTTPS origin.
+ * The CALLE_API_KEY must never be sent to an arbitrary host. Only the
+ * exact official origin is allowed; loopback and custom hosts are rejected
+ * so the key cannot be exfiltrated.
  */
 export function assertAllowedCalleBaseUrl(baseUrl: string | undefined): void {
   const urlString = baseUrl ?? DEFAULT_CALLE_BASE_URL;
@@ -67,13 +67,6 @@ export function assertAllowedCalleBaseUrl(baseUrl: string | undefined): void {
     throw new Error(`CALLE_BASE_URL is not a valid URL: ${urlString}`);
   }
   const host = url.hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
-  const isLoopback = LOOPBACK_HOSTS.has(host);
-  if (isLoopback) {
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error(`CALLE_BASE_URL loopback must use http or https: ${urlString}`);
-    }
-    return;
-  }
   if (host !== OFFICIAL_CALLE_HOST) {
     throw new Error(`CALLE_BASE_URL must be ${DEFAULT_CALLE_BASE_URL} (got ${urlString}); arbitrary hosts are not allowed.`);
   }
