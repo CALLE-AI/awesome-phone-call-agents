@@ -122,7 +122,7 @@ python permitdiff.py \
   --allow +14155550123
 ```
 
-The request itself must contain `caller_authorized_for_permit: true`; live execution must also pass the explicit CLI confirmation and exact destination allowlist. The CALL-E SDK is imported only after those gates pass. The production origin is pinned; plain HTTP is accepted only for an explicit loopback test server.
+The request itself must contain `caller_authorized_for_permit: true`; live execution must also pass the explicit CLI confirmation and exact destination allowlist. The CALL-E SDK is imported only after those gates pass. The production origin is pinned; plain HTTP is accepted only for an explicit loopback test server. A loopback test server receives only a fixed non-secret test key; `CALLE_API_KEY` is required and used only for the production origin.
 
 ## Input snapshot
 

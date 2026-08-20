@@ -241,3 +241,19 @@ def test_result_schema_and_preview_are_serializable():
     extra = {**structured, "approval": "issued"}
     assert not p.valid_structured_result(extra)
     json.dumps(p.preview(request(), NOW))
+
+
+def test_loopback_never_receives_the_real_api_key(monkeypatch):
+    monkeypatch.setenv("CALLE_API_KEY", "real-production-secret")
+    assert p.validate_base_url("http://127.0.0.1:8123") == "http://127.0.0.1:8123"
+    assert p.api_key_for_base_url("http://127.0.0.1:8123") == p.LOOPBACK_TEST_API_KEY
+
+
+def test_production_requires_the_real_api_key(monkeypatch):
+    monkeypatch.delenv("CALLE_API_KEY", raising=False)
+    try:
+        p.api_key_for_base_url(p.DEFAULT_BASE_URL)
+    except ValueError as exc:
+        assert "production" in str(exc)
+    else:
+        raise AssertionError("production execution should require CALLE_API_KEY")

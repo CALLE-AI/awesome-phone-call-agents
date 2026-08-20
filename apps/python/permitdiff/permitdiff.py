@@ -16,6 +16,7 @@ from typing import Any, Protocol
 from urllib.parse import urlparse
 
 DEFAULT_BASE_URL = "https://api.heycall-e.com"
+LOOPBACK_TEST_API_KEY = "loopback-test-key"
 TERMINAL_SUCCESS = {"completed", "succeeded"}
 MIN_CONFIDENCE = 0.80
 RECIPIENT_SPEAKERS = {"recipient", "user", "callee"}
@@ -455,6 +456,20 @@ class ReservationLedger:
         return row if row else None
 
 
+def _is_loopback_base_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return (
+        parsed.scheme == "http"
+        and parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port is not None
+        and parsed.path in {"", "/"}
+        and not parsed.username
+        and not parsed.password
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
 def validate_base_url(value: str) -> str:
     parsed = urlparse(value)
     if (
@@ -468,18 +483,19 @@ def validate_base_url(value: str) -> str:
         and not parsed.fragment
     ):
         return DEFAULT_BASE_URL
-    if (
-        parsed.scheme == "http"
-        and parsed.hostname in {"127.0.0.1", "localhost"}
-        and parsed.port is not None
-        and parsed.path in {"", "/"}
-        and not parsed.username
-        and not parsed.password
-        and not parsed.query
-        and not parsed.fragment
-    ):
+    if _is_loopback_base_url(value):
         return value.rstrip("/")
     raise ValueError("base URL must be CALL-E production or an explicit loopback test server")
+
+
+def api_key_for_base_url(base_url: str) -> str:
+    """Use a non-secret credential for local fakes; require a real key in production."""
+    if _is_loopback_base_url(base_url):
+        return LOOPBACK_TEST_API_KEY
+    key = os.environ.get("CALLE_API_KEY", "").strip()
+    if not key:
+        raise ValueError("CALLE_API_KEY is required for production --execute")
+    return key
 
 
 def execute(
@@ -572,14 +588,13 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("--execute requires the exact office phone in --allow")
         if os.environ.get("CALLE_LIVE_CALLS_ENABLED", "").lower() != "true":
             raise ValueError("--execute requires CALLE_LIVE_CALLS_ENABLED=true")
-        api_key = os.environ.get("CALLE_API_KEY")
-        if not api_key:
-            raise ValueError("CALLE_API_KEY is required for --execute")
+        base_url = validate_base_url(os.environ.get("CALLE_BASE_URL", DEFAULT_BASE_URL))
+        api_key = api_key_for_base_url(base_url)
         from calle import CalleClient
 
         with CalleClient(
             api_key=api_key,
-            base_url=validate_base_url(os.environ.get("CALLE_BASE_URL", DEFAULT_BASE_URL)),
+            base_url=base_url,
         ) as client:
             result = execute(
                 request,
