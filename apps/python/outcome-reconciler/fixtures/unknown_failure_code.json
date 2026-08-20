@@ -1,0 +1,10 @@
+{
+  "description": "Documented failed status carrying an undocumented failure_code (upstream issue #89).",
+  "surface": "rest.calls",
+  "recipient_phone": "+15550101234",
+  "expected": {"outcome": "unresolved", "reason": "undocumented_failure_detail"},
+  "sequence": [
+    {"payload": {"id": "call_reserved_fixture_unknown", "status": "in_progress", "failure_code": null}},
+    {"payload": {"id": "call_reserved_fixture_unknown", "status": "failed", "failure_code": "carrier_reject_42", "failure_message": "Carrier rejected the call.", "vendor_hint": "unrecognised-field-preserved"}}
+  ]
+}

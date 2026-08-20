@@ -1,0 +1,15 @@
+[project]
+name = "calle-python-outcome-reconciler-app"
+version = "0.0.0"
+description = "Python companion app for the call-outcome-reconciler skill: resolves a CALL-E call reference to exactly one terminal outcome."
+requires-python = ">=3.10"
+dependencies = [
+  "fastmcp>=3.2,<4",
+  "pyyaml>=6",
+  "rich>=13",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+]

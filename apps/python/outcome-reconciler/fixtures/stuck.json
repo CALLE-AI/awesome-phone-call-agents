@@ -1,0 +1,10 @@
+{
+  "description": "Call remains in progress with no terminal state (upstream issue #97).",
+  "surface": "rest.calls",
+  "recipient_phone": "+15550101234",
+  "expected": {"outcome": "unresolved", "reason": "polling_budget_exhausted"},
+  "sequence": [
+    {"payload": {"id": "call_reserved_fixture_stuck", "status": "queued", "failure_code": null}},
+    {"payload": {"id": "call_reserved_fixture_stuck", "status": "in_progress", "failure_code": null, "created_at": "2026-07-30T07:48:05Z"}}
+  ]
+}

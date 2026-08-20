@@ -1,0 +1,9 @@
+{
+  "description": "Documented no-answer on the Goal Runs error surface.",
+  "surface": "rest.goal_runs",
+  "recipient_phone": "+15550101234",
+  "expected": {"outcome": "not_connected", "entry_id": "rest.goal_runs.no_answer"},
+  "sequence": [
+    {"payload": {"code": "no_answer", "message": "The recipient did not answer.", "detail_code": null}}
+  ]
+}
