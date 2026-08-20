@@ -61,6 +61,40 @@ export CALLE_API_KEY=...
 uv run python cli.py reconcile --call-ref <call reference>
 ```
 
+Nothing here reads a `.env` file — no app in this repository does. Copy
+`.env.example` to `.env` (it is gitignored) and load it into the shell yourself:
+
+```bash
+set -a && source .env && set +a
+```
+
+The base URL defaults to `https://api.heycall-e.com`, and `CALLE_API_KEY` is only
+ever sent there or to loopback. Any other host — including
+`api.heycall-e.com.attacker.example`, a plain-http variant, or one carrying a
+port, path, query or embedded credentials — is refused **before the key is
+read**, so a mistyped or hostile base URL cannot leak it. A warning would be no
+use at that point: the credential would already have gone. Override with
+`--base-url` or `CALLE_BASE_URL`; loopback is allowed over http so the local fake
+server works.
+
+Note the `servers:` entry in the v0.6.0 OpenAPI contract calls this host a
+"Placeholder developer API base URL". That wording is stale — the
+[authentication docs](https://docs.heycall-e.com/authentication) document a live
+request against this exact origin.
+
+For the Goal Runs surface — the only place `not_connected` and `declined` are
+documented, and so the only place they can be obtained from a live call:
+
+```bash
+uv run python cli.py reconcile \
+  --surface rest.goal_runs \
+  --goal-id <goal id> \
+  --call-ref <GoalRun.id>
+```
+
+`--call-ref` is the `GoalRun.id` returned by create. The contract is explicit
+that the nested telephone `run_id` is not valid in this path.
+
 For the MCP surface, authenticate with the CALL-E CLI first
 (`npm install -g @call-e/cli && calle auth login`), then:
 
@@ -68,9 +102,17 @@ For the MCP surface, authenticate with the CALL-E CLI first
 uv run python cli.py reconcile \
   --call-ref <run id> \
   --surface mcp.get_call_run \
-  --mcp-server-url <server url> \
-  --token-cache ~/.calle-mcp/cli/<cache file>
+  --mcp-server-url <server url>
 ```
+
+`--token-cache` is optional: the cache path is derived from the server URL the
+same way `@call-e/cli` writes it (`~/.calle-mcp/cli/<md5 of server url>/token.json`),
+so there is no file to go looking for. Pass it only to override that.
+
+`--request-timeout` (default 15s) bounds each individual read. A read that times
+out is reported as `plan_timeout`, which is deliberately distinct from an
+exhausted budget: one means the state could not be read, the other that the call
+never reached a terminal state.
 
 Exit codes: `0` resolved, `2` unresolved, `1` error. A workflow can branch on
 the exit code without parsing the record.
@@ -135,10 +177,11 @@ verification is opt-in and is not needed to review this app.
 
 | File | Covers |
 | --- | --- |
-| `test_mapping.py` | Table validation, the documented-only rule, surface isolation. |
-| `test_reconciler.py` | Every fixture scenario, raw fidelity, idempotence, the property test. |
-| `test_poller.py` | Budgets, backoff, transport retries, timeouts, credential handling. |
+| `test_mapping.py` | Table validation, the documented-only rule, surface isolation, field paths. |
+| `test_reconciler.py` | Every fixture scenario, each guard, raw fidelity, idempotence, the property test. |
+| `test_poller.py` | Budgets, backoff, transport retries, timeout classification, credential handling. |
 | `test_e2e.py` | The CLI over real HTTP against `fake_status_server.py`. |
+| `test_mcp_client.py` | The MCP client over real HTTP against `apps/shared/fake-mcp-broker-server.mjs`. Skipped without `node`. |
 
 Run the fake server by hand if you want to poke at it:
 
@@ -155,7 +198,7 @@ uv run python fake_status_server.py --fixture fixtures/stuck.json
 | `poller.py` | Backoff and the two budgets. Clock and sleep injected. |
 | `mapping.py` | Loader for the mapping table. Holds no semantics of its own. |
 | `record.py` | Record construction and raw preservation. |
-| `clients.py` | Replay, REST, and MCP status clients. |
+| `clients.py` | Replay, Calls, Goal Runs, and MCP status clients. |
 | `outcome-code-map.yaml` | Synchronised copy of the skill's table. Do not edit here. |
 
 To change the mapping, edit the skill's copy and run:

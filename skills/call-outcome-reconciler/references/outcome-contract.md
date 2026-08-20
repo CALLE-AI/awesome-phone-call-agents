@@ -73,6 +73,18 @@ evidence:
 raw:
   first_payload: { ... }
   last_payload: { ... }       # verbatim upstream response, all fields
+upstream_judgment:
+  # CALL-E's own post-call verdict, copied verbatim, or null when it published
+  # none. This asserts nothing: `CallStatus.completed` says a call ended
+  # normally, not that the caller got what they rang for. A call that reaches
+  # voicemail is `completed` with `task_completed: false`, so reporting the
+  # outcome alone would be true and still misleading. Read these fields before
+  # treating `completed` as success.
+  task_completed: false
+  completion_confidence: {score: 0.82, label: high}
+  summary: "The call reached voicemail..."
+  evidence: ["The call reached voicemail instead of a live person."]
+
 recipient:
   phone_e164_masked: "+1555010****"
 ```

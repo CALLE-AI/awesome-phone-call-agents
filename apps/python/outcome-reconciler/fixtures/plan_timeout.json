@@ -2,6 +2,7 @@
   "description": "Request timed out with no recoverable state (upstream issue #80).",
   "surface": "rest.calls",
   "recipient_phone": "+15550101234",
+  "started_at": "2026-08-06T18:00:00+00:00",
   "expected": {"outcome": "unresolved", "reason": "plan_timeout"},
   "sequence": [
     {"plan_timeout": "MCP request timed out for tools/call after 15s"}

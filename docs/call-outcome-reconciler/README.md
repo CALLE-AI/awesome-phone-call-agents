@@ -47,8 +47,14 @@ Two properties are worth drawing out:
 have no published meaning. Polling stops; the outcome is `unresolved`.
 
 **Guards fire before mapping.** A payload that contradicts itself is not
-resolved even when an entry would otherwise match. A zero-duration call reported
-as declined is the motivating case.
+resolved even when an entry would otherwise match. A call reported as declined
+that began and ended at the same instant, with no transcript, is the motivating
+case: nothing in it evidences a person having heard the call and refused it.
+
+Guards are written against fields that upstream actually sends. On the Calls
+surface that means `completed_at` and the nested
+`recipients[].attempts[].transcript_turns`, because the contract has no duration
+field anywhere; a guard keyed on one would be inert against real data.
 
 ## Surfaces
 
@@ -60,8 +66,13 @@ matching never crosses between them.
 | Surface | Documented upstream |
 | --- | --- |
 | `rest.calls` (`CallStatus`) | Yes, a five-value enum. |
-| `rest.goal_runs` (`GoalRunError.code`) | Yes, an eight-value enum. |
+| `rest.goal_runs` (`GoalRunStatus` + `GoalRunError.code`) | Yes: a five-value lifecycle enum and an eight-value failure enum. |
 | `mcp.get_call_run` | No. |
+
+On the Goal Runs surface the two published vocabularies are kept apart on
+purpose. `GoalRunStatus` decides when to stop polling; `GoalRunError.code`
+carries the meaning. An error code is not a lifecycle state, and treating it as
+one would end polling on a value that never described where a run had got to.
 
 Because the Goal Runs error vocabulary is the only place CALL-E publishes an
 enumerated failure list, documented failure outcomes are reachable only from

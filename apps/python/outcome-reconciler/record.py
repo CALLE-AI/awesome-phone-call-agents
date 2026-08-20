@@ -18,6 +18,11 @@ from typing import Any, Mapping, Sequence
 SCHEMA_VERSION = 1
 
 #: The six reconciled outcomes. Exactly one is emitted per reconciliation.
+#:
+#: `cancelled` is deliberately spelled with two Ls where upstream's `canceled`
+#: has one. This vocabulary is the reconciler's own — it is not a copy of any
+#: upstream enum, and the difference in spelling is the reminder of that. The
+#: mapping table is where the two are connected. Not a typo; do not "fix" it.
 OUTCOMES: tuple[str, ...] = (
     "completed",
     "not_connected",
@@ -165,6 +170,24 @@ class OutcomeRecord:
             "elapsed_seconds": elapsed,
         }
 
+    @property
+    def upstream_judgment(self) -> dict[str, Any] | None:
+        """Upstream's own post-call verdict, copied verbatim when it published one.
+
+        This asserts nothing. `CallStatus.completed` says a call ended normally;
+        it does not say the caller got what they rang for. A call that reaches
+        voicemail is `completed` with `task_completed: false`, and reporting the
+        outcome alone would be true and still misleading. These fields are
+        documented on CallTask, so surfacing them is reading, not inferring.
+        """
+        payload = self.last_payload or {}
+        fields = {
+            key: payload[key]
+            for key in ("task_completed", "completion_confidence", "summary", "evidence")
+            if key in payload
+        }
+        return fields or None
+
     def to_dict(self) -> dict[str, Any]:
         """Serialise the record. `raw` is preserved verbatim."""
         return {
@@ -179,5 +202,6 @@ class OutcomeRecord:
                 "first_payload": self.first_payload,
                 "last_payload": self.last_payload,
             },
+            "upstream_judgment": self.upstream_judgment,
             "recipient": {"phone_e164_masked": mask_phone(self.recipient_phone)},
         }

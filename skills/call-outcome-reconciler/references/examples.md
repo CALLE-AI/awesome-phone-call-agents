@@ -38,7 +38,9 @@ uv run python cli.py replay --fixture fixtures/no_answer.json
 
 Resolves to `not_connected` via `rest.goal_runs.no_answer`. Note the surface:
 the Goal Runs error vocabulary is the only place CALL-E publishes an enumerated
-failure list, so documented failure outcomes are reachable only from there.
+failure list, so documented failure outcomes are reachable only from there. The
+observed payload is a whole `GoalRun`; the mapping reads `error.code` from it
+and the rest is preserved untouched.
 
 ## A call that never finishes
 
@@ -66,13 +68,24 @@ decision trail
 The workflow gets a durable answer at the budget instead of hanging. The raw
 payload is preserved, so reconciling the same reference later is always possible.
 
-## A zero-duration decline
-
-The case worth studying. Upstream reports a call as declined by the callee, with
-zero duration, no audio, and no transcript.
+## A documented decline
 
 ```bash
-uv run python cli.py replay --fixture fixtures/zero_duration_decline.json
+uv run python cli.py replay --fixture fixtures/declined.json
+```
+
+Resolves to `declined` via `rest.goal_runs.declined`. Together with
+`not_connected`, this is why the Goal Runs surface matters: it is the only place
+CALL-E publishes a decline code, so it is the only place a decline can be
+asserted rather than inferred.
+
+## A decline with no media behind it
+
+The case worth studying. Upstream reports a call as declined by the callee — but
+it began and ended at the same instant, with no audio and no transcript.
+
+```bash
+uv run python cli.py replay --fixture fixtures/zero_duration_decline.json --output out.json
 uv run python cli.py explain --record out.json
 ```
 
@@ -85,15 +98,39 @@ decision trail
   - consistency guard guard.declined_without_media fired before mapping
 
 notes
-  - A zero-duration DECLINED carries no evidence that a person heard the call
-    and refused it. It is indistinguishable from a pre-media transport failure,
-    so it is not resolved to `declined`.
+  - A DECLINED that began and ended at the same instant, with no transcript,
+    carries no evidence that a person heard the call and refused it. It is
+    indistinguishable from a pre-media transport failure, so it is not resolved
+    to `declined`.
   - see upstream issue #82
 ```
 
 A naive integration reports "the person declined" here, and a workflow acts on
 it: no retry, no escalation, a lead marked as refused. This layer reports that
 the payload contradicts itself and hands the decision back.
+
+## A completion with no media behind it
+
+The same contradiction on the documented Calls surface, where it is expressible
+against the contract's own fields:
+
+```bash
+uv run python cli.py replay --fixture fixtures/completed_without_media.json --output out.json
+uv run python cli.py explain --record out.json
+```
+
+```text
+outcome         unresolved
+reason          inconsistent_payload
+
+decision trail
+  - evaluated the last payload observed on surface rest.calls
+  - consistency guard guard.completed_without_media fired before mapping
+```
+
+The call task says `completed`, but its only attempt has `started_at` equal to
+`completed_at` and an empty `transcript_turns`. One attempt with real media
+anywhere in the task is enough for the guard not to fire.
 
 ## An undocumented failure code
 
@@ -168,6 +205,22 @@ node ../../../skills/call-outcome-reconciler/scripts/validate-outcome-record.mjs
 export CALLE_API_KEY=...    # never paste this into chat or commit it
 uv run python cli.py reconcile --call-ref <call reference> --max-seconds 900
 ```
+
+The key is only ever sent to `https://api.heycall-e.com` or to loopback. Any
+other host is refused before the key is read, so a mistyped `--base-url` cannot
+leak it.
+
+Against a Goal Run, which is addressed by a pair:
+
+```bash
+uv run python cli.py reconcile \
+  --surface rest.goal_runs \
+  --goal-id <goal id> \
+  --call-ref <GoalRun.id>
+```
+
+`--call-ref` is the `GoalRun.id` returned by create. The contract is explicit
+that the nested telephone `run_id` is not valid in this path.
 
 Exit codes: `0` resolved, `2` unresolved, `1` error. A workflow can branch on
 the exit code without parsing the record.

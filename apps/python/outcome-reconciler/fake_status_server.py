@@ -20,11 +20,16 @@ import argparse
 import json
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 FAKE_BEARER_TOKEN = "fake-status-token"
+
+#: How long a `plan_timeout` step holds a request open. Must exceed the
+#: client's --request-timeout for the client to classify it as a timeout.
+DEFAULT_HANG_SECONDS = 30.0
 
 
 class _State:
@@ -44,7 +49,24 @@ class _State:
             self.cursor = 0
 
 
-def build_handler(state: _State) -> type[BaseHTTPRequestHandler]:
+def _is_status_path(path: str) -> bool:
+    """Both documented read paths are served from the same scripted sequence.
+
+    `/v1/calls/{call_id}` is the Calls surface; `/v1/goals/{goal_id}/runs/{goal_run_id}`
+    is the Goal Runs surface.
+    """
+    if path.startswith("/v1/calls/"):
+        return True
+    segments = [segment for segment in path.split("?")[0].split("/") if segment]
+    return (
+        len(segments) == 5
+        and segments[0] == "v1"
+        and segments[1] == "goals"
+        and segments[3] == "runs"
+    )
+
+
+def build_handler(state: _State, hang_seconds: float) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args: Any) -> None:
             """Silence request logging; test output stays readable."""
@@ -65,7 +87,7 @@ def build_handler(state: _State) -> type[BaseHTTPRequestHandler]:
             self._send(404, {"error": "not found"})
 
         def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
-            if not self.path.startswith("/v1/calls/"):
+            if not _is_status_path(self.path):
                 self._send(404, {"error": "not found"})
                 return
             if not (self.headers.get("Authorization") or "").startswith("Bearer "):
@@ -74,7 +96,12 @@ def build_handler(state: _State) -> type[BaseHTTPRequestHandler]:
 
             step = state.next_step()
             if step.get("plan_timeout"):
-                # Emulate a hung request: close without responding.
+                # Emulate a hung request by holding the connection open past the
+                # client's timeout. Closing without responding instead would
+                # surface as a connection reset, which a client classifies as a
+                # recoverable transport error rather than a timeout — so the
+                # fixture would resolve as an exhausted budget, not plan_timeout.
+                time.sleep(hang_seconds)
                 self.close_connection = True
                 return
             if step.get("transport_error"):
@@ -89,8 +116,13 @@ def build_handler(state: _State) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def serve(sequence: list[dict[str, Any]], host: str = "127.0.0.1", port: int = 0) -> HTTPServer:
-    server = HTTPServer((host, port), build_handler(_State(sequence)))
+def serve(
+    sequence: list[dict[str, Any]],
+    host: str = "127.0.0.1",
+    port: int = 0,
+    hang_seconds: float = DEFAULT_HANG_SECONDS,
+) -> HTTPServer:
+    server = ThreadingHTTPServer((host, port), build_handler(_State(sequence), hang_seconds))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
@@ -105,10 +137,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Local fake CALL-E status server. Places no calls.")
     parser.add_argument("--fixture", type=Path, required=True, help="Fixture JSON to serve.")
     parser.add_argument("--port", type=int, default=0, help="Port to bind. Default: an ephemeral port.")
+    parser.add_argument(
+        "--hang-seconds",
+        type=float,
+        default=DEFAULT_HANG_SECONDS,
+        help=f"How long a plan_timeout step holds a request open. Default: {DEFAULT_HANG_SECONDS}.",
+    )
     args = parser.parse_args()
 
     raw = json.loads(args.fixture.read_text(encoding="utf-8"))
-    server = serve(raw.get("sequence") or [], port=args.port)
+    server = serve(raw.get("sequence") or [], port=args.port, hang_seconds=args.hang_seconds)
     url = base_url(server)
     print(json.dumps({"base_url": url, "reset_url": f"{url}/__reset"}), flush=True)
     try:

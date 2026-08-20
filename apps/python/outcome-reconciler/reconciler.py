@@ -60,6 +60,25 @@ def _describe(outcome_map: OutcomeMap, observation: Observation) -> str:
     return f"{observation.surface}:{value if value else '<no status field>'}"
 
 
+def _sole_recipient_phone(observations: Sequence[Observation]) -> str | None:
+    """The recipient's number, when the payload names exactly one.
+
+    Reading, not inferring: the number is already in the payload. A record that
+    says "unknown recipient" while carrying the number in `raw` is just hiding
+    what it has. Deliberately gives up on a batch call — masking one number out
+    of several would label the record with a recipient it is not about.
+    """
+    for observation in reversed(list(observations)):
+        recipients = (observation.payload or {}).get("recipients")
+        if not isinstance(recipients, list) or len(recipients) != 1:
+            continue
+        first = recipients[0]
+        phones = first.get("phones") if isinstance(first, Mapping) else None
+        if isinstance(phones, list) and len(phones) == 1 and isinstance(phones[0], str):
+            return phones[0]
+    return None
+
+
 def reconcile(
     call_ref: str,
     observations: Sequence[Observation],
@@ -72,6 +91,7 @@ def reconcile(
     """Reduce a sequence of observations to exactly one terminal outcome."""
     evidence = Evidence()
     observations = list(observations)
+    recipient_phone = recipient_phone or _sole_recipient_phone(observations)
 
     for observation in observations:
         evidence.observed_states.append(_describe(outcome_map, observation))

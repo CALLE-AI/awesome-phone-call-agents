@@ -13,9 +13,19 @@
 #   node skills/call-outcome-reconciler/scripts/sync-mapping.mjs
 
 schema_version: 1
-map_version: "2026-08-06"
+map_version: "2026-08-06.2"
 upstream_contract_ref: "https://docs.heycall-e.com/openapi/calle.openapi.yaml"
 upstream_contract_version: "0.6.0"
+
+# ---------------------------------------------------------------------------
+# Field paths
+#
+# `status_field`, every `match` key, and every guard `field` is a dot-separated
+# path into the observed payload. A segment ending in `[]` descends into a list
+# and fans out over its elements, so `recipients[].attempts[].started_at`
+# reaches every attempt on a CallTask and the rule must hold for all of them.
+# A path with no `[]` behaves exactly like a plain top-level key.
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Surfaces
@@ -46,28 +56,22 @@ surfaces:
       terminal_values_source: "CallStatus enum, calle.openapi.yaml v0.6.0"
 
   rest.goal_runs:
-    title: "Goal Runs API (REST) error codes"
+    title: "Goal Runs API (REST)"
     documented: true
-    contract_ref: "https://docs.heycall-e.com/openapi/calle.openapi.yaml#/components/schemas/GoalRunError"
-    status_field: code
+    contract_ref: "https://docs.heycall-e.com/openapi/calle.openapi.yaml#/components/schemas/GoalRun"
+    status_field: status
     note: >-
-      GoalRunError.code is the only place CALL-E publishes an enumerated
-      failure vocabulary. Semantic failure outcomes are therefore reachable
-      only from this surface.
+      The observed payload is a whole GoalRun, preserved verbatim. Polling
+      follows the documented GoalRunStatus lifecycle enum; meaning is read from
+      the nested `error.code`, which is the only place CALL-E publishes an
+      enumerated failure vocabulary. Semantic failure outcomes are therefore
+      reachable only from this surface. The two are deliberately separate:
+      GoalRunError.code is not a lifecycle state and never governed when to
+      stop polling.
     polling:
-      non_terminal_values: []
-      terminal_values:
-        [
-          call_failed,
-          no_answer,
-          declined,
-          timed_out,
-          canceled,
-          result_invalid,
-          result_unavailable,
-          result_failed,
-        ]
-      terminal_values_source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+      non_terminal_values: [queued, in_progress]
+      terminal_values: [completed, failed, canceled]
+      terminal_values_source: "GoalRunStatus enum, calle.openapi.yaml v0.6.0"
 
   mcp.get_call_run:
     title: "MCP get_call_run tool result"
@@ -127,7 +131,7 @@ entries:
   - id: rest.goal_runs.no_answer
     surface: rest.goal_runs
     match:
-      code: no_answer
+      error.code: no_answer
     outcome: not_connected
     documented: true
     source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
@@ -135,7 +139,7 @@ entries:
   - id: rest.goal_runs.declined
     surface: rest.goal_runs
     match:
-      code: declined
+      error.code: declined
     outcome: declined
     documented: true
     source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
@@ -143,10 +147,35 @@ entries:
   - id: rest.goal_runs.canceled
     surface: rest.goal_runs
     match:
-      code: canceled
+      error.code: canceled
     outcome: cancelled
     documented: true
     source: "GoalRunError.code enum, calle.openapi.yaml v0.6.0"
+
+  # The two lifecycle cases below carry `error: null` deliberately. A Goal Run
+  # that reports an error is described by that error, not by its lifecycle
+  # state, so these never pre-empt the entries above or the unmappable error
+  # codes below.
+  - id: rest.goal_runs.completed
+    surface: rest.goal_runs
+    match:
+      status: completed
+      error: null
+    outcome: completed
+    documented: true
+    source: >-
+      GoalRunStatus enum, calle.openapi.yaml v0.6.0. `completed` is the terminal
+      telephone-execution state. Result materialisation may still be pending,
+      which is a statement about the result payload and not about the call.
+
+  - id: rest.goal_runs.status_canceled
+    surface: rest.goal_runs
+    match:
+      status: canceled
+      error: null
+    outcome: cancelled
+    documented: true
+    source: "GoalRunStatus enum, calle.openapi.yaml v0.6.0"
 
 # ---------------------------------------------------------------------------
 # Unmappable: values that ARE published but carry no documented outcome
@@ -171,7 +200,7 @@ unmappable:
   - id: rest.goal_runs.call_failed
     surface: rest.goal_runs
     match:
-      code: call_failed
+      error.code: call_failed
     reason: ambiguous_documented_code
     note: >-
       Documented as a generic call failure. The contract does not state whether
@@ -183,7 +212,7 @@ unmappable:
   - id: rest.goal_runs.timed_out
     surface: rest.goal_runs
     match:
-      code: timed_out
+      error.code: timed_out
     reason: ambiguous_documented_code
     note: >-
       Documented, but the contract does not state whether the timeout occurred
@@ -193,7 +222,7 @@ unmappable:
   - id: rest.goal_runs.result_invalid
     surface: rest.goal_runs
     match:
-      code: result_invalid
+      error.code: result_invalid
     reason: result_error_not_call_outcome
     note: >-
       Describes the goal-run result payload, not how the call itself ended.
@@ -202,7 +231,7 @@ unmappable:
   - id: rest.goal_runs.result_unavailable
     surface: rest.goal_runs
     match:
-      code: result_unavailable
+      error.code: result_unavailable
     reason: result_error_not_call_outcome
     note: >-
       Describes the goal-run result payload, not how the call itself ended.
@@ -211,7 +240,7 @@ unmappable:
   - id: rest.goal_runs.result_failed
     surface: rest.goal_runs
     match:
-      code: result_failed
+      error.code: result_failed
     reason: result_error_not_call_outcome
     note: >-
       Describes the goal-run result payload, not how the call itself ended.
@@ -225,7 +254,16 @@ unmappable:
 # have matched. Guards encode contradictions that are visible in the payload
 # itself; they never infer intent.
 #
-# Supported predicates: `equals`, `in`, `absent`, `absent_or_empty`.
+# Supported predicates: `equals`, `in`, `absent`, `absent_or_empty`,
+# `equals_field`. `equals_field` compares two paths pairwise inside the same
+# repeated node, so one attempt's `started_at` is never compared to another
+# attempt's `completed_at`; the loader rejects operands from different scopes.
+# A pair of absent or null values never satisfies it — a queued attempt has
+# neither timestamp, and that is not evidence of anything.
+#
+# A guard fires on the FIRST match, so several narrow guards are preferable to
+# one wide clause list: each states one contradiction and names it in the
+# decision trail.
 # ---------------------------------------------------------------------------
 consistency_guards:
   - id: guard.declined_without_media
@@ -233,27 +271,75 @@ consistency_guards:
     when:
       - field: status
         equals: DECLINED
-      - field: duration_seconds
-        equals: 0
+      - field: started_at
+        equals_field: ended_at
+      - field: transcript
+        absent_or_empty: true
     reason: inconsistent_payload
+    source: >-
+      apps/shared/fake-mcp-broker-server.mjs and extract_server_duration in
+      apps/python/batch-runner/client.py (observed client behaviour in this
+      repository, not a published contract — this surface has none)
     note: >-
-      A zero-duration DECLINED carries no evidence that a person heard the call
-      and refused it. It is indistinguishable from a pre-media transport
-      failure, so it is not resolved to `declined`.
+      A DECLINED that began and ended at the same instant, with no transcript,
+      carries no evidence that a person heard the call and refused it. It is
+      indistinguishable from a pre-media transport failure, so it is not
+      resolved to `declined`.
     issue_ref: 82
 
-  - id: guard.completed_without_duration
+  - id: guard.declined_without_elapsed_time
+    surface: mcp.get_call_run
+    when:
+      - field: status
+        equals: DECLINED
+      - field: duration_seconds
+        equals: 0
+      - field: transcript
+        absent_or_empty: true
+    reason: inconsistent_payload
+    source: >-
+      apps/shared/fake-mcp-broker-server.mjs and extract_server_duration in
+      apps/python/batch-runner/client.py (observed client behaviour in this
+      repository, not a published contract — this surface has none)
+    note: >-
+      The same contradiction as guard.declined_without_media, for a payload
+      that reports elapsed time as a duration rather than as timestamps. Both
+      forms are observed in this repository and neither is published, so both
+      are checked.
+    issue_ref: 82
+
+  - id: guard.completed_without_completion_time
     surface: rest.calls
     when:
       - field: status
         equals: completed
-      - field: duration_seconds
-        equals: 0
+      - field: completed_at
+        absent_or_empty: true
     reason: inconsistent_payload
+    source: "CallStatus and CallTask.completed_at, calle.openapi.yaml v0.6.0"
     note: >-
-      A completed call with zero duration contradicts itself. The contract
-      states terminal states are published only after the post-call outcome is
-      available, so a zero-duration completion is not treated as a completion.
+      A completed call with no completion timestamp contradicts itself. The
+      contract states terminal states are published only after the post-call
+      outcome is available, and that `completed_at` is null only while queued
+      or in progress.
+    issue_ref: 82
+
+  - id: guard.completed_without_media
+    surface: rest.calls
+    when:
+      - field: status
+        equals: completed
+      - field: recipients[].attempts[].started_at
+        equals_field: recipients[].attempts[].completed_at
+      - field: recipients[].attempts[].transcript_turns
+        absent_or_empty: true
+    reason: inconsistent_payload
+    source: "CallTaskAttempt.started_at/completed_at/transcript_turns, calle.openapi.yaml v0.6.0"
+    note: >-
+      A completed call whose every attempt began and ended at the same instant
+      with no transcript established no media. The completion contradicts the
+      evidence, so it is not treated as a completion. This is the Calls-surface
+      form of the pre-media failure that issue #82 reports as a callee decline.
     issue_ref: 82
 
 # ---------------------------------------------------------------------------

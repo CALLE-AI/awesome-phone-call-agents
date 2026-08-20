@@ -2,9 +2,10 @@
   "description": "Documented failed status carrying an undocumented failure_code (upstream issue #89).",
   "surface": "rest.calls",
   "recipient_phone": "+15550101234",
+  "started_at": "2026-08-06T12:00:00+00:00",
   "expected": {"outcome": "unresolved", "reason": "undocumented_failure_detail"},
   "sequence": [
-    {"payload": {"id": "call_reserved_fixture_unknown", "status": "in_progress", "failure_code": null}},
-    {"payload": {"id": "call_reserved_fixture_unknown", "status": "failed", "failure_code": "carrier_reject_42", "failure_message": "Carrier rejected the call.", "vendor_hint": "unrecognised-field-preserved"}}
+    {"payload": {"id": "call_reserved_fixture_unknown", "object": "call_task", "status": "in_progress", "task": "Confirm the appointment.", "recipients": [{"id": "rcp_1", "phones": ["+15550101234"], "locale": "en-US", "region": "US", "status": "in_progress", "structured_result": null, "summary": null, "attempts": [{"id": "att_1", "phone": "+15550101234", "status": "dialing", "started_at": "2026-08-06T12:00:04Z", "completed_at": null, "summary": null, "transcript_turns": [], "provider_call_id": null, "failure_code": null, "failure_message": null}]}], "structured_result": null, "summary": null, "task_completed": null, "completion_confidence": null, "evidence": [], "metadata": {}, "failure_code": null, "failure_message": null, "created_at": "2026-08-06T12:00:00Z", "completed_at": null}},
+    {"payload": {"id": "call_reserved_fixture_unknown", "object": "call_task", "status": "failed", "task": "Confirm the appointment.", "recipients": [{"id": "rcp_1", "phones": ["+15550101234"], "locale": "en-US", "region": "US", "status": "failed", "structured_result": null, "summary": null, "attempts": [{"id": "att_1", "phone": "+15550101234", "status": "failed", "started_at": "2026-08-06T12:00:04Z", "completed_at": "2026-08-06T12:00:06Z", "summary": null, "transcript_turns": [], "provider_call_id": "prov_3", "failure_code": "carrier_reject_42", "failure_message": "Carrier rejected the call."}]}], "structured_result": null, "summary": null, "task_completed": null, "completion_confidence": null, "evidence": [], "metadata": {}, "failure_code": "carrier_reject_42", "failure_message": "Carrier rejected the call.", "created_at": "2026-08-06T12:00:00Z", "completed_at": "2026-08-06T12:00:08Z", "vendor_hint": "unrecognised-field-preserved"}}
   ]
 }

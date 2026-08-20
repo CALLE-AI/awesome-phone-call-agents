@@ -48,10 +48,17 @@ host scheduler owns it.
 
 | Input | Required | Notes |
 | --- | --- | --- |
-| Call reference | Yes | An upstream identifier for a call that already exists. |
-| Surface | No | `rest.calls` (default) or `mcp.get_call_run`. |
+| Call reference | Yes | An upstream identifier for a call that already exists. On `rest.goal_runs` this is the `GoalRun.id`, not the nested telephone `run_id`. |
+| Surface | No | `rest.calls` (default), `rest.goal_runs`, or `mcp.get_call_run`. |
+| Base URL | No | Defaults to `https://api.heycall-e.com`. The API key is only ever sent there or to loopback; any other host is refused before the key is read. |
+| Goal id | Only on `rest.goal_runs` | Identifies the Goal the run belongs to. |
 | Budgets | No | Wall clock (default 900s) and observation count (default 60). |
 | Recipient E.164 | No | Used only to render a masked value in the record. |
+
+`declined` and `not_connected` are documented only on `rest.goal_runs`, because
+`GoalRunError.code` is the sole enumerated failure vocabulary CALL-E publishes.
+Reconciling a call on `rest.calls` can never produce them — that is a faithful
+reading of the contract, not a gap in this skill.
 
 ## Output
 

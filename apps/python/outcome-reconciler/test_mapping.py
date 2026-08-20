@@ -143,6 +143,97 @@ def test_loader_refuses_an_unsupported_guard_predicate(raw_table: dict) -> None:
         OutcomeMap(broken)
 
 
+# -- field paths ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path,payload,expected",
+    [
+        ("status", {"status": "completed"}, ["completed"]),
+        ("status", {}, []),
+        ("error.code", {"error": {"code": "no_answer"}}, ["no_answer"]),
+        ("error.code", {"error": None}, []),
+        ("error.code", {}, []),
+        ("a[].b", {"a": [{"b": 1}, {"b": 2}]}, [1, 2]),
+        ("a[].b", {"a": []}, []),
+        ("a[].b", {"a": "not a list"}, []),
+        ("a.b", {"a": "not a mapping"}, []),
+        ("x[].y[].z", {"x": [{"y": [{"z": 1}, {"z": 2}]}, {"y": [{"z": 3}]}]}, [1, 2, 3]),
+    ],
+)
+def test_path_resolution_is_total(path: str, payload: dict, expected: list) -> None:
+    """An unexpected payload shape yields no values rather than raising."""
+    from mapping import _resolve_path
+
+    assert _resolve_path(payload, path) == expected
+
+
+def test_a_fan_out_path_must_hold_for_every_resolved_value(outcome_map: OutcomeMap) -> None:
+    from mapping import _predicate_holds
+
+    clause = {"field": "a[].b", "equals": 1}
+    assert _predicate_holds(clause, {"a": [{"b": 1}, {"b": 1}]}) is True
+    assert _predicate_holds(clause, {"a": [{"b": 1}, {"b": 2}]}) is False
+    assert _predicate_holds(clause, {"a": []}) is False
+
+
+def test_equals_field_compares_within_one_node_not_across_siblings() -> None:
+    """Attempt A's started_at must never be compared to attempt B's completed_at."""
+    from mapping import _predicate_holds
+
+    clause = {"field": "a[].start", "equals_field": "a[].end"}
+    assert _predicate_holds(clause, {"a": [{"start": "t1", "end": "t1"}]}) is True
+    assert _predicate_holds(clause, {"a": [{"start": "t1", "end": "t2"}]}) is False
+    # Were the two paths resolved independently and zipped, this would compare
+    # t1 with t2 and t2 with t1 and wrongly report a match on neither.
+    assert (
+        _predicate_holds(
+            clause, {"a": [{"start": "t1", "end": "t2"}, {"start": "t2", "end": "t1"}]}
+        )
+        is False
+    )
+
+
+def test_equals_field_is_not_satisfied_by_two_absent_or_null_values() -> None:
+    """A queued attempt has neither timestamp; that is not evidence of anything."""
+    from mapping import _predicate_holds
+
+    clause = {"field": "started_at", "equals_field": "ended_at"}
+    assert _predicate_holds(clause, {"started_at": None, "ended_at": None}) is False
+    assert _predicate_holds(clause, {}) is False
+    assert _predicate_holds(clause, {"started_at": "t", "ended_at": "t"}) is True
+
+
+def test_loader_refuses_equals_field_operands_from_different_scopes(raw_table: dict) -> None:
+    broken = copy.deepcopy(raw_table)
+    broken["consistency_guards"][0]["when"] = [
+        {"field": "recipients[].attempts[].started_at", "equals_field": "recipients[].completed_at"}
+    ]
+    with pytest.raises(MappingError, match="must share a scope"):
+        OutcomeMap(broken)
+
+
+def test_loader_refuses_a_malformed_field_path(raw_table: dict) -> None:
+    broken = copy.deepcopy(raw_table)
+    broken["consistency_guards"][0]["when"] = [{"field": "recipients[].", "equals": "x"}]
+    with pytest.raises(MappingError, match="malformed field path"):
+        OutcomeMap(broken)
+
+
+def test_loader_requires_a_source_for_a_guard_on_an_undocumented_surface(raw_table: dict) -> None:
+    """An undocumented surface has no contract, so the fields a guard reads must be cited."""
+    broken = copy.deepcopy(raw_table)
+    undocumented = [
+        guard
+        for guard in broken["consistency_guards"]
+        if not broken["surfaces"][guard["surface"]].get("documented")
+    ]
+    assert undocumented, "the table must exercise this rule"
+    del undocumented[0]["source"]
+    with pytest.raises(MappingError, match="must cite a source"):
+        OutcomeMap(broken)
+
+
 def test_loader_refuses_an_unknown_schema_version(raw_table: dict) -> None:
     broken = copy.deepcopy(raw_table)
     broken["schema_version"] = 99

@@ -27,7 +27,7 @@ from record import MAPPABLE_OUTCOMES, UNRESOLVED_REASONS
 DEFAULT_MAP_FILENAME = "outcome-code-map.yaml"
 MAP_PATH_ENV_VAR = "CALLE_OUTCOME_MAP"
 SUPPORTED_SCHEMA_VERSION = 1
-SUPPORTED_PREDICATES = ("equals", "in", "absent", "absent_or_empty")
+SUPPORTED_PREDICATES = ("equals", "in", "absent", "absent_or_empty", "equals_field")
 
 
 class MappingError(Exception):
@@ -79,6 +79,7 @@ class Guard:
     when: tuple[Mapping[str, Any], ...]
     reason: str
     note: str
+    source: str | None = None
     issue_ref: int | None = None
 
 
@@ -101,28 +102,128 @@ def _require(condition: bool, message: str) -> None:
         raise MappingError(message)
 
 
+# ---------------------------------------------------------------------------
+# Field paths
+#
+# A path is dot-separated. A segment ending in `[]` descends into a list and
+# fans out over its elements, so `recipients[].attempts[].started_at` reaches
+# every attempt on a CallTask. A path with no `[]` resolves to zero or one
+# value and behaves exactly like a plain top-level key.
+#
+# Resolution is total: a missing branch contributes nothing rather than
+# raising, so an unexpected payload shape can never make a rule throw.
+# ---------------------------------------------------------------------------
+
+
+def _validate_path(path: Any, context: str) -> str:
+    _require(
+        isinstance(path, str) and bool(path),
+        f"{context} must name a non-empty field path",
+    )
+    for segment in path.split("."):
+        name = segment[:-2] if segment.endswith("[]") else segment
+        _require(
+            bool(name) and "[" not in name and "]" not in name,
+            f"{context} has a malformed field path {path!r}; "
+            "segments are dot-separated and `[]` may only end a segment",
+        )
+    return path
+
+
+def _resolve_path(payload: Any, path: str) -> list[Any]:
+    """Every value reachable at `path`. Missing branches contribute nothing."""
+    current: list[Any] = [payload]
+    for segment in path.split("."):
+        fans_out = segment.endswith("[]")
+        key = segment[:-2] if fans_out else segment
+        following: list[Any] = []
+        for node in current:
+            if not isinstance(node, Mapping) or key not in node:
+                continue
+            value = node[key]
+            if not fans_out:
+                following.append(value)
+            elif isinstance(value, (list, tuple)):
+                following.extend(value)
+        current = following
+    return current
+
+
+def _split_scope(path: str) -> tuple[str, str]:
+    """Split a path at its last fan-out segment.
+
+    Returns `(scope, remainder)`. The scope selects the repeated nodes a
+    cross-field comparison must stay inside; the remainder is resolved against
+    each of them. `recipients[].attempts[].started_at` splits into
+    `recipients[].attempts[]` and `started_at`.
+    """
+    segments = path.split(".")
+    last_fan_out = -1
+    for index, segment in enumerate(segments):
+        if segment.endswith("[]"):
+            last_fan_out = index
+    return ".".join(segments[: last_fan_out + 1]), ".".join(segments[last_fan_out + 1 :])
+
+
+def _is_empty(value: Any) -> bool:
+    return value is None or value == "" or value == [] or value == {}
+
+
 def _matches(match: Mapping[str, Any], payload: Mapping[str, Any]) -> bool:
-    """Every declared key must be present and equal. No partial or fuzzy match."""
-    for key, expected in match.items():
-        if key not in payload:
+    """Every declared path must resolve and every resolved value must be equal.
+
+    No partial or fuzzy match. A path that resolves to nothing never matches,
+    so an unknown key can never fall through to a default.
+    """
+    for path, expected in match.items():
+        values = _resolve_path(payload, path)
+        if not values:
             return False
-        if payload[key] != expected:
+        if any(value != expected for value in values):
+            return False
+    return True
+
+
+def _equals_field_holds(left_path: str, right_path: str, payload: Mapping[str, Any]) -> bool:
+    """Compare two paths pairwise, never across sibling nodes.
+
+    Both paths share a scope (the loader enforces it), so attempt A's
+    `started_at` is only ever compared to attempt A's `completed_at`. Every
+    scoped node must satisfy the comparison, and a pair of absent or null
+    values never does — a queued attempt has neither timestamp, and that is
+    not evidence of anything.
+    """
+    scope, left_remainder = _split_scope(left_path)
+    _, right_remainder = _split_scope(right_path)
+    nodes = _resolve_path(payload, scope) if scope else [payload]
+    if not nodes:
+        return False
+    for node in nodes:
+        left = _resolve_path(node, left_remainder)
+        right = _resolve_path(node, right_remainder)
+        if not left or not right or len(left) != len(right):
+            return False
+        if any(value is None for value in left + right):
+            return False
+        if any(one != other for one, other in zip(left, right)):
             return False
     return True
 
 
 def _predicate_holds(clause: Mapping[str, Any], payload: Mapping[str, Any]) -> bool:
-    field_name = clause["field"]
-    present = field_name in payload
-    value = payload.get(field_name)
+    path = clause["field"]
+    if "equals_field" in clause:
+        return _equals_field_holds(path, clause["equals_field"], payload)
+    values = _resolve_path(payload, path)
+    present = bool(values)
     if "equals" in clause:
-        return present and value == clause["equals"]
+        return present and all(value == clause["equals"] for value in values)
     if "in" in clause:
-        return present and value in clause["in"]
+        return present and all(value in clause["in"] for value in values)
     if "absent" in clause:
         return (not present) == bool(clause["absent"])
     if "absent_or_empty" in clause:
-        empty = (not present) or value in (None, "", [], {})
+        empty = (not present) or all(_is_empty(value) for value in values)
         return empty == bool(clause["absent_or_empty"])
     return False
 
@@ -177,6 +278,7 @@ class OutcomeMap:
                 isinstance(status_field, str) and bool(status_field),
                 f"Surface {name!r} must declare a status_field",
             )
+            _validate_path(status_field, f"Surface {name!r} status_field")
             self.surfaces[name] = Surface(
                 name=name,
                 title=str(body.get("title", name)),
@@ -221,6 +323,8 @@ class OutcomeMap:
                 isinstance(match, dict) and bool(match),
                 f"Entry {entry_id} must declare a non-empty match block",
             )
+            for path in match:
+                _validate_path(path, f"Entry {entry_id} match key")
             source = item.get("source")
             _require(
                 isinstance(source, str) and bool(source),
@@ -248,6 +352,8 @@ class OutcomeMap:
                 isinstance(match, dict) and bool(match),
                 f"Unmappable item {item_id} must declare a non-empty match block",
             )
+            for path in match:
+                _validate_path(path, f"Unmappable item {item_id} match key")
             self.unmappable.append(
                 Unmappable(
                     id=item_id,
@@ -281,12 +387,31 @@ class OutcomeMap:
             for clause in clauses:
                 _require(isinstance(clause, dict), f"Guard {guard_id} has a malformed clause")
                 _require("field" in clause, f"Guard {guard_id} has a clause without a field")
+                field_path = _validate_path(clause["field"], f"Guard {guard_id} clause field")
                 used = [p for p in SUPPORTED_PREDICATES if p in clause]
                 _require(
                     len(used) == 1,
                     f"Guard {guard_id} clause on {clause.get('field')!r} must use exactly one of "
                     f"{', '.join(SUPPORTED_PREDICATES)}",
                 )
+                if used == ["equals_field"]:
+                    other_path = _validate_path(
+                        clause["equals_field"], f"Guard {guard_id} clause equals_field"
+                    )
+                    # A cross-field comparison is only meaningful inside one
+                    # node. Sharing a scope is what stops attempt A's
+                    # started_at being compared to attempt B's completed_at.
+                    _require(
+                        _split_scope(field_path)[0] == _split_scope(other_path)[0],
+                        f"Guard {guard_id} compares {field_path!r} with {other_path!r}, which sit "
+                        "in different repeated nodes; equals_field operands must share a scope",
+                    )
+            source = item.get("source")
+            _require(
+                self.surfaces[surface].documented or (isinstance(source, str) and bool(source)),
+                f"Guard {guard_id} fires on undocumented surface {surface} and must cite a source "
+                "for the fields it reads",
+            )
             self.guards.append(
                 Guard(
                     id=guard_id,
@@ -294,6 +419,7 @@ class OutcomeMap:
                     when=tuple(dict(c) for c in clauses),
                     reason=reason,
                     note=str(item.get("note", "")),
+                    source=source,
                     issue_ref=item.get("issue_ref"),
                 )
             )
@@ -307,8 +433,10 @@ class OutcomeMap:
         declared = self.surfaces.get(surface)
         if declared is None:
             return None
-        value = payload.get(declared.status_field)
-        return value if isinstance(value, str) else None
+        values = _resolve_path(payload, declared.status_field)
+        if len(values) != 1:
+            return None
+        return values[0] if isinstance(values[0], str) else None
 
     def is_terminal(self, surface: str, payload: Mapping[str, Any]) -> bool:
         """Whether polling should stop. Operational only, not a semantic claim."""

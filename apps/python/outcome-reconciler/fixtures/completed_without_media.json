@@ -1,0 +1,11 @@
+{
+  "description": "A completed CallTask whose only attempt established no media: it began and ended at the same instant with no transcript (upstream issue #82, Calls-surface form).",
+  "surface": "rest.calls",
+  "recipient_phone": "+15550101234",
+  "started_at": "2026-08-06T14:00:00+00:00",
+  "expected": {"outcome": "unresolved", "reason": "inconsistent_payload"},
+  "sequence": [
+    {"payload": {"id": "call_reserved_fixture_nomedia", "object": "call_task", "status": "in_progress", "task": "Ask whether the invoice was received.", "recipients": [{"id": "rcp_1", "phones": ["+15550101234"], "locale": "en-US", "region": "US", "status": "in_progress", "structured_result": null, "summary": null, "attempts": []}], "structured_result": null, "summary": null, "task_completed": null, "completion_confidence": null, "evidence": [], "metadata": {}, "failure_code": null, "failure_message": null, "created_at": "2026-08-06T14:00:00Z", "completed_at": null}},
+    {"payload": {"id": "call_reserved_fixture_nomedia", "object": "call_task", "status": "completed", "task": "Ask whether the invoice was received.", "recipients": [{"id": "rcp_1", "phones": ["+15550101234"], "locale": "en-US", "region": "US", "status": "completed", "structured_result": null, "summary": null, "attempts": [{"id": "att_1", "phone": "+15550101234", "status": "completed", "started_at": "2026-08-06T14:00:09Z", "completed_at": "2026-08-06T14:00:09Z", "summary": null, "transcript_turns": [], "provider_call_id": "prov_7", "failure_code": null, "failure_message": null}]}], "structured_result": null, "summary": null, "task_completed": null, "completion_confidence": null, "evidence": [], "metadata": {}, "failure_code": null, "failure_message": null, "created_at": "2026-08-06T14:00:00Z", "completed_at": "2026-08-06T14:00:11Z"}}
+  ]
+}

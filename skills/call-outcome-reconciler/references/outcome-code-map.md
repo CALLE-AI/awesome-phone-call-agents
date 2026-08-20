@@ -25,8 +25,31 @@ another, which is exactly the invention this layer refuses to do.
 | Surface | Status field | Documented upstream |
 | --- | --- | --- |
 | `rest.calls` | `status` | Yes. `CallStatus` is a five-value enum in the v0.6.0 OpenAPI contract. |
-| `rest.goal_runs` | `code` | Yes. `GoalRunError.code` is an eight-value enum. |
+| `rest.goal_runs` | `status` | Yes. `GoalRunStatus` is a five-value lifecycle enum; `GoalRunError.code` is an eight-value failure enum. |
 | `mcp.get_call_run` | `status` | No. Uppercase values that appear in neither the OpenAPI contract nor the documentation site. |
+
+On `rest.goal_runs` the observed payload is a whole `GoalRun`, preserved
+verbatim. Polling follows `GoalRunStatus`, and meaning is read from the nested
+`error.code`. The two are deliberately kept apart: an error code is not a
+lifecycle state and never governed when to stop polling.
+
+## Field paths
+
+`status_field`, every `match` key and every guard `field` is a dot-separated
+path into the observed payload. A segment ending in `[]` descends into a list
+and fans out over its elements, and the rule must then hold for **all** of them.
+A path with no `[]` behaves exactly like a plain top-level key.
+
+| Path | Reaches |
+| --- | --- |
+| `status` | the top-level status field |
+| `error.code` | `GoalRunError.code` on a `GoalRun` |
+| `recipients[].attempts[].transcript_turns` | every attempt on a `CallTask` |
+
+Resolution is total: a missing branch contributes nothing rather than raising,
+so an unexpected payload shape can never make a rule throw. A path that resolves
+to nothing never matches, so an unknown key still cannot fall through to a
+default.
 
 ## The two tiers
 
@@ -39,9 +62,15 @@ belong in the second tier.
 | --- | --- | --- |
 | `rest.calls.completed` | `status: completed` | `completed` |
 | `rest.calls.canceled` | `status: canceled` | `cancelled` |
-| `rest.goal_runs.no_answer` | `code: no_answer` | `not_connected` |
-| `rest.goal_runs.declined` | `code: declined` | `declined` |
-| `rest.goal_runs.canceled` | `code: canceled` | `cancelled` |
+| `rest.goal_runs.no_answer` | `error.code: no_answer` | `not_connected` |
+| `rest.goal_runs.declined` | `error.code: declined` | `declined` |
+| `rest.goal_runs.canceled` | `error.code: canceled` | `cancelled` |
+| `rest.goal_runs.completed` | `status: completed` **and** `error: null` | `completed` |
+| `rest.goal_runs.status_canceled` | `status: canceled` **and** `error: null` | `cancelled` |
+
+The last two carry `error: null` deliberately. A Goal Run that reports an error
+is described by that error, not by its lifecycle state, so they never pre-empt
+the error-code entries above or the unmappable error codes below.
 
 **`unmappable`** records values that are published but carry no documented
 outcome meaning. These never produce a semantic outcome. They exist so the
@@ -51,11 +80,11 @@ generic miss.
 | Item id | Match | Resolves to |
 | --- | --- | --- |
 | `rest.calls.failed` | `status: failed` | `unresolved` / `undocumented_failure_detail` |
-| `rest.goal_runs.call_failed` | `code: call_failed` | `unresolved` / `ambiguous_documented_code` |
-| `rest.goal_runs.timed_out` | `code: timed_out` | `unresolved` / `ambiguous_documented_code` |
-| `rest.goal_runs.result_invalid` | `code: result_invalid` | `unresolved` / `result_error_not_call_outcome` |
-| `rest.goal_runs.result_unavailable` | `code: result_unavailable` | `unresolved` / `result_error_not_call_outcome` |
-| `rest.goal_runs.result_failed` | `code: result_failed` | `unresolved` / `result_error_not_call_outcome` |
+| `rest.goal_runs.call_failed` | `error.code: call_failed` | `unresolved` / `ambiguous_documented_code` |
+| `rest.goal_runs.timed_out` | `error.code: timed_out` | `unresolved` / `ambiguous_documented_code` |
+| `rest.goal_runs.result_invalid` | `error.code: result_invalid` | `unresolved` / `result_error_not_call_outcome` |
+| `rest.goal_runs.result_unavailable` | `error.code: result_unavailable` | `unresolved` / `result_error_not_call_outcome` |
+| `rest.goal_runs.result_failed` | `error.code: result_failed` | `unresolved` / `result_error_not_call_outcome` |
 
 ## Consistency guards
 
@@ -64,13 +93,33 @@ A guard fires before mapping. When it matches, the observation resolves to
 matched. Guards encode contradictions visible in the payload itself; they never
 infer intent.
 
-| Guard id | Fires when | Resolves to |
-| --- | --- | --- |
-| `guard.declined_without_media` | `mcp.get_call_run` reports `DECLINED` with `duration_seconds: 0` | `unresolved` / `inconsistent_payload` |
-| `guard.completed_without_duration` | `rest.calls` reports `completed` with `duration_seconds: 0` | `unresolved` / `inconsistent_payload` |
+| Guard id | Surface | Fires when | Resolves to |
+| --- | --- | --- | --- |
+| `guard.declined_without_media` | `mcp.get_call_run` | `DECLINED`, `started_at` equals `ended_at`, no `transcript` | `unresolved` / `inconsistent_payload` |
+| `guard.declined_without_elapsed_time` | `mcp.get_call_run` | `DECLINED`, `duration_seconds: 0`, no `transcript` | `unresolved` / `inconsistent_payload` |
+| `guard.completed_without_completion_time` | `rest.calls` | `completed` with no `completed_at` | `unresolved` / `inconsistent_payload` |
+| `guard.completed_without_media` | `rest.calls` | `completed`, but every attempt has `started_at == completed_at` and empty `transcript_turns` | `unresolved` / `inconsistent_payload` |
 
-Supported predicates are `equals`, `in`, `absent`, and `absent_or_empty`. The
-loader rejects any other predicate, which keeps guards declarative and auditable.
+Guards fire on the **first** match, so several narrow guards are preferable to
+one wide clause list: each states one contradiction and names it in the decision
+trail. The two `DECLINED` guards are the same contradiction in the two forms
+this repository has observed the MCP surface report elapsed time.
+
+Supported predicates are `equals`, `in`, `absent`, `absent_or_empty`, and
+`equals_field`. The loader rejects any other predicate, which keeps guards
+declarative and auditable.
+
+`equals_field` compares two paths pairwise **inside the same repeated node**, so
+one attempt's `started_at` is never compared to another attempt's
+`completed_at`; the loader rejects operands drawn from different scopes. A pair
+of absent or null values never satisfies it, because a queued attempt has
+neither timestamp and that is not evidence of anything.
+
+A guard on an undocumented surface must cite a `source` for the fields it reads.
+The MCP guards cite `apps/shared/fake-mcp-broker-server.mjs` and
+`extract_server_duration` in `apps/python/batch-runner/client.py` — observed
+client behaviour in this repository, not a published contract, because this
+surface has none.
 
 ## Terminality is operational, not semantic
 

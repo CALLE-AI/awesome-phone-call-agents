@@ -217,3 +217,172 @@ def test_jitter_stays_within_its_declared_ratio() -> None:
 def test_invalid_policies_are_rejected(kwargs: dict) -> None:
     with pytest.raises(ValueError):
         PollingPolicy(**kwargs)
+
+
+# -- transport error classification -----------------------------------------
+
+
+def rest_client(monkeypatch: pytest.MonkeyPatch, error: Exception) -> "RestStatusClient":
+    from clients import REST_API_KEY_ENV_VAR, RestStatusClient
+    import urllib.request
+
+    monkeypatch.setenv(REST_API_KEY_ENV_VAR, "fake-status-token")
+
+    def refuse(*_args: Any, **_kwargs: Any) -> None:
+        raise error
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    return RestStatusClient(base_url="http://127.0.0.1:1")
+
+
+def test_a_read_timeout_is_a_plan_timeout_not_a_transport_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = rest_client(monkeypatch, TimeoutError("timed out"))
+    with pytest.raises(PlanTimeoutError):
+        client.fetch("call_x")
+
+
+def test_a_connect_timeout_wrapped_in_urlerror_is_still_a_plan_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """urllib wraps connect-phase timeouts, and socket.timeout is TimeoutError.
+
+    Classified as a transport error, a real request timeout would be reported
+    as an exhausted budget — the distinction this layer exists to draw.
+    """
+    import urllib.error
+
+    client = rest_client(monkeypatch, urllib.error.URLError(TimeoutError("timed out")))
+    with pytest.raises(PlanTimeoutError):
+        client.fetch("call_x")
+
+
+def test_a_genuine_network_error_stays_a_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import urllib.error
+
+    client = rest_client(monkeypatch, urllib.error.URLError(ConnectionRefusedError("refused")))
+    with pytest.raises(TransportError):
+        client.fetch("call_x")
+
+
+def test_an_auth_rejection_is_not_a_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import urllib.error
+
+    client = rest_client(
+        monkeypatch, urllib.error.HTTPError("http://x", 401, "Unauthorized", {}, None)
+    )
+    with pytest.raises(AuthUnavailableError):
+        client.fetch("call_x")
+
+
+def test_the_documented_host_is_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    from clients import DEFAULT_BASE_URL, REST_BASE_URL_ENV_VAR, resolve_base_url
+
+    monkeypatch.delenv(REST_BASE_URL_ENV_VAR, raising=False)
+    assert resolve_base_url(None) == DEFAULT_BASE_URL
+    assert resolve_base_url("https://api.heycall-e.com/") == DEFAULT_BASE_URL
+
+
+def test_the_base_url_can_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    from clients import REST_BASE_URL_ENV_VAR, resolve_base_url
+
+    monkeypatch.setenv(REST_BASE_URL_ENV_VAR, "http://127.0.0.1:8080")
+    assert resolve_base_url(None) == "http://127.0.0.1:8080"
+    assert resolve_base_url("http://localhost:9000") == "http://localhost:9000"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://api.heycall-e.com.attacker.example",  # suffix, not the host
+        "https://notapi.heycall-e.com",
+        "http://api.heycall-e.com",  # unencrypted
+        "https://api.heycall-e.com:4443",  # unexpected port
+        "https://api.heycall-e.com/v1",  # path
+        "https://api.heycall-e.com?x=1",  # query
+        "https://user:pw@api.heycall-e.com",  # embedded credentials
+        "https://evil.example",
+        "http://192.168.1.5:8080",  # not loopback
+        "http://localhost",  # loopback needs an explicit port
+        "api.heycall-e.com",  # not a URL
+        "",
+    ],
+)
+def test_the_api_key_is_never_sent_to_an_untrusted_host(base_url: str) -> None:
+    """https alone proves the transport, not who answers. The host must be exact.
+
+    This runs before the key is read: a warning would be useless, because by the
+    time anyone saw it the credential would already have left.
+    """
+    from clients import ConfigurationError, validate_base_url
+
+    with pytest.raises(ConfigurationError, match="not a host this app trusts"):
+        validate_base_url(base_url)
+
+
+@pytest.mark.parametrize(
+    "base_url,expected",
+    [
+        ("https://api.heycall-e.com", "https://api.heycall-e.com"),
+        ("https://api.heycall-e.com:443", "https://api.heycall-e.com"),
+        ("https://API.HeyCall-E.com", "https://api.heycall-e.com"),
+        ("http://127.0.0.1:52229", "http://127.0.0.1:52229"),
+        ("http://localhost:8080/", "http://localhost:8080"),
+    ],
+)
+def test_trusted_hosts_are_accepted_and_normalised(base_url: str, expected: str) -> None:
+    from clients import validate_base_url
+
+    assert validate_base_url(base_url) == expected
+
+
+# -- permanent vs retryable upstream errors ---------------------------------
+#
+# The poller retries TransportError within budget. Anything permanent must not
+# go down that path: on a metered API, retrying a 404 sixty times spends the
+# caller's quota to be told the same thing sixty times.
+
+
+@pytest.mark.parametrize("code", [400, 404, 405, 410, 422])
+def test_a_permanent_http_error_is_not_retried(
+    monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    import urllib.error
+
+    from clients import UpstreamRequestError
+
+    client = rest_client(monkeypatch, urllib.error.HTTPError("http://x", code, "no", {}, None))
+    with pytest.raises(UpstreamRequestError):
+        client.fetch("call_x")
+
+
+@pytest.mark.parametrize("code", [408, 429, 500, 502, 503])
+def test_a_transient_http_error_is_still_retryable(
+    monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    import urllib.error
+
+    client = rest_client(monkeypatch, urllib.error.HTTPError("http://x", code, "no", {}, None))
+    with pytest.raises(TransportError):
+        client.fetch("call_x")
+
+
+def test_a_missing_reference_stops_the_run_rather_than_burning_the_budget(
+    monkeypatch: pytest.MonkeyPatch, outcome_map: OutcomeMap
+) -> None:
+    """A 404 must escape poll(), not be absorbed as one more failed observation."""
+    import urllib.error
+
+    from clients import UpstreamRequestError
+
+    client = rest_client(monkeypatch, urllib.error.HTTPError("http://x", 404, "no", {}, None))
+    with pytest.raises(UpstreamRequestError, match="no record of"):
+        poll(
+            "call_typo",
+            client,
+            outcome_map,
+            PollingPolicy(max_wall_clock_seconds=60, max_observations=60),
+            clock=StepClock(),
+            sleep=lambda _s: None,
+        )

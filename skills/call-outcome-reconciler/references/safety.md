@@ -39,6 +39,12 @@ the masked recipient and never the raw payload.
   cache written by `@call-e/cli`. They are never logged, printed, or persisted
   by this skill.
 * Never ask a user to paste a token into chat.
+* `CALLE_API_KEY` is only ever sent to `https://api.heycall-e.com` or to
+  loopback. The base URL is checked **before the key is read**, so a mistyped or
+  hostile host cannot leak it — by the time a warning could be read, the
+  credential would already have left. Host matching is exact: a suffix like
+  `api.heycall-e.com.attacker.example` is refused, and https alone is not
+  accepted as trust, because it attests the transport and not who answers.
 * Authentication is re-checked before every poll cycle, since a token can expire
   mid-poll.
 * The default test suite uses a local fake server and requires no credentials at

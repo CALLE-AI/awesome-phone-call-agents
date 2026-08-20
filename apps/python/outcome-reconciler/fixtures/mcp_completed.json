@@ -1,9 +1,10 @@
 {
-  "description": "Terminal MCP status with no published contract; never translated into a semantic outcome.",
+  "description": "Terminal MCP status with no published contract; never translated into a semantic outcome. Field names follow apps/shared/fake-mcp-broker-server.mjs.",
   "surface": "mcp.get_call_run",
   "recipient_phone": "+15550101234",
+  "started_at": "2026-08-06T17:00:00+00:00",
   "expected": {"outcome": "unresolved", "reason": "undocumented_code"},
   "sequence": [
-    {"payload": {"run_id": "run_reserved_fixture_mcp", "status": "COMPLETED", "duration_seconds": 31, "summary": "Recipient confirmed."}}
+    {"payload": {"run_id": "run_reserved_fixture_mcp", "status": "COMPLETED", "duration_seconds": 31, "started_at": "2026-08-06T17:00:04Z", "ended_at": "2026-08-06T17:00:35Z", "post_summary": "Recipient confirmed.", "transcript": "[00:00:00] BOT: Hello. [00:00:06] USER: Confirmed.", "activity": [{"message": "Call completed.", "ts": "2026-08-06T17:00:35Z"}]}}
   ]
 }

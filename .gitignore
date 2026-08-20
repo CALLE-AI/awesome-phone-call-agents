@@ -18,6 +18,7 @@ build/
 logs/
 apps/**/results/
 _handoffs/
+HANDOFF.md
 .agents/
 .callback*/
 form-export.json
@@ -28,3 +29,9 @@ skills-lock.json
 **/.call-locks/
 docs/codex-implementation-plan.md
 docs/superpowers/
+
+# Outcome records embed the raw upstream payload verbatim — that is a core
+# guarantee of the reconciler, and it means a record from a live call contains
+# unmasked phone numbers and provider call ids. Never commit one. Fixtures live
+# under fixtures/ and use reserved example numbers only.
+apps/python/outcome-reconciler/*.json

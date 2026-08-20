@@ -1,9 +1,11 @@
 {
-  "description": "Documented no-answer on the Goal Runs error surface.",
+  "description": "Documented no-answer on the Goal Runs surface. A real GoalRun, per calle.openapi.yaml v0.6.0.",
   "surface": "rest.goal_runs",
   "recipient_phone": "+15550101234",
+  "started_at": "2026-08-06T15:00:00+00:00",
   "expected": {"outcome": "not_connected", "entry_id": "rest.goal_runs.no_answer"},
   "sequence": [
-    {"payload": {"code": "no_answer", "message": "The recipient did not answer.", "detail_code": null}}
+    {"payload": {"object": "goal_run", "id": "rgrp_reserved_fixture_noanswer", "goal_id": "goal_delivery_confirmation", "run_id": "run_reserved_fixture_noanswer", "run_spec": {"id": "rspec_1", "version": 3}, "status": "in_progress", "result": null, "error": null, "created_at": "2026-08-06T15:00:00Z", "completed_at": null}},
+    {"payload": {"object": "goal_run", "id": "rgrp_reserved_fixture_noanswer", "goal_id": "goal_delivery_confirmation", "run_id": "run_reserved_fixture_noanswer", "run_spec": {"id": "rspec_1", "version": 3}, "status": "failed", "result": null, "error": {"code": "no_answer", "message": "The recipient did not answer.", "detail_code": null}, "created_at": "2026-08-06T15:00:00Z", "completed_at": "2026-08-06T15:00:41Z"}}
   ]
 }

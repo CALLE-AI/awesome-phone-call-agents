@@ -18,15 +18,23 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Sequence
 
 from clients import (
+    DEFAULT_BASE_URL,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    REST_BASE_URL_ENV_VAR,
     AuthUnavailableError,
+    ConfigurationError,
+    GoalRunStatusClient,
     McpStatusClient,
     ReplayClient,
     RestStatusClient,
     StatusClient,
+    UpstreamRequestError,
+    resolve_base_url,
 )
 from mapping import MappingError, OutcomeMap, default_map_path
 from poller import DEFAULT_POLICY, PollingPolicy, poll
@@ -36,6 +44,9 @@ from record import mask_phone
 EXIT_OK = 0
 EXIT_UNRESOLVED = 2
 EXIT_ERROR = 1
+
+#: Base instant for a replayed record when the fixture does not name one.
+REPLAY_EPOCH = "2026-01-01T00:00:00+00:00"
 
 
 def _policy_from_args(args: argparse.Namespace) -> PollingPolicy:
@@ -54,14 +65,23 @@ def _build_client(args: argparse.Namespace) -> StatusClient:
             raise SystemExit("--dry-run requires --fixture; it never opens a network connection")
         return ReplayClient.from_fixture(Path(args.fixture))
     if args.surface == "mcp.get_call_run":
+        if not args.mcp_server_url:
+            raise ConfigurationError(
+                "Reading the mcp.get_call_run surface needs a server URL. Pass --mcp-server-url."
+            )
         return McpStatusClient(
             server_url=args.mcp_server_url,
             token_cache_path=Path(args.token_cache) if args.token_cache else None,
+            timeout_seconds=args.request_timeout,
         )
-    client = RestStatusClient()
-    if args.base_url:
-        client.base_url = args.base_url
-    return client
+    base_url = resolve_base_url(args.base_url)
+    if args.surface == "rest.goal_runs":
+        return GoalRunStatusClient(
+            base_url=base_url,
+            timeout_seconds=args.request_timeout,
+            goal_id=args.goal_id or "",
+        )
+    return RestStatusClient(base_url=base_url, timeout_seconds=args.request_timeout)
 
 
 def _emit(record_dict: dict[str, Any], output: Path | None) -> None:
@@ -89,6 +109,9 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     except AuthUnavailableError as exc:
         print(f"Authentication unavailable: {exc}", file=sys.stderr)
         return EXIT_ERROR
+    except UpstreamRequestError as exc:
+        print(f"Upstream refused the request: {exc}", file=sys.stderr)
+        return EXIT_ERROR
 
     record = reconcile(
         args.call_ref,
@@ -107,19 +130,21 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
 def cmd_replay(args: argparse.Namespace) -> int:
     outcome_map = OutcomeMap.load(Path(args.map) if args.map else None)
     client = ReplayClient.from_fixture(Path(args.fixture))
+    policy = _policy_from_args(args)
     result = poll(
         args.call_ref,
         client,
         outcome_map,
-        _policy_from_args(args),
+        policy,
         clock=_StepClock(),
         sleep=lambda _seconds: None,
+        timestamp=_StepTimestamp(client.started_at or REPLAY_EPOCH, policy),
     )
     record = reconcile(
         args.call_ref,
         result.observations,
         outcome_map,
-        recipient_phone=result.recipient_phone,
+        recipient_phone=result.recipient_phone or args.recipient,
         exhausted=result.exhausted,
         exhaustion_reason=result.exhaustion_reason,
     )
@@ -140,8 +165,54 @@ class _StepClock:
         return self._now
 
 
+class _StepTimestamp:
+    """Deterministic observation timestamps for a replay.
+
+    A replay never sleeps, so reading the wall clock would report a fixture
+    modelling a five-day stuck call as having elapsed a few microseconds. This
+    advances by the policy's un-jittered backoff instead, so `timing` in a
+    replayed record reads the way the same sequence would have read live.
+    """
+
+    def __init__(self, base: str, policy: PollingPolicy) -> None:
+        self._now = datetime.fromisoformat(base.replace("Z", "+00:00"))
+        self._policy = policy
+        self._delay = 0.0
+
+    def __call__(self) -> str:
+        self._now += timedelta(seconds=self._delay)
+        self._delay = (
+            self._policy.initial_backoff_seconds
+            if self._delay == 0.0
+            else min(self._delay * 2, self._policy.max_backoff_seconds)
+        )
+        return self._now.isoformat()
+
+
+def _load_record(path: Path) -> dict[str, Any]:
+    """Read an outcome record, refusing anything that is not one.
+
+    `explain` is the command people point at a file by hand, so a wrong path is
+    the most likely mistake it will ever see. It should say so rather than
+    raising from inside a dict lookup.
+    """
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ConfigurationError(f"{path} is not valid JSON: {exc}") from exc
+    if not isinstance(loaded, dict):
+        raise ConfigurationError(f"{path} is not an outcome record: expected a JSON object")
+    missing = [key for key in ("call_ref", "outcome", "mapping") if key not in loaded]
+    if missing:
+        raise ConfigurationError(
+            f"{path} is not an outcome record; it has no {', '.join(missing)}. "
+            "Produce one with `reconcile` or `replay` and its --output flag."
+        )
+    return loaded
+
+
 def cmd_explain(args: argparse.Namespace) -> int:
-    record_dict = json.loads(Path(args.record).read_text(encoding="utf-8"))
+    record_dict = _load_record(Path(args.record))
     mapping_trace = record_dict.get("mapping", {})
     timing = record_dict.get("timing", {})
     evidence = record_dict.get("evidence", {})
@@ -166,6 +237,20 @@ def cmd_explain(args: argparse.Namespace) -> int:
     for state in evidence.get("observed_states", []):
         print(f"  - {state}")
     print()
+    judgment = record_dict.get("upstream_judgment") or {}
+    if judgment:
+        print("upstream judgment")
+        if "task_completed" in judgment:
+            print(f"  task_completed  {judgment['task_completed']}")
+        confidence = judgment.get("completion_confidence") or {}
+        if confidence:
+            print(f"  confidence      {confidence.get('label')} ({confidence.get('score')})")
+        if judgment.get("summary"):
+            print(f"  summary         {judgment['summary']}")
+        for item in judgment.get("evidence") or []:
+            print(f"    - {item}")
+        print()
+
     print("decision trail")
     for step in evidence.get("decision", []):
         print(f"  - {step}")
@@ -232,18 +317,38 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument("--output", help="Write the outcome record here instead of stdout.")
 
     reconcile_cmd = sub.add_parser("reconcile", help="Poll a call reference and emit one outcome record.")
-    reconcile_cmd.add_argument("--call-ref", required=True, help="Upstream call identifier.")
+    reconcile_cmd.add_argument(
+        "--call-ref",
+        required=True,
+        help="Upstream call identifier. With --surface rest.goal_runs this is the GoalRun.id "
+        "returned by create, not the nested telephone run_id.",
+    )
     reconcile_cmd.add_argument(
         "--surface",
         default="rest.calls",
-        choices=["rest.calls", "mcp.get_call_run"],
+        choices=["rest.calls", "rest.goal_runs", "mcp.get_call_run"],
         help="Which status surface to poll. Default: rest.calls.",
     )
     reconcile_cmd.add_argument("--dry-run", action="store_true", help="Replay a fixture; makes no network request.")
     reconcile_cmd.add_argument("--fixture", help="Fixture to replay with --dry-run.")
-    reconcile_cmd.add_argument("--base-url", help="Override the REST base URL.")
+    reconcile_cmd.add_argument(
+        "--base-url",
+        help=f"REST base URL. Default: {DEFAULT_BASE_URL} (or {REST_BASE_URL_ENV_VAR}). The API key "
+        "is only ever sent to that host or to loopback, so a local fake works and a mistyped host "
+        "is refused before the key is read.",
+    )
+    reconcile_cmd.add_argument("--goal-id", help="Goal id. Required when --surface rest.goal_runs.")
     reconcile_cmd.add_argument("--mcp-server-url", help="MCP server URL when --surface mcp.get_call_run.")
-    reconcile_cmd.add_argument("--token-cache", help="Path to the CALL-E CLI token cache.")
+    reconcile_cmd.add_argument(
+        "--token-cache",
+        help="Path to the CALL-E CLI token cache. Defaults to the path `calle auth login` writes.",
+    )
+    reconcile_cmd.add_argument(
+        "--request-timeout",
+        type=float,
+        default=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        help=f"Per-request timeout. Default: {DEFAULT_REQUEST_TIMEOUT_SECONDS}.",
+    )
     reconcile_cmd.add_argument("--recipient", help="Recipient E.164, used only to render a masked value.")
     add_budget_args(reconcile_cmd)
     reconcile_cmd.set_defaults(func=cmd_reconcile)
@@ -251,6 +356,10 @@ def build_parser() -> argparse.ArgumentParser:
     replay_cmd = sub.add_parser("replay", help="Replay a recorded fixture. Makes no network request.")
     replay_cmd.add_argument("--fixture", required=True, help="Fixture JSON to replay.")
     replay_cmd.add_argument("--call-ref", default="call_replayed_fixture", help="Call reference to record.")
+    replay_cmd.add_argument(
+        "--recipient",
+        help="Recipient E.164, used only to render a masked value when the fixture names none.",
+    )
     add_budget_args(replay_cmd)
     replay_cmd.set_defaults(func=cmd_replay)
 
@@ -272,8 +381,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     except MappingError as exc:
         print(f"Mapping table error: {exc}", file=sys.stderr)
         return EXIT_ERROR
+    except ConfigurationError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
     except FileNotFoundError as exc:
         print(f"File not found: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    except json.JSONDecodeError as exc:
+        print(f"Not valid JSON: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
 
