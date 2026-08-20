@@ -1,0 +1,59 @@
+{
+  "what": "GET /v1/calls/{id} for a call the provider declined three seconds after it started dialling",
+  "source": "shape observed against the live REST API on 2026-08-20, for the second of two attempts that failed the same way. Every value in this payload — identifiers, phone numbers, names, timestamps, transcript turns, summaries and confidence scores — was written for this repository. No part of a provider response is reproduced here; what is evidentiary is the shape",
+  "unobserved": "task is not included: it is the text Ringdown sent. No carrier reason is exposed anywhere in this body; that the call never reached the destination network was established out of band and cannot be read from here",
+  "why_it_matters": "the shape of the first REST call body ever observed. It settles two things the fake could only assume: metadata comes back exactly as sent, so the attempt identity check can pass, and each attempt carries a provider_call_id. It also records that failure_message says 'Hangup by: user' for a call of zero seconds that no carrier ever saw",
+  "payload": {
+    "id": "call_example_declined",
+    "object": "call_task",
+    "status": "failed",
+    "recipients": [
+      {
+        "id": "rcp_example_2",
+        "phones": [
+          "+15550101234"
+        ],
+        "locale": null,
+        "region": null,
+        "status": "failed",
+        "structured_result": null,
+        "summary": "The first call did not connect or complete; the recipient may be busy or unavailable, so I suggest retrying in about 45 minutes.",
+        "attempts": [
+          {
+            "id": "att_example_2",
+            "phone": "+15550101234",
+            "status": "failed",
+            "started_at": "2026-08-20T00:30:03Z",
+            "completed_at": "2026-08-20T00:30:03Z",
+            "summary": "The first call did not connect or complete; the recipient may be busy or unavailable, so I suggest retrying in about 45 minutes.",
+            "transcript_turns": [],
+            "provider_call_id": "prov_example_2",
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": null,
+    "summary": "The first call did not connect or complete; the recipient may be busy or unavailable, so I suggest retrying in about 45 minutes.",
+    "task_completed": false,
+    "completion_confidence": {
+      "score": 0.72,
+      "label": "medium"
+    },
+    "evidence": [
+      "The call ended immediately with no call duration.",
+      "There was no transcript or speech recognition result from the recipient.",
+      "The on-call page required reaching and confirming the intended engineer."
+    ],
+    "metadata": {
+      "ringdown_attempt_id": "inc-2026-08-19-0001/primary/1",
+      "ringdown_contact_id": "alice",
+      "ringdown_incident_id": "inc-2026-08-19-0001"
+    },
+    "failure_code": "call_failed",
+    "failure_message": "calling task status=DECLINED (Hangup by: user)",
+    "created_at": "2026-08-20T00:30:00Z",
+    "completed_at": "2026-08-20T00:30:44Z"
+  }
+}

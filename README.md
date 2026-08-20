@@ -138,6 +138,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [`verify-by-phone`](skills/verify-by-phone/) - Single disclosed verification call that checks a directory listing against the published line, grounds every answer in a transcript span, and abstains instead of guessing when the call does not establish one.
 - [`call-summarizer`](skills/call-summarizer/) - Post-call analysis skill that turns a completed CALL-E transcript into a masked, actionable brief with a one-line outcome, extracted action items with owners and due dates, caller sentiment, and a one-way caller fingerprint for de-duplicating repeat callers.
 - [`ringer-consumer-tasks`](skills/ringer-consumer-tasks/) - Compose and safely place the dreaded consumer phone calls (bill negotiation, cancellation, refund, booking, quote comparison, inquiry) as CALL-E tasks with strict result schemas, dry-run-by-default previews, and human-in-the-loop decision authority.
+- [`incident-escalation-call`](skills/incident-escalation-call/) - Walks an on-call escalation ladder one phone call at a time and records an acknowledgement only when an owner and an ETA are both quoted by words the recipient spoke, then re-reads the call over a second transport before the incident is reported as owned.
 
 ### Apps
 

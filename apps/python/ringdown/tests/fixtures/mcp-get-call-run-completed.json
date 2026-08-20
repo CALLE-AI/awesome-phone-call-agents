@@ -1,0 +1,80 @@
+{
+  "what": "get_call_run for a run that completed, read by its run_id",
+  "source": "shape observed against the live MCP endpoint on 2026-08-20, for a call placed over MCP run_call. Every value in this payload — identifiers, phone numbers, names, timestamps, transcript turns, summaries and confidence scores — was written for this repository. No part of a provider response is reproduced here; what is evidentiary is the shape",
+  "unobserved": "three elisions, none of them read by this app: result.extracted and display_goal restate the task Ringdown sent, and activity is the provider's own stage log, kept at 3 entries where a run carries dozens. The JSON-RPC envelope around this payload is not included, only structuredContent. No run has ever been observed for a call placed over REST",
+  "why_it_matters": "the shape of the first successful response ever seen from this tool, and it is not the shape run_from reads. The call id lives at result.call_id rather than at the top level, transcript is one newline-joined string rather than a list of turns, and recipient_phone, completed_at and metadata are absent entirely, so three of the ten verification checks have nothing to read",
+  "payload": {
+    "run_id": "run_example_completed",
+    "requested_run_id": null,
+    "parent_run_id": null,
+    "root_run_id": null,
+    "status": "COMPLETED",
+    "message": "Call ended from realtime events.",
+    "display_goal": "Place an automated on-call page from Ringdown. First say exactly: \"This is an automated on-call page from Ringdown, and  ...",
+    "schedule_mode": "immediate",
+    "scheduled_at": null,
+    "schedule_timezone": null,
+    "result": {
+      "summary": "The on-call page was completed. The engineer confirmed they are taking the sev2 checkout-api incident and said they will be working it in 15 minutes.",
+      "post_summary": "The on-call page was completed. The engineer confirmed they are taking the sev2 checkout-api incident and said they will be working it in 15 minutes.",
+      "outcome": {
+        "task_completed": true,
+        "completion_confidence": {
+          "score": 0.92,
+          "label": "high"
+        },
+        "evidence": [
+          "The recipient confirmed they were Alice Okafor before the incident details were read.",
+          "The sev2 checkout-api latency incident was delivered.",
+          "The engineer acknowledged taking the incident and provided a 15-minute timeframe."
+        ]
+      },
+      "transcript": "[00:00] BOT: This is an automated on-call page from Ringdown, and this call is recorded.\n[00:04] BOT: Am I speaking with Alice Okafor?\n[00:09] USER: Yes, this is Alice.\n[00:11] BOT: There is a sev2 incident on checkout-api: checkout p99 latency above 3s.\n[00:17] BOT: p99 latency is 3.4s against a 1.2s objective and has been climbing for 12 minutes.\n[00:24] BOT: Are you taking this incident right now?\n[00:31] USER: Yes, I am taking this incident right now.\n[00:33] BOT: How many minutes until you are working the incident?\n[00:40] USER: Give me 15 minutes.\n[00:42] BOT: The engineer acknowledged taking the incident and gave a 15 minute estimate.\n[00:47] BOT: Thank you. Goodbye.",
+      "call_id": "call_example_completed",
+      "call_ids": [
+        "call_example_completed"
+      ],
+      "batch": null
+    },
+    "expires_at": null,
+    "activity": [
+      {
+        "run_id": "run_example_completed",
+        "ts": "2026-08-20T01:00:00Z",
+        "level": "info",
+        "kind": "stage_start",
+        "message": "run_call started.",
+        "data": {}
+      },
+      {
+        "run_id": "run_example_completed",
+        "ts": "2026-08-20T01:00:03Z",
+        "level": "info",
+        "kind": "external_call",
+        "message": "botlab create bot.",
+        "data": {}
+      },
+      {
+        "run_id": "run_example_completed",
+        "ts": "2026-08-20T01:00:24Z",
+        "level": "info",
+        "kind": "external_call",
+        "message": "calling resolve robot id.",
+        "data": {}
+      }
+    ],
+    "next_cursor": "1-0",
+    "next_step": {
+      "action": "report_result",
+      "tool_name": null,
+      "run_id": "run_example_completed",
+      "plan_id": null,
+      "parent_run_id": null,
+      "poll_after_seconds": null,
+      "scheduled_at": null,
+      "schedule_timezone": null,
+      "required_user_input": [],
+      "instruction": "Report the final call result to the user. Do not start another call."
+    }
+  }
+}
