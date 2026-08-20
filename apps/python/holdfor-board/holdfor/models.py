@@ -46,6 +46,7 @@ class ReviewStatus(StrEnum):
     RANG_MANUALLY = "rang_manually"
     RECEPTION_DECLINED = "reception_declined"
     NOT_REACHED = "not_reached"
+    DECLINED = "declined"
 
 
 class AppointmentMode(StrEnum):
@@ -79,6 +80,7 @@ class CallResult:
     state: CallState
     transcript: list[Turn]
     structured: dict | None
+    outcome: str | None = None
 
 
 class CallProvider(Protocol):

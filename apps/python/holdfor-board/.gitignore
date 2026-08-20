@@ -2,8 +2,8 @@
 *.db-journal
 *.sqlite3
 .env
-transcripts/
-audio/
+/transcripts/
+/audio/
 __pycache__/
 .pytest_cache/
 .venv/

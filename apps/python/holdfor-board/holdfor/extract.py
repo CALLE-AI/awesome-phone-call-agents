@@ -39,6 +39,18 @@ def is_verbatim(turns: list[Turn], text: str | None, index: int | None) -> bool:
     return turn is not None and turn.speaker == "other" and text in turn.text
 
 
+def no_answers() -> Extraction:
+    return Extraction(
+        feeling=None,
+        medication_ok=None,
+        wants_seen=None,
+        carried_words_text=None,
+        carried_words_turn=None,
+        stop_condition=False,
+        stop_reason=None,
+    )
+
+
 def extract(result: CallResult, medication_changed: bool) -> Extraction:
     structured = result.structured
     if not structured:

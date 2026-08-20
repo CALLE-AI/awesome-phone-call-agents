@@ -3,14 +3,14 @@ from __future__ import annotations
 import sqlite3
 
 from . import db
-from .extract import extract
+from .extract import extract, no_answers
+from .outcomes import connected, review_status_for
 from .models import (
     CallKind,
     CallRequest,
     CallState,
     CheckinScope,
     Patient,
-    ReviewStatus,
 )
 
 NO_CONSENT = "no_consent"
@@ -49,7 +49,7 @@ def preflight(patient: Patient) -> str | None:
 
 def build_task_text(scope: CheckinScope, medication_changed: bool) -> str:
     lines = [
-        f"Call {scope.first_name} on behalf of Ashgrove Medical Practice.",
+        f"Call {scope.first_name} on behalf of Fieldgate Surgery.",
         "Open by naming the practice and saying this is a follow-up on a recent appointment.",
         "Say you cannot answer questions and that the practice will read every answer.",
         "Say that hanging up ends the calls for good.",
@@ -137,7 +137,11 @@ def run(conn: sqlite3.Connection, provider, appointment_id: int) -> int:
     )
     run_id = provider.place(request)
     result = provider.poll(run_id)
-    extraction = extract(result, appointment.medication_changed)
+    extraction = (
+        extract(result, appointment.medication_changed)
+        if connected(result.outcome)
+        else no_answers()
+    )
 
     conn.execute(
         """
@@ -170,7 +174,7 @@ def run(conn: sqlite3.Connection, provider, appointment_id: int) -> int:
             extraction.carried_words_turn,
             int(extraction.stop_condition),
             extraction.stop_reason,
-            ReviewStatus.NEEDS_REVIEW.value,
+            review_status_for(result.outcome).value,
             db.now_iso(),
         ),
     )

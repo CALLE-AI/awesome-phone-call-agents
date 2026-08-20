@@ -28,13 +28,17 @@ class FakeProvider:
         name = self._runs.get(run_id)
         if name is None:
             return CallResult(
-                state=CallState.SUBMISSION_UNKNOWN, transcript=[], structured=None
+                state=CallState.SUBMISSION_UNKNOWN,
+                transcript=[],
+                structured=None,
+                outcome=None,
             )
         payload = json.loads((self.fixtures_dir / name).read_text(encoding="utf-8"))
         return CallResult(
             state=CallState(payload["state"]),
             transcript=[Turn(**turn) for turn in payload["turns"]],
             structured=payload.get("structured"),
+            outcome=payload.get("outcome"),
         )
 
     def transcript_path(self, run_id: str) -> str:

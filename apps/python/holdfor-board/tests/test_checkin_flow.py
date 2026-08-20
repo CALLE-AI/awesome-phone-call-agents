@@ -99,3 +99,24 @@ def test_the_queue_page_renders_the_patients_words(client):
     assert page.status_code == 200
     assert "Margaret" in page.text
     assert "get up the stairs" in page.text
+
+
+def test_a_patient_who_hung_up_is_filed_as_declined_not_unreached(db_path, fixtures_dir):
+    from fastapi.testclient import TestClient
+
+    from holdfor import db
+    from holdfor.app import create_app
+
+    provider = FakeProvider(
+        fixtures_dir=fixtures_dir, route={"checkin:1": "05-declined.json"}
+    )
+    client = TestClient(create_app(db_path=db_path, provider=provider))
+    review_item_id = client.post("/checkins/1").json()["review_item_id"]
+
+    connection = db.connect(db_path)
+    item = connection.execute(
+        "SELECT * FROM review_item WHERE id = ?", (review_item_id,)
+    ).fetchone()
+    connection.close()
+    assert item["status"] == ReviewStatus.DECLINED
+    assert item["status"] != ReviewStatus.NOT_REACHED
