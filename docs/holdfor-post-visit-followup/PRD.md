@@ -426,7 +426,7 @@ Friday is the deadline. Everything below is sized to hit it.
 ### Friday 21 Aug
 
 - **Carol** — wire live CALL-E behind the same interface, both call kinds, idempotency keys
-- **Dihan** — *the hold probe, live, first thing.* One call to our own handset: reception says "bear with me", puts the phone down, stays silent 90 seconds. Measure three things — does the agent stay quiet, does the call survive, what does the transcript hold. Costs 1 of 20 calls and needs no board, no matcher, no Release, so it runs while the code is being written. Demo beat 5 rests on it and nothing else can verify it
+- **Dihan** — *the hold probe, live, first thing.* Procedure and result sheet: [`hold-probe.md`](hold-probe.md). One call to our own handset: reception says "bear with me", puts the phone down, stays silent 90 seconds. Measure three things — does the agent stay quiet, does the call survive, what does the transcript hold. Costs 1 of 20 calls and needs no board, no matcher, no Release, so it runs while the code is being written. Demo beat 5 rests on it and nothing else can verify it
 - **Dihan** — Rebooking Call script and envelope matching: accept, refuse, return to board. Decisions in [ADR 0007–0012](../adr/)
 - **All** — *one full chain run, live, in the morning.* Not Friday night
 - **Carol** — package `skills/holdfor-post-visit-followup/`, run `python3 scripts/validate_repository.py`
