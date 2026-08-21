@@ -55,3 +55,12 @@ CREATE TABLE IF NOT EXISTS release (
     clinician      TEXT,
     approved_words TEXT    NOT NULL
 );
+
+-- One row per live placement. A table rather than a column on call_attempt so
+-- that `db.init` adds it to a database that already exists: CREATE TABLE IF NOT
+-- EXISTS creates a missing table, but never a missing column.
+CREATE TABLE IF NOT EXISTS live_call (
+    id              INTEGER PRIMARY KEY,
+    call_attempt_id INTEGER NOT NULL REFERENCES call_attempt(id),
+    placed_at       TEXT    NOT NULL
+);

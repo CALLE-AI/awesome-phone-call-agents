@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import checkin, db
 from .models import ReviewStatus
-from .providers import FakeProvider
+from .providers import default_provider
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
 
@@ -40,10 +40,17 @@ ORDER BY review_item.created_at DESC, review_item.id DESC
 """
 
 
-def create_app(db_path: str | None = None, provider=None) -> FastAPI:
+def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI:
+    """Build the board.
+
+    `clock` returns the local time the Reading Window is judged against. It is
+    injected so a test can sit inside the window deliberately rather than pass or
+    fail on the hour the suite happens to run at; nothing in production passes it.
+    """
     app = FastAPI(title="HoldFor board")
     app.state.db_path = db_path or db.default_path()
-    app.state.provider = provider or FakeProvider()
+    app.state.provider = provider or default_provider()
+    app.state.clock = clock or datetime.now
 
     def connection(request: Request) -> sqlite3.Connection:
         conn = db.connect(request.app.state.db_path)
@@ -57,9 +64,20 @@ def create_app(db_path: str | None = None, provider=None) -> FastAPI:
         appointment_id: int, conn: sqlite3.Connection = Depends(connection)
     ) -> dict:
         try:
-            review_item_id = checkin.run(conn, app.state.provider, appointment_id)
+            review_item_id = checkin.run(
+                conn, app.state.provider, appointment_id, now=app.state.clock()
+            )
         except checkin.Refused as refused:
             return JSONResponse(status_code=409, content={"refused": refused.reason})
+        except checkin.AwaitingReconciliation as pending:
+            # An attempt for this Appointment is unresolved. 409 rather than a
+            # retryable error on purpose: the correct next step is a person
+            # reading the provider's record, never this endpoint being called
+            # again.
+            return JSONResponse(
+                status_code=409,
+                content={"awaiting_reconciliation": pending.state},
+            )
         except LookupError as missing:
             raise HTTPException(status_code=404, detail=str(missing))
         return {"review_item_id": review_item_id}
@@ -85,6 +103,19 @@ def board_payload(conn: sqlite3.Connection) -> dict:
     todays = [item for item in items if item["created_at"].startswith(stamp)]
     return {
         "today": len(todays),
+        # Both of these are counts of things that are not Review Items, which is
+        # why they are read separately rather than derived from `items`.
+        "live_calls": conn.execute(
+            "SELECT COUNT(*) AS n FROM live_call"
+        ).fetchone()["n"],
+        "awaiting_reconciliation": conn.execute(
+            """
+            SELECT COUNT(*) AS n
+            FROM call_attempt
+            LEFT JOIN review_item ON review_item.call_attempt_id = call_attempt.id
+            WHERE review_item.id IS NULL
+            """
+        ).fetchone()["n"],
         "auto_closed": sum(
             1 for item in todays if item["status"] == ReviewStatus.AUTO_CLOSED
         ),

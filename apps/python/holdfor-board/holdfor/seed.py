@@ -5,8 +5,7 @@ from datetime import date, timedelta
 from typing import NamedTuple
 
 from . import db
-
-CHECKIN_DAY = 3
+from .window import due_date
 
 
 class SeedRow(NamedTuple):
@@ -39,10 +38,6 @@ PATIENTS = [
 
 def phone_e164(suffix: str) -> str:
     return f"+447700900{suffix}"
-
-
-def due_date(seen_on: str) -> date:
-    return date.fromisoformat(seen_on) + timedelta(days=CHECKIN_DAY)
 
 
 def seed(conn: sqlite3.Connection, today: date | None = None) -> None:
