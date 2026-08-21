@@ -103,6 +103,55 @@ Rebooking Call additionally takes the identifiers reception needs to find the
 Patient. Neither ever includes clinical detail.
 _Avoid_: patient data, context, payload, profile
 
+### Inside the Rebooking Call
+
+**Offered Slot**:
+What reception actually put on the table, held as the turn she said it in rather than
+as a resolved date. "Tuesday the 26th at ten past nine" is an Offered Slot; the
+matcher reads day and clock tokens out of that turn and never converts it into a
+calendar date. See [ADR 0008](docs/adr/0008-an-offered-slot-is-matched-never-resolved.md).
+_Avoid_: appointment, slot, booking, proposed time
+
+**Envelope Match**:
+The deterministic re-reading of an Offered Slot against the Booking Envelope, run
+after the call ends and never during it. The agent's acceptance is what keeps the
+conversation human; the Envelope Match is what makes the boundary real. A match
+outside the envelope flags the item and names the slot.
+_Avoid_: validation, verification, check
+
+**Practice Hours**:
+The window a Practice books inside, about 08:00 to 18:30, used to read a bare clock
+time without inferring anything. "Half four" is 16:30 because 04:30 is not on offer.
+A time outside Practice Hours is flagged, never assumed.
+_Avoid_: opening hours, business hours, working day
+
+**Reception Outcome**:
+How the Rebooking Call ended in words, as a closed enum anchored to the turn that
+carried it: a slot offered, a third-party booking refused, no slots available, or
+unclear. Distinct from the platform's outcome, which describes how the call ended
+rather than what was said in it.
+_Avoid_: result, disposition, call outcome
+
+**Booked**:
+The terminal status of a Review Item whose Rebooking Call accepted an Offered Slot
+that passed the Envelope Match. Distinct from `closed`, which is a human deciding no
+call was needed. Collapsing the two makes the board's daily ratio unreadable.
+_Avoid_: complete, done, success, resolved
+
+**Spoken Sources**:
+The three things the Rebooking Call is permitted to say aloud: the Practice's own name,
+the contents of the Release, and the Patient's identifiers. A whitelist, not a list of
+prohibitions. Anything outside it gets one fixed sentence and the call returns to
+scheduling. See [ADR 0011](docs/adr/0011-the-rebooking-call-speaks-from-a-closed-list.md).
+_Avoid_: allowed topics, script scope, guardrails
+
+**Binding Acceptance**:
+The last offer the agent accepted on a Rebooking Call, and the only one the Envelope
+Match reads. Reception revises, so acceptance is plural and the earlier offers are kept
+as evidence rather than overwritten — a withdrawn 09:10 is the reason a booking reads
+08:50. See [ADR 0012](docs/adr/0012-the-last-acceptance-binds-and-every-offer-is-kept.md).
+_Avoid_: the accepted slot, final offer, confirmation
+
 ## Flagged ambiguities
 
 **"Handoff" is taken.**
@@ -120,3 +169,10 @@ personal details is indistinguishable from a scam.
 In clinical use a follow-up is a further appointment. Here the calls are the
 Check-in Call and the Rebooking Call; the appointment they may produce is a
 follow-up appointment. Never call either call "the follow-up".
+
+**"Declined" names three different events.**
+The platform says `DECLINED` when a Patient hangs up on the Check-in Call, and again
+when the Practice's switchboard rejects the Rebooking Call. A receptionist refusing a
+third-party booking is neither: that call completes cleanly and the refusal exists only
+in what she said. The board keeps them apart as `declined`, `not_reached` and
+`reception_declined`. See [ADR 0010](docs/adr/0010-a-rebooking-outcome-is-not-a-checkin-outcome.md).

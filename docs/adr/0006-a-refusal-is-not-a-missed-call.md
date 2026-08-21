@@ -41,3 +41,30 @@ The suppression is only as good as the distinction: we cannot decline to redial 
 outcome we have filed as "not reached". Any new terminal status from a provider that
 is not recognised maps to `needs_review`, so an unknown outcome reaches a human
 rather than being silently treated as a missed call.
+
+## Amendment — the Rebooking Call inherits the suppression, and cannot dial twice
+
+The same rule binds the second call, where the stake is different. A repeated Check-in
+Call rings a Patient who has already refused; a repeated Rebooking Call books the same
+Patient twice, and the second appointment is discovered by a receptionist rather than by
+us.
+
+`call_attempt.idempotency_key` is `rebooking:{release_id}` and `release.review_item_id`
+becomes `UNIQUE`, so one Review Item holds one Release and one Release holds one call.
+Pressing run again returns the existing attempt and dials nothing. The way out of
+`submission_unknown` is `calle call recover`, which the platform provides for exactly
+this, never a redial. The `UNIQUE` constraint also closes a race in `review.release()`,
+which checked for an existing Release with a `SELECT` before its `INSERT` and could admit
+two under concurrent posts.
+
+The call is placed out of band for the same reason. `holdfor/checkin.py:138` places and
+polls inside one request, which the fake provider satisfies instantly and CALL-E cannot:
+`plan_call` alone carries a 150-second timeout, and a call that waits in a queue runs
+longer. A Release therefore only reserves a `call_attempt` row and returns; a second
+explicit step places the call and polls it to terminal. FastAPI puts `BackgroundTasks` at
+lightweight work inside one process and points heavier work at a real queue — what a
+restart would orphan here is a Patient's appointment, so the work sits in a step that can
+be re-entered rather than in the tail of a response.
+
+The cost is that a call which genuinely never rang cannot be retried by the board at all.
+A human rings instead, and the board says so.

@@ -263,12 +263,15 @@ Only ever after a Release. Dials the practice's own booking line and waits.
 ```text
 agent      This is the automated assistant for Fieldgate Surgery. I'm
            ringing on behalf of a patient after a check-in call.
-           Margaret Wilson, date of birth 4 March 1943.
+           Margaret Wilson, one of your patients.
 
            Her words were: "it's still weeping and I can't keep the
            dressing on."
 
            She'd like to be seen again.
+
+reception  Date of birth?
+agent      4 March 1943.
 
 reception  I can do Tuesday the 26th at ten past nine.
 agent      [inside envelope]  That's fine, thank you — please book that.
@@ -319,7 +322,7 @@ pitch.* Say the agent waits so she doesn't — not that it waits twenty minutes.
 
 Three screens, no more.
 
-- **Queue** — Review Items newest first: first name, the four answers as chips, a flag if a Stop Condition fired.
+- **Queue** — Review Items newest first: first name, the four answers as chips, a flag if a Stop Condition fired. Below them, a second section: **released, awaiting the call**, each row carrying its envelope and a **Run** control. A Release only reserves the call ([ADR 0006](../adr/0006-a-refusal-is-not-a-missed-call.md)), so without this section a released item is invisible and nothing can place it.
 - **Detail** — transcript alongside the extracted answers, each anchored to the turn it came from.
 - **Release form** — the Booking Envelope plus the exact Carried Words, editable *down* but never up. A Reviewer may narrow what gets spoken; they may not add to it.
 
@@ -423,7 +426,8 @@ Friday is the deadline. Everything below is sized to hit it.
 ### Friday 21 Aug
 
 - **Carol** — wire live CALL-E behind the same interface, both call kinds, idempotency keys
-- **Dihan** — Rebooking Call script and envelope matching: accept, refuse, return to board
+- **Dihan** — *the hold probe, live, first thing.* One call to our own handset: reception says "bear with me", puts the phone down, stays silent 90 seconds. Measure three things — does the agent stay quiet, does the call survive, what does the transcript hold. Costs 1 of 20 calls and needs no board, no matcher, no Release, so it runs while the code is being written. Demo beat 5 rests on it and nothing else can verify it
+- **Dihan** — Rebooking Call script and envelope matching: accept, refuse, return to board. Decisions in [ADR 0007–0012](../adr/)
 - **All** — *one full chain run, live, in the morning.* Not Friday night
 - **Carol** — package `skills/holdfor-post-visit-followup/`, run `python3 scripts/validate_repository.py`
 
@@ -490,5 +494,5 @@ skills/holdfor-post-visit-followup/    SKILL.md + references/ (safety, result-sc
 apps/python/holdfor-board/             FastAPI + SQLite + the board
 docs/holdfor-post-visit-followup/      this PRD
 CONTEXT.md                             glossary
-docs/adr/                              0001–0006
+docs/adr/                              0001–0012
 ```
