@@ -1,0 +1,16 @@
+{
+  "what": "get_call_run asked for a run that does not exist",
+  "source": "observed against the live MCP endpoint in August 2026 Identifiers, phone numbers and spoken names are synthetic; the shape and every field that carries a finding are as observed.",
+  "unobserved": "the JSON-RPC envelope around this payload was never captured, only the payload itself; the transcribed result object was elided, so fields beyond the three below may exist",
+  "why_it_matters": "the provider reports this failure inside an HTTP 200 with no JSON-RPC error key, so a parser that only looks for an error envelope reads it as a successful run and gets an empty one",
+  "payload": {
+    "run_id": "...",
+    "status": "FAILED",
+    "message": "run_id not found.",
+    "result": {
+      "call_id": null,
+      "call_ids": [],
+      "transcript": null
+    }
+  }
+}

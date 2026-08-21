@@ -1,0 +1,155 @@
+{
+  "what": "GET /v1/calls/{id} for a call that connected, where the provider reported an acknowledgement and Ringdown did not",
+  "source": "observed against the live REST API on 2026-08-20, the one call of five placed over REST that reached the recipient. Identifiers, phone numbers and spoken names are synthetic; the shape and every field that carries a finding are as observed.",
+  "unobserved": "task was dropped: it is the text Ringdown sent. The audio behind transcript_turns was not captured, so how faithfully the provider transcribed it cannot be checked from here",
+  "why_it_matters": "the whole argument of this app, observed rather than argued. The provider returned task_completed true at 0.86 high and its own evidence claims the engineer acknowledged taking the incident. The recipient turn it rests on reads 'Yes. I'm banking this incident right now' - speech recognition heard 'banking' for 'taking' - so no commitment phrase was ever spoken in the transcript, the disposition grounds to unclear and the verdict is not_acknowledged. A system branching on task_completed, the confidence label and the provider summary reports this incident as escalated. It also shows the ETA grounding working on the same call: 'K. Give me 15 minutes, please' is quoted as the span",
+  "payload": {
+    "id": "call_example_completed",
+    "object": "call_task",
+    "status": "completed",
+    "recipients": [
+      {
+        "id": "rcp_example_1",
+        "phones": [
+          "+15550101234"
+        ],
+        "locale": null,
+        "region": null,
+        "status": "completed",
+        "structured_result": null,
+        "summary": "The on-call page completed. The engineer acknowledged taking the incident and said they would be working it in 15 minutes.",
+        "attempts": [
+          {
+            "id": "att_example_1",
+            "phone": "+15550101234",
+            "status": "completed",
+            "started_at": "2026-08-20T01:42:05Z",
+            "completed_at": "2026-08-20T01:43:25Z",
+            "summary": "The on-call page completed. The engineer acknowledged taking the incident and said they would be working it in 15 minutes.",
+            "transcript_turns": [
+              {
+                "offset_seconds": 0,
+                "speaker": "bot",
+                "text": "This is an automated on-call page from Ringdown,"
+              },
+              {
+                "offset_seconds": 2,
+                "speaker": "bot",
+                "text": "and this call is recorded. Am I speaking with Alice Okafor?"
+              },
+              {
+                "offset_seconds": 11,
+                "speaker": "user",
+                "text": "Yes. This is Alyssa."
+              },
+              {
+                "offset_seconds": 12,
+                "speaker": "bot",
+                "text": "The identity doesn't match Alice Okafor."
+              },
+              {
+                "offset_seconds": 14,
+                "speaker": "bot",
+                "text": "I need to check if Alyssa can get Alice Okafor."
+              },
+              {
+                "offset_seconds": 17,
+                "speaker": "bot",
+                "text": "May I speak with Alice Okafor?"
+              },
+              {
+                "offset_seconds": 22,
+                "speaker": "user",
+                "text": "Yes. I am."
+              },
+              {
+                "offset_seconds": 24,
+                "speaker": "bot",
+                "text": "I apologize for the mix-up."
+              },
+              {
+                "offset_seconds": 26,
+                "speaker": "bot",
+                "text": "Welcome, Alice. There is a sev2 incident on checkout-api: checkout p99 latency above 3s."
+              },
+              {
+                "offset_seconds": 32,
+                "speaker": "bot",
+                "text": "p99 latency is 3.4s against a 1.2s objective and has been climbing for 12 minutes."
+              },
+              {
+                "offset_seconds": 38,
+                "speaker": "bot",
+                "text": "Are you taking this incident right now?"
+              },
+              {
+                "offset_seconds": 46,
+                "speaker": "user",
+                "text": "Yes. I'm banking this incident right now."
+              },
+              {
+                "offset_seconds": 47,
+                "speaker": "bot",
+                "text": "Got it."
+              },
+              {
+                "offset_seconds": 47,
+                "speaker": "bot",
+                "text": "Let me confirm your acknowledgment of taking this incident. How many minutes until you are working the incident?"
+              },
+              {
+                "offset_seconds": 58,
+                "speaker": "user",
+                "text": "K. Give me 15 minutes, please."
+              },
+              {
+                "offset_seconds": 59,
+                "speaker": "bot",
+                "text": "Understood."
+              },
+              {
+                "offset_seconds": 60,
+                "speaker": "bot",
+                "text": "I have recorded that you are taking this incident and will be working it in 15 minutes."
+              },
+              {
+                "offset_seconds": 64,
+                "speaker": "bot",
+                "text": "I have recorded whether the engineer acknowledged taking the incident."
+              },
+              {
+                "offset_seconds": 67,
+                "speaker": "bot",
+                "text": "Bye."
+              }
+            ],
+            "provider_call_id": "prov_example_1",
+            "failure_code": null,
+            "failure_message": null
+          }
+        ]
+      }
+    ],
+    "structured_result": null,
+    "summary": "The on-call page completed. The engineer acknowledged taking the incident and said they would be working it in 15 minutes.",
+    "task_completed": true,
+    "completion_confidence": {
+      "score": 0.86,
+      "label": "high"
+    },
+    "evidence": [
+      "The callee confirmed they were the requested on-call engineer before incident details were given.",
+      "The sev2 checkout-api latency incident details were delivered.",
+      "The engineer acknowledged taking the incident and gave a 15-minute working estimate."
+    ],
+    "metadata": {
+      "ringdown_attempt_id": "inc-2026-08-19-0002/primary/1",
+      "ringdown_contact_id": "alice",
+      "ringdown_incident_id": "inc-2026-08-19-0002"
+    },
+    "failure_code": null,
+    "failure_message": null,
+    "created_at": "2026-08-20T01:41:02.880640Z",
+    "completed_at": "2026-08-20T01:43:44.841930Z"
+  }
+}
