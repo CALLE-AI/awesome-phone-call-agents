@@ -29,7 +29,12 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
       phoneDisplay: maskE164(c.phoneE164),
     })),
   };
-  const maskedResults = results.map((r) => ({ ...r, calleCallId: undefined }));
+  const maskedResults = results.map((r) => ({
+    ...r,
+    calleCallId: undefined,
+    // Results carry the dialed number for cooldown bookkeeping; mask it here.
+    phoneE164: r.phoneE164 ? maskE164(r.phoneE164) : undefined,
+  }));
 
   return <WatchClient watch={maskedWatch} runCount={runState.runCount} results={maskedResults} />;
 }
