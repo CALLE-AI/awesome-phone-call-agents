@@ -2,10 +2,14 @@ import type { App } from "./app";
 import { cadenceForRun } from "../core/watch";
 
 /**
- * The standing-watch scheduler. Runs on the host (per Design Principle 1) and
- * triggers one watch run per schedule slot. Decaying cadence: 1h, 3h, 7h,
- * 14h, 24h, 48h, 72h, then weekly. Cancellation is first-class: a stopped or
- * completed watch is never re-run.
+ * The standing-watch scheduler. Runs on the host (per Design Principle 1):
+ * the host owns recurrence and the provider handles exactly one call per
+ * scheduled run. One tick therefore places at most ONE provider call in
+ * total — the single most-due active watch — never a loop across every due
+ * watch, and never a wave.
+ *
+ * Decaying cadence: 1h, 3h, 7h, 14h, 24h, 48h, 72h, then weekly.
+ * Cancellation is first-class: a stopped or completed watch is never re-run.
  */
 export function createScheduler(app: App, deps: { now?: () => Date; intervalMs?: number }) {
   const now = deps.now ?? (() => new Date());
@@ -17,16 +21,27 @@ export function createScheduler(app: App, deps: { now?: () => Date; intervalMs?:
     if (running) return;
     running = true;
     try {
+      // Find the single most-due active watch (oldest lastRunAt relative to
+      // its cadence). runCount === 0 means the first run is user-triggered,
+      // so a brand-new watch is skipped until the user presses Run now.
+      let dueWatchId: string | null = null;
+      let mostOverdueAt = Number.POSITIVE_INFINITY;
       for (const { watch } of app.listWatches()) {
         if (watch.status !== "active") continue;
-        const { runCount, lastRunAt } = appStoreRunState(app, watch.id);
-        if (runCount === 0) continue; // first run is user-triggered
+        const { runCount, lastRunAt } = app.getWatchRunState(watch.id);
+        if (runCount === 0) continue;
         const hours = cadenceForRun(runCount);
         const dueAt = lastRunAt ? new Date(lastRunAt).getTime() + hours * 3_600_000 : 0;
-        if (now().getTime() >= dueAt) {
-          await app.runScheduledOnce(watch.id, runCount + 1);
+        if (now().getTime() >= dueAt && dueAt < mostOverdueAt) {
+          mostOverdueAt = dueAt;
+          dueWatchId = watch.id;
         }
       }
+
+      if (!dueWatchId) return;
+
+      const { runCount } = app.getWatchRunState(dueWatchId);
+      await app.runScheduledOnce(dueWatchId, runCount + 1);
     } finally {
       running = false;
     }
@@ -51,10 +66,4 @@ export function createScheduler(app: App, deps: { now?: () => Date; intervalMs?:
   }
 
   return { start, stop, tick };
-}
-
-/** Small adapter so the scheduler does not reach into the store directly. */
-function appStoreRunState(app: App, watchId: string): { runCount: number; lastRunAt: string | null } {
-  // Exposed via a scheduler-specific query on the app object.
-  return app.getWatchRunState(watchId);
 }

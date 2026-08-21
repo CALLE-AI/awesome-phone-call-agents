@@ -31,6 +31,11 @@ export interface DispatchOptions {
   isOptedOut?: (phoneE164: string) => boolean;
   /** Lookup: last call time per number, for cooldown checks. */
   lastCalledAt?: (phoneE164: string) => Date | null;
+  /**
+   * Cancellation check, consulted before every new call so Stop prevents later
+   * calls from an already-running dispatch.
+   */
+  isCancelled?: () => boolean;
   now?: Date;
   onResult?: (result: LineCallResult) => void;
 }
@@ -39,7 +44,7 @@ export interface DispatchResult {
   results: LineCallResult[];
   openFound: number;
   /** Why the dispatch stopped. */
-  reason: "target_reached" | "exhausted" | "error" | "call_cap_reached";
+  reason: "target_reached" | "exhausted" | "error" | "call_cap_reached" | "cancelled";
   error?: string;
 }
 
@@ -55,6 +60,7 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
     maxCalls,
     isOptedOut = () => false,
     lastCalledAt = () => null,
+    isCancelled = () => false,
     onResult,
   } = options;
   const now = options.now ?? new Date();
@@ -65,9 +71,16 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
   let callsPlaced = 0;
   let hitError: string | undefined;
   let hitCap = false;
+  let cancelled = false;
   let index = 0;
 
   while (index < candidates.length) {
+    // Cancellation is checked before every new call so Stop prevents later
+    // calls from an already-running dispatch.
+    if (isCancelled()) {
+      cancelled = true;
+      break;
+    }
     // No budget left: stop creating calls. Blocked candidates do not count.
     if (maxCalls != null && callsPlaced >= maxCalls) {
       hitCap = true;
@@ -79,6 +92,11 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
 
     const batch = await Promise.all(
       wave.map(async (candidate) => {
+        // Per-call cancellation check too: a wave can take minutes and Stop
+        // must win even mid-wave.
+        if (isCancelled()) {
+          return { result: blockedResult(candidate, "cancelled"), placed: false };
+        }
         const gate = mayCall(candidate, lastCalledAt(candidate.phoneE164), isOptedOut(candidate.phoneE164), now);
         if (!gate.allow) {
           // Never dialed: must not consume the run's call budget.
@@ -93,10 +111,34 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
             idempotencyKey,
             watchId,
           });
-          // Require a terminal verified result bound to the exact call/task/recipient/watch
-          // before any availability can be treated as verified. Unverified or
-          // non-terminal results are ambiguous and must fail-closed: they become
-          // an `error` verdict that stops the current wave and the watch.
+
+          // Simulated callers (dry-run/fake) never dial, so their results are
+          // advisory by definition: classify them normally but they can never
+          // be provider-verified evidence.
+          if (output.simulated) {
+            if (output.result == null) {
+              return { result: errorResult(candidate, "simulated_missing_result"), placed: true };
+            }
+            const verdict: Verdict = classifyResult(output.result);
+            const result: LineCallResult = {
+              candidateId: candidate.id,
+              phoneE164: candidate.phoneE164,
+              verdict,
+              evidence: output.result.evidence_quote ?? output.evidence[0] ?? "",
+              raw: output.result,
+              summary: output.summary,
+              calleCallId: output.callId,
+              completedAt: new Date().toISOString(),
+              calleStatus: output.calleStatus,
+            };
+            return { result, placed: true };
+          }
+
+          // Live calls require a terminal verified result bound to the exact
+          // call/task/recipient/watch before any availability can be treated as
+          // verified. Unverified or non-terminal results are ambiguous and must
+          // fail-closed: they become an `error` verdict that stops the current
+          // wave and the watch.
           const isVerifiedTerminal =
             output.verified && output.completed && output.calleStatus === "completed" && output.result !== null;
           if (!isVerifiedTerminal) {
@@ -146,10 +188,12 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
   }
 
   // Precedence: a confirmed target is the strongest signal, then errors, then
-  // an exhausted call budget, then simply running out of candidates.
+  // an exhausted call budget, then cancellation, then simply running out of
+  // candidates.
   let reason: DispatchResult["reason"] = "exhausted";
   if (openFound >= targetOpen) reason = "target_reached";
   else if (hitError) reason = "error";
+  else if (cancelled) reason = "cancelled";
   else if (hitCap) reason = "call_cap_reached";
 
   return { results, openFound, reason, error: hitError };

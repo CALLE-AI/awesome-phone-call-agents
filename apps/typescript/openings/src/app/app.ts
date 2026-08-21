@@ -98,6 +98,8 @@ export function createApp(deps: AppDeps) {
         runKey: `run-${runNumber}`,
         isOptedOut: (phone) => deps.store.isOptedOut(phone),
         lastCalledAt: (phone) => deps.store.lastCalledAt(phone),
+        // Stop must prevent later calls from an already-running dispatch.
+        isCancelled: () => deps.store.getWatch(id)?.status !== "active",
       });
 
       deps.store.recordRun(watch.id, runNumber, dispatch.results);
@@ -135,6 +137,7 @@ export function createApp(deps: AppDeps) {
         runKey: `run-${runNumber}`,
         isOptedOut: (phone) => deps.store.isOptedOut(phone),
         lastCalledAt: (phone) => deps.store.lastCalledAt(phone),
+        isCancelled: () => deps.store.getWatch(id)?.status !== "active",
       });
 
       deps.store.recordRun(watch.id, runNumber, dispatch.results);

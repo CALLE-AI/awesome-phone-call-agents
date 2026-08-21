@@ -50,12 +50,16 @@ Optional access control for a public deployment:
 
 ```bash
 # Require a shared secret on every page and every mutating action.
-# When set, clients must send `Authorization: Bearer <token>` (or Basic with the
-# token as the password) or have a `openings_auth` cookie or `?token=` query param.
+# Clients send `Authorization: Bearer <token>` (or Basic with the token as the
+# password) or hold an `openings_auth` cookie. Browsers get the Basic prompt.
 OPENINGS_AUTH_TOKEN=your-long-random-secret
 # Alternative Basic form:
 # OPENINGS_BASIC_AUTH=admin:your-long-random-secret
 ```
+
+**Fail-closed in live mode:** `OPENINGS_CALL_MODE=live` refuses to start unless an auth
+secret is configured. A remotely reachable app that can place real calls must never be
+anonymous. There is no query-string login — URLs leak into proxy and observability logs.
 
 ## Running
 
@@ -85,8 +89,9 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
   list. Each call begins by identifying itself as an automated assistant.
 - **All pages and actions that can create, run, stop, or reveal results are gated by
   authentication.** Set `OPENINGS_AUTH_TOKEN` (or `OPENINGS_BASIC_AUTH=user:pass`) and
-  every request must present it as `Authorization: Bearer <token>` (or Basic) or as a
-  `openings_auth` cookie or `?token=` query param. Without it, the app returns 401.
+  every request must present it as `Authorization: Bearer <token>` (or Basic) or hold an
+  `openings_auth` cookie. Without it, the app returns 401. In live mode the app **refuses to
+  start** without a secret (fail-closed), and there is deliberately no query-string login.
 - **An explicit recipient authorization is required before any live call.** The start-watching
   form requires you to check "I authorize calls to the providers matching my search" — a public
   NPPES listing alone is never treated as consent. The server rejects the request if that box is
@@ -108,18 +113,23 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
   architecture rule). The CALL-E API does not support client-side cancellation of an in-flight
   call; stopping a watch stops future waves, not a call already dialing.
 - **Verified availability only.** An `open` verdict that would stop a watch is only treated
-  as verified when it comes from a terminal `completed` call bound to the exact task, recipient
-  phones, and watch id. Anything else stays advisory (`inconclusive`) and never stops the watch.
+  as verified when it comes from a terminal `completed` call with `taskCompleted: true`, no
+  failure code, the exact task text, the provider's returned recipient list containing the
+  dialed number, and metadata bound to this watch and candidate. Anything else stays
+  advisory (`inconclusive`) and never stops the watch. Simulated (dry-run/fake) results are
+  never provider-verified.
 - **Fail-closed on ambiguity.** A provider timeout, `error` verdict, or any non-terminal result
   immediately stops the current wave and marks the watch `stopped` so neither the current run
-  nor later scheduled ticks can continue dialing with fresh keys.
+  nor later scheduled ticks can continue dialing with fresh keys. Cancellation is re-checked
+  before every new call, so Stop wins even mid-wave.
 - **Phone numbers are masked** in watch and report UI (`+1 (***) ***-1234`); full numbers are
-  never rendered in summaries.
+  never rendered in summaries, and raw provider call identifiers are not shown in the UI
+  (they stay server-side for audit).
 - Every practice is called at most once per cooldown window (24h by default) and never again
   once it opts out.
-- **CALL-E credentials are pinned.** `CALLE_API_KEY` is only ever sent to `https://api.heycall-e.com`
-  (loopback `http` only for local fake-server tests with an injected fetch); any other
-  `CALLE_BASE_URL` is rejected before the key is sent.
+- **CALL-E credentials are pinned to one origin.** `CALLE_API_KEY` is only ever sent to
+  exactly `https://api.heycall-e.com` — other hosts, ports, paths, query strings, or schemes
+  are rejected before the key is sent.
 - The scheduler is **disabled** in fake and dry-run modes.
 
 ## Dry-run / preview behavior
@@ -154,11 +164,11 @@ mode supports concurrent processes safely.
 - Build: `pnpm build:scheduler` → bundles `dist-scheduler/scheduler.js` with esbuild.
 - Run: `node dist-scheduler/scheduler.js` (the Docker image runs it alongside the server).
 - The scheduler **no-ops unless `OPENINGS_CALL_MODE=live`** — it never calls in dry-run/fake.
-- **One provider call per tick.** Per the repository architecture rule, the host scheduler
-  handles recurrence and the provider handles one call per scheduled run. Each tick places
-  at most one real provider call (the next eligible candidate respecting cooldown/opt-out),
-  not a wave. Manual "Run now" may place a small wave up to `maxCallsPerRun`; scheduled ticks
-  do not.
+- **One provider call per tick, total.** Per the repository architecture rule, the host
+  scheduler handles recurrence and the provider handles one call per scheduled run. Each
+  tick selects the single most-due active watch and places at most one real provider call —
+  it never loops across every due watch and never dials a wave. Manual "Run now" may place a
+  small wave up to `maxCallsPerRun`; scheduled ticks do not.
 
 ## Deployment
 

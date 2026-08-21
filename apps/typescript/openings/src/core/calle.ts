@@ -50,13 +50,15 @@ function recipientFor(candidate: Candidate): { phones: string[]; region?: string
 }
 
 export const DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com";
-const OFFICIAL_CALLE_HOST = "api.heycall-e.com";
+const OFFICIAL_CALLE_ORIGIN = "https://api.heycall-e.com";
 
 /**
- * Verify the CALL-E base URL is strictly the official HTTPS origin.
- * The CALLE_API_KEY must never be sent to an arbitrary host. Only the
- * exact official origin is allowed; loopback and custom hosts are rejected
- * so the key cannot be exfiltrated.
+ * Verify the CALL-E base URL is exactly the official HTTPS origin.
+ * The CALLE_API_KEY must never be sent anywhere else, so the comparison is on
+ * the full origin (scheme + host + port) and any path/query/hash is rejected:
+ * `https://api.heycall-e.com.evil.test`, port variants like
+ * `https://api.heycall-e.com:8443`, and paths like
+ * `https://api.heycall-e.com/proxy` are all refused.
  */
 export function assertAllowedCalleBaseUrl(baseUrl: string | undefined): void {
   const urlString = baseUrl ?? DEFAULT_CALLE_BASE_URL;
@@ -66,12 +68,19 @@ export function assertAllowedCalleBaseUrl(baseUrl: string | undefined): void {
   } catch {
     throw new Error(`CALLE_BASE_URL is not a valid URL: ${urlString}`);
   }
-  const host = url.hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
-  if (host !== OFFICIAL_CALLE_HOST) {
-    throw new Error(`CALLE_BASE_URL must be ${DEFAULT_CALLE_BASE_URL} (got ${urlString}); arbitrary hosts are not allowed.`);
+  const origin = `${url.protocol}//${url.host}`;
+  if (origin !== OFFICIAL_CALLE_ORIGIN) {
+    throw new Error(
+      `CALLE_BASE_URL must be exactly ${OFFICIAL_CALLE_ORIGIN} (got ${urlString}); other origins, ports, or paths are not allowed.`,
+    );
   }
-  if (url.protocol !== "https:") {
-    throw new Error(`CALLE_BASE_URL must use https: ${urlString}`);
+  if (url.pathname !== "/" && url.pathname !== "") {
+    throw new Error(
+      `CALLE_BASE_URL must not include a path (got ${urlString}); use exactly ${OFFICIAL_CALLE_ORIGIN}.`,
+    );
+  }
+  if (url.search || url.hash) {
+    throw new Error(`CALLE_BASE_URL must not include a query or fragment (got ${urlString}).`);
   }
 }
 
@@ -122,27 +131,23 @@ function isVerifiedCall(
   expectedTask: string,
   expectedRecipient: { phones: string[] },
 ): boolean {
-  // Must be a terminal completed result
+  // Must be a terminal completed result with the task explicitly done.
   if (call.status !== "completed") return false;
-  if (call.taskCompleted === false) return false;
+  if (call.taskCompleted !== true) return false;
   if (call.failureCode) return false;
-  // Must be bound to the exact task, recipient phones, and watch/candidate we asked for
+  // Must be bound to the exact task we asked for.
   if (call.task !== expectedTask) return false;
-  const phones = call.recipients?.flatMap((r) => r.phones ?? []) ?? [];
-  // Also check legacy single recipient
-  // The SDK may return recipients as array; check at least one matches
+  // The provider's returned recipient list must contain the dialed number.
+  // No fallback to matching the task text: a missing or mismatched provider
+  // recipient means this result cannot be attributed to our call.
   const expectedPhone = expectedRecipient.phones[0];
-  if (expectedPhone && !phones.includes(expectedPhone)) {
-    // Fallback: check if the raw phoneE164 appears anywhere in task (defense)
-    if (!call.task.includes(expectedPhone)) return false;
-  }
+  const phones = (call.recipients ?? []).flatMap((r) => r.phones ?? []);
+  if (!expectedPhone || !phones.includes(expectedPhone)) return false;
+  // Metadata must bind the result to this watch and candidate.
   const meta = call.metadata as Record<string, unknown> | null | undefined;
-  if (meta) {
-    if (meta["watch_id"] !== input.watchId) return false;
-    if (meta["candidate_id"] !== input.candidate.id) return false;
-  } else {
-    return false;
-  }
+  if (!meta) return false;
+  if (meta["watch_id"] !== input.watchId) return false;
+  if (meta["candidate_id"] !== input.candidate.id) return false;
   // Must have a call id
   if (!call.id) return false;
   return true;
@@ -178,6 +183,9 @@ function toOutput(
 /**
  * Dry-run caller. Returns a deterministic, simulated outcome without dialing.
  * Used for previews and for reviewers who have no credentials.
+ *
+ * `verified` is false by design: nothing was dialed, so the result is a
+ * simulation, never provider-verified evidence.
  */
 export class DryRunCaller {
   async placeCall(input: PlaceCallInput): Promise<PlaceCallOutput> {
@@ -195,7 +203,8 @@ export class DryRunCaller {
       evidence: [simulated.evidence_quote],
       completed: true,
       simulated: true,
-      verified: true,
+      verified: false,
+      calleStatus: "completed",
     };
   }
 }
@@ -203,6 +212,9 @@ export class DryRunCaller {
 /**
  * Fake caller for tests. Deterministic per candidate id, no network, no
  * credentials. Mode is forced to fake by the test environment.
+ *
+ * `verified` is false by design: tests exercise the fail-closed path, so a
+ * simulated result must never count as provider-verified evidence.
  */
 export class FakeCaller {
   private readonly seed: Map<string, CallStructuredResult>;
@@ -229,7 +241,7 @@ export class FakeCaller {
       evidence: [result.evidence_quote],
       completed: true,
       simulated: true,
-      verified: true,
+      verified: false,
       calleStatus: "completed",
     };
   }

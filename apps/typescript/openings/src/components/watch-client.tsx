@@ -177,7 +177,6 @@ export function WatchClient({
                       {candidate ? maskE164(candidate.phoneE164) : "***-****"}
                       {" · "}
                       {candidate ? pl(candidate.provenance) : ""}
-                      {r.calleCallId ? ` · ${r.calleCallId}` : ""}
                     </div>
                     {r.evidence && (
                       <p className="mt-1 text-sm italic text-zinc-400">&ldquo;{r.evidence}&rdquo;</p>

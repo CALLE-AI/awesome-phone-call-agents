@@ -182,4 +182,95 @@ describe("dispatchWave", () => {
     expect(result.error).toBe("boom");
     expect(result.results[0]!.verdict).toBe("error");
   });
+
+  it("stops before later calls when cancellation is signalled mid-run", async () => {
+    const dialed: string[] = [];
+    const caller = new FakeCaller([]);
+    const counting = {
+      placeCall(input: Parameters<FakeCaller["placeCall"]>[0]) {
+        dialed.push(input.candidate.id);
+        return caller.placeCall(input);
+      },
+    };
+
+    // Cancel after the first call completes.
+    let calls = 0;
+    const result = await dispatchWave({
+      caller: counting,
+      candidates: candidates.slice(0, 6),
+      spec: SPEC,
+      idempotencyPrefix: "watch",
+      watchId: "watch-test",
+      targetOpen: 5,
+      maxCalls: 6,
+      waveSize: 1,
+      runKey: "r1",
+      isCancelled: () => {
+        calls += 1;
+        return dialed.length >= 1;
+      },
+    });
+
+    expect(result.reason).toBe("cancelled");
+    expect(dialed).toHaveLength(1);
+  });
+
+  it("treats a live unverified result as fail-closed error, never verified open", async () => {
+    // A live-looking caller that claims success but is not provider-verified.
+    const unverifiedLive = {
+      async placeCall() {
+        return {
+          callId: "call_live_1",
+          result: staffed(),
+          evidence: [staffed().evidence_quote],
+          completed: true,
+          simulated: false,
+          verified: false,
+          calleStatus: "completed",
+        };
+      },
+    };
+
+    const result = await dispatchWave({
+      caller: unverifiedLive,
+      candidates: candidates.slice(0, 2),
+      spec: SPEC,
+      idempotencyPrefix: "watch",
+      watchId: "watch-test",
+      targetOpen: 1,
+      runKey: "r1",
+    });
+    expect(result.reason).toBe("error");
+    expect(result.results.every((r) => r.verdict === "error")).toBe(true);
+    expect(result.openFound).toBe(0);
+  });
+
+  it("treats a live non-terminal status as fail-closed error", async () => {
+    const inProgress = {
+      async placeCall() {
+        return {
+          callId: "call_live_2",
+          result: staffed(),
+          evidence: [],
+          completed: false,
+          simulated: false,
+          verified: true,
+          calleStatus: "in_progress",
+        };
+      },
+    };
+
+    const result = await dispatchWave({
+      caller: inProgress,
+      candidates: candidates.slice(0, 2),
+      spec: SPEC,
+      idempotencyPrefix: "watch",
+      watchId: "watch-test",
+      targetOpen: 1,
+      runKey: "r1",
+    });
+    expect(result.reason).toBe("error");
+    expect(result.results[0]!.verdict).toBe("error");
+    expect(result.results[0]!.summary).toContain("not_terminal");
+  });
 });
