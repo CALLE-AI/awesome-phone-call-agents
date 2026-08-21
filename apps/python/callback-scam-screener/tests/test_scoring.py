@@ -5,7 +5,7 @@ from pipeline.scoring import REMOTE_ACCESS_SIGNAL_ID, score
 from pipeline.signal_catalog import load_catalog
 
 CATALOG = load_catalog()
-METADATA = CallMetadata(number_dialed="REDACTED", duration_seconds=60, timestamp="now")
+METADATA = CallMetadata(number_dialed="REDACTED", duration_seconds=60, timestamp="now", status="COMPLETED")
 
 
 def make_tags(present_ids):

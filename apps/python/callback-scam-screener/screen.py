@@ -135,6 +135,15 @@ def main() -> int:
         "seen timing out a real plan_call). Raise it if you keep seeing 'MCP request timed out' errors.",
     )
     args = parser.parse_args()
+    # Canonicalize once, here, rather than relying on every downstream
+    # comparison to strip consistently — incidental leading/trailing
+    # whitespace on a copy-pasted --to-phone or --allow-number value could
+    # otherwise read as a "different" number to an exact-string comparison
+    # (e.g. the recipient-binding check against CALL-E's own clean response).
+    if args.to_phone:
+        args.to_phone = args.to_phone.strip()
+    if args.allow_number:
+        args.allow_number = [n.strip() for n in args.allow_number]
 
     if args.demo:
         email_body = (SAMPLES / "suspicious_email.txt").read_text(encoding="utf-8-sig")
@@ -168,9 +177,16 @@ def main() -> int:
     if not args.live:
         shown_number = alert.phone_number if args.show_full_number else mask_phone_number(alert.phone_number, alert.phone_number)
         shown_task = task_preview if args.show_full_number else mask_phone_number(task_preview, alert.phone_number)
+        # claimed_reason is whichever line of the raw email matched an
+        # urgency keyword — in a real callback scam that's routinely the
+        # same sentence as the callback number itself ("call us now at
+        # 555-0187"), so this needs the same masking as everything else here.
+        shown_reason = (
+            alert.claimed_reason if args.show_full_number else mask_phone_number(alert.claimed_reason, alert.phone_number)
+        )
         print("PREVIEW — no call will be placed. Add --live --confirm --to-phone <number> to place a real call.\n")
         print("Phone number extracted:", shown_number)
-        print("Claimed reason:", alert.claimed_reason)
+        print("Claimed reason:", shown_reason)
         print("\nTask CALL-E would receive:\n")
         print(shown_task)
         return EXIT_OK

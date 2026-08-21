@@ -24,11 +24,12 @@ class CallMetadata:
     number_dialed: str
     duration_seconds: int
     timestamp: str
-    # Defaults keep every existing call site (tests, MockCallEClient callers
-    # that predate this field) meaning what they already meant: a normal,
-    # completed call. RealCallEClient always sets these explicitly from the
-    # real terminal status CALL-E reported.
-    status: str = "COMPLETED"
+    # Defaults fail closed: a caller who forgets to set status gets treated
+    # as unverified evidence (scoring.py requires COMPLETED to evaluate
+    # signals), not silently as a clean completed call. Every real call site
+    # (RealCallEClient, MockCallEClient) sets this explicitly; tests that
+    # want a completed call must say so explicitly too.
+    status: str = "UNKNOWN"
     call_id: str | None = None
 
 

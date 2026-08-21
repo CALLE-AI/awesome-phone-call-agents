@@ -43,7 +43,7 @@ def tag_transcript(transcript: str, catalog: dict) -> list[SignalTag]:
 def tag_transcript_llm(
     transcript: str,
     catalog: dict,
-    provider: str = "anthropic",
+    provider: str = "gemini",
     model: str | None = None,
     budget: LLMBudgetGuard | None = None,
 ) -> list[SignalTag]:
@@ -56,9 +56,10 @@ def tag_transcript_llm(
     verifiable callback number).
 
     Provider-agnostic (see llm_providers.py) — "bring your own key" applies
-    to whichever provider you already use, not just Anthropic. Pass
-    provider="gemini" (reads GEMINI_API_KEY/GOOGLE_API_KEY) or add another
-    provider there. Requires that provider's own API key in the
+    to whichever provider you already use. Defaults to "gemini" (reads
+    GEMINI_API_KEY/GOOGLE_API_KEY), the only provider currently registered
+    in PROVIDERS; add another provider there rather than defaulting to one
+    that isn't registered. Requires that provider's own API key in the
     environment — deliberately not bundled or shared: every user of this
     project brings their own. Pass a guardrails.LLMBudgetGuard as `budget`
     to cap daily spend (see run_pipeline's tagger parameter for how to wire

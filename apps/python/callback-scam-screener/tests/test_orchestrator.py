@@ -1,6 +1,6 @@
 import pytest
 
-from pipeline.caller import CallEClient, CallResult
+from pipeline.caller import CallEClient, CallResult, RealCallEClient
 from pipeline.guardrails import CallGuardrails, GuardrailViolation
 from pipeline.models import CallMetadata
 from pipeline.orchestrator import run_pipeline
@@ -51,7 +51,7 @@ def test_falls_back_to_extracted_number_when_to_phone_omitted():
 def test_recipient_binding_mismatch_raises_instead_of_scoring():
     # The call result claims a different number was dialed than requested —
     # must never silently score a verdict against the wrong recipient.
-    client = FakeCallClient(result=_completed_result("+19995550000"))
+    client = FakeCallClient(result=_completed_result("+19995550199"))
     with pytest.raises(RuntimeError, match="mismatched recipient"):
         run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
 
@@ -82,6 +82,24 @@ def test_record_attempt_fires_before_dialing_so_a_crash_still_blocks_redial(tmp_
     )
     with pytest.raises(GuardrailViolation, match="unknown outcome"):
         guardrails_after_crash.check("+18005550187")
+
+
+def test_real_client_without_guardrails_fails_closed_at_the_library_boundary():
+    # A caller integrating this library directly (not through screen.py)
+    # who supplies a real, dialing client but forgets guardrails would
+    # otherwise dial with no allowlist, no repeat-dial protection, and no
+    # call cap. This must refuse before ever touching the client — no
+    # subprocess/network mocking needed since it should never get that far.
+    with pytest.raises(GuardrailViolation, match="without guardrails"):
+        run_pipeline(EMAIL_BODY, "example.com", RealCallEClient(), to_phone="+18005550187")
+
+
+def test_mock_client_without_guardrails_is_fine():
+    # The --demo/preview path legitimately has no guardrails and must not
+    # be affected by the RealCallEClient-specific check above.
+    client = FakeCallClient(result=_completed_result("+18005550187"))
+    result = run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+    assert result is not None
 
 
 def test_record_call_only_fires_after_a_successful_result(tmp_path):

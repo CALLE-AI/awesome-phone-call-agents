@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -141,18 +142,43 @@ class RealCallEClient(CallEClient):
         status = run
         while status.get("status") not in TERMINAL_STATUSES:
             if time.monotonic() > deadline:
-                raise TimeoutError(f"Call run {run_id} did not reach a terminal status within {self.poll_timeout_seconds}s")
+                # Same class of problem as the call-run timeout above: we do
+                # not know whether the call is still ringing, finished after
+                # we stopped watching, or something else entirely. Raising
+                # the same AmbiguousCallOutcome (rather than a plain
+                # TimeoutError, which screen.py's except clauses don't catch)
+                # keeps this on the documented exit-53 path instead of
+                # producing a raw traceback for a call that may still be live.
+                raise AmbiguousCallOutcome(
+                    f"Call run {run_id} did not reach a terminal status within {self.poll_timeout_seconds}s. "
+                    "The call may still be in progress. Check `calle call status --run-id <id>` or the CALL-E "
+                    "dashboard before trying again by hand."
+                )
             time.sleep(self.poll_interval_seconds)
             status = self._structured(self._run_cli(["call", "status", "--run-id", run_id], mask=phone_number))
 
         result = status.get("result") or {}
-        calling_meta = ((result.get("extracted") or {}).get("calling")) or {}
+        extracted = result.get("extracted") or {}
+        calling_meta = extracted.get("calling") or {}
         confidence = ((result.get("outcome") or {}).get("completion_confidence")) or {}
+
+        # Recipient binding only means something if we read back an
+        # independent record of who was actually dialed, rather than just
+        # re-stating the number we asked for — otherwise the check downstream
+        # (run_pipeline's mismatch guard) compares a value against itself.
+        # CALL-E's own skill reference documents this exact field for
+        # rendering "Callee Number": result.extracted.to_phones[0], falling
+        # back to result.extracted.calling.callee. Fall back to the
+        # requested number only if CALL-E reports neither — this keeps
+        # existing behavior for whatever fraction of responses omit it,
+        # rather than fabricating a value that was never in CALL-E's output.
+        to_phones = extracted.get("to_phones") or []
+        reported_number = to_phones[0] if to_phones else calling_meta.get("callee")
 
         return CallResult(
             transcript=result.get("transcript") or "",
             metadata=CallMetadata(
-                number_dialed=phone_number,
+                number_dialed=reported_number or phone_number,
                 duration_seconds=calling_meta.get("duration_seconds", 0),
                 timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 status=status.get("status", "UNKNOWN"),
@@ -169,7 +195,17 @@ class RealCallEClient(CallEClient):
         # does, not a guarantee CALL-E's own error text never phrases the
         # number some other way.
         def _masked(s: str) -> str:
-            return mask_phone_number(s, mask) if mask else s
+            if mask:
+                s = mask_phone_number(s, mask)
+            # --confirm-token authorizes actually placing this specific call
+            # and --plan-id identifies it — both are live credential-like
+            # values, not just PII. An ambiguous-timeout message is exactly
+            # the kind of text someone pastes into a bug report, so these
+            # need redacting here the same way the phone number is, not just
+            # the number.
+            s = re.sub(r"(--confirm-token)\s+\S+", r"\1 [redacted]", s)
+            s = re.sub(r"(--plan-id)\s+\S+", r"\1 [redacted]", s)
+            return s
 
         # subprocess.run(["calle", ...]) fails on Windows with FileNotFoundError:
         # npm installs global CLIs as calle.cmd, not a raw .exe, and CreateProcess

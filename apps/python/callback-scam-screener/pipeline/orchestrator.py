@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Callable
 
-from .caller import CallEClient
-from .guardrails import CallGuardrails, mask_phone_number, redact_phone_number
+from .caller import CallEClient, RealCallEClient
+from .guardrails import CallGuardrails, GuardrailViolation, mask_phone_number, redact_phone_number
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
@@ -84,6 +84,16 @@ def run_pipeline(
     alert = extract_alert(email_body, sender_domain)
     if alert is None:
         return None  # not flagged as suspicious — pipeline never dials
+
+    # Fail closed at the library boundary too, not just in screen.py: a
+    # caller that supplies a real, dialing client but skips guardrails would
+    # otherwise dial with no allowlist, no repeat-dial protection, and no
+    # call cap. MockCallEClient (--demo/preview) never dials, so it's exempt.
+    if guardrails is None and isinstance(call_client, RealCallEClient):
+        raise GuardrailViolation(
+            "RealCallEClient was passed without guardrails — refusing to dial. "
+            "Pass a CallGuardrails instance (with an explicit allowlist or unrestricted=True)."
+        )
 
     precheck = run_prechecks(alert, official_support_number)
     catalog = load_catalog(catalog_path)

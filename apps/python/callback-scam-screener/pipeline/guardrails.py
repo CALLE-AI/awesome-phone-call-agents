@@ -31,6 +31,17 @@ class GuardrailViolation(Exception):
 
 
 class CallGuardrails:
+    """Application-level guard on which numbers get dialed, not a
+    platform-enforced lock: check() and record_attempt()/record_call() do a
+    plain read-check-write on a local JSON file with no cross-process
+    locking, so two concurrent `screen.py --live` runs (same machine, same
+    state file) can both pass check() before either records its attempt,
+    and both dial. Same class of limitation LLMBudgetGuard already documents
+    for concurrent runs sharing one key. Narrow in practice — it requires
+    --unrestricted (the dev/test allowlist path is meant for one contributor
+    at a time anyway) and genuinely concurrent invocations, not just back-
+    to-back ones."""
+
     def __init__(
         self,
         allowed_numbers: set[str] | None,
@@ -65,7 +76,13 @@ class CallGuardrails:
                         f"{mask_phone_number(n, n)!r} in allowed_numbers is not a strict E.164 number "
                         "(e.g. +18005550187) — refusing to build an ambiguous allowlist."
                     )
-        self.allowed_numbers = set(allowed_numbers) if allowed_numbers is not None else None
+        # Canonicalized (stripped) here and in check()/record_attempt()/
+        # record_call() below, since is_valid_e164() itself strips before
+        # matching — without stripping here too, "+18005550187" and
+        # "+18005550187 " would both individually pass validation yet compare
+        # as different keys, letting the exact-match scheme above be defeated
+        # by incidental whitespace instead of a real different destination.
+        self.allowed_numbers = {n.strip() for n in allowed_numbers} if allowed_numbers is not None else None
         self.max_calls = max_calls
         self.state_path = state_path
         self._state = self._load_state()
@@ -81,6 +98,7 @@ class CallGuardrails:
         self.state_path.write_text(json.dumps(self._state, indent=2), encoding="utf-8")
 
     def check(self, phone_number: str) -> None:
+        phone_number = phone_number.strip()  # see __init__'s canonicalization note
         # Masked in every message below (not just the final JSON output) —
         # these GuardrailViolation messages get printed to stderr on a
         # refusal, which is exactly the kind of output that ends up pasted
@@ -123,11 +141,13 @@ class CallGuardrails:
         call is actually placed. Recorded this early — rather than only on
         success — so a crash, or a human re-running the same command after an
         ambiguous outcome, can't slip a duplicate real dial past check()."""
+        phone_number = phone_number.strip()
         if phone_number not in self._state["attempted_numbers"]:
             self._state["attempted_numbers"].append(phone_number)
             self._save_state()
 
     def record_call(self, phone_number: str) -> None:
+        phone_number = phone_number.strip()
         self._state["calls_placed"] += 1
         self._state["called_numbers"].append(phone_number)
         if phone_number in self._state["attempted_numbers"]:
@@ -258,9 +278,12 @@ def redact_phone_number(text: str, phone_number: str) -> str:
 # Officially reserved fictional phone-number ranges — anything else that
 # looks like a phone number in this codebase should be treated as suspect.
 PHONE_SAFE_CORE_PATTERNS = [
-    re.compile(r"^7700900\d{3}$"),    # Ofcom UK reserved mobile drama range
-    re.compile(r"^2079460\d{3}$"),    # Ofcom UK reserved London landline drama range
-    re.compile(r"^\d{3}5550\d{3}$"),  # NANP reserved 555-0100 to 555-0199, any area code
+    re.compile(r"^7700900\d{3}$"),   # Ofcom UK reserved mobile drama range
+    re.compile(r"^2079460\d{3}$"),   # Ofcom UK reserved London landline drama range
+    re.compile(r"^\d{3}55501\d{2}$"),  # NANP reserved 555-0100 to 555-0199 exactly, any area code —
+    # previously ^\d{3}5550\d{3}$, which matched the whole 555-0000 to
+    # 555-0999 block; only 555-01XX is actually NANP-reserved, so that let
+    # e.g. 555-0500 (a real, assignable exchange number) through as "safe".
 ]
 
 # Exact substrings that trip the phone-number heuristic below without being

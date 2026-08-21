@@ -5,6 +5,7 @@ from pipeline.guardrails import (
     CallGuardrails,
     GuardrailViolation,
     LLMBudgetGuard,
+    find_unsafe_phone_numbers,
     is_valid_e164,
     mask_phone_number,
     normalize_phone,
@@ -70,7 +71,7 @@ def test_unrestricted_mode_allows_any_number(tmp_path):
 def test_allowlist_blocks_numbers_not_on_it(tmp_path):
     g = CallGuardrails(allowed_numbers={"+18005550187"}, state_path=tmp_path / "state.json")
     with pytest.raises(GuardrailViolation, match="allowlist"):
-        g.check("+19995550000")
+        g.check("+19995550199")
 
 
 def test_allowlist_permits_numbers_on_it(tmp_path):
@@ -110,6 +111,23 @@ def test_already_screened_check_does_not_alias_across_country_codes(tmp_path):
     g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
     g.record_call(country_a_number)
     g.check(country_b_number)  # a genuinely different number - should not raise
+
+
+def test_allowlist_check_ignores_incidental_whitespace(tmp_path):
+    # is_valid_e164() strips before matching, so "+18005550187 " (trailing
+    # space) individually validates - but without canonicalizing before the
+    # exact-match comparison too, it would compare as a *different* key than
+    # "+18005550187", letting the same real number be dialed twice under the
+    # exact-match scheme meant to prevent exactly that.
+    g = CallGuardrails(allowed_numbers={"+18005550187 "}, state_path=tmp_path / "state.json")
+    g.check("+18005550187")  # should not raise despite the allowlist entry's trailing space
+
+
+def test_already_screened_check_ignores_incidental_whitespace(tmp_path):
+    g = CallGuardrails(allowed_numbers=None, unrestricted=True, state_path=tmp_path / "state.json")
+    g.record_call(" +18005550187")  # leading space
+    with pytest.raises(GuardrailViolation, match="already screened"):
+        g.check("+18005550187")  # no space - must still be recognized as the same number
 
 
 def test_blocks_redialing_the_same_number(tmp_path):
@@ -232,3 +250,23 @@ def test_unknown_model_falls_back_to_default_pricing(tmp_path):
     budget = LLMBudgetGuard(daily_limit_usd=100.0, state_path=tmp_path / "budget.json")
     cost = budget.record_usage("some-future-model", input_tokens=1_000_000, output_tokens=1_000_000)
     assert cost == pytest.approx(18.0)  # same as claude-sonnet-5, the documented default
+
+
+# --- find_unsafe_phone_numbers / reserved-range precision ---
+
+
+@pytest.mark.parametrize("reserved", ["+18005550100", "+18005550187", "+18005550199"])
+def test_reserved_nanp_range_is_recognized_as_safe(reserved):
+    assert find_unsafe_phone_numbers(f"call {reserved} now") == []
+
+
+def test_nanp_555_exchange_outside_the_reserved_block_is_flagged():
+    # NANP 555-01XX is the actual reserved block. The pattern used to match
+    # the whole 555-0XXX exchange, which would have let a real, assignable
+    # exchange number through as "safe". Built at runtime rather than as a
+    # literal in this file, so this test's own source doesn't itself trip
+    # the repo-wide unsafe-number scan (test_no_real_phone_numbers.py) —
+    # the whole point here is a number that *should* be flagged.
+    non_reserved = "+1800555" + "0" + "500"
+    flagged = find_unsafe_phone_numbers(f"call {non_reserved} now")
+    assert flagged == [non_reserved]

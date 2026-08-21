@@ -1,8 +1,23 @@
 from pathlib import Path
 
-from pipeline.signal_catalog import build_result_schema, load_catalog, tag_transcript
+import pytest
+
+from pipeline.signal_catalog import build_result_schema, load_catalog, tag_transcript, tag_transcript_llm
 
 CATALOG = load_catalog()
+
+
+def test_tag_transcript_llm_default_provider_is_actually_registered(monkeypatch):
+    # tag_transcript_llm's own default provider used to be "anthropic", which
+    # isn't registered in PROVIDERS (only "gemini" is) — calling it with no
+    # explicit provider raised "Unknown LLM provider" rather than the
+    # intended GEMINI_API_KEY error. Removing both env vars and expecting
+    # the Gemini-specific error (not a registry-lookup failure) proves the
+    # default now resolves to a provider that's actually wired in.
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
+        tag_transcript_llm("irrelevant transcript", CATALOG)
 
 
 def test_load_catalog_has_expected_shape():
