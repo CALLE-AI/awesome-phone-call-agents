@@ -94,9 +94,9 @@ class IdempotencyManager {
      * Releases the lock only upon verified terminal completion.
      */
     public releaseLock(
-        orderId: string, 
-        status: 'completed' | 'failed', 
-        error?: string, 
+        orderId: string,
+        status: 'completed' | 'failed',
+        error?: string,
         result?: any
     ) {
         const key = this.normalizeOrderId(orderId);

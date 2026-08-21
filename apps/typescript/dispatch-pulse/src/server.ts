@@ -3,12 +3,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { triggerPreDeliveryCall } from './calle-service.js';
-import { 
-    authMiddleware, 
-    isValidE164, 
-    maskPhone, 
+import {
+    authMiddleware,
+    isValidE164,
+    maskPhone,
     maskAddress,
-    isAllowedOrigin, 
+    isAllowedOrigin,
     OFFICIAL_CALLE_API_URL,
     getExpectedApiKey,
     createSessionCookie
@@ -111,8 +111,8 @@ app.post('/api/settings', (req, res) => {
         });
     }
 
-    engineSettings = { 
-        ...engineSettings, 
+    engineSettings = {
+        ...engineSettings,
         ...(aiTone && { aiTone }),
         ...(mcpServerUrl && { mcpServerUrl }),
         ...(maxPolls && { maxPolls }),
@@ -207,7 +207,7 @@ app.get('/api/events', (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
-    
+
     clients.push(res);
     console.log('Client connected securely to SSE');
 
@@ -236,17 +236,17 @@ app.post('/api/dispatch', async (req, res) => {
 
     // 1. Strict E.164 Phone Format Validation
     if (!isValidE164(customerPhone)) {
-        return res.status(400).json({ 
-            error: 'InvalidPhone', 
-            message: `Customer phone '${maskPhone(customerPhone)}' is invalid. Must follow standard E.164 format (e.g. +15555550100).` 
+        return res.status(400).json({
+            error: 'InvalidPhone',
+            message: `Customer phone '${maskPhone(customerPhone)}' is invalid. Must follow standard E.164 format (e.g. +15555550100).`
         });
     }
 
     const effectiveRiderPhone = riderPhone || engineSettings.riderPhone || process.env.RIDER_TEST_PHONE || '+15555550101';
     if (!isValidE164(effectiveRiderPhone)) {
-        return res.status(400).json({ 
-            error: 'InvalidPhone', 
-            message: `Rider phone '${maskPhone(effectiveRiderPhone)}' is invalid. Must follow standard E.164 format.` 
+        return res.status(400).json({
+            error: 'InvalidPhone',
+            message: `Rider phone '${maskPhone(effectiveRiderPhone)}' is invalid. Must follow standard E.164 format.`
         });
     }
 

@@ -1,15 +1,15 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { 
-    isValidE164, 
-    maskPhone, 
-    isAllowedOrigin, 
+import {
+    isValidE164,
+    maskPhone,
+    isAllowedOrigin,
     assertTrustedBaseUrl,
-    escapeHtml, 
+    escapeHtml,
     getExpectedApiKey,
     createSessionCookie,
     verifySessionCookie,
-    OFFICIAL_CALLE_API_URL 
+    OFFICIAL_CALLE_API_URL
 } from '../src/security.js';
 import { idempotencyManager } from '../src/idempotency.js';
 
@@ -117,7 +117,7 @@ describe('Security & Cryptography: HMAC Signed Session Cookies & Key Separation'
         const validCookie = createSessionCookie(testSecret);
         const [timestamp] = validCookie.split('.');
         const forgedCookie = `${timestamp}.0000000000000000000000000000000000000000000000000000000000000000`;
-        
+
         assert.equal(verifySessionCookie(forgedCookie, testSecret), false);
         assert.equal(verifySessionCookie(validCookie, 'wrong_secret_key'), false);
     });

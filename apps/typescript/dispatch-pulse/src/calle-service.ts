@@ -289,7 +289,7 @@ export async function triggerPreDeliveryCall(order: Order, settings: any = {}) {
     // STAGE 1: REAL CALL TO CUSTOMER
     // ==========================================
     const customerTaskDescription = `Confirm delivery address ${order.address} for Order #${order.id}. Speak in a polite tone. Ask if recipient is available or if gate pass code is needed.`;
-    
+
     // Stable deterministic Stage 1 provider idempotency key
     const customerProviderKey = `dispatch-pulse:order:${order.id.trim()}:customer`;
     const customerMetadata = {
@@ -375,8 +375,8 @@ export async function triggerPreDeliveryCall(order: Order, settings: any = {}) {
     // Requires exact task, order, metadata, and recipient binding with explicit taskCompleted === true
     const customerResult = customerResultData?.structuredResult as any;
     const recipientPhoneMatches = Boolean(
-        customerResultData?.recipients?.some((r: any) => 
-            r?.phone === order.customerPhone || 
+        customerResultData?.recipients?.some((r: any) =>
+            r?.phone === order.customerPhone ||
             (Array.isArray(r?.phones) && r.phones.includes(order.customerPhone))
         ) ||
         rawCall?.recipients?.some((r: any) =>
@@ -418,7 +418,7 @@ export async function triggerPreDeliveryCall(order: Order, settings: any = {}) {
         const errMsg = isRescheduled
             ? `Customer requested reschedule for Order #${order.id}. Delivery held; rider dispatch aborted.`
             : `Customer verification call ended without authoritative bound confirmation for Order #${order.id}. Rider dispatch aborted.`;
-        
+
         console.warn(`[Dispatch Workflow] ${errMsg}`);
         broadcastEvent({
             orderId: order.id,
@@ -492,7 +492,7 @@ export async function triggerPreDeliveryCall(order: Order, settings: any = {}) {
     });
 
     const riderTaskDescription = `Call delivery rider ${assignedRider.name} for Order #${order.id}. Deliver customer instruction: "${riderInstructionSummary}". Ask rider to explicitly acknowledge and confirm receipt.`;
-    
+
     // Stable deterministic Stage 2 provider idempotency key
     const riderProviderIdempotencyKey = `dispatch-pulse:order:${order.id.trim()}:rider`;
     const riderMetadata = {
@@ -566,8 +566,8 @@ export async function triggerPreDeliveryCall(order: Order, settings: any = {}) {
     // Require exact task, order, metadata, and recipient binding with explicit taskCompleted === true
     const riderResult = riderResultData?.structuredResult as any;
     const riderRecipientPhoneMatches = Boolean(
-        riderResultData?.recipients?.some((r: any) => 
-            r?.phone === assignedRider.phone || 
+        riderResultData?.recipients?.some((r: any) =>
+            r?.phone === assignedRider.phone ||
             (Array.isArray(r?.phones) && r.phones.includes(assignedRider.phone))
         ) ||
         rawRiderCall?.recipients?.some((r: any) =>

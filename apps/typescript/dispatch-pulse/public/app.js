@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const analyticsOutcomesGrid = document.getElementById('analyticsOutcomesGrid');
     const settingsForm = document.getElementById('settingsForm');
     const testConnBtn = document.getElementById('testConnBtn');
-    
+
     const activeOrders = new Map();
     let currentFilter = 'all';
     let currentSearchTerm = '';
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dispatchForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const orderId = document.getElementById('orderId').value.trim();
         const customerPhone = document.getElementById('customerPhone').value.trim();
         const address = document.getElementById('address').value.trim();
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Apply Search Filter
         if (currentSearchTerm) {
-            ordersArray = ordersArray.filter(o => 
+            ordersArray = ordersArray.filter(o =>
                 (o.orderId || '').toLowerCase().includes(currentSearchTerm) ||
                 (o.phone || '').toLowerCase().includes(currentSearchTerm) ||
                 (o.address || '').toLowerCase().includes(currentSearchTerm) ||
@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div><strong>Assigned Rider:</strong> ${data.rider ? `${escapeHtml(data.rider.name)} (${escapeHtml(data.rider.phone)})` : 'Unassigned'}</div>
                 <div style="grid-column: span 2;"><strong>Current Status:</strong> <span class="status-badge">${escapeHtml(data.status)}</span></div>
             </div>
-            
+
             <!-- Stage 1 Banner -->
             <div class="stage-banner">
                 <div class="stage-header-title">

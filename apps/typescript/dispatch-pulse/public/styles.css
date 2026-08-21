@@ -24,7 +24,7 @@
 body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background-color: var(--menurants-bg);
-    background-image: 
+    background-image:
         radial-gradient(circle at 15% 15%, rgba(0, 192, 135, 0.08) 0%, transparent 40%),
         radial-gradient(circle at 85% 85%, rgba(5, 217, 155, 0.05) 0%, transparent 45%);
     color: var(--text-main);
@@ -1178,5 +1178,3 @@ tr:hover {
         white-space: nowrap;
     }
 }
-
-

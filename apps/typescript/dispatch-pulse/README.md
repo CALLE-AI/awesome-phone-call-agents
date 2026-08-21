@@ -1,6 +1,6 @@
 # 📦 DispatchPulse — AI Voice Logistics Command Center
 
-> **Built for the CALL-E Hackathon: *Your Code Is Calling***  
+> **Built for the CALL-E Hackathon: *Your Code Is Calling***
 > Submission Category: **Workflow Plugins / Full-Stack Applications**
 
 DispatchPulse is a real-time logistics command center and automated 2-stage pre-delivery phone call verification engine powered by **[CALL-E](https://call-e.ai)** voice AI.

@@ -65,7 +65,7 @@ describe('API Endpoint Authorization Boundaries', () => {
         assert.equal(res.status, 200);
         const cookie = res.headers.get('set-cookie');
         assert.ok(cookie && cookie.includes('dp_session='));
-        
+
         const cookieVal = cookie ? (cookie.split('dp_session=')[1]?.split(';')[0] || '') : '';
         assert.equal(verifySessionCookie(cookieVal, authKey), true);
 
