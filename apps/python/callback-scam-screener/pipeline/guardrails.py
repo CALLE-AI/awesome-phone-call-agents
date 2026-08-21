@@ -224,7 +224,14 @@ def full_digits_match(a: str, b: str) -> bool:
     E.164 string — e.g. "+18005550187" vs "18005550187" vs "+1 800 555
     0187" vs "(800) 555-0187" (with the country code) all compare equal;
     "(800) 555-0187" (missing the country code, ambiguous) does not."""
-    return "".join(ch for ch in a if ch.isdigit()) == "".join(ch for ch in b if ch.isdigit())
+    a_digits = "".join(ch for ch in a if ch.isdigit())
+    b_digits = "".join(ch for ch in b if ch.isdigit())
+    # Two digit-free strings ("", "unknown", "---") would otherwise compare
+    # equal to each other — currently unreachable (both call sites only ever
+    # pass an already-validated E.164 value or a regex-extracted string with
+    # 9+ digits), but a comparison helper shouldn't rely on its callers never
+    # handing it a degenerate input to stay correct.
+    return bool(a_digits) and a_digits == b_digits
 
 
 # ITU-T E.164: a leading '+', then a country code that doesn't start with 0,

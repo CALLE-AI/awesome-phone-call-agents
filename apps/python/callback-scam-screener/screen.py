@@ -205,8 +205,14 @@ def main() -> int:
     # 555-0187"), so exact E.164 comparison would reject the very case this
     # check exists to allow - a human confirming, via --to-phone, the number
     # they can already see in the email. This is a "does this match what's
-    # in the email" sanity check, not the authorization boundary; that's the
-    # allowlist/--unrestricted gate below, which is exact.
+    # in the email" sanity check, not the authorization boundary. --allow-number
+    # (below) is an exact gate; --unrestricted is not a gate on the number
+    # at all - it's a bare acknowledgment that any destination matching what's
+    # in the email is accepted, so in --unrestricted mode this loose,
+    # last-10-digit check is the only thing tying the dialed number to the
+    # email at all. That's the accepted tradeoff of --unrestricted, not a bug,
+    # but --unrestricted does not make this check "exact" the way the
+    # allowlist path does.
     if normalize_phone(args.to_phone) != normalize_phone(alert.phone_number):
         print(
             f"--to-phone ({mask_phone_number(args.to_phone, args.to_phone)}) does not match the number "

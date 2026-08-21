@@ -30,6 +30,17 @@ def _timed_out_proc():
     return _Proc()
 
 
+def _failed_proc(stderr: str):
+    class _Proc:
+        returncode = 1
+
+        def __init__(self):
+            self.stdout = ""
+            self.stderr = stderr
+
+    return _Proc()
+
+
 @patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
 @patch("pipeline.caller.subprocess.run")
 def test_call_run_timeout_raises_without_retrying(mock_run, mock_which):
@@ -136,6 +147,27 @@ def test_recipient_binding_falls_back_to_requested_number_when_calle_reports_nei
 
 @patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
 @patch("pipeline.caller.subprocess.run")
+def test_duration_seconds_defaults_to_zero_on_an_explicit_null(mock_run, mock_which):
+    # calling_meta.get("duration_seconds", 0) only supplies the default when
+    # the key is *absent* - an explicit JSON null for the key would still
+    # come through as None (an int-typed field), not the documented 0.
+    run_completed = json.dumps(
+        {
+            "run_id": "run-1",
+            "status": "COMPLETED",
+            "result": {"transcript": "hi", "extracted": {"calling": {"duration_seconds": None}}},
+        }
+    )
+    mock_run.side_effect = [_completed_proc(PLAN_READY), _completed_proc(run_completed)]
+
+    client = RealCallEClient()
+    result = client.place_screening_call("+18005550187", "task text")
+
+    assert result.metadata.duration_seconds == 0
+
+
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
 def test_call_run_timeout_error_does_not_leak_confirm_token(mock_run, mock_which):
     # --confirm-token authorizes actually placing this specific call — a
     # live credential, not just PII. It must not leak into an error message
@@ -148,6 +180,26 @@ def test_call_run_timeout_error_does_not_leak_confirm_token(mock_run, mock_which
         client.place_screening_call("+18005550187", "task text")
 
     assert "token-1" not in str(exc_info.value)
+    assert "[redacted]" in str(exc_info.value)
+
+
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
+def test_confirm_token_redacted_even_in_an_equals_style_rendering(mock_run, mock_which):
+    # The redaction regex must catch "--confirm-token=X" (an "=" separator),
+    # not just "--confirm-token X" (a space) - e.g. if CALL-E's own error
+    # output ever echoes the command back in that style.
+    mock_run.side_effect = [
+        _completed_proc(PLAN_READY),
+        _failed_proc("bad request: --confirm-token=token-1 --plan-id=plan-1 was rejected"),
+    ]
+
+    client = RealCallEClient(max_request_retries=0)
+    with pytest.raises(RuntimeError) as exc_info:
+        client.place_screening_call("+18005550187", "task text")
+
+    assert "token-1" not in str(exc_info.value)
+    assert "plan-1" not in str(exc_info.value)
     assert "[redacted]" in str(exc_info.value)
 
 
