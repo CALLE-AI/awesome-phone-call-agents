@@ -3,7 +3,7 @@ import pytest
 from pipeline.caller import CallEClient, CallResult, RealCallEClient
 from pipeline.guardrails import CallGuardrails, GuardrailViolation
 from pipeline.models import CallMetadata
-from pipeline.orchestrator import run_pipeline
+from pipeline.orchestrator import RecipientMismatch, run_pipeline
 
 EMAIL_BODY = (
     "Subject: Unusual Activity Detected\n\n"
@@ -52,7 +52,7 @@ def test_recipient_binding_mismatch_raises_instead_of_scoring():
     # The call result claims a different number was dialed than requested —
     # must never silently score a verdict against the wrong recipient.
     client = FakeCallClient(result=_completed_result("+19995550199"))
-    with pytest.raises(RuntimeError, match="mismatched recipient"):
+    with pytest.raises(RecipientMismatch, match="mismatched recipient"):
         run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
 
 
@@ -62,8 +62,36 @@ def test_recipient_binding_does_not_alias_across_country_codes():
     # codes) - normalize_phone's truncated comparison used to treat them
     # as equal. The binding check must still catch this as a mismatch.
     client = FakeCallClient(result=_completed_result("+447700900187"))
-    with pytest.raises(RuntimeError, match="mismatched recipient"):
+    with pytest.raises(RecipientMismatch, match="mismatched recipient"):
         run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+17700900187")
+
+
+@pytest.mark.parametrize(
+    "reported_rendering",
+    ["18005550187", "+1 800 555 0187", "+1-800-555-0187"],
+)
+def test_recipient_binding_tolerates_calle_formatting_a_real_match_differently(reported_rendering):
+    # CALL-E's own report of the dialed number may not be formatted exactly
+    # like our own validated E.164 string (no "+", different separators)
+    # even when it's genuinely the same real number, and every rendering
+    # here still carries the full country code. An exact-string comparison
+    # would discard a real, completed call's transcript over formatting
+    # alone and permanently mark the number as an unresolved attempt -
+    # full_digits_match must tolerate this.
+    client = FakeCallClient(result=_completed_result(reported_rendering))
+    result = run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
+    assert result is not None
+
+
+def test_recipient_binding_still_rejects_a_report_missing_the_country_code():
+    # "(800) 555-0187" has no country code at all - unlike the renderings
+    # above, this is genuinely ambiguous (it could be the same number
+    # written carelessly, or the national number of a different country's
+    # destination entirely), so this must still fail closed rather than
+    # guess it's a match.
+    client = FakeCallClient(result=_completed_result("(800) 555-0187"))
+    with pytest.raises(RecipientMismatch, match="mismatched recipient"):
+        run_pipeline(EMAIL_BODY, "example.com", client, to_phone="+18005550187")
 
 
 def test_record_attempt_fires_before_dialing_so_a_crash_still_blocks_redial(tmp_path):

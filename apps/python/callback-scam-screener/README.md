@@ -83,7 +83,8 @@ uv run python screen.py \
 | 50 | Usage error or explicit refusal: missing `--confirm`/`--to-phone`, `--to-phone` doesn't match the number extracted from the email or isn't strict E.164, or neither `--allow-number` nor `--unrestricted` was given |
 | 51 | CALL-E's own platform guardrails rejected the call plan (e.g. a goal that isn't transparent about being an AI) |
 | 52 | Blocked by this app's own guardrails: dev/test allowlist, repeat-dial protection, an unresolved prior attempt, call cap, or the daily LLM budget cap |
-| 53 | The call's outcome is ambiguous — a request that may have already dialed the phone (`call run`) timed out client-side. Not retried automatically (no idempotency key exists to make a retry safe); check `calle call status` or the CALL-E dashboard before trying again by hand |
+| 53 | The call's outcome is ambiguous — a request that may have already dialed the phone (`call run`) timed out client-side, or a call ran past the poll timeout without reaching a terminal status. Not retried automatically (no idempotency key exists to make a retry safe); check `calle call status` or the CALL-E dashboard before trying again by hand |
+| 54 | CALL-E's own report of who it dialed doesn't match what was requested. The call already completed and produced a transcript — that evidence is discarded rather than scored against the wrong recipient. Check `calle call status` for the actual destination before retrying |
 
 ## Side effects, credentials, data
 

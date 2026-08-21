@@ -1,4 +1,6 @@
 import screen
+from pipeline.caller import CallEClient, CallResult
+from pipeline.models import CallMetadata
 
 SAMPLES = "samples/suspicious_email.txt"
 
@@ -6,6 +8,22 @@ SAMPLES = "samples/suspicious_email.txt"
 def _run_preview(monkeypatch, argv):
     monkeypatch.setattr("sys.argv", ["screen.py", *argv])
     return screen.main()
+
+
+class _StubClient(CallEClient):
+    """Stands in for RealCallEClient so a real subprocess/CLI is never
+    invoked, while still exercising main()'s actual exception handling."""
+
+    def __init__(self, number_dialed: str, **kwargs):
+        self._number_dialed = number_dialed
+
+    def place_screening_call(self, phone_number, task, result_schema=None):
+        return CallResult(
+            transcript="a real conversation happened",
+            metadata=CallMetadata(
+                number_dialed=self._number_dialed, duration_seconds=30, timestamp="now", status="COMPLETED"
+            ),
+        )
 
 
 def test_preview_masks_the_extracted_number_by_default(monkeypatch, capsys):
@@ -47,3 +65,36 @@ def test_preview_masks_the_number_even_when_it_shares_the_claimed_reason_line(mo
     assert exit_code == screen.EXIT_OK
     assert "5550187" not in out
     assert "Claimed reason:" in out
+
+
+def test_live_run_exits_54_on_recipient_mismatch(monkeypatch, capsys, tmp_path):
+    # End-to-end through screen.main() (no real subprocess/CLI involved):
+    # CALL-E reports a genuinely different destination than requested, which
+    # must surface as exit code 54 with an accurate message, not fall
+    # through to the generic "CALL-E would not plan this call" (51) path.
+    #
+    # screen.py has no --state-path override, so CallGuardrails otherwise
+    # uses the real on-disk default state file - shared across every test in
+    # the suite that goes through this path, and liable to already have this
+    # fictional number recorded as attempted/screened by another test,
+    # producing exit 52 instead. Redirect state_path to an isolated tmp file.
+    real_call_guardrails = screen.CallGuardrails
+    monkeypatch.setattr(
+        screen, "CallGuardrails",
+        lambda **kwargs: real_call_guardrails(**kwargs, state_path=tmp_path / "state.json"),
+    )
+    monkeypatch.setattr(screen, "RealCallEClient", lambda **kwargs: _StubClient("+19995550199"))
+    exit_code = _run_preview(
+        monkeypatch,
+        [
+            "--email", SAMPLES,
+            "--sender-domain", "secure-alerts-billing.com",
+            "--live", "--confirm",
+            "--to-phone", "+18005550187",
+            "--allow-number", "+18005550187",
+        ],
+    )
+    err = capsys.readouterr().err
+    assert exit_code == screen.EXIT_RECIPIENT_MISMATCH
+    assert "mismatched recipient" in err
+    assert "would not plan this call" not in err  # must not be misreported as a plan rejection

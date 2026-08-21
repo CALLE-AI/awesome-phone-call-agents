@@ -179,7 +179,7 @@ class RealCallEClient(CallEClient):
             transcript=result.get("transcript") or "",
             metadata=CallMetadata(
                 number_dialed=reported_number or phone_number,
-                duration_seconds=calling_meta.get("duration_seconds", 0),
+                duration_seconds=calling_meta.get("duration_seconds") or 0,
                 timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 status=status.get("status", "UNKNOWN"),
                 call_id=run_id,
@@ -203,8 +203,12 @@ class RealCallEClient(CallEClient):
             # the kind of text someone pastes into a bug report, so these
             # need redacting here the same way the phone number is, not just
             # the number.
-            s = re.sub(r"(--confirm-token)\s+\S+", r"\1 [redacted]", s)
-            s = re.sub(r"(--plan-id)\s+\S+", r"\1 [redacted]", s)
+            # [\s=]+ rather than \s+: covers both "--confirm-token XYZ" (how
+            # we invoke the CLI) and a "--confirm-token=XYZ" rendering CALL-E
+            # itself might use when echoing the command back in its own
+            # stderr/stdout, which this function also masks.
+            s = re.sub(r"(--confirm-token)[\s=]+\S+", r"\1 [redacted]", s)
+            s = re.sub(r"(--plan-id)[\s=]+\S+", r"\1 [redacted]", s)
             return s
 
         # subprocess.run(["calle", ...]) fails on Windows with FileNotFoundError:

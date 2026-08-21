@@ -2,12 +2,22 @@ from pathlib import Path
 from typing import Callable
 
 from .caller import CallEClient, RealCallEClient
-from .guardrails import CallGuardrails, GuardrailViolation, mask_phone_number, redact_phone_number
+from .guardrails import CallGuardrails, GuardrailViolation, full_digits_match, mask_phone_number, redact_phone_number
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
 from .scoring import score
 from .trigger import extract_alert
+
+
+class RecipientMismatch(RuntimeError):
+    """Raised when CALL-E's own report of who it dialed doesn't match what
+    was requested. Distinct from a plain RuntimeError (which screen.py
+    reports as "CALL-E would not plan this call") because by the time this
+    can fire, CALL-E has already planned, placed, and completed a real call
+    — the failure is discovered *after* the fact, on the evidence, not
+    during planning. Reported under its own exit code so the message and
+    the documented meaning of the code both stay accurate."""
 
 # See AGENT_PROMPTS.md — this is the Screener Agent's aim, expressed as a
 # CALL-E `task` (a goal, not a branching script — CALL-E adapts the actual
@@ -107,17 +117,27 @@ def run_pipeline(
     task = SCREENER_TASK_TEMPLATE.format(phone_number=dial_number)
     call_result = call_client.place_screening_call(dial_number, task)
 
-    # Recipient binding: exact string comparison, not normalize_phone's
-    # last-10-digits form — that truncation drops the country code and can
-    # alias two different countries' numbers together, which would defeat
-    # the point of this check. Both sides are already-validated E.164 by
-    # construction, so exact comparison is correct here, not just simpler.
-    if call_result.metadata.number_dialed != dial_number:
+    # Recipient binding: compare by full digit sequence (full_digits_match),
+    # not exact string and not normalize_phone's last-10-digits form.
+    # dial_number is always our own validated E.164 string, but
+    # call_result.metadata.number_dialed may be CALL-E's own rendering of
+    # the same real number — with or without "+", with different
+    # separators — and an exact-string comparison would reject a
+    # successfully completed real call over formatting alone, discarding
+    # its transcript and permanently marking the number as an unresolved
+    # attempt (see record_attempt) for no real reason. full_digits_match
+    # still requires the complete digit sequence including country code,
+    # so it stays safe against the cross-country aliasing exact matching
+    # was introduced to prevent — only truncated forms (normalize_phone)
+    # are unsafe here, not full untruncated ones.
+    if not full_digits_match(call_result.metadata.number_dialed, dial_number):
         got = mask_phone_number(call_result.metadata.number_dialed, call_result.metadata.number_dialed)
         expected = mask_phone_number(dial_number, dial_number)
-        raise RuntimeError(
+        raise RecipientMismatch(
             f"Call result is for {got!r} but {expected!r} was requested "
-            "— refusing to score a verdict against a mismatched recipient."
+            "— refusing to score a verdict against a mismatched recipient. CALL-E already placed and "
+            "completed this call; the transcript is being discarded rather than scored against the wrong "
+            "number. Check `calle call status` for the actual destination before retrying."
         )
 
     if guardrails is not None:

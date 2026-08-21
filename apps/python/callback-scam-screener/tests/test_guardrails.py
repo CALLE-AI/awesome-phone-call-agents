@@ -6,6 +6,7 @@ from pipeline.guardrails import (
     GuardrailViolation,
     LLMBudgetGuard,
     find_unsafe_phone_numbers,
+    full_digits_match,
     is_valid_e164,
     mask_phone_number,
     normalize_phone,
@@ -270,3 +271,27 @@ def test_nanp_555_exchange_outside_the_reserved_block_is_flagged():
     non_reserved = "+1800555" + "0" + "500"
     flagged = find_unsafe_phone_numbers(f"call {non_reserved} now")
     assert flagged == [non_reserved]
+
+
+# --- full_digits_match ---
+
+
+@pytest.mark.parametrize(
+    "rendering",
+    ["+18005550187", "18005550187", "+1 800 555 0187", "+1-800-555-0187", "(1) 800-555-0187"],
+)
+def test_full_digits_match_tolerates_formatting_of_the_same_full_number(rendering):
+    assert full_digits_match(rendering, "+18005550187")
+
+
+def test_full_digits_match_rejects_a_number_missing_the_country_code():
+    # "(800) 555-0187" has no country code at all - genuinely ambiguous,
+    # not just differently formatted, so this must not match.
+    assert not full_digits_match("(800) 555-0187", "+18005550187")
+
+
+def test_full_digits_match_does_not_alias_across_country_codes():
+    # Unlike normalize_phone's last-10-digits form, comparing the complete
+    # digit sequence must still tell these two different countries' numbers
+    # apart even though they share the same last 10 digits.
+    assert not full_digits_match("+447700900123", "+17700900123")

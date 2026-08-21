@@ -214,6 +214,19 @@ def normalize_phone(number: str) -> str:
     return "".join(ch for ch in number if ch.isdigit())[-10:]
 
 
+def full_digits_match(a: str, b: str) -> bool:
+    """Compares two E.164-ish strings by their complete digit sequence, with
+    no truncation — unlike normalize_phone's last-10-digits form, this never
+    discards a country code, so it stays safe against the same cross-country
+    aliasing exact-string matching was introduced to prevent. Use this
+    instead of `==` wherever one side of a comparison might be a real
+    provider's own rendering of a number rather than our own validated
+    E.164 string — e.g. "+18005550187" vs "18005550187" vs "+1 800 555
+    0187" vs "(800) 555-0187" (with the country code) all compare equal;
+    "(800) 555-0187" (missing the country code, ambiguous) does not."""
+    return "".join(ch for ch in a if ch.isdigit()) == "".join(ch for ch in b if ch.isdigit())
+
+
 # ITU-T E.164: a leading '+', then a country code that doesn't start with 0,
 # then up to 14 more digits (15 total). Deliberately strict — a caller must
 # supply an already-unambiguous, fully-qualified number (with country code)

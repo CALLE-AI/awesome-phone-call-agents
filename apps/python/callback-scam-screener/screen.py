@@ -44,7 +44,7 @@ from pipeline.guardrails import (
     normalize_phone,
 )
 from pipeline.llm_providers import PROVIDERS as LLM_PROVIDERS
-from pipeline.orchestrator import SCREENER_TASK_TEMPLATE, run_pipeline
+from pipeline.orchestrator import SCREENER_TASK_TEMPLATE, RecipientMismatch, run_pipeline
 from pipeline.signal_catalog import tag_transcript_llm
 from pipeline.trigger import extract_alert
 
@@ -63,6 +63,7 @@ EXIT_USAGE_OR_REFUSAL = 50
 EXIT_CALLE_REJECTED_PLAN = 51
 EXIT_BUDGET_OR_GUARDRAIL = 52
 EXIT_AMBIGUOUS_CALL_OUTCOME = 53
+EXIT_RECIPIENT_MISMATCH = 54
 
 
 def main() -> int:
@@ -266,6 +267,9 @@ def main() -> int:
             file=sys.stderr,
         )
         return EXIT_AMBIGUOUS_CALL_OUTCOME
+    except RecipientMismatch as e:
+        print(f"Refusing to score this result: {e}", file=sys.stderr)
+        return EXIT_RECIPIENT_MISMATCH
     except RuntimeError as e:
         print(f"CALL-E would not plan this call: {e}", file=sys.stderr)
         return EXIT_CALLE_REJECTED_PLAN
