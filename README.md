@@ -149,6 +149,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/pour-ready`](apps/typescript/pour-ready/) | TypeScript | AI pre-pour coordination gate that calls four authorized concrete-operation roles, exposes conflicting verbal commitments with redacted evidence, and leaves proceed or hold to a human. |
 | [`apps/typescript/asyncfounders`](apps/typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
 | [`apps/typescript/one-more-story`](apps/typescript/one-more-story/) | TypeScript | Consent-first oral-history call that discloses AI use, preserves the storyteller's correction, and creates no story until the corrected read-back is explicitly confirmed. |
 | [`apps/web/callproof`](apps/web/callproof/) | Ruby / Python | Closed-loop CALL-E workflow that checks transcript evidence against an immutable call contract and routes policy exceptions to persisted AgentKit human review. |
