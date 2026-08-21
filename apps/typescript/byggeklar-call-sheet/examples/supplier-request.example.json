@@ -1,0 +1,18 @@
+{
+  "request_id": "project-elm-rfq-07",
+  "project_name": "Project Elm",
+  "supplier_name": "Northbridge Timber Demo Supplier",
+  "phone": "+442079460123",
+  "region": "GB",
+  "locale": "en-GB",
+  "consent_note": "Demo contact has consented to one automated supplier-readiness call.",
+  "material": "48 lengths of FSC-certified C24 timber, 47 x 150 mm",
+  "requested_delivery_date": "2026-09-02",
+  "questions": [
+    "Can you supply the full quantity by the requested delivery date?",
+    "Until what date is the quoted price valid?",
+    "Are delivery, unloading, or pallet fees excluded from the quote?",
+    "Is any substitution required?"
+  ],
+  "calling_window": "Weekdays 09:00-16:00 in the supplier's local time"
+}
