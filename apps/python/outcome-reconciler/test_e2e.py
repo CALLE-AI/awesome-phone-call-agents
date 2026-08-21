@@ -62,6 +62,7 @@ def start_fake_server(fixture: str, hang_seconds: float = 30.0) -> tuple[subproc
 def run_cli(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     merged = dict(os.environ)
     merged.pop("CALLE_API_KEY", None)
+    merged.pop("CALLE_TEST_API_KEY", None)
     merged.pop("CALLE_BASE_URL", None)
     if env:
         merged.update(env)
@@ -100,7 +101,7 @@ def test_reconcile_over_http_reports_a_documented_completion(fake_server: dict) 
         "--max-observations",
         "6",
         *FAST_BACKOFF,
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_OK, result.stderr
     record = json.loads(result.stdout)
@@ -121,7 +122,7 @@ def test_reconcile_over_http_refuses_to_guess_an_undocumented_code(fake_server: 
         "--max-observations",
         "6",
         *FAST_BACKOFF,
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_UNRESOLVED
     record = json.loads(result.stdout)
@@ -144,7 +145,7 @@ def test_a_stuck_call_terminates_at_the_budget_rather_than_hanging(fake_server: 
         "--max-seconds",
         "30",
         *FAST_BACKOFF,
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_UNRESOLVED
     record = json.loads(result.stdout)
@@ -175,7 +176,7 @@ def test_a_documented_decline_is_reachable_from_a_live_goal_run(fake_server: dic
         "--max-observations",
         "6",
         *FAST_BACKOFF,
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_OK, result.stderr
     record = json.loads(result.stdout)
@@ -196,7 +197,7 @@ def test_the_goal_runs_surface_refuses_to_run_without_a_goal_id() -> None:
         "rgrp_e2e_nogoal",
         "--base-url",
         "http://127.0.0.1:1",
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_ERROR
     assert "--goal-id" in result.stderr
@@ -221,7 +222,7 @@ def test_a_hung_request_is_a_plan_timeout_over_real_http(fake_server: dict) -> N
         "--max-observations",
         "3",
         *FAST_BACKOFF,
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_UNRESOLVED
     record = json.loads(result.stdout)
@@ -245,7 +246,7 @@ def test_the_api_key_is_not_sent_to_an_untrusted_base_url() -> None:
         "call_e2e_badhost",
         "--base-url",
         "https://api.heycall-e.com.attacker.example",
-        env={"CALLE_API_KEY": FAKE_TOKEN},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN},
     )
     assert result.returncode == EXIT_ERROR
     assert "not a host this app trusts" in result.stderr
@@ -260,7 +261,7 @@ def test_the_base_url_may_come_from_the_environment(fake_server: dict) -> None:
         "--max-observations",
         "6",
         *FAST_BACKOFF,
-        env={"CALLE_API_KEY": FAKE_TOKEN, "CALLE_BASE_URL": fake_server["base_url"]},
+        env={"CALLE_TEST_API_KEY": FAKE_TOKEN, "CALLE_BASE_URL": fake_server["base_url"]},
     )
     assert result.returncode == EXIT_OK, result.stderr
     assert json.loads(result.stdout)["outcome"] == "completed"
@@ -478,3 +479,65 @@ def test_a_fixture_naming_an_unknown_surface_resolves_rather_than_crashing() -> 
         result = run_cli("replay", "--fixture", str(path), *FAST_BACKOFF)
     assert result.returncode == EXIT_UNRESOLVED
     assert json.loads(result.stdout)["reason"] == "undocumented_code"
+
+
+# -- explain is documented as safe to share ---------------------------------
+
+
+def test_explain_never_prints_upstream_call_prose(tmp_path: Path) -> None:
+    """safety.md promises this view can be shared. Then keep it shareable.
+
+    `summary` and `evidence` are upstream's prose about what was said on the
+    call. They were briefly printed here, which quietly falsified that promise.
+    """
+    record_path = tmp_path / "record.json"
+    replay = run_cli(
+        "replay", "--fixture", str(FIXTURE_DIR / "completed_voicemail.json"),
+        "--output", str(record_path), *FAST_BACKOFF,
+    )
+    assert replay.returncode == EXIT_OK, replay.stderr
+
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    judgment = record["upstream_judgment"]
+
+    # positive control: the payload really does carry prose, so the assertions
+    # below cannot pass merely because there was nothing to leak
+    assert judgment["summary"], "fixture no longer carries a summary; this test is vacuous"
+    assert judgment["evidence"], "fixture no longer carries evidence; this test is vacuous"
+
+    explained = run_cli("explain", "--record", str(record_path))
+    assert explained.returncode == EXIT_OK, explained.stderr
+
+    assert judgment["summary"] not in explained.stdout
+    for item in judgment["evidence"]:
+        assert item not in explained.stdout
+    # the useful signal survives without the prose
+    assert "task_completed" in explained.stdout
+    assert "False" in explained.stdout
+
+
+def test_explain_masks_the_call_reference(tmp_path: Path) -> None:
+    record_path = tmp_path / "record.json"
+    run_cli(
+        "replay", "--fixture", str(FIXTURE_DIR / "happy.json"),
+        "--call-ref", "call_sensitive_reference_value",
+        "--output", str(record_path), *FAST_BACKOFF,
+    )
+    explained = run_cli("explain", "--record", str(record_path))
+    assert "call_sensitive_reference_value" not in explained.stdout
+    assert "call_sens" in explained.stdout
+
+
+def test_explain_never_prints_a_raw_payload_field(tmp_path: Path) -> None:
+    """The other half of the safety.md promise."""
+    record_path = tmp_path / "record.json"
+    run_cli(
+        "replay", "--fixture", str(FIXTURE_DIR / "unknown_failure_code.json"),
+        "--output", str(record_path), *FAST_BACKOFF,
+    )
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert record["raw"]["last_payload"]["failure_code"] == "carrier_reject_42"  # control
+
+    explained = run_cli("explain", "--record", str(record_path))
+    assert "carrier_reject_42" not in explained.stdout
+    assert "unrecognised-field-preserved" not in explained.stdout

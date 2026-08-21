@@ -64,6 +64,21 @@ def mask_phone(phone: str | None) -> str | None:
     return phone[:keep] + "*" * (len(phone) - keep)
 
 
+def mask_reference(reference: str | None) -> str | None:
+    """Mask a call reference for user-facing output.
+
+    A reference identifies one call and, through upstream, the person called.
+    The `explain` view is documented as safe to share, so it keeps only enough
+    of the reference to correlate against a record you already hold.
+    """
+    if not reference:
+        return None
+    keep = 9
+    if len(reference) <= keep:
+        return "*" * len(reference)
+    return reference[:keep] + "*" * (len(reference) - keep)
+
+
 def _parse_timestamp(value: str) -> datetime | None:
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -199,6 +214,20 @@ class OutcomeRecord:
             "timing": self._timing(),
             "evidence": self.evidence.to_dict(),
             "raw": {
+                # Every observation, not a sample. "Nothing is pruned" is a
+                # stated guarantee, and a record that kept only the endpoints
+                # silently discarded everything a stuck call was polled for —
+                # exactly the case the audit trail exists to explain.
+                "observations": [
+                    {
+                        "surface": o.surface,
+                        "observed_at": o.observed_at,
+                        "payload": o.copy_payload(),
+                        "transport_error": o.transport_error,
+                    }
+                    for o in self.observations
+                ],
+                # Convenience pointers into the list above.
                 "first_payload": self.first_payload,
                 "last_payload": self.last_payload,
             },

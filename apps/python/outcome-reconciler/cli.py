@@ -39,7 +39,7 @@ from clients import (
 from mapping import MappingError, OutcomeMap, default_map_path
 from poller import DEFAULT_POLICY, PollingPolicy, poll
 from reconciler import reconcile
-from record import mask_phone
+from record import mask_phone, mask_reference
 
 EXIT_OK = 0
 EXIT_UNRESOLVED = 2
@@ -217,7 +217,7 @@ def cmd_explain(args: argparse.Namespace) -> int:
     timing = record_dict.get("timing", {})
     evidence = record_dict.get("evidence", {})
 
-    print(f"call_ref        {record_dict.get('call_ref')}")
+    print(f"call_ref        {mask_reference(record_dict.get('call_ref'))}")
     print(f"outcome         {record_dict.get('outcome')}")
     print(f"reason          {record_dict.get('reason') or '-'}")
     print(f"recipient       {record_dict.get('recipient', {}).get('phone_e164_masked') or '-'}")
@@ -245,10 +245,12 @@ def cmd_explain(args: argparse.Namespace) -> int:
         confidence = judgment.get("completion_confidence") or {}
         if confidence:
             print(f"  confidence      {confidence.get('label')} ({confidence.get('score')})")
-        if judgment.get("summary"):
-            print(f"  summary         {judgment['summary']}")
-        for item in judgment.get("evidence") or []:
-            print(f"    - {item}")
+        # `summary` and `evidence` are upstream's prose about what was said on
+        # the call. They stay in the JSON record and out of this view, which is
+        # documented as safe to share.
+        for field in ("summary", "evidence"):
+            if judgment.get(field):
+                print(f"  {field:<15} <in the record; not shown here — call content>")
         print()
 
     print("decision trail")

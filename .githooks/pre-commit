@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Block credentials and captured call data from entering a commit.
+#
+# This exists because both got through once: a live CALLE_API_KEY was committed
+# in a .env.example, and a real call's transcript was committed as a fixture.
+# A checklist is something a person has to remember; this is not.
+#
+# Bypass with --no-verify only when you have looked at the diff and are certain.
+
+set -uo pipefail
+FAIL=0
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$STAGED" ] && exit 0
+
+flag() { printf '\033[31mblocked:\033[0m %s\n  %s\n' "$1" "$2" >&2; FAIL=1; }
+
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  case "$f" in *.lock|*uv.lock|*.png|*.jpg|*.svg) continue;; esac
+  BLOB=$(git show ":$f" 2>/dev/null) || continue
+
+  # 1. CALL-E live API keys
+  printf '%s' "$BLOB" | grep -qE 'iams_live_[A-Za-z0-9_]{16,}' \
+    && flag "$f" "contains a live CALL-E API key (iams_live_...)"
+
+  # 2. generic long high-entropy secrets in an assignment
+  printf '%s' "$BLOB" | grep -qE '(api[_-]?key|token|secret|password)[[:space:]]*[=:][[:space:]]*["'"'"']?[A-Za-z0-9_\-]{40,}' \
+    && flag "$f" "assigns a 40+ character secret-looking value"
+
+  # 3. payloads captured from a live call: the API stamps microseconds,
+  #    hand-written fixtures do not — and a captured payload carries a transcript
+  case "$f" in
+    */fixtures/*.json)
+      printf '%s' "$BLOB" | grep -qE '"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]+\.[0-9]+Z?"' \
+        && flag "$f" "looks captured from a live call (sub-second timestamp). Build fixtures from the documented schema."
+      ;;
+  esac
+
+  # 4. real phone numbers in repository content
+  printf '%s' "$BLOB" | grep -oE '\+[1-9][0-9]{7,14}' | grep -qv '^+1555010' \
+    && flag "$f" "contains a phone number outside the reserved +1555010xxxx range"
+done <<< "$STAGED"
+
+[ "$FAIL" = "0" ] || { printf '\ncommit aborted. Fix the above, or bypass deliberately with --no-verify.\n' >&2; exit 1; }
+exit 0

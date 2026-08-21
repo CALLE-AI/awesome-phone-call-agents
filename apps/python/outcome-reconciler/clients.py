@@ -48,7 +48,14 @@ LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 REST_API_KEY_ENV_VAR = "CALLE_API_KEY"
 REST_BASE_URL_ENV_VAR = "CALLE_BASE_URL"
+#: Credential used for plaintext loopback targets, so a local fake server can
+#: never be handed the production key.
+REST_TEST_API_KEY_ENV_VAR = "CALLE_TEST_API_KEY"
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 15.0
+
+#: The MCP host `@call-e/cli` authenticates against. Mirrors DEFAULT_BASE_URL in
+#: apps/python/batch-runner/client.py.
+CALLE_MCP_HOST = "seleven-mcp-sg.airudder.com"
 
 #: Where `@call-e/cli` writes its token cache. Mirrors DEFAULT_CACHE_ROOT and
 #: fallback_token_cache_path in apps/python/batch-runner/client.py.
@@ -256,6 +263,21 @@ class _RestReader:
     timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
 
     def _api_key(self) -> str:
+        """The credential for this base URL.
+
+        A plaintext origin never receives the production key. Loopback exists so
+        a local fake server can be driven end to end, and a fake server should be
+        given a fake credential — otherwise a stray `--base-url http://...` sends
+        a live key over the wire in the clear.
+        """
+        if urllib.parse.urlparse(self.base_url).scheme != "https":
+            key = os.environ.get(REST_TEST_API_KEY_ENV_VAR)
+            if not key:
+                raise AuthUnavailableError(
+                    f"{self.base_url} is not https, so {REST_API_KEY_ENV_VAR} was not sent. "
+                    f"Set {REST_TEST_API_KEY_ENV_VAR} with a throwaway value for local fake servers."
+                )
+            return key
         key = os.environ.get(REST_API_KEY_ENV_VAR)
         if not key:
             raise AuthUnavailableError(
@@ -361,6 +383,38 @@ class GoalRunStatusClient(_RestReader):
 # ---------------------------------------------------------------------------
 
 
+def validate_mcp_server_url(value: str) -> str:
+    """Refuse to send the cached CALL-E token anywhere it should not go.
+
+    The token cache holds a bearer credential for the user's CALL-E account.
+    Without this check `--mcp-server-url` would forward it to any host named on
+    the command line, which turns a mistyped or hostile flag into account
+    takeover. Checked before the cache is read, for the same reason the REST
+    base URL is: once the token has left, a warning is useless.
+
+    The same rules as `validate_base_url`: the documented MCP host over https,
+    or loopback with an explicit port so the fake broker in
+    `apps/shared/fake-mcp-broker-server.mjs` still works.
+    """
+    parsed = urllib.parse.urlparse(value)
+    host = (parsed.hostname or "").strip("[]")
+    if parsed.scheme == "https" and host == CALLE_MCP_HOST and not parsed.username and not parsed.password:
+        return value.rstrip("/")
+    if (
+        parsed.scheme == "http"
+        and host in LOOPBACK_HOSTS
+        and parsed.port is not None
+        and not parsed.username
+        and not parsed.password
+    ):
+        return value.rstrip("/")
+    raise ConfigurationError(
+        f"MCP server URL {value!r} is not a host this app trusts, so the cached CALL-E token "
+        f"was not sent. Use https://{CALLE_MCP_HOST}/mcp/<channel>, or http on 127.0.0.1, "
+        "localhost or ::1 with a port for a local fake server."
+    )
+
+
 def default_token_cache_path(server_url: str) -> Path:
     """Where `@call-e/cli` caches the token for a given server.
 
@@ -399,6 +453,10 @@ class McpStatusClient:
     timeout_seconds: float = 30.0
     min_token_ttl_seconds: float = MCP_MIN_TOKEN_TTL_SECONDS
     surface: str = "mcp.get_call_run"
+
+    def __post_init__(self) -> None:
+        # Validate on construction: any caller, not just the CLI, is covered.
+        self.server_url = validate_mcp_server_url(self.server_url)
 
     def _cache_path(self) -> Path:
         return Path(self.token_cache_path or default_token_cache_path(self.server_url))

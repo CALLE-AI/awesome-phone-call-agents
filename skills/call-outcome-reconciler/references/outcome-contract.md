@@ -71,8 +71,13 @@ evidence:
   notes: ["..."]
   decision: ["..."]           # why this outcome, step by step
 raw:
-  first_payload: { ... }
-  last_payload: { ... }       # verbatim upstream response, all fields
+  observations:               # every observation, in order — nothing is pruned
+    - surface: rest.calls
+      observed_at: "..."
+      payload: { ... }        # verbatim upstream response, all fields
+      transport_error: null
+  first_payload: { ... }      # convenience pointers into the list above
+  last_payload: { ... }
 upstream_judgment:
   # CALL-E's own post-call verdict, copied verbatim, or null when it published
   # none. This asserts nothing: `CallStatus.completed` says a call ended

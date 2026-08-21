@@ -227,6 +227,7 @@ def rest_client(monkeypatch: pytest.MonkeyPatch, error: Exception) -> "RestStatu
     import urllib.request
 
     monkeypatch.setenv(REST_API_KEY_ENV_VAR, "fake-status-token")
+    monkeypatch.setenv("CALLE_TEST_API_KEY", "fake-status-token")
 
     def refuse(*_args: Any, **_kwargs: Any) -> None:
         raise error
@@ -386,3 +387,32 @@ def test_a_missing_reference_stops_the_run_rather_than_burning_the_budget(
             clock=StepClock(),
             sleep=lambda _s: None,
         )
+
+
+def test_the_production_key_is_never_sent_over_plaintext(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Loopback exists for fake servers, and a fake server gets a fake credential.
+
+    Positive control first: with the test credential set, the same client works.
+    Without it, the production key must not be substituted.
+    """
+    from clients import REST_API_KEY_ENV_VAR, AuthUnavailableError, RestStatusClient
+
+    monkeypatch.setenv(REST_API_KEY_ENV_VAR, "production-key-value")
+    monkeypatch.setenv("CALLE_TEST_API_KEY", "throwaway")
+    assert RestStatusClient(base_url="http://127.0.0.1:9").check_auth() is None
+
+    monkeypatch.delenv("CALLE_TEST_API_KEY", raising=False)
+    with pytest.raises(AuthUnavailableError, match="not https"):
+        RestStatusClient(base_url="http://127.0.0.1:9").check_auth()
+
+
+def test_the_production_key_is_still_used_for_the_real_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from clients import DEFAULT_BASE_URL, REST_API_KEY_ENV_VAR, RestStatusClient
+
+    monkeypatch.setenv(REST_API_KEY_ENV_VAR, "production-key-value")
+    monkeypatch.delenv("CALLE_TEST_API_KEY", raising=False)
+    assert RestStatusClient(base_url=DEFAULT_BASE_URL).check_auth() is None

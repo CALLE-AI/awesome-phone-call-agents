@@ -532,3 +532,36 @@ def test_the_guard_above_can_actually_detect_a_captured_payload(tmp_path: Path) 
     assert re.findall(r'"\d{4}-\d{2}-\d{2}T[\d:]+(\.\d+)Z?"', sample), (
         "the live-timestamp fingerprint no longer matches; the guard above is dead"
     )
+
+
+def test_every_observation_survives_into_the_record(outcome_map: OutcomeMap) -> None:
+    """"Nothing is pruned" is a stated guarantee, so it must hold for all of them.
+
+    The serializer previously kept only the first and last payload, so polling a
+    stuck call sixty times discarded fifty-eight observations while the contract
+    promised a complete raw history.
+    """
+    observations = [
+        Observation("rest.calls", {"status": "queued", "n": 0}, "2026-01-02T09:00:00+00:00"),
+        Observation("rest.calls", None, "2026-01-02T09:00:02+00:00", transport_error="reset"),
+        Observation("rest.calls", {"status": "in_progress", "n": 2}, "2026-01-02T09:00:06+00:00"),
+        Observation("rest.calls", {"status": "in_progress", "n": 3}, "2026-01-02T09:00:14+00:00"),
+        Observation("rest.calls", {"status": "completed", "n": 4,
+                                   "completed_at": "2026-01-02T09:00:20Z"}, "2026-01-02T09:00:20+00:00"),
+    ]
+    raw = reconcile("call_x", observations, outcome_map).to_dict()["raw"]
+
+    assert len(raw["observations"]) == len(observations)
+    assert [o["payload"]["n"] if o["payload"] else None for o in raw["observations"]] == [0, None, 2, 3, 4]
+    assert raw["observations"][1]["transport_error"] == "reset"
+    # the middle observations are the ones the old serializer dropped
+    assert raw["first_payload"]["n"] == 0
+    assert raw["last_payload"]["n"] == 4
+
+
+def test_the_full_history_is_still_a_deep_copy(outcome_map: OutcomeMap) -> None:
+    payload = {"status": "completed", "completed_at": "x", "nested": {"keep": "me"}}
+    record = reconcile("call_x", [Observation("rest.calls", payload, "2026-01-02T09:00:00+00:00")], outcome_map)
+    emitted = record.to_dict()
+    emitted["raw"]["observations"][0]["payload"]["nested"]["keep"] = "mutated"
+    assert payload["nested"]["keep"] == "me"

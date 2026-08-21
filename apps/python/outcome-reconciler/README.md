@@ -119,7 +119,12 @@ the exit code without parsing the record.
 
 ## Credentials
 
-* The REST surface reads `CALLE_API_KEY` from the environment.
+* The REST surface reads `CALLE_API_KEY` from the environment, and sends it only
+  to `https://api.heycall-e.com`. A plaintext base URL never receives it: loopback
+  targets read `CALLE_TEST_API_KEY` instead, so a local fake server cannot be
+  handed the production key.
+* The MCP surface sends the cached token only to the documented CALL-E MCP host
+  or to loopback. `--mcp-server-url` is checked before the cache is opened.
 * The MCP surface reuses the token cache written by `@call-e/cli`; this app runs
   no OAuth flow of its own.
 * Credentials are never logged, printed, or persisted by this app, and never

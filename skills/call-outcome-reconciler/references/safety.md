@@ -30,8 +30,14 @@ payload verbatim, because raw fidelity is a core guarantee. If upstream returns
 an unmasked phone number in that payload, it is in the record. Treat an outcome
 record as data at the same sensitivity as the upstream response: safe to store
 where you already store call data, not safe to paste into a public issue. Mask
-or redact before sharing one. The `explain` view is safe to share — it prints
-the masked recipient and never the raw payload.
+or redact before sharing one.
+
+The `explain` view is safe to share. It prints a masked recipient and a masked
+call reference, and it never prints the raw payload — including `summary` and
+`evidence`, which are upstream's prose about what was said on the call. Those
+stay in the JSON record. What the view does show from upstream's post-call
+verdict is `task_completed` and a confidence label: a boolean and a word, which
+carry the judgment without carrying the conversation.
 
 ## Credentials
 

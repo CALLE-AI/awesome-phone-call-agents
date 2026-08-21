@@ -23,7 +23,9 @@ from typing import Any, Iterator
 import pytest
 
 from clients import (
+    CALLE_MCP_HOST,
     AuthUnavailableError,
+    ConfigurationError,
     McpStatusClient,
     default_token_cache_path,
 )
@@ -36,6 +38,9 @@ FAKE_BROKER = REPO_ROOT / "apps" / "shared" / "fake-mcp-broker-server.mjs"
 
 #: The token the fake broker accepts. Same value as in the broker source.
 FAKE_ACCESS_TOKEN = "fake-access-token"
+
+#: A trusted URL for tests that exercise the token cache rather than a request.
+TRUSTED_MCP_URL = f"https://{CALLE_MCP_HOST}/mcp/openagent_oauth"
 
 pytestmark = pytest.mark.skipif(
     shutil.which("node") is None or not FAKE_BROKER.exists(),
@@ -87,7 +92,7 @@ def write_token_cache(path: Path, token: str = FAKE_ACCESS_TOKEN, expires_at: st
 
 def test_the_default_cache_path_matches_the_one_the_cli_writes() -> None:
     """Mirrors fallback_token_cache_path in apps/python/batch-runner/client.py."""
-    server_url = "https://example.test/mcp/openagent_oauth"
+    server_url = TRUSTED_MCP_URL
     digest = hashlib.md5(server_url.encode("utf-8")).hexdigest()
     resolved = default_token_cache_path(server_url)
     assert resolved.name == "token.json"
@@ -98,19 +103,19 @@ def test_the_default_cache_path_matches_the_one_the_cli_writes() -> None:
 
 def test_a_nested_cli_token_cache_is_read(tmp_path: Path) -> None:
     cache = write_token_cache(tmp_path / "token.json")
-    client = McpStatusClient(server_url="https://example.test/mcp", token_cache_path=cache)
+    client = McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=cache)
     client.check_auth()
 
 
 def test_a_flat_token_cache_is_still_accepted(tmp_path: Path) -> None:
     cache = tmp_path / "token.json"
     cache.write_text(json.dumps({"access_token": FAKE_ACCESS_TOKEN}), encoding="utf-8")
-    McpStatusClient(server_url="https://example.test/mcp", token_cache_path=cache).check_auth()
+    McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=cache).check_auth()
 
 
 def test_a_missing_cache_names_the_path_it_looked_in(tmp_path: Path) -> None:
     missing = tmp_path / "absent" / "token.json"
-    client = McpStatusClient(server_url="https://example.test/mcp", token_cache_path=missing)
+    client = McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=missing)
     with pytest.raises(AuthUnavailableError, match="calle auth login"):
         client.check_auth()
 
@@ -118,7 +123,7 @@ def test_a_missing_cache_names_the_path_it_looked_in(tmp_path: Path) -> None:
 def test_a_cache_without_a_usable_token_is_refused(tmp_path: Path) -> None:
     cache = tmp_path / "token.json"
     cache.write_text(json.dumps({"token": {"refresh_token": "only-this"}}), encoding="utf-8")
-    client = McpStatusClient(server_url="https://example.test/mcp", token_cache_path=cache)
+    client = McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=cache)
     with pytest.raises(AuthUnavailableError, match="no usable access token"):
         client.check_auth()
 
@@ -126,7 +131,7 @@ def test_a_cache_without_a_usable_token_is_refused(tmp_path: Path) -> None:
 def test_an_expired_token_is_refused_before_a_request_is_made(tmp_path: Path) -> None:
     """An expired token would otherwise fail as an opaque transport error."""
     cache = write_token_cache(tmp_path / "token.json", expires_at="2020-01-01T00:00:00Z")
-    client = McpStatusClient(server_url="https://example.test/mcp", token_cache_path=cache)
+    client = McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=cache)
     with pytest.raises(AuthUnavailableError, match="expires in"):
         client.check_auth()
 
@@ -134,7 +139,7 @@ def test_an_expired_token_is_refused_before_a_request_is_made(tmp_path: Path) ->
 def test_a_cache_with_no_expiry_is_accepted(tmp_path: Path) -> None:
     """Matches token_document_usable in batch-runner: absent expiry is not fatal."""
     cache = write_token_cache(tmp_path / "token.json")
-    McpStatusClient(server_url="https://example.test/mcp", token_cache_path=cache).check_auth()
+    McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=cache).check_auth()
 
 
 def test_fetch_reads_get_call_run_over_real_http(fake_broker: dict, tmp_path: Path) -> None:
@@ -200,3 +205,42 @@ def test_no_token_value_appears_in_the_record(
     emitted = json.dumps(reconcile("run_e2e_4", result.observations, outcome_map).to_dict())
     assert FAKE_ACCESS_TOKEN not in emitted
     assert "Bearer" not in emitted
+
+
+# -- the token must not follow an arbitrary --mcp-server-url ----------------
+
+
+@pytest.mark.parametrize(
+    "server_url",
+    [
+        "https://evil.example/mcp",
+        f"https://{CALLE_MCP_HOST}.attacker.example/mcp",   # suffix, not the host
+        f"http://{CALLE_MCP_HOST}/mcp",                     # plaintext downgrade
+        f"https://user:pw@{CALLE_MCP_HOST}/mcp",            # embedded credentials
+        "http://localhost",                                 # loopback needs a port
+        "http://10.0.0.5:8080",                             # not loopback
+        "not a url",
+    ],
+)
+def test_the_cached_token_is_never_sent_to_an_untrusted_server(
+    server_url: str, tmp_path: Path
+) -> None:
+    """The cache holds a bearer credential for the user's CALL-E account.
+
+    Forwarding it to any host named on the command line turns a mistyped or
+    hostile flag into account takeover, so construction fails before the cache
+    is even opened.
+    """
+    cache = write_token_cache(tmp_path / "token.json")
+    with pytest.raises(ConfigurationError, match="not a host this app trusts"):
+        McpStatusClient(server_url=server_url, token_cache_path=cache)
+
+
+def test_refusal_happens_before_the_token_cache_is_read(tmp_path: Path) -> None:
+    """Positive control: the cache is valid, so only the URL check can be refusing."""
+    cache = write_token_cache(tmp_path / "token.json")
+    McpStatusClient(server_url=TRUSTED_MCP_URL, token_cache_path=cache).check_auth()
+
+    missing = tmp_path / "absent" / "token.json"
+    with pytest.raises(ConfigurationError):
+        McpStatusClient(server_url="https://evil.example/mcp", token_cache_path=missing)
