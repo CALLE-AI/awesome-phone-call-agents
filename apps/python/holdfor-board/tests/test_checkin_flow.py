@@ -12,11 +12,13 @@ WITHHOLDING = 6
 
 
 @pytest.fixture
-def client(db_path, fixtures_dir):
+def client(db_path, fixtures_dir, now):
     provider = FakeProvider(
         fixtures_dir=fixtures_dir, route={"checkin:1": "02-wants-seen.json"}
     )
-    return TestClient(create_app(db_path=db_path, provider=provider))
+    return TestClient(
+        create_app(db_path=db_path, provider=provider, clock=lambda: now)
+    )
 
 
 def test_the_default_provider_places_no_real_call():
@@ -101,7 +103,9 @@ def test_the_queue_page_renders_the_patients_words(client):
     assert "get up the stairs" in page.text
 
 
-def test_a_patient_who_hung_up_is_filed_as_declined_not_unreached(db_path, fixtures_dir):
+def test_a_patient_who_hung_up_is_filed_as_declined_not_unreached(
+    db_path, fixtures_dir, now
+):
     from fastapi.testclient import TestClient
 
     from holdfor import db
@@ -110,7 +114,9 @@ def test_a_patient_who_hung_up_is_filed_as_declined_not_unreached(db_path, fixtu
     provider = FakeProvider(
         fixtures_dir=fixtures_dir, route={"checkin:1": "05-declined.json"}
     )
-    client = TestClient(create_app(db_path=db_path, provider=provider))
+    client = TestClient(
+        create_app(db_path=db_path, provider=provider, clock=lambda: now)
+    )
     review_item_id = client.post("/checkins/1").json()["review_item_id"]
 
     connection = db.connect(db_path)
