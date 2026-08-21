@@ -6,7 +6,7 @@ import { cadenceForRun } from "../core/watch";
  * the host owns recurrence and the provider handles exactly one call per
  * scheduled run. One tick therefore places at most ONE provider call in
  * total — the single most-due active watch — never a loop across every due
- * watch, and never a wave.
+ * watch, and never a batch.
  *
  * Decaying cadence: 1h, 3h, 7h, 14h, 24h, 48h, 72h, then weekly.
  * Cancellation is first-class: a stopped or completed watch is never re-run.

@@ -17,7 +17,7 @@ Openings takes the care you need, your insurance plan, your city, and a specialt
 
 1. **Frame** — builds the candidate list from the federal NPPES NPI Registry (by specialty and city/state). Every number carries provenance; none is synthesized.
 2. **Gate** — screens the request for crisis language (diverts to 988) and for PHI (rejected; the app never collects a diagnosis or medication details, so no protected health information ever touches the phone call).
-3. **Verify** — a wave engine dials practices in controlled waves and stops the moment the target number of openings is confirmed. Each call identifies itself as an automated assistant and asks only two questions: *do you accept this plan, and do you have an opening?*
+3. **Verify** — dials practices strictly one at a time (cancellation checked before every call) and stops the moment the target number of openings is confirmed. Each call identifies itself as an automated assistant and asks only two questions: *do you accept this plan, and do you have an opening?*
 4. **Watch** — when nothing is open, the host scheduler re-calls on a decaying cadence until an opening appears or the user stops it.
 
 Every call returns a verdict with a verbatim evidence quote and CALL-E's post-call summary, so nothing is taken on faith. Dead and misrouted lines accumulate into a verifiable **access report** — facts proven by calls, not by claims.

@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { FakeCaller } from "../src/core/calle";
-import { dispatchWave } from "../src/core/dispatch";
+import { dispatchRun } from "../src/core/dispatch";
 import type { Candidate, CallStructuredResult, SearchSpec } from "../src/core/types";
 
 const SPEC: SearchSpec = {
@@ -36,7 +36,7 @@ function staffed(overrides: Partial<CallStructuredResult> = {}): CallStructuredR
 
 const candidates = Array.from({ length: 12 }, (_, i) => cand(String(i)));
 
-describe("dispatchWave", () => {
+describe("dispatchRun", () => {
   it("stops as soon as the target number of openings is confirmed", async () => {
     const openIds = new Set(["2", "3"]);
     const caller = new FakeCaller(
@@ -48,7 +48,7 @@ describe("dispatchWave", () => {
       })),
     );
 
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller,
       candidates,
       spec: SPEC,
@@ -56,14 +56,12 @@ describe("dispatchWave", () => {
       watchId: "watch-test",
       targetOpen: 2,
       runKey: "r1",
-      waveSize: 5,
     });
 
     expect(result.reason).toBe("target_reached");
     expect(result.openFound).toBe(2);
-    // Waves of 5: after wave 1 (0 open) + wave 2 (2 open) → 10 results max.
-    expect(result.results.length).toBeLessThanOrEqual(10);
-    expect(result.results.length).toBeGreaterThan(2);
+    // Sequential: 0 and 1 are not accepting, 2 and 3 are open → stop at 4.
+    expect(result.results.map((r) => r.candidateId)).toEqual(["0", "1", "2", "3"]);
   });
 
   it("exhausts all candidates when the target is never reached", async () => {
@@ -73,7 +71,7 @@ describe("dispatchWave", () => {
         result: { ...staffed(), accepts_plan: "no", accepting_new_patients: "no" },
       })),
     );
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller,
       candidates,
       spec: SPEC,
@@ -93,7 +91,7 @@ describe("dispatchWave", () => {
       { candidateId: "1", result: { ...staffed(), line_outcome: "wrong_entity" } },
       { candidateId: "2", result: staffed() },
     ]);
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller,
       candidates: candidates.slice(0, 3),
       spec: SPEC,
@@ -111,7 +109,7 @@ describe("dispatchWave", () => {
 
   it("respects opt-outs and never dials a blocked candidate", async () => {
     const caller = new FakeCaller([]);
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller,
       candidates: candidates.slice(0, 2),
       spec: SPEC,
@@ -127,7 +125,7 @@ describe("dispatchWave", () => {
 
   it("stops at the per-run call cap without dialing the remaining candidates", async () => {
     const caller = new FakeCaller([]); // all voicemail → unreachable, target never met
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller,
       candidates,
       spec: SPEC,
@@ -144,7 +142,7 @@ describe("dispatchWave", () => {
 
   it("does not count gate-blocked candidates against the call cap", async () => {
     const caller = new FakeCaller([]);
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller,
       candidates: candidates.slice(0, 4),
       spec: SPEC,
@@ -169,7 +167,7 @@ describe("dispatchWave", () => {
       }
     } as unknown as typeof FakeCaller;
 
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller: new failing(),
       candidates: candidates.slice(0, 3),
       spec: SPEC,
@@ -195,7 +193,7 @@ describe("dispatchWave", () => {
 
     // Cancel after the first call completes.
     let calls = 0;
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller: counting,
       candidates: candidates.slice(0, 6),
       spec: SPEC,
@@ -203,7 +201,6 @@ describe("dispatchWave", () => {
       watchId: "watch-test",
       targetOpen: 5,
       maxCalls: 6,
-      waveSize: 1,
       runKey: "r1",
       isCancelled: () => {
         calls += 1;
@@ -231,7 +228,7 @@ describe("dispatchWave", () => {
       },
     };
 
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller: unverifiedLive,
       candidates: candidates.slice(0, 2),
       spec: SPEC,
@@ -260,7 +257,7 @@ describe("dispatchWave", () => {
       },
     };
 
-    const result = await dispatchWave({
+    const result = await dispatchRun({
       caller: inProgress,
       candidates: candidates.slice(0, 2),
       spec: SPEC,

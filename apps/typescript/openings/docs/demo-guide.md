@@ -108,7 +108,7 @@ Timing assumes ~150 spoken words/minute. Keep it tight; every word counts.
 
 > "Start watching. Openings frames the practices that are actually listed — from the
 > federal NPPES registry, so every number has provenance, none is synthesized — then
-> dials them in waves. Each call identifies itself as an automated assistant and asks
+> dials them one at a time, re-checking cancellation before every call. Each call identifies itself as an automated assistant and asks
 > one thing: do you take this plan, and do you have a slot? Here's a real run: open…
 > waitlist… not accepting… and this one is a ghost. The directory listed it; the phone
 > says disconnected. That's now a verifiable fact, evidence quote included."
@@ -158,7 +158,7 @@ Keep these answers to one or two sentences each:
 2. **What if nobody answers?** — Classified `unreachable` with the CALL-E summary,
    re-called on the decay cadence inside the 24h cooldown. Silence is never read as an opening.
 3. **Cost?** — a fraction of a cent to a few cents per call, capped per run, and the
-   wave engine stops the moment the target is met.
+   sequential dispatcher stops the moment the target is met.
 4. **Who is this for?** — anyone navigating a marketplace directory: individuals, care
    coordinators, navigators, and employers running an access scan.
 5. **Why NPPES?** — it is the federal directory with provenance for every number; we

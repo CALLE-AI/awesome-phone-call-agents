@@ -4,13 +4,16 @@ import { mayCall } from "./safety";
 import type { Candidate, LineCallResult, SearchSpec, Verdict } from "./types";
 
 /**
- * Wave dispatch engine.
+ * Sequential dispatch engine.
  *
- * The CALL-E Calls API exposes no cancellation; in-flight calls run to
- * completion. So we dispatch in controlled waves against a confirmation
- * target and stop creating new calls once the target is met. A hard per-run
- * cap bounds spend even when the target is never reached. This is the
- * documented CALL-E pattern and the safety-correct one.
+ * Calls are placed strictly ONE AT A TIME. Cancellation is observed
+ * immediately before every single call, so Stop during an in-flight call
+ * prevents every subsequent live call — there is no pre-launched batch that
+ * can keep dialing after the user stops the watch.
+ *
+ * A hard per-run cap bounds spend even when the target is never reached, and
+ * any ambiguous provider result fails closed: it stops the run and (at the
+ * app layer) stops the watch.
  */
 
 export interface DispatchOptions {
@@ -22,7 +25,6 @@ export interface DispatchOptions {
   watchId: string;
   /** Stop once this many open verdicts are confirmed. */
   targetOpen: number;
-  waveSize?: number;
   /** Hard cap on calls placed in this run. Gate-blocked candidates do not count. */
   maxCalls?: number;
   /** Idempotency key to reuse (the same run), used for retries. */
@@ -32,8 +34,8 @@ export interface DispatchOptions {
   /** Lookup: last call time per number, for cooldown checks. */
   lastCalledAt?: (phoneE164: string) => Date | null;
   /**
-   * Cancellation check, consulted before every new call so Stop prevents later
-   * calls from an already-running dispatch.
+   * Cancellation check, consulted immediately before every new call so Stop
+   * prevents later calls from an already-running dispatch.
    */
   isCancelled?: () => boolean;
   now?: Date;
@@ -48,7 +50,7 @@ export interface DispatchResult {
   error?: string;
 }
 
-export async function dispatchWave(options: DispatchOptions): Promise<DispatchResult> {
+export async function dispatchRun(options: DispatchOptions): Promise<DispatchResult> {
   const {
     caller,
     candidates,
@@ -64,7 +66,6 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
     onResult,
   } = options;
   const now = options.now ?? new Date();
-  const waveSize = options.waveSize ?? 5;
 
   const results: LineCallResult[] = [];
   let openFound = 0;
@@ -72,11 +73,10 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
   let hitError: string | undefined;
   let hitCap = false;
   let cancelled = false;
-  let index = 0;
 
-  while (index < candidates.length) {
-    // Cancellation is checked before every new call so Stop prevents later
-    // calls from an already-running dispatch.
+  for (const candidate of candidates) {
+    // Cancellation is observed immediately before every single call, so Stop
+    // prevents later calls from an already-running dispatch.
     if (isCancelled()) {
       cancelled = true;
       break;
@@ -86,72 +86,69 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
       hitCap = true;
       break;
     }
-    const remaining = maxCalls != null ? maxCalls - callsPlaced : Infinity;
-    const wave = candidates.slice(index, index + Math.min(waveSize, remaining));
-    index += wave.length;
 
-    const batch = await Promise.all(
-      wave.map(async (candidate) => {
-        // Per-call cancellation check too: a wave can take minutes and Stop
-        // must win even mid-wave.
-        if (isCancelled()) {
-          return { result: blockedResult(candidate, "cancelled"), placed: false };
+    const gate = mayCall(candidate, lastCalledAt(candidate.phoneE164), isOptedOut(candidate.phoneE164), now);
+    if (!gate.allow) {
+      // Never dialed: does not consume the run's call budget.
+      const blocked = blockedResult(candidate, gate.reason ?? "blocked");
+      results.push(blocked);
+      onResult?.(blocked);
+      continue;
+    }
+
+    const idempotencyKey = `${idempotencyPrefix}:${runKey}:${candidate.id}`;
+    let result: LineCallResult;
+    try {
+      const output = await caller.placeCall({
+        candidate,
+        spec,
+        idempotencyKey,
+        watchId,
+      });
+
+      // Simulated callers (dry-run/fake) never dial, so their results are
+      // advisory by definition: classify them normally but they can never
+      // be provider-verified evidence.
+      if (output.simulated) {
+        if (output.result == null) {
+          hitError = hitError ?? `simulated_missing_result:${candidate.id}`;
+          result = errorResult(candidate, "simulated_missing_result");
+          results.push(result);
+          onResult?.(result);
+          callsPlaced += 1;
+          break;
         }
-        const gate = mayCall(candidate, lastCalledAt(candidate.phoneE164), isOptedOut(candidate.phoneE164), now);
-        if (!gate.allow) {
-          // Never dialed: must not consume the run's call budget.
-          return { result: blockedResult(candidate, gate.reason ?? "blocked"), placed: false };
-        }
-
-        const idempotencyKey = `${idempotencyPrefix}:${runKey}:${candidate.id}`;
-        try {
-          const output = await caller.placeCall({
-            candidate,
-            spec,
-            idempotencyKey,
-            watchId,
-          });
-
-          // Simulated callers (dry-run/fake) never dial, so their results are
-          // advisory by definition: classify them normally but they can never
-          // be provider-verified evidence.
-          if (output.simulated) {
-            if (output.result == null) {
-              return { result: errorResult(candidate, "simulated_missing_result"), placed: true };
-            }
-            const verdict: Verdict = classifyResult(output.result);
-            const result: LineCallResult = {
-              candidateId: candidate.id,
-              phoneE164: candidate.phoneE164,
-              verdict,
-              evidence: output.result.evidence_quote ?? output.evidence[0] ?? "",
-              raw: output.result,
-              summary: output.summary,
-              calleCallId: output.callId,
-              completedAt: new Date().toISOString(),
-              calleStatus: output.calleStatus,
-            };
-            return { result, placed: true };
-          }
-
-          // Live calls require a terminal verified result bound to the exact
-          // call/task/recipient/watch before any availability can be treated as
-          // verified. Unverified or non-terminal results are ambiguous and must
-          // fail-closed: they become an `error` verdict that stops the current
-          // wave and the watch.
-          const isVerifiedTerminal =
-            output.verified && output.completed && output.calleStatus === "completed" && output.result !== null;
-          if (!isVerifiedTerminal) {
-            const reason = !output.verified
-              ? "unverified_result"
-              : !output.completed || output.calleStatus !== "completed"
-                ? `not_terminal:${output.calleStatus ?? "unknown"}`
-                : "missing_result";
-            hitError = hitError ?? `${reason}:${candidate.id}`;
-            return { result: errorResult(candidate, reason), placed: true };
-          }
+        const verdict: Verdict = classifyResult(output.result);
+        result = {
+          candidateId: candidate.id,
+          phoneE164: candidate.phoneE164,
+          verdict,
+          evidence: output.result.evidence_quote ?? output.evidence[0] ?? "",
+          raw: output.result,
+          summary: output.summary,
+          calleCallId: output.callId,
+          completedAt: new Date().toISOString(),
+          calleStatus: output.calleStatus,
+        };
+      } else {
+        // Live calls require a terminal verified result bound to the exact
+        // call/task/recipient/watch before any availability can be treated as
+        // verified. Unverified or non-terminal results are ambiguous and must
+        // fail closed: they become an `error` verdict that stops this run and
+        // (at the app layer) stops the watch.
+        const isVerifiedTerminal =
+          output.verified && output.completed && output.calleStatus === "completed" && output.result !== null;
+        if (!isVerifiedTerminal) {
+          const reason = !output.verified
+            ? "unverified_result"
+            : !output.completed || output.calleStatus !== "completed"
+              ? `not_terminal:${output.calleStatus ?? "unknown"}`
+              : "missing_result";
+          hitError = hitError ?? `${reason}:${candidate.id}`;
+          result = errorResult(candidate, reason);
+        } else {
           const verdict: Verdict = classifyResult(output.result!);
-          const result: LineCallResult = {
+          result = {
             candidateId: candidate.id,
             phoneE164: candidate.phoneE164,
             verdict,
@@ -162,33 +159,29 @@ export async function dispatchWave(options: DispatchOptions): Promise<DispatchRe
             completedAt: new Date().toISOString(),
             calleStatus: output.calleStatus,
           };
-          return { result, placed: true };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          hitError = msg;
-          // A call may have been created before it failed; count it against
-          // the budget conservatively. Distinct from `blocked` (which means
-          // we deliberately did not dial).
-          return { result: errorResult(candidate, msg), placed: true };
         }
-      }),
-    );
-
-    for (const { result, placed } of batch) {
-      results.push(result);
-      if (placed) callsPlaced += 1;
-      onResult?.(result);
-      if (result.verdict === "open") openFound += 1;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      hitError = msg;
+      // A call may have been created before it failed; count it against
+      // the budget conservatively. Distinct from `blocked` (which means
+      // we deliberately did not dial).
+      result = errorResult(candidate, msg);
     }
 
+    results.push(result);
+    callsPlaced += 1;
+    onResult?.(result);
+    if (result.verdict === "open") openFound += 1;
+
+    // Fail closed: stop creating calls after any ambiguous outcome.
     if (hitError) break;
-    if (openFound >= targetOpen) {
-      break;
-    }
+    if (openFound >= targetOpen) break;
   }
 
   // Precedence: a confirmed target is the strongest signal, then errors, then
-  // an exhausted call budget, then cancellation, then simply running out of
+  // cancellation, then an exhausted call budget, then simply running out of
   // candidates.
   let reason: DispatchResult["reason"] = "exhausted";
   if (openFound >= targetOpen) reason = "target_reached";

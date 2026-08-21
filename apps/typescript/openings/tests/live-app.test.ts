@@ -52,7 +52,7 @@ describe.skipIf(!runLive)("full-app live verification (n credits)", () => {
       console.log(`[verify] watch id=${watch.id}`);
       console.log(`[verify] candidates=${candidates.length} db=${DB_PATH}`);
       console.log(
-        `[verify] target open=${watch.targetOpen} waveSize=5 callers is LIVE — credits will be spent`,
+        `[verify] target open=${watch.targetOpen} maxCallsPerRun=${watch.maxCallsPerRun} sequential caller is LIVE — credits will be spent`,
       );
 
       const dispatch = await app.runWatch(watch.id, 1);

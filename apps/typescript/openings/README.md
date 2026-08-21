@@ -31,7 +31,7 @@ inspect. Dead and misrouted lines accumulate into a verifiable access report.
    the UI — a paste path that dials user-supplied numbers needs its own consent design.)
 2. **Gate** — the care request is screened for crisis language (stops the search and points to
    988) and for PHI (rejected; Openings never collects diagnosis or medication details).
-3. **Verify** — a wave engine dispatches calls in controlled waves and stops as soon as the
+3. **Verify** — calls are placed strictly one at a time and stop as soon as the
    target number of openings is confirmed. Each call identifies itself as an automated
    assistant and asks only about plan acceptance and availability.
 4. **Watch** — when nothing is open, the host scheduler re-calls on a decaying cadence
@@ -108,10 +108,10 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
 - **Off-hours results are honest.** A call that reaches a closed office returns
   `structured_result: null` → classified `unreachable`, with the CALL-E summary capturing
   "call back Monday 9am" style guidance. Run business-hours batches for positive signals.
-- Calls are dispatched in **waves**, never all at once (manual "Run now" may place a small
-  wave; the host scheduler places **exactly one provider call per tick**, per the repository
-  architecture rule). The CALL-E API does not support client-side cancellation of an in-flight
-  call; stopping a watch stops future waves, not a call already dialing.
+- Calls are placed **strictly one at a time**. Cancellation is re-checked immediately before
+  every single call, so Stop prevents every subsequent live call — including from an
+  already-running dispatch. The CALL-E API does not support cancelling an in-flight call, so
+  the call already dialing runs to completion; nothing after it does.
 - **Verified availability only.** An `open` verdict that would stop a watch is only treated
   as verified when it comes from a terminal `completed` call with `taskCompleted: true`, no
   failure code, the exact task text, the provider's returned recipient list containing the
@@ -119,9 +119,8 @@ OPENINGS_LIVE_TESTS=1 pnpm test   # exercises NPPES framing + the full server-ac
   advisory (`inconclusive`) and never stops the watch. Simulated (dry-run/fake) results are
   never provider-verified.
 - **Fail-closed on ambiguity.** A provider timeout, `error` verdict, or any non-terminal result
-  immediately stops the current wave and marks the watch `stopped` so neither the current run
-  nor later scheduled ticks can continue dialing with fresh keys. Cancellation is re-checked
-  before every new call, so Stop wins even mid-wave.
+  immediately stops the run and marks the watch `stopped` so neither the current run
+  nor later scheduled ticks can continue dialing with fresh keys.
 - **Phone numbers are masked** in watch and report UI (`+1 (***) ***-1234`); full numbers are
   never rendered in summaries, and raw provider call identifiers are not shown in the UI
   (they stay server-side for audit).
@@ -167,8 +166,8 @@ mode supports concurrent processes safely.
 - **One provider call per tick, total.** Per the repository architecture rule, the host
   scheduler handles recurrence and the provider handles one call per scheduled run. Each
   tick selects the single most-due active watch and places at most one real provider call —
-  it never loops across every due watch and never dials a wave. Manual "Run now" may place a
-  small wave up to `maxCallsPerRun`; scheduled ticks do not.
+  it never loops across every due watch. Manual "Run now" is also sequential (one call at a
+  time) up to `maxCallsPerRun`; scheduled ticks place exactly one.
 
 ## Deployment
 

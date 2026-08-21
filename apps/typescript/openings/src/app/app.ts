@@ -1,6 +1,6 @@
 import type { Caller } from "../core/calle";
 import type { DispatchResult } from "../core/dispatch";
-import { dispatchWave } from "../core/dispatch";
+import { dispatchRun } from "../core/dispatch";
 import type {
   Candidate,
   Fact,
@@ -78,7 +78,7 @@ export function createApp(deps: AppDeps) {
     },
 
     /**
-     * Execute one watch run: dispatch a wave, record results, and report
+     * Execute one watch run: place calls sequentially (one at a time), record results, and report
      * whether a next run is scheduled. This is used for manual "Run now"
      * triggered by the user (may place up to maxCallsPerRun calls).
      */
@@ -87,7 +87,7 @@ export function createApp(deps: AppDeps) {
       if (!watch) throw new Error("watch_not_found");
       if (watch.status !== "active") throw new Error("watch_not_active");
 
-      const dispatch = await dispatchWave({
+      const dispatch = await dispatchRun({
         caller: deps.caller,
         candidates: watch.candidates,
         spec: watch.spec,
@@ -117,7 +117,7 @@ export function createApp(deps: AppDeps) {
     /**
      * Host-scheduler entry point: exactly one provider call per scheduled tick,
      * per the repository architecture rule. The scheduler owns recurrence; the
-     * provider handles one call per run. This keeps scheduled waves from
+     * provider handles one call per run. This keeps scheduled ticks from
      * re-dialling a whole batch on every decaying cadence tick.
      */
     async runScheduledOnce(id: string, runNumber: number): Promise<DispatchResult> {
@@ -125,7 +125,7 @@ export function createApp(deps: AppDeps) {
       if (!watch) throw new Error("watch_not_found");
       if (watch.status !== "active") throw new Error("watch_not_active");
 
-      const dispatch = await dispatchWave({
+      const dispatch = await dispatchRun({
         caller: deps.caller,
         candidates: watch.candidates,
         spec: watch.spec,
@@ -133,7 +133,6 @@ export function createApp(deps: AppDeps) {
         watchId: watch.id,
         targetOpen: watch.targetOpen,
         maxCalls: 1,
-        waveSize: 1,
         runKey: `run-${runNumber}`,
         isOptedOut: (phone) => deps.store.isOptedOut(phone),
         lastCalledAt: (phone) => deps.store.lastCalledAt(phone),
