@@ -1,6 +1,6 @@
 # The last acceptance binds, and every offer is kept
 
-Reception offers Tuesday the 26th at ten past nine, the agent accepts, and then she says
+Reception offers Wednesday the 26th at ten past nine, the agent accepts, and then she says
 that slot has just gone and offers ten to nine instead. People revise; a front desk
 revises constantly. A matcher that assumes one Offered Slot per call has no answer here,
 and the wrong answers are both bad: refusing the revision throws away a call that was

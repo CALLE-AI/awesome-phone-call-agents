@@ -10,7 +10,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import checkin, db, review
+from . import checkin, db, rebooking, review
 from .models import ReviewStatus
 from .providers import default_provider
 
@@ -141,6 +141,17 @@ def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI
             _wants_html(request),
         )
 
+    @app.post("/releases/{release_id}/run", status_code=201)
+    async def run_rebooking(release_id: int, request: Request):
+        """Place the one call a Release granted. Pressing this twice never rings twice."""
+        return await run_in_threadpool(
+            _run_rebooking_now,
+            app.state.db_path,
+            app.state.provider,
+            release_id,
+            _wants_html(request),
+        )
+
     @app.post("/review-items/{review_item_id}/manual", status_code=201)
     async def manual(review_item_id: int, request: Request):
         return await run_in_threadpool(
@@ -188,6 +199,29 @@ def _terminate_now(
     if html:
         return RedirectResponse("/", 303)
     return JSONResponse(status_code=201, content={"status": settled})
+
+
+def _run_rebooking_now(db_path: str, provider, release_id: int, html: bool):
+    conn = db.connect(db_path)
+    try:
+        outcome = rebooking.run(conn, provider, release_id)
+    except rebooking.Refused as refused:
+        if html:
+            # The reason travels in the query string rather than being swallowed: a
+            # missing booking line looks exactly like a broken button otherwise.
+            return RedirectResponse(f"/?refused={refused.reason}", 303)
+        return JSONResponse(status_code=409, content={"refused": refused.reason})
+    except review.Rejected as rejected:
+        return JSONResponse(
+            status_code=rejected.status, content={"error": rejected.code}
+        )
+    except LookupError as missing:
+        raise HTTPException(status_code=404, detail=str(missing))
+    finally:
+        conn.close()
+    if html:
+        return RedirectResponse("/", 303)
+    return JSONResponse(status_code=201, content=outcome)
 
 
 async def _body(request: Request) -> dict:
@@ -252,5 +286,11 @@ def board_payload(conn: sqlite3.Connection) -> dict:
         ),
         "items": [
             item for item in items if item["status"] == ReviewStatus.NEEDS_REVIEW
+        ],
+        # A released item is on neither list: not waiting for a person, not settled
+        # either. Without this it is invisible, and nothing can place its call.
+        # See docs/adr/0006, amendment.
+        "awaiting_call": [
+            dict(row) for row in review.released_awaiting_call(conn)
         ],
     }

@@ -44,6 +44,7 @@ class ReviewStatus(StrEnum):
     RELEASED = "released"
     CLOSED = "closed"
     RANG_MANUALLY = "rang_manually"
+    BOOKED = "booked"
     RECEPTION_DECLINED = "reception_declined"
     NOT_REACHED = "not_reached"
     DECLINED = "declined"
@@ -52,6 +53,10 @@ class ReviewStatus(StrEnum):
 class AppointmentMode(StrEnum):
     IN_PERSON = "in_person"
     PHONE = "phone"
+    # A Reviewer who does not care which is not made to choose. Without this every
+    # Release narrows the mode by construction and every Rebooking Call has to ask
+    # reception about it. See docs/adr/0003, amendment.
+    ANY = "any"
 
 
 class TimeOfDay(StrEnum):

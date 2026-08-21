@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from holdfor.models import ReviewStatus
+from holdfor.models import CallKind, ReviewStatus
 from holdfor.outcomes import may_redial, review_status_for
 
 
@@ -19,15 +19,35 @@ from holdfor.outcomes import may_redial, review_status_for
     ],
 )
 def test_platform_outcomes_map_to_a_board_status(outcome, expected):
-    assert review_status_for(outcome) is expected
+    assert review_status_for(outcome, CallKind.CHECKIN) is expected
 
 
 def test_a_refusal_is_not_filed_as_an_unanswered_call():
-    assert review_status_for("DECLINED") is not review_status_for("NO_ANSWER")
+    assert review_status_for("DECLINED", CallKind.CHECKIN) is not review_status_for(
+        "NO_ANSWER", CallKind.CHECKIN
+    )
 
 
 def test_an_unrecognised_outcome_reaches_a_human_rather_than_being_dropped():
-    assert review_status_for("SOMETHING_NEW") is ReviewStatus.NEEDS_REVIEW
+    assert (
+        review_status_for("SOMETHING_NEW", CallKind.CHECKIN)
+        is ReviewStatus.NEEDS_REVIEW
+    )
+
+
+def test_a_switchboard_rejecting_us_is_not_the_patient_declining():
+    """ADR 0010. DECLINED on the second call is the practice line, never Margaret.
+
+    Filing it as `declined` would put "she does not want these calls" on the board
+    about a call she was never on.
+    """
+    assert review_status_for("DECLINED", CallKind.REBOOKING) is ReviewStatus.NOT_REACHED
+    assert review_status_for("DECLINED", CallKind.CHECKIN) is ReviewStatus.DECLINED
+
+
+@pytest.mark.parametrize("kind", [CallKind.CHECKIN, CallKind.REBOOKING])
+def test_an_unknown_outcome_reaches_a_human_on_either_call(kind):
+    assert review_status_for("WHAT_IS_THIS", kind) is ReviewStatus.NEEDS_REVIEW
 
 
 @pytest.mark.parametrize(

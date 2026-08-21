@@ -1,6 +1,6 @@
 # An Offered Slot is matched against the envelope, never resolved into a date
 
-"Tuesday the 26th" is not a date. Turning it into `2026-08-26` needs a year, a month,
+"Wednesday the 26th" is not a date. Turning it into `2026-08-26` needs a year, a month,
 and a rule for what "Tuesday" means when today is a Friday — three resolutions, each
 silent when wrong, and a wrong one books a Patient into a slot nobody offered.
 
@@ -28,3 +28,13 @@ then fall inside it and the ambiguity we avoided returns. That is a constraint o
 Release form rather than a defect: a Reviewer authorising five weeks has not narrowed
 anything. `holdfor/extract.py:35` already anchors a model claim to the turn it came from;
 the slot match reuses that discipline instead of inventing a second one.
+
+## Postscript
+
+The first thing this matcher rejected was the PRD's own demo script. It offered "Tuesday
+the 26th", and 26 August 2026 is a Wednesday — Tuesday is the 25th, which the same
+document names as a public holiday. The refuse-path example offered "Friday the 12th of
+September", which is a Saturday. Both would have been spoken on camera. A model asked to
+resolve those strings would have produced a confident date for each; asking the envelope
+which of its own days were named produced neither, which is the whole argument for the
+inversion in one paragraph.

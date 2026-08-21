@@ -64,3 +64,31 @@ CREATE TABLE IF NOT EXISTS live_call (
     call_attempt_id INTEGER NOT NULL REFERENCES call_attempt(id),
     placed_at       TEXT    NOT NULL
 );
+
+-- One Review Item holds one Release. An index rather than a UNIQUE column so that
+-- `db.init` applies it to a database that already exists, and because it also closes
+-- a race: review.release checked for an existing row with a SELECT before its INSERT,
+-- which two concurrent posts could both pass. See docs/adr/0006, amendment.
+CREATE UNIQUE INDEX IF NOT EXISTS release_one_per_review_item
+    ON release(review_item_id);
+
+-- Every offer reception made, in the order she made them. Reception revises, so
+-- acceptance is plural: the Binding Acceptance is the last row with accepted = 1, and
+-- the earlier rows are kept as evidence rather than overwritten. A withdrawn 09:10 is
+-- the reason a booking reads 08:50. See docs/adr/0012.
+--
+-- verdict is what the Envelope Match made of the offer, never what the agent thought:
+--   inside      the offer names a day and time the Booking Envelope allows
+--   outside     it names a day or time the envelope does not allow
+--   unreadable  the turn names no day we can read, so nothing is claimed about it
+CREATE TABLE IF NOT EXISTS rebooking_offer (
+    id              INTEGER PRIMARY KEY,
+    call_attempt_id INTEGER NOT NULL REFERENCES call_attempt(id),
+    turn_index      INTEGER NOT NULL,
+    spoken_text     TEXT    NOT NULL,
+    accepted        INTEGER NOT NULL,
+    matched_date    TEXT,
+    matched_time    TEXT,
+    verdict         TEXT    NOT NULL,
+    created_at      TEXT    NOT NULL
+);

@@ -107,7 +107,7 @@ _Avoid_: patient data, context, payload, profile
 
 **Offered Slot**:
 What reception actually put on the table, held as the turn she said it in rather than
-as a resolved date. "Tuesday the 26th at ten past nine" is an Offered Slot; the
+as a resolved date. "Wednesday the 26th at ten past nine" is an Offered Slot; the
 matcher reads day and clock tokens out of that turn and never converts it into a
 calendar date. See [ADR 0008](docs/adr/0008-an-offered-slot-is-matched-never-resolved.md).
 _Avoid_: appointment, slot, booking, proposed time

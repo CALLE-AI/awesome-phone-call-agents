@@ -15,9 +15,23 @@
   .empty { color: #666; }
   .counts small { display: block; color: #666; font-size: .75rem; }
   a { color: #14476b; }
+  h2 { font-size: 1.05rem; margin-top: 2.5rem; }
+  .note { color: #666; max-width: 44rem; }
+  .refused { color: #a03328; font-weight: 600; }
+  .waiting { color: #666; font-size: .85rem; }
 </style>
 
 <h1>Review queue</h1>
+
+{% if request.query_params.get("refused") %}
+<p class="refused">
+  That call was not placed: {{ request.query_params.get("refused") }}.
+  {%- if request.query_params.get("refused") == "no_booking_line" %}
+  Set <code>HOLDFOR_BOOKING_LINE</code> to the practice's appointments number. There is
+  no default, on purpose.
+  {%- endif %}
+</p>
+{% endif %}
 
 <div class="counts">
   <span>Called today <b>{{ today }}</b></span>
@@ -60,4 +74,41 @@
   {%- if today %}Nothing needs you. All {{ today }} of today's calls closed on their own.
   {%- else %}No calls yet today. Run <code>python -m holdfor run-due</code>.{% endif %}
 </p>
+{% endif %}
+
+
+{% if awaiting_call %}
+<h2>Released, awaiting the call</h2>
+<p class="note">
+  A named Reviewer authorised each of these. Nothing has been dialled yet and nothing
+  will be until somebody runs it. One Release grants one call: pressing Run twice reads
+  the call that happened rather than making another one.
+</p>
+<table>
+  <tr>
+    <th>Patient</th><th>Envelope</th><th>Words that may be spoken</th>
+    <th>Released by</th><th></th>
+  </tr>
+  {% for item in awaiting_call %}
+  <tr>
+    <td><a href="/review-items/{{ item.id }}/view">{{ item.first_name }} {{ item.surname }}</a></td>
+    <td>{{ item.earliest_date }} to {{ item.latest_date }}
+      <br><small>{{ item.time_of_day }} &middot; {{ item.mode }}
+        {%- if item.clinician %} &middot; {{ item.clinician }}{% endif %}</small></td>
+    <td class="words">
+      {%- if item.approved_words %}“{{ item.approved_words }}”
+      {%- else %}<span class="waiting">nothing will be spoken</span>{% endif %}
+    </td>
+    <td>{{ item.reviewer_name }}</td>
+    <td>
+      {%- if item.rebooking_state %}<span class="waiting">{{ item.rebooking_state }}</span>
+      {%- else %}
+      <form method="post" action="/releases/{{ item.release_id }}/run">
+        <button type="submit">Run</button>
+      </form>
+      {%- endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
 {% endif %}

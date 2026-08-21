@@ -1,6 +1,6 @@
 # The agent accepts the offer, and the board checks the acceptance
 
-Reception offers "Tuesday the 26th at ten past nine" and somebody has to answer while
+Reception offers "Wednesday the 26th at ten past nine" and somebody has to answer while
 she waits. CALL-E's surface is `--to-phone` and `--goal <text>`, then polling: there is
 no callback during a call and no tool the agent can reach mid-sentence, so our code
 cannot be consulted at the moment the answer is owed. The Booking Envelope therefore

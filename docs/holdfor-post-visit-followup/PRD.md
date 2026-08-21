@@ -57,7 +57,7 @@ has no reason to exist.
 | Should we book them in? | Agent books when the patient says yes. | Never. A **Review Item** appears on the board; a named **Reviewer** releases it or closes it. |
 | Is this slot acceptable? | Agent takes whatever reception offers. | Accepts only inside the **Booking Envelope** a Reviewer already set. Anything outside is refused and returned to the board. |
 
-The third row is the one to defend. When reception says "I can do Tuesday the 26th
+The third row is the one to defend. When reception says "I can do Wednesday the 26th
 at ten past nine", something has to answer — so "the agent never decides" taken
 literally makes the second call useless. A **Release** is therefore a bounded
 authority, not a yes/no flag. See
@@ -273,12 +273,12 @@ agent      This is the automated assistant for Fieldgate Surgery. I'm
 reception  Date of birth?
 agent      4 March 1943.
 
-reception  I can do Tuesday the 26th at ten past nine.
+reception  I can do Wednesday the 26th at ten past nine.
 agent      [inside envelope]  That's fine, thank you — please book that.
 
   — or —
 
-reception  Earliest I've got is Friday the 12th of September.
+reception  Earliest I've got is Friday the 11th of September.
 agent      [outside envelope] I can't accept that one. I'll pass it back
            to the surgery. Thank you.
 ```

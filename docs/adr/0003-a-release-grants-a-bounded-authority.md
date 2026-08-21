@@ -33,7 +33,8 @@ confirmation; a field the Reviewer narrowed must be heard aloud or the offer fai
 Tightening the envelope is what makes the call longer, and the Reviewer chooses that
 trade knowingly, for one Patient at a time.
 
-This requires `AppointmentMode` to carry `ANY` and `release.mode` to become nullable.
-`TimeOfDay` already has `ANY`; its absence from `AppointmentMode` was an oversight, not a
-position. Without it every Release narrows the mode by construction, every call must ask,
+This requires `AppointmentMode` to carry `ANY`. `TimeOfDay` already has it; its absence
+from `AppointmentMode` was an oversight, not a position. `release.mode` stays `NOT NULL`
+and always holds a value — a nullable column would give "unconstrained" two spellings,
+and the one that is never read is the one that rots. Without it every Release narrows the mode by construction, every call must ask,
 and the rule collapses into the interrogation it was written to avoid.

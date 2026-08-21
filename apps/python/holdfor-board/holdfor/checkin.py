@@ -471,7 +471,7 @@ def run(
         extraction = no_answers()
         stop_condition, stop_reason = False, None
 
-    status = review_status_for(result.outcome)
+    status = review_status_for(result.outcome, CallKind.CHECKIN)
     if stop_reason == DECLINED:
         # She answered, heard the opening, and asked us not to go on. ADR 0006 files a
         # hang-up as `declined`; saying it in words is the same refusal, said more
