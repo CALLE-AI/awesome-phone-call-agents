@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from . import checkin, db, seed as seeding
+from . import checkin, db, review, seed as seeding
 from .providers import FakeProvider
 
 USAGE = "usage: python -m holdfor (init | run-due | serve)"
@@ -32,7 +32,10 @@ def cmd_run_due() -> None:
         except checkin.Refused as refused:
             print(f"appointment {appointment_id}: refused ({refused.reason})")
         else:
-            print(f"appointment {appointment_id}: review item {review_item_id}")
+            status = review.settle(conn, review_item_id)
+            print(
+                f"appointment {appointment_id}: review item {review_item_id} ({status})"
+            )
     conn.close()
 
 

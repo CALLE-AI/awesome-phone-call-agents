@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import checkin, db
+from . import checkin, db, review
 from .models import ReviewStatus
 from .providers import FakeProvider
 
@@ -62,7 +64,8 @@ def create_app(db_path: str | None = None, provider=None) -> FastAPI:
             return JSONResponse(status_code=409, content={"refused": refused.reason})
         except LookupError as missing:
             raise HTTPException(status_code=404, detail=str(missing))
-        return {"review_item_id": review_item_id}
+        status = review.settle(conn, review_item_id)
+        return {"review_item_id": review_item_id, "status": status}
 
     @app.get("/board")
     def board(conn: sqlite3.Connection = Depends(connection)) -> dict:
@@ -74,10 +77,135 @@ def create_app(db_path: str | None = None, provider=None) -> FastAPI:
             request=request, name="board.html", context=board_payload(conn)
         )
 
+    @app.get("/review-items/{review_item_id}")
+    def detail(
+        review_item_id: int, conn: sqlite3.Connection = Depends(connection)
+    ) -> dict:
+        return detail_payload(conn, review_item_id)
+
+    @app.get("/review-items/{review_item_id}/view", response_class=HTMLResponse)
+    def detail_page(
+        review_item_id: int,
+        request: Request,
+        conn: sqlite3.Connection = Depends(connection),
+    ):
+        payload = detail_payload(conn, review_item_id)
+        return TEMPLATES.TemplateResponse(
+            request=request,
+            name="detail.html",
+            context={**payload, "today": date.today().isoformat()},
+        )
+
+    # The three writing endpoints read their body before touching the database, so
+    # they are async, and an async handler runs on the event loop while a sync
+    # dependency runs in a worker thread. A SQLite connection cannot cross that line.
+    # Each write therefore opens its own connection inside the same worker that uses
+    # it, rather than borrowing one from a dependency.
+
+    @app.post("/review-items/{review_item_id}/release", status_code=201)
+    async def release(review_item_id: int, request: Request):
+        body = await _body(request)
+        return await run_in_threadpool(
+            _release_now,
+            app.state.db_path,
+            review_item_id,
+            body,
+            _wants_html(request),
+        )
+
+    @app.post("/review-items/{review_item_id}/close", status_code=201)
+    async def close(review_item_id: int, request: Request):
+        return await run_in_threadpool(
+            _terminate_now,
+            app.state.db_path,
+            review_item_id,
+            ReviewStatus.CLOSED,
+            _wants_html(request),
+        )
+
+    @app.post("/review-items/{review_item_id}/manual", status_code=201)
+    async def manual(review_item_id: int, request: Request):
+        return await run_in_threadpool(
+            _terminate_now,
+            app.state.db_path,
+            review_item_id,
+            ReviewStatus.RANG_MANUALLY,
+            _wants_html(request),
+        )
+
     return app
 
 
+def _release_now(db_path: str, review_item_id: int, body: dict, html: bool):
+    conn = db.connect(db_path)
+    try:
+        release_id = review.release(conn, review_item_id, body)
+    except review.Rejected as rejected:
+        return JSONResponse(
+            status_code=rejected.status, content={"error": rejected.code}
+        )
+    except LookupError as missing:
+        raise HTTPException(status_code=404, detail=str(missing))
+    finally:
+        conn.close()
+    if html:
+        return RedirectResponse(f"/review-items/{review_item_id}/view", 303)
+    return JSONResponse(status_code=201, content={"release_id": release_id})
+
+
+def _terminate_now(
+    db_path: str, review_item_id: int, status: ReviewStatus, html: bool
+):
+    conn = db.connect(db_path)
+    try:
+        settled = review.terminate(conn, review_item_id, status)
+    except review.Rejected as rejected:
+        return JSONResponse(
+            status_code=rejected.status, content={"error": rejected.code}
+        )
+    except LookupError as missing:
+        raise HTTPException(status_code=404, detail=str(missing))
+    finally:
+        conn.close()
+    if html:
+        return RedirectResponse("/", 303)
+    return JSONResponse(status_code=201, content={"status": settled})
+
+
+async def _body(request: Request) -> dict:
+    """Accept a JSON body or a submitted form. The rules are the same for both."""
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        return await request.json()
+    form = await request.form()
+    return {key: value for key, value in form.items()}
+
+
+def _wants_html(request: Request) -> bool:
+    content_type = request.headers.get("content-type", "")
+    return not content_type.startswith("application/json")
+
+
+def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
+    item = review.fetch(conn, review_item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"No review item {review_item_id}")
+    turns = review.load_turns(item["transcript_path"])
+    row = dict(item)
+    row["stop_condition"] = bool(row["stop_condition"])
+    return {
+        "item": row,
+        "turns": [asdict(turn) for turn in turns],
+        "anchors": review.anchors(item, turns),
+    }
+
+
 def board_payload(conn: sqlite3.Connection) -> dict:
+    """The queue lists only what needs a person. The counts cover the whole day.
+
+    The ratio is the only number showing the practice got something back for the
+    calls it placed, so it is counted from the rows rather than illustrated.
+    """
     items = [dict(row) for row in conn.execute(BOARD_QUERY).fetchall()]
     for item in items:
         item["stop_condition"] = bool(item["stop_condition"])
@@ -91,5 +219,7 @@ def board_payload(conn: sqlite3.Connection) -> dict:
         "needs_review": sum(
             1 for item in todays if item["status"] == ReviewStatus.NEEDS_REVIEW
         ),
-        "items": items,
+        "items": [
+            item for item in items if item["status"] == ReviewStatus.NEEDS_REVIEW
+        ],
     }

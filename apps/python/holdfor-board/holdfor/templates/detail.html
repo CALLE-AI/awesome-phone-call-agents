@@ -1,0 +1,138 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>{{ item.first_name }} {{ item.surname }} — HoldFor</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 76rem; }
+  h1 { font-size: 1.25rem; margin-bottom: .25rem; }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #444; }
+  .meta { color: #666; margin-bottom: 1.5rem; }
+  .split { display: flex; gap: 2.5rem; align-items: flex-start; }
+  .split > * { flex: 1; min-width: 0; }
+  .turn { padding: .3rem 0; border-bottom: 1px solid #eee; }
+  .turn.agent { color: #555; }
+  .turn.other { font-weight: 500; }
+  .turn .who { font-size: .75rem; color: #888; display: inline-block; min-width: 5.5rem; }
+  .turn.anchored { background: #fdf6d8; }
+  dl { margin: 0; }
+  dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #666; margin-top: .8rem; }
+  dd { margin: 0; font-size: 1.05rem; }
+  dd small { color: #888; font-weight: 400; font-size: .75rem; }
+  .quote { font-style: italic; background: #fdf6d8; padding: .4rem .6rem; }
+  .stop { color: #a03328; font-weight: 600; }
+  form { margin-top: 2rem; border-top: 2px solid #222; padding-top: 1rem; }
+  fieldset { border: 1px solid #ddd; margin: 0 0 1rem; }
+  label { display: block; font-size: .8rem; color: #444; margin-top: .6rem; }
+  input, select, textarea { font: inherit; padding: .3rem; width: 100%; box-sizing: border-box; }
+  textarea { height: 4rem; }
+  .row { display: flex; gap: 1rem; }
+  .row > * { flex: 1; }
+  button { font: inherit; padding: .5rem 1rem; margin-right: .5rem; }
+  .primary { font-weight: 600; }
+  .note { color: #666; font-size: .85rem; }
+  a { color: #14476b; }
+</style>
+
+<p><a href="/">&larr; Review queue</a></p>
+
+<h1>{{ item.first_name }} {{ item.surname }}</h1>
+<p class="meta">
+  {{ item.appointment_type }}, seen {{ item.seen_on }} &middot; status {{ item.status }}
+  {%- if item.stop_condition %} &middot; <span class="stop">stopped: {{ item.stop_reason }}</span>{% endif %}
+</p>
+
+<div class="split">
+  <section>
+    <h2>What she said</h2>
+    {% if turns %}
+      {% for turn in turns %}
+      <div class="turn {{ turn.speaker }}{% if turn.index in anchors.values() %} anchored{% endif %}">
+        <span class="who">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="note">No transcript stored for this call.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>What was recorded</h2>
+    <dl>
+      <dt>Feeling</dt>
+      <dd>{{ item.feeling or "not answered" }}
+        {%- if "feeling" in anchors %} <small>turn {{ anchors.feeling }}</small>{% endif %}</dd>
+
+      <dt>Medication</dt>
+      <dd>{{ item.medication_ok or "not answered" }}
+        {%- if "medication_ok" in anchors %} <small>turn {{ anchors.medication_ok }}</small>{% endif %}</dd>
+
+      <dt>Wants to be seen</dt>
+      <dd>{{ item.wants_seen or "not answered" }}
+        {%- if "wants_seen" in anchors %} <small>turn {{ anchors.wants_seen }}</small>{% endif %}</dd>
+
+      <dt>Her words</dt>
+      <dd>
+        {%- if item.carried_words_text %}
+        <span class="quote">{{ item.carried_words_text }}</span>
+        <small>turn {{ item.carried_words_turn }}</small>
+        {%- else %}nothing carried{% endif %}
+      </dd>
+    </dl>
+  </section>
+</div>
+
+<form method="post" action="/review-items/{{ item.id }}/release">
+  <h2>Release</h2>
+  <p class="note">
+    This authorises one call to the practice's booking line on her behalf. The agent
+    accepts an offer inside the dates and times below and refuses anything outside
+    them. It will speak the words in the box and nothing else.
+  </p>
+
+  <fieldset>
+    <legend>Booking envelope</legend>
+    <div class="row">
+      <label>Earliest date <input type="date" name="earliest_date" value="{{ today }}" required></label>
+      <label>Latest date <input type="date" name="latest_date" value="{{ today }}" required></label>
+    </div>
+    <div class="row">
+      <label>Time of day
+        <select name="time_of_day">
+          <option value="any">any</option>
+          <option value="morning">morning</option>
+          <option value="afternoon">afternoon</option>
+        </select>
+      </label>
+      <label>Appointment mode
+        <select name="mode">
+          <option value="in_person">in person</option>
+          <option value="phone">phone</option>
+        </select>
+      </label>
+      <label>Clinician <input type="text" name="clinician" placeholder="any clinician"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Words that may be spoken</legend>
+    <label>
+      <textarea name="approved_words">{{ item.carried_words_text or "" }}</textarea>
+    </label>
+    <p class="note">
+      You may shorten this. You may not add to it: anything that is not part of what
+      she actually said is refused, because a receptionist would hear it as her words.
+    </p>
+  </fieldset>
+
+  <label>Your name <input type="text" name="reviewer_name" required></label>
+  <p class="note">Recorded with the Release. A release always says who granted it.</p>
+
+  <button class="primary" type="submit">Release for rebooking</button>
+</form>
+
+<form method="post" action="/review-items/{{ item.id }}/close">
+  <button type="submit">Close, nothing needed</button>
+</form>
+
+<form method="post" action="/review-items/{{ item.id }}/manual">
+  <button type="submit">Ring them myself</button>
+</form>

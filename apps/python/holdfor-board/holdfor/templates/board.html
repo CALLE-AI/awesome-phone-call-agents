@@ -6,39 +6,41 @@
   h1 { font-size: 1.25rem; }
   .counts { display: flex; gap: 2rem; margin: 1rem 0 1.5rem; }
   .counts b { display: block; font-size: 1.75rem; }
+  .counts .you b { color: #a03328; }
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid #ddd; vertical-align: top; }
   th { font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
   .stop { color: #a03328; font-weight: 600; }
   .words { max-width: 24rem; font-style: italic; }
   .empty { color: #666; }
+  a { color: #14476b; }
 </style>
 
 <h1>Review queue</h1>
 
 <div class="counts">
   <span>Called today <b>{{ today }}</b></span>
-  <span>Auto-closed <b>{{ auto_closed }}</b></span>
-  <span>Needs review <b>{{ needs_review }}</b></span>
+  <span>Closed, nothing needed <b>{{ auto_closed }}</b></span>
+  <span class="you">Need you <b>{{ needs_review }}</b></span>
 </div>
 
 {% if items %}
 <table>
   <tr>
     <th>Patient</th><th>Seen for</th><th>Feeling</th><th>Medication</th>
-    <th>Wants seen</th><th>Their words</th><th>Status</th>
+    <th>Wants seen</th><th>Their words</th><th>Why it is here</th>
   </tr>
   {% for item in items %}
   <tr>
-    <td>{{ item.first_name }} {{ item.surname }}</td>
+    <td><a href="/review-items/{{ item.id }}/view">{{ item.first_name }} {{ item.surname }}</a></td>
     <td>{{ item.appointment_type }}<br><small>{{ item.seen_on }}</small></td>
-    <td>{{ item.feeling or "—" }}</td>
-    <td>{{ item.medication_ok or "—" }}</td>
-    <td>{{ item.wants_seen or "—" }}</td>
+    <td>{{ item.feeling or "not answered" }}</td>
+    <td>{{ item.medication_ok or "not answered" }}</td>
+    <td>{{ item.wants_seen or "not answered" }}</td>
     <td class="words">
       {%- if item.carried_words_text %}“{{ item.carried_words_text }}”
       <br><small>turn {{ item.carried_words_turn }}</small>
-      {%- else %}—{% endif %}
+      {%- else %}nothing carried{% endif %}
     </td>
     <td>
       {%- if item.stop_condition %}<span class="stop">stopped: {{ item.stop_reason }}</span>
@@ -48,5 +50,8 @@
   {% endfor %}
 </table>
 {% else %}
-<p class="empty">No Review Items yet. Run <code>python -m holdfor run-due</code>.</p>
+<p class="empty">
+  {%- if today %}Nothing needs you. All {{ today }} of today's calls closed on their own.
+  {%- else %}No calls yet today. Run <code>python -m holdfor run-due</code>.{% endif %}
+</p>
 {% endif %}

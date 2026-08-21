@@ -7,6 +7,9 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.32",
     "jinja2>=3.1",
+    # The Release form posts form-encoded, and Starlette cannot parse a form without
+    # this. Not optional: without it the board renders and every Release fails.
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

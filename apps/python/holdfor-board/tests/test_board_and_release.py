@@ -1,0 +1,483 @@
+"""T3: the queue, the detail view, and the Release.
+
+Review Items are inserted directly here rather than produced by a call, so the board
+is tested against the shapes it actually reads and needs no recorded transcript.
+"""
+
+from __future__ import annotations
+
+import json
+from itertools import count
+
+import pytest
+from fastapi.testclient import TestClient
+
+from holdfor import db, review
+from holdfor.app import create_app
+from holdfor.models import ReviewStatus
+
+QUOTE = "I have to hold the worktop for a minute when I get up in the morning"
+
+TRANSCRIPT = {
+    "state": "terminal_verified",
+    "turns": [
+        {"index": 0, "speaker": "agent", "text": "Hello, is that Margaret?"},
+        {"index": 1, "speaker": "other", "text": "Yes, speaking."},
+        {
+            "index": 2,
+            "speaker": "agent",
+            "text": "Since Monday, are you feeling better, about the same, or worse?",
+        },
+        {"index": 3, "speaker": "other", "text": "About the same."},
+        {
+            "index": 4,
+            "speaker": "agent",
+            "text": "Are you getting on alright with what they gave you?",
+        },
+        {"index": 5, "speaker": "other", "text": "I think so, yes."},
+        {"index": 6, "speaker": "agent", "text": "Is there anything worrying you?"},
+        {"index": 7, "speaker": "other", "text": f"Well, {QUOTE}."},
+        {
+            "index": 8,
+            "speaker": "agent",
+            "text": "Would you like the surgery to see you again?",
+        },
+        {"index": 9, "speaker": "other", "text": "Yes, I would."},
+    ],
+}
+
+keys = count(1)
+
+
+@pytest.fixture
+def transcript_file(tmp_path):
+    path = tmp_path / "margaret.json"
+    path.write_text(json.dumps(TRANSCRIPT), encoding="utf-8")
+    return str(path)
+
+
+@pytest.fixture
+def client(db_path):
+    return TestClient(create_app(db_path=db_path))
+
+
+def add_item(
+    conn,
+    *,
+    feeling="same",
+    medication_ok="not_asked",
+    wants_seen="no",
+    carried=QUOTE,
+    carried_turn=7,
+    stop=False,
+    reason=None,
+    transcript_path=None,
+    status=ReviewStatus.NEEDS_REVIEW,
+) -> int:
+    stamp = db.now_iso()
+    attempt = conn.execute(
+        """
+        INSERT INTO call_attempt
+            (appointment_id, kind, idempotency_key, state, transcript_path,
+             created_at, updated_at)
+        VALUES (1, 'checkin', ?, 'terminal_verified', ?, ?, ?)
+        """,
+        (f"test:{next(keys)}", transcript_path, stamp, stamp),
+    )
+    item = conn.execute(
+        """
+        INSERT INTO review_item
+            (call_attempt_id, feeling, medication_ok, wants_seen,
+             carried_words_text, carried_words_turn,
+             stop_condition, stop_reason, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            attempt.lastrowid,
+            feeling,
+            medication_ok,
+            wants_seen,
+            carried,
+            carried_turn,
+            int(stop),
+            reason,
+            status.value,
+            stamp,
+        ),
+    )
+    conn.commit()
+    return item.lastrowid
+
+
+def envelope(**overrides) -> dict:
+    body = {
+        "earliest_date": "2026-08-24",
+        "latest_date": "2026-08-28",
+        "time_of_day": "morning",
+        "mode": "in_person",
+        "clinician": None,
+        "approved_words": QUOTE,
+        "reviewer_name": "Sister Okonjo",
+    }
+    return body | overrides
+
+
+# --- auto-close: narrow on purpose ------------------------------------------------
+
+
+def test_a_settled_call_closes_without_anyone_reading_it(conn):
+    item_id = add_item(conn, feeling="better", wants_seen="no")
+
+    assert review.settle(conn, item_id) == ReviewStatus.AUTO_CLOSED.value
+
+
+def test_a_stop_condition_alone_keeps_it_in_the_queue(conn):
+    item_id = add_item(conn, feeling="better", stop=True, reason="red_flag_phrase")
+
+    assert review.settle(conn, item_id) == ReviewStatus.NEEDS_REVIEW.value
+
+
+def test_feeling_worse_alone_keeps_it_in_the_queue(conn):
+    item_id = add_item(conn, feeling="worse")
+
+    assert review.settle(conn, item_id) == ReviewStatus.NEEDS_REVIEW.value
+
+
+def test_feeling_unsure_alone_keeps_it_in_the_queue(conn):
+    item_id = add_item(conn, feeling="unsure")
+
+    assert review.settle(conn, item_id) == ReviewStatus.NEEDS_REVIEW.value
+
+
+def test_wanting_to_be_seen_alone_keeps_it_in_the_queue(conn):
+    item_id = add_item(conn, feeling="better", wants_seen="yes")
+
+    assert review.settle(conn, item_id) == ReviewStatus.NEEDS_REVIEW.value
+
+
+def test_an_unanswered_medication_question_alone_keeps_it_in_the_queue(conn):
+    item_id = add_item(conn, feeling="better", medication_ok=None)
+
+    assert review.settle(conn, item_id) == ReviewStatus.NEEDS_REVIEW.value
+
+
+def test_not_asked_counts_as_answered(conn):
+    """The question was never put to her, which is a complete state, not a gap."""
+    item_id = add_item(conn, feeling="better", medication_ok="not_asked")
+
+    assert review.settle(conn, item_id) == ReviewStatus.AUTO_CLOSED.value
+
+
+# --- the queue --------------------------------------------------------------------
+
+
+def test_the_queue_counts_the_day_and_lists_only_what_needs_a_person(conn, client):
+    add_item(conn, feeling="better", status=ReviewStatus.AUTO_CLOSED)
+    add_item(conn, feeling="better", status=ReviewStatus.AUTO_CLOSED)
+    needs_you = add_item(conn, feeling="worse")
+
+    payload = client.get("/board").json()
+
+    assert payload["today"] == 3
+    assert payload["auto_closed"] == 2
+    assert payload["needs_review"] == 1
+    assert [item["id"] for item in payload["items"]] == [needs_you]
+
+
+def test_the_queue_page_leads_with_the_number_that_needs_a_person(conn, client):
+    add_item(conn, feeling="worse")
+
+    page = client.get("/")
+
+    assert page.status_code == 200
+    assert "Need you" in page.text
+    assert "Margaret" in page.text
+
+
+# --- the detail view --------------------------------------------------------------
+
+
+def test_the_detail_view_anchors_each_answer_to_the_turn_it_came_from(
+    conn, client, transcript_file
+):
+    item_id = add_item(conn, wants_seen="yes", transcript_path=transcript_file)
+
+    payload = client.get(f"/review-items/{item_id}").json()
+
+    assert [turn["index"] for turn in payload["turns"]] == list(range(10))
+    assert payload["anchors"] == {
+        "feeling": 3,
+        "medication_ok": 5,
+        "wants_seen": 9,
+        "carried_words_text": 7,
+    }
+
+
+def test_an_answer_that_was_never_given_gets_no_anchor(
+    conn, client, transcript_file
+):
+    item_id = add_item(
+        conn, wants_seen=None, carried=None, carried_turn=None,
+        transcript_path=transcript_file,
+    )
+
+    anchors = client.get(f"/review-items/{item_id}").json()["anchors"]
+
+    assert "wants_seen" not in anchors
+    assert "carried_words_text" not in anchors
+    assert anchors["feeling"] == 3
+
+
+def test_a_missing_transcript_is_an_empty_call_not_a_crash(conn, client):
+    item_id = add_item(conn, transcript_path="fixtures/transcripts/gone.json")
+
+    payload = client.get(f"/review-items/{item_id}").json()
+
+    assert payload["turns"] == []
+    assert payload["anchors"] == {"carried_words_text": 7}
+
+
+def test_the_detail_page_shows_the_transcript_beside_the_answers(
+    conn, client, transcript_file
+):
+    item_id = add_item(conn, transcript_path=transcript_file)
+
+    page = client.get(f"/review-items/{item_id}/view")
+
+    assert page.status_code == 200
+    assert QUOTE in page.text
+    assert "Would you like the surgery to see you again?" in page.text
+    assert "Release for rebooking" in page.text
+
+
+def test_an_unknown_review_item_is_a_404(client):
+    assert client.get("/review-items/9999").status_code == 404
+
+
+# --- the Release ------------------------------------------------------------------
+
+
+def test_a_release_records_who_granted_it_and_when(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    response = client.post(f"/review-items/{item_id}/release", json=envelope())
+
+    assert response.status_code == 201
+    row = conn.execute(
+        "SELECT * FROM release WHERE id = ?", (response.json()["release_id"],)
+    ).fetchone()
+    assert row["reviewer_name"] == "Sister Okonjo"
+    assert row["released_at"]
+    assert row["review_item_id"] == item_id
+
+
+def test_a_release_carries_the_whole_booking_envelope(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    release_id = client.post(
+        f"/review-items/{item_id}/release",
+        json=envelope(clinician="Dr Whitfield", mode="phone", time_of_day="afternoon"),
+    ).json()["release_id"]
+
+    row = conn.execute("SELECT * FROM release WHERE id = ?", (release_id,)).fetchone()
+    assert row["earliest_date"] == "2026-08-24"
+    assert row["latest_date"] == "2026-08-28"
+    assert row["time_of_day"] == "afternoon"
+    assert row["mode"] == "phone"
+    assert row["clinician"] == "Dr Whitfield"
+
+
+def test_a_release_moves_the_item_out_of_the_queue(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    client.post(f"/review-items/{item_id}/release", json=envelope())
+
+    status = conn.execute(
+        "SELECT status FROM review_item WHERE id = ?", (item_id,)
+    ).fetchone()["status"]
+    assert status == ReviewStatus.RELEASED.value
+
+
+def test_narrowing_the_quote_is_accepted(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+    narrowed = "hold the worktop for a minute"
+
+    release_id = client.post(
+        f"/review-items/{item_id}/release", json=envelope(approved_words=narrowed)
+    ).json()["release_id"]
+
+    row = conn.execute("SELECT * FROM release WHERE id = ?", (release_id,)).fetchone()
+    assert row["approved_words"] == narrowed
+
+
+def test_widening_the_quote_is_refused(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+    widened = QUOTE + " and I nearly fell"
+
+    response = client.post(
+        f"/review-items/{item_id}/release", json=envelope(approved_words=widened)
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "words_widened"}
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 0
+
+
+def test_words_cannot_be_approved_for_a_call_that_carried_none(conn, client):
+    item_id = add_item(conn, carried=None, carried_turn=None, feeling="worse")
+
+    response = client.post(
+        f"/review-items/{item_id}/release",
+        json=envelope(approved_words="she mentioned her knee"),
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "words_widened"}
+
+
+def test_a_release_with_no_quote_at_all_is_allowed(conn, client):
+    item_id = add_item(conn, carried=None, carried_turn=None, feeling="worse")
+
+    response = client.post(
+        f"/review-items/{item_id}/release", json=envelope(approved_words="")
+    )
+
+    assert response.status_code == 201
+
+
+def test_a_release_without_a_named_reviewer_is_refused(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    response = client.post(
+        f"/review-items/{item_id}/release", json=envelope(reviewer_name="  ")
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "reviewer_required"}
+
+
+def test_an_envelope_that_ends_before_it_starts_is_refused(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    response = client.post(
+        f"/review-items/{item_id}/release",
+        json=envelope(earliest_date="2026-08-28", latest_date="2026-08-24"),
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "envelope_invalid"}
+
+
+def test_an_unknown_appointment_mode_is_refused(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    response = client.post(
+        f"/review-items/{item_id}/release", json=envelope(mode="video")
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"error": "envelope_invalid"}
+
+
+def test_releasing_twice_does_not_authorise_two_calls(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    first = client.post(f"/review-items/{item_id}/release", json=envelope())
+    second = client.post(f"/review-items/{item_id}/release", json=envelope())
+
+    assert first.status_code == 201
+    assert second.status_code == 409
+    assert second.json() == {"error": "already_released"}
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 1
+
+
+# --- the other two actions --------------------------------------------------------
+
+
+def test_closing_an_item_authorises_nothing(conn, client):
+    item_id = add_item(conn, feeling="worse")
+
+    response = client.post(f"/review-items/{item_id}/close", json={})
+
+    assert response.status_code == 201
+    assert _status(conn, item_id) == ReviewStatus.CLOSED.value
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 0
+
+
+def test_ringing_them_myself_takes_it_off_the_agent(conn, client):
+    item_id = add_item(conn, feeling="worse")
+
+    response = client.post(f"/review-items/{item_id}/manual", json={})
+
+    assert response.status_code == 201
+    assert _status(conn, item_id) == ReviewStatus.RANG_MANUALLY.value
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 0
+
+
+def test_a_closed_item_cannot_then_be_released(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+    client.post(f"/review-items/{item_id}/close", json={})
+
+    response = client.post(f"/review-items/{item_id}/release", json=envelope())
+
+    assert response.status_code == 409
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 0
+
+
+def test_a_settled_item_cannot_be_settled_again(conn, client):
+    item_id = add_item(conn, feeling="worse")
+    client.post(f"/review-items/{item_id}/close", json={})
+
+    response = client.post(f"/review-items/{item_id}/manual", json={})
+
+    assert response.status_code == 409
+    assert response.json() == {"error": "already_settled"}
+
+
+# --- the path a Reviewer actually uses -------------------------------------------
+
+
+def test_the_submitted_form_releases_and_returns_to_the_item(conn, client):
+    """The form posts form-encoded, not JSON. Same rules, different content type."""
+    item_id = add_item(conn, wants_seen="yes")
+    body = envelope(clinician="")
+    body.pop("clinician")
+
+    response = client.post(
+        f"/review-items/{item_id}/release", data=body, follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/review-items/{item_id}/view"
+    assert _status(conn, item_id) == ReviewStatus.RELEASED.value
+
+
+def test_a_widened_quote_from_the_form_is_refused_too(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    response = client.post(
+        f"/review-items/{item_id}/release",
+        data=envelope(approved_words=QUOTE + " and I nearly fell", clinician=""),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 422
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 0
+
+
+def test_the_close_button_returns_to_the_queue(conn, client):
+    item_id = add_item(conn, feeling="worse")
+
+    response = client.post(
+        f"/review-items/{item_id}/close", data={}, follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
+    assert _status(conn, item_id) == ReviewStatus.CLOSED.value
+
+
+def _status(conn, item_id: int) -> str:
+    return conn.execute(
+        "SELECT status FROM review_item WHERE id = ?", (item_id,)
+    ).fetchone()["status"]
