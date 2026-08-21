@@ -104,7 +104,7 @@ Every plugin should document supported triggers or actions, required inputs, sid
 ### README list entry template
 
 ```markdown
-- [Project Name](https://example.com) - One sentence explaining why this is useful for AI-agent phone-call workflows.
+# Awesome Phone Call AgentsModular AI-agent phone-call workflows built on CALL-E.## 📞 Plugins- [call-reminder](skills/call-reminder)    Automates recurring phone‑call reminders for AI‑agent workflows.- [call-logger](skills/call-logger)    Logs and timestamps AI‑agent phone‑call events for audit and analytics.- [call-cancel](skills/call-cancel)    Safely cancels or rolls back scheduled calls to prevent duplicates or unintended actions.- [fs-sponsor-outreach](skills/fs-sponsor-outreach)    Batch outbound caller for Formula Student racing teams, built on CALL‑E CLI.
 ```
 
 Keep descriptions short, specific, factual, and directly tied to packaging, scheduling, executing, or safely operating AI-agent phone-call tasks.
@@ -178,6 +178,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/python/callflow-campaign-runner`](apps/python/callflow-campaign-runner/) | Python | CSV-driven outbound campaign runner that triages structured results into auto-closed, retry, and needs-human queues. |
 | [`apps/python/mobilize`](apps/python/mobilize/) | Python | Parallel wave dispatch to a consented pool under a deadline: stops calling the moment enough people confirm, and scores how firm each "yes" actually is instead of trusting every stated agreement. Ships a 300-trial zero-cost evaluation harness with a measured accuracy result, a crash-safe ledger, and an MCP server. |
 | [`apps/python/batch-runner`](apps/python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
+| [`apps/python/fs-sponsor-outreach`](apps/python/fs-sponsor-outreach/) | Python | Packages a CSV of sponsor leads into per-contact outbound calls via the CALL-E CLI, executing each call and returning structured interest-level and follow-up data, with dry-run preview and phone-number masking for safe operation. |
 | [`apps/python/broker-login-client`](apps/python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`apps/typescript/broker-login-client`](apps/typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`apps/typescript/broker-login-client-standalone`](apps/typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
@@ -259,3 +260,15 @@ Out of scope:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
+## Viewing results
+
+Open results_dashboard.html in a browser and use the "Load results.csv"
+button to load your output file. It renders each contact as a row in a
+pit-wall style timing tower, color-coded by outcome (interested,
+callback requested, not interested, no answer), with per-contact detail
+on click.
+
+Do not commit a real results.csv containing real contact phone numbers
+to a public repository. Use a redacted copy (mask the phone number) if
+you want to show real results in the repo.

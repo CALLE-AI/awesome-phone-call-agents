@@ -28,6 +28,7 @@ Current apps:
 | [`python/webhook-result-receiver`](python/webhook-result-receiver/) | Python | Durable at-least-once CALL-E terminal webhook ingestion with SQLite deduplication, conflict detection, and authenticated Calls API reconciliation. |
 | [`python/mobilize`](python/mobilize/) | Python | Parallel wave dispatch to a consented pool under a deadline: stops calling the moment enough people confirm, and scores how firm each "yes" actually is instead of trusting every stated agreement. Ships a 300-trial zero-cost evaluation harness with a measured accuracy result, a crash-safe ledger, and an MCP server. |
 | [`python/batch-runner`](python/batch-runner/) | Python | JSONL batch runner using CALL-E CLI auth state, FastMCP, Rich output, and MCP tool-call metadata. |
+| [`python/fs-sponsor-outreach`](python/fs-sponsor-outreach/) | Python | Batch sponsor-outreach caller for student racing teams (Formula Student, FSAE): reads a CSV lead list, places one outbound call per contact, and returns structured interest-level and follow-up results. |
 | [`python/broker-login-client`](python/broker-login-client/) | Python | CALL-E brokered login client with local token cache and MCP HTTP calls. |
 | [`typescript/broker-login-client`](typescript/broker-login-client/) | TypeScript | CALL-E brokered login client using `@call-e/core`. |
 | [`typescript/broker-login-client-standalone`](typescript/broker-login-client-standalone/) | TypeScript | CALL-E brokered login client without a shared package dependency. |
