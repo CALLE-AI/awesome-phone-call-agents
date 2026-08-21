@@ -18,8 +18,9 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   const runState = app.getWatchRunState(id);
   const results = app.getLatestResults(id);
 
-  // Mask full numbers before passing to the client bundle (defense in depth:
-  // UI also masks, but the RSC payload should not contain full numbers).
+  // Mask full numbers and strip raw provider call identifiers before passing
+  // to the client bundle (defense in depth: the UI also masks, but the RSC
+  // payload should not contain full numbers or provider call ids).
   const maskedWatch = {
     ...watch,
     candidates: watch.candidates.map((c) => ({
@@ -28,6 +29,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
       phoneDisplay: maskE164(c.phoneE164),
     })),
   };
+  const maskedResults = results.map((r) => ({ ...r, calleCallId: undefined }));
 
-  return <WatchClient watch={maskedWatch} runCount={runState.runCount} results={results} />;
+  return <WatchClient watch={maskedWatch} runCount={runState.runCount} results={maskedResults} />;
 }
