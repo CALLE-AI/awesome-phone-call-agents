@@ -143,6 +143,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
+- [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
