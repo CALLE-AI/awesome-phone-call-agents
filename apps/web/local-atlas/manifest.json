@@ -1,0 +1,12 @@
+{
+  "name": "Local Atlas",
+  "short_name": "Atlas",
+  "description": "Explore any US or Canadian town: weather, news, events, places",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F6F8F6",
+  "theme_color": "#00583D",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

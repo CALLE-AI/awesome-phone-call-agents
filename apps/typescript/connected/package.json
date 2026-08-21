@@ -1,0 +1,30 @@
+{
+  "name": "connected-check-in",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc -b --pretty false",
+    "call:preview": "node --import tsx scripts/call.ts preview",
+    "call:live": "node --import tsx scripts/call.ts live",
+    "check": "npm test && npm run build"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0",
+    "lucide-react": "^0.468.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "latest",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3",
+    "vite": "latest"
+  }
+}

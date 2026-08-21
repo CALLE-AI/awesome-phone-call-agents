@@ -75,37 +75,39 @@ out of a README.
 
 ## What a human verified that no test covers
 
-Every live call went to a number the author owns (+60\*\*\*\*\*\*\*22, region MY). No third party
-was called at any point. The three call ids below are the live calls this submission cites.
+Every live call went to a number the author owns, region MY. No third party was called at any
+point.
 
-- `call_6ErYKmEI472cBVdsUd7K3Q` (2026-08-04) — first confirmation that the frozen text passes the
-  content screen. Completed, `task_completed` true, confidence 0.92, decision `continue_job`.
-  The same call produced the inconsistency that became the twelfth condition: the author said
-  "continue" twice, confirmed the read-back, and then gave his reason as "the jobs done enough, take
-  it back" — a reason that means stop. Extraction was faithful, and `reason_sentence` recorded the
-  sentence word for word. The human was inconsistent. He decided a reason pointing away from the
-  choice should end the lease, and wrote `reason_does_not_contradict_decision`. This was one call,
-  not two: the acceptance and the inconsistency came out of the same three minutes.
-- `call_RV8aiijpyuySJAermpuFxA` (2026-08-17) — completed, confidence 0.88, decision `stop_job`. The
-  author said "stop"; speech recognition wrote the turn down as `dot.` The agent's read-back ("You
-  said stop. Is that correct?") recovered it, and the structured result matched the confirmed
-  choice. He heard this happen live and unstaged. It is why `readback_confirmed` is a condition and
-  not a courtesy.
-- `call_Kw_lOkxZKiO15-I3_m8-vQ` is the recorded demonstration: completed, `task_completed` true,
-  confidence 0.95, decision `stop_job`, created 2026-08-17T02:31:42Z, completed 02:34:59Z. Ten of
-  the twelve conditions held. `decision_is_continue` and `evidence_supports_decision` did not. Both
-  are conditions for the lease continuing, so on a stop call neither can hold — ten of twelve is
-  what an ordinary release reads like, not a partial failure. The credential was revoked and the
-  next refresh exchange returned 400.
-- An earlier call, placed during platform smoke tests on 2026-08-04 with different task text and
-  before the LEASH script existed, returned a structured field that disagreed with its own
-  transcript and evidence at 0.93 confidence: the caller answered "yes", `evidence[]` said they
-  acknowledged, and the enum came back `"no"`. Anything gating a side effect on a single structured
-  field would have taken the wrong branch in silence. `evidence_supports_decision` exists because of
-  that call.
-- The duplicate-dial guard was exercised against the real API, not the fake. A re-run with an
+Summaries only. Call identifiers, transcript text and structured-result payloads from real calls
+are not published in this repository; the records are held privately and can be shown to a
+maintainer on request.
+
+- **The frozen task text passes CALL-E's content screen.** Established by placing real calls, which
+  is the only way to establish it: a schema pre-flight says nothing about the screen. Two earlier
+  drafts of the script were refused outright before either could dial.
+- **A caller's stated reason contradicted their stated choice**, on a call that was otherwise clean
+  at 0.92 confidence. The author chose continue, confirmed the read-back, then gave a reason that
+  plainly meant stop. Extraction was faithful and recorded the sentence accurately; the human was
+  the inconsistent party. He decided a reason pointing away from the choice should end the lease,
+  and wrote `reason_does_not_contradict_decision`. Acceptance and inconsistency came out of the same
+  three minutes, not two separate calls.
+- **Speech recognition mis-transcribed the decision word**, on a call at 0.88 confidence. The
+  agent's read-back of the chosen option recovered it, and the structured result matched the
+  confirmed choice. He heard it happen live and unstaged. It is why `readback_confirmed` is a
+  condition and not a courtesy.
+- **The recorded demonstration**, at 0.95 confidence, ended in `stop_job`. Ten of the twelve
+  conditions held; `decision_is_continue` and `evidence_supports_decision` did not. Both are
+  conditions for the lease *continuing*, so on a stop call neither can hold — ten of twelve is what
+  an ordinary release reads like, not a partial failure. The credential was revoked and the next
+  refresh exchange returned 400.
+- **A structured field disagreed with its own transcript and evidence at 0.93 confidence**, on an
+  earlier smoke-test call with different task text, before the LEASH script existed. Anything
+  gating a side effect on a single structured field would have taken the wrong branch in silence.
+  `evidence_supports_decision` exists because of it.
+- **The duplicate-dial guard was exercised against the real API**, not the fake. A re-run with an
   identical payload produced an identical Idempotency-Key and CALL-E returned the stored call record
   instead of dialling a second time. Nothing rang twice.
+
 
 ## What is not verified
 

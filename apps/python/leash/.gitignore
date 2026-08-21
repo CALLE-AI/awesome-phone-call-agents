@@ -10,3 +10,8 @@ __pycache__/
 
 # Runtime state written by demo/live runs. Never part of the source.
 .leash/
+
+# Build artifacts. Committed once by mistake; never again.
+*.egg-info/
+build/
+dist/
