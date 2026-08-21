@@ -1,0 +1,22 @@
+{
+  "name": "byggeklar-call-sheet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Approval-gated CALL-E workflow for verifying construction supplier readiness without making commitments.",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "preview": "node --import tsx src/cli.ts preview --request examples/supplier-request.example.json",
+    "demo": "node --import tsx src/cli.ts demo --request examples/supplier-request.example.json",
+    "call": "node --import tsx src/cli.ts call"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
