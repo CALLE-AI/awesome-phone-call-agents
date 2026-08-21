@@ -61,6 +61,9 @@ CALLE_MCP_HOST = "seleven-mcp-sg.airudder.com"
 #: fallback_token_cache_path in apps/python/batch-runner/client.py.
 MCP_TOKEN_CACHE_ROOT = "~/.calle-mcp/cli"
 MCP_MIN_TOKEN_TTL_SECONDS = 300.0
+#: Credential used for plaintext loopback MCP targets, so a local fake broker
+#: can never be handed the real cached token.
+MCP_TEST_TOKEN_ENV_VAR = "CALLE_TEST_MCP_TOKEN"
 
 INTEGRATION_HEADER = "apps/python/outcome-reconciler/0.0.0"
 
@@ -93,6 +96,28 @@ class UpstreamRequestError(Exception):
 
 class ConfigurationError(Exception):
     """The caller has not supplied something this app refuses to guess."""
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect rather than follow one carrying the credential.
+
+    urllib follows redirects by default and copies the request headers onto the
+    new request, `Authorization` included, without re-checking the host. A 302
+    from a trusted origin to any other host would therefore hand over the API
+    key — defeating the base-URL allowlist entirely, since that only ever sees
+    the first URL.
+
+    Refusing is safe here: both documented read paths are direct GETs. If
+    upstream ever needs a redirect, the new target must be revalidated against
+    the allowlist before the credential is attached, not followed blindly.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        raise UpstreamRequestError(
+            f"upstream redirected to {newurl!r} (HTTP {code}); the request was not followed and "
+            f"{REST_API_KEY_ENV_VAR} was not forwarded. A redirect target is not covered by the "
+            "base-URL check, so following it could send the credential to another host."
+        )
 
 
 class StatusClient(Protocol):
@@ -297,8 +322,9 @@ class _RestReader:
                 "X-Integration": INTEGRATION_HEADER,
             },
         )
+        opener = urllib.request.build_opener(_RefuseRedirects())
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+            with opener.open(request, timeout=self.timeout_seconds) as response:
                 body = response.read().decode("utf-8")
         except TimeoutError as exc:
             # socket.timeout is an alias of TimeoutError, so a read-phase
@@ -398,7 +424,13 @@ def validate_mcp_server_url(value: str) -> str:
     """
     parsed = urllib.parse.urlparse(value)
     host = (parsed.hostname or "").strip("[]")
-    if parsed.scheme == "https" and host == CALLE_MCP_HOST and not parsed.username and not parsed.password:
+    if (
+        parsed.scheme == "https"
+        and host == CALLE_MCP_HOST
+        and parsed.port in (None, 443)
+        and not parsed.username
+        and not parsed.password
+    ):
         return value.rstrip("/")
     if (
         parsed.scheme == "http"
@@ -462,6 +494,21 @@ class McpStatusClient:
         return Path(self.token_cache_path or default_token_cache_path(self.server_url))
 
     def _access_token(self) -> str:
+        """The credential for this server URL.
+
+        A plaintext loopback target never receives the cached CALL-E token. The
+        loopback allowance exists so the fake broker can be driven end to end,
+        and a fake broker should be handed a fake credential — the same rule the
+        REST client applies to `CALLE_API_KEY`.
+        """
+        if urllib.parse.urlparse(self.server_url).scheme != "https":
+            token = os.environ.get(MCP_TEST_TOKEN_ENV_VAR)
+            if not token:
+                raise AuthUnavailableError(
+                    f"{self.server_url} is not https, so the cached CALL-E token was not sent. "
+                    f"Set {MCP_TEST_TOKEN_ENV_VAR} with a throwaway value for local fake servers."
+                )
+            return token
         path = self._cache_path()
         if not path.exists():
             raise AuthUnavailableError(

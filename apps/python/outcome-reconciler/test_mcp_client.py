@@ -54,7 +54,8 @@ def outcome_map() -> OutcomeMap:
 
 
 @pytest.fixture
-def fake_broker() -> Iterator[dict[str, Any]]:
+def fake_broker(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[str, Any]]:
+    monkeypatch.setenv("CALLE_TEST_MCP_TOKEN", FAKE_ACCESS_TOKEN)
     process = subprocess.Popen(
         ["node", str(FAKE_BROKER)],
         stdout=subprocess.PIPE,
@@ -244,3 +245,28 @@ def test_refusal_happens_before_the_token_cache_is_read(tmp_path: Path) -> None:
     missing = tmp_path / "absent" / "token.json"
     with pytest.raises(ConfigurationError):
         McpStatusClient(server_url="https://evil.example/mcp", token_cache_path=missing)
+
+
+def test_a_non_default_port_on_the_trusted_host_is_refused(tmp_path: Path) -> None:
+    """Exact origin, not just exact hostname — a different port is a different service."""
+    cache = write_token_cache(tmp_path / "token.json")
+    with pytest.raises(ConfigurationError, match="not a host this app trusts"):
+        McpStatusClient(server_url=f"https://{CALLE_MCP_HOST}:8443/mcp", token_cache_path=cache)
+
+
+def test_the_real_cached_token_is_never_sent_to_plaintext_loopback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Loopback exists for the fake broker, and a fake broker gets a fake token.
+
+    Positive control first: a valid cache is present, so the failure below can
+    only come from the plaintext rule and not from a missing cache.
+    """
+    cache = write_token_cache(tmp_path / "token.json", token="REAL-CACHED-TOKEN")
+    monkeypatch.setenv("CALLE_TEST_MCP_TOKEN", "throwaway")
+    client = McpStatusClient(server_url="http://127.0.0.1:9", token_cache_path=cache)
+    assert client._access_token() == "throwaway"
+
+    monkeypatch.delenv("CALLE_TEST_MCP_TOKEN", raising=False)
+    with pytest.raises(AuthUnavailableError, match="not https"):
+        McpStatusClient(server_url="http://127.0.0.1:9", token_cache_path=cache).check_auth()

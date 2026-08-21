@@ -51,6 +51,8 @@ carry the judgment without carrying the conversation.
   credential would already have left. Host matching is exact: a suffix like
   `api.heycall-e.com.attacker.example` is refused, and https alone is not
   accepted as trust, because it attests the transport and not who answers.
+* Redirects are refused, not followed. A redirect target is not covered by the
+  host check, and urllib would copy the credential onto it.
 * Authentication is re-checked before every poll cycle, since a token can expire
   mid-poll.
 * The default test suite uses a local fake server and requires no credentials at

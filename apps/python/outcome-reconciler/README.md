@@ -124,7 +124,13 @@ the exit code without parsing the record.
   targets read `CALLE_TEST_API_KEY` instead, so a local fake server cannot be
   handed the production key.
 * The MCP surface sends the cached token only to the documented CALL-E MCP host
-  or to loopback. `--mcp-server-url` is checked before the cache is opened.
+  over https on its default port. `--mcp-server-url` is checked before the cache is
+  opened, and a plaintext loopback target reads `CALLE_TEST_MCP_TOKEN` instead, so a
+  local fake broker cannot be handed the real token.
+* Redirects are refused rather than followed. urllib copies `Authorization` onto a
+  redirected request without rechecking the host, and the base-URL allowlist only sees
+  the first URL — so a redirect would carry the credential somewhere it was never
+  approved to go.
 * The MCP surface reuses the token cache written by `@call-e/cli`; this app runs
   no OAuth flow of its own.
 * Credentials are never logged, printed, or persisted by this app, and never

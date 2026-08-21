@@ -232,7 +232,9 @@ def rest_client(monkeypatch: pytest.MonkeyPatch, error: Exception) -> "RestStatu
     def refuse(*_args: Any, **_kwargs: Any) -> None:
         raise error
 
-    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    # `_get` builds its own opener so it can refuse redirects, so patch the
+    # opener rather than the module-level urlopen.
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", refuse)
     return RestStatusClient(base_url="http://127.0.0.1:1")
 
 
@@ -416,3 +418,32 @@ def test_the_production_key_is_still_used_for_the_real_host(
     monkeypatch.setenv(REST_API_KEY_ENV_VAR, "production-key-value")
     monkeypatch.delenv("CALLE_TEST_API_KEY", raising=False)
     assert RestStatusClient(base_url=DEFAULT_BASE_URL).check_auth() is None
+
+
+def test_a_redirect_is_refused_rather_than_followed_with_the_credential(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """urllib copies Authorization onto a redirect without rechecking the host.
+
+    The base-URL allowlist only ever sees the first URL, so a 302 from a trusted
+    origin would carry the API key to any host upstream named.
+    """
+    import urllib.request
+
+    from clients import UpstreamRequestError, _RefuseRedirects
+
+    handler = _RefuseRedirects()
+    request = urllib.request.Request("https://api.heycall-e.com/v1/calls/x")
+    with pytest.raises(UpstreamRequestError, match="was not forwarded"):
+        handler.redirect_request(request, None, 302, "Found", {}, "https://evil.example/steal")
+
+
+def test_the_rest_client_installs_the_refusing_redirect_handler() -> None:
+    """Positive control: the handler is actually wired into the opener."""
+    import inspect
+
+    from clients import _RestReader
+
+    assert "_RefuseRedirects()" in inspect.getsource(_RestReader._get), (
+        "the redirect guard is defined but not installed on the opener"
+    )
