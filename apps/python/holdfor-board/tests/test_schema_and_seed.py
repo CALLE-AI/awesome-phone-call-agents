@@ -7,10 +7,17 @@ import pytest
 from holdfor import db
 from holdfor.seed import PATIENTS
 
-TABLES = {"patient", "appointment", "call_attempt", "review_item", "release"}
+TABLES = {
+    "patient",
+    "appointment",
+    "call_attempt",
+    "review_item",
+    "release",
+    "live_call",
+}
 
 
-def test_five_tables_exist(conn):
+def test_every_table_exists(conn):
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
     assert TABLES <= {row["name"] for row in rows}
 

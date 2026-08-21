@@ -83,8 +83,26 @@ class CallResult:
     outcome: str | None = None
 
 
+class SubmissionUnknown(Exception):
+    """Raised by `place` when the provider cannot say whether a call was accepted.
+
+    A client timeout, a dropped connection, a response that arrived unreadable:
+    all of them say what the client observed, not that no call went out. A
+    provider raises this instead of a plain error so that the caller is forced to
+    tell the two apart, because the safe response to each is opposite.
+
+    Carry no provider text into the message. The string reaches a log, and a
+    truncated HTTP error can have a token in it.
+    """
+
+
 class CallProvider(Protocol):
-    def place(self, req: CallRequest) -> str: ...
+    def place(self, req: CallRequest) -> str:
+        """Submit one call and return the provider's run id.
+
+        Raise `SubmissionUnknown` rather than returning, if acceptance is unknown.
+        """
+        ...
 
     def poll(self, run_id: str) -> CallResult: ...
 

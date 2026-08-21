@@ -13,6 +13,7 @@
   .stop { color: #a03328; font-weight: 600; }
   .words { max-width: 24rem; font-style: italic; }
   .empty { color: #666; }
+  .counts small { display: block; color: #666; font-size: .75rem; }
   a { color: #14476b; }
 </style>
 
@@ -22,6 +23,11 @@
   <span>Called today <b>{{ today }}</b></span>
   <span>Closed, nothing needed <b>{{ auto_closed }}</b></span>
   <span class="you">Need you <b>{{ needs_review }}</b></span>
+  <span>Live calls used <b>{{ live_calls }}</b><small>of 20</small></span>
+  {%- if awaiting_reconciliation %}
+  <span class="stop">Awaiting reconciliation <b>{{ awaiting_reconciliation }}</b>
+    <small>a person must check these against the provider</small></span>
+  {%- endif %}
 </div>
 
 {% if items %}
