@@ -32,6 +32,14 @@ PHONE_RE = re.compile(r"(\(?\+?\d[\d\-.() ]{7,}\d\)?)")
 # hard-coding more literal phrases each time a new one turns up.
 HOUR_DEADLINE_RE = re.compile(r"\b(?:within|in the next|you have)\s+\d+\s+hours?\b", re.IGNORECASE)
 
+# A fourth real email (another fake "Geek Squad" renewal) used no explicit
+# deadline or authorization phrase at all — its only urgency hook was that
+# the (unwanted, unexpected) charge is happening the same day: "will expire
+# today. This subscription will be renewed and paid automatically." Catches
+# that same-day-charge framing generally (expire/renew/charge/bill + today)
+# rather than hard-coding this one exact sentence.
+SAME_DAY_CHARGE_RE = re.compile(r"\b(?:expir\w*|renew\w*|charg\w*|bill\w*)\s+today\b", re.IGNORECASE)
+
 # Real emails routinely contain other phone-number-shaped noise earlier in
 # the document than the actual callback number — invoice/transaction IDs,
 # amounts, and especially dates (e.g. "Renewal Date: 2026-08-20", which
@@ -61,7 +69,11 @@ def extract_alert(email_body: str, sender_domain: str) -> Alert | None:
     """Flags an email as a suspected callback scam if it combines urgency
     language with a phone number to call back. Returns None otherwise —
     the pipeline never dials unless this bar is met."""
-    urgency_hit = any(kw in email_body.lower() for kw in URGENCY_KEYWORDS) or HOUR_DEADLINE_RE.search(email_body)
+    urgency_hit = (
+        any(kw in email_body.lower() for kw in URGENCY_KEYWORDS)
+        or HOUR_DEADLINE_RE.search(email_body)
+        or SAME_DAY_CHARGE_RE.search(email_body)
+    )
     phone_number = _find_callback_phone(email_body)
     if not (urgency_hit and phone_number):
         return None

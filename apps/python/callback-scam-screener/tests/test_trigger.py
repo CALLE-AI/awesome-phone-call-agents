@@ -113,3 +113,26 @@ def test_a_date_earlier_in_the_email_is_not_mistaken_for_the_phone_number():
     )
     assert alert is not None
     assert alert.phone_number == "+447700900456"
+
+
+# --- fourth real email, 2026-08-22: another fake "Geek Squad" renewal, this
+# time with no explicit deadline or authorization phrase at all — the only
+# urgency hook was that the (unwanted) charge is happening the same day ---
+
+
+def test_same_day_charge_language_is_flagged_without_any_deadline_phrase():
+    alert = extract_alert(
+        "Your personal subscription GEEK SQUAD CARE will expire today. This subscription will be "
+        "renewed and paid automatically. Customer Support: +447700900789",
+        "example.com",
+    )
+    assert alert is not None
+    assert alert.phone_number == "+447700900789"
+
+
+def test_same_day_charge_matches_expire_renew_charge_or_bill():
+    assert extract_alert("Your card will be charged today. Call (800) 555-0187.", "example.com") is not None
+    assert extract_alert("You will be billed today. Call (800) 555-0187.", "example.com") is not None
+    # "today" alone, without one of these charge-related verbs, is not itself
+    # urgency language.
+    assert extract_alert("We processed your request today. Call (800) 555-0187 for help.", "example.com") is None
