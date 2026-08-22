@@ -1,0 +1,14 @@
+{
+  "candidate-a": {
+    "outcome": "declined",
+    "evidence_summary": "The participant cannot use the offered time."
+  },
+  "candidate-b": {
+    "outcome": "accepted",
+    "evidence_summary": "The participant wants the slot and understands a human must confirm it."
+  },
+  "candidate-c": {
+    "outcome": "accepted",
+    "evidence_summary": "This fixture must remain untouched because the cascade already stopped."
+  }
+}

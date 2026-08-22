@@ -1,0 +1,32 @@
+{
+  "workflow_id": "repair-waitlist-demo-001",
+  "slot_id": "slot-2030-09-10-1400",
+  "business_display_name": "Example Repair Studio",
+  "service_category": "home-service",
+  "service_label": "60-minute repair assessment",
+  "slot_start": "2030-09-10T14:00:00+02:00",
+  "offer_expires_at": "2030-09-09T18:00:00+02:00",
+  "candidates": [
+    {
+      "candidate_id": "candidate-a",
+      "phone": "+12025550111",
+      "position": 1,
+      "locale": "en-US",
+      "consented_to_waitlist_calls": true
+    },
+    {
+      "candidate_id": "candidate-b",
+      "phone": "+12025550122",
+      "position": 2,
+      "locale": "en-US",
+      "consented_to_waitlist_calls": true
+    },
+    {
+      "candidate_id": "candidate-c",
+      "phone": "+12025550133",
+      "position": 3,
+      "locale": "en-US",
+      "consented_to_waitlist_calls": true
+    }
+  ]
+}

@@ -143,7 +143,6 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
-- [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
@@ -173,6 +172,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/multi-party-scheduler`](apps/typescript/multi-party-scheduler/) | TypeScript | Two-phase appointment scheduling over phone calls: gather availability, confirm one time with everybody by voice, release everybody who confirmed when the commit fails and resume an interrupted run. |
 | [`apps/python/callback-coordinator`](apps/python/callback-coordinator/) | Python | Consent-first callback triage and routing: one CALL-E call learns why a person needs a callback, classifies the outcome into a fail-closed disposition, and routes it to the right team. |
 | [`apps/python/callback-window-coordinator`](apps/python/callback-window-coordinator/) | Python | Consent-first callback-window coordinator with masked preview, stable idempotency, and structured CALL-E results. |
+| [`apps/python/waitlist-slot-rescue`](apps/python/waitlist-slot-rescue/) | Python | Sequentially offers one expiring service slot to an opted-in waitlist, stops on the first acceptance or ambiguity, and leaves booking to a human. |
 | [`apps/python/webhook-result-receiver`](apps/python/webhook-result-receiver/) | Python | Durable at-least-once CALL-E terminal webhook ingestion with SQLite deduplication, conflict detection, and authenticated Calls API reconciliation. |
 | [`apps/python/lead-follow-up-booking`](apps/python/lead-follow-up-booking/) | Python | Consent-first lead follow-up booking: a disclosed AI call offers only calendar-confirmed free slots and books a Google Calendar event only when the lead picks a time on the call. |
 | [`apps/python/callflow-campaign-runner`](apps/python/callflow-campaign-runner/) | Python | CSV-driven outbound campaign runner that triages structured results into auto-closed, retry, and needs-human queues. |
@@ -187,7 +187,6 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/vibehub-founder-relay`](apps/typescript/vibehub-founder-relay/) | TypeScript | Consent-first founder-match readiness call with masked preview, stable idempotency, and structured CALL-E results. |
 | [`apps/typescript/ringer`](apps/typescript/ringer/) | TypeScript | Consumer web app that turns dreaded phone tasks — bill negotiation, cancellations, bookings, refunds, and multi-business quote comparison — into consent-first, multilingual CALL-E workflows with strict per-call and per-recipient result schemas, human-in-the-loop decision authority, evidence-gated and denominator-honest outcomes, and a no-call demo mode by default. |
 | [`apps/web/local-atlas`](apps/web/local-atlas/) | JavaScript / Node | Map-first local guide where one confirmed call becomes a dated, evidence-quoted fact every later visitor reuses: stored answers, opinion refusal, closed-business and calling-window checks all work to avoid placing a call at all, results keep their uncertainty and expire by outcome, and private results are written where the public list cannot read them. A comparison across two or three nearby places is one multi-recipient task, with each business answering for itself and the cross-call verdict marked as derived rather than quoted. |
-| [`apps/typescript/dispatch-pulse`](apps/typescript/dispatch-pulse/) | TypeScript | Real-time logistics command center for automated pre-delivery recipient phone verification, estate gate code extraction, and live SSE event streaming. |
 
 The default e2e tests use a local fake broker/OAuth/MCP server or dry-run paths, so they do not require real CALL-E credentials or browser login. Live verification is opt-in in each app README.
 
