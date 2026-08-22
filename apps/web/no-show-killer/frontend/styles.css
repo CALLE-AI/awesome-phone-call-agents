@@ -1,0 +1,551 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f2f4f8;
+  --card-bg: #ffffff;
+  --text: #1a1d23;
+  --text-secondary: #5b6573;
+  --muted: #8a94a6;
+  --border: #e2e6ee;
+  --border-light: #f0f2f6;
+  --accent: #2d6cdf;
+  --accent-hover: #1f56b5;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --transition: 0.2s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111318;
+    --card-bg: #1a1d26;
+    --text: #edeef0;
+    --text-secondary: #a8b0be;
+    --muted: #6b7485;
+    --border: #2a2e3a;
+    --border-light: #1f232e;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+
+/* ===== HEADER ===== */
+header {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 1.5rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+  background: rgba(var(--card-bg-rgb, 255, 255, 255), 0.85);
+}
+
+@media (prefers-color-scheme: dark) {
+  header {
+    background: rgba(26, 29, 38, 0.88);
+  }
+}
+
+.header-content {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0.2rem 0 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.api-status {
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--border-light);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ===== MAIN ===== */
+main {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ===== ADD APPOINTMENT ===== */
+.add-appointment h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.65rem;
+}
+
+#add-form {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  box-shadow: var(--shadow);
+  transition: box-shadow var(--transition);
+}
+
+#add-form:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+#add-form input {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+
+#add-form input::placeholder {
+  color: var(--muted);
+}
+
+#add-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(45, 108, 223, 0.15);
+}
+
+#add-form button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+@media (max-width: 580px) {
+  #add-form {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+}
+
+/* ===== BUTTONS ===== */
+.btn-primary {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1.2rem;
+  background: var(--accent);
+  color: #fff;
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(45, 108, 223, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.confirm-btn {
+  margin-top: 0.75rem;
+  font: inherit;
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  background: var(--card-bg);
+  color: var(--accent);
+  transition: all var(--transition);
+}
+
+.confirm-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== APPOINTMENT CARDS ===== */
+#appointments {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow);
+  transition: box-shadow var(--transition), transform var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.patient-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.service {
+  margin: 0.1rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.time {
+  margin: 0.1rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ===== BADGES ===== */
+.badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--border-light);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.badge.status-COMPLETED {
+  background: #d7f5df;
+  color: #1a7a34;
+  border-color: #b8e6c8;
+}
+
+.badge.status-FAILED,
+.badge.status-DECLINED,
+.badge.status-NO_ANSWER,
+.badge.status-BUSY {
+  background: #fbe5e5;
+  color: #b33a33;
+  border-color: #f5d0d0;
+}
+
+.badge.status-STARTED,
+.badge.status-IN_PROGRESS,
+.badge.status-CALLING {
+  background: #dbe7fb;
+  color: var(--accent);
+  border-color: #c5d8f5;
+}
+
+.badge.status-PENDING {
+  background: #f5f0d6;
+  color: #8a7a3a;
+  border-color: #ece2b8;
+}
+
+/* ===== ACTIVITY LOG ===== */
+.activity {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-light);
+  height:300px;
+  overflow-y:auto ;
+  overflow-x: hidden;
+
+}
+
+.activity div {
+  padding: 0.1rem 0;
+}
+
+/* ===== RESULT SECTION ===== */
+.result {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border-light);
+  padding-top: 0.75rem;
+}
+
+.result.hidden {
+  display: none;
+}
+
+.result h3 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.25rem;
+}
+
+.result .summary {
+  font-size: 0.9rem;
+  background: var(--bg);
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  margin: 0 0 0.5rem;
+}
+
+.transcript-wrap {
+  margin-top: 0.5rem;
+}
+
+.transcript-wrap summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.transcript {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  font-family: 'Inter', monospace;
+  background: var(--bg);
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  margin-top: 0.4rem;
+  border: 1px solid var(--border-light);
+  height: 250px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ===== ERROR ===== */
+.error {
+  color: #b33a33;
+  background: #fbe5e5;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  border: 1px solid #f5d0d0;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 700px) {
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .header-actions {
+    justify-content: space-between;
+  }
+
+  main {
+    padding: 1rem 1rem 3rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .api-status {
+    text-align: center;
+  }
+
+  #add-form button {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .btn-primary {
+    width: 100%;
+    text-align: center;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .badge {
+    align-self: flex-start;
+  }
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  background: var(--card-bg);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.empty-subtitle {
+  font-size: 0.9rem !important;
+  color: var(--muted);
+  margin-top: 0.5rem !important;
+}
+
+/* ===== LOADING ===== */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border);
+  border-radius: 50%;
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== STATUS INDICATOR ===== */
+.api-status.success {
+  color: var(--accent);
+}
+
+.api-status.error {
+  color: #b33a33;
+}
+
+.api-status.warning {
+  color: #8a7a3a;
+}
+
+/* Add this to your existing styles.css */
+.waiting-message {
+  display: inline-block;
+  width: fit-content;
+  padding: 4px 14px;
+  background: var(--border-light);
+  border-radius: 16px;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.85rem;
+  margin: 4px 0;
+}
+
+/* Pulsing "live" indicator while a call is in progress */
+.card.is-live .badge {
+  position: relative;
+  padding-left: 1.4rem;
+}
+
+.card.is-live .badge::before {
+  content: "";
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
+  50% { opacity: 0.4; transform: translateY(-50%) scale(0.7); }
+}
+
+/* Fade-in for newly appended activity lines */
+.activity-line-new {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.activity-line-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
