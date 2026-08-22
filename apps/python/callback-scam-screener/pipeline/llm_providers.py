@@ -23,6 +23,17 @@ before its own real test (see caller.py).
 import os
 from dataclasses import dataclass
 
+import truststore
+
+# Defer to the OS's own certificate validation for every SSL connection this
+# process makes, instead of OpenSSL's strict PEM-based checks against
+# certifi's bundle. Needed on Windows machines where an HTTPS-scanning
+# antivirus feature installs a root CA that Windows trusts but OpenSSL 3.x's
+# stricter X.509 parsing rejects (e.g. "Basic Constraints of CA cert not
+# marked critical") — real failure mode hit during this project's own live
+# call testing. Must run before any LLM SDK opens a connection.
+truststore.inject_into_ssl()
+
 
 @dataclass
 class LLMResponse:
