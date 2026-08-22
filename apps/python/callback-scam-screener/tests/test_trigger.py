@@ -81,6 +81,21 @@ def test_real_geek_squad_renewal_email_is_flagged():
     assert alert.phone_number == "+447700900456"
 
 
+def test_real_robinhood_device_update_email_is_flagged():
+    # Third real email, 2026-08-22: a fake Robinhood "device update" alert
+    # used "please contact support right away" — none of "immediately",
+    # "unusual activity", "call back"/"call us" matched it ("contact" isn't
+    # "call").
+    alert = extract_alert(
+        "A sign-in was detected from a device we have not seen on your account. "
+        "If you recognize this activity, you can ignore this message. If you do not, please contact "
+        "support right away. Security support phone number: +447700900456",
+        "robinhood-security-notice.com",
+    )
+    assert alert is not None
+    assert alert.phone_number == "+447700900456"
+
+
 def test_a_date_earlier_in_the_email_is_not_mistaken_for_the_phone_number():
     # The same real Geek Squad email had "Renewal Date: 2026-08-20" earlier
     # in the body than the actual callback number — PHONE_RE alone matches

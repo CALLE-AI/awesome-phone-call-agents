@@ -16,6 +16,11 @@ URGENCY_KEYWORDS = [
     # "unauthorized" — not a substring of it, so the existing keyword didn't
     # catch it either.
     "did not authorize",
+    # Added after a third real email (a fake Robinhood "device update"
+    # alert) also slipped past: "please contact support right away" hit
+    # none of the phrasing above (not "immediately", not "unusual
+    # activity", not "call us"/"call back" — "contact" isn't "call").
+    "contact support",
 ]
 
 PHONE_RE = re.compile(r"(\(?\+?\d[\d\-.() ]{7,}\d\)?)")
