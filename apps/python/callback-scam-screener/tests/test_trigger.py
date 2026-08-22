@@ -34,3 +34,31 @@ def test_phone_number_keeps_leading_parenthesis():
     alert = extract_alert("Your account has been suspended. Call (800) 555-0187 immediately.", "example.com")
     assert alert is not None
     assert alert.phone_number.startswith("(")
+
+
+# --- real phishing email, 2026-08-22: a fake "iApple" invoice used none of
+# the original keyword list ("call us right away" instead of "call back",
+# "in the next 24 hours" instead of "within 24 hours") and would have gone
+# completely undetected ---
+
+
+def test_real_iapple_invoice_email_is_flagged():
+    # Phone number replaced with an Ofcom-reserved fictional one — the real
+    # email used a genuine third-party phone number, which must not end up
+    # committed in source (see test_no_real_phone_numbers.py).
+    alert = extract_alert(
+        "You received a new invoice from We're about to charge your account in the next 24 hours. "
+        "If this wasn't you call us right away at +447700900123 to stop the payment and protect "
+        "your account.",
+        "iapple.com",
+    )
+    assert alert is not None
+    assert alert.phone_number == "+447700900123"
+
+
+def test_hour_deadline_matches_any_hour_count_and_either_preposition():
+    assert extract_alert("Respond within 2 hours. Call (800) 555-0187.", "example.com") is not None
+    assert extract_alert("Respond in the next 48 hours. Call (800) 555-0187.", "example.com") is not None
+    # A bare number of hours without "within"/"in the next" is not itself
+    # urgency language — must not become a blanket "any hour count matches".
+    assert extract_alert("Open 24 hours. Call (800) 555-0187 for support.", "example.com") is None
