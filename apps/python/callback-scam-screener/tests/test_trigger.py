@@ -62,3 +62,39 @@ def test_hour_deadline_matches_any_hour_count_and_either_preposition():
     # A bare number of hours without "within"/"in the next" is not itself
     # urgency language — must not become a blanket "any hour count matches".
     assert extract_alert("Open 24 hours. Call (800) 555-0187 for support.", "example.com") is None
+
+
+# --- second real phishing email, 2026-08-22: a fake "Geek Squad" renewal
+# notice used yet more phrasing the original keyword list missed — "did not
+# authorize" (not a substring of "unauthorized") and "you have 12 hours"
+# (neither "within" nor "in the next") ---
+
+
+def test_real_geek_squad_renewal_email_is_flagged():
+    alert = extract_alert(
+        "We have renewed your Geek Squad subscription. If you did not authorize this transaction, "
+        "you have 12 hours to initiate a cancellation and receive an immediate refund. Reach out to "
+        "our support team at +447700900456.",
+        "geeksquad-billing.com",
+    )
+    assert alert is not None
+    assert alert.phone_number == "+447700900456"
+
+
+def test_a_date_earlier_in_the_email_is_not_mistaken_for_the_phone_number():
+    # The same real Geek Squad email had "Renewal Date: 2026-08-20" earlier
+    # in the body than the actual callback number — PHONE_RE alone matches
+    # "2026-08-20" as an 8-digit sequence, and a plain "first match in the
+    # document" would extract the date instead of the real number. Only
+    # screen.py's separate --to-phone mismatch guard caught this in
+    # practice; extract_alert itself must get the right number without
+    # relying on that downstream check.
+    alert = extract_alert(
+        "We have renewed your subscription.\n"
+        "Renewal Date: 2026-08-20\n"
+        "If you did not authorize this transaction, you have 12 hours to initiate a cancellation. "
+        "Reach out to our support team at +447700900456.",
+        "example.com",
+    )
+    assert alert is not None
+    assert alert.phone_number == "+447700900456"
