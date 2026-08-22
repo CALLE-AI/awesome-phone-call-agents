@@ -31,6 +31,13 @@ class CallMetadata:
     # want a completed call must say so explicitly too.
     status: str = "UNKNOWN"
     call_id: str | None = None
+    # CALL-E reports status=COMPLETED even when the call was picked up by an
+    # answering machine, not a person — a real live test hit this exact case
+    # (status COMPLETED, non-empty transcript, verdict computed as if a human
+    # had answered). Derived from CALL-E's own result.outcome.evidence text
+    # (see caller.py), not guessed — scoring.py must not treat this as real
+    # evidence of legitimacy just because the call technically completed.
+    answered_by_machine: bool = False
 
 
 @dataclass
@@ -88,6 +95,7 @@ class ScreeningResult:
                 "timestamp": self.call_metadata.timestamp,
                 "status": self.call_metadata.status,
                 "call_id": self.call_metadata.call_id,
+                "answered_by_machine": self.call_metadata.answered_by_machine,
             },
             "precheck": (
                 {

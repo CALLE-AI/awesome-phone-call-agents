@@ -13,6 +13,20 @@ SCOREABLE_CALL_STATUS = "COMPLETED"
 
 
 def score(tags: list[SignalTag], catalog: dict, transcript: str, call_metadata: CallMetadata) -> ScreeningResult:
+    if call_metadata.answered_by_machine:
+        return ScreeningResult(
+            verdict="inconclusive",
+            score=0,
+            triggered_signals=[],
+            warnings=[
+                "Call was answered by an automatic voicemail/answering system, not a live person — no "
+                "signals were evaluated. This is not the same as a clean call; escalate to a human rather "
+                "than treating it as cleared."
+            ],
+            transcript=transcript,
+            call_metadata=call_metadata,
+        )
+
     if call_metadata.status != SCOREABLE_CALL_STATUS or not transcript.strip():
         return ScreeningResult(
             verdict="inconclusive",

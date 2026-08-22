@@ -218,6 +218,63 @@ def test_exhausted_retry_error_does_not_leak_plan_id_or_confirm_token(mock_run, 
     assert "token-secret" not in str(exc_info.value)
 
 
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
+def test_answered_by_machine_detected_from_outcome_evidence(mock_run, mock_which):
+    # Real call evidence (2026-08-22): status stays COMPLETED even when an
+    # answering machine picked up — outcome.evidence is the only place
+    # CALL-E actually says so.
+    run_completed = json.dumps(
+        {
+            "run_id": "run-1",
+            "status": "COMPLETED",
+            "result": {
+                "transcript": "hi",
+                "outcome": {"evidence": ["The call was answered by an automatic voicemail system."]},
+            },
+        }
+    )
+    mock_run.side_effect = [_completed_proc(PLAN_READY), _completed_proc(run_completed)]
+
+    client = RealCallEClient()
+    result = client.place_screening_call("+18005550187", "task text")
+
+    assert result.metadata.answered_by_machine is True
+
+
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
+def test_answered_by_machine_false_when_evidence_does_not_mention_it(mock_run, mock_which):
+    run_completed = json.dumps(
+        {
+            "run_id": "run-1",
+            "status": "COMPLETED",
+            "result": {
+                "transcript": "hi",
+                "outcome": {"evidence": ["A live representative from Acme Corp was reached."]},
+            },
+        }
+    )
+    mock_run.side_effect = [_completed_proc(PLAN_READY), _completed_proc(run_completed)]
+
+    client = RealCallEClient()
+    result = client.place_screening_call("+18005550187", "task text")
+
+    assert result.metadata.answered_by_machine is False
+
+
+@patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
+@patch("pipeline.caller.subprocess.run")
+def test_answered_by_machine_defaults_false_when_outcome_missing(mock_run, mock_which):
+    run_completed = json.dumps({"run_id": "run-1", "status": "COMPLETED", "result": {"transcript": "hi"}})
+    mock_run.side_effect = [_completed_proc(PLAN_READY), _completed_proc(run_completed)]
+
+    client = RealCallEClient()
+    result = client.place_screening_call("+18005550187", "task text")
+
+    assert result.metadata.answered_by_machine is False
+
+
 @patch("pipeline.caller.time.sleep")
 @patch("pipeline.caller.shutil.which", return_value="C:/fake/calle.cmd")
 @patch("pipeline.caller.subprocess.run")

@@ -48,6 +48,31 @@ def test_falls_back_to_extracted_number_when_to_phone_omitted():
     assert client.dialed_numbers == ["(800) 555-0187"]
 
 
+def test_skips_tagging_entirely_when_answered_by_machine():
+    # score() discards any tags when answered_by_machine is set (see
+    # test_scoring.py), so tagging first would only spend real LLM budget on
+    # a result that's thrown away — this asserts the tagger is never called.
+    result = CallResult(
+        transcript="a real conversation happened",
+        metadata=CallMetadata(
+            number_dialed="+18005550187",
+            duration_seconds=30,
+            timestamp="now",
+            status="COMPLETED",
+            answered_by_machine=True,
+        ),
+    )
+    client = FakeCallClient(result=result)
+
+    def _tagger_that_must_not_be_called(transcript, catalog):
+        raise AssertionError("tagger should not be called when answered_by_machine is True")
+
+    screening = run_pipeline(
+        EMAIL_BODY, "example.com", client, to_phone="+18005550187", tagger=_tagger_that_must_not_be_called
+    )
+    assert screening.verdict == "inconclusive"
+
+
 def test_recipient_binding_mismatch_raises_instead_of_scoring():
     # The call result claims a different number was dialed than requested —
     # must never silently score a verdict against the wrong recipient.

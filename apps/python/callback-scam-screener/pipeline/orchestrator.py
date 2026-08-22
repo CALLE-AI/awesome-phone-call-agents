@@ -148,8 +148,16 @@ def run_pipeline(
     # ever said the number aloud it would otherwise be sent verbatim. The
     # unredacted transcript is still what's scored and returned below; this
     # redaction is scoped to the LLM call only.
-    redacted_transcript = redact_phone_number(call_result.transcript, dial_number)
-    tags = tagger(redacted_transcript, catalog)
+    #
+    # Skip tagging entirely when CALL-E reports the call was picked up by an
+    # answering machine — score() discards any tags in that case anyway (see
+    # answered_by_machine), so tagging first would just spend real LLM budget
+    # on a result that's thrown away.
+    if call_result.metadata.answered_by_machine:
+        tags = []
+    else:
+        redacted_transcript = redact_phone_number(call_result.transcript, dial_number)
+        tags = tagger(redacted_transcript, catalog)
 
     result = score(tags, catalog, call_result.transcript, call_result.metadata)
     result.precheck = precheck

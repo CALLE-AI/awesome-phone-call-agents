@@ -160,7 +160,21 @@ class RealCallEClient(CallEClient):
         result = status.get("result") or {}
         extracted = result.get("extracted") or {}
         calling_meta = extracted.get("calling") or {}
-        confidence = ((result.get("outcome") or {}).get("completion_confidence")) or {}
+        outcome = result.get("outcome") or {}
+        confidence = (outcome.get("completion_confidence")) or {}
+
+        # CALL-E's own status is COMPLETED even when an answering machine
+        # picked up, not a person — confirmed against a real call where
+        # outcome.evidence included "The call was answered by an automatic
+        # voicemail system." while status stayed COMPLETED. There is no
+        # dedicated boolean field for this, so this reads CALL-E's own
+        # plain-English evidence list rather than guessing from the
+        # transcript, which risks false positives on a live caller who
+        # merely mentions the word "voicemail".
+        evidence = outcome.get("evidence") or []
+        answered_by_machine = any(
+            "voicemail" in e.lower() or "answering machine" in e.lower() for e in evidence if isinstance(e, str)
+        )
 
         # Recipient binding only means something if we read back an
         # independent record of who was actually dialed, rather than just
@@ -183,6 +197,7 @@ class RealCallEClient(CallEClient):
                 timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 status=status.get("status", "UNKNOWN"),
                 call_id=run_id,
+                answered_by_machine=answered_by_machine,
             ),
             structured_result=None,  # see class docstring — extraction-by-goal-text doesn't work
             completion_confidence=confidence.get("score"),

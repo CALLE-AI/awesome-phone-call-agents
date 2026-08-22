@@ -89,3 +89,30 @@ def test_completed_call_with_zero_tags_is_still_likely_legitimate():
     metadata = CallMetadata(number_dialed="REDACTED", duration_seconds=90, timestamp="now", status="COMPLETED")
     result = score(make_tags(set()), CATALOG, "a real transcript", metadata)
     assert result.verdict == "likely_legitimate"
+
+
+def test_answered_by_machine_is_inconclusive_even_with_completed_status_and_transcript():
+    # A real live test hit this: CALL-E reports status=COMPLETED with a
+    # non-empty transcript even when an answering machine picked up, not a
+    # person — the pre-existing status/empty-transcript guard above never
+    # fires for that case, so this needs its own explicit check.
+    metadata = CallMetadata(
+        number_dialed="REDACTED", duration_seconds=33, timestamp="now", status="COMPLETED", answered_by_machine=True
+    )
+    result = score(make_tags(set()), CATALOG, "a real transcript", metadata)
+    assert result.verdict == "inconclusive"
+    assert result.score == 0
+    assert result.triggered_signals == []
+    assert any("voicemail" in w for w in result.warnings)
+
+
+def test_answered_by_machine_overrides_signals_that_would_otherwise_score_scam():
+    # Even if the tagger somehow found signal-shaped text in a voicemail
+    # greeting, a machine pickup means nothing about the call's legitimacy
+    # was actually verified — this must not be allowed to reach likely_scam.
+    metadata = CallMetadata(
+        number_dialed="REDACTED", duration_seconds=33, timestamp="now", status="COMPLETED", answered_by_machine=True
+    )
+    result = score(make_tags({"C1"}), CATALOG, "a real transcript", metadata)
+    assert result.verdict == "inconclusive"
+    assert result.triggered_signals == []
