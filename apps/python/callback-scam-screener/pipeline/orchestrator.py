@@ -6,7 +6,7 @@ from .guardrails import CallGuardrails, GuardrailViolation, full_digits_match, m
 from .models import ScreeningResult, SignalTag
 from .precheck import run_prechecks
 from .signal_catalog import load_catalog, tag_transcript
-from .scoring import score
+from .scoring import USER_TURN_RE, score
 from .trigger import extract_alert
 
 
@@ -150,10 +150,12 @@ def run_pipeline(
     # redaction is scoped to the LLM call only.
     #
     # Skip tagging entirely when CALL-E reports the call was picked up by an
-    # answering machine — score() discards any tags in that case anyway (see
-    # answered_by_machine), so tagging first would just spend real LLM budget
-    # on a result that's thrown away.
-    if call_result.metadata.answered_by_machine:
+    # answering machine, or when the transcript has no speech from the other
+    # party at all (silent pickup/dead air) — score() discards any tags in
+    # both cases anyway (see answered_by_machine and USER_TURN_RE), so
+    # tagging first would just spend real LLM budget on a result that's
+    # thrown away.
+    if call_result.metadata.answered_by_machine or not USER_TURN_RE.search(call_result.transcript):
         tags = []
     else:
         redacted_transcript = redact_phone_number(call_result.transcript, dial_number)
