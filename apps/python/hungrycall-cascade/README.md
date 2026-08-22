@@ -120,4 +120,4 @@ and the live CALL-E transport — lives at <https://github.com/ellmos-ai/hungryc
 since been field-tested twice against the real CALL-E service (2026-08-11 and 2026-08-22),
 each call played out live by a human on the other end of the phone; its README carries a
 "How We Tested" section describing what was run, what broke, and what got fixed, and its
-test suite currently stands at 301 passing.
+test suite currently stands at 368 passing.
