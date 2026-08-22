@@ -1,0 +1,103 @@
+[
+  {
+    "id": "appt_44465c97-583e-44e9-a86f-7f8d6dbd5e3b",
+    "patientName": "Jordan Ellis",
+    "phone": "+12025550142",
+    "service": "dinner appointment",
+    "scheduledAt": "2026-08-19T08:30:00.000Z",
+    "status": "DECLINED",
+    "runId": "sample_run_5mu6q",
+    "activity": [
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:02.498+01:00",
+        "level": "info",
+        "kind": "stage_start",
+        "message": "run_call started.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:04.196+01:00",
+        "level": "info",
+        "kind": "external_call",
+        "message": "botlab create bot.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:25.952+01:00",
+        "level": "info",
+        "kind": "external_call",
+        "message": "calling resolve robot id.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:28.480+01:00",
+        "level": "info",
+        "kind": "external_call",
+        "message": "calling create task.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:29.394+01:00",
+        "level": "info",
+        "kind": "result",
+        "message": "calling task created.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:30.075+01:00",
+        "level": "info",
+        "kind": "progress",
+        "message": "calling task status=pending",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:37.945+01:00",
+        "level": "info",
+        "kind": "progress",
+        "message": "calling task status=calling",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:45.230+01:00",
+        "level": "info",
+        "kind": "callee_realtime",
+        "message": "Call is ringing.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:13:50.597+01:00",
+        "level": "info",
+        "kind": "callee_realtime",
+        "message": "Call ended; syncing final Calling result.",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:14:45.373+01:00",
+        "level": "info",
+        "kind": "progress",
+        "message": "calling task status=DECLINED",
+        "data": {}
+      },
+      {
+        "run_id": "sample_run_5mu6q",
+        "ts": "2026-08-17T23:14:57.088+01:00",
+        "level": "error",
+        "kind": "error",
+        "message": "calling task completed with status=DECLINED",
+        "data": {}
+      }
+    ],
+    "summary": "The first call did not connect or complete; I suggest retrying in about 45 minutes, and you can confirm that timing, provide a different retry time, or ask to retry immediately.",
+    "transcript": null
+  }
+]
