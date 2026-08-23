@@ -32,6 +32,27 @@ TERMINAL_OUTCOMES = {
 }
 
 
+def audit_event(
+    sequence: int,
+    event: str,
+    *,
+    decision: str,
+    candidate_id: str | None = None,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Return one deterministic, privacy-safe workflow event."""
+    payload: dict[str, Any] = {
+        "sequence": sequence,
+        "event": event,
+        "decision": decision,
+    }
+    if candidate_id is not None:
+        payload["candidate_id"] = candidate_id
+    if reason is not None:
+        payload["reason"] = reason
+    return payload
+
+
 @dataclass(frozen=True)
 class Candidate:
     candidate_id: str
@@ -218,7 +239,11 @@ def build_task(request: RescueRequest, candidate: Candidate) -> str:
         f"Call on behalf of {request.business_display_name} about one newly available "
         f"{request.service_label} slot at {start}. Conduct the conversation in the language implied by "
         f"the BCP 47 locale {candidate.locale}. Use short sentences, ask only one question at a time, "
-        "and wait for the participant's answer after every question. First identify yourself as an AI "
+        "and wait for the participant's answer after every question. Sound warm and conversational, "
+        "with a natural cadence and brief pauses; do not read field names or ISO timestamps aloud. "
+        "Acknowledge each answer before moving on. If there is silence, ask once whether the participant "
+        "can hear you; if there is still no reliable answer, end with an unknown outcome. First identify "
+        "yourself as an AI "
         "calling assistant and say the number was supplied through an opt-in waitlist. Then confirm this "
         "is the intended waitlist participant. Only after that confirmation, ask whether they agree to "
         "continue the AI-assisted call. If they do not, record the appropriate wrong-person or opted-out "
@@ -549,12 +574,32 @@ def run_rescue(
 ) -> dict[str, Any]:
     clock = now or (lambda: datetime.now(timezone.utc))
     attempts: list[dict[str, Any]] = []
+    audit_events = [
+        audit_event(1, "request.validated", decision="continue", reason="all-safety-gates-passed")
+    ]
     selected_candidate_id: str | None = None
     final_status = "exhausted"
     for candidate in request.candidates:
         if clock() >= request.offer_expires_at:
             final_status = "offer-expired"
+            audit_events.append(
+                audit_event(
+                    len(audit_events) + 1,
+                    "offer.expired",
+                    decision="stop",
+                    reason="expiry-reached-before-dispatch",
+                )
+            )
             break
+        audit_events.append(
+            audit_event(
+                len(audit_events) + 1,
+                "candidate.dispatch-authorized",
+                decision="call-one",
+                candidate_id=candidate.candidate_id,
+                reason="next-consented-candidate-in-queue",
+            )
+        )
         result = transport.place(request, candidate)
         outcome = result.get("outcome", "unknown")
         if outcome not in TERMINAL_OUTCOMES:
@@ -577,15 +622,51 @@ def run_rescue(
         if result.get("call_id"):
             attempt["call_id"] = result["call_id"]
         attempts.append(attempt)
+        audit_events.append(
+            audit_event(
+                len(audit_events) + 1,
+                f"outcome.{outcome}",
+                decision="evaluate-stop-rule",
+                candidate_id=candidate.candidate_id,
+                reason=attempt["classification_reason"],
+            )
+        )
         if clock() >= request.offer_expires_at:
             final_status = "offer-expired-after-call-human-review"
+            audit_events.append(
+                audit_event(
+                    len(audit_events) + 1,
+                    "workflow.halted",
+                    decision="human-review",
+                    candidate_id=candidate.candidate_id,
+                    reason="expiry-reached-after-call",
+                )
+            )
             break
         if outcome == "accepted":
             selected_candidate_id = candidate.candidate_id
             final_status = "candidate-found-human-confirmation-required"
+            audit_events.append(
+                audit_event(
+                    len(audit_events) + 1,
+                    "workflow.handoff",
+                    decision="human-confirmation",
+                    candidate_id=candidate.candidate_id,
+                    reason="first-evidence-backed-acceptance",
+                )
+            )
             break
         if outcome == "unknown":
             final_status = "halted-ambiguous-outcome"
+            audit_events.append(
+                audit_event(
+                    len(audit_events) + 1,
+                    "workflow.halted",
+                    decision="human-review",
+                    candidate_id=candidate.candidate_id,
+                    reason="ambiguous-outcome-fails-closed",
+                )
+            )
             break
 
     attempted_ids = {attempt["candidate_id"] for attempt in attempts}
@@ -597,7 +678,17 @@ def run_rescue(
         "halted-ambiguous-outcome",
         "offer-expired-after-call-human-review",
     }
+    if not audit_events[-1]["event"].startswith("workflow.") and final_status == "exhausted":
+        audit_events.append(
+            audit_event(
+                len(audit_events) + 1,
+                "workflow.exhausted",
+                decision="stop",
+                reason="end-of-waitlist",
+            )
+        )
     return {
+        "schema_version": 1,
         "mode": "simulate" if simulated else "execute",
         "creates_phone_calls": not simulated,
         "workflow_id": request.workflow_id,
@@ -609,11 +700,19 @@ def run_rescue(
         "human_review_required": human_review_required,
         "attempts": attempts,
         "untouched_candidate_ids": untouched,
+        "safety_invariants": {
+            "calls_are_sequential": True,
+            "automatic_redial_is_disabled": True,
+            "booking_is_never_created": True,
+            "ambiguous_outcome_halts_queue": True,
+        },
+        "audit_events": audit_events,
     }
 
 
 def preview(request: RescueRequest) -> dict[str, Any]:
     return {
+        "schema_version": 1,
         "mode": "preview",
         "creates_phone_calls": False,
         "workflow_id": request.workflow_id,
@@ -634,6 +733,20 @@ def preview(request: RescueRequest) -> dict[str, Any]:
         "stop_rules": ["first-acceptance", "ambiguous-outcome", "end-of-waitlist"],
         "booking_created": False,
         "human_review_required": False,
+        "safety_invariants": {
+            "calls_are_sequential": True,
+            "automatic_redial_is_disabled": True,
+            "booking_is_never_created": True,
+            "ambiguous_outcome_halts_queue": True,
+        },
+        "audit_events": [
+            audit_event(
+                1,
+                "request.validated",
+                decision="preview-only",
+                reason="all-safety-gates-passed-no-call-created",
+            )
+        ],
     }
 
 

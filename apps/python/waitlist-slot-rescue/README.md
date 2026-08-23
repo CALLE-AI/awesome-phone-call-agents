@@ -35,8 +35,13 @@ The simulation contacts candidate A, records a decline, receives candidate B's a
 
 ### Judge-facing visual demo
 
-The self-contained browser demo uses only fictional data and has no network or
-call capability:
+The hosted judge console provides golden-path, safe-halt, and redacted live
+boundary replays with downloadable audit evidence:
+
+**[Open the interactive judge console](https://waitlist-slot-rescue.cebucccedfjfla.chatgpt.site)**
+
+The repository also includes a self-contained fallback that uses only fictional
+data and has no network or call capability:
 
 **[Open the judge demo](https://htmlpreview.github.io/?https://github.com/Piotr1231/awesome-phone-call-agents/blob/feat/waitlist-slot-rescue/apps/python/waitlist-slot-rescue/demo/index.html)**
 
@@ -56,6 +61,11 @@ The safe-halt replay is based on the privacy-minimized behavior of one
 authorized live call, not a claimed successful acceptance. See
 [`docs/live-verification.md`](docs/live-verification.md).
 
+Every replay also exposes a deterministic, privacy-safe decision trace. Expand
+**Engine audit** to inspect the same dispatch, evidence, stop, and handoff events
+returned by `rescue.py`, then download them as JSON. The artifact contains no
+raw phone number, transcript, provider evidence text, or credentials.
+
 ## Reproducible impact model
 
 `evaluate.py` compares manual sequential calling with the same queue automated
@@ -73,6 +83,10 @@ operator time falls from 6.56 to 1.25 minutes (81.0%) while preserving queue
 order, sequential calls, ambiguity stopping, no automatic redial, and
 human-only booking. These are modeled results and must not be represented as
 measured customer impact.
+
+For a truthful sub-three-minute competition recording with functioning product
+footage and one optional authorized German call, use the
+[`demo recording guide`](docs/demo-recording-guide.md).
 
 ## Live CALL-E run
 

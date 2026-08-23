@@ -105,6 +105,47 @@ def test_ambiguous_outcome_halts_instead_of_calling_next_candidate():
     assert result["untouched_candidate_ids"] == ["candidate-b", "candidate-c"]
 
 
+def test_audit_trace_explains_dispatch_stop_and_handoff_without_phone_data():
+    request = rescue.parse_request(payload())
+    golden = rescue.run_rescue(
+        request,
+        rescue.FixtureTransport(
+            {
+                "candidate-a": {"outcome": "declined"},
+                "candidate-b": {"outcome": "accepted"},
+            }
+        ),
+        simulated=True,
+    )
+    assert [event["sequence"] for event in golden["audit_events"]] == list(
+        range(1, len(golden["audit_events"]) + 1)
+    )
+    assert [event["event"] for event in golden["audit_events"]] == [
+        "request.validated",
+        "candidate.dispatch-authorized",
+        "outcome.declined",
+        "candidate.dispatch-authorized",
+        "outcome.accepted",
+        "workflow.handoff",
+    ]
+    assert golden["audit_events"][-1]["decision"] == "human-confirmation"
+    assert "+120255501" not in json.dumps(golden["audit_events"])
+
+    halted = rescue.run_rescue(
+        request,
+        rescue.FixtureTransport({"candidate-a": {"outcome": "unknown"}}),
+        simulated=True,
+    )
+    assert halted["audit_events"][-1] == {
+        "sequence": 4,
+        "event": "workflow.halted",
+        "decision": "human-review",
+        "candidate_id": "candidate-a",
+        "reason": "ambiguous-outcome-fails-closed",
+    }
+    assert halted["safety_invariants"]["automatic_redial_is_disabled"] is True
+
+
 def test_request_rejects_missing_consent_expired_offer_and_sensitive_category():
     raw = payload()
     raw["candidates"][0]["consented_to_waitlist_calls"] = False
@@ -226,6 +267,10 @@ def test_call_task_uses_candidate_locale_and_turn_by_turn_questions():
     assert "BCP 47 locale de-DE" in task
     assert "ask only one question at a time" in task
     assert "wait for the participant's answer after every question" in task
+    assert "Sound warm and conversational" in task
+    assert "Acknowledge each answer before moving on" in task
+    assert "ask once whether the participant can hear you" in task
+    assert "do not read field names or ISO timestamps aloud" in task
     assert "Never treat silence, an interruption, a hang-up, or an unclear answer as agreement" in task
 
 

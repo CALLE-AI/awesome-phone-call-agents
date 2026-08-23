@@ -1,11 +1,13 @@
 {
   "candidate-a": {
     "outcome": "declined",
-    "evidence_summary": "The participant cannot use the offered time."
+    "evidence_summary": "The participant cannot use the offered time.",
+    "classification_reason": "evidence-backed-decline"
   },
   "candidate-b": {
     "outcome": "accepted",
-    "evidence_summary": "The participant wants the slot and understands a human must confirm it."
+    "evidence_summary": "The participant wants the slot and understands a human must confirm it.",
+    "classification_reason": "evidence-backed-acceptance"
   },
   "candidate-c": {
     "outcome": "accepted",

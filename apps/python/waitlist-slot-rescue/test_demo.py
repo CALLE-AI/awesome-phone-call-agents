@@ -42,7 +42,7 @@ def test_demo_has_both_judge_scenarios_and_only_masked_fictional_numbers():
     assert "Candidate found · human confirmation required" in html
     assert "Queue halted · human review required" in html
     assert "+120255501" not in html
-    assert html.count("+12*******") == 3
+    assert html.count("+12******") == 3
 
 
 def test_demo_metrics_match_committed_evaluation_after_display_rounding():
@@ -61,3 +61,17 @@ def test_demo_metrics_match_committed_evaluation_after_display_rounding():
     assert f"{manual_operator:.2f} → {automated_operator:.2f}" in html
     assert f"{automated_wall:.2f}m" in html
     assert f"{manual_wall:.2f}m" in html
+
+
+def test_demo_exposes_a_privacy_safe_downloadable_decision_trace():
+    html = DEMO_PATH.read_text(encoding="utf-8")
+
+    assert 'id="audit-events"' in html
+    assert 'id="download-audit"' in html
+    assert "candidate.dispatch-authorized" in html
+    assert "workflow.handoff" in html
+    assert "workflow.halted" in html
+    assert "safety_invariants" in html
+    assert "booking_created: false" in html
+    assert "automatic_redial_is_disabled: true" in html
+    assert "new Blob" in html

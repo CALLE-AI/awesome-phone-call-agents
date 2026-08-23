@@ -286,6 +286,34 @@
     .controls .danger { color: #ffc0bd; }
     .controls button:disabled { opacity: .45; cursor: progress; transform: none; }
 
+    .audit {
+      margin-top: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 17px;
+      background: rgba(4, 12, 14, .52);
+    }
+    .audit summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 13px 15px;
+      color: #c9d4d2;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 800;
+      list-style: none;
+    }
+    .audit summary::-webkit-details-marker { display: none; }
+    .audit summary span { color: var(--teal); font: 700 9px/1 ui-monospace, monospace; letter-spacing: .08em; }
+    .audit-body { padding: 0 15px 15px; border-top: 1px solid rgba(255,255,255,.06); }
+    .audit-events { display: grid; gap: 7px; margin: 12px 0; padding: 0; list-style: none; }
+    .audit-events li { display: grid; grid-template-columns: 22px 1fr; gap: 9px; color: var(--muted); font: 9px/1.4 ui-monospace, monospace; }
+    .audit-events b { color: var(--teal); font-weight: 700; }
+    .audit-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .audit-actions small { color: #72817f; font-size: 9px; line-height: 1.4; }
+    .audit-actions button { padding: 8px 10px; border: 1px solid rgba(116,240,197,.28); border-radius: 9px; background: rgba(116,240,197,.08); color: var(--teal); cursor: pointer; font-size: 9px; font-weight: 800; }
+
     .metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -371,13 +399,13 @@
 
           <div class="queue" id="queue">
             <div class="candidate" data-candidate="a">
-              <div class="position">01</div><div><strong>Candidate A</strong><small>+12*******111 · en-US</small></div><div class="state">Ready</div>
+              <div class="position">01</div><div><strong>Candidate A</strong><small>+12******111 · en-US</small></div><div class="state">Ready</div>
             </div>
             <div class="candidate" data-candidate="b">
-              <div class="position">02</div><div><strong>Candidate B</strong><small>+12*******122 · en-US</small></div><div class="state">Ready</div>
+              <div class="position">02</div><div><strong>Candidate B</strong><small>+12******122 · en-US</small></div><div class="state">Ready</div>
             </div>
             <div class="candidate" data-candidate="c">
-              <div class="position">03</div><div><strong>Candidate C</strong><small>+12*******133 · en-US</small></div><div class="state">Ready</div>
+              <div class="position">03</div><div><strong>Candidate C</strong><small>+12******133 · en-US</small></div><div class="state">Ready</div>
             </div>
           </div>
 
@@ -392,6 +420,17 @@
             <button type="button" class="danger" id="ambiguous">Replay safe halt</button>
             <button type="button" id="reset" aria-label="Reset demo">Reset</button>
           </div>
+
+          <details class="audit" open>
+            <summary>Privacy-safe decision trace <span>ENGINE AUDIT</span></summary>
+            <div class="audit-body">
+              <ol class="audit-events" id="audit-events" aria-live="polite"></ol>
+              <div class="audit-actions">
+                <small>Deterministic fixture output · no transcript or raw phone data</small>
+                <button type="button" id="download-audit">Download JSON ↓</button>
+              </div>
+            </div>
+          </details>
         </section>
       </section>
 
@@ -420,7 +459,10 @@
     const resultTitle = document.getElementById('result-title');
     const resultCopy = document.getElementById('result-copy');
     const buttons = [...document.querySelectorAll('.controls button')];
+    const auditEvents = document.getElementById('audit-events');
+    const downloadAudit = document.getElementById('download-audit');
     let runToken = 0;
+    let currentAudit = [];
 
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -430,11 +472,35 @@
       node.querySelector('.state').textContent = label;
     }
 
+    function setAudit(events) {
+      currentAudit = events;
+      auditEvents.replaceChildren(...events.map(event => {
+        const item = document.createElement('li');
+        const sequence = document.createElement('b');
+        const copy = document.createElement('span');
+        sequence.textContent = String(event.sequence).padStart(2, '0');
+        copy.textContent = `${event.event} · ${event.decision}`;
+        item.append(sequence, copy);
+        return item;
+      }));
+    }
+
+    function addAudit(event, decision, candidateId, reason) {
+      setAudit([...currentAudit, {
+        sequence: currentAudit.length + 1,
+        event,
+        decision,
+        ...(candidateId ? { candidate_id: candidateId } : {}),
+        ...(reason ? { reason } : {}),
+      }]);
+    }
+
     function resetDemo() {
       runToken += 1;
       for (const id of ['a', 'b', 'c']) setCandidate(id, '', 'Ready');
       resultTitle.textContent = 'Ready for a safe rehearsal';
       resultCopy.textContent = 'Choose the golden path or replay the privacy-minimized live safety outcome. This page cannot place a phone call.';
+      setAudit([{sequence: 1, event: 'request.validated', decision: 'preview-only', reason: 'all-safety-gates-passed-no-call-created'}]);
       buttons.forEach(button => button.disabled = false);
     }
 
@@ -445,22 +511,28 @@
       resultTitle.textContent = 'Calling Candidate A…';
       resultCopy.textContent = 'AI disclosure, identity check, then one bounded slot question.';
       setCandidate('a', 'calling', 'Calling');
+      setAudit([{sequence: 1, event: 'request.validated', decision: 'continue', reason: 'all-safety-gates-passed'}]);
+      addAudit('candidate.dispatch-authorized', 'call-one', 'candidate-a', 'next-consented-candidate-in-queue');
       await sleep(850);
       if (token !== runToken) return;
       setCandidate('a', '', 'Declined');
       resultTitle.textContent = 'Candidate A declined clearly';
       resultCopy.textContent = 'The queue advances exactly one position. No booking or commitment was created.';
+      addAudit('outcome.declined', 'evaluate-stop-rule', 'candidate-a', 'evidence-backed-decline');
       await sleep(750);
       if (token !== runToken) return;
       setCandidate('b', 'calling', 'Calling');
       resultTitle.textContent = 'Calling Candidate B…';
       resultCopy.textContent = 'The same consent, disclosure, evidence, and expiry gates apply.';
+      addAudit('candidate.dispatch-authorized', 'call-one', 'candidate-b', 'next-consented-candidate-in-queue');
       await sleep(900);
       if (token !== runToken) return;
       setCandidate('b', 'accepted', 'Accepted');
       setCandidate('c', 'untouched', 'Untouched');
       resultTitle.textContent = 'Candidate found · human confirmation required';
       resultCopy.textContent = 'Candidate B gave an evidence-backed yes. Candidate C remains untouched and the app creates no booking.';
+      addAudit('outcome.accepted', 'evaluate-stop-rule', 'candidate-b', 'evidence-backed-acceptance');
+      addAudit('workflow.handoff', 'human-confirmation', 'candidate-b', 'first-evidence-backed-acceptance');
       buttons.forEach(button => button.disabled = false);
     }
 
@@ -471,6 +543,8 @@
       resultTitle.textContent = 'Replaying the authorized live outcome…';
       resultCopy.textContent = 'The participant answered, but the call ended before a clear decision was captured.';
       setCandidate('a', 'calling', 'Connected');
+      setAudit([{sequence: 1, event: 'authorization.verified', decision: 'call-one', reason: 'owner-authorized-exact-test'}]);
+      addAudit('provider.connected', 'await-evidence', 'candidate-a', 'authorized-live-boundary');
       await sleep(1050);
       if (token !== runToken) return;
       setCandidate('a', 'unknown', 'Unknown');
@@ -478,12 +552,37 @@
       setCandidate('c', 'untouched', 'Untouched');
       resultTitle.textContent = 'Queue halted · human review required';
       resultCopy.textContent = 'A 25-second participant-ended call produced no reliable acceptance. No booking, no blind retry, and no next-candidate call.';
+      addAudit('outcome.unknown', 'evaluate-stop-rule', 'candidate-a', 'insufficient-conversation-evidence');
+      addAudit('workflow.halted', 'human-review', 'candidate-a', 'ambiguous-outcome-fails-closed');
       buttons.forEach(button => button.disabled = false);
     }
 
     document.getElementById('golden').addEventListener('click', runGoldenPath);
     document.getElementById('ambiguous').addEventListener('click', runAmbiguousPath);
     document.getElementById('reset').addEventListener('click', resetDemo);
+    downloadAudit.addEventListener('click', () => {
+      const payload = {
+        schema_version: 1,
+        fixture_data: true,
+        creates_phone_calls: false,
+        booking_created: false,
+        safety_invariants: {
+          calls_are_sequential: true,
+          automatic_redial_is_disabled: true,
+          booking_is_never_created: true,
+          ambiguous_outcome_halts_queue: true,
+        },
+        audit_events: currentAudit,
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2) + '\n'], {type: 'application/json'}));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'waitlist-slot-rescue-audit.json';
+      anchor.click();
+      URL.revokeObjectURL(url);
+    });
+
+    resetDemo();
 
     const scenario = new URLSearchParams(location.search).get('autoplay');
     if (scenario === 'golden') setTimeout(runGoldenPath, 500);
