@@ -38,6 +38,21 @@ def test_automation_reduces_operator_time_without_changing_queue_order():
     assert result["invariants"]["booking_is_never_created"] is True
 
 
+def test_labor_only_break_even_is_formula_driven_and_not_provider_pricing():
+    result = evaluation.evaluate(trials=2_000, seed=23)
+    metrics = result["results"]
+    economics = result["unit_economics"]
+    saved_minutes = (
+        metrics["manual_mean_operator_minutes"]
+        - metrics["automated_mean_operator_minutes"]
+    )
+
+    assert economics["labor_only_not_provider_pricing"] is True
+    assert economics["break_even_workflow_cost_eur"]["35"] == saved_minutes / 60 * 35
+    assert "excludes recovered-slot value" in economics["interpretation"]
+    assert metrics["modeled_candidate_found_rate_change_percentage_points"] >= 0
+
+
 def test_evaluation_output_contains_no_phone_or_personal_data():
     rendered = json.dumps(evaluation.evaluate(trials=20, seed=1))
 

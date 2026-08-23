@@ -55,6 +55,10 @@ def verify() -> dict[str, object]:
             generated_evaluation["results"]["modeled_operator_time_reduction_percent"],
             1,
         ),
+        "labor_only_break_even_at_35_eur_per_hour": round(
+            generated_evaluation["unit_economics"]["break_even_workflow_cost_eur"]["35"],
+            2,
+        ),
         "model_is_customer_data": False,
     }
 

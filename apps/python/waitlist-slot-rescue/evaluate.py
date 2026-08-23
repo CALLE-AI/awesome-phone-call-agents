@@ -36,6 +36,7 @@ MANUAL_NOTE_SECONDS = 15
 AUTOMATED_BETWEEN_CALLS_SECONDS = 2
 AUTOMATED_SETUP_SECONDS = 45
 AUTOMATED_REVIEW_SECONDS = 30
+LABOR_RATE_SCENARIOS_EUR_PER_HOUR = (25, 35, 50)
 
 
 @dataclass(frozen=True)
@@ -137,6 +138,11 @@ def evaluate(*, trials: int, seed: int) -> dict:
     manual_mean_operator = mean(manual_operator)
     automated_mean_operator = mean(automated_operator)
     reduction = 100 * (1 - automated_mean_operator / manual_mean_operator)
+    saved_operator_minutes = manual_mean_operator - automated_mean_operator
+    break_even_workflow_cost = {
+        str(rate): saved_operator_minutes / 60 * rate
+        for rate in LABOR_RATE_SCENARIOS_EUR_PER_HOUR
+    }
 
     return {
         "model_only_not_customer_data": True,
@@ -171,6 +177,23 @@ def evaluate(*, trials: int, seed: int) -> dict:
             "manual_mean_operator_minutes": manual_mean_operator,
             "automated_mean_operator_minutes": automated_mean_operator,
             "modeled_operator_time_reduction_percent": reduction,
+            "modeled_operator_minutes_saved": saved_operator_minutes,
+            "modeled_candidate_found_rate_change_percentage_points": 100
+            * (
+                mean(result.status == "candidate-found" for result in automated)
+                - mean(result.status == "candidate-found" for result in manual)
+            ),
+        },
+        "unit_economics": {
+            "labor_only_not_provider_pricing": True,
+            "interpretation": (
+                "Maximum total variable workflow cost for labor-time savings alone "
+                "to break even; excludes recovered-slot value and customer impact."
+            ),
+            "labor_rate_scenarios_eur_per_hour": list(
+                LABOR_RATE_SCENARIOS_EUR_PER_HOUR
+            ),
+            "break_even_workflow_cost_eur": break_even_workflow_cost,
         },
         "invariants": {
             "calls_are_sequential": True,

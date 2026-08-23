@@ -94,6 +94,17 @@ order, sequential calls, ambiguity stopping, no automatic redial, and
 human-only booking. These are modeled results and must not be represented as
 measured customer impact.
 
+The same model now exposes a labor-only break-even sensitivity instead of
+inventing provider pricing or customer revenue. At an illustrative EUR 35/hour
+loaded labor rate, the 5.31 modeled operator minutes saved imply a maximum total
+variable workflow cost of EUR 3.10 before labor savings alone stop covering the
+workflow. The calculation explicitly excludes recovered-slot value and is not
+a claim about CALL-E pricing.
+
+For a concise mapping from every judging criterion to a reproducible artifact,
+known limitation, and final-video proof point, see the
+[`judge evidence map`](docs/judge-evidence-map.md).
+
 For a truthful sub-three-minute competition recording with functioning product
 footage and one optional authorized German call, use the
 [`demo recording guide`](docs/demo-recording-guide.md).

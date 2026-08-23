@@ -26,6 +26,7 @@ def test_judge_proof_verifies_attribution_and_fail_closed_behavior():
     assert proof["phone_calls_created"] == 0
     assert proof["automatic_bookings"] == 0
     assert proof["automatic_redials"] == 0
+    assert proof["labor_only_break_even_at_35_eur_per_hour"] > 0
 
 
 def test_judge_proof_runs_with_standard_library_only():
