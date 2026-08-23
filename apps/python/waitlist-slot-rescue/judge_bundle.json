@@ -1,0 +1,155 @@
+{
+  "artifact": "waitlist-slot-rescue-judge-bundle",
+  "creates_phone_calls": false,
+  "fixture_data": true,
+  "generated_by": "judge_bundle.py -> rescue.run_rescue",
+  "scenarios": {
+    "golden": {
+      "attempts": [
+        {
+          "candidate_id": "candidate-a",
+          "classification_reason": "evidence-backed-decline",
+          "evidence_summary": "The participant cannot use the offered time.",
+          "idempotency_key": "waitlist-rescue-f077189402be611c9285",
+          "outcome": "declined",
+          "phone": "+12******111",
+          "position": 1
+        },
+        {
+          "candidate_id": "candidate-b",
+          "classification_reason": "evidence-backed-acceptance",
+          "evidence_summary": "The participant wants the slot and understands a human must confirm it.",
+          "idempotency_key": "waitlist-rescue-2f42f751ab119c96f1c0",
+          "outcome": "accepted",
+          "phone": "+12******122",
+          "position": 2
+        }
+      ],
+      "audit_events": [
+        {
+          "decision": "continue",
+          "event": "request.validated",
+          "reason": "all-safety-gates-passed",
+          "sequence": 1
+        },
+        {
+          "candidate_id": "candidate-a",
+          "decision": "call-one",
+          "event": "candidate.dispatch-authorized",
+          "reason": "next-consented-candidate-in-queue",
+          "sequence": 2
+        },
+        {
+          "candidate_id": "candidate-a",
+          "decision": "evaluate-stop-rule",
+          "event": "outcome.declined",
+          "reason": "evidence-backed-decline",
+          "sequence": 3
+        },
+        {
+          "candidate_id": "candidate-b",
+          "decision": "call-one",
+          "event": "candidate.dispatch-authorized",
+          "reason": "next-consented-candidate-in-queue",
+          "sequence": 4
+        },
+        {
+          "candidate_id": "candidate-b",
+          "decision": "evaluate-stop-rule",
+          "event": "outcome.accepted",
+          "reason": "evidence-backed-acceptance",
+          "sequence": 5
+        },
+        {
+          "candidate_id": "candidate-b",
+          "decision": "human-confirmation",
+          "event": "workflow.handoff",
+          "reason": "first-evidence-backed-acceptance",
+          "sequence": 6
+        }
+      ],
+      "booking_created": false,
+      "creates_phone_calls": false,
+      "human_confirmation_required": true,
+      "human_review_required": true,
+      "mode": "simulate",
+      "safety_invariants": {
+        "ambiguous_outcome_halts_queue": true,
+        "automatic_redial_is_disabled": true,
+        "booking_is_never_created": true,
+        "calls_are_sequential": true
+      },
+      "schema_version": 1,
+      "selected_candidate_id": "candidate-b",
+      "slot_id": "slot-2030-09-10-1400",
+      "status": "candidate-found-human-confirmation-required",
+      "untouched_candidate_ids": [
+        "candidate-c"
+      ],
+      "workflow_id": "repair-waitlist-demo-001"
+    },
+    "safe_halt": {
+      "attempts": [
+        {
+          "candidate_id": "candidate-a",
+          "classification_reason": "ambiguous-structured-result",
+          "evidence_summary": "The response was not reliable enough to classify.",
+          "idempotency_key": "waitlist-rescue-f077189402be611c9285",
+          "outcome": "unknown",
+          "phone": "+12******111",
+          "position": 1
+        }
+      ],
+      "audit_events": [
+        {
+          "decision": "continue",
+          "event": "request.validated",
+          "reason": "all-safety-gates-passed",
+          "sequence": 1
+        },
+        {
+          "candidate_id": "candidate-a",
+          "decision": "call-one",
+          "event": "candidate.dispatch-authorized",
+          "reason": "next-consented-candidate-in-queue",
+          "sequence": 2
+        },
+        {
+          "candidate_id": "candidate-a",
+          "decision": "evaluate-stop-rule",
+          "event": "outcome.unknown",
+          "reason": "ambiguous-structured-result",
+          "sequence": 3
+        },
+        {
+          "candidate_id": "candidate-a",
+          "decision": "human-review",
+          "event": "workflow.halted",
+          "reason": "ambiguous-outcome-fails-closed",
+          "sequence": 4
+        }
+      ],
+      "booking_created": false,
+      "creates_phone_calls": false,
+      "human_confirmation_required": false,
+      "human_review_required": true,
+      "mode": "simulate",
+      "safety_invariants": {
+        "ambiguous_outcome_halts_queue": true,
+        "automatic_redial_is_disabled": true,
+        "booking_is_never_created": true,
+        "calls_are_sequential": true
+      },
+      "schema_version": 1,
+      "selected_candidate_id": null,
+      "slot_id": "slot-2030-09-10-1400",
+      "status": "halted-ambiguous-outcome",
+      "untouched_candidate_ids": [
+        "candidate-b",
+        "candidate-c"
+      ],
+      "workflow_id": "repair-waitlist-demo-001"
+    }
+  },
+  "schema_version": 1
+}

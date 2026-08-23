@@ -1,4 +1,5 @@
 import json
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -42,7 +43,10 @@ def test_demo_has_both_judge_scenarios_and_only_masked_fictional_numbers():
     assert "Candidate found · human confirmation required" in html
     assert "Queue halted · human review required" in html
     assert "+120255501" not in html
-    assert html.count("+12******") == 3
+    assert html.count("data-candidate=") == 3
+    assert "+12******111" in html
+    assert "+12******122" in html
+    assert "+12******133" in html
 
 
 def test_demo_metrics_match_committed_evaluation_after_display_rounding():
@@ -72,6 +76,49 @@ def test_demo_exposes_a_privacy_safe_downloadable_decision_trace():
     assert "workflow.handoff" in html
     assert "workflow.halted" in html
     assert "safety_invariants" in html
-    assert "booking_created: false" in html
-    assert "automatic_redial_is_disabled: true" in html
+    assert '"booking_created": false' in html
+    assert '"automatic_redial_is_disabled":true' in html
     assert "new Blob" in html
+
+
+def test_demo_audit_is_attributed_from_the_exact_engine_bundle():
+    html = DEMO_PATH.read_text(encoding="utf-8")
+    match = re.search(
+        r'<script type="application/json" id="engine-scenarios">(.*?)</script>',
+        html,
+        re.DOTALL,
+    )
+    assert match
+    embedded = json.loads(match.group(1))
+    canonical = json.loads(
+        (APP_ROOT / "judge_bundle.json").read_text(encoding="utf-8")
+    )["scenarios"]
+
+    for name in ("golden", "safe_halt"):
+        assert embedded[name]["status"] == canonical[name]["status"]
+        assert embedded[name]["selected_candidate_id"] == canonical[name][
+            "selected_candidate_id"
+        ]
+        assert embedded[name]["booking_created"] == canonical[name]["booking_created"]
+        assert embedded[name]["attempts"] == [
+            {
+                key: attempt[key]
+                for key in (
+                    "candidate_id",
+                    "phone",
+                    "outcome",
+                    "classification_reason",
+                )
+            }
+            for attempt in canonical[name]["attempts"]
+        ]
+        assert embedded[name]["untouched_candidate_ids"] == canonical[name][
+            "untouched_candidate_ids"
+        ]
+        assert embedded[name]["safety_invariants"] == canonical[name][
+            "safety_invariants"
+        ]
+        assert embedded[name]["audit_events"] == canonical[name]["audit_events"]
+
+    assert "event.title.includes" not in html
+    assert embedded["golden"]["audit_events"][-1]["candidate_id"] == "candidate-b"
