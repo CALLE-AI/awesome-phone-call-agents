@@ -36,6 +36,8 @@ The simulation contacts candidate A, records a decline, receives candidate B's a
 The self-contained browser demo uses only fictional data and has no network or
 call capability:
 
+**[Open the judge demo](https://htmlpreview.github.io/?https://github.com/Piotr1231/awesome-phone-call-agents/blob/feat/waitlist-slot-rescue/apps/python/waitlist-slot-rescue/demo/index.html)**
+
 ```bash
 cd apps/python/waitlist-slot-rescue
 python3 -m http.server 8000 --directory demo
@@ -126,6 +128,10 @@ Tests use fake transports and fictional `+1 555-01xx` numbers. They never need a
 python -m pytest -q
 python3 ../../../scripts/validate_repository.py
 ```
+
+The public no-call verification run checked out this contribution, installed
+the locked environment, and completed **23/23 tests** on Python 3.12. Every
+live-call step was skipped: [view GitHub Actions evidence](https://github.com/Piotr1231/awesome-phone-call-agents/actions/runs/32639686513).
 
 The regressions cover phone masking, consent and expiry validation,
 duplicate-recipient rejection, candidate-locale task construction,
