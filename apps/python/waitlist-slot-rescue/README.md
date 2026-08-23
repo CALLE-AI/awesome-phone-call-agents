@@ -2,6 +2,8 @@
 
 Fill a last-minute service cancellation without making the whole waitlist race for the same slot.
 
+![Waitlist Slot Rescue: one expiring slot moves through a fair queue and ends at human confirmation](demo/thumbnail.jpg)
+
 This focused Python app calls previously opted-in waitlist candidates in their existing order. It stops at the first explicit acceptance, never creates a booking, and hands the candidate's response to a human for final confirmation. An ambiguous result stops the cascade instead of risking a duplicate offer.
 
 The workflow is for non-regulated services such as salons, vehicle or home services, tutoring, and fitness. It deliberately rejects medical, legal, financial, emergency, collections, political, and unsolicited-marketing use.
