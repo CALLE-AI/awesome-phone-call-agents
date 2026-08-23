@@ -211,18 +211,22 @@ def idempotency_key(request: RescueRequest, candidate: Candidate) -> str:
     return f"waitlist-rescue-{digest}"
 
 
-def build_task(request: RescueRequest) -> str:
+def build_task(request: RescueRequest, candidate: Candidate) -> str:
     start = request.slot_start.isoformat()
     expiry = request.offer_expires_at.isoformat()
     return (
         f"Call on behalf of {request.business_display_name} about one newly available "
-        f"{request.service_label} slot at {start}. At the start, identify yourself as an AI calling "
-        "assistant, say the number was supplied through an opt-in waitlist, confirm this is the intended "
-        "waitlist participant, and ask whether they want to continue. If not, record the appropriate "
-        "wrong-person or opted-out outcome and end immediately. Explain that the slot is not reserved "
-        f"yet, their response is valid only until {expiry}, and a human must confirm any booking. Ask "
-        "only whether they want the slot. Do not book, cancel, take payment, negotiate, collect sensitive "
-        "information, or promise availability. End after one clear answer."
+        f"{request.service_label} slot at {start}. Conduct the conversation in the language implied by "
+        f"the BCP 47 locale {candidate.locale}. Use short sentences, ask only one question at a time, "
+        "and wait for the participant's answer after every question. First identify yourself as an AI "
+        "calling assistant and say the number was supplied through an opt-in waitlist. Then confirm this "
+        "is the intended waitlist participant. Only after that confirmation, ask whether they agree to "
+        "continue the AI-assisted call. If they do not, record the appropriate wrong-person or opted-out "
+        "outcome and end immediately. Explain that the slot is not reserved yet, their response is valid "
+        f"only until {expiry}, and a human must confirm any booking. Finally, ask only whether they want "
+        "the slot. Never treat silence, an interruption, a hang-up, or an unclear answer as agreement. "
+        "Do not book, cancel, take payment, negotiate, collect sensitive information, or promise "
+        "availability. End after one clear answer."
     )
 
 
@@ -299,21 +303,28 @@ def _has_provider_evidence(result: dict[str, Any]) -> bool:
 
 
 def _has_high_confidence_evidence(result: dict[str, Any]) -> bool:
+    return _completion_gate_failure(result) is None
+
+
+def _completion_gate_failure(result: dict[str, Any]) -> str | None:
+    if str(result.get("status", "")).lower() != "completed":
+        return "provider-status-not-completed"
+    if result.get("task_completed") is not True:
+        return "task-not-completed"
     confidence = result.get("completion_confidence")
     if not isinstance(confidence, dict):
-        return False
+        return "missing-completion-confidence"
     try:
         score = float(confidence.get("score", 0))
     except (TypeError, ValueError):
-        return False
-    return (
-        result.get("status") == "completed"
-        and result.get("task_completed") is True
-        and score >= 0.8
-        and str(confidence.get("label", "")).lower() == "high"
-        and _has_provider_evidence(result)
-        and bool(_transcript_text(result).strip())
-    )
+        return "invalid-completion-confidence"
+    if score < 0.8 or str(confidence.get("label", "")).lower() != "high":
+        return "insufficient-completion-confidence"
+    if not _has_provider_evidence(result):
+        return "missing-provider-evidence"
+    if not _transcript_text(result).strip():
+        return "missing-transcript"
+    return None
 
 
 def _verified_no_answer(result: dict[str, Any]) -> bool:
@@ -359,10 +370,14 @@ def _verified_no_answer(result: dict[str, Any]) -> bool:
     return attempts_seen
 
 
-def _classify_completed_result(result: dict[str, Any]) -> str:
+def _classify_completed_result_with_reason(result: dict[str, Any]) -> tuple[str, str]:
+    gate_failure = _completion_gate_failure(result)
+    if gate_failure:
+        return "unknown", gate_failure
+
     structured = result.get("structured_result")
-    if not isinstance(structured, dict) or not _has_high_confidence_evidence(result):
-        return "unknown"
+    if not isinstance(structured, dict):
+        return "unknown", "missing-structured-result"
 
     allowed = {"yes", "no", "unknown"}
     fields = {
@@ -375,31 +390,91 @@ def _classify_completed_result(result: dict[str, Any]) -> str:
         )
     }
     if any(value not in allowed for value in fields.values()):
-        return "unknown"
+        return "unknown", "invalid-structured-fields"
     if fields["waitlist_call_opt_out"] == "yes":
-        return "opted-out"
+        return "opted-out", "explicit-opt-out"
     if fields["right_person"] == "no":
-        return "wrong-person"
+        return "wrong-person", "wrong-person-confirmed"
     if (
         fields["right_person"] == "yes"
         and fields["continued_after_ai_disclosure"] == "yes"
         and fields["waitlist_call_opt_out"] == "no"
         and fields["wants_slot"] == "yes"
     ):
-        return "accepted"
+        return "accepted", "evidence-backed-acceptance"
     if (
         fields["right_person"] == "yes"
         and fields["continued_after_ai_disclosure"] == "yes"
         and fields["waitlist_call_opt_out"] == "no"
         and fields["wants_slot"] == "no"
     ):
-        return "declined"
-    return "unknown"
+        return "declined", "evidence-backed-decline"
+    return "unknown", "ambiguous-structured-result"
+
+
+def _classify_completed_result(result: dict[str, Any]) -> str:
+    return _classify_completed_result_with_reason(result)[0]
+
+
+def _privacy_safe_provider_diagnostics(
+    result: dict[str, Any], classification_reason: str
+) -> dict[str, Any]:
+    confidence = result.get("completion_confidence")
+    confidence_score: float | None = None
+    confidence_label: str | None = None
+    if isinstance(confidence, dict):
+        try:
+            confidence_score = float(confidence.get("score"))
+        except (TypeError, ValueError):
+            confidence_score = None
+        raw_label = confidence.get("label")
+        if isinstance(raw_label, str):
+            normalized_label = raw_label.lower()
+            confidence_label = (
+                normalized_label
+                if normalized_label in {"high", "medium", "low"}
+                else "unknown"
+            )
+
+    structured = result.get("structured_result")
+    decision_fields: dict[str, str] = {}
+    if isinstance(structured, dict):
+        for name in (
+            "right_person",
+            "continued_after_ai_disclosure",
+            "waitlist_call_opt_out",
+            "wants_slot",
+        ):
+            value = str(structured.get(name, "unknown")).lower()
+            decision_fields[name] = value if value in {"yes", "no", "unknown"} else "invalid"
+
+    provider_status = str(result.get("status", "unknown")).lower()
+    if provider_status not in {
+        "created",
+        "queued",
+        "ringing",
+        "in_progress",
+        "completed",
+        "failed",
+        "canceled",
+    }:
+        provider_status = "unknown"
+
+    return {
+        "provider_status": provider_status,
+        "task_completed": result.get("task_completed") is True,
+        "confidence_score": confidence_score,
+        "confidence_label": confidence_label,
+        "has_provider_evidence": _has_provider_evidence(result),
+        "has_transcript": bool(_transcript_text(result).strip()),
+        "decision_fields": decision_fields,
+        "classification_reason": classification_reason,
+    }
 
 
 def build_call_arguments(request: RescueRequest, candidate: Candidate) -> dict[str, Any]:
     return {
-        "task": build_task(request),
+        "task": build_task(request, candidate),
         "recipients": [{"phones": [candidate.phone], "locale": candidate.locale}],
         "result_schema": build_result_schema(),
         "metadata": {
@@ -426,11 +501,19 @@ class CalleTransport:
             call_id, timeout_seconds=self.timeout_seconds, interval_seconds=2
         )
         structured = completed.get("structured_result")
-        outcome = "no-answer" if _verified_no_answer(completed) else _classify_completed_result(completed)
+        if _verified_no_answer(completed):
+            outcome = "no-answer"
+            classification_reason = "provider-verified-no-answer"
+        else:
+            outcome, classification_reason = _classify_completed_result_with_reason(completed)
         return {
             "outcome": outcome,
             "evidence_summary": redact_phone_like_text(
                 structured.get("evidence_summary", "") if isinstance(structured, dict) else ""
+            ),
+            "classification_reason": classification_reason,
+            "provider_diagnostics": _privacy_safe_provider_diagnostics(
+                completed, classification_reason
             ),
             "call_id": call_id,
         }
@@ -443,10 +526,17 @@ class FixtureTransport:
     def place(self, request: RescueRequest, candidate: Candidate) -> dict[str, Any]:
         raw = self.fixtures.get(candidate.candidate_id)
         if not isinstance(raw, dict) or raw.get("outcome") not in TERMINAL_OUTCOMES:
-            return {"outcome": "unknown", "evidence_summary": "No valid fixture outcome."}
+            return {
+                "outcome": "unknown",
+                "evidence_summary": "No valid fixture outcome.",
+                "classification_reason": "invalid-fixture-outcome",
+            }
         return {
             "outcome": raw["outcome"],
             "evidence_summary": redact_phone_like_text(raw.get("evidence_summary", "")),
+            "classification_reason": raw.get(
+                "classification_reason", "fixture-declared-outcome"
+            ),
         }
 
 
@@ -475,8 +565,15 @@ def run_rescue(
             "phone": mask_phone(candidate.phone),
             "outcome": outcome,
             "evidence_summary": result.get("evidence_summary", ""),
+            "classification_reason": result.get(
+                "classification_reason", "transport-outcome-without-reason"
+            ),
             "idempotency_key": idempotency_key(request, candidate),
         }
+        if isinstance(result.get("provider_diagnostics"), dict):
+            attempt["provider_diagnostics"] = redact_phone_like_text(
+                result["provider_diagnostics"]
+            )
         if result.get("call_id"):
             attempt["call_id"] = result["call_id"]
         attempts.append(attempt)
@@ -495,6 +592,11 @@ def run_rescue(
     untouched = [
         candidate.candidate_id for candidate in request.candidates if candidate.candidate_id not in attempted_ids
     ]
+    human_confirmation_required = selected_candidate_id is not None
+    human_review_required = human_confirmation_required or final_status in {
+        "halted-ambiguous-outcome",
+        "offer-expired-after-call-human-review",
+    }
     return {
         "mode": "simulate" if simulated else "execute",
         "creates_phone_calls": not simulated,
@@ -503,7 +605,8 @@ def run_rescue(
         "status": final_status,
         "selected_candidate_id": selected_candidate_id,
         "booking_created": False,
-        "human_confirmation_required": selected_candidate_id is not None,
+        "human_confirmation_required": human_confirmation_required,
+        "human_review_required": human_review_required,
         "attempts": attempts,
         "untouched_candidate_ids": untouched,
     }
@@ -530,6 +633,7 @@ def preview(request: RescueRequest) -> dict[str, Any]:
         ],
         "stop_rules": ["first-acceptance", "ambiguous-outcome", "end-of-waitlist"],
         "booking_created": False,
+        "human_review_required": False,
     }
 
 

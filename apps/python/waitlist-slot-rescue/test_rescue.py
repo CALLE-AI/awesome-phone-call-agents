@@ -100,6 +100,8 @@ def test_ambiguous_outcome_halts_instead_of_calling_next_candidate():
     )
     assert result["status"] == "halted-ambiguous-outcome"
     assert len(result["attempts"]) == 1
+    assert result["human_confirmation_required"] is False
+    assert result["human_review_required"] is True
     assert result["untouched_candidate_ids"] == ["candidate-b", "candidate-c"]
 
 
@@ -194,7 +196,93 @@ def test_live_transport_uses_calle_and_redacts_returned_phone():
     assert len(client.calls.created) == 1
     assert client.calls.created[0]["recipients"][0]["phones"] == ["+12025550111"]
     assert result["attempts"][0]["evidence_summary"] == "Confirmed using [phone-redacted]."
+    assert result["attempts"][0]["classification_reason"] == "evidence-backed-acceptance"
+    assert result["attempts"][0]["provider_diagnostics"] == {
+        "provider_status": "completed",
+        "task_completed": True,
+        "confidence_score": 0.94,
+        "confidence_label": "high",
+        "has_provider_evidence": True,
+        "has_transcript": True,
+        "decision_fields": {
+            "right_person": "yes",
+            "continued_after_ai_disclosure": "yes",
+            "waitlist_call_opt_out": "no",
+            "wants_slot": "yes",
+        },
+        "classification_reason": "evidence-backed-acceptance",
+    }
     assert result["creates_phone_calls"] is True
+
+
+def test_call_task_uses_candidate_locale_and_turn_by_turn_questions():
+    raw = payload()
+    raw["candidates"][0]["locale"] = "de-DE"
+    request = rescue.parse_request(raw)
+    arguments = rescue.build_call_arguments(request, request.candidates[0])
+    task = arguments["task"]
+
+    assert arguments["recipients"][0]["locale"] == "de-DE"
+    assert "BCP 47 locale de-DE" in task
+    assert "ask only one question at a time" in task
+    assert "wait for the participant's answer after every question" in task
+    assert "Never treat silence, an interruption, a hang-up, or an unclear answer as agreement" in task
+
+
+def test_answered_then_hung_up_is_unknown_and_requires_human_review():
+    class HungUpCalls(FakeCalls):
+        def wait_for_result(self, call_id, **kwargs):
+            assert kwargs == {"timeout_seconds": 30, "interval_seconds": 2}
+            return {
+                "status": "completed",
+                "task_completed": False,
+                "completion_confidence": {"score": 0.1, "label": "low"},
+                "evidence": [],
+                "turns": [],
+                "structured_result": {
+                    "right_person": "unknown",
+                    "continued_after_ai_disclosure": "unknown",
+                    "waitlist_call_opt_out": "unknown",
+                    "wants_slot": "unknown",
+                    "evidence_summary": "",
+                },
+            }
+
+    request = rescue.parse_request(payload())
+    client = FakeClient()
+    client.calls = HungUpCalls()
+    result = rescue.run_rescue(
+        request, rescue.CalleTransport(client, timeout_seconds=30), simulated=False
+    )
+
+    assert len(client.calls.created) == 1
+    assert result["status"] == "halted-ambiguous-outcome"
+    assert result["selected_candidate_id"] is None
+    assert result["human_confirmation_required"] is False
+    assert result["human_review_required"] is True
+    assert result["attempts"][0]["outcome"] == "unknown"
+    assert result["attempts"][0]["classification_reason"] == "task-not-completed"
+    assert result["attempts"][0]["provider_diagnostics"]["has_transcript"] is False
+    assert result["untouched_candidate_ids"] == ["candidate-b", "candidate-c"]
+
+
+def test_provider_diagnostics_never_copy_transcript_evidence_or_arbitrary_labels():
+    raw = completed_result()
+    raw["status"] = "completed for +12025550111"
+    raw["completion_confidence"]["label"] = "high for Alice"
+    raw["turns"] = [{"role": "recipient", "text": "My number is +12025550111"}]
+    raw["evidence"] = [{"summary": "Alice accepted using +12025550111"}]
+    raw["structured_result"]["evidence_summary"] = "Alice accepted."
+
+    diagnostics = rescue._privacy_safe_provider_diagnostics(raw, "test-reason")
+    rendered = json.dumps(diagnostics)
+
+    assert diagnostics["provider_status"] == "unknown"
+    assert diagnostics["confidence_label"] == "unknown"
+    assert diagnostics["has_transcript"] is True
+    assert diagnostics["has_provider_evidence"] is True
+    assert "+12025550111" not in rendered
+    assert "Alice" not in rendered
 
 
 def test_phone_redaction_handles_common_display_formats():
@@ -305,11 +393,13 @@ def test_expiry_is_rechecked_before_and_after_each_call():
     assert result["status"] == "offer-expired-after-call-human-review"
     assert result["selected_candidate_id"] is None
     assert result["human_confirmation_required"] is False
+    assert result["human_review_required"] is True
     assert result["untouched_candidate_ids"] == ["candidate-b", "candidate-c"]
 
     result = rescue.run_rescue(request, fixtures, simulated=True, now=lambda: after_expiry)
     assert result["status"] == "offer-expired"
     assert result["attempts"] == []
+    assert result["human_review_required"] is False
     assert result["untouched_candidate_ids"] == [
         "candidate-a",
         "candidate-b",
