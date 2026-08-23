@@ -1,6 +1,6 @@
 {
   "ticket_id": "FR-1888",
-  "sku": "PL-9F88",
+  "sku": "PL-9F21",
   "spoken_time_budget_s": 90,
   "parties": [
     {
@@ -19,7 +19,7 @@
   "nodes": [
     {
       "id": "dock",
-      "text": "Pallet PL-9F88 staged at dock 2.",
+      "text": "Pallet PL-9F21 staged at dock 2.",
       "evidence": {
         "span": {
           "quote": "staged at dock 2"
@@ -32,7 +32,7 @@
     },
     {
       "id": "arrival",
-      "text": "Driver reached the gate for PL-9F88.",
+      "text": "Driver reached the gate for PL-9F21.",
       "evidence": {
         "span": {
           "quote": "truck at the gate"
@@ -60,7 +60,7 @@
   "candidate_questions": [
     {
       "id": "q-dock",
-      "text": "Which dock did you pull to for pallet PL-9F88?",
+      "text": "Which dock did you pull to for pallet PL-9F21?",
       "targets": ["dock"]
     }
   ],

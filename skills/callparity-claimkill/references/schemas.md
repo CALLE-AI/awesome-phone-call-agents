@@ -42,4 +42,4 @@
 | `quotes[].polarity` | string | `contradicts`, `supports`, or empty. Empty means no falsifier. |
 | `quotes[].tested_by` | string | Optional question id. |
 
-Could-not-verify in a human summary maps to `UNREACHABLE`, `ABSTAIN`, or `UNTESTED`.
+Could-not-verify in a human summary maps to `UNREACHABLE`, `ABSTAIN`, or `UNTESTED`. Merged graph JSON also sets `overall` to `SUPPORTED`, `CONTRADICTED`, or `could-not-verify`.

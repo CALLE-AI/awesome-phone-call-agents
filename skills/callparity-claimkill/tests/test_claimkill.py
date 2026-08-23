@@ -108,10 +108,12 @@ def test_fr1842_merger_dock_contradicted_arrival_supported_seal_untested() -> No
     assert graph.node("dock").status == claimkill.CONTRADICTED
     assert graph.node("arrival").status == claimkill.SUPPORTED
     assert graph.node("seal").status == claimkill.UNTESTED
+    assert graph.to_dict()["overall"] == claimkill.CONTRADICTED
     tested = {edge.claim_id: edge.tested_by for edge in graph.edges}
     assert tested["dock"] == "q-dock-empty"
     assert "seal" not in tested
     assert graph.node("dock").evidence.quote == "pallet left dock 3"
+    assert graph.to_dict()["overall"] == claimkill.CONTRADICTED
 
 
 def test_fr1842_merge_without_falsifier_stays_untested() -> None:
@@ -137,6 +139,7 @@ def test_fr1900_low_confidence_abstains() -> None:
     graph = claimkill.merge_fixture("FR-1900")
     assert graph.node("dock").status == claimkill.ABSTAIN
     assert graph.node("arrival").status == claimkill.ABSTAIN
+    assert graph.to_dict()["overall"] == "could-not-verify"
 
 
 def test_fr1888_voicemail_unreachable_and_low_confidence_abstain() -> None:
@@ -146,6 +149,7 @@ def test_fr1888_voicemail_unreachable_and_low_confidence_abstain() -> None:
     assert graph.node("dock").status == claimkill.UNREACHABLE
     assert graph.node("arrival").status == claimkill.UNREACHABLE
     assert graph.node("seal").status == claimkill.ABSTAIN
+    assert graph.to_dict()["overall"] == "could-not-verify"
     tested = {edge.claim_id: edge.tested_by for edge in graph.edges}
     assert tested["dock"] == "call-nplus1-fr-1888"
     assert "seal" not in tested
@@ -161,3 +165,13 @@ def test_preview_cli_json_artifact() -> None:
         for item in artifact["dropped"]
     )
     assert "warehouse said dock 3" not in json.dumps(artifact["kept"]).lower()
+    assert artifact["blocked_reason"] is None
+
+
+def test_missing_consent_blocks_next_question() -> None:
+    loaded = claimkill.load_fixture("FR-1842")
+    loaded.parties[1]["consent"] = False
+    plan = claimkill.compile_preview(loaded)
+    assert plan.blocked_reason == "missing consent"
+    assert plan.next_question is None
+    assert plan.calls_placed == 0

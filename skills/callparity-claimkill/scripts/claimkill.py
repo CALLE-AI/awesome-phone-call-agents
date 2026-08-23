@@ -133,6 +133,7 @@ class ClaimGraph:
             "nodes": [node.to_dict() for node in self.nodes.values()],
             "edges": [edge.to_dict() for edge in self.edges],
             "spoken_time_budget_s": self.spoken_time_budget_s,
+            "overall": overall_result(self),
         }
 
 
@@ -339,6 +340,15 @@ def merge(graph: ClaimGraph, event: MergeEvent) -> ClaimGraph:
 
     result.edges = new_edges
     return result
+
+
+def overall_result(graph: ClaimGraph) -> str:
+    statuses = [node.status for node in graph.nodes.values()]
+    if CONTRADICTED in statuses:
+        return CONTRADICTED
+    if SUPPORTED in statuses:
+        return SUPPORTED
+    return "could-not-verify"
 
 
 def _require_object(value: Any, where: str) -> dict[str, Any]:

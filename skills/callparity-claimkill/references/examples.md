@@ -10,13 +10,7 @@ Run `scripts/claimkill.py preview --fixture fixtures/FR-1842.json`. Expect `Was 
 
 ## Merge result
 
-With the FR-1842 fixture quotes, the merger writes:
-
-- `dock` `CONTRADICTED`, `tested_by` `q-dock-empty`
-- `arrival` `SUPPORTED` (alias `CONFIRMED`)
-- `seal` `UNTESTED` because no falsifier quote exists
-
-The written artifact is the JSON graph from `scripts/claimkill.py merge --fixture fixtures/FR-1842.json`.
+With the FR-1842 fixture quotes, the merger writes `dock` as `CONTRADICTED` with `tested_by` `q-dock-empty`, `arrival` as `SUPPORTED`, and `seal` as `UNTESTED` because no falsifier quote exists. `CONFIRMED` on input means `SUPPORTED`. Overall result is `CONTRADICTED`. The written artifact is the JSON graph from `scripts/claimkill.py merge --fixture fixtures/FR-1842.json`.
 
 ## Extra fixtures
 
