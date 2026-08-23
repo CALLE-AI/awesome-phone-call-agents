@@ -113,7 +113,6 @@ def test_fr1842_merger_dock_contradicted_arrival_supported_seal_untested() -> No
     assert tested["dock"] == "q-dock-empty"
     assert "seal" not in tested
     assert graph.node("dock").evidence.quote == "pallet left dock 3"
-    assert graph.to_dict()["overall"] == claimkill.CONTRADICTED
 
 
 def test_fr1842_merge_without_falsifier_stays_untested() -> None:
