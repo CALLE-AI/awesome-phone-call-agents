@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 
-from holdfor import db, seed as seeding
+from holdfor import db, envfile, seed as seeding
 from holdfor.providers import FakeProvider
 
 
@@ -36,6 +37,29 @@ def never_calls_out(monkeypatch):
     """
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("HOLDFOR_EXTRACT_MODEL", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def never_reads_a_settings_file(monkeypatch, tmp_path):
+    """No untracked file on one developer's machine decides what the suite proves.
+
+    `main` loads `.env` and `test_cli` calls `main`, so the first CLI test used to put
+    a real `.env` into `os.environ` for the rest of the process — and monkeypatch
+    cannot unwind what it did not set. A booking line leaking out of it turned
+    `test_no_booking_line_means_no_call` into a pass or a fail depending on which test
+    ran first.
+
+    Closed twice over, because the two close different holes. Moving the default path
+    means the file is never read at all, including inside the test that calls `main`;
+    the loader itself is still the real one, so a test may point it at a file it wrote.
+    Clearing the settings covers the other way in — a variable somebody exported in the
+    shell they happen to be running the suite from.
+    """
+    monkeypatch.setattr(envfile, "DEFAULT", str(tmp_path / "absent" / ".env"))
+    for name in [
+        setting for setting in os.environ if setting.startswith("HOLDFOR_")
+    ]:
+        monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture

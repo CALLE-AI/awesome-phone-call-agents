@@ -10,15 +10,17 @@ dependencies = [
     # The Release form posts form-encoded, and Starlette cannot parse a form without
     # this. Not optional: without it the board renders and every Release fails.
     "python-multipart>=0.0.9",
-    # The second pass that reads the four answers back out of a transcript, because
-    # `calle call start` cannot carry a result schema. Optional at runtime: the
-    # extractor is gated on ANTHROPIC_API_KEY and every failure, import errors
-    # included, ends as `extraction_failed` and a call a person reads.
-    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "httpx>=0.27"]
+# The second pass that reads the four answers back out of a transcript, because
+# `calle call start` cannot carry a result schema. An extra rather than a dependency:
+# the board runs without it, `reextract` catches the ImportError, and a call then lands
+# as `extraction_failed` for a person to read — which is the board this app had before
+# the second pass existed. Nothing about it is load-bearing.
+#   uv sync --extra extract
+extract = ["anthropic>=0.40"]
 
 [project.scripts]
 holdfor = "holdfor.__main__:main"

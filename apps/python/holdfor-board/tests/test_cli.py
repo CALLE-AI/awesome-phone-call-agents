@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from holdfor import __main__ as cli
-from holdfor import db, seed as seeding
-from holdfor.providers import LiveProvider
+from holdfor import db, envfile, rebooking, seed as seeding
+from holdfor.providers import LiveProvider, default_provider
 
 
 @pytest.fixture
@@ -150,3 +152,77 @@ def test_an_unresolved_attempt_tells_you_not_to_re_run(calendar_db, monkeypatch,
 def test_an_unknown_appointment_is_reported_not_raised(calendar_db, capsys):
     assert cli.main(["call", "9999"]) == 0
     assert "No appointment 9999" in capsys.readouterr().err
+
+
+# --- the settings file ------------------------------------------------------------
+#
+# Every setting in this app is an environment variable, and the two phone numbers were
+# the ones that hurt: they sat in `.env` with nothing to read them, so a server started
+# in a shell that had not sourced the file refused every Rebooking Call with
+# `no_booking_line` — indistinguishable from a broken button.
+
+
+def test_a_setting_in_the_file_reaches_the_environment(tmp_path, monkeypatch):
+    settings = tmp_path / ".env"
+    settings.write_text("HOLDFOR_BOOKING_LINE=+441632960118\n", encoding="utf-8")
+    monkeypatch.delenv("HOLDFOR_BOOKING_LINE", raising=False)
+
+    assert envfile.load(settings) == ["HOLDFOR_BOOKING_LINE"]
+    assert rebooking.booking_line() == "+441632960118"
+
+
+def test_what_somebody_typed_always_wins(tmp_path, monkeypatch):
+    """A file must never countermand a command line. `CALLE_LIVE=1 python -m holdfor`
+    has to mean what it says, and so does a booking line aimed at a different phone."""
+    settings = tmp_path / ".env"
+    settings.write_text("HOLDFOR_BOOKING_LINE=+441632960118\n", encoding="utf-8")
+    monkeypatch.setenv("HOLDFOR_BOOKING_LINE", "+447700900500")
+
+    assert envfile.load(settings) == []
+    assert rebooking.booking_line() == "+447700900500"
+
+
+def test_comments_and_blank_lines_are_not_settings(tmp_path, monkeypatch):
+    settings = tmp_path / ".env"
+    settings.write_text(
+        "# HOLDFOR_REGION=MY\n\n   \nHOLDFOR_DB=demo.db\nnot a setting\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("HOLDFOR_REGION", raising=False)
+    monkeypatch.delenv("HOLDFOR_DB", raising=False)
+
+    assert envfile.load(settings) == ["HOLDFOR_DB"]
+    assert "HOLDFOR_REGION" not in os.environ
+
+
+def test_a_settings_file_can_never_arm_a_real_phone_call(tmp_path, monkeypatch):
+    """The one key that is not config.
+
+    Config comes from the file; spending one of the twenty is typed on the command
+    line, every time. `CALLE_LIVE` sits commented out in `.env` for that reason, and a
+    comment is not a safeguard — uncommenting it is one keystroke. So it is skipped by
+    name, and a file that says `CALLE_LIVE=1` still leaves the provider fake.
+    """
+    settings = tmp_path / ".env"
+    settings.write_text("CALLE_LIVE=1\nHOLDFOR_DB=demo.db\n", encoding="utf-8")
+    monkeypatch.delenv("CALLE_LIVE", raising=False)
+    monkeypatch.delenv("HOLDFOR_DB", raising=False)
+
+    assert envfile.load(settings) == ["HOLDFOR_DB"]
+    assert "CALLE_LIVE" not in os.environ
+    assert default_provider().live is False
+
+
+def test_a_quoted_value_loses_its_quotes(tmp_path, monkeypatch):
+    settings = tmp_path / ".env"
+    settings.write_text('HOLDFOR_DB="demo.db"\n', encoding="utf-8")
+    monkeypatch.delenv("HOLDFOR_DB", raising=False)
+
+    envfile.load(settings)
+    assert os.environ["HOLDFOR_DB"] == "demo.db"
+
+
+def test_no_file_is_the_normal_case(tmp_path):
+    """Nothing in this app requires a settings file, and a fresh checkout runs on the
+    defaults."""
+    assert envfile.load(tmp_path / "absent") == []

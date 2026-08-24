@@ -244,8 +244,9 @@ def test_an_error_of_any_kind_is_the_same_as_no_answer(monkeypatch):
         def __init__(self):
             raise RuntimeError("no network, no credit, no idea")
 
-    import anthropic
-
+    # Skipped rather than failed when the extra is not installed: the library is
+    # optional and a suite that demanded it would make it load-bearing.
+    anthropic = pytest.importorskip("anthropic")
     monkeypatch.setattr(anthropic, "Anthropic", Exploding)
 
     assert reextract.structured_from(SPOKEN, True) is None

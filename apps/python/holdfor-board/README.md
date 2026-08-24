@@ -29,6 +29,20 @@ uv run python -m holdfor serve     # queue at http://127.0.0.1:8000
 
 `GET /board` returns the same data as JSON.
 
+## Settings
+
+Everything is an environment variable. `python -m holdfor <command>` reads `.env` at
+startup, so a setting is written once instead of sourced before every launch:
+
+```bash
+cp .env.example .env      # then fill in the numbers; .env is gitignored
+uv run python -m holdfor serve
+```
+
+Anything already in the environment wins, so a variable on the command line is never
+overridden by the file. `CALLE_LIVE` is the exception and is never read from it at all —
+see below.
+
 ## Live calls
 
 `FakeProvider` is the default. A real phone call requires `CALLE_LIVE=1` and the
@@ -37,6 +51,10 @@ uv run python -m holdfor serve     # queue at http://127.0.0.1:8000
 ```bash
 CALLE_LIVE=1 uv run python -m holdfor call 1
 ```
+
+It cannot come from `.env`. The loader skips it by name, so a settings file can never
+arm a real phone call by being present: config lives in a file, spending one of the
+twenty is typed each time.
 
 Two guards sit around that command:
 

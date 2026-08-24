@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from . import checkin, db, reextract, review, seed as seeding
+from . import checkin, db, envfile, reextract, review, seed as seeding
 from .extract import extract
 from .models import CallResult, CallState
 from .providers import LIVE_FLAG, default_provider
@@ -122,6 +122,18 @@ def cmd_read_back(_: list[str]) -> int:
         )
         return 2
 
+    try:
+        import anthropic  # noqa: F401
+    except ImportError:
+        # The library is an optional extra, so a key on its own is not enough. Said
+        # here rather than letting every row report "no answers came back", which is
+        # true and tells nobody what to do about it.
+        print(
+            "The extract extra is not installed:  uv sync --extra extract",
+            file=sys.stderr,
+        )
+        return 2
+
     conn = db.connect()
     rows = conn.execute(
         """
@@ -211,6 +223,14 @@ COMMANDS = {
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Before anything reads a setting. Every one of them is an environment variable,
+    # and the two phone numbers sat in `.env` with nothing to read them: a server
+    # launched from a shell that had not sourced the file refused every Rebooking Call
+    # with `no_booking_line`, which is indistinguishable from a broken button. What is
+    # already in the environment still wins, so a variable typed on the command line
+    # cannot be countermanded by a file.
+    envfile.load(envfile.DEFAULT)
+
     args = list(argv if argv is not None else sys.argv[1:])
     if not args or args[0] not in COMMANDS:
         print(USAGE, file=sys.stderr)
