@@ -25,9 +25,9 @@ Awesome Phone Call Agents is an early community hub for developers and workflow 
 
 | Contribution area | Good examples | Where to contribute |
 | --- | --- | --- |
-| Agent Skills      | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/`           |
-| Workflow Plugins  | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes                                      | `plugins/`          |
-| User-facing Apps  | Call chat, call review console, call scheduler UI, customer callback app, business call workbench                                  | `apps/`             |
+| Agent Skills | Customer callbacks, appointment confirmation, lead qualification, order exception follow-up, service dispatch, incident escalation | `skills/` |
+| Workflow Plugins | Dify tools, n8n nodes, Zapier actions, HubSpot workflow actions, Feishu/Lark automation nodes | `plugins/` |
+| User-facing Apps | Call chat, call review console, call scheduler UI, customer callback app, business call workbench | `apps/` |
 
 The community roadmap is a direction guide, not a fixed release plan. Small examples, platform notes, workflow sketches, templates, and focused demos are all useful.
 
@@ -147,6 +147,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
 | App | Language | Purpose |
+| --- | --- | --- |
 | [`apps/typescript/asyncfounders`](apps/typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
 | [`apps/typescript/one-more-story`](apps/typescript/one-more-story/) | TypeScript | Consent-first oral-history call that discloses AI use, preserves the storyteller's correction, and creates no story until the corrected read-back is explicitly confirmed. |
 | [`apps/web/callproof`](apps/web/callproof/) | Ruby / Python | Closed-loop CALL-E workflow that checks transcript evidence against an immutable call contract and routes policy exceptions to persisted AgentKit human review. |
@@ -196,12 +197,13 @@ No-code and low-code workflow plugins live under [`plugins/`](plugins/). They ar
 
 Plugins should be explicit about inputs, outbound call side effects, credential handling, preview or dry-run behavior, and how a workflow builder can disable or roll back the integration.
 
-| Plugin                                                | Platform | Purpose                                                                                                                                                                 |
-| [`plugins/n8n-calle-api`](plugins/n8n-calle-api/)     | n8n      | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results.       |
-| [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/) | n8n      | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes.                                           |
-| [`plugins/dify-template`](plugins/dify-template/)     | Dify     | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results.                                    |
-| [`plugins/hubspot-calle`](plugins/hubspot-calle/)     | HubSpot  | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards.                                                                     |
-| [`plugins/zapier-calle`](plugins/zapier-calle/)       | Zapier   | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
+| Plugin | Platform | Purpose |
+| --- | --- | --- |
+| [`plugins/n8n-calle-api`](plugins/n8n-calle-api/) | n8n | Importable CALL-E API workflow template for one-by-one outbound calls, metadata round trips, call status signals, transcripts, summaries, and structured results. |
+| [`plugins/n8n-nodes-calle`](plugins/n8n-nodes-calle/) | n8n | Documentation-only pointer to the standalone `@call-e/n8n-nodes-calle` community node package for native outbound-call nodes. |
+| [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
+| [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
+| [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
 
 ### Safety patterns
 
