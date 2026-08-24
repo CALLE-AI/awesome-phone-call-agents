@@ -10,7 +10,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import checkin, db, rebooking, review
+from . import checkin, db, rebooking, review, window
 from .models import ReviewStatus
 from .providers import default_provider
 
@@ -42,6 +42,55 @@ ORDER BY review_item.created_at DESC, review_item.id DESC
 """
 
 
+DUE_QUERY = """
+SELECT appointment.id               AS appointment_id,
+       appointment.seen_on          AS seen_on,
+       appointment.appointment_type AS appointment_type,
+       patient.first_name           AS first_name,
+       patient.surname              AS surname,
+       patient.phone_e164           AS phone_e164,
+       patient.consent_to_call      AS consent_to_call
+FROM appointment
+JOIN patient ON patient.id = appointment.patient_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM call_attempt
+    WHERE call_attempt.appointment_id = appointment.id
+      AND call_attempt.kind = 'checkin'
+)
+ORDER BY appointment.id
+"""
+
+
+def masked(number: str) -> str:
+    """Enough of a number to recognise, not enough to read off a recording.
+
+    The board is on screen in a recorded demo and every number dialled belongs to
+    somebody on this team. Convention follows apps/python/leash/README.md.
+    """
+    if len(number) < 8:
+        return "*" * len(number)
+    return number[:5] + "*" * (len(number) - 7) + number[-2:]
+
+
+def due_checkins(conn, today):
+    """Whose Check-in Call is still to be placed, and how many consent gates out.
+
+    The weekend shift lives in `window.due_date`, which is Python, so the date
+    comparison happens here rather than in the query.
+    """
+    rows = [dict(row) for row in conn.execute(DUE_QUERY).fetchall()]
+    due = [r for r in rows if window.due_date(r["seen_on"]) == today]
+    withheld = sum(1 for r in due if not r["consent_to_call"])
+    callable_now = []
+    for row in due:
+        if not row["consent_to_call"]:
+            continue
+        row["phone_masked"] = masked(row["phone_e164"])
+        del row["phone_e164"]
+        callable_now.append(row)
+    return callable_now, withheld
+
+
 def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI:
     """Build the board.
 
@@ -60,6 +109,22 @@ def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI
             yield conn
         finally:
             conn.close()
+
+    @app.post("/checkins", status_code=201)
+    async def place_due_checkins(request: Request):
+        """Place today's Check-in Calls from the board.
+
+        The scheduler was cut on the basis that calls fire from a button here, so
+        this is that button. One attempt each: an Appointment already carrying a
+        checkin attempt is not in `due` and cannot be reached from this route.
+        """
+        return await run_in_threadpool(
+            _place_due_now,
+            app.state.db_path,
+            app.state.provider,
+            app.state.clock(),
+            _wants_html(request),
+        )
 
     @app.post("/checkins/{appointment_id}", status_code=201)
     def place_checkin(
@@ -87,12 +152,14 @@ def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI
 
     @app.get("/board")
     def board(conn: sqlite3.Connection = Depends(connection)) -> dict:
-        return board_payload(conn)
+        return board_payload(conn, app.state.provider)
 
     @app.get("/", response_class=HTMLResponse)
     def queue(request: Request, conn: sqlite3.Connection = Depends(connection)):
         return TEMPLATES.TemplateResponse(
-            request=request, name="board.html", context=board_payload(conn)
+            request=request,
+            name="board.html",
+            context=board_payload(conn, app.state.provider),
         )
 
     @app.get("/review-items/{review_item_id}")
@@ -233,6 +300,36 @@ async def _body(request: Request) -> dict:
     return {key: value for key, value in form.items()}
 
 
+def _place_due_now(db_path: str, provider, now, html: bool):
+    """Walk today's due Appointments once, and report rather than raise.
+
+    A refusal on one Patient must not stop the rest: consent and the Reading
+    Window are per-Patient facts, not a failure of the run.
+    """
+    conn = db.connect(db_path)
+    placed, refused = 0, []
+    try:
+        due, _ = due_checkins(conn, now.date())
+        for row in due:
+            try:
+                review_item_id = checkin.run(
+                    conn, provider, row["appointment_id"], now=now
+                )
+            except (checkin.Refused, checkin.AwaitingReconciliation) as stopped:
+                refused.append(getattr(stopped, "reason", None) or stopped.state)
+                continue
+            review.settle(conn, review_item_id)
+            placed += 1
+    finally:
+        conn.close()
+    if html:
+        query = f"?placed={placed}"
+        if refused:
+            query += "&refused=" + refused[0]
+        return RedirectResponse(url="/" + query, status_code=303)
+    return {"placed": placed, "refused": refused}
+
+
 def _wants_html(request: Request) -> bool:
     content_type = request.headers.get("content-type", "")
     return not content_type.startswith("application/json")
@@ -252,7 +349,7 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
     }
 
 
-def board_payload(conn: sqlite3.Connection) -> dict:
+def board_payload(conn: sqlite3.Connection, provider=None) -> dict:
     """The queue lists only what needs a person. The counts cover the whole day.
 
     The ratio is the only number showing the practice got something back for the
@@ -263,7 +360,13 @@ def board_payload(conn: sqlite3.Connection) -> dict:
         item["stop_condition"] = bool(item["stop_condition"])
     stamp = date.today().isoformat()
     todays = [item for item in items if item["created_at"].startswith(stamp)]
+    due, withheld = due_checkins(conn, date.today())
     return {
+        # Whether pressing a button on this page spends one of twenty calls. The
+        # board says so before it is pressed rather than after.
+        "live": bool(getattr(provider, "live", False)),
+        "due": due,
+        "due_without_consent": withheld,
         "today": len(todays),
         # Both of these are counts of things that are not Review Items, which is
         # why they are read separately rather than derived from `items`.
@@ -283,6 +386,16 @@ def board_payload(conn: sqlite3.Connection) -> dict:
         ),
         "needs_review": sum(
             1 for item in todays if item["status"] == ReviewStatus.NEEDS_REVIEW
+        ),
+        # Settled without a person, and counted separately because they mean
+        # opposite things: she refused, or she was never reached. Without these the
+        # counts do not reconcile against `today` and a refusal is invisible.
+        # See docs/adr/0006.
+        "declined": sum(
+            1 for item in todays if item["status"] == ReviewStatus.DECLINED
+        ),
+        "not_reached": sum(
+            1 for item in todays if item["status"] == ReviewStatus.NOT_REACHED
         ),
         "items": [
             item for item in items if item["status"] == ReviewStatus.NEEDS_REVIEW

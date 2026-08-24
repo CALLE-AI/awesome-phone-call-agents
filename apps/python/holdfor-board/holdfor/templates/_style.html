@@ -1,0 +1,183 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,400;1,400&display=swap">
+<style>
+:root{
+  --paper:#F4F6F6; --surface:#FFFFFF; --raised:#FDFEFE;
+  --ink:#14232B; --muted:#5B6E73; --faint:#849699;
+  --rule:#D5DEDD; --rule-soft:#E4EAEA;
+  --ok:#0E6E6B;   --ok-soft:#E2EFEE;
+  --note:#B4691A; --note-soft:#F6EBDC;
+  --alarm:#A03328; --alarm-soft:#F6E4E1;
+  --on-ok:#FFFFFF;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --serif:Spectral,Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1618; --surface:#152023; --raised:#1A272B;
+    --ink:#DDE7E6; --muted:#94A8AC; --faint:#6F8489;
+    --rule:#25353A; --rule-soft:#1D2B2F;
+    --ok:#54B5AF;   --ok-soft:#12302F;
+    --note:#DFA24C; --note-soft:#2E2415;
+    --alarm:#E08373; --alarm-soft:#2E1B18;
+    --on-ok:#08191A;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1618; --surface:#152023; --raised:#1A272B;
+  --ink:#DDE7E6; --muted:#94A8AC; --faint:#6F8489;
+  --rule:#25353A; --rule-soft:#1D2B2F;
+  --ok:#54B5AF;   --ok-soft:#12302F;
+  --note:#DFA24C; --note-soft:#2E2415;
+  --alarm:#E08373; --alarm-soft:#2E1B18;
+  --on-ok:#08191A;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:1.5rem 1.25rem 5rem;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.page{max-width:78rem;margin:0 auto}
+h1{font-size:1.35rem;font-weight:600;letter-spacing:-.015em;margin:0 0 .2rem}
+h2{
+  font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);margin:0 0 .7rem;
+}
+a{color:var(--ok);text-underline-offset:2px}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--note);outline-offset:2px;
+}
+.back{font-size:.82rem;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:1.1rem}
+.back:hover{color:var(--ok)}
+.sub{color:var(--muted);font-size:.86rem;margin:0 0 1.6rem}
+.note{color:var(--muted);font-size:.84rem;line-height:1.5}
+
+/* the counts band — the number that says the practice got something back */
+.counts{
+  display:flex;flex-wrap:wrap;gap:0;margin:1.1rem 0 2rem;
+  background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+}
+.counts div{padding:.85rem 1.4rem;border-right:1px solid var(--rule-soft);flex:0 0 auto}
+.counts div:last-child{border-right:none}
+.counts b{
+  display:block;font-size:1.9rem;font-weight:600;line-height:1.05;
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+.counts span{
+  display:block;font-size:.68rem;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);margin-top:.2rem;
+}
+.counts .you b{color:var(--alarm)}
+.counts .quiet b{color:var(--muted)}
+.counts .budget b{font-size:1.25rem;padding-top:.5rem}
+.counts .budget em{font-style:normal;color:var(--faint);font-weight:400;font-size:.8rem}
+
+/* chips — colour is information, never decoration */
+.chip{
+  display:inline-block;font-family:var(--mono);font-size:.72rem;letter-spacing:.02em;
+  padding:.15rem .45rem;border-radius:2px;border:1px solid transparent;white-space:nowrap;
+}
+.chip.feel.better,.chip.med.yes{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.chip.feel.same,.chip.seen.no{background:var(--rule-soft);color:var(--muted);border-color:var(--rule)}
+.chip.feel.worse,.chip.med.no{background:var(--alarm-soft);color:var(--alarm);border-color:var(--alarm)}
+.chip.feel.unsure,.chip.med.unsure,.chip.seen.yes,.chip.seen.unsure{
+  background:var(--note-soft);color:var(--note);border-color:var(--note);
+}
+.chip.unanswered,.chip.med.not_asked{
+  background:transparent;color:var(--faint);border:1px dashed var(--rule);
+}
+.chip.state{background:var(--rule-soft);color:var(--muted);border-color:var(--rule)}
+.chip.stopped{background:var(--alarm-soft);color:var(--alarm);border-color:var(--alarm);font-weight:500}
+
+/* tables */
+.scroll{overflow-x:auto;margin:0 0 2.5rem}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{
+  text-align:left;font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding:0 .85rem .5rem;border-bottom:1px solid var(--ink);white-space:nowrap;
+}
+td{padding:.75rem .85rem;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+tbody tr{background:var(--surface)}
+tbody tr:hover{background:var(--raised)}
+tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--alarm)}
+.who{font-weight:500}
+.who a{text-decoration:none}
+.who a:hover{text-decoration:underline}
+.seen-for{color:var(--muted);font-size:.82rem}
+.stamp{font-family:var(--mono);font-size:.72rem;color:var(--faint);display:block}
+
+/* her words — the one place a serif is used, because it is her voice */
+.words{max-width:26rem}
+.words q{
+  font-family:var(--serif);font-style:italic;font-size:.98rem;line-height:1.45;
+  quotes:"\201C" "\201D";display:block;padding-left:.7rem;border-left:2px solid var(--note);
+}
+.words .stamp{margin-top:.3rem;padding-left:.75rem}
+.words .nothing{color:var(--faint);font-size:.82rem}
+
+.empty{
+  background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:1.6rem;color:var(--muted);
+}
+.banner{
+  background:var(--alarm-soft);border-left:3px solid var(--alarm);border-radius:2px;
+  padding:.85rem 1.1rem;margin:0 0 1.4rem;color:var(--alarm);font-size:.88rem;
+}
+.banner code{background:transparent;font-family:var(--mono);font-weight:500}
+button{
+  font:inherit;font-size:.86rem;font-family:var(--sans);padding:.5rem 1rem;
+  min-height:44px;background:var(--surface);color:var(--ink);
+  border:1px solid var(--rule);border-radius:2px;cursor:pointer;
+}
+button:hover{border-color:var(--ink)}
+button.primary{background:var(--ok);border-color:var(--ok);color:var(--on-ok);font-weight:500}
+code{font-family:var(--mono);font-size:.85em;background:var(--rule-soft);padding:.05rem .3rem;border-radius:2px}
+
+/* a deliberate second action before anything dials — no JS, no browser dialog */
+details.confirm{max-width:34rem;margin:0}
+details.confirm > summary{
+  list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;
+  font-size:.86rem;font-weight:500;min-height:44px;padding:.5rem 1rem;
+  background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:2px;
+}
+details.confirm > summary::-webkit-details-marker,
+details.confirm > summary::marker{display:none;content:""}
+details.confirm > summary:hover{border-color:var(--ink)}
+details.confirm[open] > summary{border-color:var(--ink);border-radius:2px 2px 0 0}
+details.confirm[open] > summary .caret{transform:rotate(90deg)}
+.caret{font-family:var(--mono);font-size:.7rem;color:var(--faint);display:inline-block}
+.confirm-body{
+  border:1px solid var(--ink);border-top:none;border-radius:0 0 2px 2px;
+  background:var(--surface);padding:.95rem 1.1rem;
+}
+.confirm-body.spends{border-color:var(--alarm);background:var(--alarm-soft)}
+.confirm-body p{margin:0 0 .7rem;font-size:.86rem;line-height:1.5}
+.confirm-body p:last-child{margin-bottom:0}
+.cost{font-family:var(--mono);font-size:.78rem;font-weight:500;letter-spacing:.02em}
+.cost.real{color:var(--alarm)}
+.cost.free{color:var(--muted)}
+details.confirm.compact{max-width:24rem}
+details.confirm.compact > summary{min-height:38px;padding:.35rem .8rem;font-size:.82rem}
+
+/* due today */
+.due{
+  background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:1.1rem 1.25rem;margin:0 0 2.5rem;
+}
+.due h2{margin-bottom:.8rem}
+.due ul{list-style:none;margin:0 0 1.1rem;padding:0}
+.due li{
+  display:flex;flex-wrap:wrap;gap:.3rem 1rem;align-items:baseline;
+  padding:.45rem 0;border-bottom:1px solid var(--rule-soft);font-size:.88rem;
+}
+.due li:last-of-type{border-bottom:none}
+.due li .name{font-weight:500;min-width:11rem}
+.due li .for{color:var(--muted);font-size:.82rem;flex:1}
+.due li .num{font-family:var(--mono);font-size:.76rem;color:var(--faint)}
+.gated{font-size:.82rem;color:var(--muted);margin:.8rem 0 0}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (min-width:52rem){ body{padding:2.5rem 2rem 6rem} h1{font-size:1.6rem} }
+</style>

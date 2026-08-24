@@ -481,3 +481,76 @@ def _status(conn, item_id: int) -> str:
     return conn.execute(
         "SELECT status FROM review_item WHERE id = ?", (item_id,)
     ).fetchone()["status"]
+
+
+def test_every_item_counted_today_is_accounted_for_by_a_counter(conn, client):
+    """An item in a status no counter covers is invisible to the practice.
+
+    `items` deliberately lists only what needs a person, so the counts are the
+    only place a refusal shows up at all. See docs/adr/0006.
+    """
+    add_item(conn, status=ReviewStatus.NEEDS_REVIEW)
+    add_item(conn, status=ReviewStatus.AUTO_CLOSED)
+    add_item(conn, status=ReviewStatus.DECLINED)
+    add_item(conn, status=ReviewStatus.NOT_REACHED)
+
+    payload = client.get("/board").json()
+    accounted = (
+        payload["needs_review"]
+        + payload["auto_closed"]
+        + payload["declined"]
+        + payload["not_reached"]
+    )
+
+    assert accounted == payload["today"] == 4
+
+
+def test_a_refusal_is_visible_on_the_queue_page(conn, client):
+    add_item(conn, status=ReviewStatus.DECLINED)
+
+    page = client.get("/")
+
+    assert "Refused the call" in page.text
+
+
+def test_the_board_offers_todays_due_checkins_with_numbers_masked(conn, client):
+    payload = client.get("/board").json()
+
+    assert payload["due"], "nothing due, so the button would have nothing to place"
+    for row in payload["due"]:
+        assert "phone_e164" not in row, "a raw number reached the board payload"
+        assert row["phone_masked"].count("*") >= 4
+
+
+def test_a_patient_without_consent_is_never_offered_as_due(conn, client):
+    payload = client.get("/board").json()
+
+    withheld = conn.execute(
+        "SELECT id FROM patient WHERE consent_to_call = 0"
+    ).fetchall()
+    assert withheld, "no patient withholds consent, so this proves nothing"
+    offered = {row["appointment_id"] for row in payload["due"]}
+    for patient in withheld:
+        theirs = conn.execute(
+            "SELECT id FROM appointment WHERE patient_id = ?", (patient["id"],)
+        ).fetchall()
+        for appointment in theirs:
+            assert appointment["id"] not in offered
+
+
+def test_placing_todays_checkins_twice_places_them_once(conn, client):
+    first = client.post("/checkins", headers={"content-type": "application/json"})
+    placed = first.json()["placed"]
+    assert placed >= 1
+
+    second = client.post("/checkins", headers={"content-type": "application/json"})
+
+    assert second.json()["placed"] == 0
+    assert client.get("/board").json()["due"] == []
+
+
+def test_the_board_says_whether_a_button_spends_a_real_call(conn, client):
+    page = client.get("/")
+
+    assert "no call will be placed" in page.text
+    assert "of 20 used" in page.text

@@ -1,88 +1,114 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ item.first_name }} {{ item.surname }} — HoldFor</title>
+{% include "_style.html" %}
 <style>
-  body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 76rem; }
-  h1 { font-size: 1.25rem; margin-bottom: .25rem; }
-  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #444; }
-  .meta { color: #666; margin-bottom: 1.5rem; }
-  .split { display: flex; gap: 2.5rem; align-items: flex-start; }
-  .split > * { flex: 1; min-width: 0; }
-  .turn { padding: .3rem 0; border-bottom: 1px solid #eee; }
-  .turn.agent { color: #555; }
-  .turn.other { font-weight: 500; }
-  .turn .who { font-size: .75rem; color: #888; display: inline-block; min-width: 5.5rem; }
-  .turn.anchored { background: #fdf6d8; }
-  dl { margin: 0; }
-  dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #666; margin-top: .8rem; }
-  dd { margin: 0; font-size: 1.05rem; }
-  dd small { color: #888; font-weight: 400; font-size: .75rem; }
-  .quote { font-style: italic; background: #fdf6d8; padding: .4rem .6rem; }
-  .stop { color: #a03328; font-weight: 600; }
-  form { margin-top: 2rem; border-top: 2px solid #222; padding-top: 1rem; }
-  fieldset { border: 1px solid #ddd; margin: 0 0 1rem; }
-  label { display: block; font-size: .8rem; color: #444; margin-top: .6rem; }
-  input, select, textarea { font: inherit; padding: .3rem; width: 100%; box-sizing: border-box; }
-  textarea { height: 4rem; }
-  .row { display: flex; gap: 1rem; }
-  .row > * { flex: 1; }
-  button { font: inherit; padding: .5rem 1rem; margin-right: .5rem; }
-  .primary { font-weight: 600; }
-  .note { color: #666; font-size: .85rem; }
-  a { color: #14476b; }
+.split{display:grid;gap:2rem;margin-bottom:2.5rem}
+@media (min-width:60rem){.split{grid-template-columns:1.15fr 1fr;gap:3rem}}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:1.1rem 1.25rem}
+.turn{padding:.5rem 0;border-bottom:1px solid var(--rule-soft);font-size:.9rem;line-height:1.5}
+.turn:last-child{border-bottom:none}
+.turn.agent{color:var(--muted)}
+.turn.other{color:var(--ink)}
+.turn .idx{
+  font-family:var(--mono);font-size:.68rem;color:var(--faint);
+  display:inline-block;min-width:4.4rem;letter-spacing:.02em;
+}
+.turn.anchored{
+  background:var(--note-soft);margin-inline:-1.25rem;padding-inline:1.25rem;
+  box-shadow:inset 3px 0 0 var(--note);
+}
+.recorded{display:grid;grid-template-columns:max-content 1fr;gap:.7rem 1.1rem;margin:0}
+.recorded dt{
+  font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding-top:.25rem;
+}
+.recorded dd{margin:0}
+form.act{margin-top:2.5rem;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:1.4rem 1.5rem}
+form.act h2{margin-bottom:.6rem}
+fieldset{border:1px solid var(--rule);border-radius:2px;margin:0 0 1.2rem;padding:.9rem 1.1rem 1.1rem}
+legend{
+  font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding:0 .4rem;
+}
+label{display:block;font-size:.76rem;font-weight:500;letter-spacing:.03em;color:var(--muted);margin-top:.7rem}
+input,select,textarea{
+  font:inherit;font-size:.9rem;font-family:var(--sans);width:100%;margin-top:.25rem;
+  padding:.5rem .6rem;min-height:44px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--rule);border-radius:2px;
+}
+textarea{min-height:5rem;font-family:var(--serif);font-size:.98rem;line-height:1.5}
+.row{display:grid;gap:.9rem}
+@media (min-width:44rem){.row{grid-template-columns:repeat(2,1fr)}.row.three{grid-template-columns:repeat(3,1fr)}}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.4rem;align-items:center}
+.actions form{margin:0}
+.hdr{display:flex;flex-wrap:wrap;gap:.5rem;align-items:baseline;margin-bottom:1.5rem}
 </style>
 
-<p><a href="/">&larr; Review queue</a></p>
+<div class="page">
+
+<a class="back" href="/">&larr; Review queue</a>
 
 <h1>{{ item.first_name }} {{ item.surname }}</h1>
-<p class="meta">
-  {{ item.appointment_type }}, seen {{ item.seen_on }} &middot; status {{ item.status }}
-  {%- if item.stop_condition %} &middot; <span class="stop">stopped: {{ item.stop_reason }}</span>{% endif %}
-</p>
+<div class="hdr">
+  <span class="sub" style="margin:0">{{ item.appointment_type }}, seen {{ item.seen_on }}</span>
+  {%- if item.stop_condition %}
+  <span class="chip stopped">stopped · {{ item.stop_reason }}</span>
+  {%- else %}
+  <span class="chip state">{{ item.status.replace("_", " ") }}</span>
+  {%- endif %}
+</div>
 
 <div class="split">
   <section>
     <h2>What she said</h2>
-    {% if turns %}
-      {% for turn in turns %}
-      <div class="turn {{ turn.speaker }}{% if turn.index in anchors.values() %} anchored{% endif %}">
-        <span class="who">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
-      </div>
-      {% endfor %}
-    {% else %}
-      <p class="note">No transcript stored for this call.</p>
-    {% endif %}
+    <div class="panel">
+      {% if turns %}
+        {% for turn in turns %}
+        <div class="turn {{ turn.speaker }}{% if turn.index in anchors.values() %} anchored{% endif %}">
+          <span class="idx">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="note" style="margin:0">No transcript stored for this call.</p>
+      {% endif %}
+    </div>
   </section>
 
   <section>
     <h2>What was recorded</h2>
-    <dl>
-      <dt>Feeling</dt>
-      <dd>{{ item.feeling or "not answered" }}
-        {%- if "feeling" in anchors %} <small>turn {{ anchors.feeling }}</small>{% endif %}</dd>
+    <div class="panel">
+      <dl class="recorded">
+        <dt>Feeling</dt>
+        <dd>{% if item.feeling %}<span class="chip feel {{ item.feeling }}">{{ item.feeling }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "feeling" in anchors %}<span class="stamp">turn {{ anchors.feeling }}</span>{% endif %}</dd>
 
-      <dt>Medication</dt>
-      <dd>{{ item.medication_ok or "not answered" }}
-        {%- if "medication_ok" in anchors %} <small>turn {{ anchors.medication_ok }}</small>{% endif %}</dd>
+        <dt>Medication</dt>
+        <dd>{% if item.medication_ok %}<span class="chip med {{ item.medication_ok }}">{{ item.medication_ok.replace("_", " ") }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "medication_ok" in anchors %}<span class="stamp">turn {{ anchors.medication_ok }}</span>{% endif %}</dd>
 
-      <dt>Wants to be seen</dt>
-      <dd>{{ item.wants_seen or "not answered" }}
-        {%- if "wants_seen" in anchors %} <small>turn {{ anchors.wants_seen }}</small>{% endif %}</dd>
+        <dt>Wants to be seen</dt>
+        <dd>{% if item.wants_seen %}<span class="chip seen {{ item.wants_seen }}">{{ item.wants_seen }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "wants_seen" in anchors %}<span class="stamp">turn {{ anchors.wants_seen }}</span>{% endif %}</dd>
 
-      <dt>Her words</dt>
-      <dd>
-        {%- if item.carried_words_text %}
-        <span class="quote">{{ item.carried_words_text }}</span>
-        <small>turn {{ item.carried_words_turn }}</small>
-        {%- else %}nothing carried{% endif %}
-      </dd>
-    </dl>
+        <dt>Her words</dt>
+        <dd class="words">
+          {%- if item.carried_words_text %}
+          <q>{{ item.carried_words_text }}</q><span class="stamp">turn {{ item.carried_words_turn }}</span>
+          {%- else %}<span class="nothing">nothing carried</span>{% endif %}
+        </dd>
+      </dl>
+    </div>
   </section>
 </div>
 
-<form method="post" action="/review-items/{{ item.id }}/release">
+<form class="act" method="post" action="/review-items/{{ item.id }}/release">
   <h2>Release</h2>
-  <p class="note">
+  <p class="note" style="max-width:52rem">
     This authorises one call to the practice's booking line on her behalf. The agent
     accepts an offer inside the dates and times below and refuses anything outside
     them. It will speak the words in the box and nothing else.
@@ -94,7 +120,7 @@
       <label>Earliest date <input type="date" name="earliest_date" value="{{ today }}" required></label>
       <label>Latest date <input type="date" name="latest_date" value="{{ today }}" required></label>
     </div>
-    <div class="row">
+    <div class="row three">
       <label>Time of day
         <select name="time_of_day">
           <option value="any">any</option>
@@ -116,10 +142,9 @@
   <fieldset>
     <legend>Words that may be spoken</legend>
     <label>
-      <textarea name="approved_words"
-                placeholder="empty: nothing will be spoken"></textarea>
+      <textarea name="approved_words" placeholder="empty: nothing will be spoken"></textarea>
     </label>
-    <p class="note">
+    <p class="note" style="margin-top:.7rem">
       {%- if item.carried_words_text %}
       Her sentence is above, at turn {{ item.carried_words_turn }}. Copy in the part
       reception may hear. This box starts empty on purpose: nothing is spoken unless you
@@ -130,22 +155,27 @@
       empty.
       {%- endif %}
     </p>
-    <p class="note">
+    <p class="note" style="margin-top:.5rem">
       You may shorten what she said. You may not add to it: anything that is not part of
       her own sentence is refused, because a receptionist would hear it as her words.
     </p>
   </fieldset>
 
-  <label>Your name <input type="text" name="reviewer_name" required></label>
-  <p class="note">Recorded with the Release. A release always says who granted it.</p>
+  <label style="max-width:22rem">Your name <input type="text" name="reviewer_name" required></label>
+  <p class="note" style="margin-top:.5rem">Recorded with the Release. A release always says who granted it.</p>
 
-  <button class="primary" type="submit">Release for rebooking</button>
+  <div class="actions">
+    <button class="primary" type="submit">Release for rebooking</button>
+  </div>
 </form>
 
-<form method="post" action="/review-items/{{ item.id }}/close">
-  <button type="submit">Close, nothing needed</button>
-</form>
+<div class="actions">
+  <form method="post" action="/review-items/{{ item.id }}/close">
+    <button type="submit">Close, nothing needed</button>
+  </form>
+  <form method="post" action="/review-items/{{ item.id }}/manual">
+    <button type="submit">Ring them myself</button>
+  </form>
+</div>
 
-<form method="post" action="/review-items/{{ item.id }}/manual">
-  <button type="submit">Ring them myself</button>
-</form>
+</div>
