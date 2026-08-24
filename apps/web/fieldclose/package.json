@@ -1,0 +1,57 @@
+{
+  "name": "fieldclose",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Human-approved commercial HVAC closeout calls powered by CALL-E.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:public-demo": "node scripts/verify-public-demo-environment.mjs && next build",
+    "build:verify": "node scripts/run-isolated-build.mjs",
+    "start": "next start",
+    "setup:local-demo": "node scripts/setup-local-demo.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "validate": "pnpm typecheck && pnpm lint && pnpm test && pnpm db:check && pnpm test:integration && pnpm build:verify && pnpm test:e2e"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0",
+    "better-auth": "1.6.25",
+    "drizzle-orm": "0.45.2",
+    "next": "16.2.12",
+    "nodemailer": "9.0.3",
+    "postgres": "3.4.9",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testcontainers/postgresql": "12.0.4",
+    "@types/node": "24.13.3",
+    "@types/nodemailer": "8.0.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "dotenv": "17.4.2",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.12",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}
