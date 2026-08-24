@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -409,3 +410,117 @@ def test_a_captured_live_call_is_written_in_the_shape_the_fake_reads(tmp_path):
     assert payload["outcome"] == "COMPLETED"
     assert payload["turns"][1]["speaker"] == "other"
     assert provider.transcript_path(run_id).endswith(saved.name)
+
+
+# --- the transcript the platform actually returns ---------------------------------
+#
+# Two real live calls landed on the board saying "no transcript stored" after speaking
+# for 52 and 121 seconds. Three separate reasons, and every one of them was ours: the
+# transcript sits a level deeper than we looked, it is one string rather than a list of
+# turns, and nothing had given the provider anywhere to write it. The shapes below are
+# the platform's, with fictional words in them.
+
+SPOKEN = (
+    "[00:00:00] BOT: Hello, is that Margaret?\n"
+    "[00:00:06] USER: yes, speaking.\n"
+    "[00:00:11] BOT: Since Friday, are you feeling better, about the same, or worse?\n"
+    "[00:00:14] USER: worse, if i'm honest. it's the mornings mostly.\n"
+)
+
+
+def finished(transcript, *, nested: bool = True) -> dict:
+    """A `call status` reply, with the transcript where the platform puts it."""
+    call = {"status": "COMPLETED"}
+    if nested:
+        call["result"] = {"transcript": transcript}
+    else:
+        call["transcript"] = transcript
+    return {"result": {"structuredContent": call}}
+
+
+def turns_from(reply: dict) -> list:
+    provider = LiveProvider(
+        runner=Cli(AUTH_OK, STARTED, reply), sleep=lambda _: None
+    )
+    return provider.poll(provider.place(a_request())).transcript
+
+
+def test_the_transcript_is_read_from_under_the_nested_result():
+    """The bug that cost two live calls. At the depth we read the status from, the
+    transcript is simply absent, and absent read as "the call left no words"."""
+    turns = turns_from(finished(SPOKEN))
+
+    assert [turn.text for turn in turns][:2] == [
+        "Hello, is that Margaret?",
+        "yes, speaking.",
+    ]
+
+
+def test_one_string_of_timestamped_lines_becomes_turns():
+    turns = turns_from(finished(SPOKEN))
+
+    assert [turn.index for turn in turns] == [0, 1, 2, 3]
+    assert [turn.speaker for turn in turns] == ["agent", "other", "agent", "other"]
+    assert turns[3].text == "worse, if i'm honest. it's the mornings mostly."
+
+
+def test_a_line_without_a_timestamp_continues_the_turn_above_it():
+    """A sentence broken across two lines is one sentence. Starting a new turn at the
+    break would let a quote be sliced out of half of what she said."""
+    turns = turns_from(
+        finished(
+            "[00:00:14] USER: i can't get up the stairs the way i could\n"
+            "a fortnight ago, and i'm having to stop halfway.\n"
+        )
+    )
+
+    assert len(turns) == 1
+    assert turns[0].text.endswith("having to stop halfway.")
+
+
+def test_a_transcript_that_starts_mid_sentence_is_thrown_away():
+    """There is nothing for the first line to continue, and inventing a speaker for it
+    is the one mistake this module must not make."""
+    assert turns_from(finished("she said she was alright\n[00:00:06] USER: yes.\n")) == []
+
+
+def test_an_unknown_speaker_label_discards_the_whole_transcript():
+    """Same rule as the list form: attributing the agent's sentence to the Patient
+    could put a Carried Words quote in her mouth she never said."""
+    assert turns_from(finished("[00:00:00] SUPERVISOR: are you recording this?\n")) == []
+
+
+def test_the_list_form_is_still_read_where_it_used_to_be():
+    """Every stored fixture and every captured call is in this shape. The new depth is
+    checked second, not instead."""
+    turns = turns_from(FINISHED)
+
+    assert [turn.speaker for turn in turns] == ["agent", "other"]
+
+
+def test_a_live_provider_is_given_somewhere_to_write_the_transcript(monkeypatch):
+    """`LiveProvider()` took no capture directory, so `_capture` returned at its first
+    line and every live call was unreadable afterwards however well it had gone."""
+    monkeypatch.setenv("CALLE_LIVE", "1")
+    monkeypatch.setenv("HOLDFOR_TRANSCRIPTS", "somewhere/else")
+
+    provider = default_provider()
+
+    assert provider.live is True
+    assert provider._capture_dir == Path("somewhere/else")
+
+
+def test_a_captured_transcript_keeps_its_whole_path(tmp_path):
+    """`.name` alone lost the directory, so a capture written anywhere but beside the
+    database could not be found again."""
+    provider = LiveProvider(
+        runner=Cli(AUTH_OK, STARTED, FINISHED),
+        sleep=lambda _: None,
+        capture_dir=tmp_path / "nested" / "transcripts",
+    )
+    run_id = provider.place(a_request())
+    provider.poll(run_id)
+
+    stored = Path(provider.transcript_path(run_id))
+    assert stored.is_file()
+    assert stored.parent.name == "transcripts"

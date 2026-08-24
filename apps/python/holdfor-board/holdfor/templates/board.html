@@ -191,6 +191,23 @@
 </p>
 {% endif %}
 
+{% if settled %}
+<details class="settled">
+  <summary><span class="caret">&#9656;</span> Settled today &middot; {{ settled|length }}</summary>
+  <ul>
+    {% for item in settled %}
+    <li>
+      <a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a>
+      <span class="for">{{ item.appointment_type }}, seen {{ item.seen_on }}</span>
+      <span class="chip state">{{ item.status.replace("_", " ") }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="note">None of these needs a person. Listed so the call can still be read:
+  a count on its own says how many rang, not a word of what was said.</p>
+</details>
+{% endif %}
+
 {% if awaiting_call %}
 <h2>Released, awaiting the call</h2>
 <p class="note" style="max-width:46rem;margin-bottom:1rem">

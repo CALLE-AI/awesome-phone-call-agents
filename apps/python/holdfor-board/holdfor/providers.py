@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import time
+from dataclasses import replace
 from pathlib import Path
 
 from .models import (
@@ -85,6 +87,13 @@ ROUTE_FILE = "HOLDFOR_ROUTE"
 # this repository refuses to guess these from a phone number, and so does this.
 REGION = "HOLDFOR_REGION"
 LANGUAGE = "HOLDFOR_LANGUAGE"
+
+# Where a live call's words are written so a Reviewer can read them afterwards. Was
+# unset, which meant `_capture` returned at its first line and every live call landed
+# on the board saying "no transcript stored" however well it had gone. Gitignored, and
+# never a fixture: these are a real person's sentences.
+TRANSCRIPTS = "HOLDFOR_TRANSCRIPTS"
+DEFAULT_TRANSCRIPTS = "transcripts"
 
 # The attribution environment the calle skill requires on every invocation.
 CALLE_ENV = {
@@ -177,6 +186,56 @@ def speaker_of(item: dict) -> str | None:
     return SPEAKERS.get(raw.strip().lower())
 
 
+# `[00:01:26] USER: i can\'t get up the stairs`. The platform writes a finished call
+# as one string of these rather than as turn objects, so the timestamp and the label
+# are all there is to go on.
+SPOKEN_LINE = re.compile(r"^\[\d{2}:\d{2}:\d{2}\]\s+([^:]+):\s*(.*)$")
+
+
+def transcript_of(content: dict) -> object:
+    """The transcript, at whichever depth this response keeps it.
+
+    `call status` returns the run at the top level — id, status, next step — and the
+    call itself under a nested `result`. We read the outer level for the status, so
+    the transcript is one level further in than the obvious place, and looking only
+    at the obvious place found `None` on two real calls that had both spoken for
+    minutes. Both depths are checked because neither is documented.
+    """
+    raw = content.get("transcript")
+    if raw is not None:
+        return raw
+    nested = content.get("result")
+    return nested.get("transcript") if isinstance(nested, dict) else None
+
+
+def turns_from_text(raw: str) -> list[Turn]:
+    """Read the one-string form back into turns.
+
+    A line that does not start with a timestamp is the previous turn continuing, not
+    a new one: joining it is the only reading of the format that keeps a sentence
+    whole, and a quote sliced from half of one would be words she did not finish
+    saying. A line before any turn, or a speaker label outside `SPEAKERS`, discards
+    the whole transcript exactly as an unreadable entry does below.
+    """
+    turns: list[Turn] = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = SPOKEN_LINE.match(line)
+        if match is None:
+            if not turns:
+                return []
+            turns[-1] = replace(turns[-1], text=f"{turns[-1].text}\n{line}")
+            continue
+        label, text = match.groups()
+        speaker = speaker_of({"speaker": label})
+        if speaker is None:
+            return []
+        turns.append(Turn(index=len(turns), speaker=speaker, text=text.strip()))
+    return turns
+
+
 def turns_of(content: dict) -> list[Turn]:
     """Build the transcript, or return none at all.
 
@@ -189,7 +248,9 @@ def turns_of(content: dict) -> list[Turn]:
     unreadable entry discards the whole transcript rather than leaving a gap in
     the middle that a quote could be sliced across.
     """
-    raw = content.get("transcript")
+    raw = transcript_of(content)
+    if isinstance(raw, str):
+        return turns_from_text(raw)
     if not isinstance(raw, list):
         return []
 
@@ -413,7 +474,10 @@ class LiveProvider:
             + "\n",
             encoding="utf-8",
         )
-        self._captured[run_id] = f"{self._capture_dir.name}/{name}"
+        # The whole path, not its last segment: `review.load_turns` resolves a
+        # relative one against the app root and an absolute one as given, and a
+        # capture directory anywhere but beside the database broke under `.name`.
+        self._captured[run_id] = str(self._capture_dir / name)
 
 
 def route_from_env() -> dict[str, str]:
@@ -442,5 +506,10 @@ def default_provider():
     is absent by default, so every test and every default run is fake.
     """
     if os.environ.get(LIVE_FLAG) == "1":
-        return LiveProvider()
+        return LiveProvider(capture_dir=transcript_dir())
     return FakeProvider(route=route_from_env())
+
+
+def transcript_dir() -> Path:
+    """Where live transcripts land. Overridable so a test never writes beside one."""
+    return Path(os.environ.get(TRANSCRIPTS) or DEFAULT_TRANSCRIPTS)

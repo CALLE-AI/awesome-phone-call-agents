@@ -279,6 +279,32 @@ html:has(.sheet){overflow:hidden}
 @keyframes sheet-in{from{transform:translateX(100%)}to{transform:none}}
 @keyframes scrim-in{from{opacity:0}to{opacity:1}}
 
+/* the Rebooking Call, read the same way as the call it came from */
+section.rebooking{margin-bottom:2.5rem}
+section.rebooking .panel{border-left:3px solid var(--ok)}
+
+/* settled today — a quiet disclosure, not an action. Nothing here needs pressing;
+   it exists so a closed call is still a call somebody can read. */
+details.settled{margin:2rem 0 0;max-width:52rem}
+details.settled > summary{
+  list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;
+  font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);min-height:44px;
+}
+details.settled > summary::-webkit-details-marker,
+details.settled > summary::marker{display:none;content:""}
+details.settled > summary:hover{color:var(--ink)}
+details.settled[open] > summary .caret{transform:rotate(90deg)}
+details.settled ul{list-style:none;margin:.2rem 0 .9rem;padding:0}
+details.settled li{
+  display:flex;flex-wrap:wrap;gap:.3rem 1rem;align-items:baseline;
+  padding:.45rem 0;border-bottom:1px solid var(--rule-soft);font-size:.88rem;
+}
+details.settled li:last-of-type{border-bottom:none}
+details.settled li a{min-width:11rem;font-weight:500;text-decoration:none}
+details.settled li a:hover{text-decoration:underline}
+details.settled li .for{color:var(--muted);font-size:.82rem;flex:1}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (min-width:52rem){ body{padding:2.5rem 2rem 6rem} h1{font-size:1.6rem} }
 </style>

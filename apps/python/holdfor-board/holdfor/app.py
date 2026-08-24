@@ -523,10 +523,21 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
     turns = review.load_turns(item["transcript_path"])
     row = dict(item)
     row["stop_condition"] = bool(row["stop_condition"])
+    # The other half of the story, when there is one. A Reviewer is accountable for
+    # the call she authorised, so it is read the same way as the call she is judging
+    # rather than reduced to a status chip.
+    rebooking = review.rebooking_call(conn, review_item_id)
     return {
         "item": row,
         "turns": [asdict(turn) for turn in turns],
         "anchors": review.anchors(item, turns),
+        "rebooking_state": rebooking["state"] if rebooking else None,
+        "rebooking_turns": [
+            asdict(turn)
+            for turn in review.load_turns(
+                rebooking["transcript_path"] if rebooking else None
+            )
+        ],
         # The default the Release form offers. Not `today`, which the board already
         # uses for how many calls went out: the sheet renders inside that context and
         # the shorter name would quietly turn a count into a date.
@@ -602,6 +613,14 @@ def board_payload(
         ),
         "items": [
             item for item in items if item["status"] == ReviewStatus.NEEDS_REVIEW
+        ],
+        # Everything else that happened today. Counted in the band above but listed
+        # nowhere, which made a settled call's transcript unreachable: a Reviewer could
+        # read the number 3 and not one word of what those three calls were about.
+        "settled": [
+            item
+            for item in todays
+            if item["status"] != ReviewStatus.NEEDS_REVIEW
         ],
         # A released item is on neither list: not waiting for a person, not settled
         # either. Without this it is invisible, and nothing can place its call.

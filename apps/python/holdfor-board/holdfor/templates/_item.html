@@ -57,6 +57,29 @@
   </section>
 </div>
 
+{% if rebooking_state %}
+{#- The other half. She authorised words and an envelope and the call left the
+    building; a status chip on its own cannot answer "what was it about". #}
+<section class="rebooking">
+  <h2>The call to the practice</h2>
+  <div class="panel">
+    <p class="note" style="margin:0 0 .9rem">
+      Placed on her behalf after a Release.
+      <span class="chip state">{{ rebooking_state.replace("_", " ") }}</span>
+    </p>
+    {% if rebooking_turns %}
+      {% for turn in rebooking_turns %}
+      <div class="turn {{ turn.speaker }}">
+        <span class="idx">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="note" style="margin:0">No transcript stored for this call.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
 <form class="act" method="post" action="/review-items/{{ item.id }}/release">
   <h2>Release</h2>
   <p class="note" style="max-width:52rem">

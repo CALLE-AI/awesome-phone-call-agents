@@ -124,6 +124,29 @@ def fetch(conn: sqlite3.Connection, review_item_id: int) -> sqlite3.Row | None:
     ).fetchone()
 
 
+REBOOKING_CALL = """
+SELECT call_attempt.state           AS state,
+       call_attempt.transcript_path AS transcript_path
+FROM release
+JOIN call_attempt ON call_attempt.idempotency_key = 'rebooking:' || release.id
+WHERE release.review_item_id = ?
+"""
+
+
+def rebooking_call(conn: sqlite3.Connection, review_item_id: int):
+    """The Rebooking Call this item earned, if one has been placed.
+
+    Joined on the idempotency key rather than a column, because that key is what makes
+    one Release grant one call and there is deliberately no second place recording it.
+
+    Read so a Reviewer can hear the other half. She authorised words and an envelope
+    and then the call left the building; without this the only thing that comes back is
+    a status chip, and "what was the call about" has no answer for the one call she is
+    accountable for.
+    """
+    return conn.execute(REBOOKING_CALL, (review_item_id,)).fetchone()
+
+
 def load_turns(transcript_path: str | None) -> list[Turn]:
     """Read the stored transcript. A missing file is an empty call, not a crash."""
     if not transcript_path:

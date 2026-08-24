@@ -614,7 +614,14 @@ def test_a_patient_without_consent_is_never_offered_as_due(conn, client):
             assert appointment["id"] not in offered
 
 
-def test_placing_todays_checkins_twice_places_them_once(conn, client):
+def test_placing_todays_checkins_twice_places_them_once(conn, db_path, now):
+    """On the pinned clock, like everything else that places a call.
+
+    On the real one this passed only between 10:00 and 16:00 on a weekday: outside
+    the Reading Window nothing is placed and `placed` is 0. The window is the thing
+    under test elsewhere, not a condition for running the suite.
+    """
+    client = TestClient(create_app(db_path=db_path, clock=lambda: now))
     first = client.post("/checkins", headers={"content-type": "application/json"})
     placed = first.json()["placed"]
     assert placed >= 1
@@ -630,3 +637,115 @@ def test_the_board_says_whether_a_button_spends_a_real_call(conn, client):
 
     assert "no call will be placed" in page.text
     assert "of 20 used" in page.text
+
+
+# --- every call is readable, whichever kind it was ---------------------------------
+#
+# Two things made a transcript unreachable even once it was stored. The Rebooking Call
+# is a second `call_attempt` joined by its idempotency key, and nothing ever read it —
+# a Reviewer could see that reception had been rung and not one word of what was said.
+# And an item that settled left the queue entirely, so its call became a number in the
+# counts band and nothing else.
+
+BOOKING_CALL = {
+    "state": "terminal_verified",
+    "turns": [
+        {"index": 0, "speaker": "agent", "text": "I'm calling on behalf of a patient."},
+        {"index": 1, "speaker": "other", "text": "Right, what's the name?"},
+        {"index": 2, "speaker": "agent", "text": "Margaret Ellery."},
+        {"index": 3, "speaker": "other", "text": "I can do Thursday at ten past nine."},
+    ],
+}
+
+
+@pytest.fixture
+def booking_transcript(tmp_path):
+    path = tmp_path / "reception.json"
+    path.write_text(json.dumps(BOOKING_CALL), encoding="utf-8")
+    return str(path)
+
+
+def rebook(conn, release_id: int, transcript_path: str) -> None:
+    stamp = db.now_iso()
+    conn.execute(
+        """
+        INSERT INTO call_attempt
+            (appointment_id, kind, idempotency_key, state, transcript_path,
+             created_at, updated_at)
+        VALUES (1, 'rebooking', ?, 'terminal_verified', ?, ?, ?)
+        """,
+        (f"rebooking:{release_id}", transcript_path, stamp, stamp),
+    )
+    conn.commit()
+
+
+def test_the_sheet_shows_what_reception_said(conn, client, booking_transcript):
+    """The call she authorised, read the same way as the call she judged."""
+    item_id = add_item(conn, wants_seen="yes")
+    release_id = client.post(
+        f"/review-items/{item_id}/release", json=envelope()
+    ).json()["release_id"]
+    rebook(conn, release_id, booking_transcript)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "The call to the practice" in page
+    assert "I can do Thursday at ten past nine." in page
+
+
+def test_an_item_with_no_rebooking_call_shows_no_such_panel(conn, client):
+    item_id = add_item(conn, wants_seen="yes")
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "The call to the practice" not in page
+
+
+def test_a_rebooking_call_that_stored_nothing_says_so_rather_than_vanishing(
+    conn, client
+):
+    """A placed call with no transcript is still a placed call. Hiding the panel would
+    read as no call having been made."""
+    item_id = add_item(conn, wants_seen="yes")
+    release_id = client.post(
+        f"/review-items/{item_id}/release", json=envelope()
+    ).json()["release_id"]
+    rebook(conn, release_id, None)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "The call to the practice" in page
+    assert "No transcript stored for this call." in page
+
+
+def test_a_settled_call_is_still_reachable_from_the_board(conn, client):
+    """It needs nobody, which is not the same as nobody being allowed to read it."""
+    closed = add_item(conn, feeling="better", status=ReviewStatus.AUTO_CLOSED)
+    needs_you = add_item(conn, feeling="worse")
+
+    page = client.get("/").text
+
+    assert "Settled today" in page
+    assert f'href="/?open={closed}"' in page
+    assert f'href="/?open={needs_you}"' in page
+
+
+def test_a_settled_item_opens_the_same_sheet_as_any_other(
+    conn, client, transcript_file
+):
+    item_id = add_item(
+        conn,
+        feeling="better",
+        status=ReviewStatus.AUTO_CLOSED,
+        transcript_path=transcript_file,
+    )
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "Hello, is that Margaret?" in page
+
+
+def test_a_board_with_nothing_settled_offers_no_such_list(conn, client):
+    add_item(conn, feeling="worse")
+
+    assert "Settled today" not in client.get("/").text
