@@ -81,6 +81,39 @@ Transcript:
 {transcript}\
 """
 
+OFFERS_TOOL = "record_reception_call"
+
+OFFER_INSTRUCTIONS = """\
+Below is the transcript of one automated call to a GP surgery's appointments line, made
+on a patient's behalf. Record what the person on the appointments line offered, using
+the tool.
+
+An offer is the appointments line naming a day, a date or a time when the patient could
+be seen. Record one entry per offer, with the index of the turn it was spoken in and the
+clock time as 24-hour HH:MM if a time was named. Leave the time null if a day was named
+and no time was. `accepted` is whether the automated caller said yes to that offer, not
+whether it sounded acceptable to you.
+
+Only turns marked `reception` can hold an offer. Never point at a turn the automated
+caller spoke itself, and never at a turn that holds no offer: an empty list is a correct
+answer when nothing was offered.
+
+The transcription of the appointments line is often poor and half a turn may be
+unreadable. Record only what is legibly an offer. Do not repair a garbled turn into one,
+and do not infer an offer from the caller's reply to it.
+
+reception_outcome is how the call ended in words:
+  slot_offered          a time or day was offered, whether or not it was accepted
+  refused_third_party   they would not book for somebody who is not on the line
+  no_slots              they had nothing to offer
+  unclear               anything else, including a call too garbled to read
+
+Prefer unclear over guessing.
+
+Transcript:
+{transcript}\
+"""
+
 MEDICATION_ASKED = (
     'one of "yes", "no" or "unsure": this appointment changed the patient\'s '
     "medication, so the question is put to them"
@@ -129,6 +162,18 @@ def tool_schema() -> dict:
     }
 
 
+def offers_schema() -> dict:
+    """The schema the Rebooking Call already declares, as a tool definition.
+
+    Read from `rebooking` rather than restated, for the reason its own comment gives:
+    a schema copied would drift, and the drift would show up as a field the board
+    cannot read. Imported inside the function because `rebooking` imports this module.
+    """
+    from .rebooking import RESULT_SCHEMA
+
+    return {**RESULT_SCHEMA, "additionalProperties": False}
+
+
 def as_text(transcript: list[Turn]) -> str:
     """The transcript with its turn indexes, because one of them is an answer.
 
@@ -140,6 +185,20 @@ def as_text(transcript: list[Turn]) -> str:
         f"{'patient' if turn.speaker == PATIENT else 'agent'}: {turn.text}"
         for turn in transcript
     )
+
+
+def offers_prompt(transcript: list[Turn]) -> str:
+    """The transcript labelled by who was on which end.
+
+    `reception` rather than `patient`: the person speaking is a receptionist and the
+    model has to be able to tell an offer from the caller repeating itself.
+    """
+    labelled = "\n".join(
+        f"turn {turn.index} "
+        f"{'reception' if turn.speaker == PATIENT else 'caller'}: {turn.text}"
+        for turn in transcript
+    )
+    return OFFER_INSTRUCTIONS.format(transcript=labelled)
 
 
 def prompt(transcript: list[Turn], medication_changed: bool) -> str:
@@ -169,14 +228,14 @@ def answers_in(message) -> dict | None:
     return None
 
 
-def structured_from(transcript: list[Turn], medication_changed: bool) -> dict | None:
-    """Ask for the four answers. Return them, or return nothing.
+def ask(tool: str, description: str, schema: dict, question: str) -> dict | None:
+    """One forced tool call, or nothing at all.
 
     Every failure is the same failure. An import error, a missing key, a refusal, a
-    timeout, a reply with no tool call in it: all of them are a call whose answers
-    nobody has, which is a state this app already had a name and a queue for.
+    timeout, a reply with no tool call in it: all of them are a call nobody has a
+    reading of, which is a state this app already had a name and a queue for.
     """
-    if not transcript or not available():
+    if not available():
         return None
     try:
         import anthropic
@@ -190,28 +249,57 @@ def structured_from(transcript: list[Turn], medication_changed: bool) -> dict | 
             timeout=REQUEST_TIMEOUT_SECONDS,
             tools=[
                 {
-                    "name": TOOL,
-                    "description": (
-                        "Record what the patient answered in this check-in call."
-                    ),
-                    "input_schema": tool_schema(),
+                    "name": tool,
+                    "description": description,
+                    "input_schema": schema,
                 }
             ],
-            tool_choice={"type": "tool", "name": TOOL},
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt(transcript, medication_changed),
-                }
-            ],
+            tool_choice={"type": "tool", "name": tool},
+            messages=[{"role": "user", "content": question}],
         )
     except Exception:
-        # Deliberately everything. This is one optional read on the way to a Review
-        # Item, and there is no error it could raise that is worth losing the call
-        # over: the Item is written either way and a person reads it when it is empty.
+        # Deliberately everything. This is one optional read on the way to a record,
+        # and there is no error it could raise that is worth losing the call over: the
+        # row is written either way and a person reads it when it is empty.
         return None
 
     return answers_in(message)
+
+
+def structured_from(transcript: list[Turn], medication_changed: bool) -> dict | None:
+    """The four answers a Check-in Call would have returned, had it been able to."""
+    if not transcript:
+        return None
+    return ask(
+        TOOL,
+        "Record what the patient answered in this check-in call.",
+        tool_schema(),
+        prompt(transcript, medication_changed),
+    )
+
+
+def offers_from(transcript: list[Turn]) -> dict | None:
+    """What reception offered, and how the call ended.
+
+    The same hole as the Check-in Call had, in the other half of the app, and it made
+    the Rebooking Call look broken when it was not: `rebooking.place` read `offers` off
+    a structured block that a live call never carries, so a slot spoken aloud and
+    correctly refused was recorded as `unreadable` and the item went back to a person
+    with nothing on it.
+
+    Nothing here is trusted about the words. `record_offers` re-reads each offer's text
+    from the turn it claims to come from and discards a claim pointing at nothing, or
+    at something the agent said itself. This supplies the pointers; the transcript is
+    still the evidence.
+    """
+    if not transcript:
+        return None
+    return ask(
+        OFFERS_TOOL,
+        "Record what the appointments line offered in this call.",
+        offers_schema(),
+        offers_prompt(transcript),
+    )
 
 
 def fill(

@@ -75,6 +75,14 @@ CREATE TABLE IF NOT EXISTS live_call (
     placed_at       TEXT    NOT NULL
 );
 
+-- One counted placement per attempt. `checkin.start` inserts exactly once because the
+-- attempt insert beside it is what races, but a Rebooking Call's `reserve` deliberately
+-- returns an existing row on a second press, so the count needs its guarantee here
+-- rather than upstream: pressing Run twice on a Release whose run id never bound must
+-- not spend two of the twenty.
+CREATE UNIQUE INDEX IF NOT EXISTS live_call_one_per_attempt
+    ON live_call(call_attempt_id);
+
 -- One Review Item holds one Release. An index rather than a UNIQUE column so that
 -- `db.init` applies it to a database that already exists, and because it also closes
 -- a race: review.release checked for an existing row with a SELECT before its INSERT,

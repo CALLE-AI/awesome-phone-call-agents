@@ -362,3 +362,70 @@ def test_the_column_is_added_to_a_ledger_that_already_exists(tmp_path):
     db.init(conn)
     assert "answers_from" in db.columns(conn, "review_item")
     conn.close()
+
+
+# --- the other half: what reception offered ---------------------------------------
+#
+# The same hole, in the other half of the app. `rebooking.place` read `offers` off a
+# structured block a live call never carries, so a real call where reception offered
+# Saturday morning and the agent correctly refused it was recorded as `unreadable` with
+# no offer rows at all, and the item went back to a person with nothing on it. The
+# transcript below is the shape of that call, garbled turns included.
+
+RECEPTION = [
+    Turn(index=0, speaker="agent", text="Hi, is this the appointments line?"),
+    Turn(index=1, speaker="other", text="hello phil, get surgery on my."),
+    Turn(index=2, speaker="agent", text="Can you book her between the 25th and 27th?"),
+    Turn(index=3, speaker="other", text="is there with you? and was the nurse a doctor?"),
+    Turn(index=4, speaker="agent", text="I'm only able to pass on what she said."),
+    Turn(index=5, speaker="other", text="i could do saturday morning."),
+    Turn(index=6, speaker="agent", text="That won't work for us."),
+]
+
+OFFERED = {
+    "offers": [{"turn": 5, "time": None, "accepted": False}],
+    "reception_outcome": "slot_offered",
+    "reception_outcome_turn": 5,
+}
+
+
+def test_offers_are_read_back_out_of_the_transcript(monkeypatch):
+    monkeypatch.setattr(reextract, "ask", lambda *args: OFFERED)
+
+    read = reextract.offers_from(RECEPTION)
+
+    assert read["offers"][0]["turn"] == 5
+    assert read["reception_outcome"] == "slot_offered"
+
+
+def test_the_offers_prompt_says_which_end_of_the_line_each_turn_is(monkeypatch):
+    """`patient` would not do here. The model has to tell an offer from the caller
+    repeating itself, and both are turns in the same transcript."""
+    asked = reextract.offers_prompt(RECEPTION)
+
+    assert "turn 5 reception: i could do saturday morning." in asked
+    assert "turn 0 caller: Hi, is this the appointments line?" in asked
+
+
+def test_the_offers_schema_is_the_one_rebooking_declares():
+    from holdfor.rebooking import RESULT_SCHEMA
+
+    schema = reextract.offers_schema()
+
+    assert schema["properties"] == RESULT_SCHEMA["properties"]
+    assert schema["additionalProperties"] is False
+
+
+def test_a_call_with_no_transcript_asks_nobody_about_it(monkeypatch):
+    monkeypatch.setattr(
+        reextract, "ask", lambda *args: pytest.fail("asked about an empty call")
+    )
+
+    assert reextract.offers_from([]) is None
+
+
+def test_nothing_back_leaves_the_rebooking_call_exactly_as_it_was(monkeypatch):
+    """Which is no offers, `unreadable`, and a person looking at the call."""
+    monkeypatch.setattr(reextract, "ask", lambda *args: None)
+
+    assert reextract.offers_from(RECEPTION) is None

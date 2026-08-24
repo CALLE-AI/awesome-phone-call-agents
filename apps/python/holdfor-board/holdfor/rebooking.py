@@ -30,6 +30,7 @@ from .models import (
     TimeOfDay,
     Turn,
 )
+from . import reextract
 from .outcomes import review_status_for
 
 BOOKING_LINE = "HOLDFOR_BOOKING_LINE"
@@ -68,6 +69,24 @@ ENVELOPE_TOO_WIDE = "envelope_too_wide"
 FIXED_LINE = (
     "I'm only able to pass on what she said. The practice has the rest on file."
 )
+
+# Spoken aloud, so no dashes, no parentheses, nothing a text-to-speech engine has to
+# guess at. Pinned by tests for the same reason the Check-in Call's lines are.
+#
+# These exist because `FIXED_LINE` was the only verbatim string the agent had, and it
+# was scoped to being asked something it may not answer. Given a turn it simply could
+# not make out, it had no other instruction and reached for that one: a real call to
+# reception answered "ok, right, wise regarding" and "31" with the line about passing
+# on what she said, five times between them, while a slot sat unaccepted on the table.
+DIDNT_CATCH = "Sorry, I didn't catch that. Could you say it again?"
+PASSING_BACK = (
+    "I'll pass this back to the practice and someone will call you. Thank you."
+)
+
+# How many times it may ask reception to repeat herself before giving the call up. The
+# Check-in Call already bounds this at three for the Patient, in `scan.REPEAT_LIMIT`.
+# Reception is a working phone line and a fourth attempt is a nuisance, not diligence.
+ASK_AGAIN_LIMIT = 2
 
 WEEKDAYS = {
     "monday": 0,
@@ -303,6 +322,16 @@ def build_task_text(scope: RebookingScope, release: sqlite3.Row) -> str:
         "arranging the appointment.",
         "Never answer a medical question. Never describe her condition. Never say "
         "anything about her that is not written above.",
+        # The turn-5 failure: a slot was offered in plain words and answered with the
+        # line about passing on what she said. An offer is not a question, and the
+        # agent has to be told so before it can tell them apart.
+        "A day, a date or a time spoken to you is an offer, not a question. Judge it "
+        "against the dates above and answer it. Never answer an offer with the line "
+        "about passing on what she said.",
+        f'If you cannot make out what was said, say exactly this: "{DIDNT_CATCH}" You '
+        f"may ask that {ASK_AGAIN_LIMIT} times in the whole call. If you still cannot "
+        f'make it out, say exactly this: "{PASSING_BACK}" Then end the call. Do not '
+        "guess at what was said and do not fill the silence.",
         "If you are asked to wait or to hold, wait quietly. Do not speak again until "
         "somebody speaks to you.",
         "If they say they cannot book on behalf of another person, thank them and end "
@@ -381,6 +410,28 @@ def reserve(conn: sqlite3.Connection, release_id: int) -> int:
             raise
         return already["id"]
     return cursor.lastrowid
+
+
+def count_against_the_budget(conn: sqlite3.Connection, provider, attempt_id: int) -> None:
+    """A Rebooking Call spends one of the twenty like any other.
+
+    It was not counted at all. Three check-ins and two rebookings read as three on the
+    board, and under-counting is the direction that costs a call somebody needed. The
+    same reasoning as `checkin.start`: counted before submitting, and counted even when
+    the submission turns out ambiguous, because a call we cannot account for may still
+    have been placed.
+
+    `INSERT OR IGNORE` on the attempt, because `reserve` returns an existing row on a
+    second press and a second press must not spend a second call. See the unique index
+    in schema.sql.
+    """
+    if not getattr(provider, "live", False):
+        return
+    conn.execute(
+        "INSERT OR IGNORE INTO live_call (call_attempt_id, placed_at) VALUES (?, ?)",
+        (attempt_id, db.now_iso()),
+    )
+    conn.commit()
 
 
 def _turn(turns: list[Turn], index) -> Turn | None:
@@ -506,6 +557,7 @@ def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
         raise Refused(NO_BOOKING_LINE)
 
     attempt_id = reserve(conn, release_id)
+    count_against_the_budget(conn, provider, attempt_id)
 
     scope = RebookingScope(
         first_name=row["first_name"],
@@ -539,7 +591,11 @@ def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
     )
     conn.commit()
 
-    structured = result.structured or {}
+    # The provider cannot carry a result schema, so a live call arrives with a
+    # conversation and no reading of it. `offers_from` reads it back out of the
+    # transcript when it can and returns nothing when it cannot, which leaves this
+    # exactly as it was: no offers, `unreadable`, and a person looks at the call.
+    structured = result.structured or reextract.offers_from(result.transcript) or {}
     offers = structured.get("offers") or []
     verdict, day, clock = record_offers(conn, attempt_id, result.transcript, offers, row)
     reception_turn = _turn(result.transcript, structured.get("reception_outcome_turn"))

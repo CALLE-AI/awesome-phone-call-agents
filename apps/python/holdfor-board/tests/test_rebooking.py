@@ -536,3 +536,154 @@ def test_practice_hours_are_a_working_day_rather_than_a_clock_face():
     assert rebooking.PRACTICE_OPENS == time(8, 0)
     assert rebooking.PRACTICE_CLOSES == time(18, 30)
     assert rebooking.AFTERNOON_FROM == time(12, 0)
+
+
+# --- a live call, which carries no reading of itself -------------------------------
+
+
+class Live(FakeProvider):
+    """A provider that connects and returns no structured block, which is every live
+    call: `calle call start` cannot carry a result schema."""
+
+    live = True
+
+    def poll(self, run_id):
+        from dataclasses import replace
+
+        return replace(super().poll(run_id), structured=None)
+
+
+def test_a_live_call_reads_its_offers_back_out_of_the_transcript(
+    conn, released, line, tmp_path, monkeypatch
+):
+    """The bug that made a working Rebooking Call look broken.
+
+    Reception offered a slot inside the envelope and the agent accepted it. The offer
+    lived only in the transcript, `offers` came off a block that was never there, and
+    what reached the board was `unreadable` with no offer rows at all.
+    """
+    spoken = transcript([{"turn": 5, "time": "09:10", "accepted": True}])
+    provider = Live(
+        fixtures_dir=tmp_path,
+        route={rebooking.idempotency_key(released["release_id"]): "reception.json"},
+    )
+    (tmp_path / "reception.json").write_text(json.dumps(spoken), encoding="utf-8")
+    monkeypatch.setattr(
+        rebooking.reextract,
+        "offers_from",
+        lambda turns: {
+            "offers": [{"turn": 5, "time": "09:10", "accepted": True}],
+            "reception_outcome": rebooking.SLOT_OFFERED,
+            "reception_outcome_turn": 5,
+        },
+    )
+
+    rebooking.run(conn, provider, released["release_id"])
+
+    rows = conn.execute("SELECT * FROM rebooking_offer").fetchall()
+    assert [row["turn_index"] for row in rows] == [5]
+    assert rows[0]["verdict"] == rebooking.INSIDE
+
+
+def test_a_live_call_nobody_can_read_lands_exactly_where_it_did_before(
+    conn, released, line, tmp_path, monkeypatch
+):
+    """No key, no library, no answer. Not a new state and not a worse one."""
+    spoken = transcript([{"turn": 5, "time": "09:10", "accepted": True}])
+    provider = Live(
+        fixtures_dir=tmp_path,
+        route={rebooking.idempotency_key(released["release_id"]): "reception.json"},
+    )
+    (tmp_path / "reception.json").write_text(json.dumps(spoken), encoding="utf-8")
+    monkeypatch.setattr(rebooking.reextract, "offers_from", lambda turns: None)
+
+    rebooking.run(conn, provider, released["release_id"])
+
+    assert conn.execute("SELECT COUNT(*) n FROM rebooking_offer").fetchone()["n"] == 0
+
+
+# --- the budget -------------------------------------------------------------------
+
+
+def test_a_rebooking_call_spends_one_of_the_twenty(
+    conn, released, line, tmp_path, monkeypatch
+):
+    """It was not counted at all. Three check-ins and two rebookings read as three on
+    the board, and under-counting is the direction that costs a call somebody needed."""
+    provider = Live(
+        fixtures_dir=tmp_path,
+        route={rebooking.idempotency_key(released["release_id"]): "reception.json"},
+    )
+    (tmp_path / "reception.json").write_text(
+        json.dumps(transcript([])), encoding="utf-8"
+    )
+    monkeypatch.setattr(rebooking.reextract, "offers_from", lambda turns: None)
+
+    rebooking.run(conn, provider, released["release_id"])
+
+    assert conn.execute("SELECT COUNT(*) n FROM live_call").fetchone()["n"] == 1
+
+
+def test_a_second_press_never_spends_a_second_call(
+    conn, released, line, tmp_path, monkeypatch
+):
+    """`reserve` returns the existing attempt on a second press, so the count needs its
+    guarantee in the index rather than upstream."""
+    provider = Live(
+        fixtures_dir=tmp_path,
+        route={rebooking.idempotency_key(released["release_id"]): "reception.json"},
+    )
+    (tmp_path / "reception.json").write_text(
+        json.dumps(transcript([])), encoding="utf-8"
+    )
+    monkeypatch.setattr(rebooking.reextract, "offers_from", lambda turns: None)
+
+    rebooking.run(conn, provider, released["release_id"])
+    rebooking.run(conn, provider, released["release_id"])
+
+    assert conn.execute("SELECT COUNT(*) n FROM live_call").fetchone()["n"] == 1
+
+
+def test_a_fake_call_spends_nothing(conn, released, line, tmp_path):
+    provider = provider_for(tmp_path, released["release_id"], transcript([]))
+
+    rebooking.run(conn, provider, released["release_id"])
+
+    assert conn.execute("SELECT COUNT(*) n FROM live_call").fetchone()["n"] == 0
+
+
+# --- what the agent is told when it cannot make out a word ------------------------
+
+
+def test_the_agent_is_told_what_to_do_with_an_offer(conn, released):
+    """The turn-5 failure: a slot offered in plain words, answered with the line about
+    passing on what she said. An offer is not a question and it has to be told so."""
+    row = rebooking.release_row(conn, released["release_id"])
+    said = rebooking.build_task_text(
+        rebooking.RebookingScope("Margaret", "Ellery", "1944-02-11", "+447700900500"),
+        row,
+    )
+
+    assert "is an offer, not a question" in said
+    assert "Never answer an offer with the line" in said
+
+
+def test_the_agent_is_told_to_ask_again_rather_than_repeat_itself(conn, released):
+    """It had one verbatim string and it was scoped to being asked something it may not
+    answer. Given "ok, right, wise regarding" it had no other instruction."""
+    row = rebooking.release_row(conn, released["release_id"])
+    said = rebooking.build_task_text(
+        rebooking.RebookingScope("Margaret", "Ellery", "1944-02-11", "+447700900500"),
+        row,
+    )
+
+    assert rebooking.DIDNT_CATCH in said
+    assert rebooking.PASSING_BACK in said
+    assert f"may ask that {rebooking.ASK_AGAIN_LIMIT} times" in said
+
+
+def test_nothing_spoken_carries_punctuation_a_voice_cannot_read():
+    """Read aloud by a text-to-speech engine, which may say a dash out loud or pause in
+    the wrong place for a bracket."""
+    for line in (rebooking.DIDNT_CATCH, rebooking.PASSING_BACK, rebooking.FIXED_LINE):
+        assert not set(line) & set("—–()[]{}*_/")
