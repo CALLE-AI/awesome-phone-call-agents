@@ -1,9 +1,70 @@
 const API_BASE = "http://localhost:5200";
+const TOKEN_KEY = "noShowKillerApiToken";
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 const appointmentsEl = document.getElementById("appointments");
 const cardTemplate = document.getElementById("card-template");
 const apiStatusEl = document.getElementById("api-status");
 const runBatchBtn = document.getElementById("run-batch");
+const authGateEl = document.getElementById("auth-gate");
+const authFormEl = document.getElementById("auth-form");
+const authTokenInputEl = document.getElementById("auth-token-input");
+const authErrorEl = document.getElementById("auth-error");
+
+// Statuses that mean a call is actively being dispatched or is already in
+// flight - mirrors IN_FLIGHT_STATUSES on the backend.
+const IN_FLIGHT_STATUSES = ["DISPATCHING", "STARTED", "CALLING"];
+
+function showAuthGate(message) {
+  document.body.classList.add("auth-locked");
+  authGateEl.classList.remove("hidden");
+  if (message) {
+    authErrorEl.textContent = message;
+    authErrorEl.classList.remove("hidden");
+  } else {
+    authErrorEl.classList.add("hidden");
+  }
+  authTokenInputEl.focus();
+}
+
+function hideAuthGate() {
+  document.body.classList.remove("auth-locked");
+  authGateEl.classList.add("hidden");
+}
+
+// A 401 anywhere means the stored token is missing or wrong - drop it and
+// make the operator re-enter it instead of silently retrying forever.
+function handleUnauthorized() {
+  clearToken();
+  if (ws) {
+    ws.onclose = null; // don't let this expected close trigger a reconnect loop
+    ws.close();
+    ws = null;
+  }
+  showAuthGate("That token was rejected. Enter the current API token.");
+}
+
+authFormEl.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const token = authTokenInputEl.value.trim();
+  if (!token) return;
+  setToken(token);
+  authTokenInputEl.value = "";
+  await start();
+});
 
 // Health check and status display
 async function checkHealth() {
@@ -23,7 +84,11 @@ async function checkHealth() {
 
 // Fetch appointments from the backend
 async function fetchAppointments() {
-  const res = await fetch(`${API_BASE}/api/appointments`);
+  const res = await fetch(`${API_BASE}/api/appointments`, { headers: authHeaders() });
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error("Unauthorized");
+  }
   if (!res.ok) {
     throw new Error(`Backend returned ${res.status} ${res.statusText}`);
   }
@@ -102,10 +167,10 @@ function updateCard(card, appt) {
   }
   if (badge.textContent !== appt.status) badge.textContent = appt.status;
 
-  // Mark the card as "live" while a call is actively in progress, so the
-  // pulsing indicator shows the user something is happening in the background.
-  const isLive = ["PENDING", "STARTED", "CALLING"].includes(appt.status) && (appt.activity?.length || 0) > 0;
-  card.classList.toggle("is-live", isLive);
+  // Mark the card as "live" while a call is actively being dispatched or is
+  // in progress, so the pulsing indicator shows the user something is
+  // happening in the background.
+  card.classList.toggle("is-live", IN_FLIGHT_STATUSES.includes(appt.status));
 
   // Activity log — only append new lines instead of rebuilding the whole thing
   const activityEl = card.querySelector(".activity");
@@ -152,21 +217,22 @@ function updateCard(card, appt) {
   let btnText;
   let btnDisabled;
 
-  const inProgress = appt.runId && ["PENDING", "STARTED", "CALLING"].includes(appt.status);
-
   if (!appt.status) {
     btnDisabled = true;
     btnText = "⏳ No call yet";
-  } else if (inProgress) {
-    // A call has actually been placed and hasn't reached a terminal status
-    // yet - keep the button disabled with distinct copy so it doesn't look
-    // like a fresh, clickable "send confirmation call" button and invite a
-    // second call to the same patient.
+  } else if (IN_FLIGHT_STATUSES.includes(appt.status)) {
+    // A call is genuinely being dispatched or is already running - keep the
+    // button disabled with distinct copy so it doesn't look like a fresh,
+    // clickable "send confirmation call" button and invite a second call to
+    // the same patient.
     btnDisabled = true;
-    btnText = "📞 Call in progress…";
-  } else if (["PENDING", "STARTED", "CALLING"].includes(appt.status)) {
+    btnText = appt.status === "DISPATCHING" ? "📞 Starting call…" : "📞 Call in progress…";
+  } else if (appt.status === "PENDING") {
     btnDisabled = false;
     btnText = "📞 Send confirmation call";
+  } else if (appt.status === "DISPATCH_FAILED") {
+    btnDisabled = false;
+    btnText = "⚠️ Retry call";
   } else {
     btnDisabled = false;
     btnText = "📞 Call again";
@@ -187,11 +253,18 @@ async function confirmAppointment(id, btn) {
   btn.disabled = true;
   btn.textContent = "⏳ Calling…";
   try {
-    const res = await fetch(`${API_BASE}/api/appointments/${id}/confirm`, { method: "POST" });
-    if (!res.ok) {
+    const res = await fetch(`${API_BASE}/api/appointments/${id}/confirm`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (res.status === 401) {
+      handleUnauthorized();
+    } else if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       if (body.code === "call_in_progress") {
         alert("A call for this appointment is already in progress.");
+      } else if (body.code === "unauthorized_destination") {
+        alert("This appointment's phone number is not an authorized calling destination.");
       } else {
         alert(`Failed to start call: ${body.error || res.statusText}`);
       }
@@ -208,8 +281,12 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 // Connect to the backend WebSocket for real-time updates
 function connectWebSocket() {
+  const token = getToken();
+  if (!token) return;
+
   try {
-    ws = new WebSocket(`ws://localhost:5200/ws`);
+    const wsUrl = `${API_BASE.replace(/^http/, "ws")}/ws?token=${encodeURIComponent(token)}`;
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       reconnectAttempts = 0;
@@ -227,7 +304,11 @@ function connectWebSocket() {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      if (event.code === 4401) {
+        handleUnauthorized();
+        return;
+      }
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
         const delay = Math.min(5000 * reconnectAttempts, 30000);
@@ -270,12 +351,18 @@ runBatchBtn.addEventListener("click", async () => {
   runBatchBtn.disabled = true;
   runBatchBtn.textContent = "⏳ Starting calls…";
   try {
-    const response = await fetch(`${API_BASE}/api/confirm-tomorrow`, { method: "POST" });
-    if (!response.ok) {
+    const response = await fetch(`${API_BASE}/api/confirm-tomorrow`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
+    if (response.status === 401) {
+      handleUnauthorized();
+    } else if (!response.ok) {
       throw new Error(`Backend returned ${response.status}`);
+    } else {
+      const result = await response.json();
+      console.log("Batch call result:", result);
     }
-    const result = await response.json();
-    console.log("Batch call result:", result);
   } catch (err) {
     alert(`Failed to start batch calls: ${err.message}`);
   } finally {
@@ -308,9 +395,13 @@ addForm.addEventListener("submit", async (e) => {
   try {
     const res = await fetch(`${API_BASE}/api/appointments`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ patientName, phone, service, scheduledAt }),
     });
+    if (res.status === 401) {
+      handleUnauthorized();
+      return;
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || `Backend returned ${res.status}`);
@@ -342,17 +433,37 @@ async function initialRefresh() {
   await refresh();
 }
 
-// Initialize
-checkHealth();
-initialRefresh();
-connectWebSocket();
+function startIntervals() {
+  if (window.__intervalsStarted) return;
+  window.__intervalsStarted = true;
 
-// Safety net only — WebSocket is the primary update path
-setInterval(() => {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    refresh();
+  // Safety net only — WebSocket is the primary update path
+  setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) refresh();
+  }, 30000);
+
+  // Health check every minute
+  setInterval(checkHealth, 60000);
+}
+
+// Entry point: require a token before touching any patient data. If one's
+// already stored, try it silently; a 401 during that first fetch re-shows
+// the gate via handleUnauthorized().
+async function start() {
+  const token = getToken();
+  if (!token) {
+    showAuthGate();
+    return;
   }
-}, 30000);
 
-// Health check every minute
-setInterval(checkHealth, 60000);
+  hideAuthGate();
+  checkHealth();
+  await initialRefresh();
+
+  if (getToken()) {
+    connectWebSocket();
+    startIntervals();
+  }
+}
+
+start();
