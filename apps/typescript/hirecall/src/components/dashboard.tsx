@@ -1,35 +1,18 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 
-import { rosterStatus } from "@/lib/parse-workbook";
-
-type Candidate = {
-  id: string;
-  name: string;
-  phone: string;
-  consent: boolean;
-  resumeUrl: string;
-  sourceFilename: string;
-  createdAt: string;
-};
-
-type UploadResponse = {
-  error?: string;
-  imported?: number;
-  skipped?: number;
-  issues?: { row: number; message: string }[];
-  candidates?: Candidate[];
-};
-
-const STATUS_COPY = {
-  ready: { label: "Ready", className: "bg-[rgba(47,107,79,0.12)] text-forest" },
-  missing_resume: { label: "No resume link", className: "bg-[rgba(161,92,18,0.12)] text-warn" },
-  needs_consent: { label: "Needs consent", className: "bg-[rgba(154,59,47,0.12)] text-danger" },
-} as const;
+import { DEMO_CALL_PROMPT, DEMO_JOB_ROLE, DEMO_NAME, DEMO_RESUME_TEXT } from "@/lib/demo-candidate";
+import { formatUploadedAt, shortBatchId } from "@/lib/status";
+import type { Batch } from "@/lib/types";
+import { ApiError, hirecallApi } from "@/services/hirecall-api";
 
 export function Dashboard() {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const router = useRouter();
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [inactiveBatches, setInactiveBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,9 +20,9 @@ export function Dashboard() {
   const [dragOver, setDragOver] = useState(false);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/candidates");
-    const data = (await response.json()) as { candidates?: Candidate[] };
-    setCandidates(data.candidates ?? []);
+    const data = await hirecallApi.listRoster();
+    setBatches(data.batches);
+    setInactiveBatches(data.inactiveBatches);
   }, []);
 
   useEffect(() => {
@@ -49,35 +32,28 @@ export function Dashboard() {
   }, [load]);
 
   const stats = useMemo(() => {
-    const consented = candidates.filter((row) => row.consent).length;
-    const ready = candidates.filter((row) => rosterStatus(row) === "ready").length;
-    const missing = candidates.filter((row) => rosterStatus(row) === "missing_resume").length;
     return {
-      total: candidates.length,
-      consented,
-      ready,
-      missing,
+      files: batches.length,
+      total: batches.reduce((sum, row) => sum + row.candidateCount, 0),
+      consented: batches.reduce((sum, row) => sum + row.consentedCount, 0),
+      ready: batches.reduce((sum, row) => sum + row.readyCount, 0),
     };
-  }, [candidates]);
+  }, [batches]);
 
   async function uploadFile(file: File) {
     setBusy(true);
     setError("");
     setNotice("");
-    const body = new FormData();
-    body.set("file", file);
     try {
-      const response = await fetch("/api/candidates", { method: "POST", body });
-      const data = (await response.json()) as UploadResponse;
-      if (!response.ok) {
-        setError(data.error ?? "Upload failed.");
-        return;
-      }
-      setCandidates(data.candidates ?? []);
+      const data = await hirecallApi.uploadWorkbook(file);
+      setBatches(data.batches);
+      setInactiveBatches(data.inactiveBatches);
       const extra = data.skipped ? ` ${data.skipped} row(s) skipped.` : "";
-      setNotice(`${data.imported} candidate(s) saved. The spreadsheet itself was not kept.${extra}`);
-    } catch {
-      setError("Upload failed. Try again.");
+      setNotice(
+        `${data.imported} candidate(s) saved as a new Excel batch. Open that row to call them.${extra}`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Upload failed. Try again.");
     } finally {
       setBusy(false);
     }
@@ -90,18 +66,32 @@ export function Dashboard() {
   }
 
   async function clearRoster() {
-    if (!confirm("Remove every candidate from the roster? Call results are not stored yet.")) {
+    if (!confirm("Deactivate every Excel batch? They move to Inactive and can be restored.")) {
       return;
     }
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/candidates", { method: "DELETE" });
-      const data = (await response.json()) as UploadResponse;
-      setCandidates(data.candidates ?? []);
-      setNotice("Roster cleared.");
-    } catch {
-      setError("Could not clear the roster.");
+      const data = await hirecallApi.deactivateAll();
+      setBatches(data.batches);
+      setInactiveBatches(data.inactiveBatches);
+      setNotice("Active batches moved to Inactive.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not clear the roster.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreBatch(id: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await hirecallApi.setBatchActive(id, true);
+      await load();
+      setNotice("Excel restored to the active roster.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not restore that Excel.");
     } finally {
       setBusy(false);
     }
@@ -119,8 +109,8 @@ export function Dashboard() {
               HireCall
             </h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-muted md:text-lg">
-              Upload a candidate spreadsheet. We keep the rows — name, phone, consent,
-              resume link — so you can screen later. The file itself is discarded.
+              Each uploaded Excel becomes its own batch. Open a batch to edit a
+              candidate or re-upload a corrected file into that same batch.
             </p>
           </div>
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-paper shadow-[var(--shadow)] md:h-20 md:w-20">
@@ -129,26 +119,83 @@ export function Dashboard() {
         </header>
 
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="In roster" value={stats.total} />
+          <Stat label="Excel batches" value={stats.files} />
+          <Stat label="Candidates" value={stats.total} />
           <Stat label="Consented" value={stats.consented} />
-          <Stat label="Ready to screen" value={stats.ready} />
-          <Stat label="Missing resume" value={stats.missing} />
+          <Stat label="Ready to call" value={stats.ready} />
         </section>
 
         <section className="rounded-[28px] border border-line bg-paper p-5 shadow-[var(--shadow)] md:p-8">
-          <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="font-display text-2xl">Inbox</h2>
               <p className="mt-1 text-sm text-muted">
-                Columns: <span className="text-ink">name, phone, consent, resume_link</span>
+                Download the Excel template, fill in candidate details, then upload it
+                here to create a new batch. Fix names or resume links on the batch
+                page, not by uploading another roster row. Phones need a country
+                code, e.g. +14155550123 or +14155550123.
               </p>
             </div>
-            <a
-              className="text-sm font-medium text-accent underline-offset-4 hover:underline"
-              href="/samples/candidates.sample.csv"
-            >
-              Download sample CSV
-            </a>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                className="inline-flex items-center rounded-full bg-accent px-4 py-2 text-sm font-medium text-paper hover:bg-accent/90"
+                download="HireCall-candidates-template.xlsx"
+                href="/samples/candidates.sample.xlsx"
+              >
+                Download Excel template
+              </a>
+              <a
+                className="text-sm font-medium text-accent underline-offset-4 hover:underline"
+                href="/samples/candidates.sample.csv"
+              >
+                CSV instead
+              </a>
+            </div>
+          </div>
+
+          <div className="mb-5 overflow-x-auto rounded-2xl border border-line">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-canvas text-xs tracking-wide text-muted uppercase">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Column</th>
+                  <th className="px-4 py-3 font-medium">Required</th>
+                  <th className="px-4 py-3 font-medium">What to enter</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-line">
+                  <td className="px-4 py-3 font-medium text-ink">name</td>
+                  <td className="px-4 py-3">Yes</td>
+                  <td className="px-4 py-3 text-muted">Full name, e.g. Priya Sharma</td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-4 py-3 font-medium text-ink">phone</td>
+                  <td className="px-4 py-3">Yes</td>
+                  <td className="px-4 py-3 text-muted">
+                    International number with country code, e.g. +14155550123 or
+                    +14155550123.
+                  </td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-4 py-3 font-medium text-ink">job_role</td>
+                  <td className="px-4 py-3">Yes</td>
+                  <td className="px-4 py-3 text-muted">
+                    Opening for this Excel, e.g. Software intern. Same role on every row is
+                    fine.
+                  </td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-4 py-3 font-medium text-ink">consent</td>
+                  <td className="px-4 py-3">No</td>
+                  <td className="px-4 py-3 text-muted">yes or no</td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-4 py-3 font-medium text-ink">resume_link</td>
+                  <td className="px-4 py-3">No</td>
+                  <td className="px-4 py-3 text-muted">Google Drive or other resume URL</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <label
@@ -176,9 +223,9 @@ export function Dashboard() {
               onChange={onFileChange}
               type="file"
             />
-            <span className="font-display text-2xl text-ink">Drop Excel or CSV here</span>
+            <span className="font-display text-2xl text-ink">Drop the filled Excel here</span>
             <span className="mt-2 text-sm text-muted">
-              {busy ? "Saving rows…" : "or click to choose a file. Max 5 MB."}
+              {busy ? "Saving rows…" : "or click to choose .xlsx, .xls, or .csv. Max 5 MB."}
             </span>
           </label>
 
@@ -194,29 +241,37 @@ export function Dashboard() {
           ) : null}
         </section>
 
+        <JudgeTestForm
+          busy={busy}
+          onBusy={setBusy}
+          onError={setError}
+          onNotice={setNotice}
+          onCreated={(batchId) => router.push(`/batches/${batchId}`)}
+        />
+
         <section className="overflow-hidden rounded-[28px] border border-line bg-paper shadow-[var(--shadow)]">
           <div className="flex items-center justify-between border-b border-line px-5 py-4 md:px-8">
             <h2 className="font-display text-2xl">Roster</h2>
-            {candidates.length > 0 ? (
+            {batches.length > 0 ? (
               <button
                 className="text-sm font-medium text-danger hover:underline"
                 disabled={busy}
                 onClick={() => void clearRoster()}
                 type="button"
               >
-                Clear roster
+                Deactivate all
               </button>
             ) : null}
           </div>
 
           {loading ? (
             <p className="px-5 py-12 text-center text-muted md:px-8">Loading roster…</p>
-          ) : candidates.length === 0 ? (
+          ) : batches.length === 0 ? (
             <div className="px-5 py-16 text-center md:px-8">
-              <p className="font-display text-2xl">No candidates yet</p>
+              <p className="font-display text-2xl">No active Excel batches</p>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                Upload a spreadsheet to pin names and numbers to the desk. Calling and
-                scoring come in the next step.
+                Upload a spreadsheet to create a batch
+                {inactiveBatches.length > 0 ? ", or restore one from Inactive below." : ". Click that batch to see its candidates and call them from there."}
               </p>
             </div>
           ) : (
@@ -224,60 +279,226 @@ export function Dashboard() {
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-canvas/80 text-xs tracking-wide text-muted uppercase">
                   <tr>
-                    <th className="px-5 py-3 font-medium md:px-8">Candidate</th>
-                    <th className="px-3 py-3 font-medium">Phone</th>
-                    <th className="px-3 py-3 font-medium">Resume</th>
-                    <th className="px-3 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium md:px-8">Source</th>
+                    <th className="px-5 py-3 font-medium md:px-8">Excel</th>
+                    <th className="px-3 py-3 font-medium">Job role</th>
+                    <th className="px-3 py-3 font-medium">Batch ID</th>
+                    <th className="px-3 py-3 font-medium">Uploaded</th>
+                    <th className="px-3 py-3 font-medium">Candidates</th>
+                    <th className="px-3 py-3 font-medium">Ready</th>
+                    <th className="px-5 py-3 font-medium md:px-8">Open</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {candidates.map((row) => {
-                    const status = rosterStatus(row);
-                    const copy = STATUS_COPY[status];
-                    return (
-                      <tr className="border-t border-line align-top" key={row.id}>
-                        <td className="px-5 py-4 md:px-8">
-                          <div className="font-medium text-ink">{row.name}</div>
-                          <div className="text-xs text-muted">
-                            {row.consent ? "Consent on file" : "No consent"}
-                          </div>
-                        </td>
-                        <td className="px-3 py-4 whitespace-nowrap">{row.phone}</td>
-                        <td className="max-w-[220px] px-3 py-4">
-                          {row.resumeUrl ? (
-                            <a
-                              className="break-all text-accent hover:underline"
-                              href={row.resumeUrl}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              Open link
-                            </a>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${copy.className}`}
-                          >
-                            {copy.label}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-xs text-muted md:px-8">
-                          {row.sourceFilename || "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {batches.map((row) => (
+                    <tr className="border-t border-line" key={row.id}>
+                      <td className="px-5 py-4 md:px-8">
+                        <Link
+                          className="font-medium text-ink hover:text-accent hover:underline"
+                          href={`/batches/${row.id}`}
+                        >
+                          {row.filename}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-4">{row.jobRole || "—"}</td>
+                      <td className="px-3 py-4 font-mono text-xs text-muted">
+                        {shortBatchId(row.id)}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-muted">
+                        {formatUploadedAt(row.createdAt)}
+                      </td>
+                      <td className="px-3 py-4">{row.candidateCount}</td>
+                      <td className="px-3 py-4">{row.readyCount}</td>
+                      <td className="px-5 py-4 md:px-8">
+                        <Link
+                          className="text-sm font-medium text-accent hover:underline"
+                          href={`/batches/${row.id}`}
+                        >
+                          View candidates
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
         </section>
+
+        {inactiveBatches.length > 0 ? (
+          <section className="overflow-hidden rounded-[28px] border border-line bg-paper shadow-[var(--shadow)]">
+            <div className="border-b border-line px-5 py-4 md:px-8">
+              <h2 className="font-display text-2xl">Inactive</h2>
+              <p className="mt-1 text-sm text-muted">
+                Soft-deleted Excels. Restore to put them back on the roster.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-canvas/80 text-xs tracking-wide text-muted uppercase">
+                  <tr>
+                    <th className="px-5 py-3 font-medium md:px-8">Excel</th>
+                    <th className="px-3 py-3 font-medium">Batch ID</th>
+                    <th className="px-3 py-3 font-medium">Uploaded</th>
+                    <th className="px-3 py-3 font-medium">Candidates</th>
+                    <th className="px-5 py-3 font-medium md:px-8">Restore</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inactiveBatches.map((row) => (
+                    <tr className="border-t border-line" key={row.id}>
+                      <td className="px-5 py-4 md:px-8 font-medium text-muted">{row.filename}</td>
+                      <td className="px-3 py-4 font-mono text-xs text-muted">
+                        {shortBatchId(row.id)}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-muted">
+                        {formatUploadedAt(row.createdAt)}
+                      </td>
+                      <td className="px-3 py-4">{row.candidateCount}</td>
+                      <td className="px-5 py-4 md:px-8">
+                        <button
+                          className="text-sm font-medium text-accent hover:underline disabled:text-muted"
+                          disabled={busy}
+                          onClick={() => void restoreBatch(row.id)}
+                          type="button"
+                        >
+                          Restore
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function JudgeTestForm({
+  busy,
+  onBusy,
+  onError,
+  onNotice,
+  onCreated,
+}: {
+  busy: boolean;
+  onBusy: (value: boolean) => void;
+  onError: (value: string) => void;
+  onNotice: (value: string) => void;
+  onCreated: (batchId: string) => void;
+}) {
+  const [name, setName] = useState(DEMO_NAME);
+  const [jobRole, setJobRole] = useState(DEMO_JOB_ROLE);
+  const [phone, setPhone] = useState("");
+  const [consent, setConsent] = useState(true);
+
+  async function submit() {
+    if (!consent) {
+      onError("Consent is required to place the judge test call.");
+      return;
+    }
+    onBusy(true);
+    onError("");
+    onNotice("");
+    try {
+      const data = await hirecallApi.createJudgeTest({ phone, name, jobRole });
+      onNotice("Judge test batch ready. Call that row — resume and script are already filled.");
+      onCreated(data.batch.id);
+    } catch (err) {
+      onError(err instanceof ApiError ? err.message : "Could not create the judge test.");
+    } finally {
+      onBusy(false);
+    }
+  }
+
+  const fieldClass =
+    "mt-1 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-accent";
+
+  return (
+    <section className="rounded-[28px] border border-line bg-paper p-5 shadow-[var(--shadow)] md:p-8">
+      <h2 className="font-display text-2xl">Judge test</h2>
+      <p className="mt-1 mb-5 text-sm text-muted">
+        Same columns as the Excel. Fake resume and CALL-E script are already
+        written. Enter your number with a country code, then Call on the next page.
+        After hangup, <span className="font-medium text-ink">GEMINI_API_KEY</span> is
+        required so Gemini can write the score and summary. CALLE_API_KEY is required
+        to place the call.
+      </p>
+      <form
+        className="grid gap-4 md:grid-cols-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        <label className="text-sm font-medium text-ink">
+          name
+          <input
+            className={fieldClass}
+            disabled={busy}
+            onChange={(event) => setName(event.target.value)}
+            required
+            value={name}
+          />
+        </label>
+        <label className="text-sm font-medium text-ink">
+          job_role
+          <input
+            className={fieldClass}
+            disabled={busy}
+            onChange={(event) => setJobRole(event.target.value)}
+            required
+            value={jobRole}
+          />
+        </label>
+        <label className="text-sm font-medium text-ink">
+          phone
+          <input
+            className={fieldClass}
+            disabled={busy}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="+14155550123"
+            required
+            value={phone}
+          />
+          <span className="mt-1 block text-xs font-normal text-muted">
+            Any country. Include the + code. This is the number CALL-E will dial.
+          </span>
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-ink">
+          <input
+            checked={consent}
+            disabled={busy}
+            onChange={(event) => setConsent(event.target.checked)}
+            type="checkbox"
+          />
+          consent
+        </label>
+        <div className="md:col-span-2">
+          <p className="text-sm font-medium text-ink">Fake resume</p>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-2xl border border-line bg-canvas p-3 text-xs leading-relaxed text-muted">
+            {DEMO_RESUME_TEXT}
+          </pre>
+        </div>
+        <div className="md:col-span-2">
+          <p className="text-sm font-medium text-ink">Fake call prompt</p>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-2xl border border-line bg-canvas p-3 text-xs leading-relaxed text-muted">
+            {DEMO_CALL_PROMPT}
+          </pre>
+        </div>
+        <div className="md:col-span-2">
+          <button
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
+            disabled={busy}
+            type="submit"
+          >
+            Create judge test
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 
