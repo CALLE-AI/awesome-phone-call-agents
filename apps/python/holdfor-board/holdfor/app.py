@@ -7,7 +7,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -240,13 +240,23 @@ def create_app(
         return board_payload(conn, app.state.provider, app.state.clock().date())
 
     @app.get("/", response_class=HTMLResponse)
-    def queue(request: Request, conn: sqlite3.Connection = Depends(connection)):
+    def queue(
+        request: Request,
+        opened: int | None = Query(default=None, alias="open"),
+        conn: sqlite3.Connection = Depends(connection),
+    ):
+        """The queue, and optionally one item read over the top of it.
+
+        `?open=` rather than a page of its own so the row a Reviewer came from is
+        still behind her when she decides. The item is fetched only when asked for:
+        the transcript is a file read, and the board reloads itself every few seconds
+        while a call is in the air.
+        """
+        context = board_payload(conn, app.state.provider, app.state.clock().date())
+        if opened is not None:
+            context = {**context, **sheet_payload(conn, opened)}
         return TEMPLATES.TemplateResponse(
-            request=request,
-            name="board.html",
-            context=board_payload(
-                conn, app.state.provider, app.state.clock().date()
-            ),
+            request=request, name="board.html", context=context
         )
 
     @app.get("/review-items/{review_item_id}")
@@ -261,11 +271,10 @@ def create_app(
         request: Request,
         conn: sqlite3.Connection = Depends(connection),
     ):
-        payload = detail_payload(conn, review_item_id)
         return TEMPLATES.TemplateResponse(
             request=request,
             name="detail.html",
-            context={**payload, "today": date.today().isoformat()},
+            context=detail_payload(conn, review_item_id),
         )
 
     # The three writing endpoints read their body before touching the database, so
@@ -332,7 +341,11 @@ def _release_now(db_path: str, review_item_id: int, body: dict, html: bool):
     finally:
         conn.close()
     if html:
-        return RedirectResponse(f"/review-items/{review_item_id}/view", 303)
+        # Back to the queue, not back to the item. The Release has moved it out of
+        # what needs a person and into "Released, awaiting the call", where the Run
+        # button is — and the form she just submitted would otherwise still be sitting
+        # there offering to grant a second one.
+        return RedirectResponse("/", 303)
     return JSONResponse(status_code=201, content={"release_id": release_id})
 
 
@@ -514,7 +527,18 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
         "item": row,
         "turns": [asdict(turn) for turn in turns],
         "anchors": review.anchors(item, turns),
+        # The default the Release form offers. Not `today`, which the board already
+        # uses for how many calls went out: the sheet renders inside that context and
+        # the shorter name would quietly turn a count into a date.
+        "today_iso": date.today().isoformat(),
     }
+
+
+def sheet_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
+    """The same Review Item, named for a sheet that sits over the board."""
+    payload = detail_payload(conn, review_item_id)
+    payload["open_item"] = payload.pop("item")
+    return payload
 
 
 def board_payload(

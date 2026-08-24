@@ -1,10 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{%- if in_flight %}
-{#- Only while a call is in progress. A settled board sits still, which matters on a
-    recording and matters more to somebody reading a row when it reloads underneath
-    her. No script: this page has none and does not need one to wait. #}
+{%- if in_flight and not open_item %}
+{#- Only while a call is in progress, and never behind an open sheet: a reload would
+    empty the half-filled Release form in front of her to update a count behind it.
+    A settled board sits still, which matters on a recording and matters more to
+    somebody reading a row when it reloads underneath her. No script: this page has
+    none and does not need one to wait. #}
 <meta http-equiv="refresh" content="4">
 {%- endif %}
 <title>HoldFor board</title>
@@ -158,7 +160,7 @@
   <tbody>
   {% for item in items %}
   <tr{% if item.stop_condition %} class="flagged"{% endif %}>
-    <td class="who"><a href="/review-items/{{ item.id }}/view">{{ item.first_name }} {{ item.surname }}</a></td>
+    <td class="who"><a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a></td>
     <td class="seen-for">{{ item.appointment_type }}<span class="stamp">{{ item.seen_on }}</span></td>
     <td>{% if item.feeling %}<span class="chip feel {{ item.feeling }}">{{ item.feeling }}</span>
         {%- else %}<span class="chip unanswered">not answered</span>{% endif %}</td>
@@ -207,7 +209,7 @@
   <tbody>
   {% for item in awaiting_call %}
   <tr>
-    <td class="who"><a href="/review-items/{{ item.id }}/view">{{ item.first_name }} {{ item.surname }}</a></td>
+    <td class="who"><a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a></td>
     <td class="seen-for">{{ item.earliest_date }} to {{ item.latest_date }}
       <span class="stamp">{{ item.time_of_day }} &middot; {{ item.mode.replace("_", " ") }}
         {%- if item.clinician %} &middot; {{ item.clinician }}{% endif %}</span></td>
@@ -246,3 +248,17 @@
 {% endif %}
 
 </div>
+
+{% if open_item %}
+{#- Outside `.page` on purpose: a fixed overlay inside a contained ancestor is
+    positioned against that ancestor instead of the viewport. The scrim is a link, so
+    clicking away from the sheet closes it without a line of script. #}
+<a class="scrim" href="/" aria-label="Close"></a>
+<aside class="sheet" aria-label="{{ open_item.first_name }} {{ open_item.surname }}">
+  <div class="shutbar">
+    <span class="where">Review item</span>
+    <a class="shut" href="/">Close &times;</a>
+  </div>
+  {% with item = open_item %}{% include "_item.html" %}{% endwith %}
+</aside>
+{% endif %}

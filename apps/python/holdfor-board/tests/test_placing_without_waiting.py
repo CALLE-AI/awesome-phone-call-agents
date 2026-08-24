@@ -145,6 +145,23 @@ def test_the_page_reloads_itself_only_while_a_call_is_in_flight(board, held):
     assert "On the phone now" not in settled
 
 
+def test_an_open_sheet_stops_the_board_reloading_underneath_it(board, held, conn):
+    """The two features would otherwise fight.
+
+    A reload every four seconds empties a half-typed Release to update a count behind
+    it. Opening a sheet is a deliberate act on one item; the queue can wait until she
+    closes it, and then it starts moving again.
+    """
+    board.post(f"/checkins/{CONSENTING}", headers=FORM)
+    held.land()
+    item_id = state_of(conn, CONSENTING)["review_item_id"]
+
+    board.post("/checkins/2", headers=FORM)
+
+    assert 'http-equiv="refresh"' in board.get("/").text
+    assert 'http-equiv="refresh"' not in board.get(f"/?open={item_id}").text
+
+
 def test_the_number_in_flight_is_masked_like_every_other(board, conn, today):
     board.post(f"/checkins/{CONSENTING}", headers=FORM)
     number = conn.execute(

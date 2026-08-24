@@ -7,6 +7,7 @@ is tested against the shapes it actually reads and needs no recorded transcript.
 from __future__ import annotations
 
 import json
+from datetime import date
 from itertools import count
 
 import pytest
@@ -254,6 +255,76 @@ def test_an_unknown_review_item_is_a_404(client):
     assert client.get("/review-items/9999").status_code == 404
 
 
+# --- the sheet --------------------------------------------------------------------
+#
+# One Review Item read over the top of the queue rather than instead of it. A Reviewer
+# decides by comparing: this row against the five above it, what was heard against what
+# was recorded. Sending her to a page of her own took the comparison away and made
+# getting back a navigation. `?open=` keeps the queue behind her and keeps Back honest.
+
+
+def test_a_patient_name_opens_the_sheet_rather_than_leaving_the_board(conn, client):
+    """The link she actually clicks. Nothing in the queue navigates away from it."""
+    item_id = add_item(conn)
+
+    board = client.get("/").text
+
+    assert f'href="/?open={item_id}"' in board
+    assert "/view" not in board
+
+
+def test_the_sheet_carries_the_whole_item_and_leaves_the_queue_behind(
+    conn, client, transcript_file
+):
+    item_id = add_item(conn, transcript_path=transcript_file)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert 'class="sheet"' in page
+    assert "Hello, is that Margaret?" in page
+    assert "Release for rebooking" in page
+    assert "Review queue" in page
+
+
+def test_the_plain_queue_carries_no_sheet(conn, client, transcript_file):
+    """The transcript is a file read and the board reloads itself while a call is in
+    the air. Nothing is fetched for a sheet nobody asked for."""
+    add_item(conn, transcript_path=transcript_file)
+
+    page = client.get("/").text
+
+    assert 'class="sheet"' not in page
+    assert "Release for rebooking" not in page
+    assert "Hello, is that Margaret?" not in page
+
+
+def test_the_sheet_closes_two_ways_and_neither_is_script(conn, client):
+    """Click away or press Close, and both are links to the queue. That is also what
+    makes the browser's own Back button the way out."""
+    item_id = add_item(conn)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert '<a class="scrim" href="/"' in page
+    assert '<a class="shut" href="/"' in page
+    assert "<script" not in page
+
+
+def test_the_release_form_in_the_sheet_still_offers_today(conn, client):
+    """`today` on the board is how many calls went out; `today_iso` is the date the
+    envelope starts on. The sheet renders inside the board's context, so the two names
+    have to stay apart or the date input silently receives a count."""
+    item_id = add_item(conn)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert f'name="earliest_date" value="{date.today().isoformat()}"' in page
+
+
+def test_opening_an_item_that_is_not_there_is_a_404(client):
+    assert client.get("/?open=9999").status_code == 404
+
+
 # --- the Release ------------------------------------------------------------------
 
 
@@ -437,8 +508,13 @@ def test_a_settled_item_cannot_be_settled_again(conn, client):
 # --- the path a Reviewer actually uses -------------------------------------------
 
 
-def test_the_submitted_form_releases_and_returns_to_the_item(conn, client):
-    """The form posts form-encoded, not JSON. Same rules, different content type."""
+def test_the_submitted_form_releases_and_returns_to_the_queue(conn, client):
+    """The form posts form-encoded, not JSON. Same rules, different content type.
+
+    Back to the queue rather than back to the item: the Release has moved this one
+    into "Released, awaiting the call", and the sheet it was granted from would
+    otherwise reopen still offering to grant a second.
+    """
     item_id = add_item(conn, wants_seen="yes")
     body = envelope(clinician="")
     body.pop("clinician")
@@ -448,7 +524,7 @@ def test_the_submitted_form_releases_and_returns_to_the_item(conn, client):
     )
 
     assert response.status_code == 303
-    assert response.headers["location"] == f"/review-items/{item_id}/view"
+    assert response.headers["location"] == "/"
     assert _status(conn, item_id) == ReviewStatus.RELEASED.value
 
 

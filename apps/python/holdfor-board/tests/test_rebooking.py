@@ -517,7 +517,7 @@ def test_the_release_form_starts_with_an_empty_words_box():
     from pathlib import Path
 
     template = (
-        Path(rebooking.__file__).parent / "templates" / "detail.html"
+        Path(rebooking.__file__).parent / "templates" / "_item.html"
     ).read_text(encoding="utf-8")
     assert 'name="approved_words"' in template
     assert 'name="approved_words">{{ item.carried_words_text' not in template
@@ -527,7 +527,7 @@ def test_the_release_form_offers_any_as_an_appointment_mode():
     from pathlib import Path
 
     template = (
-        Path(rebooking.__file__).parent / "templates" / "detail.html"
+        Path(rebooking.__file__).parent / "templates" / "_item.html"
     ).read_text(encoding="utf-8")
     assert '<option value="any">any</option>' in template
 

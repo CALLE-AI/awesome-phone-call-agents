@@ -201,6 +201,84 @@ section.ringing li .name{font-weight:500;min-width:11rem}
 section.ringing li .num{font-family:var(--mono);font-size:.76rem;color:var(--note);flex:1}
 .chip.live{color:var(--note);background:var(--note-soft);border-color:var(--note)}
 
+/* one Review Item, read the same way on its own page or in the sheet */
+.split{display:grid;gap:2rem;margin-bottom:2.5rem}
+@media (min-width:60rem){.page>.split{grid-template-columns:1.15fr 1fr;gap:3rem}}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:1.1rem 1.25rem}
+.turn{padding:.5rem 0;border-bottom:1px solid var(--rule-soft);font-size:.9rem;line-height:1.5}
+.turn:last-child{border-bottom:none}
+.turn.agent{color:var(--muted)}
+.turn.other{color:var(--ink)}
+.turn .idx{
+  font-family:var(--mono);font-size:.68rem;color:var(--faint);
+  display:inline-block;min-width:4.4rem;letter-spacing:.02em;
+}
+.turn.anchored{
+  background:var(--note-soft);margin-inline:-1.25rem;padding-inline:1.25rem;
+  box-shadow:inset 3px 0 0 var(--note);
+}
+.recorded{display:grid;grid-template-columns:max-content 1fr;gap:.7rem 1.1rem;margin:0}
+.recorded dt{
+  font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding-top:.25rem;
+}
+.recorded dd{margin:0}
+form.act{margin-top:2.5rem;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:1.4rem 1.5rem}
+form.act h2{margin-bottom:.6rem}
+fieldset{border:1px solid var(--rule);border-radius:2px;margin:0 0 1.2rem;padding:.9rem 1.1rem 1.1rem}
+legend{
+  font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding:0 .4rem;
+}
+label{display:block;font-size:.76rem;font-weight:500;letter-spacing:.03em;color:var(--muted);margin-top:.7rem}
+input,select,textarea{
+  font:inherit;font-size:.9rem;font-family:var(--sans);width:100%;margin-top:.25rem;
+  padding:.5rem .6rem;min-height:44px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--rule);border-radius:2px;
+}
+textarea{min-height:5rem;font-family:var(--serif);font-size:.98rem;line-height:1.5}
+.row{display:grid;gap:.9rem}
+@media (min-width:44rem){.row{grid-template-columns:repeat(2,1fr)}.row.three{grid-template-columns:repeat(3,1fr)}}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.4rem;align-items:center}
+.actions form{margin:0}
+.hdr{display:flex;flex-wrap:wrap;gap:.5rem;align-items:baseline;margin-bottom:1.5rem}
+
+/* the sheet — the same Review Item, over the board rather than instead of it.
+   Opened by a link and closed by a link, so Back is a real way out and this page
+   still has no script in it. The queue stays behind, so a Reviewer never loses the
+   row she came from. */
+.scrim{
+  position:fixed;inset:0;z-index:10;
+  background:rgb(20 35 43 / .4);backdrop-filter:blur(1.5px);
+  animation:scrim-in .16s ease-out;
+}
+.sheet{
+  --pad:1.35rem;
+  position:fixed;top:0;right:0;bottom:0;z-index:11;
+  width:min(52rem,100%);padding:0 var(--pad) 5rem;
+  overflow-y:auto;overscroll-behavior:contain;
+  background:var(--paper);border-left:1px solid var(--rule);
+  box-shadow:-24px 0 48px -28px rgb(0 0 0 / .5);
+  animation:sheet-in .24s cubic-bezier(.32,.72,0,1);
+}
+.sheet .shutbar{
+  position:sticky;top:0;z-index:2;
+  margin:0 calc(var(--pad) * -1) 1.2rem;padding:.9rem var(--pad) .6rem;
+  background:var(--paper);border-bottom:1px solid var(--rule-soft);
+  display:flex;justify-content:space-between;align-items:baseline;gap:1rem;
+}
+.sheet .shutbar .where{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.sheet .shut{font-size:.82rem;color:var(--muted);text-decoration:none;white-space:nowrap}
+.sheet .shut:hover{color:var(--ok)}
+.sheet form.act{margin-top:2rem}
+@media (min-width:52rem){.sheet{--pad:2.1rem;padding-bottom:6rem}}
+@media (min-width:58rem){.sheet .split{grid-template-columns:1.1fr 1fr}}
+/* The queue must not scroll under an open sheet: the wheel belongs to whatever is
+   being read, and that is the transcript. */
+html:has(.sheet){overflow:hidden}
+@keyframes sheet-in{from{transform:translateX(100%)}to{transform:none}}
+@keyframes scrim-in{from{opacity:0}to{opacity:1}}
+
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (min-width:52rem){ body{padding:2.5rem 2rem 6rem} h1{font-size:1.6rem} }
 </style>

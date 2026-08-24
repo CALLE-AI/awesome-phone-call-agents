@@ -1,0 +1,130 @@
+{#- One Review Item, read the same way whether it fills a page or slides over the
+    board. Nothing here knows which: no `.page`, no back link, no <title>. The two
+    callers supply that, so the reviewer sees identical words either way. #}
+<h1>{{ item.first_name }} {{ item.surname }}</h1>
+<div class="hdr">
+  <span class="sub" style="margin:0">{{ item.appointment_type }}, seen {{ item.seen_on }}</span>
+  {%- if item.stop_condition %}
+  <span class="chip stopped">stopped · {{ item.stop_reason }}</span>
+  {%- else %}
+  <span class="chip state">{{ item.status.replace("_", " ") }}</span>
+  {%- endif %}
+</div>
+
+<div class="split">
+  <section>
+    <h2>What she said</h2>
+    <div class="panel">
+      {% if turns %}
+        {% for turn in turns %}
+        <div class="turn {{ turn.speaker }}{% if turn.index in anchors.values() %} anchored{% endif %}">
+          <span class="idx">{{ turn.speaker }} {{ turn.index }}</span>{{ turn.text }}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="note" style="margin:0">No transcript stored for this call.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section>
+    <h2>What was recorded</h2>
+    <div class="panel">
+      <dl class="recorded">
+        <dt>Feeling</dt>
+        <dd>{% if item.feeling %}<span class="chip feel {{ item.feeling }}">{{ item.feeling }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "feeling" in anchors %}<span class="stamp">turn {{ anchors.feeling }}</span>{% endif %}</dd>
+
+        <dt>Medication</dt>
+        <dd>{% if item.medication_ok %}<span class="chip med {{ item.medication_ok }}">{{ item.medication_ok.replace("_", " ") }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "medication_ok" in anchors %}<span class="stamp">turn {{ anchors.medication_ok }}</span>{% endif %}</dd>
+
+        <dt>Wants to be seen</dt>
+        <dd>{% if item.wants_seen %}<span class="chip seen {{ item.wants_seen }}">{{ item.wants_seen }}</span>
+            {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+          {%- if "wants_seen" in anchors %}<span class="stamp">turn {{ anchors.wants_seen }}</span>{% endif %}</dd>
+
+        <dt>Her words</dt>
+        <dd class="words">
+          {%- if item.carried_words_text %}
+          <q>{{ item.carried_words_text }}</q><span class="stamp">turn {{ item.carried_words_turn }}</span>
+          {%- else %}<span class="nothing">nothing carried</span>{% endif %}
+        </dd>
+      </dl>
+    </div>
+  </section>
+</div>
+
+<form class="act" method="post" action="/review-items/{{ item.id }}/release">
+  <h2>Release</h2>
+  <p class="note" style="max-width:52rem">
+    This authorises one call to the practice's booking line on her behalf. The agent
+    accepts an offer inside the dates and times below and refuses anything outside
+    them. It will speak the words in the box and nothing else.
+  </p>
+
+  <fieldset>
+    <legend>Booking envelope</legend>
+    <div class="row">
+      <label>Earliest date <input type="date" name="earliest_date" value="{{ today_iso }}" required></label>
+      <label>Latest date <input type="date" name="latest_date" value="{{ today_iso }}" required></label>
+    </div>
+    <div class="row three">
+      <label>Time of day
+        <select name="time_of_day">
+          <option value="any">any</option>
+          <option value="morning">morning</option>
+          <option value="afternoon">afternoon</option>
+        </select>
+      </label>
+      <label>Appointment mode
+        <select name="mode">
+          <option value="any">any</option>
+          <option value="in_person">in person</option>
+          <option value="phone">phone</option>
+        </select>
+      </label>
+      <label>Clinician <input type="text" name="clinician" placeholder="any clinician"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Words that may be spoken</legend>
+    <label>
+      <textarea name="approved_words" placeholder="empty: nothing will be spoken"></textarea>
+    </label>
+    <p class="note" style="margin-top:.7rem">
+      {%- if item.carried_words_text %}
+      Her sentence is above, at turn {{ item.carried_words_turn }}. Copy in the part
+      reception may hear. This box starts empty on purpose: nothing is spoken unless you
+      put it here, and an empty Release is valid. Her own words may name a medicine, and
+      that is exactly what must not travel to a receptionist.
+      {%- else %}
+      Nothing was carried from this call, so there is nothing to approve. Leave this
+      empty.
+      {%- endif %}
+    </p>
+    <p class="note" style="margin-top:.5rem">
+      You may shorten what she said. You may not add to it: anything that is not part of
+      her own sentence is refused, because a receptionist would hear it as her words.
+    </p>
+  </fieldset>
+
+  <label style="max-width:22rem">Your name <input type="text" name="reviewer_name" required></label>
+  <p class="note" style="margin-top:.5rem">Recorded with the Release. A release always says who granted it.</p>
+
+  <div class="actions">
+    <button class="primary" type="submit">Release for rebooking</button>
+  </div>
+</form>
+
+<div class="actions">
+  <form method="post" action="/review-items/{{ item.id }}/close">
+    <button type="submit">Close, nothing needed</button>
+  </form>
+  <form method="post" action="/review-items/{{ item.id }}/manual">
+    <button type="submit">Ring them myself</button>
+  </form>
+</div>
