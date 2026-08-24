@@ -7,7 +7,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from . import db, redflags, window
-from .extract import extract, no_answers
+from .extract import EXTRACTION_FAILED, extract, no_answers
 from .outcomes import connected, review_status_for
 from .models import (
     Appointment,
@@ -257,8 +257,16 @@ def recover_carried_words(result, extraction) -> Extraction:
     less to release, and the second call is then one where she has to explain herself
     a third time. The recovered span is sliced out of her own turn, so nothing here
     can produce words she did not say.
+
+    `extraction_failed` is the one refusal that does not mean the agent got something
+    wrong. It means the platform returned no structured block at all, which is every
+    live call: `call start` has no way to carry a result schema. Refusing to recover
+    from it left `carried_words_text` NULL on every real call, and `_narrowed_words`
+    then refused a Reviewer her own patient's verbatim sentence as `words_widened`.
+    Every other reason still blocks recovery, because every other reason is the agent
+    reporting something about the call rather than the platform saying nothing at all.
     """
-    if extraction.stop_reason is not None:
+    if extraction.stop_reason not in (None, EXTRACTION_FAILED):
         return extraction
     if extraction.carried_words_text is not None:
         return extraction

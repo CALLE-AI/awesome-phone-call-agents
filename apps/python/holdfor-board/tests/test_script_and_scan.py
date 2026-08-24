@@ -26,7 +26,7 @@ from holdfor.checkin import (
     settle_stop_condition,
     weekday_of,
 )
-from holdfor.extract import NOT_VERBATIM
+from holdfor.extract import EXTRACTION_FAILED, NOT_VERBATIM
 from holdfor.models import (
     CallResult,
     CallState,
@@ -413,6 +413,48 @@ def test_recovery_leaves_a_refused_extraction_alone():
     refused = clean_extraction(stop_condition=True, stop_reason=NOT_VERBATIM)
 
     assert recover_carried_words(as_result(transcript), refused) is refused
+
+
+def test_recovery_fires_when_the_platform_returned_no_structure_at_all():
+    """The one refusal that is not the agent getting something wrong.
+
+    `extraction_failed` means there was no structured block to read, which is every
+    live call: `call start` cannot carry a result schema. Blocking recovery on it left
+    `carried_words_text` NULL on every real call, and `_narrowed_words` then refused a
+    Reviewer her own patient's verbatim sentence as `words_widened`. The words were
+    visible in the transcript and impossible to release.
+    """
+    transcript = four_questions("My knee has been giving me trouble on the stairs.")
+    live = clean_extraction(stop_condition=True, stop_reason=EXTRACTION_FAILED)
+
+    recovered = recover_carried_words(as_result(transcript), live)
+
+    assert recovered.carried_words_text == (
+        "My knee has been giving me trouble on the stairs"
+    )
+    assert recovered.carried_words_text in transcript[recovered.carried_words_turn].text
+
+
+def test_recovery_does_not_pretend_the_extraction_worked():
+    """The span is filled in; the refusal is not withdrawn. Nobody said the four
+    fields came back, and the item still queues for a person."""
+    transcript = four_questions("My knee has been giving me trouble on the stairs.")
+    live = clean_extraction(stop_condition=True, stop_reason=EXTRACTION_FAILED)
+
+    recovered = recover_carried_words(as_result(transcript), live)
+
+    assert recovered.stop_reason == EXTRACTION_FAILED
+    assert recovered.stop_condition is True
+    assert recovered.feeling is live.feeling
+
+
+def test_a_live_call_with_nothing_worth_quoting_still_carries_nothing():
+    """Narrowing the guard opened a door, not a tap. The span still has to survive
+    every test in `extract_carried_words`."""
+    transcript = four_questions("No, nothing really.")
+    live = clean_extraction(stop_condition=True, stop_reason=EXTRACTION_FAILED)
+
+    assert recover_carried_words(as_result(transcript), live).carried_words_text is None
 
 
 # --- a transcript that never arrived ---------------------------------------------
