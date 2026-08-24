@@ -90,6 +90,51 @@ test("fails closed when readiness is not explicitly ready", () => {
   }
 });
 
+test("fails closed when the loading-dock requirement is unknown", () => {
+  const vendor: VendorPlan = {
+    ...resolvedVendorPlans[0],
+    needsLoadingDock: "unknown",
+  };
+  const conflicts = detectConflicts(fixtureVenue, [vendor]);
+  assert.equal(conflicts.filter((conflict) => conflict.type === "UNKNOWN_INPUT").length, 1);
+  assert.equal(
+    conflicts.some((conflict) => conflict.detail.includes("loading-dock requirement")),
+    true,
+  );
+  assert.equal(readinessSummary([vendor], conflicts).status, "blocked");
+});
+
+test("fails closed when a ready claim carries a stated blocker", () => {
+  const vendor: VendorPlan = {
+    ...resolvedVendorPlans[0],
+    blocker: "  Waiting on generator approval.  ",
+  };
+  const conflicts = detectConflicts(fixtureVenue, [vendor]);
+  assert.equal(
+    conflicts.some((conflict) => conflict.type === "READINESS_NOT_CONFIRMED"),
+    true,
+  );
+  assert.equal(
+    conflicts.some((conflict) => conflict.detail.includes("generator approval")),
+    true,
+  );
+  assert.equal(readinessSummary([vendor], conflicts).status, "blocked");
+});
+
+test("readiness summary stays blocked on unresolved inputs even without conflicts", () => {
+  const unknownDock: VendorPlan = {
+    ...resolvedVendorPlans[0],
+    needsLoadingDock: "unknown",
+  };
+  const statedBlocker: VendorPlan = {
+    ...resolvedVendorPlans[1],
+    blocker: "Crate unopened.",
+  };
+
+  assert.equal(readinessSummary([unknownDock], []).status, "blocked");
+  assert.equal(readinessSummary([statedBlocker], []).status, "blocked");
+});
+
 test("does not report an empty vendor plan as ready", () => {
   assert.deepEqual(readinessSummary([], []), {
     readyCount: 0,
