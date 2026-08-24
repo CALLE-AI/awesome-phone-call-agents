@@ -25,6 +25,19 @@ def never_live(monkeypatch):
     monkeypatch.delenv("CALLE_LIVE", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def never_calls_out(monkeypatch):
+    """No test may reach the Anthropic API either, however the machine is configured.
+
+    The second-pass extractor is gated on a key being present, so a developer who
+    exported one must not thereby turn the suite into something that costs money, goes
+    over the network, and answers differently on Tuesday. A test that wants the
+    extractor supplies its own answers.
+    """
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("HOLDFOR_EXTRACT_MODEL", raising=False)
+
+
 @pytest.fixture
 def today():
     return date(2026, 8, 20)

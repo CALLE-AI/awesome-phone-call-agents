@@ -25,9 +25,24 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     return conn
 
 
+# Columns added to a table that already exists. `CREATE TABLE IF NOT EXISTS` does
+# nothing to a database that has the table already, so a new column has to be added by
+# name — and `init` runs on every start, over ledgers that hold real calls, so each one
+# has to be safe to attempt twice.
+ADDED_COLUMNS = (("review_item", "answers_from", "TEXT"),)
+
+
 def init(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+    for table, column, kind in ADDED_COLUMNS:
+        if column in columns(conn, table):
+            continue
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
     conn.commit()
+
+
+def columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
 def patient(conn: sqlite3.Connection, patient_id: int) -> Patient | None:

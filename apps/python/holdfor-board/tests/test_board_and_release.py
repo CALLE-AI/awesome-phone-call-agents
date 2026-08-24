@@ -749,3 +749,47 @@ def test_a_board_with_nothing_settled_offers_no_such_list(conn, client):
     add_item(conn, feeling="worse")
 
     assert "Settled today" not in client.get("/").text
+
+
+def test_the_sheet_says_when_the_board_read_the_answers_itself(conn, client):
+    """A Reviewer looking at "worse" is entitled to know whether the agent on the call
+    said so or whether this app decided it afterwards from the recording."""
+    item_id = add_item(conn, feeling="worse")
+    conn.execute(
+        "UPDATE review_item SET answers_from = 'transcript' WHERE id = ?", (item_id,)
+    )
+    conn.commit()
+
+    assert "This board read these three out of the transcript" in (
+        client.get(f"/?open={item_id}").text
+    )
+
+
+def test_answers_the_call_reported_get_no_such_note(conn, client):
+    """That is the baseline, and labelling it would make the exception invisible."""
+    item_id = add_item(conn, feeling="worse")
+    conn.execute(
+        "UPDATE review_item SET answers_from = 'agent' WHERE id = ?", (item_id,)
+    )
+    conn.commit()
+
+    assert "read these three out of the transcript" not in (
+        client.get(f"/?open={item_id}").text
+    )
+
+
+def test_the_patient_on_the_row_is_not_assumed_to_be_a_woman(conn, client):
+    """The copy was written when Margaret was the only patient in the fixtures, and
+    every one of these sat above whichever name the row actually held."""
+    item_id = add_item(conn, wants_seen="yes")
+
+    sheet = client.get(f"/?open={item_id}").text
+    board = client.get("/").text
+
+    assert "What they said" in sheet
+    assert "Their words" in sheet
+    assert "on their behalf" in sheet
+    assert "You may shorten what they said" in sheet
+    assert "<th>Their words</th>" in board
+    assert "What she said" not in sheet
+    assert "Her words" not in board

@@ -10,6 +10,11 @@ dependencies = [
     # The Release form posts form-encoded, and Starlette cannot parse a form without
     # this. Not optional: without it the board renders and every Release fails.
     "python-multipart>=0.0.9",
+    # The second pass that reads the four answers back out of a transcript, because
+    # `calle call start` cannot carry a result schema. Optional at runtime: the
+    # extractor is gated on ANTHROPIC_API_KEY and every failure, import errors
+    # included, ends as `extraction_failed` and a call a person reads.
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]

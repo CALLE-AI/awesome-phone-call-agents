@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS call_attempt (
     updated_at      TEXT    NOT NULL
 );
 
+-- `answers_from` is 'agent' when the call itself returned the answers, 'transcript'
+-- when this app read them back out of the recording afterwards, and NULL when nobody
+-- has any. A Reviewer looking at "worse" is entitled to know which, because the two
+-- are not equally close to the person who said it.
+--
+-- It arrived after this table did, so `db.init` also adds it by name to a ledger that
+-- already exists: see ADDED_COLUMNS in db.py. Comments stay outside the table body,
+-- because SQLite re-parses the stored CREATE TABLE text to run ALTER TABLE DROP
+-- COLUMN and a comment left dangling beside a removed column fails that parse.
 CREATE TABLE IF NOT EXISTS review_item (
     id                 INTEGER PRIMARY KEY,
     call_attempt_id    INTEGER NOT NULL REFERENCES call_attempt(id),
@@ -40,7 +49,8 @@ CREATE TABLE IF NOT EXISTS review_item (
     stop_condition     INTEGER NOT NULL,
     stop_reason        TEXT,
     status             TEXT    NOT NULL,
-    created_at         TEXT    NOT NULL
+    created_at         TEXT    NOT NULL,
+    answers_from       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS release (

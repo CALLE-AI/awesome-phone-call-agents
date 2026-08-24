@@ -6,7 +6,7 @@ from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
-from . import db, redflags, window
+from . import db, redflags, reextract, window
 from .extract import EXTRACTION_FAILED, extract, no_answers
 from .outcomes import connected, review_status_for
 from .models import (
@@ -523,6 +523,11 @@ def finish(conn: sqlite3.Connection, provider, attempt_id: int) -> int:
 
     medication_changed = bool(row["medication_changed"])
     if connected(result.outcome):
+        # The platform cannot carry a result schema, so a live call arrives with a
+        # transcript and no answers. `reextract` reads them back out of the transcript
+        # when it can, and hands back the same result untouched when it cannot — and
+        # either way what comes out goes through `extract` unchanged, quote included.
+        result, answers_from = reextract.fill(result, medication_changed)
         extraction = recover_carried_words(
             result, extract(result, medication_changed)
         )
@@ -532,6 +537,7 @@ def finish(conn: sqlite3.Connection, provider, attempt_id: int) -> int:
         # nothing to map. ADR 0006: a refusal carries no Stop Condition.
         extraction = no_answers()
         stop_condition, stop_reason = False, None
+        answers_from = None
 
     status = review_status_for(result.outcome, CallKind.CHECKIN)
     if stop_reason == DECLINED:
@@ -569,8 +575,8 @@ def finish(conn: sqlite3.Connection, provider, attempt_id: int) -> int:
             INSERT INTO review_item
                 (call_attempt_id, feeling, medication_ok, wants_seen,
                  carried_words_text, carried_words_turn,
-                 stop_condition, stop_reason, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 stop_condition, stop_reason, status, created_at, answers_from)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 attempt_id,
@@ -583,6 +589,9 @@ def finish(conn: sqlite3.Connection, provider, attempt_id: int) -> int:
                 stop_reason,
                 status.value,
                 db.now_iso(),
+                # Nothing when there are no answers. A Review Item with three empty
+                # fields has no source to name, and naming one would suggest it does.
+                answers_from if extraction.feeling else None,
             ),
         )
         conn.commit()
