@@ -76,6 +76,16 @@ class FakeProvider:
 
 LIVE_FLAG = "CALLE_LIVE"
 
+# A transcript pinned to an idempotency key, so a recording does not vary between
+# takes. Absent by default: an unrouted run picks by key exactly as it always did.
+ROUTE_FILE = "HOLDFOR_ROUTE"
+
+# Named, never inferred. A country code is not a region and not a language, and the
+# number that connects from one region does not connect from another. Every skill in
+# this repository refuses to guess these from a phone number, and so does this.
+REGION = "HOLDFOR_REGION"
+LANGUAGE = "HOLDFOR_LANGUAGE"
+
 # The attribution environment the calle skill requires on every invocation.
 CALLE_ENV = {
     "CALLE_SOURCE": "skills_sh",
@@ -243,11 +253,28 @@ class LiveProvider:
         self._authorised = False
         self._captured: dict[str, str] = {}
 
+    def dial_options(self) -> list[str]:
+        """Region and language, only when somebody named them."""
+        options = []
+        region = os.environ.get(REGION)
+        if region:
+            options += ["--region", region]
+        language = os.environ.get(LANGUAGE)
+        if language:
+            options += ["--language", language]
+        return options
+
     def place(self, req: CallRequest) -> str:
         self._authorise()
         try:
             payload = self._command(
-                "call", "start", "--to-phone", req.to_e164, "--goal", req.task_text
+                "call",
+                "start",
+                "--to-phone",
+                req.to_e164,
+                "--goal",
+                req.task_text,
+                *self.dial_options(),
             )
         except _Ambiguous as ambiguous:
             # The submission left us and we did not learn what became of it. Not
@@ -384,6 +411,25 @@ class LiveProvider:
         self._captured[run_id] = f"{self._capture_dir.name}/{name}"
 
 
+def route_from_env() -> dict[str, str]:
+    """The pinned transcripts, or none at all.
+
+    A malformed route raises rather than falling back to picking by key: a recording
+    that silently ignored its own route would show the wrong patient's transcript,
+    which is the thing the route exists to prevent.
+    """
+    path = os.environ.get(ROUTE_FILE)
+    if not path:
+        return {}
+    loaded = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict) or not all(
+        isinstance(key, str) and isinstance(value, str)
+        for key, value in loaded.items()
+    ):
+        raise ValueError(f"{ROUTE_FILE}: expected an object of key to filename")
+    return loaded
+
+
 def default_provider():
     """`FakeProvider` unless live is switched on explicitly, by name, as `1`.
 
@@ -392,4 +438,4 @@ def default_provider():
     """
     if os.environ.get(LIVE_FLAG) == "1":
         return LiveProvider()
-    return FakeProvider()
+    return FakeProvider(route=route_from_env())

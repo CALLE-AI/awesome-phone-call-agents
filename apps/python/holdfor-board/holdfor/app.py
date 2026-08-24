@@ -373,12 +373,15 @@ def board_payload(conn: sqlite3.Connection, provider=None) -> dict:
         "live_calls": conn.execute(
             "SELECT COUNT(*) AS n FROM live_call"
         ).fetchone()["n"],
+        # Check-ins only. A Rebooking Call never has a Review Item of its own, so
+        # without the kind a successful second call reports itself as a submission
+        # nobody confirmed.
         "awaiting_reconciliation": conn.execute(
             """
             SELECT COUNT(*) AS n
             FROM call_attempt
             LEFT JOIN review_item ON review_item.call_attempt_id = call_attempt.id
-            WHERE review_item.id IS NULL
+            WHERE review_item.id IS NULL AND call_attempt.kind = 'checkin'
             """
         ).fetchone()["n"],
         "auto_closed": sum(
@@ -396,6 +399,12 @@ def board_payload(conn: sqlite3.Connection, provider=None) -> dict:
         ),
         "not_reached": sum(
             1 for item in todays if item["status"] == ReviewStatus.NOT_REACHED
+        ),
+        # The one outcome the whole board exists to reach. Counted for the same
+        # reason as the two above: without it a booked item leaves `needs_review`
+        # and lands nowhere, which reads as the row having been lost.
+        "booked": sum(
+            1 for item in todays if item["status"] == ReviewStatus.BOOKED
         ),
         "items": [
             item for item in items if item["status"] == ReviewStatus.NEEDS_REVIEW

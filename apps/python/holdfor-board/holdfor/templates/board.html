@@ -35,6 +35,9 @@
   {%- if not_reached %}
   <div class="quiet"><b>{{ not_reached }}</b><span>Not reached</span></div>
   {%- endif %}
+  {%- if booked %}
+  <div class="done"><b>{{ booked }}</b><span>Booked</span></div>
+  {%- endif %}
   <div class="budget"><b>{{ live_calls }} <em>of 20</em></b><span>Live calls used</span></div>
   {%- if awaiting_reconciliation %}
   <div class="you"><b>{{ awaiting_reconciliation }}</b><span>Awaiting reconciliation</span></div>
