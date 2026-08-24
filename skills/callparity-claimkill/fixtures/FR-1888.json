@@ -1,0 +1,72 @@
+{
+  "ticket_id": "FR-1888",
+  "sku": "PL-9F21",
+  "spoken_time_budget_s": 90,
+  "parties": [
+    {
+      "role": "warehouse",
+      "label": "A",
+      "phone": "+15550100188",
+      "consent": true
+    },
+    {
+      "role": "driver",
+      "label": "B",
+      "phone": "+15550100189",
+      "consent": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "dock",
+      "text": "Pallet PL-9F21 staged at dock 2.",
+      "evidence": {
+        "span": {
+          "quote": "staged at dock 2"
+        }
+      },
+      "observable_of": "dock_location",
+      "status": "UNTESTED",
+      "confidence": 0.9,
+      "party": "A"
+    },
+    {
+      "id": "arrival",
+      "text": "Driver reached the gate for PL-9F21.",
+      "evidence": {
+        "span": {
+          "quote": "truck at the gate"
+        }
+      },
+      "observable_of": "driver_arrival",
+      "status": "UNTESTED",
+      "confidence": 0.86,
+      "party": "A"
+    },
+    {
+      "id": "seal",
+      "text": "Seal digits might have been read.",
+      "evidence": {
+        "span": {
+          "quote": "maybe a seal"
+        }
+      },
+      "observable_of": "seal_recorded",
+      "status": "UNTESTED",
+      "confidence": 0.31,
+      "party": "A"
+    }
+  ],
+  "candidate_questions": [
+    {
+      "id": "q-dock",
+      "text": "Which dock did you pull to for pallet PL-9F21?",
+      "targets": ["dock"]
+    }
+  ],
+  "call": {
+    "id": "call-nplus1-fr-1888",
+    "disposition": "voicemail",
+    "quotes": []
+  }
+}
