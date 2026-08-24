@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, time, timedelta
 
 CHECKIN_DAY = 3
@@ -36,3 +37,50 @@ def open_at(now: datetime) -> bool:
     if now.weekday() >= SATURDAY:
         return False
     return OPENS <= now.time() < CLOSES
+
+
+# The clock this process is told it is. Not an override of the Reading Window: the rule
+# stays 10:00 to 16:00 on a weekday and nothing here relaxes it. What this changes is
+# what time the app believes it is, which is the same lever `create_app(clock=...)` and
+# `start(now=...)` already hand a test — the docstrings above say so — and which was
+# reachable from nowhere else.
+#
+# The distinction matters because the window has no override on purpose: 16:00 exists
+# because a flagged Review Item after it sits unread overnight, and a switch that let
+# somebody call at 18:00 anyway would quietly delete the reason. A pinned clock cannot
+# be mistaken for the real one, because everything that reads it says so out loud — the
+# board carries a banner and the CLI prints a line. Whoever set it can see they set it,
+# and so can anybody watching a recording.
+PINNED = "HOLDFOR_NOW"
+
+
+def pinned() -> datetime | None:
+    """The time somebody has told this process it is, or nothing.
+
+    Accepts a full ISO datetime, or a bare `HH:MM` meaning that time today. The bare
+    form is the one worth reaching for: the due list is judged against this clock too,
+    so pinning a different date silently changes which Appointments come due, and
+    `HOLDFOR_NOW=11:00` moves the hour without touching the day.
+
+    A value that cannot be read raises rather than falling back to the real clock. The
+    fallback would refuse a call for being outside the window while the setting meant
+    to open it sat there misspelt.
+    """
+    raw = (os.environ.get(PINNED) or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        pass
+    try:
+        return datetime.combine(date.today(), time.fromisoformat(raw))
+    except ValueError:
+        raise ValueError(
+            f"{PINNED}={raw!r}: expected an ISO datetime or a HH:MM time"
+        ) from None
+
+
+def clock() -> datetime:
+    """What the app believes the time is. The pinned one if there is one."""
+    return pinned() or datetime.now()

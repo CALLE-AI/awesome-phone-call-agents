@@ -36,6 +36,19 @@
 </p>
 {% endif %}
 
+{% if pinned_clock %}
+{#- Loud on purpose. The Reading Window has no override; this is the app being told
+    what time it is, which is the same lever the tests use. It is still the one thing
+    on this page that is not true of the world, so it says so where nobody reading the
+    board — or watching a recording of it — could miss it. #}
+<p class="banner pinned">
+  <strong>The clock is pinned.</strong> This board is judged against
+  <strong>{{ pinned_clock.strftime("%A %d %B, %H:%M") }}</strong>, not the real time.
+  Calls will be placed or refused by that clock. Unset <code>HOLDFOR_NOW</code> and
+  restart to use the real one.
+</p>
+{% endif %}
+
 <div class="counts">
   <div><b>{{ today }}</b><span>Called today</span></div>
   <div class="quiet"><b>{{ auto_closed }}</b><span>Closed, nothing needed</span></div>

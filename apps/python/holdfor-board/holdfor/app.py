@@ -186,7 +186,12 @@ def create_app(
     app = FastAPI(title="HoldFor board")
     app.state.db_path = db_path or db.default_path()
     app.state.provider = provider or default_provider()
-    app.state.clock = clock or datetime.now
+    # `window.clock` rather than `datetime.now`, so a pinned clock reaches the board
+    # the same way it reaches the CLI. A malformed one raises here, at startup, rather
+    # than refusing calls later for a reason nobody could see.
+    if clock is None:
+        window.pinned()
+    app.state.clock = clock or window.clock
     app.state.background = background or in_the_background
 
     def connection(request: Request) -> sqlite3.Connection:
@@ -574,6 +579,11 @@ def board_payload(
     due, withheld = due_checkins(conn, due_on or date.today())
     ringing, unreconciled = unfinished(conn)
     return {
+        # Said out loud because it is the one thing on this page that is not true of
+        # the world. A pinned clock is the price of testing outside the Reading Window
+        # and it must never be the quiet kind: whoever set it can see they set it, and
+        # so can anybody watching a recording of this screen.
+        "pinned_clock": window.pinned(),
         # Whether pressing a button on this page spends one of twenty calls. The
         # board says so before it is pressed rather than after.
         "live": bool(getattr(provider, "live", False)),

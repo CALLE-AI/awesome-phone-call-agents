@@ -13,7 +13,7 @@ from itertools import count
 import pytest
 from fastapi.testclient import TestClient
 
-from holdfor import db, review
+from holdfor import db, review, window
 from holdfor.app import create_app
 from holdfor.models import ReviewStatus
 
@@ -793,3 +793,43 @@ def test_the_patient_on_the_row_is_not_assumed_to_be_a_woman(conn, client):
     assert "<th>Their words</th>" in board
     assert "What she said" not in sheet
     assert "Her words" not in board
+
+
+# --- the clock the board is judged against ----------------------------------------
+
+
+def test_a_pinned_clock_is_announced_on_the_board(db_path, monkeypatch):
+    """The Reading Window has no override, and this is not one: it tells the app what
+    time it is, which is the lever every test already uses. What it must never be is
+    quiet — the hour is the whole reason a call is allowed, so a board judged against
+    a made-up one says so where a reader, or a recording, cannot miss it."""
+    monkeypatch.setenv("HOLDFOR_NOW", "11:00")
+    page = TestClient(create_app(db_path=db_path)).get("/").text
+
+    assert "The clock is pinned" in page
+    assert "11:00" in page
+
+
+def test_a_real_clock_says_nothing(db_path, monkeypatch):
+    monkeypatch.delenv("HOLDFOR_NOW", raising=False)
+
+    assert "The clock is pinned" not in (
+        TestClient(create_app(db_path=db_path)).get("/").text
+    )
+
+
+def test_a_clock_nobody_can_read_fails_at_startup(db_path, monkeypatch):
+    """Not a fallback to the real time. That would refuse a call for being outside the
+    window while the setting meant to open it sat there misspelt."""
+    monkeypatch.setenv("HOLDFOR_NOW", "lunchtime")
+
+    with pytest.raises(ValueError, match="HOLDFOR_NOW"):
+        create_app(db_path=db_path)
+
+
+def test_a_bare_time_does_not_move_the_day(db_path, monkeypatch):
+    """The due list is judged against this clock too, so pinning a whole date would
+    quietly change which Appointments come due."""
+    monkeypatch.setenv("HOLDFOR_NOW", "11:00")
+
+    assert window.clock().date() == date.today()

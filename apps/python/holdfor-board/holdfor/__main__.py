@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from . import checkin, db, envfile, reextract, review, seed as seeding
+from . import checkin, db, envfile, reextract, review, seed as seeding, window
 from .extract import extract
 from .models import CallResult, CallState
 from .providers import LIVE_FLAG, default_provider
@@ -28,8 +28,14 @@ def cmd_init(_: list[str]) -> int:
 
 def place(conn, provider, appointment_id: int) -> None:
     """One appointment, one line of output, whichever provider is in hand."""
+    now = window.clock()
+    if window.pinned():
+        # Never quietly. The Reading Window is the rule this appears to bend, and a
+        # line saying which clock refused or allowed a call is the difference between
+        # a test and a call nobody can account for.
+        print(f"{window.PINNED} is set: this call is judged against {now:%a %d %b %H:%M}.")
     try:
-        review_item_id = checkin.run(conn, provider, appointment_id)
+        review_item_id = checkin.run(conn, provider, appointment_id, now=now)
     except checkin.Refused as refused:
         print(f"appointment {appointment_id}: refused ({refused.reason})")
     except checkin.AwaitingReconciliation as pending:
