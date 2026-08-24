@@ -1,6 +1,8 @@
 import { read, utils, type WorkBook } from "xlsx";
 
-import type { CandidateInput } from "@/lib/db";
+import type { CandidateInput } from "@/lib/types";
+
+export { rosterStatus } from "@/lib/status";
 
 const MAX_ROWS = 500;
 
@@ -14,6 +16,14 @@ const RESUME_HEADERS = [
   "cv_link",
   "cv_url",
   "cv",
+];
+const JOB_ROLE_HEADERS = [
+  "job_role",
+  "role",
+  "position",
+  "job",
+  "job_title",
+  "opening",
 ];
 
 export type ParseIssue = {
@@ -49,10 +59,15 @@ function cell(row: unknown[], index: number): string {
   return String(value).trim();
 }
 
-function normalizePhone(value: string): string {
-  const compact = value.replace(/[\s()-]/g, "");
-  if (/^\d{8,15}$/.test(compact)) return `+${compact}`;
+export function normalizePhone(value: string): string {
+  let compact = value.replace(/[\s().-]/g, "");
+  if (compact.startsWith("00")) compact = `+${compact.slice(2)}`;
+  if (/^91\d{10}$/.test(compact)) return `+${compact}`;
   return compact;
+}
+
+export function isValidE164(phone: string): boolean {
+  return /^\+[1-9]\d{7,14}$/.test(phone);
 }
 
 function parseConsent(value: string): boolean {
@@ -88,6 +103,7 @@ export function parseWorkbook(buffer: ArrayBuffer): ParseResult {
   const phoneIndex = pickColumn(headers, PHONE_HEADERS);
   const consentIndex = pickColumn(headers, CONSENT_HEADERS);
   const resumeIndex = pickColumn(headers, RESUME_HEADERS);
+  const jobRoleIndex = pickColumn(headers, JOB_ROLE_HEADERS);
 
   const issues: ParseIssue[] = [];
   if (nameIndex < 0) issues.push({ row: 1, message: "Missing a Name column." });
@@ -105,6 +121,7 @@ export function parseWorkbook(buffer: ArrayBuffer): ParseResult {
     const name = cell(rawRow, nameIndex);
     const phone = normalizePhone(cell(rawRow, phoneIndex));
     const resumeUrl = cell(rawRow, resumeIndex);
+    const jobRole = cell(rawRow, jobRoleIndex);
     const consent = parseConsent(cell(rawRow, consentIndex));
 
     if (!name && !phone) {
@@ -119,9 +136,24 @@ export function parseWorkbook(buffer: ArrayBuffer): ParseResult {
       skipped += 1;
       return;
     }
+    if (!isValidE164(phone)) {
+      issues.push({
+        row: excelRow,
+        message: "Phone needs a country code, e.g. +14155550123 or +14155550123. This row was skipped.",
+      });
+      skipped += 1;
+      return;
+    }
 
-    candidates.push({ name, phone, consent, resumeUrl });
+    candidates.push({ name, phone, consent, resumeUrl, jobRole });
   });
+
+  const sharedRole = candidates.find((row) => row.jobRole)?.jobRole ?? "";
+  if (sharedRole) {
+    for (const row of candidates) {
+      if (!row.jobRole) row.jobRole = sharedRole;
+    }
+  }
 
   if (matrix.length - 1 > MAX_ROWS) {
     issues.push({
@@ -131,13 +163,4 @@ export function parseWorkbook(buffer: ArrayBuffer): ParseResult {
   }
 
   return { candidates, issues, skipped };
-}
-
-export function rosterStatus(candidate: {
-  consent: boolean;
-  resumeUrl: string;
-}): "ready" | "missing_resume" | "needs_consent" {
-  if (!candidate.consent) return "needs_consent";
-  if (!candidate.resumeUrl) return "missing_resume";
-  return "ready";
 }
