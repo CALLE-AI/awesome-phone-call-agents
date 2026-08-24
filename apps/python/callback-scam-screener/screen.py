@@ -11,9 +11,11 @@ dialed.
 Live mode requires --live, --confirm, and --to-phone matching the number
 extracted from the email exactly (this app never guesses which number to
 dial) and in strict E.164 format. It also requires either --allow-number
-(dev/test allowlist) or --unrestricted (explicit acknowledgment this may
-dial any number extracted from the email) — there is no silent unrestricted
-default. It places exactly one real CALL-E call and scores the real
+(dev/test allowlist, itself an exact per-number gate) or both --unrestricted
+and --confirm-number (an explicit, destination-specific authorization for
+that exact E.164 number) — there is no silent unrestricted default, and
+--unrestricted alone is not accepted as authorization to dial a specific
+destination. It places exactly one real CALL-E call and scores the real
 transcript with your own --llm-provider's API key (default: gemini, reads
 GEMINI_API_KEY/GOOGLE_API_KEY) — see docs/CONCEPT.md for full design notes.
 Printed output masks the dialed number by default; pass --show-full-number
@@ -25,6 +27,9 @@ Usage:
   python screen.py --email suspicious.txt --sender-domain example.com \\
       --live --confirm --to-phone "+18005550187" \\
       --allow-number "+18005550187"
+  python screen.py --email suspicious.txt --sender-domain example.com \\
+      --live --confirm --to-phone "+18005550187" \\
+      --unrestricted --confirm-number "+18005550187"
 """
 import argparse
 import functools
@@ -92,7 +97,15 @@ def main() -> int:
         "--unrestricted",
         action="store_true",
         help="Required alongside --live when --allow-number is omitted: explicitly acknowledges this run may "
-        "dial any number extracted from the email, not just a pre-verified dev/test number.",
+        "dial a number that isn't on a pre-verified dev/test allowlist. On its own this is a general "
+        "acknowledgment, not authorization for any specific destination — --confirm-number is also required.",
+    )
+    parser.add_argument(
+        "--confirm-number",
+        default=None,
+        help="Required alongside --unrestricted: the exact E.164 destination you are authorizing this specific "
+        "call to dial. Must match --to-phone exactly (strict string equality, typed independently) — this is "
+        "the affirmative, destination-specific authorization --unrestricted alone does not provide.",
     )
     parser.add_argument(
         "--show-full-number",
@@ -232,6 +245,23 @@ def main() -> int:
         print(
             "Refusing to place a live call without either --allow-number (dev/test allowlist) or "
             "--unrestricted (explicit acknowledgment that this may dial any number extracted from the email).",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE_OR_REFUSAL
+    # --unrestricted on its own is a general acknowledgment ("this run may
+    # dial an unverified number"), not authorization for the specific
+    # destination about to be dialed — --allow-number already ties
+    # authorization to an exact number, but --unrestricted didn't have an
+    # equivalent gate. --confirm-number closes that: it must be typed
+    # independently and match --to-phone by strict string equality (not
+    # normalize_phone's loose digit comparison used for the email-extraction
+    # sanity check above), so it can't be satisfied by copy-pasting the same
+    # value used elsewhere without a deliberate second confirmation.
+    if args.unrestricted and args.confirm_number != args.to_phone:
+        print(
+            "Refusing to place a live call: --unrestricted requires --confirm-number to exactly match "
+            "--to-phone — an acknowledgment that some number extracted from the email may be dialed is not "
+            "authorization for this specific destination.",
             file=sys.stderr,
         )
         return EXIT_USAGE_OR_REFUSAL
