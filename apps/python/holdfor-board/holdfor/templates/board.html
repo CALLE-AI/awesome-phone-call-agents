@@ -57,16 +57,36 @@
   <h2>Due today &middot; {{ due|length }} not yet called</h2>
   <ul>
     {% for row in due %}
-    <li>
+    <li{% if row.yours %} class="yours"{% endif %}>
       <span class="name">{{ row.first_name }} {{ row.surname }}</span>
       <span class="for">{{ row.appointment_type }}, seen {{ row.seen_on }}</span>
       <span class="num">{{ row.phone_masked }}</span>
+      {%- if row.yours %}<span class="chip handset">your phone</span>{% endif %}
+      <details class="confirm compact">
+        <summary><span class="caret">&#9656;</span> Call</summary>
+        <div class="confirm-body{% if live %} spends{% endif %}">
+          {%- if live %}
+          <p><strong>This rings {{ row.phone_masked }} for real</strong>{% if row.yours %},
+            which is the phone in your hand{% endif %}.</p>
+          <p class="cost real">{{ live_calls }} of 20 used &middot; {{ 20 - live_calls }} left
+            &middot; this spends 1</p>
+          {%- else %}
+          <p>Fake provider: <strong>no call will be placed</strong>. One Review Item
+            from a stored transcript.</p>
+          <p class="cost free">nothing is spent</p>
+          {%- endif %}
+          <form method="post" action="/checkins/{{ row.appointment_id }}" style="margin-top:.8rem">
+            <button class="primary" type="submit">
+              {%- if live %}Yes, ring {{ row.first_name }}{% else %}Run this one{% endif %}</button>
+          </form>
+        </div>
+      </details>
     </li>
     {% endfor %}
   </ul>
 
   <details class="confirm">
-    <summary><span class="caret">&#9656;</span> Place today's check-ins</summary>
+    <summary><span class="caret">&#9656;</span> Place all {{ due|length }} at once</summary>
     <div class="confirm-body{% if live %} spends{% endif %}">
       {%- if live %}
       <p><strong>This places {{ due|length }} real phone call{{ "" if due|length == 1 else "s" }}</strong>

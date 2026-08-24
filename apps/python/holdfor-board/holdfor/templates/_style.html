@@ -177,6 +177,11 @@ details.confirm.compact > summary{min-height:38px;padding:.35rem .8rem;font-size
 .due li .name{font-weight:500;min-width:11rem}
 .due li .for{color:var(--muted);font-size:.82rem;flex:1}
 .due li .num{font-family:var(--mono);font-size:.76rem;color:var(--faint)}
+.due li>details{margin-left:auto;align-self:center}
+.due li>details[open]{flex:1 0 100%;margin-left:0;margin-top:.4rem}
+.due li.yours{box-shadow:inset 3px 0 0 var(--note);padding-left:.7rem;margin-left:-.7rem}
+.due li.yours .num{color:var(--note)}
+.chip.handset{color:var(--note);background:var(--note-soft);border-color:var(--note)}
 .gated{font-size:.82rem;color:var(--muted);margin:.8rem 0 0}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

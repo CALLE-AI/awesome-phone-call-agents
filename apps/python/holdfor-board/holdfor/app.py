@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from dataclasses import asdict
 from datetime import date, datetime
@@ -15,6 +16,12 @@ from .models import ReviewStatus
 from .providers import default_provider
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
+
+# The handset of whoever is sitting at the board. Named so a calibration call can be
+# aimed at a phone in the room and seen to be aimed there, before anybody presses Run.
+# The number is compared and then discarded: what reaches the template is a mask and a
+# flag, never the digits.
+MY_HANDSET = "HOLDFOR_MY_HANDSET"
 
 BOARD_QUERY = """
 SELECT review_item.id                 AS id,
@@ -81,11 +88,13 @@ def due_checkins(conn, today):
     rows = [dict(row) for row in conn.execute(DUE_QUERY).fetchall()]
     due = [r for r in rows if window.due_date(r["seen_on"]) == today]
     withheld = sum(1 for r in due if not r["consent_to_call"])
+    mine = os.environ.get(MY_HANDSET) or None
     callable_now = []
     for row in due:
         if not row["consent_to_call"]:
             continue
         row["phone_masked"] = masked(row["phone_e164"])
+        row["yours"] = mine is not None and row["phone_e164"] == mine
         del row["phone_e164"]
         callable_now.append(row)
     return callable_now, withheld
@@ -128,19 +137,36 @@ def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI
 
     @app.post("/checkins/{appointment_id}", status_code=201)
     def place_checkin(
-        appointment_id: int, conn: sqlite3.Connection = Depends(connection)
-    ) -> dict:
+        appointment_id: int,
+        request: Request,
+        conn: sqlite3.Connection = Depends(connection),
+    ):
+        """Place one Check-in Call, named in the path.
+
+        The same work `POST /checkins` does for the whole day, for one Appointment.
+        It exists so the board has a control that spends one call rather than
+        however many are due, which is the only kind of dial worth practising with.
+        """
+        html = _from_form(request)
         try:
             review_item_id = checkin.run(
                 conn, app.state.provider, appointment_id, now=app.state.clock()
             )
         except checkin.Refused as refused:
+            if html:
+                return RedirectResponse(
+                    url=f"/?refused={refused.reason}", status_code=303
+                )
             return JSONResponse(status_code=409, content={"refused": refused.reason})
         except checkin.AwaitingReconciliation as pending:
             # An attempt for this Appointment is unresolved. 409 rather than a
             # retryable error on purpose: the correct next step is a person
             # reading the provider's record, never this endpoint being called
             # again.
+            if html:
+                return RedirectResponse(
+                    url=f"/?refused={pending.state}", status_code=303
+                )
             return JSONResponse(
                 status_code=409,
                 content={"awaiting_reconciliation": pending.state},
@@ -148,18 +174,22 @@ def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI
         except LookupError as missing:
             raise HTTPException(status_code=404, detail=str(missing))
         status = review.settle(conn, review_item_id)
+        if html:
+            return RedirectResponse(url="/?placed=1", status_code=303)
         return {"review_item_id": review_item_id, "status": status}
 
     @app.get("/board")
     def board(conn: sqlite3.Connection = Depends(connection)) -> dict:
-        return board_payload(conn, app.state.provider)
+        return board_payload(conn, app.state.provider, app.state.clock().date())
 
     @app.get("/", response_class=HTMLResponse)
     def queue(request: Request, conn: sqlite3.Connection = Depends(connection)):
         return TEMPLATES.TemplateResponse(
             request=request,
             name="board.html",
-            context=board_payload(conn, app.state.provider),
+            context=board_payload(
+                conn, app.state.provider, app.state.clock().date()
+            ),
         )
 
     @app.get("/review-items/{review_item_id}")
@@ -335,6 +365,17 @@ def _wants_html(request: Request) -> bool:
     return not content_type.startswith("application/json")
 
 
+# Form encodings, named. `_wants_html` cannot serve here: it treats a request with no
+# content type as a browser, and this endpoint answered callers with no content type in
+# JSON before it had a button. Opting in by encoding leaves that contract alone.
+FORM_TYPES = ("application/x-www-form-urlencoded", "multipart/form-data")
+
+
+def _from_form(request: Request) -> bool:
+    content_type = request.headers.get("content-type", "")
+    return content_type.startswith(FORM_TYPES)
+
+
 def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
     item = review.fetch(conn, review_item_id)
     if item is None:
@@ -349,18 +390,26 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
     }
 
 
-def board_payload(conn: sqlite3.Connection, provider=None) -> dict:
+def board_payload(
+    conn: sqlite3.Connection, provider=None, due_on: date | None = None
+) -> dict:
     """The queue lists only what needs a person. The counts cover the whole day.
 
     The ratio is the only number showing the practice got something back for the
     calls it placed, so it is counted from the rows rather than illustrated.
+
+    Two dates, and they are not the same question. The counts filter rows by when
+    they were written, which is the real clock in `db.now_iso()` and nothing else.
+    `due_on` asks which Appointments come due, which is the clock the endpoints are
+    judged against — passed in, so the day the board describes is the day its own
+    buttons act on.
     """
     items = [dict(row) for row in conn.execute(BOARD_QUERY).fetchall()]
     for item in items:
         item["stop_condition"] = bool(item["stop_condition"])
     stamp = date.today().isoformat()
     todays = [item for item in items if item["created_at"].startswith(stamp)]
-    due, withheld = due_checkins(conn, date.today())
+    due, withheld = due_checkins(conn, due_on or date.today())
     return {
         # Whether pressing a button on this page spends one of twenty calls. The
         # board says so before it is pressed rather than after.
