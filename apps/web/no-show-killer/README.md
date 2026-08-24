@@ -36,19 +36,32 @@ no-show-killer/
 
 ## Setup
 
+Copy `backend/.env.example` to `backend/.env` and set `API_TOKEN` and
+`ALLOWED_CALL_NUMBERS` - the server refuses to start without an `API_TOKEN`, and
+no appointment can be created or called until its number is in
+`ALLOWED_CALL_NUMBERS` (comma-separated, E.164). Generate a token with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+Then:
+
 ```bash
 cd backend
 npm install
 npm start          # http://localhost:4000 by default, PORT in .env.example
 ```
 
-Then open `frontend/index.html` directly in a browser (or `npx serve frontend`).
-`frontend/app.js` has `API_BASE` as a literal constant at the top of the file - edit it
-there to point at a deployed backend; there's no build step to inject it through.
+Open `frontend/index.html` directly in a browser (or `npx serve frontend`) - it'll
+prompt for the API token before loading anything and remember it in
+`localStorage` after that. `frontend/app.js` has `API_BASE` as a literal constant
+at the top of the file - edit it there to point at a deployed backend; there's no
+build step to inject it through.
 
-Copy `backend/.env.example` to `backend/.env` and fill in `CALL_E_ACCESS_KEY` when
-you're ready to go live (see below). Everything else has a safe default and the app
-runs with an empty `.env`.
+Fill in `CALL_E_ACCESS_KEY` in `backend/.env` when you're ready to go live (see
+below). Everything else besides `API_TOKEN`/`ALLOWED_CALL_NUMBERS` has a safe
+default.
 
 ## Dry-run mode (default: on)
 
@@ -119,9 +132,13 @@ blank.
 | Requirement | How this app meets it |
 | --- | --- |
 | No real call without explicit opt-in | `DRY_RUN` defaults to `true`; going live requires deliberately setting it to `false` (see [Going live](#going-live)). |
+| No unauthenticated access | Every route that reads appointment data or can trigger a call requires `Authorization: Bearer <API_TOKEN>`; the WebSocket requires `?token=`. The server refuses to start at all without `API_TOKEN` set. |
+| Only authorized destinations get called | `ALLOWED_CALL_NUMBERS` is an explicit, comma-separated E.164 allowlist. Empty by default, so nothing is authorized until you configure it - appointment creation and call dispatch both reject anything not on the list. |
 | E.164 phone numbers | Appointments store `phone` in E.164; `phone-region.js` reads it to hint CALL-E's `region` parameter, it does not reformat or guess numbers. |
+| Phone numbers masked everywhere | Every API response, WebSocket broadcast, and the appointment-creation error path returns a masked number (`+1202••••0142`); the real number is only ever used internally to place the call. |
 | Masking numbers in samples | `data/appointments.json`'s sample appointment uses `+12025550142`, in the reserved NANP `555-01xx` fictional range. |
 | No credential exposure | See [Credential handling](#credential-handling) above. |
-| No duplicate jobs | `triggerCall()` refuses a second call for an appointment whose existing call hasn't reached a terminal status. |
+| No duplicate jobs, race-safe | `triggerCall()` closes the gap between two near-simultaneous requests with an in-memory lock, and persists an unresolved `DISPATCHING` status *before* calling CALL-E - so a crash or an ambiguous response can't leave an attempt untracked and retryable into a duplicate dial. |
+| No unattended automatic dispatch | The nightly cron only *reports* how many appointments are ready by default; it does not dial on its own unless `LIVE_UNATTENDED_BATCH=true` is set. An operator clicking "Run tomorrow's confirmation calls" always works regardless, since that's explicit human intent for that one run. |
 | No hidden recurring schedule | The nightly cron is documented in this README, logs its schedule at boot, and can be switched off with one env var (see [Stopping and rolling back](#stopping-and-rolling-back)). |
 | Clear cancellation behavior | See [Stopping and rolling back](#stopping-and-rolling-back) above, including the one thing that genuinely can't be cancelled (a call already ringing). |

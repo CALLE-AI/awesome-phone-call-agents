@@ -9,7 +9,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="auth-locked">
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-gate-card">
+      <h2>Operator sign-in required</h2>
+      <p>This dashboard can read patient data and place real phone calls. Enter the API token to continue.</p>
+      <form id="auth-form">
+        <input type="password" id="auth-token-input" placeholder="API token" autocomplete="off" required />
+        <button type="submit" class="btn-primary">Continue</button>
+      </form>
+      <p id="auth-error" class="auth-error hidden"></p>
+    </div>
+  </div>
+
   <header>
     <div class="header-content">
       <div>

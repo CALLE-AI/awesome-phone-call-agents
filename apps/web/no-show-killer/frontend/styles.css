@@ -549,3 +549,68 @@ main {
   opacity: 1;
   transform: translateY(0);
 }
+/* ===== AUTH GATE ===== */
+body.auth-locked header,
+body.auth-locked main {
+  display: none;
+}
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 100;
+  padding: 1rem;
+}
+
+.auth-gate.hidden {
+  display: none;
+}
+
+.auth-gate-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2rem;
+  max-width: 380px;
+  width: 100%;
+}
+
+.auth-gate-card h2 {
+  margin-bottom: 0.5rem;
+}
+
+.auth-gate-card p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.auth-gate-card input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.75rem;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.auth-gate-card .btn-primary {
+  width: 100%;
+}
+
+.auth-error {
+  color: #b33a33;
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.auth-error.hidden {
+  display: none;
+}
