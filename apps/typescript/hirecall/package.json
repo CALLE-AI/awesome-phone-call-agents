@@ -8,14 +8,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate-template": "node scripts/generate-template.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",
     "next": "^15.5.9",
+    "pdf-parse": "^2.4.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "@call-e/calle": "0.2.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.12",
