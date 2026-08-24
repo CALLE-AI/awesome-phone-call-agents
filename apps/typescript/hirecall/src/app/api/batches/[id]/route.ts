@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { liveCallsEnabled } from "@/lib/calle";
 import { getBatch, setBatchActive, setBatchJobRole, setBatchScoreConfig, setBatchSystemPrompt } from "@/lib/db";
 import { parseScoreConfig } from "@/lib/score-config";
 import { ensureBatchSummaries, syncBatchCalls } from "@/lib/place-call";
@@ -22,7 +23,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!detail) {
     return NextResponse.json({ error: "That Excel batch was not found." }, { status: 404 });
   }
-  return NextResponse.json(detail);
+  return NextResponse.json({ ...detail, liveCallsEnabled: liveCallsEnabled() });
 }
 
 export async function PATCH(request: Request, context: RouteContext) {

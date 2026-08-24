@@ -1,5 +1,5 @@
 import { emptyScreeningResult, parseScreeningResult, type ScreeningResult } from "@/lib/call-result-schema";
-import { CalleConfigError, calleConfig, createCalleCall, getCalleCall, hasCalleKey, type CalleSnapshot } from "@/lib/calle";
+import { CalleConfigError, createCalleCall, getCalleCall, type CalleSnapshot } from "@/lib/calle";
 import { summarizeScreeningCall } from "@/lib/generate-call-prompt";
 import {
   getBatch,
@@ -118,7 +118,6 @@ export async function startCandidateCall(batchId: string, candidateId: string): 
 }
 
 export async function queueReadyCalls(batchId: string): Promise<{ queued: number; failed: number; started: number }> {
-  calleConfig();
   await requireActiveBatch(batchId);
   const detail = await getBatch(batchId);
   if (!detail) {
@@ -162,7 +161,6 @@ export async function startNextQueuedCall(batchId: string): Promise<Candidate | 
 }
 
 export async function syncBatchCalls(batchId: string): Promise<void> {
-  if (!hasCalleKey()) return;
   const detail = await getBatch(batchId);
   if (!detail) return;
 

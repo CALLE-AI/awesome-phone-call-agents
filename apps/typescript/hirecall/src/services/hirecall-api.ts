@@ -15,6 +15,7 @@ export class ApiError extends Error {
 export type RosterPayload = {
   batches: Batch[];
   inactiveBatches: Batch[];
+  liveCallsEnabled: boolean;
 };
 
 export type UploadPayload = RosterPayload & {
@@ -25,6 +26,7 @@ export type UploadPayload = RosterPayload & {
 export type BatchDetail = {
   batch: Batch;
   candidates: Candidate[];
+  liveCallsEnabled?: boolean;
 };
 
 export type PreparePayload = BatchDetail & {
@@ -64,6 +66,7 @@ export const hirecallApi = {
     return {
       batches: data.batches ?? [],
       inactiveBatches: data.inactiveBatches ?? [],
+      liveCallsEnabled: data.liveCallsEnabled === true,
     };
   },
 
@@ -89,6 +92,7 @@ export const hirecallApi = {
       skipped: data.skipped ?? 0,
       batches: data.batches ?? [],
       inactiveBatches: data.inactiveBatches ?? [],
+      liveCallsEnabled: data.liveCallsEnabled === true,
       batch: data.batch,
       candidates: data.candidates ?? [],
     };
@@ -107,6 +111,7 @@ export const hirecallApi = {
       skipped: data.skipped ?? 0,
       batches: data.batches ?? [],
       inactiveBatches: data.inactiveBatches ?? [],
+      liveCallsEnabled: data.liveCallsEnabled === true,
     };
   },
 
@@ -119,6 +124,7 @@ export const hirecallApi = {
     return {
       batches: data.batches ?? [],
       inactiveBatches: data.inactiveBatches ?? [],
+      liveCallsEnabled: data.liveCallsEnabled === true,
     };
   },
 
@@ -134,6 +140,7 @@ export const hirecallApi = {
     return {
       batch: data.batch,
       candidates: data.candidates ?? [],
+      liveCallsEnabled: data.liveCallsEnabled === true,
     };
   },
 

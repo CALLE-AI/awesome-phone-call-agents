@@ -18,11 +18,13 @@ export function Dashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [liveCallsEnabled, setLiveCallsEnabled] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     const data = await hirecallApi.listRoster();
     setBatches(data.batches);
     setInactiveBatches(data.inactiveBatches);
+    setLiveCallsEnabled(data.liveCallsEnabled);
   }, []);
 
   useEffect(() => {
@@ -118,6 +120,16 @@ export function Dashboard() {
           </div>
         </header>
 
+        {liveCallsEnabled === false ? (
+          <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
+            Live calls are off. Clicking Call completes a local dry-run and does not
+            ring anyone. Set <span className="font-medium text-ink">HIRECALL_LIVE_CALLS=true</span>{" "}
+            and <span className="font-medium text-ink">CALLE_API_KEY</span> in{" "}
+            <span className="font-medium text-ink">.env</span>, then restart{" "}
+            <span className="font-medium text-ink">npm run dev</span>, to place a real CALL-E call.
+          </p>
+        ) : null}
+
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Stat label="Excel batches" value={stats.files} />
           <Stat label="Candidates" value={stats.total} />
@@ -133,7 +145,7 @@ export function Dashboard() {
                 Download the Excel template, fill in candidate details, then upload it
                 here to create a new batch. Fix names or resume links on the batch
                 page, not by uploading another roster row. Phones need a country
-                code, e.g. +14155550123 or +14155550123.
+                code. Samples use reserved fictional numbers such as +14155550123.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -172,8 +184,8 @@ export function Dashboard() {
                   <td className="px-4 py-3 font-medium text-ink">phone</td>
                   <td className="px-4 py-3">Yes</td>
                   <td className="px-4 py-3 text-muted">
-                    International number with country code, e.g. +14155550123 or
-                    +14155550123.
+                    International E.164 number with country code. Samples use
+                    reserved fictional numbers such as +14155550123.
                   </td>
                 </tr>
                 <tr className="border-t border-line">
@@ -423,8 +435,10 @@ function JudgeTestForm({
         Same columns as the Excel. Fake resume and CALL-E script are already
         written. Enter your number with a country code, then Call on the next page.
         After hangup, <span className="font-medium text-ink">GEMINI_API_KEY</span> is
-        required so Gemini can write the score and summary. CALLE_API_KEY is required
-        to place the call.
+        required so Gemini can write the score and summary. Live ringing also needs
+        <span className="font-medium text-ink">HIRECALL_LIVE_CALLS=true</span> and
+        <span className="font-medium text-ink">CALLE_API_KEY</span>. Without live
+        calls, Call runs a local dry-run and does not dial.
       </p>
       <form
         className="grid gap-4 md:grid-cols-2"

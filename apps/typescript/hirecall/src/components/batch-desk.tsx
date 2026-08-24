@@ -26,11 +26,15 @@ export function BatchDesk() {
   const [copiedId, setCopiedId] = useState("");
   const [criteriaPrompted, setCriteriaPrompted] = useState(false);
   const [agentDismissed, setAgentDismissed] = useState("");
+  const [liveCallsEnabled, setLiveCallsEnabled] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     const data = await hirecallApi.getBatch(batchId);
     setBatch(data.batch);
     setCandidates(data.candidates);
+    if (typeof data.liveCallsEnabled === "boolean") {
+      setLiveCallsEnabled(data.liveCallsEnabled);
+    }
   }, [batchId]);
 
   useEffect(() => {
@@ -309,6 +313,13 @@ export function BatchDesk() {
         ) : null}
         {notice ? (
           <p className="rounded-xl bg-[rgba(47,107,79,0.1)] px-4 py-3 text-sm text-forest">{notice}</p>
+        ) : null}
+        {liveCallsEnabled === false ? (
+          <p className="rounded-xl border border-line bg-paper px-4 py-3 text-sm text-muted">
+            Live calls are off. Call completes a local dry-run and does not dial.
+            Set HIRECALL_LIVE_CALLS=true and CALLE_API_KEY, then restart the app, to
+            place a real CALL-E call.
+          </p>
         ) : null}
 
         {batch?.active ? (
@@ -922,7 +933,7 @@ function CandidateEditor({
           value={phone}
         />
         <span className="mt-1 block text-xs font-normal text-muted">
-          Include the country code, e.g. +14155550123 or +14155550123.
+          Include the country code, e.g. +14155550123.
         </span>
       </label>
       <label className="text-sm font-medium text-ink md:col-span-2">

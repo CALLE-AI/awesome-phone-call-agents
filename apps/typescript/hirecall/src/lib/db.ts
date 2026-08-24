@@ -370,7 +370,7 @@ export async function createDemoBatch(input: {
 
   const phone = normalizePhone(input.phone);
   if (!isValidE164(phone)) {
-    throw new Error("Phone needs a country code, e.g. +14155550123 or +14155550123.");
+    throw new Error("Phone needs a country code, e.g. +14155550123.");
   }
 
   const name = (input.name ?? DEMO_NAME).trim() || DEMO_NAME;
@@ -813,7 +813,7 @@ export async function updateCandidate(
     throw new Error("Name and phone are both required.");
   }
   if (!isValidE164(phone)) {
-    throw new Error("Phone needs a country code, e.g. +14155550123 or +14155550123.");
+    throw new Error("Phone needs a country code, e.g. +14155550123.");
   }
 
   const linkChanged = resumeUrl !== current.resumeUrl;

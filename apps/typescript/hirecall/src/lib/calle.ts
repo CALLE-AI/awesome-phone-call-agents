@@ -58,8 +58,51 @@ export function assertTrustedBaseUrl(baseUrl: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
+export const DRY_RUN_CALL_PREFIX = "dry-run:";
+
 export function hasCalleKey() {
   return Boolean(process.env.CALLE_API_KEY?.trim());
+}
+
+export function liveCallsEnabled() {
+  return process.env.HIRECALL_LIVE_CALLS?.trim().toLowerCase() === "true";
+}
+
+export function isDryRunCallId(callId: string) {
+  return callId.startsWith(DRY_RUN_CALL_PREFIX);
+}
+
+function dryRunStructuredResult(): Record<string, unknown> {
+  return {
+    identity_confirmed: "yes",
+    good_time: "yes",
+    education: "Dry-run: no live call was placed.",
+    projects: "Dry-run: no live call was placed.",
+    work_or_internship: "Dry-run: no live call was placed.",
+    off_script: "",
+    end_reason: "completed",
+    recruiter_follow_up: "Set HIRECALL_LIVE_CALLS=true and CALLE_API_KEY to place a real CALL-E call.",
+    callee_quote: "",
+  };
+}
+
+export function dryRunSnapshot(candidateId: string): CalleSnapshot {
+  const now = new Date().toISOString();
+  const result = dryRunStructuredResult();
+  return {
+    id: `${DRY_RUN_CALL_PREFIX}${candidateId}`,
+    status: "completed",
+    createdAt: now,
+    completedAt: now,
+    structuredResult: result,
+    recipients: [
+      {
+        status: "completed",
+        structuredResult: result,
+        attempts: [{ status: "completed", startedAt: now, completedAt: now }],
+      },
+    ],
+  };
 }
 
 export function calleConfig() {
@@ -119,6 +162,9 @@ export async function createCalleCall(input: {
   candidateId: string;
   idempotencyKey: string;
 }): Promise<CalleSnapshot> {
+  if (!liveCallsEnabled()) {
+    return dryRunSnapshot(input.candidateId);
+  }
   try {
     const client = await sdkClient();
     const { region, locale } = calleRegionForPhone(input.phone);
@@ -141,6 +187,9 @@ export async function createCalleCall(input: {
 }
 
 export async function getCalleCall(callId: string): Promise<CalleSnapshot> {
+  if (isDryRunCallId(callId)) {
+    return dryRunSnapshot(callId.slice(DRY_RUN_CALL_PREFIX.length));
+  }
   try {
     const client = await sdkClient();
     return (await client.calls.get(callId)) as unknown as CalleSnapshot;

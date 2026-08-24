@@ -139,7 +139,7 @@ export function parseWorkbook(buffer: ArrayBuffer): ParseResult {
     if (!isValidE164(phone)) {
       issues.push({
         row: excelRow,
-        message: "Phone needs a country code, e.g. +14155550123 or +14155550123. This row was skipped.",
+        message: "Phone needs a country code, e.g. +14155550123. This row was skipped.",
       });
       skipped += 1;
       return;

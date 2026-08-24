@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { liveCallsEnabled } from "@/lib/calle";
 import { createBatchWithCandidates, createDemoBatch, deactivateAll, listBatches } from "@/lib/db";
 import { parseWorkbook } from "@/lib/parse-workbook";
 
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
 const MAX_BYTES = 5 * 1024 * 1024;
 
 export async function GET() {
-  return NextResponse.json(await listBatches());
+  return NextResponse.json({ ...(await listBatches()), liveCallsEnabled: liveCallsEnabled() });
 }
 
 export async function POST(request: Request) {

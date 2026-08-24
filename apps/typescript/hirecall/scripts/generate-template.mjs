@@ -33,7 +33,7 @@ const candidateRows = [
 const guideRows = [
   ["column", "required", "what_to_enter", "example"],
   ["name", "yes", "Full name of the candidate", "Priya Sharma"],
-  ["phone", "yes", "Mobile with country code. Examples: +14155550123 or +14155550123. No spaces.", "+14155550123"],
+  ["phone", "yes", "Mobile with country code. Example reserved number: +14155550123. Replace with a real E.164 number before live calls.", "+14155550123"],
   ["job_role", "yes", "Opening for this Excel. Use the same role on every row.", "Software intern"],
   [
     "consent",
