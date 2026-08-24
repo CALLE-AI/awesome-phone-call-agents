@@ -266,3 +266,4 @@ Out of scope:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+- [VoltGuard](https://github.com/Rubenskiada/VoltGuard) - A hardware lockout safety architecture using Call-E for high-voltage L2 voice escalation.
