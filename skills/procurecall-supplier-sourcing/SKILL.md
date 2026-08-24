@@ -1,4 +1,4 @@
----
+﻿---
 name: procurecall-supplier-sourcing
 description: Source and qualify suppliers by phone for a buyer's procurement request, collect structured quotes, and return supplier comparisons for human approval.
 ---
@@ -6,6 +6,23 @@ description: Source and qualify suppliers by phone for a buyer's procurement req
 # ProcureCall Supplier Sourcing
 
 Use this skill when a buyer wants to source suppliers for a product, material, or service.
+
+## Live Call Safety
+
+Before conducting or instructing any live supplier call:
+
+1. Read `references/safety.md` and follow its live-call safety requirements.
+2. Read `references/examples.md` for representative supplier-call patterns.
+3. Confirm the buyer's intent for the current run before calling.
+4. Confirm the exact recipient and authorization for the call.
+5. Accept phone numbers only in strict E.164 format.
+6. Never expose a supplier's full phone number in output; mask phone numbers in results.
+7. Stop when the outcome is duplicate, ambiguous, or otherwise insufficient to distinguish the supplier response.
+8. Stop or cancel the call when cancellation is requested or continued calling is not authorized.
+9. Do not conduct calls involving medical, legal, financial, or emergency matters.
+10. Do not place orders or make binding purchase commitments; supplier information must be returned for human approval.
+11. The requirements in `references/safety.md` take precedence over examples when they conflict.
+
 
 ## Workflow
 
