@@ -24,7 +24,7 @@ Three rules follow from that, and they are what the tests defend:
 
 This is the collection edition: fixture-driven, no network, no telephone, no
 credentials, no scheduler. The full application lives at
-https://github.com/lukisch/ringedingeding
+https://github.com/ellmos-ai/ringedingeding
 """
 
 from __future__ import annotations
@@ -87,6 +87,17 @@ class Status(str, Enum):
     DECLINED = "declined"
     NO_ANSWER = "no_answer"
     BUSY = "busy"
+    # An answering machine is not "nobody answered" and not "the person declined" --
+    # it is its own outcome. Folding it into either would misreport a common,
+    # innocuous case as its neighbour. Set by the fixture author when the call
+    # reached a mailbox rather than a person.
+    VOICEMAIL = "voicemail"
+    # Set when the call reached someone, but confirming it was the invited person
+    # failed -- a different person answered and no handover happened. Bucketed as
+    # UNREACHED, not REFUSED: a stranger's answer, whatever it was, is not this
+    # participant's answer. Collapsing it into REFUSED is exactly the
+    # misattribution this aggregator exists to keep out of a merged result.
+    WRONG_PERSON = "wrong_person"
     NOT_CALLED = "not_called"
     UNKNOWN = "unknown"
 
@@ -97,6 +108,8 @@ class Status(str, Enum):
             Status.DECLINED: Bucket.REFUSED,
             Status.NO_ANSWER: Bucket.UNREACHED,
             Status.BUSY: Bucket.UNREACHED,
+            Status.VOICEMAIL: Bucket.UNREACHED,
+            Status.WRONG_PERSON: Bucket.UNREACHED,
             Status.NOT_CALLED: Bucket.PENDING,
             Status.UNKNOWN: Bucket.UNKNOWN,
         }[self]

@@ -1,0 +1,46 @@
+{
+  "_comment": "The payload this whole integration exists for, modelled on a real production response. CALL-E reports status=completed with a high confidence label AND a structured_result - because it is confident in its judgment that the call ended without an answer. Every field CALL-E returns says success. Branching on status === 'completed' writes 'confirmed' to a CRM for a person who hung up. The classifier must return review_required / lead_state=needs_human.",
+  "id": "evt_fixture_hung_up",
+  "type": "call.completed",
+  "created_at": "2026-08-05T15:04:48Z",
+  "data": {
+    "id": "call_fixture_hung_up",
+    "object": "call_task",
+    "status": "completed",
+    "task": "Confirm the Thursday 3pm dental appointment.",
+    "task_completed": true,
+    "completion_confidence": { "score": 0.88, "label": "high" },
+    "structured_result": { "confirmed": "unknown", "reschedule_requested": "unknown" },
+    "summary": "The call ended before the patient confirmed the appointment.",
+    "evidence": ["The line disconnected shortly after the greeting."],
+    "failure_code": null,
+    "failure_message": null,
+    "metadata": { "source_platform": "zapier", "correlation_id": "row-105" },
+    "created_at": "2026-08-05T15:04:12Z",
+    "completed_at": "2026-08-05T15:04:48Z",
+    "recipients": [
+      {
+        "phone": "+15550123456",
+        "status": "completed",
+        "attempts": [
+          {
+            "id": "att_1",
+            "phone": "+15550123456",
+            "status": "completed",
+            "started_at": "2026-08-05T15:04:15Z",
+            "completed_at": "2026-08-05T15:04:31Z",
+            "summary": "Recipient disconnected during the greeting.",
+            "provider_call_id": "prov_2",
+            "failure_code": null,
+            "failure_message": null,
+            "transcript_turns": [
+              { "offset_seconds": 2, "speaker": "bot", "text": "Hi, this is an automated assistant calling from Dr. Chen's office to confirm your Thursday three pm appointment." },
+              { "offset_seconds": 8, "speaker": "user", "text": "Who is this? I'm driving." },
+              { "offset_seconds": 11, "speaker": "bot", "text": "I can call back at a better time. Would this afternoon work?" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

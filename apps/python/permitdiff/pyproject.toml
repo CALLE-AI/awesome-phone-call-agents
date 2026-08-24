@@ -1,0 +1,9 @@
+[project]
+name = "permitdiff-calle"
+version = "0.1.0"
+description = "Evidence-bound reconciliation of stale or conflicting permit portal records by phone."
+requires-python = ">=3.11"
+dependencies = ["calle-ai==0.2.0"]
+
+[dependency-groups]
+dev = ["pytest>=9.0.0"]
