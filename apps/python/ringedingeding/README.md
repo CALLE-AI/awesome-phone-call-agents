@@ -160,4 +160,4 @@ call orchestration, the hash-chained record, web interface and the live CALL-E t
 lives at <https://github.com/ellmos-ai/ringedingeding>. It has since been field-tested
 twice against the real CALL-E service (2026-08-11 and 2026-08-22), including a live
 retest of a retry-idempotency bug found and fixed the same day; its README carries a
-"How We Tested" section, and its test suite currently stands at 567 passing.
+"How We Tested" section, and its test suite currently stands at 575 passing.
