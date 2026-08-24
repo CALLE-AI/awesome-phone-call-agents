@@ -1,6 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{%- if in_flight %}
+{#- Only while a call is in progress. A settled board sits still, which matters on a
+    recording and matters more to somebody reading a row when it reloads underneath
+    her. No script: this page has none and does not need one to wait. #}
+<meta http-equiv="refresh" content="4">
+{%- endif %}
 <title>HoldFor board</title>
 {% include "_style.html" %}
 
@@ -18,6 +24,9 @@
 {% if request.query_params.get("refused") %}
 <p class="banner">
   That call was not placed: <strong>{{ request.query_params.get("refused") }}</strong>.
+  {%- if request.query_params.get("refused") in ("accepted", "reserved") %}
+  One is already on its way to this Appointment, and one is all it gets.
+  {%- endif %}
   {%- if request.query_params.get("refused") == "no_booking_line" %}
   Set <code>HOLDFOR_BOOKING_LINE</code> to the practice's appointments number. There is
   no default, on purpose.
@@ -38,6 +47,9 @@
   {%- if booked %}
   <div class="done"><b>{{ booked }}</b><span>Booked</span></div>
   {%- endif %}
+  {%- if in_flight %}
+  <div class="ringing"><b>{{ in_flight|length }}</b><span>On the phone</span></div>
+  {%- endif %}
   <div class="budget"><b>{{ live_calls }} <em>of 20</em></b><span>Live calls used</span></div>
   {%- if awaiting_reconciliation %}
   <div class="you"><b>{{ awaiting_reconciliation }}</b><span>Awaiting reconciliation</span></div>
@@ -50,6 +62,23 @@
   submitted without a confirmed outcome. A person must check these against the provider
   before anything is retried.
 </p>
+{% endif %}
+
+{% if in_flight %}
+<section class="ringing">
+  <h2>On the phone now &middot; {{ in_flight|length }}</h2>
+  <ul>
+    {% for row in in_flight %}
+    <li>
+      <span class="name">{{ row.first_name }} {{ row.surname }}</span>
+      <span class="num">{{ row.phone_masked }}</span>
+      <span class="chip live">{{ "ringing" if row.state == "accepted" else "dialling" }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="note">This page updates itself every few seconds. Nothing is written until
+  the call ends, and there is nothing here to press again.</p>
+</section>
 {% endif %}
 
 {% if due %}
@@ -154,7 +183,9 @@
 {% else %}
 <p class="empty">
   {%- if today %}Nothing needs you. All {{ today }} of today's calls closed on their own.
-  {%- else %}No calls yet today. Run <code>python -m holdfor run-due</code>.{% endif %}
+  {%- elif in_flight %}Nothing to read yet. The call above has not ended.
+  {%- else %}No calls yet today. Press Call on a row above, or run
+  <code>python -m holdfor run-due</code>.{% endif %}
 </p>
 {% endif %}
 

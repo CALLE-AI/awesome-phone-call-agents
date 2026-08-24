@@ -41,8 +41,17 @@ def counting(fixtures_dir):
 
 @pytest.fixture
 def board(db_path, counting, now):
+    """Waits for the call inline. The board hands the poll to a worker so that a
+    browser is not held for the length of a conversation; a test wants the landing
+    to have happened by the time it reads a row. See test_placing_without_waiting.
+    """
     return TestClient(
-        create_app(db_path=db_path, provider=counting, clock=lambda: now)
+        create_app(
+            db_path=db_path,
+            provider=counting,
+            clock=lambda: now,
+            background=lambda work: work(),
+        )
     )
 
 
@@ -115,12 +124,14 @@ def test_every_due_row_offers_its_own_control(board, conn, today):
 
 
 def test_a_form_post_comes_back_to_the_board(board, conn, today):
+    """Plain `/`, with nothing to announce. The call has been placed and not yet
+    answered, so the board's own in-progress row is the honest report of it."""
     target = due_checkins(conn, today)[0][0]["appointment_id"]
     response = board.post(
         f"/checkins/{target}", headers=FORM, follow_redirects=False
     )
     assert response.status_code == 303
-    assert response.headers["location"] == "/?placed=1"
+    assert response.headers["location"] == "/"
 
 
 def test_a_refusal_says_so_in_the_url_rather_than_in_json(board):

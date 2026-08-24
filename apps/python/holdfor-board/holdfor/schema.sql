@@ -72,6 +72,14 @@ CREATE TABLE IF NOT EXISTS live_call (
 CREATE UNIQUE INDEX IF NOT EXISTS release_one_per_review_item
     ON release(review_item_id);
 
+-- One Review Item per attempt. Added when the board stopped waiting for the poll:
+-- the write can now arrive from a background worker, from a second press, or from a
+-- process that restarted mid-call, and the LEFT JOIN that looks for an existing item
+-- is a read two of those could both pass. Same shape and same reason as the index
+-- above.
+CREATE UNIQUE INDEX IF NOT EXISTS review_item_one_per_attempt
+    ON review_item(call_attempt_id);
+
 -- Every offer reception made, in the order she made them. Reception revises, so
 -- acceptance is plural: the Binding Acceptance is the last row with accepted = 1, and
 -- the earlier rows are kept as evidence rather than overwritten. A withdrawn 09:10 is

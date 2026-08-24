@@ -72,6 +72,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .counts .you b{color:var(--alarm)}
 .counts .quiet b{color:var(--muted)}
 .counts .done b{color:var(--ok)}
+.counts .ringing b{color:var(--note)}
 .counts .budget b{font-size:1.25rem;padding-top:.5rem}
 .counts .budget em{font-style:normal;color:var(--faint);font-weight:400;font-size:.8rem}
 
@@ -183,6 +184,22 @@ details.confirm.compact > summary{min-height:38px;padding:.35rem .8rem;font-size
 .due li.yours .num{color:var(--note)}
 .chip.handset{color:var(--note);background:var(--note-soft);border-color:var(--note)}
 .gated{font-size:.82rem;color:var(--muted);margin:.8rem 0 0}
+
+/* a call in progress — the due list's shape, in the colour of something happening */
+section.ringing{
+  background:var(--surface);border:1px solid var(--note);border-left-width:3px;
+  border-radius:3px;padding:1.1rem 1.25rem;margin:0 0 2.5rem;
+}
+section.ringing h2{margin-bottom:.8rem;color:var(--note)}
+section.ringing ul{list-style:none;margin:0 0 .9rem;padding:0}
+section.ringing li{
+  display:flex;flex-wrap:wrap;gap:.3rem 1rem;align-items:baseline;
+  padding:.45rem 0;border-bottom:1px solid var(--rule-soft);font-size:.88rem;
+}
+section.ringing li:last-of-type{border-bottom:none}
+section.ringing li .name{font-weight:500;min-width:11rem}
+section.ringing li .num{font-family:var(--mono);font-size:.76rem;color:var(--note);flex:1}
+.chip.live{color:var(--note);background:var(--note-soft);border-color:var(--note)}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (min-width:52rem){ body{padding:2.5rem 2rem 6rem} h1{font-size:1.6rem} }

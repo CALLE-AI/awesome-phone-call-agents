@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
 from dataclasses import asdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -12,8 +13,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from . import checkin, db, rebooking, review, window
-from .models import ReviewStatus
-from .providers import default_provider
+from .models import CallState, ReviewStatus
+from .providers import POLL_BUDGET_SECONDS, default_provider
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
 
@@ -68,6 +69,35 @@ ORDER BY appointment.id
 """
 
 
+UNFINISHED_QUERY = """
+SELECT call_attempt.id         AS attempt_id,
+       call_attempt.state      AS state,
+       call_attempt.updated_at AS updated_at,
+       appointment.id          AS appointment_id,
+       patient.first_name      AS first_name,
+       patient.surname         AS surname,
+       patient.phone_e164      AS phone_e164
+FROM call_attempt
+JOIN appointment  ON appointment.id = call_attempt.appointment_id
+JOIN patient      ON patient.id     = appointment.patient_id
+LEFT JOIN review_item ON review_item.call_attempt_id = call_attempt.id
+WHERE review_item.id IS NULL
+  AND call_attempt.kind = 'checkin'
+ORDER BY call_attempt.id
+"""
+
+# A call still worth waiting for is one that was submitted and is bound to a run.
+# `.value` on both, because a StrEnum member does not hash as its own string and a
+# set of members would silently match nothing a query returns.
+STILL_RINGING = frozenset({CallState.RESERVED.value, CallState.ACCEPTED.value})
+
+# How long past its own poll budget an attempt may look like a call in progress.
+# Beyond this nothing is coming: the worker holding it died, or the process did, and
+# it is an attempt for a person to reconcile — which is what every unfinished attempt
+# was before the board stopped waiting for the poll.
+RINGING_GRACE = timedelta(seconds=POLL_BUDGET_SECONDS + 60)
+
+
 def masked(number: str) -> str:
     """Enough of a number to recognise, not enough to read off a recording.
 
@@ -100,17 +130,64 @@ def due_checkins(conn, today):
     return callable_now, withheld
 
 
-def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI:
+def unfinished(conn) -> tuple[list[dict], int]:
+    """The Check-in Calls with no Review Item, split by whether one is still coming.
+
+    These used to be one number. Handing the poll to a worker makes them two
+    different questions, and getting it wrong is worse than not asking: a call
+    placed thirty seconds ago is a phone ringing, and telling a Reviewer to go and
+    reconcile it against the provider by hand would be a lie about a call she can
+    still hear.
+
+    The masking rule is the one `due_checkins` follows. What reaches the page is a
+    mask; the digits are read here and dropped.
+    """
+    now = datetime.now(timezone.utc)
+    ringing, unreconciled = [], 0
+    for row in conn.execute(UNFINISHED_QUERY).fetchall():
+        row = dict(row)
+        still_going = (
+            row["state"] in STILL_RINGING
+            and now - datetime.fromisoformat(row["updated_at"]) < RINGING_GRACE
+        )
+        if not still_going:
+            unreconciled += 1
+            continue
+        row["phone_masked"] = masked(row.pop("phone_e164"))
+        ringing.append(row)
+    return ringing, unreconciled
+
+
+def in_the_background(work) -> None:
+    """Wait for a phone call somewhere a browser is not.
+
+    A daemon thread rather than a task on the event loop, because the work is a
+    blocking poll with a five-minute budget and its own SQLite connection, and
+    because it must not be cancelled by the request that started it going away.
+    Nothing is lost if the process dies mid-call: the attempt stays unfinished,
+    which the board reads as needing a person.
+    """
+    threading.Thread(target=work, daemon=True).start()
+
+
+def create_app(
+    db_path: str | None = None, provider=None, clock=None, background=None
+) -> FastAPI:
     """Build the board.
 
     `clock` returns the local time the Reading Window is judged against. It is
     injected so a test can sit inside the window deliberately rather than pass or
     fail on the hour the suite happens to run at; nothing in production passes it.
+
+    `background` is where a placed call goes to be waited for. Injected for the same
+    reason as the clock: a test that runs it inline can assert on what the call
+    produced instead of on when a thread got round to it.
     """
     app = FastAPI(title="HoldFor board")
     app.state.db_path = db_path or db.default_path()
     app.state.provider = provider or default_provider()
     app.state.clock = clock or datetime.now
+    app.state.background = background or in_the_background
 
     def connection(request: Request) -> sqlite3.Connection:
         conn = db.connect(request.app.state.db_path)
@@ -136,47 +213,27 @@ def create_app(db_path: str | None = None, provider=None, clock=None) -> FastAPI
         )
 
     @app.post("/checkins/{appointment_id}", status_code=201)
-    def place_checkin(
-        appointment_id: int,
-        request: Request,
-        conn: sqlite3.Connection = Depends(connection),
-    ):
+    async def place_checkin(appointment_id: int, request: Request):
         """Place one Check-in Call, named in the path.
 
-        The same work `POST /checkins` does for the whole day, for one Appointment.
-        It exists so the board has a control that spends one call rather than
-        however many are due, which is the only kind of dial worth practising with.
+        A browser gets the board back as soon as the call is out of the door. The
+        poll that waits for an 82-year-old to finish a sentence runs behind the
+        page, and the page says a call is in progress and refreshes itself until it
+        lands. Holding the response open instead meant a spinner for the length of a
+        conversation and a board that only told the truth after a manual reload.
+
+        A JSON caller still waits and still gets the Review Item back, because it
+        asked for the outcome rather than for a page.
         """
-        html = _from_form(request)
-        try:
-            review_item_id = checkin.run(
-                conn, app.state.provider, appointment_id, now=app.state.clock()
-            )
-        except checkin.Refused as refused:
-            if html:
-                return RedirectResponse(
-                    url=f"/?refused={refused.reason}", status_code=303
-                )
-            return JSONResponse(status_code=409, content={"refused": refused.reason})
-        except checkin.AwaitingReconciliation as pending:
-            # An attempt for this Appointment is unresolved. 409 rather than a
-            # retryable error on purpose: the correct next step is a person
-            # reading the provider's record, never this endpoint being called
-            # again.
-            if html:
-                return RedirectResponse(
-                    url=f"/?refused={pending.state}", status_code=303
-                )
-            return JSONResponse(
-                status_code=409,
-                content={"awaiting_reconciliation": pending.state},
-            )
-        except LookupError as missing:
-            raise HTTPException(status_code=404, detail=str(missing))
-        status = review.settle(conn, review_item_id)
-        if html:
-            return RedirectResponse(url="/?placed=1", status_code=303)
-        return {"review_item_id": review_item_id, "status": status}
+        return await run_in_threadpool(
+            _place_one_now,
+            app.state.db_path,
+            app.state.provider,
+            app.state.clock(),
+            appointment_id,
+            _from_form(request),
+            app.state.background,
+        )
 
     @app.get("/board")
     def board(conn: sqlite3.Connection = Depends(connection)) -> dict:
@@ -330,6 +387,76 @@ async def _body(request: Request) -> dict:
     return {key: value for key, value in form.items()}
 
 
+def _place_one_now(db_path, provider, now, appointment_id, html, background):
+    conn = db.connect(db_path)
+    try:
+        return _place_one(
+            conn, db_path, provider, now, appointment_id, html, background
+        )
+    finally:
+        conn.close()
+
+
+def _place_one(conn, db_path, provider, now, appointment_id, html, background):
+    try:
+        attempt_id = checkin.start(conn, provider, appointment_id, now=now)
+    except checkin.Settled as settled:
+        # This Appointment's call already happened. Read it back rather than place
+        # a second one.
+        return _settled(conn, settled.review_item_id, html)
+    except checkin.Refused as refused:
+        return _stopped(refused.reason, html)
+    except checkin.AwaitingReconciliation as pending:
+        # An attempt for this Appointment is unresolved. 409 rather than a
+        # retryable error on purpose: the correct next step is a person reading
+        # the provider's record, never this endpoint being called again.
+        return _stopped(pending.state, html, key="awaiting_reconciliation")
+    except LookupError as missing:
+        raise HTTPException(status_code=404, detail=str(missing))
+
+    if html:
+        # Submitted, bound, and nobody has picked up yet. A board is more use than a
+        # spinner, so it goes back now and the waiting happens on its own connection.
+        background(lambda: _finish_now(db_path, provider, attempt_id))
+        return RedirectResponse(url="/", status_code=303)
+
+    try:
+        review_item_id = checkin.finish(conn, provider, attempt_id)
+    except checkin.AwaitingReconciliation as pending:
+        return _stopped(pending.state, html, key="awaiting_reconciliation")
+    return _settled(conn, review_item_id, html)
+
+
+def _finish_now(db_path: str, provider, attempt_id: int) -> None:
+    """Wait for one placed call where no request is waiting for the answer.
+
+    Its own connection, opened in the thread that uses it: a SQLite connection
+    cannot cross that line. Nothing is retried and nothing is raised onward — an
+    attempt this cannot finish stays unfinished, and the board already knows how to
+    say so.
+    """
+    conn = db.connect(db_path)
+    try:
+        review.settle(conn, checkin.finish(conn, provider, attempt_id))
+    except checkin.AwaitingReconciliation:
+        pass
+    finally:
+        conn.close()
+
+
+def _settled(conn, review_item_id: int, html: bool):
+    status = review.settle(conn, review_item_id)
+    if html:
+        return RedirectResponse(url="/?placed=1", status_code=303)
+    return {"review_item_id": review_item_id, "status": status}
+
+
+def _stopped(reason: str, html: bool, key: str = "refused"):
+    if html:
+        return RedirectResponse(url=f"/?refused={reason}", status_code=303)
+    return JSONResponse(status_code=409, content={key: reason})
+
+
 def _place_due_now(db_path: str, provider, now, html: bool):
     """Walk today's due Appointments once, and report rather than raise.
 
@@ -410,6 +537,7 @@ def board_payload(
     stamp = date.today().isoformat()
     todays = [item for item in items if item["created_at"].startswith(stamp)]
     due, withheld = due_checkins(conn, due_on or date.today())
+    ringing, unreconciled = unfinished(conn)
     return {
         # Whether pressing a button on this page spends one of twenty calls. The
         # board says so before it is pressed rather than after.
@@ -422,17 +550,10 @@ def board_payload(
         "live_calls": conn.execute(
             "SELECT COUNT(*) AS n FROM live_call"
         ).fetchone()["n"],
-        # Check-ins only. A Rebooking Call never has a Review Item of its own, so
-        # without the kind a successful second call reports itself as a submission
-        # nobody confirmed.
-        "awaiting_reconciliation": conn.execute(
-            """
-            SELECT COUNT(*) AS n
-            FROM call_attempt
-            LEFT JOIN review_item ON review_item.call_attempt_id = call_attempt.id
-            WHERE review_item.id IS NULL AND call_attempt.kind = 'checkin'
-            """
-        ).fetchone()["n"],
+        # A call on the phone right now. The page refreshes itself while this is not
+        # empty, and stops when it empties, so a settled board sits still.
+        "in_flight": ringing,
+        "awaiting_reconciliation": unreconciled,
         "auto_closed": sum(
             1 for item in todays if item["status"] == ReviewStatus.AUTO_CLOSED
         ),

@@ -122,6 +122,20 @@ class AwaitingReconciliation(Exception):
         self.state = state
 
 
+class Settled(Exception):
+    """This key already has a Review Item, so there is nothing left to place.
+
+    Not a failure. A second press reads back the call that happened, which is what
+    keeps one Appointment to one Check-in Call however many times the button is hit.
+    Raised rather than returned because it leaves `start` by the same door
+    `Refused` does: no call went out.
+    """
+
+    def __init__(self, review_item_id: int) -> None:
+        super().__init__(str(review_item_id))
+        self.review_item_id = review_item_id
+
+
 def idempotency_key(appointment_id: int) -> str:
     return f"checkin:{appointment_id}"
 
@@ -318,14 +332,15 @@ def existing_attempt(conn: sqlite3.Connection, key: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def settle_existing(existing: sqlite3.Row) -> int:
+def settle_existing(existing: sqlite3.Row) -> None:
     """Answer for an attempt that already exists, without placing anything.
 
     A finished attempt replays its Review Item, which is what makes a second POST
-    harmless rather than a second phone call. An unfinished one stops here.
+    harmless rather than a second phone call. An unfinished one stops here. Both
+    leave by raising, because neither is a call this caller placed.
     """
     if existing["review_item_id"] is not None:
-        return existing["review_item_id"]
+        raise Settled(existing["review_item_id"])
     raise AwaitingReconciliation(existing["state"])
 
 
@@ -355,13 +370,30 @@ def advance(
     conn.commit()
 
 
-def run(
+UNFINISHED = """
+SELECT call_attempt.provider_run_id   AS run_id,
+       call_attempt.state             AS state,
+       appointment.medication_changed  AS medication_changed,
+       review_item.id                 AS review_item_id
+FROM call_attempt
+JOIN appointment ON appointment.id = call_attempt.appointment_id
+LEFT JOIN review_item ON review_item.call_attempt_id = call_attempt.id
+WHERE call_attempt.id = ?
+"""
+
+
+def start(
     conn: sqlite3.Connection,
     provider,
     appointment_id: int,
     now: datetime | None = None,
 ) -> int:
-    """Place one Check-in Call for one Appointment, or refuse to.
+    """Reserve one Check-in Call and submit it. Returns the attempt now in flight.
+
+    Everything that can refuse a call happens here, and nothing that waits for one
+    does: this returns as soon as the provider has named the run, which is seconds
+    rather than the length of a conversation. `finish` is what turns the attempt it
+    hands back into a Review Item.
 
     `now` is injected rather than read here so that a test can sit inside the
     Reading Window without the suite passing or failing on the hour it is run at.
@@ -382,7 +414,7 @@ def run(
     key = idempotency_key(appointment_id)
     existing = existing_attempt(conn, key)
     if existing is not None:
-        return settle_existing(existing)
+        settle_existing(existing)
 
     # Reserve before submitting. After this row is committed, no call can exist
     # that the application has no record of; without it, a submission that timed
@@ -422,7 +454,7 @@ def run(
         raced = existing_attempt(conn, key)
         if raced is None:
             raise
-        return settle_existing(raced)
+        settle_existing(raced)
 
     attempt_id = cursor.lastrowid
     request = CallRequest(
@@ -448,11 +480,32 @@ def run(
         advance(conn, attempt_id, CallState.SUBMISSION_UNKNOWN)
         raise AwaitingReconciliation(CallState.SUBMISSION_UNKNOWN.value) from None
 
-    # Bind the run id before polling. A poll that raises, or a process that dies
+    # Bind the run id before returning. A poll that raises, or a process that dies
     # here, then leaves an `accepted` row that names the call a person can look up.
     advance(conn, attempt_id, CallState.ACCEPTED, run_id=run_id)
+    return attempt_id
 
-    result = provider.poll(run_id)
+
+def finish(conn: sqlite3.Connection, provider, attempt_id: int) -> int:
+    """Wait for a call already placed, and write the Review Item it earned.
+
+    Nothing here can dial. The run id was bound before this became reachable and a
+    status read is the only thing that leaves the machine, which is what makes this
+    safe to hand to a worker no request is waiting on — and safe to arrive twice,
+    from a worker and a restart both. An attempt that already has its Review Item
+    returns that one rather than writing a second.
+    """
+    row = conn.execute(UNFINISHED, (attempt_id,)).fetchone()
+    if row is None:
+        raise LookupError(f"No call attempt {attempt_id}")
+    if row["review_item_id"] is not None:
+        return row["review_item_id"]
+    if row["run_id"] is None:
+        # Nothing was ever bound, so there is no run to ask about. Reserved or
+        # submission_unknown: a person reconciles it, exactly as before.
+        raise AwaitingReconciliation(row["state"])
+
+    result = provider.poll(row["run_id"])
     if result.state is not CallState.TERMINAL_VERIFIED:
         # The provider will not account for a run it just handed us. That is a
         # contradiction rather than an outcome, and filing it as a call that
@@ -460,9 +513,10 @@ def run(
         advance(conn, attempt_id, CallState.NEEDS_HUMAN)
         raise AwaitingReconciliation(CallState.NEEDS_HUMAN.value)
 
+    medication_changed = bool(row["medication_changed"])
     if connected(result.outcome):
         extraction = recover_carried_words(
-            result, extract(result, appointment.medication_changed)
+            result, extract(result, medication_changed)
         )
         stop_condition, stop_reason = settle_stop_condition(result, extraction)
     else:
@@ -488,39 +542,68 @@ def run(
     # Verified is the application's conclusion, not the provider's claim: we polled
     # a run bound to the intent we reserved, and the result mapped through
     # `outcomes.py`. A provider cannot assert this state about itself.
-    conn.execute(
-        """
-        UPDATE call_attempt
-        SET state = ?, transcript_path = ?, updated_at = ?
-        WHERE id = ?
-        """,
-        (
-            CallState.TERMINAL_VERIFIED.value,
-            _transcript_path(provider, run_id),
-            db.now_iso(),
-            attempt_id,
-        ),
-    )
-    review = conn.execute(
-        """
-        INSERT INTO review_item
-            (call_attempt_id, feeling, medication_ok, wants_seen,
-             carried_words_text, carried_words_turn,
-             stop_condition, stop_reason, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            attempt_id,
-            extraction.feeling.value if extraction.feeling else None,
-            extraction.medication_ok.value if extraction.medication_ok else None,
-            extraction.wants_seen.value if extraction.wants_seen else None,
-            extraction.carried_words_text,
-            extraction.carried_words_turn,
-            int(stop_condition),
-            stop_reason,
-            status.value,
-            db.now_iso(),
-        ),
-    )
-    conn.commit()
+    try:
+        conn.execute(
+            """
+            UPDATE call_attempt
+            SET state = ?, transcript_path = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                CallState.TERMINAL_VERIFIED.value,
+                _transcript_path(provider, row["run_id"]),
+                db.now_iso(),
+                attempt_id,
+            ),
+        )
+        review = conn.execute(
+            """
+            INSERT INTO review_item
+                (call_attempt_id, feeling, medication_ok, wants_seen,
+                 carried_words_text, carried_words_turn,
+                 stop_condition, stop_reason, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                attempt_id,
+                extraction.feeling.value if extraction.feeling else None,
+                extraction.medication_ok.value if extraction.medication_ok else None,
+                extraction.wants_seen.value if extraction.wants_seen else None,
+                extraction.carried_words_text,
+                extraction.carried_words_turn,
+                int(stop_condition),
+                stop_reason,
+                status.value,
+                db.now_iso(),
+            ),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        # Two finishers polled the same run and both got an answer. The index on
+        # review_item settles it; whoever lost reads the row that won rather than
+        # putting a second copy of one call in front of a Reviewer.
+        conn.rollback()
+        settled = conn.execute(UNFINISHED, (attempt_id,)).fetchone()
+        if settled["review_item_id"] is None:
+            raise
+        return settled["review_item_id"]
     return review.lastrowid
+
+
+def run(
+    conn: sqlite3.Connection,
+    provider,
+    appointment_id: int,
+    now: datetime | None = None,
+) -> int:
+    """Place one Check-in Call and wait for it, which is `start` and then `finish`.
+
+    The whole call in one blocking step, for a caller that has nothing better to do
+    until it lands: the CLI, the day's run, a test. A browser uses the two halves
+    separately, so that the page comes back while the phone is still ringing.
+    """
+    try:
+        attempt_id = start(conn, provider, appointment_id, now=now)
+    except Settled as settled:
+        return settled.review_item_id
+    return finish(conn, provider, attempt_id)

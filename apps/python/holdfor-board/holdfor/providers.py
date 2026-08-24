@@ -133,6 +133,11 @@ COMMAND_TIMEOUT_SECONDS = 60
 POLL_INTERVAL_SECONDS = 10
 POLL_ATTEMPTS = 30  # five minutes, then a person looks
 
+# Everything one poll may spend, which is also the longest a call can plausibly
+# still be ringing. The board reads it to tell a call in progress from an attempt
+# nobody is going to finish, now that the poll no longer happens inside the request.
+POLL_BUDGET_SECONDS = POLL_INTERVAL_SECONDS * POLL_ATTEMPTS
+
 
 class AuthUnavailable(Exception):
     """CALL-E cannot be used from this machine, and nothing was dialled.
