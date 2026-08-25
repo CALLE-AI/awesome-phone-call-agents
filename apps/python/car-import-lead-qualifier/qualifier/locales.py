@@ -39,9 +39,6 @@ class Market:
 # E.164 prefix -> market
 MARKETS: dict[str, Market] = {
     "+258": Market("Mozambique", "pt-MZ", "Africa/Maputo", (8, 18), "MZ"),
-    "+244": Market("Angola", "pt-AO", "Africa/Luanda", (8, 18), "AO"),
-    "+255": Market("Tanzania", "en-TZ", "Africa/Dar_es_Salaam", (8, 18), "TZ"),
-    "+254": Market("Kenya", "en-KE", "Africa/Nairobi", (8, 18), "KE"),
     "+1": Market("Test line", "en-US", "America/New_York", (9, 20), "US"),
 }
 

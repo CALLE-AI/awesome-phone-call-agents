@@ -68,9 +68,6 @@ def test_every_example_market_resolves_from_its_own_number():
     resolved = {lead.lead_id: lead.locale for lead in batch().leads}
     assert resolved == {
         "lead-mz-0001": "pt-MZ",
-        "lead-ao-0002": "pt-AO",
-        "lead-tz-0003": "en-TZ",
-        "lead-ke-0004": "en-KE",
         "lead-test-0005": "en-US",
     }
 
@@ -86,10 +83,10 @@ def test_a_contradictory_country_field_cannot_change_the_market():
 
 def test_explicit_timezone_overrides_the_market_default():
     raw = deepcopy(EXAMPLE)
-    raw["leads"][1]["timezone"] = "Europe/Lisbon"
-    lead = models.parse_batch(raw).leads[1]
-    assert lead.market.region_hint == "AO"
-    assert lead.locale == "pt-AO"
+    raw["leads"][0]["timezone"] = "Europe/Lisbon"
+    lead = models.parse_batch(raw).leads[0]
+    assert lead.market.region_hint == "MZ"
+    assert lead.locale == "pt-MZ"
     assert lead.timezone == "Europe/Lisbon"
 
 
@@ -157,7 +154,7 @@ def test_mask_phone_keeps_only_the_edges():
 
 def test_longest_prefix_wins_over_a_shorter_one():
     assert locales.resolve_market("+12025550143").region_hint == "US"
-    assert locales.resolve_market("+254100000001").region_hint == "KE"
+    assert locales.resolve_market("+258800000001").region_hint == "MZ"
     assert locales.supported_prefixes()[-1] == "+1"
 
 
@@ -251,7 +248,7 @@ def test_preview_masks_every_phone_and_creates_no_call():
     rendered = json.dumps(plan)
 
     assert plan["creates_phone_call"] is False
-    assert plan["lead_count"] == 5
+    assert plan["lead_count"] == 2
     for lead in loaded.leads:
         assert lead.phone not in rendered
         assert lead.masked_phone in rendered
@@ -521,8 +518,10 @@ def test_a_declined_call_ends_the_poll_instead_of_hanging_the_batch():
     loaded = batch()
     lead, next_lead = loaded.leads[0], loaded.leads[1]
     calls = FakeCalls(status="declined", task_completed=False)
-    # Two hours past the Maputo opening, so the Luanda lead is callable too.
-    moment = inside_business_hours(lead) + timedelta(hours=2)
+    # Maputo 08:00-18:00 is 06:00-16:00 UTC; the New York test line's 09:00-20:00
+    # is 13:00-24:00 UTC. Eight hours past the Maputo opening lands at 14:00 UTC,
+    # inside both, so the second lead is callable rather than deferred.
+    moment = inside_business_hours(lead) + timedelta(hours=8)
 
     payload = runner.execute(
         loaded,
@@ -706,12 +705,12 @@ def test_cli_execute_requires_the_consent_flag():
 
 
 def test_cli_can_select_a_single_lead_and_rejects_unknown_ids():
-    result = run_cli("--leads", "example_leads.json", "--lead-id", "lead-ao-0002")
+    result = run_cli("--leads", "example_leads.json", "--lead-id", "lead-test-0005")
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["lead_count"] == 1
-    assert payload["leads"][0]["lead_id"] == "lead-ao-0002"
-    assert payload["leads"][0]["market"] == "Angola / pt-AO / Africa/Luanda"
+    assert payload["leads"][0]["lead_id"] == "lead-test-0005"
+    assert payload["leads"][0]["market"] == "Test line / en-US / America/New_York"
 
     missing = run_cli("--leads", "example_leads.json", "--lead-id", "lead-none")
     assert missing.returncode == 2

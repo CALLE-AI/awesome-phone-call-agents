@@ -3,7 +3,8 @@
 A lead file never declares the caller's country. The number itself resolves to a
 market (see `locales.py`), and the market supplies the locale, the timezone, and
 the calling window. `locale` and `timezone` stay overridable per lead for the
-cases the prefix cannot know, such as a Kenyan number whose owner lives abroad.
+cases the prefix cannot know, such as a Mozambican number whose owner lives
+abroad.
 """
 
 from __future__ import annotations
@@ -138,7 +139,7 @@ def parse_lead(raw: Any, *, index: int, batch: dict[str, Any]) -> Lead:
         raw.get("locale", market.locale), f"{where}.locale", minimum=2, maximum=16
     )
     if not LOCALE.fullmatch(locale):
-        raise ValueError(f"{where}.locale must look like pt-MZ or en-KE")
+        raise ValueError(f"{where}.locale must look like pt-MZ or en-US")
 
     timezone = validate_timezone(
         clean_text(

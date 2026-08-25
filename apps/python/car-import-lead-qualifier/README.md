@@ -52,7 +52,7 @@ uv sync --dev
 
 Copy `example_leads.json` and replace the placeholder numbers with E.164 numbers you are authorized to call. Every lead must set `submitted_import_inquiry: true`, which records that the person asked to be contacted. Parsing fails otherwise.
 
-Only the US line in the example uses an officially reserved test range (`+1 202 555 01xx`). Mozambique, Angola, Tanzania, and Kenya publish no documentation range, so those entries use structurally valid numbers in unallocated prefixes (`+258 80…`, `+244 90…`, `+255 70…`, `+254 10…`). They are placeholders to be replaced, not numbers to dial.
+Only the US line in the example uses an officially reserved test range (`+1 202 555 01xx`). Mozambique publishes no documentation range, so that entry uses a structurally valid number in an unallocated prefix (`+258 80…`). It is a placeholder to be replaced, not a number to dial.
 
 ## Dry run (default)
 
@@ -109,17 +109,16 @@ Per lead:
 - `inquiry_source` and `inquiry_date` (`YYYY-MM-DD`): what the caller cites when explaining the reason for the call;
 - `vehicle_interest`: short free text, spoken back to the lead;
 - `destination_country`: optional ISO 3166-1 alpha-2 import destination, defaulting to the market's own region and passed to CALL-E as metadata;
-- `locale`, `timezone`: optional overrides for the cases a prefix cannot know, such as a Kenyan number whose owner lives abroad.
+- `locale`, `timezone`: optional overrides for the cases a prefix cannot know, such as a Mozambican number whose owner lives abroad.
 
 There is deliberately no `country` field. The market comes from the dialled number, so a `country` key added to a lead is simply ignored:
 
 | Prefix | Market | Locale | Timezone | Local window |
 | --- | --- | --- | --- | --- |
 | `+258` | Mozambique | `pt-MZ` | `Africa/Maputo` | 08:00-18:00 |
-| `+244` | Angola | `pt-AO` | `Africa/Luanda` | 08:00-18:00 |
-| `+255` | Tanzania | `en-TZ` | `Africa/Dar_es_Salaam` | 08:00-18:00 |
-| `+254` | Kenya | `en-KE` | `Africa/Nairobi` | 08:00-18:00 |
 | `+1` | Test line | `en-US` | `America/New_York` | 09:00-20:00 |
+
+Mozambique is the only market this app serves. `+1` is the internal test line, not a market to sell into: it exists so the call path can be exercised end to end against a reserved number. Other countries were removed rather than left in untested — adding one back means a `Market` entry here, a port list it can actually quote, and a real call placed to verify it.
 
 Prefixes are matched longest first, so a longer market prefix always wins over a shorter one. A number outside every market is rejected at parse time with a masked error (`unsupported destination for +491***`) rather than dialled.
 
@@ -129,7 +128,7 @@ Do not put names, addresses, account numbers, document numbers, payment data, he
 
 Before each live call, the lead's local time is checked against its market window. Leads outside their window are **deferred**: no call is created, and the result records the next local window. Use `--allow-outside-business-hours` only when you have a specific reason to call anyway.
 
-Calling days are one policy for the whole app (`BUSINESS_WEEKDAYS`, Monday to Friday) while the hours belong to each market. Both ignore public holidays; adjust `qualifier/locales.py` before a real campaign. Adding a market is one entry in `MARKETS` and nothing else.
+Calling days are one policy for the whole app (`BUSINESS_WEEKDAYS`, Monday to Friday) while the hours belong to each market. Both ignore public holidays; adjust `qualifier/locales.py` before a real campaign.
 
 ## Idempotency
 
@@ -170,7 +169,7 @@ The spoken options in `qualifier/task.py` are read from this schema, so the scri
 
 The schema has been refined once against real results: a compound question that silently dropped `vehicle_type`, and budget bands whose borders were ambiguous at the boundary. Both are written up in [`docs/field-notes.md`](docs/field-notes.md).
 
-Two known edges remain: `budget_band_usd` is fixed in US dollars, and `destination_port` lists Mozambican ports only, so leads in the Angola, Tanzania, and Kenya markets will answer `other`. Widening either one means adding enum values here and a matching line in `task.py`.
+One known edge remains: `budget_band_usd` is fixed in US dollars, which is the currency import quotes are written in here but not the one the lead pays in. Changing that means adding enum values here and a matching line in `task.py`. The `destination_port` enum lists Mozambican ports, which now matches the only market served.
 
 ## Routing
 
@@ -192,7 +191,7 @@ A provider decline is treated as retryable rather than as an opt-out, because CA
 
 `completion_confidence` arrives from CALL-E as `{"score": 0.66, "label": "medium"}`. The score is what feeds the `manual_review` gate below `0.8`; a plain float is still accepted.
 
-`payment_support` exists because in these markets a blocked payment is usually not a lost sale: a buyer waiting on foreign currency needs a different team than a buyer who is still browsing. The blocker is echoed on the decision so the queue can be split by cause.
+`payment_support` exists because in this market a blocked payment is usually not a lost sale: a buyer waiting on foreign currency needs a different team than a buyer who is still browsing. The blocker is echoed on the decision so the queue can be split by cause.
 
 ## Side effects and safety
 

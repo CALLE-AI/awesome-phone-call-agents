@@ -16,7 +16,7 @@ A qualification call reaches a real person about a purchase decision. Read this 
 - One call per number per run: duplicate numbers in a lead file are rejected.
 - Numbers are masked as `+25*******001` in previews, results, logs, and errors. The unmasked number appears only in the request body sent to CALL-E.
 - Phone-like digit runs are stripped from returned evidence text before the result is written.
-- `example_leads.json` never contains a dialable number. `+1 202 555 0143` is an officially reserved US test number; the Mozambique, Angola, Tanzania, and Kenya entries use unallocated prefixes (`+258 80…`, `+244 90…`, `+255 70…`, `+254 10…`) because those countries publish no documentation range. Treat them as placeholders, verify before reuse, and never commit a real number.
+- `example_leads.json` never contains a dialable number. `+1 202 555 0143` is an officially reserved US test number; the Mozambique entry uses an unallocated prefix (`+258 80…`) because the country publishes no documentation range. Treat them as placeholders, verify before reuse, and never commit a real number.
 
 ## Disclosure and opt-out
 
