@@ -1,0 +1,15 @@
+name: 'CallAction - On-Call Escalation'
+description: 'Places a live AI phone call to an on-call engineer when a CI step fails.'
+inputs:
+  calle_api_key:
+    description: 'CALL-E API Key'
+    required: true
+  phone_number:
+    description: 'E.164 formatted phone number to call'
+    required: true
+  github_token:
+    description: 'GitHub token for PR commenting'
+    required: true
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
