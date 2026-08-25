@@ -97,6 +97,7 @@ export async function runAudit(options) {
     callbackNumber,
     now = new Date(),
     live = false,
+    mode = live ? 'live' : 'preview',
     client = null,
     concurrency = 4,
     runId = `run-${now.toISOString().slice(0, 10)}`,
@@ -171,7 +172,7 @@ export async function runAudit(options) {
   return {
     run_id: runId,
     generated_at: now.toISOString(),
-    mode: live ? 'live' : 'preview',
+    mode,
     plan_name: planName,
     auditing_organization: auditingOrganization,
     counts_by_office: { dialable: dialable.length, skipped: skipped.length, deferred: deferred.length },
@@ -219,6 +220,8 @@ async function main() {
     process.exit(1);
   }
 
+  const runMode = mode.live ? 'live' : usingFakeServer ? 'rehearsal' : 'preview';
+
   const run = await runAudit({
     listings,
     suppressionList: file.suppression_list || [],
@@ -227,6 +230,7 @@ async function main() {
     callbackNumber: String(args['callback-number'] || '+12125550100'),
     now,
     live: executing,
+    mode: runMode,
     client: executing ? new CalleClient({ baseUrl, apiKey: process.env.CALLE_API_KEY }) : null,
     concurrency: Number(args.concurrency || 4),
   });
@@ -239,7 +243,7 @@ async function main() {
 
   // A preview has no findings to summarize. Printing the scored summary here would
   // report "the audit did not connect" for a run that was never meant to connect.
-  if (run.mode === 'preview') {
+  if (runMode === 'preview') {
     process.stdout.write(
       `Previewed ${run.previews.length} calls covering ${score.counts.dialable} listings. Nothing was dialed.\n\n`,
     );
