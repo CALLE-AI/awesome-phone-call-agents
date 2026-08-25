@@ -5,16 +5,21 @@
 - Status: Accepted for the hackathon MVP
 - Decision date: 2026-07-28
 - Product form: Web application
-- Implementation status: MVP implemented; fake-only public deployed; protected staging verification pending
-- Live-integration status: One authorized local CALL-E attempt verified with a contact exception; successful conversation and protected-staging execution remain unverified
+- Implementation status: MVP implemented; fake-only public and protected
+  staging verified
+- Live-integration status: One authorized local CALL-E attempt reached the intended participant and completed a conversation; structured answer capture was inaccurate, and protected-staging execution remains unverified
 - Review trigger: Revisit only if the CALL-E integration spike, hosting spike, or security controls fail
 
 This document records the implementation stack and operational shape selected
 for FieldClose. The public fake-only deployment and the authorized local CALL-E
-evidence are verified separately. The live run reached a Sonetel forwarding
-announcement rather than the participant, preserved every requested HVAC field
-as `not_asked`, and routed the result to a human. It is not evidence of a
-successful conversation or of the still-pending protected-staging deployment.
+evidence are verified separately. The live run reached the intended participant
+and completed a conversation, but the structured result incorrectly treated a
+Sonetel forwarding announcement in the connection path as terminal. FieldClose
+stored every requested HVAC field as `not_asked` and routed the result to a
+human. A dated operator correction records the successful contact
+without rewriting the original machine artifacts. The run is evidence of a
+successful conversation, but not of accurate structured answer capture or the
+still-pending protected-staging deployment.
 
 ## Decision
 
@@ -294,7 +299,7 @@ Two deployments have intentionally different capabilities:
 | Environment | Access | Provider | Live credentials |
 | --- | --- | --- | --- |
 | Public demo | Any authenticated user receives an isolated demo workspace; anonymous users see the sign-in experience | Fake only | Absent |
-| Protected live/staging | Allow-listed operator identities only | Fake by default; CALL-E only after explicit approval | Required only in protected server secret storage; deployment verification pending |
+| Protected live/staging | Allow-listed operator identities only | Fake by default; CALL-E only after explicit approval | Required only in protected server secret storage; configuration is not publicly verifiable |
 
 A live call requires both:
 
@@ -307,12 +312,14 @@ Both default to blocking live creation. Neither can be enabled from ordinary bro
 
 ### Current deployment evidence and target protected topology
 
-- The Aliyun ECS public demo runs behind Caddy HTTPS, contains no CALL-E
-  credential, and is forced to the fake provider.
+- The public demo is browser-visible at its HTTPS URL and exposes a fake-only
+  boundary. The absence of a CALL-E credential is additionally enforced by the
+  public build-time configuration check in this tree.
 - The protected target is a separate application environment with separate data
   and server-side CALL-E and authentication-email secrets.
-- Inspectable evidence for protected deployment, isolation, production
-  authentication, and deployed CALL-E/SMTP configuration is still pending.
+- Protected deployment, isolation, production authentication, and CALL-E/SMTP
+  statements have maintainer-reported private operational evidence only. No
+  inaccessible deployment revision is cited as public provenance.
 
 ### Supported managed topology
 

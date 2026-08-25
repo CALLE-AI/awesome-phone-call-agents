@@ -17,11 +17,12 @@ export type NewCaseFieldErrors = Partial<
 type NewCaseFormProps = {
   busy: boolean;
   defaultWorkOrder: string;
-  error: string | null;
   fieldErrors: NewCaseFieldErrors;
+  formError: string | null;
   mode: "fake" | "live";
   onCancel: () => void;
   onFieldErrorsChange: (errors: NewCaseFieldErrors) => void;
+  onFormErrorChange: (error: string | null) => void;
   onSubmit: (input: NewCaseInput) => Promise<void>;
 };
 
@@ -43,21 +44,92 @@ const questionOptions = [
   },
 ] as const;
 
+export const PRESET_DEMO_WORK_ORDER = {
+  workOrderRef: "WO-DEMO-1042",
+  contractorDisplayName: "Example HVAC",
+  siteLabel: "Fictional North Store",
+  timezone: "America/Chicago",
+  contactRole: "site_manager",
+  phoneE164: "+12025550142",
+  serviceDate: "2026-07-27",
+  equipmentLabel: "Rooftop unit RTU-2",
+  technicianCompletionNote: "Filter replaced and unit restarted",
+  allowedReferenceText:
+    "A fictional technician visited to service rooftop unit RTU-2.",
+  requestedFields: [
+    "observed_operating_status",
+    "unresolved_issue",
+    "return_visit_request",
+  ],
+} as const satisfies {
+  workOrderRef: string;
+  contractorDisplayName: string;
+  siteLabel: string;
+  timezone: string;
+  contactRole: string;
+  phoneE164: string;
+  serviceDate: string;
+  equipmentLabel: string;
+  technicianCompletionNote: string;
+  allowedReferenceText: string;
+  requestedFields: readonly DemoCloseoutCaseInput["requestedFields"][number][];
+};
+
+export function createNewCaseWorkOrderReference(mode: "fake" | "live") {
+  if (mode === "fake") {
+    return PRESET_DEMO_WORK_ORDER.workOrderRef;
+  }
+
+  return `WO-LIVE-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+export function formatDateInTimezone(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: timezone,
+    year: "numeric",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export function NewCaseForm({
   busy,
   defaultWorkOrder,
-  error,
   fieldErrors,
+  formError,
   mode,
   onCancel,
   onFieldErrorsChange,
+  onFormErrorChange,
   onSubmit,
 }: NewCaseFormProps) {
   const live = mode === "live";
+  const formRef = useRef<HTMLFormElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+  const serviceDateInputRef = useRef<HTMLInputElement>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(
-    new Set(questionOptions.map((question) => question.value)),
+    new Set(
+      live
+        ? questionOptions.map((question) => question.value)
+        : PRESET_DEMO_WORK_ORDER.requestedFields,
+    ),
   );
+
+  function restoreDemoPreset() {
+    if (live) {
+      return;
+    }
+
+    formRef.current?.reset();
+    setSelectedQuestions(new Set(PRESET_DEMO_WORK_ORDER.requestedFields));
+    onFieldErrorsChange({});
+    onFormErrorChange(null);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,7 +194,16 @@ export function NewCaseForm({
   }
 
   return (
-    <form className="workspace-panel" onSubmit={handleSubmit}>
+    <form
+      className="workspace-panel"
+      onChange={() => {
+        if (formError) {
+          onFormErrorChange(null);
+        }
+      }}
+      onSubmit={handleSubmit}
+      ref={formRef}
+    >
       <div className="panel-heading">
         <div>
           <p className="eyebrow">
@@ -144,11 +225,32 @@ export function NewCaseForm({
         role="note"
       >
         <span aria-hidden="true" className="notice-mark">
-          {live ? "L" : "D"}
+          {live ? (
+            <svg fill="none" viewBox="0 0 24 24">
+              <path d="M12 4.25 20.25 19H3.75L12 4.25Z" />
+              <path d="M12 9.75v4.5M12 17.25h.01" />
+            </svg>
+          ) : (
+            <svg fill="none" viewBox="0 0 24 24">
+              <path d="M9 3.5h6M10 3.5V6l-4.5 6.5A1.5 1.5 0 0 0 6.7 15h10.6a1.5 1.5 0 0 0 1.2-2.5L14 6V3.5" />
+              <path d="M6.7 15a5 5 0 0 0 10.6 0" />
+            </svg>
+          )}
         </span>
-        {live
-          ? "Live mode can place one real CALL-E phone call after a separate exact approval. Enter only a contact and purpose your organization is authorized to use."
-          : "Demo data only. Use the fictional 555 number below; this workflow never places a real call."}
+        <span className="notice-strip-copy">
+          {live
+            ? "Live mode can place one real CALL-E phone call after a separate exact approval. Enter only a contact and purpose your organization is authorized to use."
+            : "Demo data only. Use the fixed fictional inputs below; this workflow never places a real call."}
+        </span>
+        {live ? null : (
+          <button
+            className="text-button notice-strip-action"
+            onClick={restoreDemoPreset}
+            type="button"
+          >
+            Restore fictional preset
+          </button>
+        )}
       </div>
 
       <ol className="form-progress" aria-label="Case preparation sections">
@@ -157,8 +259,8 @@ export function NewCaseForm({
           ["02", "Authorized contact"],
           ["03", "Visit evidence"],
           ["04", "Approved questions"],
-        ].map(([number, label]) => (
-          <li key={number}>
+        ].map(([number, label], index) => (
+          <li aria-current={index === 0 ? "step" : undefined} key={number}>
             <span>{number}</span>
             <strong>{label}</strong>
           </li>
@@ -174,7 +276,11 @@ export function NewCaseForm({
             Work-order reference
             <input
               className="field-control"
-              defaultValue={defaultWorkOrder}
+              defaultValue={
+                live
+                  ? defaultWorkOrder
+                  : PRESET_DEMO_WORK_ORDER.workOrderRef
+              }
               name="workOrderRef"
               required
             />
@@ -183,7 +289,9 @@ export function NewCaseForm({
             Contractor display name
             <input
               className="field-control"
-              defaultValue={live ? "" : "Example HVAC"}
+              defaultValue={
+                live ? "" : PRESET_DEMO_WORK_ORDER.contractorDisplayName
+              }
               name="contractorDisplayName"
               placeholder={live ? "Authorized contractor name" : undefined}
               required
@@ -193,7 +301,7 @@ export function NewCaseForm({
             {live ? "Site label" : "Fictional site label"}
             <input
               className="field-control"
-              defaultValue={live ? "" : "Fictional North Store"}
+              defaultValue={live ? "" : PRESET_DEMO_WORK_ORDER.siteLabel}
               name="siteLabel"
               placeholder={live ? "Customer-safe site label" : undefined}
               required
@@ -203,8 +311,18 @@ export function NewCaseForm({
             IANA timezone
             <select
               className="field-control"
-              defaultValue="America/Chicago"
+              defaultValue={
+                live ? "America/Chicago" : PRESET_DEMO_WORK_ORDER.timezone
+              }
               name="timezone"
+              onChange={(event) => {
+                if (live && serviceDateInputRef.current) {
+                  serviceDateInputRef.current.value = formatDateInTimezone(
+                    new Date(),
+                    event.target.value,
+                  );
+                }
+              }}
             >
               <option value="America/Chicago">America/Chicago</option>
               <option value="America/New_York">America/New_York</option>
@@ -238,7 +356,9 @@ export function NewCaseForm({
             Contact role
             <select
               className="field-control"
-              defaultValue="site_manager"
+              defaultValue={
+                live ? "site_manager" : PRESET_DEMO_WORK_ORDER.contactRole
+              }
               name="contactRole"
             >
               <option value="site_manager">Site manager</option>
@@ -259,7 +379,7 @@ export function NewCaseForm({
               }
               autoComplete="off"
               className="field-control font-mono"
-              defaultValue={live ? "" : "+12025550142"}
+              defaultValue={live ? "" : PRESET_DEMO_WORK_ORDER.phoneE164}
               id="phone-e164"
               inputMode="tel"
               name="phoneE164"
@@ -331,8 +451,13 @@ export function NewCaseForm({
             Service date
             <input
               className="field-control"
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              defaultValue={
+                live
+                  ? formatDateInTimezone(new Date(), "America/Chicago")
+                  : PRESET_DEMO_WORK_ORDER.serviceDate
+              }
               name="serviceDate"
+              ref={serviceDateInputRef}
               required
               type="date"
             />
@@ -341,7 +466,9 @@ export function NewCaseForm({
             Equipment label
             <input
               className="field-control"
-              defaultValue={live ? "" : "Rooftop unit RTU-2"}
+              defaultValue={
+                live ? "" : PRESET_DEMO_WORK_ORDER.equipmentLabel
+              }
               name="equipmentLabel"
               placeholder={live ? "Equipment or serviced area" : undefined}
               required
@@ -351,7 +478,11 @@ export function NewCaseForm({
             Internal technician completion note
             <textarea
               className="field-control"
-              defaultValue={live ? "" : "Filter replaced and unit restarted"}
+              defaultValue={
+                live
+                  ? ""
+                  : PRESET_DEMO_WORK_ORDER.technicianCompletionNote
+              }
               name="technicianCompletionNote"
               required
               rows={2}
@@ -367,7 +498,7 @@ export function NewCaseForm({
               defaultValue={
                 live
                   ? ""
-                  : "A fictional technician visited to service rooftop unit RTU-2."
+                  : PRESET_DEMO_WORK_ORDER.allowedReferenceText
               }
               name="allowedReferenceText"
               placeholder={
@@ -415,9 +546,9 @@ export function NewCaseForm({
         </div>
       </fieldset>
 
-      {error ? (
+      {formError ? (
         <p className="form-error" role="alert">
-          {error}
+          {formError}
         </p>
       ) : null}
 

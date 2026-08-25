@@ -15,7 +15,9 @@ import { useWorkspaceConfiguration } from "@/components/workspace-configuration"
 import { projectConfig } from "@/config/project";
 
 import {
+  createNewCaseWorkOrderReference,
   NewCaseForm,
+  PRESET_DEMO_WORK_ORDER,
   type NewCaseFieldErrors,
   type NewCaseInput,
 } from "./new-case-form";
@@ -297,7 +299,9 @@ function AuthenticatedWorkbench({
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [preview, setPreview] = useState<CallPreview | null>(null);
-  const [defaultWorkOrder, setDefaultWorkOrder] = useState("WO-DEMO-1042");
+  const [defaultWorkOrder, setDefaultWorkOrder] = useState<string>(
+    PRESET_DEMO_WORK_ORDER.workOrderRef,
+  );
   const [selectedScenario, setSelectedScenario] = useState("resolved_clear");
   const [attestations, setAttestations] = useState<Set<string>>(new Set());
   const [busyAction, setBusyAction] = useState<string | null>("bootstrap");
@@ -308,6 +312,7 @@ function AuthenticatedWorkbench({
     useState<WorkspaceLoadState>("loading");
   const [newCaseFieldErrors, setNewCaseFieldErrors] =
     useState<NewCaseFieldErrors>({});
+  const [newCaseFormError, setNewCaseFormError] = useState<string | null>(null);
   const view = route.view;
   const selectedCaseId = route.caseId ?? null;
   const showNewCase = Boolean(route.newCase);
@@ -353,7 +358,7 @@ function AuthenticatedWorkbench({
       try {
         setError(null);
         setWorkspaceLoadState("loading");
-        const demoResponse = await requestJson<{ workspace: Workspace }>(
+        const demoResponse = await requestJson<{ "workspace": Workspace }>(
           "/api/workspaces",
           { method: "POST" },
         );
@@ -407,7 +412,7 @@ function AuthenticatedWorkbench({
         setWorkspace(initialWorkspace);
         setWorkspaceLoadState("ready");
         setDefaultWorkOrder(
-          `WO-${workspaceMode(initialWorkspace) === "live" ? "LIVE" : "DEMO"}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+          createNewCaseWorkOrderReference(workspaceMode(initialWorkspace)),
         );
         window.localStorage.setItem(
           "fieldclose.last-workspace",
@@ -548,6 +553,7 @@ function AuthenticatedWorkbench({
     setBusyAction("create");
     setError(null);
     setNewCaseFieldErrors({});
+    setNewCaseFormError(null);
 
     try {
       const response = await requestJson<{ case: { id: string } }>(
@@ -568,8 +574,11 @@ function AuthenticatedWorkbench({
         `/workspace/${workspace.slug}/cases/${response.case.id}`,
       );
     } catch (caught) {
-      setNewCaseFieldErrors(newCaseErrors(caught));
-      setError(readableError(caught));
+      const fieldErrors = newCaseErrors(caught);
+      setNewCaseFieldErrors(fieldErrors);
+      setNewCaseFormError(
+        Object.keys(fieldErrors).length > 0 ? null : readableError(caught),
+      );
     } finally {
       setBusyAction(null);
     }
@@ -728,12 +737,12 @@ function AuthenticatedWorkbench({
   }
 
   function openNewCase() {
-    const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
     setDefaultWorkOrder(
-      `WO-${workspaceMode(workspace) === "live" ? "LIVE" : "DEMO"}-${suffix}`,
+      createNewCaseWorkOrderReference(workspaceMode(workspace)),
     );
     setError(null);
     setNewCaseFieldErrors({});
+    setNewCaseFormError(null);
     if (workspace) {
       router.push(`/workspace/${workspace.slug}/cases/new`);
     }
@@ -748,6 +757,8 @@ function AuthenticatedWorkbench({
 
     setBusyAction("workspace");
     setError(null);
+    setNewCaseFieldErrors({});
+    setNewCaseFormError(null);
     setDetail(null);
     setPreview(null);
     setAttestations(new Set());
@@ -756,7 +767,7 @@ function AuthenticatedWorkbench({
       nextWorkspace.slug,
     );
     setDefaultWorkOrder(
-      `WO-${workspaceMode(nextWorkspace) === "live" ? "LIVE" : "DEMO"}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      createNewCaseWorkOrderReference(workspaceMode(nextWorkspace)),
     );
     router.push(`/workspace/${nextWorkspace.slug}/cases`);
   }
@@ -915,8 +926,8 @@ function AuthenticatedWorkbench({
               <NewCaseForm
                 busy={busyAction === "create"}
                 defaultWorkOrder={defaultWorkOrder}
-                error={error}
                 fieldErrors={newCaseFieldErrors}
+                formError={newCaseFormError}
                 key={workspace?.id ?? "workspace-loading"}
                 mode={workspaceMode(workspace)}
                 onCancel={() => {
@@ -925,10 +936,14 @@ function AuthenticatedWorkbench({
                   }
                 }}
                 onFieldErrorsChange={setNewCaseFieldErrors}
+                onFormErrorChange={setNewCaseFormError}
                 onSubmit={handleCreateCase}
               />
             ) : view === "audit" ? (
               <AuditView
+                casesHref={
+                  workspace ? `/workspace/${workspace.slug}/cases` : undefined
+                }
                 detail={activeDetail}
                 loadState={activeDetailLoadState}
                 loading={detailLoading}
@@ -945,6 +960,11 @@ function AuthenticatedWorkbench({
                 busyAction={busyAction}
                 canRecordDisposition={
                   workspace?.role === "owner" || workspace?.role === "operator"
+                }
+                casesHref={
+                  workspace
+                    ? `/workspace/${workspace.slug}/cases`
+                    : undefined
                 }
                 detail={activeDetail}
                 loadState={activeDetailLoadState}
@@ -1145,11 +1165,27 @@ function CaseRail({
             </>
           ) : (
             <>
-              <span aria-hidden="true">00</span>
-              <p>{emptyLabel}</p>
+              <span aria-hidden="true" className="rail-empty-mark">
+                <svg fill="none" viewBox="0 0 24 24">
+                  <path d="M8.5 4.5h7a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" />
+                  <path d="M9.5 8h5M9.5 11.5h5M9.5 15h3" />
+                </svg>
+              </span>
+              <div className="rail-empty-copy">
+                <span className="rail-empty-kicker">Closeout queue</span>
+                <h2>{emptyLabel}</h2>
+                <p>
+                  Completed work orders land here once a closeout case is
+                  created and ready for review.
+                </p>
+              </div>
               {showNewAction ? (
-                <button className="text-button" onClick={onNewCase} type="button">
-                  Create the first case
+                <button
+                  className="rail-empty-action"
+                  onClick={onNewCase}
+                  type="button"
+                >
+                  Create the first case <span aria-hidden="true">→</span>
                 </button>
               ) : null}
             </>
@@ -1165,6 +1201,7 @@ function CaseWorkspace({
   attestations,
   busyAction,
   canRecordDisposition,
+  casesHref,
   detail,
   loadState,
   loading,
@@ -1184,6 +1221,7 @@ function CaseWorkspace({
   attestations: Set<string>;
   busyAction: string | null;
   canRecordDisposition: boolean;
+  casesHref: string | undefined;
   detail: CaseDetail | null;
   loadState: DetailLoadState;
   loading: boolean;
@@ -1216,15 +1254,29 @@ function CaseWorkspace({
 
   if (!detail) {
     return (
-      <section className="workspace-panel empty-workspace">
+      <section className="workspace-panel empty-workspace empty-state empty-state--neutral">
         <span aria-hidden="true" className="empty-index">
           FC / 01
         </span>
+        <div aria-hidden="true" className="empty-state-icon">
+          <svg fill="none" viewBox="0 0 24 24">
+            <path d="M8 4.5h8a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" />
+            <path d="M9 8h6M9 11.5h6M9 15h4" />
+          </svg>
+        </div>
+        <p className="empty-state-eyebrow">Case workspace</p>
         <h2>Select a case to begin.</h2>
-        <p>
+        <p className="empty-copy">
           Each case keeps the reviewed brief, one exact approval, provider state,
           normalized result, and human next action together.
         </p>
+        {casesHref ? (
+          <div className="empty-actions">
+            <Link className="secondary-button" href={casesHref}>
+              Browse closeout cases
+            </Link>
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -1872,11 +1924,13 @@ function ExceptionView({
 }
 
 function AuditView({
+  casesHref,
   detail,
   loadState,
   loading,
   user,
 }: {
+  casesHref: string | undefined;
   detail: CaseDetail | null;
   loadState: DetailLoadState;
   loading: boolean;
@@ -1895,8 +1949,28 @@ function AuditView({
 
   if (!detail) {
     return (
-      <section className="workspace-panel empty-workspace">
+      <section className="workspace-panel empty-workspace empty-state empty-state--neutral">
+        <span aria-hidden="true" className="empty-index">
+          FC / 02
+        </span>
+        <div aria-hidden="true" className="empty-state-icon">
+          <svg fill="none" viewBox="0 0 24 24">
+            <path d="M4.5 6.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-11Z" />
+            <path d="M8.5 9.5h7M8.5 12.5h7M8.5 15.5h4" />
+          </svg>
+        </div>
+        <p className="empty-state-eyebrow">Append-only audit</p>
         <h2>Select a case to inspect its audit history.</h2>
+        <p className="empty-copy">
+          Open a case from the queue to review its immutable event timeline.
+        </p>
+        {casesHref ? (
+          <div className="empty-actions">
+            <Link className="secondary-button" href={casesHref}>
+              Browse closeout cases
+            </Link>
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -2051,7 +2125,15 @@ function DispositionForm({
         });
       }}
     >
-      <span>Final human checkpoint</span>
+      <div className="disposition-panel-header">
+        <span aria-hidden="true" className="disposition-mark">
+          <svg fill="none" viewBox="0 0 24 24">
+            <path d="M7.5 5.5h9a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1Z" />
+            <path d="m9.25 12.25 2 2 3.5-3.75" />
+          </svg>
+        </span>
+        <span>Final human checkpoint</span>
+      </div>
       <strong>Record the FieldClose disposition</strong>
       <p>
         This resolves the current FieldClose task only. It does not close an
@@ -2240,12 +2322,19 @@ function WorkspaceLoading() {
 
 function WorkspaceUnavailable() {
   return (
-    <section className="workspace-panel empty-workspace workspace-unavailable">
+    <section className="workspace-panel empty-workspace empty-state empty-state--attention workspace-unavailable">
       <span aria-hidden="true" className="empty-index">
         FC / 00
       </span>
+      <div aria-hidden="true" className="empty-state-icon">
+        <svg fill="none" viewBox="0 0 24 24">
+          <path d="M12 4.25 20.25 19H3.75L12 4.25Z" />
+          <path d="M12 9.75v4.5M12 17.25h.01" />
+        </svg>
+      </div>
+      <p className="empty-state-eyebrow">Workspace access</p>
       <h2>Workspace unavailable</h2>
-      <p>
+      <p className="empty-copy">
         Choose an available workspace or return to the public product page. No
         record details were disclosed.
       </p>
@@ -2267,12 +2356,20 @@ function CaseCreationUnavailable({
   showLocalSetupHint: boolean;
 }) {
   return (
-    <section className="workspace-panel empty-workspace">
+    <section className="workspace-panel empty-workspace empty-state empty-state--attention">
       <span aria-hidden="true" className="empty-index">
         FC / CFG
       </span>
+      <div aria-hidden="true" className="empty-state-icon">
+        <svg fill="none" viewBox="0 0 24 24">
+          <path d="M14.5 10.5h4l1.5 1.5v5a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-5l1.5-1.5h1Z" />
+          <circle cx="11.75" cy="14.5" r="0.75" />
+          <path d="M12.5 14.5v-2a1.75 1.75 0 0 0-3.5 0v2" />
+        </svg>
+      </div>
+      <p className="empty-state-eyebrow">Configuration required</p>
       <h2>Case protection setup required</h2>
-      <p>
+      <p className="empty-copy">
         Contact data cannot be accepted until separate encryption and lookup
         keys are configured.
         {showLocalSetupHint
@@ -2285,12 +2382,20 @@ function CaseCreationUnavailable({
 
 function CaseUnavailable() {
   return (
-    <section className="workspace-panel empty-workspace case-unavailable">
+    <section className="workspace-panel empty-workspace empty-state empty-state--attention case-unavailable">
       <span aria-hidden="true" className="empty-index">
         FC / 04
       </span>
+      <div aria-hidden="true" className="empty-state-icon">
+        <svg fill="none" viewBox="0 0 24 24">
+          <path d="M6.5 4.5h7L18 9v10a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z" />
+          <path d="M13 4.5V9h4.5" />
+          <path d="m9.25 15.5 5.5-5.5M14.75 15.5l-5.5-5.5" />
+        </svg>
+      </div>
+      <p className="empty-state-eyebrow">Record access</p>
       <h2>Case unavailable</h2>
-      <p>
+      <p className="empty-copy">
         This record could not be opened. It may not exist or may be outside your
         workspace access.
       </p>
@@ -2440,10 +2545,10 @@ function createCallingWindow(timezone: string) {
   };
 }
 
-function workspaceMode(workspace: Workspace | null): "fake" | "live" {
-  return workspace?.kind === "protected" &&
-    workspace.provider === "call_e" &&
-    workspace.liveCallsAllowed
+function workspaceMode(workspaceValue: Workspace | null): "fake" | "live" {
+  return workspaceValue?.kind === "protected" &&
+    workspaceValue.provider === "call_e" &&
+    workspaceValue.liveCallsAllowed
     ? "live"
     : "fake";
 }
