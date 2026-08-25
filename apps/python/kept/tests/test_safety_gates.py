@@ -196,6 +196,17 @@ def test_a_result_from_a_different_recipient_records_nothing(policy: Policy) -> 
     assert result.rejection is RejectionReason.RESULT_NOT_BOUND
 
 
+def test_a_result_with_an_extra_recipient_records_nothing(policy: Policy) -> None:
+    placed = replace(
+        _placed(dict(_GOOD_ANSWER)),
+        phones=("+12025550101", "+12025550150"),
+    )
+
+    result = _capture(policy, placed, binding())
+
+    assert result.rejection is RejectionReason.RESULT_NOT_BOUND
+
+
 def test_a_result_for_a_different_task_records_nothing(policy: Policy) -> None:
     other = task_digest("Ask about something else.")
 

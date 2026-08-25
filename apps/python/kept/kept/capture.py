@@ -181,7 +181,7 @@ def _binding_mismatch(placed: PlacedCall, binding: CallBinding) -> str | None:
         return "call_id"
     if not placed.task or task_digest(placed.task) != binding.task_digest:
         return "task"
-    if binding.phone not in placed.phones:
+    if placed.phones != (binding.phone,):
         return "recipient"
     for key, expected in binding.metadata.items():
         if placed.metadata.get(key) != expected:
