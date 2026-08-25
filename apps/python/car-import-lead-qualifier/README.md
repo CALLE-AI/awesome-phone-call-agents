@@ -1,6 +1,10 @@
 # Car Import Lead Qualifier
 
-This Python app calls people who already submitted a vehicle import inquiry, discloses that the caller is an AI assistant, asks a short fixed set of qualification questions, and returns a schema-validated result plus one routing decision per lead.
+A vehicle importer collects inquiries all week — a quote form on the site, a calculator landing page, a partner dealership referral. Each row is a phone number and a sentence about a car. None of them says whether the person is ready to buy, still comparing, or already gone. Finding out means calling every row by hand, and the two leads worth a specialist's time look exactly like the rest until someone dials.
+
+This Python app makes those calls. It rings people who already submitted a vehicle import inquiry, discloses that the caller is an AI assistant, asks seven qualification questions, and returns a schema-validated result plus one routing decision per lead: close it, book a human specialist, nurture, retry later, or stop calling this number.
+
+**It has been run against real phone lines.** On one live call the person confirmed the inquiry, said they were ready to buy, gave a USD 20,000 budget, *corrected the delivery port* from the one on file to Nacala, and accepted a callback from a human specialist — and the structured result carries the correction instead of the stale CRM value. Live runs have exercised five of the seven routes, including the revenue route and the opt-out route. Every run, and the two defects that surfaced only in real speech, are recorded in [`docs/field-notes.md`](docs/field-notes.md).
 
 The language and the clock come from the lead, not from the seller: the E.164 prefix of the number that is actually dialled resolves the market, and the market decides the locale, the timezone, and the local calling window. A mislabelled CRM row cannot cause a call in the wrong language or at three in the morning.
 

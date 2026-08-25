@@ -28,7 +28,9 @@ DEFAULT_BASE_URL = "https://api.heycall-e.com"
 #: the batch, so anything final the provider can report has to be listed here.
 #: `declined` and `rejected` are included because CALL-E maps a failed
 #: per-recipient result to a decline even when the call never established
-#: media; `routing.py` decides what a decline is worth.
+#: media; `routing.py` decides what a decline is worth. CALL-E confirmed this
+#: mapping while investigating the failures in `docs/field-notes.md`
+#: (CALLE-AI/awesome-phone-call-agents#81).
 TERMINAL_STATUSES = frozenset(
     {
         "completed",

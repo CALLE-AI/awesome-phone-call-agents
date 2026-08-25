@@ -28,6 +28,7 @@ callback-writeback.json
 hotline-*.json
 my-leads*.json
 call-results*.json
+call-state*.json
 plan.json
 skills-lock.json
 **/.call-locks/
