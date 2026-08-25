@@ -1,4 +1,4 @@
-﻿---
+---
 name: procurecall-supplier-sourcing
 description: Source and qualify suppliers by phone for a buyer's procurement request, collect structured quotes, and return supplier comparisons for human approval.
 ---

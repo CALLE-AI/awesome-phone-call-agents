@@ -1,4 +1,4 @@
-﻿# Safety Reference — procurecall-supplier-sourcing
+# Safety Reference — procurecall-supplier-sourcing
 
 ProcureCall supplier sourcing may research suppliers, contact suppliers, collect
 quotes, and compare supplier options. It must not make purchasing commitments
