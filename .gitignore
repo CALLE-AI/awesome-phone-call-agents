@@ -20,10 +20,15 @@ apps/**/results/
 _handoffs/
 .agents/
 .callback*/
+.state/
 form-export.json
 candidates.json
 callback-state.json
 callback-writeback.json
+hotline-*.json
+my-leads*.json
+call-results*.json
+plan.json
 skills-lock.json
 **/.call-locks/
 docs/codex-implementation-plan.md

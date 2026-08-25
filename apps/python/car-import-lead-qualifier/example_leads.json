@@ -1,0 +1,47 @@
+{
+  "campaign_id": "import-demo-2026-08",
+  "dealer_display_name": "Example Import Motors",
+  "leads": [
+    {
+      "lead_id": "lead-mz-0001",
+      "phone": "+258800000001",
+      "submitted_import_inquiry": true,
+      "inquiry_source": "website import quote form",
+      "inquiry_date": "2026-07-28",
+      "vehicle_interest": "2019 Toyota Land Cruiser, diesel"
+    },
+    {
+      "lead_id": "lead-ao-0002",
+      "phone": "+244900000001",
+      "submitted_import_inquiry": true,
+      "inquiry_source": "import calculator landing page",
+      "inquiry_date": "2026-07-30",
+      "vehicle_interest": "2021 Toyota Hilux, double cab"
+    },
+    {
+      "lead_id": "lead-tz-0003",
+      "phone": "+255700000001",
+      "submitted_import_inquiry": true,
+      "inquiry_source": "partner dealership referral form",
+      "inquiry_date": "2026-08-01",
+      "vehicle_interest": "2020 Toyota Land Cruiser Prado, automatic"
+    },
+    {
+      "lead_id": "lead-ke-0004",
+      "phone": "+254100000001",
+      "submitted_import_inquiry": true,
+      "inquiry_source": "website import quote form",
+      "inquiry_date": "2026-08-02",
+      "vehicle_interest": "2019 Mazda CX-5, petrol"
+    },
+    {
+      "lead_id": "lead-test-0005",
+      "phone": "+12025550143",
+      "submitted_import_inquiry": true,
+      "inquiry_source": "internal end-to-end test",
+      "inquiry_date": "2026-08-03",
+      "vehicle_interest": "2018 Toyota Hilux, manual",
+      "destination_country": "MZ"
+    }
+  ]
+}
