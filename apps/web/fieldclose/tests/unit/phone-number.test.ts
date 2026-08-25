@@ -12,7 +12,7 @@ describe("E.164 phone numbers", () => {
     expect(() => assertE164PhoneNumber("+12025550142")).not.toThrow();
   });
 
-  it.each(["123", "+0123456789", "+1202", "+1202555014212345"])(
+  it.each(["123", "+0123456789", "+1202", "+1-202-555-0142"])(
     "rejects invalid input %s with actionable copy",
     (value) => {
       expect(e164PhoneSchema.safeParse(value).error?.issues[0]).toMatchObject({
@@ -29,7 +29,7 @@ describe("US E.164 phone numbers", () => {
   });
 
   it("rejects a non-US E.164 number instead of pairing it with the US provider region", () => {
-    expect(usE164PhoneSchema.safeParse("+861012345678").error?.issues[0]).toMatchObject({
+    expect(usE164PhoneSchema.safeParse("+442079460000").error?.issues[0]).toMatchObject({
       message: "Enter an explicit US E.164 number beginning with +1.",
     });
   });
