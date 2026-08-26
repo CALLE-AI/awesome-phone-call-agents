@@ -233,6 +233,12 @@ function updateCard(card, appt) {
   } else if (appt.status === "DISPATCH_FAILED") {
     btnDisabled = false;
     btnText = "⚠️ Retry call";
+  } else if (appt.status === "DISPATCH_UNCERTAIN") {
+    // CALL-E never confirmed the call didn't start - staying disabled here is
+    // deliberate, not a bug. Retrying automatically risks a duplicate real
+    // call; this needs a human to check CALL-E's own records first.
+    btnDisabled = true;
+    btnText = "⚠️ Needs manual review";
   } else {
     btnDisabled = false;
     btnText = "📞 Call again";
@@ -263,6 +269,11 @@ async function confirmAppointment(id, btn) {
       const body = await res.json().catch(() => ({}));
       if (body.code === "call_in_progress") {
         alert("A call for this appointment is already in progress.");
+      } else if (body.code === "dispatch_uncertain") {
+        alert(
+          "This appointment's last call outcome is uncertain. Check CALL-E's own records, " +
+            "then clear it by hand before retrying - it won't retry automatically."
+        );
       } else if (body.code === "unauthorized_destination") {
         alert("This appointment's phone number is not an authorized calling destination.");
       } else {
@@ -285,10 +296,13 @@ function connectWebSocket() {
   if (!token) return;
 
   try {
-    const wsUrl = `${API_BASE.replace(/^http/, "ws")}/ws?token=${encodeURIComponent(token)}`;
+    // Auth is sent as the first message after connecting, not in the URL - a
+    // query string can end up in proxy/access logs and browser history.
+    const wsUrl = `${API_BASE.replace(/^http/, "ws")}/ws`;
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "auth", token }));
       reconnectAttempts = 0;
       checkHealth(); // re-run so the "live" indicator reflects current state cleanly
     };

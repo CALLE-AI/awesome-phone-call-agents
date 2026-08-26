@@ -86,6 +86,38 @@ function toPublicAppointment(appt) {
   return { ...appt, phone: maskPhone(appt.phone) };
 }
 
+// Redact anything phone-shaped inside provider-derived free text - activity
+// messages, summaries, transcripts, error messages. Masking the appointment's
+// own `phone` field isn't enough: a transcript is generated from an actual
+// conversation and can easily restate the number in the body of the text.
+// This runs before persistence (inside extractFields(), so it's already
+// applied by the time anything is written to disk), not just at the API/WS
+// output boundary.
+const PHONE_LIKE_RE = /\+?\d[\d().\s-]{5,}\d/g;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function redactPhoneLikeText(text) {
+  if (typeof text !== "string") return text;
+  return text.replace(PHONE_LIKE_RE, (match) => {
+    const trimmed = match.trim();
+    if (ISO_DATE_RE.test(trimmed)) return match; // e.g. "2026-08-19" - a date, not a phone number
+    const digitCount = (match.match(/\d/g) || []).length;
+    if (digitCount < 7) return match; // too short to plausibly be a phone number
+    return maskPhone(trimmed);
+  });
+}
+
+function redactPhoneLikeDeep(value) {
+  if (typeof value === "string") return redactPhoneLikeText(value);
+  if (Array.isArray(value)) return value.map(redactPhoneLikeDeep);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [key, v] of Object.entries(value)) out[key] = redactPhoneLikeDeep(v);
+    return out;
+  }
+  return value;
+}
+
 const TERMINAL_STATUSES = new Set([
   "COMPLETED",
   "FAILED",
@@ -102,6 +134,17 @@ const TERMINAL_STATUSES = new Set([
 // flight - re-triggering a call for an appointment in any of these states
 // is refused.
 const IN_FLIGHT_STATUSES = new Set(["DISPATCHING", "STARTED", "CALLING"]);
+
+// True only when CALL-E's own response explicitly confirms the call never
+// started. A thrown error (timeout, connection reset, malformed CLI output)
+// or a response that doesn't make that confirmation carries no guarantee the
+// call wasn't actually placed - those outcomes go to DISPATCH_UNCERTAIN
+// instead of the retryable DISPATCH_FAILED, and stay non-retryable until a
+// human checks CALL-E's own records and clears it by hand (there is no
+// automatic path out of DISPATCH_UNCERTAIN, by design).
+function definitelyNeverStarted(result) {
+  return !!result && typeof result === "object" && result.call_started === false;
+}
 
 const clients = new Set();
 
@@ -152,12 +195,12 @@ function buildGoal(appt) {
 function extractFields(structuredContent) {
   if (!structuredContent) return {};
   const result = structuredContent.result ?? {};
-  return {
+  return redactPhoneLikeDeep({
     status: structuredContent.status ?? null,
     activity: structuredContent.activity ?? [],
     summary: result.post_summary ?? result.summary ?? null,
     transcript: result.transcript ?? null,
-  };
+  });
 }
 
 async function pollCallStatus(appointmentId, runId) {
@@ -168,11 +211,11 @@ async function pollCallStatus(appointmentId, runId) {
     try {
       result = await callStatus({ runId });
     } catch (err) {
-      console.error(`Status poll failed for ${runId}:`, err.message);
+      console.error(`Status poll failed for ${runId}:`, redactPhoneLikeText(err.message));
       return;
     }
     if (!result.ok) {
-      console.error(`Status poll error for ${runId}:`, result.error);
+      console.error(`Status poll error for ${runId}:`, redactPhoneLikeDeep(result.error));
       return;
     }
 
@@ -217,6 +260,16 @@ async function triggerCall(appointments, apptId) {
     };
   }
 
+  if (appt.status === "DISPATCH_UNCERTAIN") {
+    return {
+      ok: false,
+      code: "dispatch_uncertain",
+      error:
+        "This appointment's last call outcome is uncertain - check CALL-E's own records, " +
+        "then clear it by hand before retrying. It will not be retried automatically.",
+    };
+  }
+
   if (!isAuthorizedDestination(appt.phone)) {
     return {
       ok: false,
@@ -241,17 +294,37 @@ async function triggerCall(appointments, apptId) {
     try {
       result = await startCall({ toPhone: appt.phone, goal, region });
     } catch (err) {
-      appointments[idx] = { ...appointments[idx], status: "DISPATCH_FAILED", lastError: err.message };
+      // Thrown errors (timeout, connection reset, malformed CLI output) carry
+      // no confirmation the call never started - DISPATCH_UNCERTAIN, not the
+      // retryable DISPATCH_FAILED. See definitelyNeverStarted() above.
+      const message = redactPhoneLikeText(err.message);
+      appointments[idx] = { ...appointments[idx], status: "DISPATCH_UNCERTAIN", lastError: message };
       await saveAppointments(appointments);
       broadcastAppointmentUpdate(appointments[idx]);
-      return { ok: false, error: err.message };
+      return {
+        ok: false,
+        code: "dispatch_uncertain",
+        error: "Call outcome is uncertain - this appointment needs manual review before it can be retried",
+      };
     }
+
+    const message = redactPhoneLikeText(result.error?.message ?? "call start failed");
     if (!result.ok) {
-      const message = result.error?.message ?? "call start failed";
-      appointments[idx] = { ...appointments[idx], status: "DISPATCH_FAILED", lastError: message };
+      if (definitelyNeverStarted(result)) {
+        appointments[idx] = { ...appointments[idx], status: "DISPATCH_FAILED", lastError: message };
+        await saveAppointments(appointments);
+        broadcastAppointmentUpdate(appointments[idx]);
+        return { ok: false, code: "dispatch_failed", error: message };
+      }
+
+      appointments[idx] = { ...appointments[idx], status: "DISPATCH_UNCERTAIN", lastError: message };
       await saveAppointments(appointments);
       broadcastAppointmentUpdate(appointments[idx]);
-      return { ok: false, error: message };
+      return {
+        ok: false,
+        code: "dispatch_uncertain",
+        error: "Call outcome is uncertain - this appointment needs manual review before it can be retried",
+      };
     }
 
     const runId = result.run_id;
@@ -305,18 +378,40 @@ app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
-wss.on("connection", (ws, req) => {
-  const { searchParams } = new URL(req.url, "http://localhost");
-  const token = searchParams.get("token");
-  if (!token || !safeEqual(token, API_TOKEN)) {
-    ws.close(4401, "unauthorized");
-    return;
-  }
+// Auth is carried in the first message after connect, not the URL - a query
+// string can end up in proxy/access logs, browser history, and the Referer
+// header of anything the page subsequently loads. The socket is held in an
+// unauthenticated limbo (not added to `clients`, no other message handled)
+// until a valid `{ type: "auth", token }` arrives, or it's closed.
+const WS_AUTH_TIMEOUT_MS = 5000;
 
-  clients.add(ws);
-  console.log("WebSocket client connected. Total clients:", clients.size);
+wss.on("connection", (ws) => {
+  let authenticated = false;
+
+  const authTimeout = setTimeout(() => {
+    if (!authenticated) ws.close(4401, "unauthorized");
+  }, WS_AUTH_TIMEOUT_MS);
 
   ws.on("message", (data) => {
+    if (!authenticated) {
+      let parsed;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        ws.close(4401, "unauthorized");
+        return;
+      }
+      if (parsed?.type === "auth" && typeof parsed.token === "string" && safeEqual(parsed.token, API_TOKEN)) {
+        authenticated = true;
+        clearTimeout(authTimeout);
+        clients.add(ws);
+        console.log("WebSocket client connected. Total clients:", clients.size);
+      } else {
+        ws.close(4401, "unauthorized");
+      }
+      return;
+    }
+
     try {
       const parsed = JSON.parse(data);
       if (parsed.type === "ping") {
@@ -328,11 +423,13 @@ wss.on("connection", (ws, req) => {
   });
 
   ws.on("close", () => {
+    clearTimeout(authTimeout);
     clients.delete(ws);
     console.log("WebSocket client disconnected. Total clients:", clients.size);
   });
 
   ws.on("error", (err) => {
+    clearTimeout(authTimeout);
     console.error("WebSocket error:", err.message);
     clients.delete(ws);
   });
@@ -401,6 +498,7 @@ app.post("/api/appointments/:id/confirm", requireAuth, async (req, res) => {
   if (!outcome.ok) {
     const statusCode =
       outcome.code === "call_in_progress" ? 409 :
+      outcome.code === "dispatch_uncertain" ? 409 :
       outcome.code === "unauthorized_destination" ? 403 :
       502;
     return res.status(statusCode).json({ error: outcome.error, code: outcome.code });
@@ -469,7 +567,7 @@ if (CRON_ENABLED) {
         const triggered = await runNightlyBatch();
         console.log(`[cron] triggered ${triggered.length} confirmation call(s):`, triggered);
       } catch (err) {
-        console.error("[cron] nightly batch failed:", err.message);
+        console.error("[cron] nightly batch failed:", redactPhoneLikeText(err.message));
       }
     },
     { timezone: CRON_TIMEZONE }
