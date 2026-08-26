@@ -1,47 +1,57 @@
-# Exception Resolver
-
-Resolve operational exceptions by gathering missing information through a CALL-E phone conversation and returning a structured result for human approval.
-
-## Purpose
-
-Use this skill when an AI agent detects an operational exception that cannot be resolved from available system data and requires information from a person.
-
-## Workflow
-
-1. Identify the operational exception and available context.
-2. Determine what information is missing.
-3. Decide whether a phone call is necessary.
-4. Place a CALL-E call to the authorized contact.
-5. Gather the information required to understand the exception.
-6. Return the call outcome as structured operational data.
-7. Present the proposed resolution to a human decision-maker.
-8. Apply the resolution only after human approval.
-
-## Safety
-
-- Use only authorized contact information.
-- Do not expose credentials or secrets during a call.
-- Clearly disclose AI involvement when required.
-- Treat uncertain, incomplete, refused, or failed call results as unresolved.
-- Do not allow the phone conversation alone to authorize consequential actions.
-- Keep final resolution decisions under human control.
-
-## Example Use Cases
-
-- Shipment exception follow-up
-- SLA risk investigation
-- Vendor delay clarification
-- Service disruption follow-up
-- Missing operational information
-
-## Result
-
-The skill should return structured information describing:
-
-- exception
-- information gathered
-- call outcome
-- proposed resolution
-- confidence
-- human approval status
-- next action
+jdinovitser
+skills-exception-resolver-
+Public
+forked from CALLE-AI/awesome-phone-call-agents
+Go to file
+t
+T
+This branch is 3 commits ahead of and 11 commits behind CALLE-AI/awesome-phone-call-agents:main.
+jdinovitser
+jdinovitser
+Add Exception Resolver workflow reference
+d313915
+ · 
+4 days ago
+Name		
+.githooks
+docs: add git naming conventions
+2 months ago
+.github
+chore: adopt native issue types and structured triage labels
+last week
+apps
+feat(dispatch-pulse): add logistics voice verification app
+5 days ago
+docs
+docs: add production workflow guide (CALLE-AI#193)
+last week
+forms/callback-request
+feat: add Google Form callback skill
+3 months ago
+plugins
+fix(plugins): align CALL-E API contract (CALLE-AI#51)
+2 weeks ago
+scripts
+docs: add production workflow guide (CALLE-AI#193)
+last week
+skills
+Add Exception Resolver workflow reference
+4 days ago
+.gitignore
+feat(accesscall): add accessibility intake skill for VPAT/508 audits (C…
+3 weeks ago
+AGENTS.md
+docs(outbound-call-skill-creator): add package readme
+2 months ago
+CONTRIBUTING.md
+docs: add git naming conventions
+2 months ago
+LICENSE
+Add portable call reminder skill reference
+3 months ago
+README.md
+feat(dispatch-pulse): add logistics voice verification app
+5 days ago
+SECURITY.md
+feat: expand repository scope and migrate examples
+3 months ago
