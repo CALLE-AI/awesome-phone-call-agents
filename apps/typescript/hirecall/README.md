@@ -50,7 +50,7 @@ Open [http://localhost:3000](http://localhost:3000). Enter the operator token fr
 
 1. Download the template (`public/samples/candidates.sample.xlsx`) or use CSV.
 2. Upload it. HireCall keeps the rows, not the file. Each upload is one batch.
-3. Set **job role** and **Scoring criteria** (ticks, pass mark, Gemini mark vs you mark).
+3. Set **job role** and **Scoring criteria** (ticks, pass mark). Gemini scores 0–10. You click **Next round** or **Rejected** after you read Screening.
 4. **Prepare resume** fetches Drive/HTTP text. Gemini writes `call_prompt` from that resume.
 5. **Call** or **Call ready candidates**. One live or dry-run call at a time. Next queued person waits until Gemini has scored the previous screen.
 6. **Call again needed** after a completed but unclear screen rewrites the next script. No answer / call-me-later keeps the same script.
@@ -92,6 +92,8 @@ There is **no recurring scheduler**. Nothing runs unattended.
 Once a live CALL-E call has started, HireCall cannot cancel the phone-network side effect. Stop clicking Call, deactivate the batch, and use CALL-E's own controls if you need to intervene.
 
 If CALL-E create or poll does not clearly succeed or fail (timeout, 5xx, network), HireCall leaves that person queued or calling and **does not** mark them failed or dial the next number. A definite CALL-E rejection (4xx) can mark that row failed; the rest of the queue still waits until you click Call or Call ready.
+
+HireCall uses a screening result only when the CALL-E snapshot matches this candidate’s script, phone, and metadata and the call completed. Gemini may write a 0–10 score. **Next round** and **Rejected** are saved only when you click them.
 
 ## Dry-run / no-call
 

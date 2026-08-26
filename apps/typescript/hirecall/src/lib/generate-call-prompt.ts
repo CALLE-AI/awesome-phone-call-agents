@@ -1,5 +1,5 @@
 import type { RecruiterDecision } from "@/lib/types";
-import { DEFAULT_SCORE_CONFIG, decisionFromScore, scoreCriteriaLines, type ScoreConfig } from "@/lib/score-config";
+import { DEFAULT_SCORE_CONFIG, scoreCriteriaLines, type ScoreConfig } from "@/lib/score-config";
 
 export type PromptSource = "gemini" | "dry-run";
 
@@ -281,11 +281,10 @@ export async function summarizeScreeningCall(input: {
     summary = parsed.summary;
   }
 
-  const suggested = decisionFromScore(input.result.end_reason, score, pass);
   return {
     summary,
     score,
-    decision: config.autoDecision ? suggested : "",
+    decision: "",
   };
 }
 

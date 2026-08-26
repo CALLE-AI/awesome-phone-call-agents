@@ -20,7 +20,7 @@ export const DEFAULT_SCORE_CONFIG: ScoreConfig = {
   passScore: 7,
   selected: ["education", "projects", "communication", "role_fit"],
   notes: "",
-  autoDecision: true,
+  autoDecision: false,
 };
 
 export function parseScoreConfig(value: unknown): ScoreConfig {
@@ -43,7 +43,7 @@ export function parseScoreConfig(value: unknown): ScoreConfig {
     passScore: Number.isFinite(pass) ? Math.min(10, Math.max(1, pass)) : DEFAULT_SCORE_CONFIG.passScore,
     selected: selected.length ? selected : DEFAULT_SCORE_CONFIG.selected,
     notes: typeof raw.notes === "string" ? raw.notes.trim() : "",
-    autoDecision: raw.autoDecision === false ? false : true,
+    autoDecision: raw.autoDecision === true,
   };
 }
 

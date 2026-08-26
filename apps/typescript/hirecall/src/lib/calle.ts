@@ -16,10 +16,15 @@ export class CalleApiError extends Error {
 export type CalleSnapshot = {
   id: string;
   status: string;
+  task?: string | null;
+  taskCompleted?: boolean | null;
+  task_completed?: boolean | null;
+  metadata?: Record<string, unknown> | null;
   createdAt?: string | null;
   completedAt?: string | null;
   structuredResult?: Record<string, unknown> | null;
   recipients?: Array<{
+    phones?: string[];
     status?: string;
     structuredResult?: Record<string, unknown> | null;
     attempts?: Array<{
@@ -28,6 +33,13 @@ export type CalleSnapshot = {
       completedAt?: string | null;
     }>;
   }>;
+};
+
+export type CalleBindExpected = {
+  task: string;
+  phone: string;
+  batchId: string;
+  candidateId: string;
 };
 
 export function assertTrustedBaseUrl(baseUrl: string): string {
@@ -86,17 +98,63 @@ export function newDryRunCallId(candidateId: string): string {
   return `${DRY_RUN_CALL_PREFIX}${candidateId}:${Date.now()}`;
 }
 
-export function dryRunSnapshot(callId: string): CalleSnapshot {
+function samePhone(left: string, right: string) {
+  const a = left.replace(/\D/g, "");
+  const b = right.replace(/\D/g, "");
+  return a.length > 0 && a === b;
+}
+
+function snapshotTaskCompleted(snapshot: CalleSnapshot) {
+  return snapshot.taskCompleted === true || snapshot.task_completed === true;
+}
+
+function metaText(metadata: Record<string, unknown> | null | undefined, key: string) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : value == null ? "" : String(value);
+}
+
+export function calleIdentityMatches(snapshot: CalleSnapshot, expected: CalleBindExpected) {
+  if ((snapshot.task ?? "") !== expected.task) return false;
+  const recipients = snapshot.recipients ?? [];
+  if (recipients.length !== 1) return false;
+  const phones = recipients[0]?.phones ?? [];
+  if (phones.length !== 1 || !samePhone(phones[0] ?? "", expected.phone)) return false;
+  const metadata = snapshot.metadata ?? {};
+  return (
+    metaText(metadata, "skill") === "hirecall"
+    && metaText(metadata, "batch_id") === expected.batchId
+    && metaText(metadata, "candidate_id") === expected.candidateId
+  );
+}
+
+export function bindCalleSnapshot(snapshot: CalleSnapshot, expected: CalleBindExpected) {
+  if (!calleIdentityMatches(snapshot, expected)) return false;
+  const recipient = snapshot.recipients?.[0];
+  const status = String(snapshot.status ?? "").toLowerCase().replace(/-/g, "_");
+  const recipientStatus = String(recipient?.status ?? "").toLowerCase().replace(/-/g, "_");
+  return status === "completed" && snapshotTaskCompleted(snapshot) && recipientStatus === "completed";
+}
+
+export function dryRunSnapshot(callId: string, expected: CalleBindExpected): CalleSnapshot {
   const now = new Date().toISOString();
   const result = dryRunStructuredResult();
+  const id = callId.startsWith(DRY_RUN_CALL_PREFIX) ? callId : newDryRunCallId(expected.candidateId);
   return {
-    id: callId.startsWith(DRY_RUN_CALL_PREFIX) ? callId : newDryRunCallId(callId),
+    id,
     status: "completed",
+    task: expected.task,
+    taskCompleted: true,
+    metadata: {
+      skill: "hirecall",
+      batch_id: expected.batchId,
+      candidate_id: expected.candidateId,
+    },
     createdAt: now,
     completedAt: now,
     structuredResult: result,
     recipients: [
       {
+        phones: [expected.phone],
         status: "completed",
         structuredResult: result,
         attempts: [{ status: "completed", startedAt: now, completedAt: now }],
@@ -163,7 +221,12 @@ export async function createCalleCall(input: {
   idempotencyKey: string;
 }): Promise<CalleSnapshot> {
   if (!liveCallsEnabled()) {
-    return dryRunSnapshot(newDryRunCallId(input.candidateId));
+    return dryRunSnapshot(newDryRunCallId(input.candidateId), {
+      task: input.task,
+      phone: input.phone,
+      batchId: input.batchId,
+      candidateId: input.candidateId,
+    });
   }
   try {
     const client = await sdkClient();
@@ -186,9 +249,12 @@ export async function createCalleCall(input: {
   }
 }
 
-export async function getCalleCall(callId: string): Promise<CalleSnapshot> {
+export async function getCalleCall(callId: string, expected?: CalleBindExpected): Promise<CalleSnapshot> {
   if (isDryRunCallId(callId)) {
-    return dryRunSnapshot(callId);
+    if (!expected) {
+      throw new CalleApiError("Dry-run poll needs the candidate this call was placed for.", 400);
+    }
+    return dryRunSnapshot(callId, expected);
   }
   try {
     const client = await sdkClient();

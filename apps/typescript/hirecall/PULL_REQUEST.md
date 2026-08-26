@@ -45,6 +45,7 @@ Setup for a judge is in `apps/typescript/hirecall/README.md`: copy `.env.example
 - Resume fetch is public HTTPS only. Private, loopback, and insecure URLs are blocked; each redirect hop is revalidated.
 - Deactivate is a soft delete (`active = 0`). Restore from Inactive. No scheduler daemon; the desk only polls while the batch page is open. Deactivating a batch stops further queueing and dialing in that Excel.
 - If CALL-E create or poll is unclear, the queue stops. HireCall does not mark that person failed and does not auto-dial the next number.
+- Screening answers are used only when the CALL-E result matches this candidate’s task, phone, and metadata and the call completed. Gemini may score 0–10. Next round and Rejected are saved only when the recruiter clicks.
 - Default path is dry-run: Call does not create a CALL-E task. Live calls require `HIRECALL_LIVE_CALLS=true` and `CALLE_API_KEY`. Without `GEMINI_API_KEY`, post-call scoring uses a fallback instead of a Gemini summary.
 
 ## Checklist

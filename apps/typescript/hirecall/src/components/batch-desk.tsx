@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 
 import { CALL_COPY, DECISION_COPY, STATUS_COPY, canPlaceCall, formatCallClock, formatCallDuration, formatUploadedAt, isInFlightCall, isQueueBusy, queueActivity, rosterStatus, shortBatchId, shortCalleId, type QueueActivity } from "@/lib/status";
-import { DEFAULT_SCORE_CONFIG, SCORE_CRITERIA_OPTIONS, decisionFromScore, scoreCriteriaLines, type ScoreConfig } from "@/lib/score-config";
+import { DEFAULT_SCORE_CONFIG, SCORE_CRITERIA_OPTIONS, scoreCriteriaLines, type ScoreConfig } from "@/lib/score-config";
 import type { Batch, Candidate, RecruiterDecision } from "@/lib/types";
 import { ApiError, clearOperatorToken, hirecallApi } from "@/services/hirecall-api";
 
@@ -220,11 +220,7 @@ export function BatchDesk() {
       applyDetail(data);
       setCriteriaOpen(false);
       setNotice(
-        `Scoring saved for this Excel. Pass mark is ${config.passScore}/10. ${
-          config.autoDecision
-            ? "Gemini will mark Next round or Rejected from the score."
-            : "Gemini will score only. You mark Next round after reading the screening."
-        }`,
+        `Scoring saved for this Excel. Pass mark is ${config.passScore}/10. Gemini scores only. You click Next round or Rejected after you read the screening.`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save scoring criteria.");
@@ -751,10 +747,8 @@ export function BatchDesk() {
                 <h2 className="font-display text-2xl">Screening result · {openCandidate.name}</h2>
                 <p className="mt-1 text-sm text-muted">
                   Call time, duration, CALL-E id, Gemini score against the ticks
-                  below, and the answers table.{" "}
-                  {batch?.scoreConfig.autoDecision
-                    ? "Gemini also marks Next round or Rejected. You can still change it."
-                    : "Gemini scores only. Mark Next round, Rejected, or Call again after you read this."}
+                  below, and the answers table. Gemini scores only. Mark Next
+                  round, Rejected, or Call again after you read this.
                 </p>
               </div>
               <div className="flex gap-3">
@@ -775,7 +769,6 @@ export function BatchDesk() {
               </div>
             </div>
             <ScreeningResultCard
-              autoDecision={batch?.scoreConfig.autoDecision ?? true}
               busy={busy}
               candidate={openCandidate}
               criteria={scoreCriteriaLines(batch?.scoreConfig ?? DEFAULT_SCORE_CONFIG)}
@@ -1072,9 +1065,7 @@ function ScoreCriteriaCard({
           <h2 className="font-display text-2xl">Scoring for this Excel</h2>
           <p className="mt-1 text-sm text-muted">
             Gemini reads the ticks below after each call. Pass mark is {config.passScore}/10.
-            {config.autoDecision
-              ? " Gemini also marks Next round or Rejected."
-              : " You mark Next round yourself after reading the screening."}
+            You mark Next round yourself after reading the screening.
           </p>
         </div>
         <button
@@ -1113,13 +1104,11 @@ function ScoreCriteriaDialog({
   const [passScore, setPassScore] = useState(config.passScore);
   const [selected, setSelected] = useState<ScoreConfig["selected"]>(config.selected);
   const [notes, setNotes] = useState(config.notes);
-  const [autoDecision, setAutoDecision] = useState(config.autoDecision);
 
   useEffect(() => {
     setPassScore(config.passScore);
     setSelected(config.selected);
     setNotes(config.notes);
-    setAutoDecision(config.autoDecision);
   }, [config]);
 
   function toggle(id: ScoreConfig["selected"][number]) {
@@ -1135,7 +1124,7 @@ function ScoreCriteriaDialog({
         <p className="mt-1 mb-5 text-sm text-muted">
           These marks apply to every candidate in this file
           {jobRole ? ` for ${jobRole}` : ""}. Gemini scores the call against the
-          boxes you tick, then uses the pass mark for Next round vs Rejected.
+          boxes you tick. You click Next round or Rejected after you read Screening.
         </p>
         <label className="block text-sm font-medium text-ink">
           Pass mark: {passScore} / 10
@@ -1173,27 +1162,6 @@ function ScoreCriteriaDialog({
             value={notes}
           />
         </label>
-        <p className="mt-5 mb-2 text-sm font-medium text-ink">Who marks Next round</p>
-        <label className="flex items-start gap-2 text-sm text-ink">
-          <input
-            checked={autoDecision}
-            className="mt-0.5"
-            name="decision-mode"
-            onChange={() => setAutoDecision(true)}
-            type="radio"
-          />
-          Gemini marks Next round, Rejected, or Call again from the score. You can still change it.
-        </label>
-        <label className="mt-2 flex items-start gap-2 text-sm text-ink">
-          <input
-            checked={!autoDecision}
-            className="mt-0.5"
-            name="decision-mode"
-            onChange={() => setAutoDecision(false)}
-            type="radio"
-          />
-          Gemini scores only. I mark Next round after I read the screening result.
-        </label>
         <div className="mt-6 flex justify-end gap-3">
           <button
             className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink"
@@ -1205,7 +1173,7 @@ function ScoreCriteriaDialog({
           <button
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
             disabled={busy || selected.length === 0}
-            onClick={() => onSave({ passScore, selected, notes: notes.trim(), autoDecision })}
+            onClick={() => onSave({ passScore, selected, notes: notes.trim(), autoDecision: false })}
             type="button"
           >
             Save criteria
@@ -1217,13 +1185,11 @@ function ScoreCriteriaDialog({
 }
 
 function ScreeningResultCard({
-  autoDecision,
   busy,
   candidate,
   criteria,
   onDecision,
 }: {
-  autoDecision: boolean;
   busy: boolean;
   candidate: Candidate;
   criteria: string[];
@@ -1239,10 +1205,6 @@ function ScreeningResultCard({
   }
 
   const result = response.result;
-  const suggested =
-    response.score != null && result
-      ? decisionFromScore(result.end_reason, response.score, response.passScore)
-      : "";
   const decisionKey = response.decision || "pending";
   const fields = result
     ? [
@@ -1315,11 +1277,6 @@ function ScreeningResultCard({
           <p className={`mt-1 text-sm font-medium ${DECISION_COPY[decisionKey].className}`}>
             {DECISION_COPY[decisionKey].label}
           </p>
-          {suggested ? (
-            <p className="mt-0.5 text-xs text-muted">
-              Gemini {autoDecision ? "marked" : "suggests"} {DECISION_COPY[suggested].label}
-            </p>
-          ) : null}
         </div>
       </div>
       {criteria.length > 0 ? (
@@ -1372,7 +1329,7 @@ function ScreeningResultCard({
       </div>
       <div>
         <p className="mb-2 text-sm font-medium text-ink">
-          {autoDecision ? "Change Gemini’s mark if you disagree" : "Mark this screening after you read the answers"}
+          Mark this screening after you read the answers
         </p>
         <div className="flex flex-wrap gap-2">
           {(

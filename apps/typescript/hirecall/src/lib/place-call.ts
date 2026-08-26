@@ -1,5 +1,5 @@
 import { emptyScreeningResult, parseScreeningResult, type ScreeningResult } from "@/lib/call-result-schema";
-import { CalleApiError, CalleConfigError, createCalleCall, getCalleCall, isDryRunCallId, type CalleSnapshot } from "@/lib/calle";
+import { bindCalleSnapshot, calleIdentityMatches, CalleApiError, CalleConfigError, createCalleCall, getCalleCall, isDryRunCallId, type CalleBindExpected, type CalleSnapshot } from "@/lib/calle";
 import { summarizeScreeningCall } from "@/lib/generate-call-prompt";
 import {
   getBatch,
@@ -11,7 +11,7 @@ import {
   saveCallVerdict,
   saveDialledCall,
 } from "@/lib/db";
-import { DEFAULT_SCORE_CONFIG, decisionFromScore } from "@/lib/score-config";
+import { DEFAULT_SCORE_CONFIG } from "@/lib/score-config";
 import { canPlaceCall, isLiveCall, isScoringPending, isTerminalCall } from "@/lib/status";
 import type { CallStatus, Candidate } from "@/lib/types";
 
@@ -42,6 +42,29 @@ function snapshotResult(snapshot: CalleSnapshot): ScreeningResult | null {
   return parseScreeningResult(
     snapshot.recipients?.[0]?.structuredResult ?? snapshot.structuredResult ?? null,
   );
+}
+
+function bindExpected(batchId: string, candidate: Candidate): CalleBindExpected {
+  return {
+    task: candidate.callPrompt,
+    phone: candidate.phone,
+    batchId,
+    candidateId: candidate.id,
+  };
+}
+
+function usableResult(snapshot: CalleSnapshot, expected: CalleBindExpected) {
+  return bindCalleSnapshot(snapshot, expected) ? snapshotResult(snapshot) : null;
+}
+
+function progressStatus(snapshot: CalleSnapshot, expected: CalleBindExpected): CallStatus {
+  if (bindCalleSnapshot(snapshot, expected)) {
+    return mapCalleSnapshotToStatus(snapshot);
+  }
+  if (!calleIdentityMatches(snapshot, expected)) return "calling";
+  const mapped = mapCalleSnapshotToStatus(snapshot);
+  if (mapped === "failed") return "failed";
+  return isTerminal(mapped) ? "calling" : mapped;
 }
 
 export function mapCalleSnapshotToStatus(snapshot: CalleSnapshot): CallStatus {
@@ -85,7 +108,8 @@ async function dialCandidate(batchId: string, candidate: Candidate): Promise<Can
       candidateId: candidate.id,
       idempotencyKey: `hirecall:${batchId}:${candidate.id}:${attempt}`,
     });
-    const status = mapCalleSnapshotToStatus(snapshot);
+    const expected = bindExpected(batchId, candidate);
+    const status = progressStatus(snapshot, expected);
     const times = snapshotTimes(snapshot);
     const ended = isTerminal(status);
     const saved = await saveDialledCall({
@@ -97,7 +121,7 @@ async function dialCandidate(batchId: string, candidate: Candidate): Promise<Can
       startedAt: times.startedAt || new Date().toISOString(),
       endedAt: ended ? times.endedAt || new Date().toISOString() : "",
       durationSeconds: times.durationSeconds,
-      result: snapshotResult(snapshot),
+      result: usableResult(snapshot, expected),
       raw: snapshot,
     });
     if (isDryRunCallId(snapshot.id) && saved.callResponse && saved.callResponse.score == null) {
@@ -181,10 +205,14 @@ export async function syncBatchCalls(batchId: string): Promise<void> {
 
   try {
     for (const row of live) {
-      const snapshot = await getCalleCall(row.calleCallId);
-      const status = mapCalleSnapshotToStatus(snapshot);
+      const expected = bindExpected(batchId, row);
+      const snapshot = await getCalleCall(row.calleCallId, expected);
+      if (!calleIdentityMatches(snapshot, expected)) {
+        continue;
+      }
+      const status = progressStatus(snapshot, expected);
       const times = snapshotTimes(snapshot);
-      const result = snapshotResult(snapshot);
+      const result = usableResult(snapshot, expected);
       await saveCallProgress({
         batchId,
         candidateId: row.id,
@@ -238,7 +266,16 @@ export async function ensureCallSummary(candidate: Candidate): Promise<void> {
     await saveCallVerdict(response.id, {
       score: 0,
       summary: "No answer. There was no screening to score.",
-      decision: scoreConfig.autoDecision ? decisionFromScore("no_answer", 0, scoreConfig.passScore) : "",
+      decision: "",
+    });
+    return;
+  }
+
+  if (!response.result) {
+    await saveCallVerdict(response.id, {
+      score: 0,
+      summary: "This call did not return a bound screening result. Next round and Rejected were not recorded.",
+      decision: "",
     });
     return;
   }
@@ -256,7 +293,7 @@ export async function ensureCallSummary(candidate: Candidate): Promise<void> {
     await saveCallVerdict(response.id, {
       score: 0,
       summary: "Call ended. Gemini could not write a score and summary.",
-      decision: scoreConfig.autoDecision ? decisionFromScore(result.end_reason, 0, scoreConfig.passScore) : "",
+      decision: "",
     });
   }
 }
