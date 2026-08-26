@@ -77,7 +77,7 @@ Optional: `consent` (`yes` / `no`), `resume_link` (Drive or HTTP; file stays on 
 - With `HIRECALL_LIVE_CALLS=true` and `CALLE_API_KEY`, Call places a real outbound CALL-E call to the stored number. This consumes CALL-E credit and rings a real phone.
 - Resume fetch reads a public Drive/HTTP link and stores **text only**.
 - Phone numbers in samples are reserved fictional NANP numbers (`+14155550123`, `+14155550124`, `+14155550125`). The roster, status popup, screening view, and API responses show phones **masked** (last four digits only). Judge test stores the number you type; it dials that number only when live calls are on.
-- `CALLE_BASE_URL` defaults to the official CALL-E HTTPS API (`https://api.heycall-e.com`).
+- `CALLE_BASE_URL` defaults to and accepts only the exact origin `https://api.heycall-e.com`. HTTP, loopback, and other hosts are refused so the production key is not sent there.
 
 ## Credentials
 

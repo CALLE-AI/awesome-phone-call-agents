@@ -41,7 +41,7 @@ Setup for a judge is in `apps/typescript/hirecall/README.md`: copy `.env.example
 
 - Credentials from `.env` only. `.env` and SQLite (`data/hirecall.db`) are gitignored.
 - Samples use reserved fictional NANP numbers (`+14155550123`, `+14155550124`, `+14155550125`). Judge test stores the number the reviewer types and dials it only when live calls are on.
-- `CALLE_BASE_URL` defaults to the official CALL-E HTTPS API.
+- `CALLE_BASE_URL` defaults to and accepts only `https://api.heycall-e.com`. The production `CALLE_API_KEY` is not sent to loopback or any other host.
 - Deactivate is a soft delete (`active = 0`). Restore from Inactive. No scheduler daemon; the desk only polls while the batch page is open. Deactivating a batch stops further queueing and dialing in that Excel.
 - Default path is dry-run: Call does not create a CALL-E task. Live calls require `HIRECALL_LIVE_CALLS=true` and `CALLE_API_KEY`. Without `GEMINI_API_KEY`, post-call scoring uses a fallback instead of a Gemini summary.
 

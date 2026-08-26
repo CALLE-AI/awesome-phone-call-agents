@@ -2,9 +2,6 @@ import { SCREENING_RESULT_SCHEMA } from "@/lib/call-result-schema";
 
 export const DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com";
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const TRUSTED_HOSTS = new Set(["api.heycall-e.com"]);
-
 export class CalleConfigError extends Error {}
 
 export class CalleApiError extends Error {
@@ -33,10 +30,6 @@ export type CalleSnapshot = {
   }>;
 };
 
-function normalizeHost(value: string) {
-  return (/^\[.*\]$/.test(value) ? value.slice(1, -1) : value).toLowerCase();
-}
-
 export function assertTrustedBaseUrl(baseUrl: string): string {
   let url: URL;
   try {
@@ -44,16 +37,19 @@ export function assertTrustedBaseUrl(baseUrl: string): string {
   } catch {
     throw new CalleConfigError("CALLE_BASE_URL is not a URL. CALLE_API_KEY was not sent.");
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new CalleConfigError("CALLE_BASE_URL must use http or https. CALLE_API_KEY was not sent.");
-  }
-  const host = normalizeHost(url.hostname);
-  const loopback = LOOPBACK_HOSTS.has(host);
-  if (url.protocol === "http:" && !loopback) {
-    throw new CalleConfigError(`CALLE_BASE_URL would send CALLE_API_KEY to ${host} unencrypted.`);
-  }
-  if (!loopback && !TRUSTED_HOSTS.has(host)) {
-    throw new CalleConfigError(`${host} is not a trusted CALL-E host. CALLE_API_KEY was not sent.`);
+  if (
+    url.protocol !== "https:"
+    || url.hostname.toLowerCase() !== "api.heycall-e.com"
+    || url.username !== ""
+    || url.password !== ""
+    || url.search !== ""
+    || url.hash !== ""
+    || url.port !== ""
+    || !new Set(["", "/"]).has(url.pathname)
+  ) {
+    throw new CalleConfigError(
+      "CALLE_BASE_URL must be exactly https://api.heycall-e.com. CALLE_API_KEY was not sent.",
+    );
   }
   return url.toString().replace(/\/$/, "");
 }
