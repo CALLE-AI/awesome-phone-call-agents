@@ -5,7 +5,8 @@
 <div class="hdr">
   <span class="sub" style="margin:0">{{ item.appointment_type }}, seen {{ item.seen_on }}</span>
   {%- if item.stop_condition %}
-  <span class="chip stopped">stopped · {{ item.stop_reason }}</span>
+  <span class="chip stopped{% if item.stop_reason == "red_flag_not_told" %} untold{% endif %}">
+    stopped · {{ item.stop_reason.replace("_", " ") }}</span>
   {%- else %}
   <span class="chip state">{{ item.status.replace("_", " ") }}</span>
   {%- endif %}
@@ -88,6 +89,41 @@
 </section>
 {% endif %}
 
+{% if item.stop_reason in red_flag_reasons %}
+{#- No Release here. The agent on the phone stopped rather than offer an appointment to
+    somebody describing chest pain; offering a Reviewer one button to have a second agent
+    ring reception about it would spend that refusal one layer up. `review.release`
+    refuses this too, so the form is not merely hidden. #}
+<section class="act">
+  <h2>This one is not for a machine</h2>
+  {%- if item.stop_reason == "red_flag_not_told" %}
+  <p class="banner" style="margin:0 0 1rem">
+    <b>They have not been told where to turn.</b> Something on the red-flag list was said
+    on this call, and no urgent number was spoken back to them afterwards. Nobody has
+    given them 111 or 999. Ring them now, before anything else on this board.
+  </p>
+  {%- else %}
+  <p class="note" style="max-width:52rem;margin:0 0 1rem">
+    The call stopped and read the Safety Line, so they have been told to ring 111, and
+    999 if it feels like an emergency. That is all it did. It offered no appointment and
+    made no judgement about what they said.
+  </p>
+  {%- endif %}
+  <p class="note" style="max-width:52rem">
+    There is no Release on a flagged call. A Rebooking Call would offer a routine
+    appointment to somebody who may need urgent care, and would carry their own words
+    about it to a receptionist. Ring them yourself, then record what you did.
+  </p>
+  <div class="actions">
+    <form method="post" action="/review-items/{{ item.id }}/manual">
+      <button class="primary" type="submit">Ring them myself</button>
+    </form>
+    <form method="post" action="/review-items/{{ item.id }}/close">
+      <button type="submit">Close, nothing needed</button>
+    </form>
+  </div>
+</section>
+{% else %}
 <form class="act" method="post" action="/review-items/{{ item.id }}/release">
   <h2>Release</h2>
   <p class="note" style="max-width:52rem">
@@ -159,3 +195,4 @@
     <button type="submit">Ring them myself</button>
   </form>
 </div>
+{% endif %}

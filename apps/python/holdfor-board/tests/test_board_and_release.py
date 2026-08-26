@@ -16,6 +16,13 @@ from fastapi.testclient import TestClient
 from holdfor import db, review, window
 from holdfor.app import create_app
 from holdfor.models import ReviewStatus
+from holdfor.scan import (
+    RED_FLAG_NOT_TOLD,
+    RED_FLAG_PHRASE,
+    REPEATED_NON_ANSWER,
+    THIRD_PARTY,
+    UNMAPPABLE,
+)
 
 QUOTE = "I have to hold the worktop for a minute when I get up in the morning"
 
@@ -58,8 +65,14 @@ def transcript_file(tmp_path):
 
 
 @pytest.fixture
-def client(db_path):
-    return TestClient(create_app(db_path=db_path))
+def client(db_path, now):
+    """On the pinned clock, because `db_path` seeds against the pinned date.
+
+    Without it the board asked the real calendar which Appointments were due and the
+    ledger answered for the week of `today`, so every due-list assertion here passed
+    during one week of 2026 and failed every week after it.
+    """
+    return TestClient(create_app(db_path=db_path, clock=lambda: now))
 
 
 def add_item(
@@ -448,6 +461,81 @@ def test_an_unknown_appointment_mode_is_refused(conn, client):
 
     assert response.status_code == 422
     assert response.json() == {"error": "envelope_invalid"}
+
+
+# --- a red flag is not something a machine may act on ------------------------------
+#
+# The agent on the phone stops rather than offer an appointment to somebody describing
+# chest pain. Until these ran, the board then offered a Reviewer one button to have a
+# second agent ring reception on her behalf, carrying her own words about it: the exact
+# call the first agent correctly declined to set up, one layer up, with the refusal
+# already spent. `auto_closes` had always gated on `stop_condition`; `release` had not.
+
+
+def test_a_red_flagged_item_cannot_be_released_for_a_rebooking_call(conn, client):
+    item_id = add_item(conn, wants_seen="yes", stop=True, reason=RED_FLAG_PHRASE)
+
+    response = client.post(f"/review-items/{item_id}/release", json=envelope())
+
+    assert response.status_code == 409
+    assert response.json() == {"error": "flagged_needs_a_person"}
+    assert conn.execute("SELECT COUNT(*) AS n FROM release").fetchone()["n"] == 0
+
+
+def test_an_item_where_nobody_told_her_anything_cannot_be_released_either(conn, client):
+    item_id = add_item(conn, wants_seen="yes", stop=True, reason=RED_FLAG_NOT_TOLD)
+
+    response = client.post(f"/review-items/{item_id}/release", json=envelope())
+
+    assert response.status_code == 409
+    assert response.json() == {"error": "flagged_needs_a_person"}
+
+
+def test_a_call_that_merely_did_not_work_may_still_be_released(conn, client):
+    """Narrow on purpose. These mean the call failed, not that anybody is unwell.
+
+    A muddled call is often exactly the one worth rebooking, and a gate wide enough to
+    catch `unmappable` would refuse a Reviewer the thing she is there to do.
+    """
+    for reason in (UNMAPPABLE, THIRD_PARTY, REPEATED_NON_ANSWER):
+        item_id = add_item(conn, wants_seen="yes", stop=True, reason=reason)
+
+        response = client.post(f"/review-items/{item_id}/release", json=envelope())
+
+        assert response.status_code == 201, reason
+
+
+def test_a_flagged_item_is_offered_no_release_form_at_all(conn, client):
+    """Refused server-side and not offered client-side. Both, deliberately.
+
+    A form the server rejects is a Reviewer typing out a booking envelope, naming
+    herself, pressing the button, and getting a JSON error back.
+    """
+    item_id = add_item(conn, wants_seen="yes", stop=True, reason=RED_FLAG_PHRASE)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "Release for rebooking" not in page
+    assert "This one is not for a machine" in page
+    assert "Ring them myself" in page
+
+
+def test_a_flagged_item_says_whether_she_was_told_where_to_turn(conn, client):
+    told = add_item(conn, stop=True, reason=RED_FLAG_PHRASE)
+    untold = add_item(conn, stop=True, reason=RED_FLAG_NOT_TOLD)
+
+    assert "have been told to ring 111" in client.get(f"/?open={told}").text
+    assert "have not been told where to turn" in client.get(f"/?open={untold}").text
+
+
+def test_the_patient_nobody_told_sorts_above_everything_else_waiting(conn, client):
+    add_item(conn, wants_seen="yes")
+    add_item(conn, stop=True, reason=RED_FLAG_PHRASE)
+    untold = add_item(conn, stop=True, reason=RED_FLAG_NOT_TOLD)
+
+    first = client.get("/board").json()["items"][0]
+
+    assert first["id"] == untold
 
 
 def test_releasing_twice_does_not_authorise_two_calls(conn, client):

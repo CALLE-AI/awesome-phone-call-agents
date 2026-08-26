@@ -172,7 +172,7 @@
   </thead>
   <tbody>
   {% for item in items %}
-  <tr{% if item.stop_condition %} class="flagged"{% endif %}>
+  <tr{% if item.stop_condition %} class="flagged{% if item.stop_reason == "red_flag_not_told" %} untold{% endif %}"{% endif %}>
     <td class="who"><a href="/?open={{ item.id }}">{{ item.first_name }} {{ item.surname }}</a></td>
     <td class="seen-for">{{ item.appointment_type }}<span class="stamp">{{ item.seen_on }}</span></td>
     <td>{% if item.feeling %}<span class="chip feel {{ item.feeling }}">{{ item.feeling }}</span>
@@ -187,7 +187,7 @@
       {%- else %}<span class="nothing">nothing carried</span>{% endif %}
     </td>
     <td>
-      {%- if item.stop_condition %}<span class="chip stopped">stopped · {{ item.stop_reason }}</span>
+      {%- if item.stop_condition %}<span class="chip stopped{% if item.stop_reason == "red_flag_not_told" %} untold{% endif %}">stopped · {{ item.stop_reason.replace("_", " ") }}</span>
       {%- else %}<span class="chip state">{{ item.status.replace("_", " ") }}</span>{% endif %}
     </td>
   </tr>

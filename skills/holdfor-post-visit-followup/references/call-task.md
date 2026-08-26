@@ -175,8 +175,40 @@ so I'm going to stop here rather than get it wrong.
 Please ring 111 and tell them what you've just told me. They're there day and night,
 and they'll decide what happens next. If it feels like an emergency, ring 999.
 
-I'm letting the practice know we spoke, and someone there will see this today.
+You won't be any trouble to them. That's what the number is for.
+
+I'm letting the practice know we spoke, and someone there will see this today, so you
+are not left on your own with it.
+
+So that's 111. Take care, {first_name}.
 ```
+
+The last three sentences were added after a test call, and each buys about four
+seconds. They are not softening.
+
+- **"You won't be any trouble to them."** The reason an older person does not ring
+  111 is rarely that nobody told them to. It is that they do not want to be a
+  nuisance, and a machine has just told them their problem is too serious for it.
+- **"So that's 111."** Spoken safety advice repeats the action at the end. The first
+  hearing lands while she is still taking in that the call has changed under her.
+- **"Take care, {first_name}."** Every other way out of this call has a goodbye. This
+  one did not, and the line ended mid-air. The first person to hear it said the agent
+  hung up on her.
+
+## Where the Safety Line sits in the prompt
+
+Above the red-flag list, not below it, and it says *say this* before it says *stop*.
+
+The first version put the trigger first — "STOP the call and read the line below" —
+and then ninety five red-flag phrases, and only then the line itself. On the first
+live call to somebody who said the words, the agent stopped the call and said nothing
+at all. That ordering asks a model to hold a long instruction across a wall of list
+items and act on its second clause; the first clause is `STOP the call`, and it obeyed
+it.
+
+So the order is now: what to say, how to say it, that it is never skipped, then what
+triggers it, then one line closing the loop. The imperative the model meets first is
+to speak.
 
 Why 111 and not the practice's own number: the agent does not grade severity, so the
 line cannot route by severity. 111 exists precisely for "I don't know how urgent this

@@ -18,6 +18,7 @@ from . import redflags
 from .models import Turn
 
 RED_FLAG_PHRASE = "red_flag_phrase"
+RED_FLAG_NOT_TOLD = "red_flag_not_told"
 NO_TRANSCRIPT = "no_transcript"
 UNMAPPABLE = "unmappable"
 REPEATED_NON_ANSWER = "repeated_non_answer"
@@ -33,6 +34,16 @@ QUESTION_THREE_MARKER = "worrying you"
 
 REPEAT_LIMIT = 3
 MIN_QUOTE_WORDS = 3
+
+# The two reasons that mean she may be unwell right now, as opposed to the four that
+# mean the call did not work. Read by `review.release`, which refuses to place an
+# automated booking call on either of them.
+RED_FLAG_REASONS = (RED_FLAG_PHRASE, RED_FLAG_NOT_TOLD)
+
+# 111 and 999, not the Safety Line's wording. What has to reach her is where to turn;
+# whether the agent recited the sentence around it perfectly is a different question,
+# and one this layer is deliberately not the judge of.
+URGENT_NUMBER = re.compile(r"(?<!\d)(?:111|999)(?!\d)")
 
 # The two lists below are ours, not lifted from anywhere, and are not clinical claims.
 # They match conversational surfaces: somebody else taking the handset, and a question
@@ -127,9 +138,13 @@ def scan(
     extracted = extracted or {}
     patient = _patient_turns(transcript)
 
-    for turn in patient:
+    for position, turn in enumerate(transcript):
+        if turn.speaker != PATIENT:
+            continue
         if redflags.match(turn.text, source):
-            return True, RED_FLAG_PHRASE
+            if _told_where_to_turn(transcript[position + 1 :]):
+                return True, RED_FLAG_PHRASE
+            return True, RED_FLAG_NOT_TOLD
 
     if any(extracted.get(field) is None for field in BOUNDED_FIELDS):
         return True, UNMAPPABLE
@@ -146,6 +161,24 @@ def scan(
             return True, CLINICAL_QUESTION
 
     return False, None
+
+
+def _told_where_to_turn(rest: list[Turn]) -> bool:
+    """Whether the agent gave her an urgent number after she said the phrase.
+
+    The entire clinical value of a stopped call is one number spoken aloud, and until
+    this ran nothing checked it had been. Both of the red-flag fixtures reached the
+    board reading `red_flag_phrase`: the one where the agent read the Safety Line, and
+    the one where it sailed past "coughing up blood" into the cheerful closing. A
+    Reviewer could not tell from the board which patient had been told anything.
+
+    Position, not `Turn.index`, and only the turns after hers: the number has to have
+    been said in answer to what she said. An agent that mentioned 111 in its opening
+    and hung up on her afterwards has told her nothing.
+    """
+    return any(
+        turn.speaker == AGENT and URGENT_NUMBER.search(turn.text) for turn in rest
+    )
 
 
 def _repeated_question(transcript: list[Turn]) -> bool:

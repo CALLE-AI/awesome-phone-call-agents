@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import db
 from .models import AppointmentMode, ReviewStatus, TimeOfDay, Turn
+from .scan import RED_FLAG_REASONS
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 
@@ -198,6 +199,17 @@ def release(
     """Grant one bounded authority, and record who granted it.
 
     Every refusal here is a refusal to let a call happen, which is the safe direction.
+
+    A red flag is refused outright. The agent on the phone stops rather than offer an
+    appointment to somebody describing chest pain, and until this ran the board then
+    offered a Reviewer one button to have a second agent ring reception about it: the
+    exact call the first one correctly declined to set up, one layer up and with the
+    refusal spent. A Reviewer is not blocked from helping her. She is blocked from
+    delegating it, and "Ring them myself" is the way through.
+
+    Narrow on purpose, and only the two clinical reasons. `unmappable`, `third_party`
+    and `repeated_non_answer` mean the call did not work, not that anybody is unwell,
+    and a Rebooking Call is often exactly what those need.
     """
     item = fetch(conn, review_item_id)
     if item is None:
@@ -206,6 +218,8 @@ def release(
         raise Rejected(409, "already_released")
     if item["status"] in HUMAN_SETTLED:
         raise Rejected(409, "already_released")
+    if item["stop_reason"] in RED_FLAG_REASONS:
+        raise Rejected(409, "flagged_needs_a_person")
 
     reviewer_name = str(body.get("reviewer_name") or "").strip()
     if not reviewer_name:

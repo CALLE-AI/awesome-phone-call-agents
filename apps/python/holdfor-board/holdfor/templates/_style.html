@@ -92,6 +92,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 }
 .chip.state{background:var(--rule-soft);color:var(--muted);border-color:var(--rule)}
 .chip.stopped{background:var(--alarm-soft);color:var(--alarm);border-color:var(--alarm);font-weight:500}
+.chip.stopped.untold{background:var(--alarm);color:var(--paper);border-color:var(--alarm);font-weight:600}
 
 /* tables */
 .scroll{overflow-x:auto;margin:0 0 2.5rem}
@@ -104,6 +105,8 @@ td{padding:.75rem .85rem;border-bottom:1px solid var(--rule-soft);vertical-align
 tbody tr{background:var(--surface)}
 tbody tr:hover{background:var(--raised)}
 tbody tr.flagged td:first-child{box-shadow:inset 3px 0 0 var(--alarm)}
+tbody tr.flagged.untold td:first-child{box-shadow:inset 6px 0 0 var(--alarm)}
+tbody tr.flagged.untold td{background:var(--alarm-soft)}
 .who{font-weight:500}
 .who a{text-decoration:none}
 .who a:hover{text-decoration:underline}

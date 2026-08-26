@@ -19,7 +19,7 @@ from holdfor.checkin import (
     DISCLOSURE,
     NEVER_ASK_PROMISE,
     RESULT_SCHEMA_PATH,
-    SAFETY_LINE,
+    safety_line,
     build_task_text,
     recover_carried_words,
     result_schema,
@@ -40,7 +40,9 @@ from holdfor.models import (
 from holdfor.scan import (
     CLINICAL_QUESTION,
     NO_TRANSCRIPT,
+    RED_FLAG_NOT_TOLD,
     RED_FLAG_PHRASE,
+    RED_FLAG_REASONS,
     THIRD_PARTY,
     UNMAPPABLE,
     extract_carried_words,
@@ -64,7 +66,11 @@ def turns(*pairs: tuple[str, str]) -> list[Turn]:
 
 
 def four_questions(worry: str, feeling: str = "About the same.") -> list[Turn]:
-    """A complete, well-behaved call. The agent stops for nothing."""
+    """A complete, well-behaved call. The agent stops for nothing.
+
+    Including for a red flag, so nothing in here ever gives her a number. A flag found
+    in one of these is `red_flag_not_told` by construction.
+    """
     return turns(
         ("agent", "Hello, is that Margaret?"),
         ("other", "Yes, speaking."),
@@ -108,7 +114,37 @@ def test_the_safety_line_routes_to_111_and_is_read_verbatim():
 
     assert "Please ring 111" in text
     assert "If it feels like an emergency, ring 999" in text
-    assert "Read it exactly" in text
+    assert "Say it exactly" in text
+
+
+def test_the_safety_line_ends_with_a_goodbye_and_the_number_again():
+    """Why the first live caller said the agent hung up on her.
+
+    The authored line stopped at "someone there will see this today" and the call
+    ended on it. Every other way out of this call has a farewell; this is the one that
+    most needs one.
+    """
+    line = safety_line("Margaret")
+
+    assert line.endswith("So that's 111. Take care, Margaret.")
+    assert "You won't be any trouble to them" in line
+
+
+def test_the_line_comes_before_the_list_of_things_that_trigger_it():
+    """Why it was never spoken at all.
+
+    The first version read "STOP the call and read the line below", then ninety five
+    red-flag phrases, then the line. On the first live call to somebody who said one
+    of the phrases, the agent stopped and said nothing. A model meeting `STOP the
+    call` as its first imperative, with the line an instruction-wall away, obeys the
+    clause it can see.
+    """
+    text = build_task_text(MARGARET, medication_changed=False, weekday="Wednesday")
+    phrases = redflags.phrases()
+
+    assert len(phrases) > 50, "the wall this ordering exists to get in front of"
+    assert text.index(safety_line("Margaret")) < text.index(phrases[0])
+    assert "Never end the call silently" in text
 
 
 def test_all_four_questions_are_in_the_script():
@@ -131,7 +167,7 @@ def test_question_two_is_not_asked_when_the_medication_did_not_change():
 
 def test_nothing_spoken_carries_punctuation_a_speech_engine_may_read_aloud():
     unspeakable = set("—–()[]{}/\\*_#|<>")
-    for line in (DISCLOSURE, NEVER_ASK_PROMISE, CLOSING, SAFETY_LINE):
+    for line in (DISCLOSURE, NEVER_ASK_PROMISE, CLOSING, safety_line("Margaret")):
         assert not unspeakable & set(line), line
 
 
@@ -204,7 +240,7 @@ def test_the_prompt_and_the_scanner_read_the_same_list(tmp_path, monkeypatch):
     )
 
     assert "the kitchen ceiling is humming" in prompt
-    assert (flagged, reason) == (True, RED_FLAG_PHRASE)
+    assert (flagged, reason) == (True, RED_FLAG_NOT_TOLD)
 
 
 def test_a_phrase_matches_whole_and_not_in_part():
@@ -221,10 +257,64 @@ def test_it_flags_a_red_flag_the_agent_walked_straight_past():
     Four questions asked, four answers given, agent reported nothing wrong. On the
     agent's account this call auto-closes and a woman who mentioned chest pain is
     filed as needing nothing.
+
+    `not_told` rather than `phrase`, because the agent that walks past a red flag also
+    walks past the Safety Line: she said it, nobody answered it, and she put the phone
+    down knowing nothing she did not know before.
     """
     transcript = four_questions("Not really, though I've had a pain in my chest.")
 
+    assert scan(transcript, dict(ALL_SET)) == (True, RED_FLAG_NOT_TOLD)
+
+
+def test_a_red_flag_answered_with_the_safety_line_says_she_was_told():
+    """The other half, and the distinction the board turns on.
+
+    Same phrase, same flag, materially different call: this one ends with her holding
+    a number. Until this ran both reached a Reviewer reading `red_flag_phrase`, and
+    nothing on the board said which patient had been told anything.
+    """
+    transcript = turns(
+        ("agent", "Since Wednesday, are you feeling better, about the same, or worse?"),
+        ("other", "I've had a pain in my chest."),
+        ("agent", safety_line("Margaret")),
+        ("other", "Right. Thank you."),
+    )
+
     assert scan(transcript, dict(ALL_SET)) == (True, RED_FLAG_PHRASE)
+
+
+def test_a_number_spoken_before_she_says_it_does_not_count_as_telling_her():
+    """It has to be an answer to her, not something said earlier in the call."""
+    transcript = turns(
+        ("agent", "If you ever need us out of hours, there is always 111."),
+        ("agent", "Since Wednesday, are you feeling better, about the same, or worse?"),
+        ("other", "I've had a pain in my chest."),
+        ("agent", "Thank you, Margaret. Take care."),
+    )
+
+    assert scan(transcript, dict(ALL_SET)) == (True, RED_FLAG_NOT_TOLD)
+
+
+def test_999_alone_is_telling_her_where_to_turn():
+    transcript = turns(
+        ("agent", "Is there anything worrying you?"),
+        ("other", "I've had a pain in my chest."),
+        ("agent", "Please ring 999 now and tell them what you told me."),
+    )
+
+    assert scan(transcript, dict(ALL_SET)) == (True, RED_FLAG_PHRASE)
+
+
+def test_the_number_has_to_be_the_agent_saying_it_not_her():
+    """She can say 111 herself. That is not the practice telling her anything."""
+    transcript = turns(
+        ("agent", "Is there anything worrying you?"),
+        ("other", "I've had a pain in my chest. Should I ring 111 about it?"),
+        ("agent", "Thank you, Margaret. Take care."),
+    )
+
+    assert scan(transcript, dict(ALL_SET)) == (True, RED_FLAG_NOT_TOLD)
 
 
 def test_a_clean_complete_call_is_not_flagged():
@@ -269,7 +359,10 @@ def test_the_red_flag_is_reported_before_a_null_field():
     unset = dict(ALL_SET) | {"feeling": None}
     transcript = four_questions("I've had a pain in my chest.")
 
-    assert scan(transcript, unset) == (True, RED_FLAG_PHRASE)
+    flagged, reason = scan(transcript, unset)
+
+    assert flagged is True
+    assert reason in RED_FLAG_REASONS
 
 
 # --- Carried Words: verbatim or nothing ------------------------------------------
@@ -350,7 +443,7 @@ def test_the_scanner_overrules_an_agent_that_reported_nothing_wrong():
 
     assert settle_stop_condition(as_result(transcript), clean_extraction()) == (
         True,
-        RED_FLAG_PHRASE,
+        RED_FLAG_NOT_TOLD,
     )
 
 
@@ -374,10 +467,10 @@ def test_a_red_flag_still_takes_the_reason_slot_from_a_specific_reason():
     )
     transcript = four_questions("I've had a pain in my chest.")
 
-    assert settle_stop_condition(as_result(transcript), refused) == (
-        True,
-        RED_FLAG_PHRASE,
-    )
+    flagged, reason = settle_stop_condition(as_result(transcript), refused)
+
+    assert flagged is True
+    assert reason in RED_FLAG_REASONS
 
 
 def test_a_clean_call_stays_clean():

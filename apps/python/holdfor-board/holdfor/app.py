@@ -12,7 +12,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import checkin, db, rebooking, review, window
+from . import checkin, db, rebooking, review, scan, window
 from .models import CallState, ReviewStatus
 from .providers import POLL_BUDGET_SECONDS, default_provider
 
@@ -46,7 +46,10 @@ FROM review_item
 JOIN call_attempt ON call_attempt.id = review_item.call_attempt_id
 JOIN appointment  ON appointment.id  = call_attempt.appointment_id
 JOIN patient      ON patient.id      = appointment.patient_id
-ORDER BY review_item.created_at DESC, review_item.id DESC
+-- A call where nobody was told to ring anyone outranks every other kind of
+-- waiting. Only that reason is lifted; the rest keep the day's own order.
+ORDER BY CASE WHEN review_item.stop_reason = 'red_flag_not_told' THEN 0 ELSE 1 END,
+         review_item.created_at DESC, review_item.id DESC
 """
 
 
@@ -547,6 +550,10 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
         # uses for how many calls went out: the sheet renders inside that context and
         # the shorter name would quietly turn a count into a date.
         "today_iso": date.today().isoformat(),
+        # Which stop reasons hide the Release form, read from the module that also
+        # makes `review.release` refuse them. A template holding its own copy of this
+        # list would eventually offer a form the server rejects.
+        "red_flag_reasons": scan.RED_FLAG_REASONS,
     }
 
 

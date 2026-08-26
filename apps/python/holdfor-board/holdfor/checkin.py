@@ -20,7 +20,7 @@ from .models import (
     ReviewStatus,
     SubmissionUnknown,
 )
-from .scan import RED_FLAG_PHRASE, extract_carried_words, scan
+from .scan import RED_FLAG_REASONS, extract_carried_words, scan
 
 NO_CONSENT = "no_consent"
 DECLINED = "declined"
@@ -79,13 +79,31 @@ CLOSING = (
     "appointment they'll sort that out for you, so you won't have to ring in and "
     "wait on hold."
 )
-SAFETY_LINE = (
-    "Thank you for telling me. That's something a person needs to hear, not a "
-    "computer, so I'm going to stop here rather than get it wrong. Please ring 111 "
-    "and tell them what you've just told me. They're there day and night, and "
-    "they'll decide what happens next. If it feels like an emergency, ring 999. "
-    "I'm letting the practice know we spoke, and someone there will see this today."
-)
+def safety_line(first_name: str) -> str:
+    """The Safety Line, ending the way every other exit from this call ends.
+
+    A function rather than a constant because the farewell carries her name. The line
+    she hears when something has gone wrong should not be the one place the call stops
+    sounding like it is addressed to her.
+
+    Three sentences were added to the authored line after a test call, and each earns
+    its seconds. "You won't be any trouble to them" is there because the reason an
+    older person does not ring 111 is rarely that they were not told to. Repeating the
+    number at the end is how spoken safety advice is given, since the first hearing
+    lands while she is still taking in that the call has changed. And "Take care,
+    {first_name}" is a goodbye: without one the line ends mid-air and she is left
+    working out whether she was hung up on.
+    """
+    return (
+        "Thank you for telling me. That's something a person needs to hear, not a "
+        "computer, so I'm going to stop here rather than get it wrong. Please ring "
+        "111 and tell them what you've just told me. They're there day and night, "
+        "and they'll decide what happens next. If it feels like an emergency, ring "
+        "999. You won't be any trouble to them. That's what the number is for. I'm "
+        "letting the practice know we spoke, and someone there will see this today, "
+        f"so you are not left on your own with it. So that's 111. Take care, "
+        f"{first_name}."
+    )
 
 
 def weekday_of(seen_on: str) -> str:
@@ -229,19 +247,27 @@ def build_task_text(
         "to her record. Do not reassure her, do not alarm her, and do not say whether "
         "something sounds normal or serious.",
         "",
-        "STOP the call and read the line below, word for word, if any of these "
-        "happens: she says anything on the list that follows; she asks you for "
-        "clinical advice; somebody else comes on the line; or you have asked the same "
-        "question three times without a usable answer.",
+        "IF THE CALL HAS TO STOP, THIS IS THE LINE YOU SAY. Say all of it, out "
+        "loud, before you do anything else:",
+        f'"{safety_line(scope.first_name)}"',
         "",
-        "Stop if she says anything like:",
+        "Say it exactly. Do not add to it, do not shorten it, do not adapt it to what "
+        "she said, and do not offer an opinion on what she told you. End the call "
+        "only once you have finished saying it.",
+        "",
+        "Never end the call silently. She has just told you something frightening, "
+        "and a line going dead is the worst answer available to you. Saying this "
+        "matters more than any answer you have not collected: abandon the remaining "
+        "questions, never the line.",
+        "",
+        "Say it when any of these happens: she says anything on the list below; she "
+        "asks you for clinical advice; somebody else comes on the line; or you have "
+        "asked the same question three times without a usable answer.",
+        "",
+        "The list. Say the line if she says anything like:",
         redflags.prompt_block(),
         "",
-        "THE LINE, word for word, then end the call:",
-        f'"{SAFETY_LINE}"',
-        "",
-        "Read it exactly. Do not add to it, do not adapt it to what she said, and do "
-        "not offer an opinion on what she told you.",
+        "If any of those happens: say the line above, all of it, then end the call.",
     ]
     return "\n".join(lines)
 
@@ -287,8 +313,8 @@ def settle_stop_condition(result, extraction) -> tuple[bool, str | None]:
     docs/adr/0005-stop-conditions-are-enforced-twice.md: the prompt layer serves the
     Patient, this layer serves the Practice, and only one of them can be the record.
 
-    A red flag always takes the reason slot, because it is what a Reviewer must see
-    first. Otherwise an existing, more specific reason is kept — a fabricated quote
+    Either red-flag reason always takes the slot, because it is what a Reviewer must
+    see first. Otherwise an existing, more specific reason is kept — a fabricated quote
     tells a Reviewer something that "unmappable" would bury.
 
     A decline returns before any of that. She was reached and she said not now, so
@@ -311,7 +337,7 @@ def settle_stop_condition(result, extraction) -> tuple[bool, str | None]:
     )
     if not flagged:
         return extraction.stop_condition, extraction.stop_reason
-    if reason == RED_FLAG_PHRASE or extraction.stop_reason is None:
+    if reason in RED_FLAG_REASONS or extraction.stop_reason is None:
         return True, reason
     return True, extraction.stop_reason
 
