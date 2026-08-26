@@ -1,4 +1,4 @@
-"""The four answers, read back out of a transcript nobody else would classify.
+"""The bounded answers, read back out of a transcript nobody else would classify.
 
 `calle call start` accepts `--to-phone`, `--goal`, `--language` and `--region`. There
 is no way to hand it a result schema, so a live call returns words and a status and no
@@ -272,7 +272,7 @@ def ask(tool: str, description: str, schema: dict, question: str) -> dict | None
 
 
 def structured_from(transcript: list[Turn], medication_changed: bool) -> dict | None:
-    """The four answers a Check-in Call would have returned, had it been able to."""
+    """The answers a Check-in Call would have returned, had it been able to."""
     if not transcript:
         return None
     return ask(

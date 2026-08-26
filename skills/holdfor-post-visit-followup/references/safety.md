@@ -77,6 +77,29 @@ and never widens the envelope.
 This is what makes the workflow answerable. When something goes wrong on a Rebooking
 Call, the question "who authorised this" has a name as its answer.
 
+The contract is in [`envelope.md`](envelope.md).
+
+## Nothing recurs, so nothing has to be cancelled
+
+There is no scheduler here, no background job, and no retry. One appointment produces
+at most one Check-in Call; one Release produces at most one Rebooking Call. Recurrence,
+where a practice wants it, belongs to the host scheduler and stays visible there.
+
+Cancelling is therefore not a feature that can fail: it is declining to press the
+button. A workflow that could quietly re-arm itself is one an older person cannot get
+away from, and she has no account to log into and no setting to turn off.
+
+## Numbers
+
+- **E.164 only**, everywhere — `+447700900123`, never `07700 900123` and never a local
+  form. A number with no country code is not dialled, and a region is named rather than
+  inferred from a prefix.
+- **Masked wherever they are shown.** The board displays `+4477******23`; the digits are
+  read to compare and dropped before the row reaches the page. A board is on screen in
+  a demo, in a corridor, and over somebody's shoulder.
+- **No number in a log line, an error, or a commit.** Real handsets live in `.env`,
+  which is gitignored, and nowhere else.
+
 ## Live calls
 
 - Fictional numbers only in every fixture, test, seed and example: the Ofcom-reserved

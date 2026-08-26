@@ -31,7 +31,7 @@ PRACTICE_NAME = "Fieldgate Surgery"
 SKILL_DIR = (
     Path(__file__).resolve().parents[4] / "skills" / "holdfor-post-visit-followup"
 )
-RESULT_SCHEMA_PATH = SKILL_DIR / "result-schema.json"
+RESULT_SCHEMA_PATH = SKILL_DIR / "references" / "result-schema.json"
 
 WEEKDAYS = (
     "Monday",

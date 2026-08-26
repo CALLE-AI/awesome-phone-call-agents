@@ -87,8 +87,8 @@ is read verbatim, with nothing added about chest pain.
 
 ## 4 — The red flag the agent walked straight past
 
-The case that justifies the second layer. Same symptom, but the model completed all
-four questions without stopping.
+The case that justifies the second layer. Same symptom, but the model completed the
+run without stopping.
 
 ```
 agent    Since Wednesday, are you feeling better, about the same, or worse?

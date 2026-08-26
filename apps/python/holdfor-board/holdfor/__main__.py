@@ -110,7 +110,7 @@ def cmd_call(args: list[str]) -> int:
 
 
 def cmd_read_back(_: list[str]) -> int:
-    """Read the four answers back out of transcripts already on disk.
+    """Read the bounded answers back out of transcripts already on disk.
 
     For calls that landed before the second pass existed, or before a key did. A
     settled Review Item is never re-extracted by `finish` — it returns the item that

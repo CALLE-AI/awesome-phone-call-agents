@@ -294,7 +294,7 @@ class LiveProvider:
     refuses an absent structured block, `recover_carried_words` recovers her quote
     from her own turn, and the call reaches a Reviewer. That is the correct
     outcome for a live call rather than a shortfall: nobody promised the platform
-    would fill in our four fields.
+    would fill in our bounded fields.
     """
 
     live = True

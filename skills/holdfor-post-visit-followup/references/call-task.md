@@ -75,7 +75,7 @@ Notes on each part:
 
 ## When she declines
 
-Set `declined` to `true`, leave the four answers out, and do **not** set
+Set `declined` to `true`, leave the five answers out, and do **not** set
 `stop_condition`. Then stop.
 
 The distinction is not bookkeeping. A **Stop Condition** is one of five surfaces

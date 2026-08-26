@@ -2,7 +2,7 @@
 
 The prompt is for the Patient — it ends the call kindly with the Safety Line. This is
 for the Practice, and it is the authority. It reads the finished transcript and flags
-even when the agent sailed through all four questions without stopping, because the
+even when the agent sailed through every question without stopping, because the
 call where the model missed something is exactly the call a human needs to read.
 
 Nothing here calls a model, and nothing here grades severity. It matches surfaces.
