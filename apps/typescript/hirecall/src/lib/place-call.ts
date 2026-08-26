@@ -1,5 +1,5 @@
 import { emptyScreeningResult, parseScreeningResult, type ScreeningResult } from "@/lib/call-result-schema";
-import { CalleConfigError, createCalleCall, getCalleCall, isDryRunCallId, type CalleSnapshot } from "@/lib/calle";
+import { CalleApiError, CalleConfigError, createCalleCall, getCalleCall, isDryRunCallId, type CalleSnapshot } from "@/lib/calle";
 import { summarizeScreeningCall } from "@/lib/generate-call-prompt";
 import {
   getBatch,
@@ -14,6 +14,12 @@ import {
 import { DEFAULT_SCORE_CONFIG, decisionFromScore } from "@/lib/score-config";
 import { canPlaceCall, isLiveCall, isScoringPending, isTerminalCall } from "@/lib/status";
 import type { CallStatus, Candidate } from "@/lib/types";
+
+const DEFINITE_CALLE_REJECTION = new Set([400, 401, 403, 404, 405, 413, 415, 422]);
+
+function isDefiniteCalleRejection(error: unknown) {
+  return error instanceof CalleApiError && error.status != null && DEFINITE_CALLE_REJECTION.has(error.status);
+}
 
 function isTerminal(status: CallStatus) {
   return isTerminalCall(status);
@@ -104,11 +110,10 @@ async function dialCandidate(batchId: string, candidate: Candidate): Promise<Can
     }
     return saved;
   } catch (error) {
-    if (error instanceof CalleConfigError) {
-      throw error;
+    if (isDefiniteCalleRejection(error)) {
+      const message = error instanceof Error ? error.message : "CALL-E did not place the call.";
+      await markCallFailed(batchId, candidate.id, message);
     }
-    const message = error instanceof Error ? error.message : "CALL-E did not place the call.";
-    await markCallFailed(batchId, candidate.id, message);
     throw error;
   }
 }
@@ -165,12 +170,7 @@ export async function startNextQueuedCall(batchId: string): Promise<Candidate | 
   if (detail.candidates.some((row) => isScoringPending(row))) return null;
   const next = detail.candidates.find((row) => row.callStatus === "queued");
   if (!next) return null;
-  try {
-    return await dialCandidate(batchId, next);
-  } catch (error) {
-    if (error instanceof CalleConfigError) throw error;
-    return startNextQueuedCall(batchId);
-  }
+  return dialCandidate(batchId, next);
 }
 
 export async function syncBatchCalls(batchId: string): Promise<void> {
@@ -233,6 +233,15 @@ export async function ensureCallSummary(candidate: Candidate): Promise<void> {
       : "failed");
   const result = response.result ?? emptyScreeningResult(endReason);
   const scoreConfig = (await getBatch(candidate.batchId))?.batch.scoreConfig ?? DEFAULT_SCORE_CONFIG;
+
+  if (endReason === "no_answer" || candidate.callStatus === "no_answer") {
+    await saveCallVerdict(response.id, {
+      score: 0,
+      summary: "No answer. There was no screening to score.",
+      decision: scoreConfig.autoDecision ? decisionFromScore("no_answer", 0, scoreConfig.passScore) : "",
+    });
+    return;
+  }
 
   try {
     const verdict = await summarizeScreeningCall({

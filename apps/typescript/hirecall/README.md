@@ -91,6 +91,8 @@ There is **no recurring scheduler**. Nothing runs unattended.
 
 Once a live CALL-E call has started, HireCall cannot cancel the phone-network side effect. Stop clicking Call, deactivate the batch, and use CALL-E's own controls if you need to intervene.
 
+If CALL-E create or poll does not clearly succeed or fail (timeout, 5xx, network), HireCall leaves that person queued or calling and **does not** mark them failed or dial the next number. A definite CALL-E rejection (4xx) can mark that row failed; the rest of the queue still waits until you click Call or Call ready.
+
 ## Dry-run / no-call
 
 **Dry-run is the default.** `HIRECALL_LIVE_CALLS` is not `true`, so Call does not create a CALL-E task and does not dial. It stores a completed local result with a `dry-run:` id.
