@@ -1,0 +1,75 @@
+{
+  "assumptions": {
+    "automated_between_calls_seconds": 2,
+    "automated_review_seconds": 30,
+    "automated_setup_seconds": 45,
+    "manual_between_calls_seconds": 20,
+    "manual_note_seconds_per_attempt": 15,
+    "maximum_candidates": 12,
+    "offer_window_minutes": 15.0,
+    "outcome_duration_seconds": {
+      "accepted": 95,
+      "declined": 75,
+      "no-answer": 30,
+      "unknown": 70
+    },
+    "outcome_probabilities": {
+      "accepted": 0.16,
+      "declined": 0.4,
+      "no-answer": 0.38,
+      "unknown": 0.06
+    }
+  },
+  "invariants": {
+    "ambiguous_outcome_halts_queue": true,
+    "automatic_redial_is_disabled": true,
+    "booking_is_never_created": true,
+    "calls_are_sequential": true
+  },
+  "model_only_not_customer_data": true,
+  "results": {
+    "automated_candidate_found_rate": 0.6778,
+    "automated_mean_attempts": 4.3354,
+    "automated_mean_operator_minutes": 1.25,
+    "automated_mean_wall_minutes": 4.489655,
+    "automated_p90_wall_minutes": 9.383333333333333,
+    "manual_candidate_found_rate": 0.6706,
+    "manual_mean_attempts": 4.3276,
+    "manual_mean_operator_minutes": 6.563666666666666,
+    "manual_mean_wall_minutes": 5.481766666666666,
+    "manual_p90_wall_minutes": 12.083333333333334,
+    "modeled_candidate_found_rate_change_percentage_points": 0.7199999999999984,
+    "modeled_operator_minutes_saved": 5.313666666666666,
+    "modeled_operator_time_reduction_percent": 80.95576659387538
+  },
+  "sample_results": {
+    "automated": {
+      "attempts": 12,
+      "elapsed_seconds": 717,
+      "operator_seconds": 75,
+      "status": "candidate-found"
+    },
+    "manual": {
+      "attempts": 12,
+      "elapsed_seconds": 915,
+      "operator_seconds": 1095,
+      "status": "offer-expired-after-call-human-review"
+    }
+  },
+  "seed": 20260823,
+  "trials": 10000,
+  "unit_economics": {
+    "break_even_workflow_cost_eur": {
+      "25": 2.2140277777777775,
+      "35": 3.099638888888889,
+      "50": 4.428055555555555
+    },
+    "interpretation": "Maximum total variable workflow cost for labor-time savings alone to break even; excludes recovered-slot value and customer impact.",
+    "labor_only_not_provider_pricing": true,
+    "labor_rate_scenarios_eur_per_hour": [
+      25,
+      35,
+      50
+    ]
+  }
+}
