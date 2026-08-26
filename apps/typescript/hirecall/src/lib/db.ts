@@ -9,6 +9,7 @@ import { generateCallPrompt, generateFollowUpCallPrompt, passScore, type PromptS
 import { DEFAULT_SCORE_CONFIG, parseScoreConfig } from "@/lib/score-config";
 import { DEMO_CALL_PROMPT, DEMO_FILENAME, DEMO_JOB_ROLE, DEMO_NAME, DEMO_RESUME_TEXT } from "@/lib/demo-candidate";
 import { isValidE164, normalizePhone } from "@/lib/parse-workbook";
+import { looksMasked } from "@/lib/phone";
 import { rosterStatus } from "@/lib/status";
 
 export type { Batch, Candidate, CandidateInput };
@@ -480,11 +481,16 @@ export async function saveDialledCall(input: {
   attempt: number;
   status: CallStatus;
   startedAt: string;
+  endedAt?: string;
+  durationSeconds?: number | null;
+  result?: unknown;
   raw: unknown;
 }): Promise<Candidate> {
   const client = getClient();
   const now = new Date().toISOString();
   const responseId = crypto.randomUUID();
+  const endedAt = input.endedAt ?? "";
+  const resultJson = input.result ? JSON.stringify(input.result) : "";
   await client.execute({
     sql: `UPDATE candidates
           SET call_status = ?, calle_call_id = ?, call_attempt = ?
@@ -494,7 +500,7 @@ export async function saveDialledCall(input: {
   await client.execute({
     sql: `INSERT INTO call_responses (
             id, batch_id, candidate_id, calle_call_id, status, started_at, ended_at, duration_seconds, result_json, raw_json, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, '', NULL, '', ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       responseId,
       input.batchId,
@@ -502,6 +508,9 @@ export async function saveDialledCall(input: {
       input.calleCallId,
       input.status,
       input.startedAt,
+      endedAt,
+      input.durationSeconds ?? null,
+      resultJson,
       JSON.stringify(input.raw ?? {}),
       now,
     ],
@@ -805,7 +814,8 @@ export async function updateCandidate(
   }
 
   const name = (patch.name ?? current.name).trim();
-  const phone = normalizePhone(patch.phone ?? current.phone);
+  const requestedPhone = typeof patch.phone === "string" ? normalizePhone(patch.phone) : "";
+  const phone = !requestedPhone || looksMasked(requestedPhone) ? current.phone : requestedPhone;
   const resumeUrl = (patch.resumeUrl ?? current.resumeUrl).trim();
   const jobRole = (patch.jobRole ?? current.jobRole).trim();
   const consent = patch.consent ?? current.consent;

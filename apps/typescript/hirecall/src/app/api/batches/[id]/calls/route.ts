@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { CalleApiError, CalleConfigError } from "@/lib/calle";
 import { getBatch, setCallDecision } from "@/lib/db";
 import { queueReadyCalls, startCandidateCall } from "@/lib/place-call";
+import { publicPayload } from "@/lib/public-payload";
 import type { RecruiterDecision } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,14 +23,14 @@ export async function POST(request: Request, context: RouteContext) {
     if (body.allReady) {
       const summary = await queueReadyCalls(id);
       const detail = await getBatch(id);
-      return NextResponse.json({ ...summary, ...detail });
+      return NextResponse.json(publicPayload({ ...summary, ...detail }));
     }
     if (!body.candidateId) {
       return NextResponse.json({ error: "Choose a candidate to call." }, { status: 400 });
     }
     await startCandidateCall(id, body.candidateId);
     const detail = await getBatch(id);
-    return NextResponse.json({ queued: 1, ...detail });
+    return NextResponse.json(publicPayload({ queued: 1, ...detail }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not place the call.";
     const status =
@@ -41,7 +42,7 @@ export async function POST(request: Request, context: RouteContext) {
             ? 404
             : 400;
     const detail = await getBatch(id);
-    return NextResponse.json({ error: message, ...detail }, { status });
+    return NextResponse.json(publicPayload({ error: message, ...detail }), { status });
   }
 }
 
@@ -62,11 +63,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     await setCallDecision(id, body.candidateId, body.decision);
     const detail = await getBatch(id);
-    return NextResponse.json(detail);
+    return NextResponse.json(publicPayload(detail));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save that decision.";
     const status = message.includes("not found") ? 404 : 400;
     const detail = await getBatch(id);
-    return NextResponse.json({ error: message, ...detail }, { status });
+    return NextResponse.json(publicPayload({ error: message, ...detail }), { status });
   }
 }

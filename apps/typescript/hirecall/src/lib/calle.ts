@@ -86,11 +86,15 @@ function dryRunStructuredResult(): Record<string, unknown> {
   };
 }
 
-export function dryRunSnapshot(candidateId: string): CalleSnapshot {
+export function newDryRunCallId(candidateId: string): string {
+  return `${DRY_RUN_CALL_PREFIX}${candidateId}:${Date.now()}`;
+}
+
+export function dryRunSnapshot(callId: string): CalleSnapshot {
   const now = new Date().toISOString();
   const result = dryRunStructuredResult();
   return {
-    id: `${DRY_RUN_CALL_PREFIX}${candidateId}`,
+    id: callId.startsWith(DRY_RUN_CALL_PREFIX) ? callId : newDryRunCallId(callId),
     status: "completed",
     createdAt: now,
     completedAt: now,
@@ -163,7 +167,7 @@ export async function createCalleCall(input: {
   idempotencyKey: string;
 }): Promise<CalleSnapshot> {
   if (!liveCallsEnabled()) {
-    return dryRunSnapshot(input.candidateId);
+    return dryRunSnapshot(newDryRunCallId(input.candidateId));
   }
   try {
     const client = await sdkClient();
@@ -188,7 +192,7 @@ export async function createCalleCall(input: {
 
 export async function getCalleCall(callId: string): Promise<CalleSnapshot> {
   if (isDryRunCallId(callId)) {
-    return dryRunSnapshot(callId.slice(DRY_RUN_CALL_PREFIX.length));
+    return dryRunSnapshot(callId);
   }
   try {
     const client = await sdkClient();

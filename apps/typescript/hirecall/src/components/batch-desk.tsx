@@ -110,11 +110,19 @@ export function BatchDesk() {
         candidateId ? { candidateId } : { allReady: true },
       );
       applyDetail(data);
-      setNotice(
-        candidateId
-          ? "CALL-E is placing the call. Status will move to Calling, then Talking."
-          : `${data.queued ?? 0} ready candidate(s) queued.${data.started ? " The first call has started." : ""}${data.failed ? ` ${data.failed} failed.` : ""}`,
-      );
+      if (candidateId) {
+        const row = data.candidates?.find((person) => person.id === candidateId);
+        const dryRun = Boolean(row?.calleCallId?.startsWith("dry-run:"));
+        setNotice(
+          dryRun
+            ? "Dry-run finished. No live CALL-E call was placed. Set HIRECALL_LIVE_CALLS=true to dial for real."
+            : "CALL-E is placing the call. Status will move to Calling, then Talking.",
+        );
+      } else {
+        setNotice(
+          `${data.queued ?? 0} ready candidate(s) queued.${data.started ? " The first call has started." : ""}${data.failed ? ` ${data.failed} failed.` : ""}`,
+        );
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         applyDetail(err.payload as { batch?: Batch; candidates?: Candidate[] });
@@ -537,9 +545,11 @@ export function BatchDesk() {
                                 {DECISION_COPY[decision].label}
                               </span>
                               <span className="text-xs text-muted">
-                                {row.callResponse.score == null
-                                  ? "Scoring…"
-                                  : `${row.callResponse.score}/${row.callResponse.passScore}`}
+                                {(row.calleCallId || "").startsWith("dry-run:")
+                                  ? "No live call"
+                                  : row.callResponse.score == null
+                                    ? "Scoring…"
+                                    : `${row.callResponse.score}/${row.callResponse.passScore}`}
                               </span>
                             </div>
                           ) : (
@@ -850,14 +860,14 @@ function CandidateEditor({
 }) {
   const [name, setName] = useState(candidate.name);
   const [jobRole, setJobRole] = useState(candidate.jobRole);
-  const [phone, setPhone] = useState(candidate.phone);
+  const [phone, setPhone] = useState("");
   const [resumeUrl, setResumeUrl] = useState(candidate.resumeUrl);
   const [consent, setConsent] = useState(candidate.consent);
 
   useEffect(() => {
     setName(candidate.name);
     setJobRole(candidate.jobRole);
-    setPhone(candidate.phone);
+    setPhone("");
     setResumeUrl(candidate.resumeUrl);
     setConsent(candidate.consent);
   }, [candidate.id, candidate.name, candidate.jobRole, candidate.phone, candidate.resumeUrl, candidate.consent]);
@@ -869,7 +879,7 @@ function CandidateEditor({
     try {
       const data = await hirecallApi.updateCandidate(batchId, candidate.id, {
         name,
-        phone,
+        phone: phone.trim() || candidate.phone,
         resumeUrl,
         consent,
         jobRole,
@@ -929,11 +939,11 @@ function CandidateEditor({
           disabled={busy || !active}
           onChange={(event) => setPhone(event.target.value)}
           placeholder="+14155550123"
-          required
           value={phone}
         />
         <span className="mt-1 block text-xs font-normal text-muted">
-          Include the country code, e.g. +14155550123.
+          Stored number is shown masked: {candidate.phone}. Leave blank to keep it, or enter a new
+          country-code number to replace it.
         </span>
       </label>
       <label className="text-sm font-medium text-ink md:col-span-2">
@@ -1254,19 +1264,33 @@ function ScreeningResultCard({
           <p className="mt-1 text-sm font-medium text-ink">{formatCallDuration(response.durationSeconds)}</p>
         </div>
         <div className="rounded-2xl border border-line bg-canvas px-4 py-3">
-          <p className="text-xs tracking-wide text-muted uppercase">CALL-E id</p>
+          <p className="text-xs tracking-wide text-muted uppercase">
+            {(response.calleCallId || candidate.calleCallId || "").startsWith("dry-run:")
+              ? "Call id"
+              : "CALL-E id"}
+          </p>
           <p className="mt-1 font-mono text-sm break-all text-ink">
-            {response.calleCallId || candidate.calleCallId || "—"}
+            {shortCalleId(response.calleCallId || candidate.calleCallId || "") || "—"}
           </p>
           <p className="mt-0.5 text-xs text-muted">Attempt {candidate.callAttempt || 1}</p>
         </div>
         <div className="rounded-2xl border border-line bg-canvas px-4 py-3">
           <p className="text-xs tracking-wide text-muted uppercase">Gemini score</p>
           <p className="mt-1 text-sm font-medium text-ink">
-            {response.score == null ? "Scoring…" : `${response.score}/10`}
-            <span className="mt-0.5 block text-xs font-normal text-muted">
-              Pass mark {response.passScore}
-            </span>
+            {(response.calleCallId || candidate.calleCallId || "").startsWith("dry-run:")
+              ? "No live call"
+              : response.score == null
+                ? "Scoring…"
+                : `${response.score}/10`}
+            {(response.calleCallId || candidate.calleCallId || "").startsWith("dry-run:") ? (
+              <span className="mt-0.5 block text-xs font-normal text-muted">
+                Dry-run does not ask Gemini for a score.
+              </span>
+            ) : (
+              <span className="mt-0.5 block text-xs font-normal text-muted">
+                Pass mark {response.passScore}
+              </span>
+            )}
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-canvas px-4 py-3">

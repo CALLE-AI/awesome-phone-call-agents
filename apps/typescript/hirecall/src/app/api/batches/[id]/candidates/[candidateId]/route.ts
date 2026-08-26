@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getBatch, updateCandidate } from "@/lib/db";
+import { publicPayload } from "@/lib/public-payload";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     await updateCandidate(id, candidateId, body);
     const detail = await getBatch(id);
-    return NextResponse.json(detail);
+    return NextResponse.json(publicPayload(detail));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update this candidate.";
     const status = message.includes("not found") ? 404 : 400;

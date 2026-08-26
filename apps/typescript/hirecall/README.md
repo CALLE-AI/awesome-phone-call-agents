@@ -75,7 +75,7 @@ Optional: `consent` (`yes` / `no`), `resume_link` (Drive or HTTP; file stays on 
 - Local SQLite at `data/hirecall.db` (gitignored). No S3. Spreadsheet is discarded after import.
 - With `HIRECALL_LIVE_CALLS=true` and `CALLE_API_KEY`, Call places a real outbound CALL-E call to the stored number. This consumes CALL-E credit and rings a real phone.
 - Resume fetch reads a public Drive/HTTP link and stores **text only**.
-- Phone numbers in samples are reserved fictional NANP numbers (`+14155550123`, `+14155550124`, `+14155550125`). Judge test stores the number you type; it dials that number only when live calls are on.
+- Phone numbers in samples are reserved fictional NANP numbers (`+14155550123`, `+14155550124`, `+14155550125`). The roster, status popup, screening view, and API responses show phones **masked** (last four digits only). Judge test stores the number you type; it dials that number only when live calls are on.
 - `CALLE_BASE_URL` defaults to the official CALL-E HTTPS API (`https://api.heycall-e.com`).
 
 ## Credentials

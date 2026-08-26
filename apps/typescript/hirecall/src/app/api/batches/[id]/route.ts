@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { liveCallsEnabled } from "@/lib/calle";
 import { getBatch, setBatchActive, setBatchJobRole, setBatchScoreConfig, setBatchSystemPrompt } from "@/lib/db";
+import { publicPayload } from "@/lib/public-payload";
 import { parseScoreConfig } from "@/lib/score-config";
 import { ensureBatchSummaries, syncBatchCalls } from "@/lib/place-call";
 
@@ -23,7 +24,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!detail) {
     return NextResponse.json({ error: "That Excel batch was not found." }, { status: 404 });
   }
-  return NextResponse.json({ ...detail, liveCallsEnabled: liveCallsEnabled() });
+  return NextResponse.json(publicPayload({ ...detail, liveCallsEnabled: liveCallsEnabled() }));
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -60,7 +61,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
     const detail = await getBatch(id);
-    return NextResponse.json(detail);
+    return NextResponse.json(publicPayload(detail));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not update this batch.";
     const status = message.includes("not found") ? 404 : 400;

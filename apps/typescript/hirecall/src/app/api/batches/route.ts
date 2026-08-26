@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { liveCallsEnabled } from "@/lib/calle";
 import { createBatchWithCandidates, createDemoBatch, deactivateAll, listBatches } from "@/lib/db";
 import { parseWorkbook } from "@/lib/parse-workbook";
+import { publicPayload } from "@/lib/public-payload";
 
 export const runtime = "nodejs";
 
@@ -33,14 +34,16 @@ export async function POST(request: Request) {
         name: typeof body.name === "string" ? body.name : undefined,
         jobRole: typeof body.jobRole === "string" ? body.jobRole : undefined,
       });
-      return NextResponse.json({
-        imported: 1,
-        skipped: 0,
-        issues: [],
-        batch: created.batch,
-        candidates: created.candidates,
-        ...(await listBatches()),
-      });
+      return NextResponse.json(
+        publicPayload({
+          imported: 1,
+          skipped: 0,
+          issues: [],
+          batch: created.batch,
+          candidates: created.candidates,
+          ...(await listBatches()),
+        }),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create the judge test.";
       return NextResponse.json({ error: message }, { status: 400 });

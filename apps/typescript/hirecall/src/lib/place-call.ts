@@ -1,5 +1,5 @@
 import { emptyScreeningResult, parseScreeningResult, type ScreeningResult } from "@/lib/call-result-schema";
-import { CalleConfigError, createCalleCall, getCalleCall, type CalleSnapshot } from "@/lib/calle";
+import { CalleConfigError, createCalleCall, getCalleCall, isDryRunCallId, type CalleSnapshot } from "@/lib/calle";
 import { summarizeScreeningCall } from "@/lib/generate-call-prompt";
 import {
   getBatch,
@@ -81,15 +81,28 @@ async function dialCandidate(batchId: string, candidate: Candidate): Promise<Can
     });
     const status = mapCalleSnapshotToStatus(snapshot);
     const times = snapshotTimes(snapshot);
-    return saveDialledCall({
+    const ended = isTerminal(status);
+    const saved = await saveDialledCall({
       batchId,
       candidateId: candidate.id,
       calleCallId: snapshot.id,
       attempt,
       status: status === "queued" ? "calling" : status,
       startedAt: times.startedAt || new Date().toISOString(),
+      endedAt: ended ? times.endedAt || new Date().toISOString() : "",
+      durationSeconds: times.durationSeconds,
+      result: snapshotResult(snapshot),
       raw: snapshot,
     });
+    if (isDryRunCallId(snapshot.id) && saved.callResponse && saved.callResponse.score == null) {
+      await saveCallVerdict(saved.callResponse.id, {
+        score: 0,
+        summary: "Dry-run: no live call was placed. Set HIRECALL_LIVE_CALLS=true and CALLE_API_KEY to dial.",
+        decision: "",
+      });
+      return loadCandidate(batchId, candidate.id);
+    }
+    return saved;
   } catch (error) {
     if (error instanceof CalleConfigError) {
       throw error;
@@ -203,6 +216,15 @@ export async function ensureCallSummary(candidate: Candidate): Promise<void> {
   const response = candidate.callResponse;
   if (!response || response.score != null) return;
   if (!isTerminal(response.status) && !isTerminal(candidate.callStatus)) return;
+
+  if (isDryRunCallId(response.calleCallId) || isDryRunCallId(candidate.calleCallId)) {
+    await saveCallVerdict(response.id, {
+      score: 0,
+      summary: "Dry-run: no live call was placed. Set HIRECALL_LIVE_CALLS=true and CALLE_API_KEY to dial.",
+      decision: "",
+    });
+    return;
+  }
 
   const endReason =
     response.result?.end_reason ||

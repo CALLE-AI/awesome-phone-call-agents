@@ -105,8 +105,13 @@ export function formatUploadedAt(value: string) {
 export function shortCalleId(id: string) {
   const value = id.trim();
   if (!value) return "";
+  if (isDryRunCallId(value)) return "Dry-run (no live call)";
   if (value.length <= 14) return value;
   return `${value.slice(0, 8)}…${value.slice(-4)}`;
+}
+
+export function isDryRunCallId(id: string) {
+  return id.startsWith("dry-run:");
 }
 
 export const DECISION_COPY: Record<Exclude<RecruiterDecision, ""> | "pending", { label: string; className: string }> = {
