@@ -3,11 +3,23 @@
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 
+E164_REGEX = re.compile(r"^\+[1-9]\d{1,14}$")
+
 def mask_number(phone):
     return "***-***-" + phone[-4:] if len(phone) >= 4 else "****"
+
+def validate_e164(phone):
+    if not E164_REGEX.match(phone):
+        print(json.dumps({
+            "status": "error",
+            "code": "INVALID_E164",
+            "message": f"Phone number '{phone}' is not valid E.164 format. Must match ^\\+[1-9]\\d{{1,14}}$"
+        }, indent=2), file=sys.stderr)
+        sys.exit(2)
 
 def main():
     parser = argparse.ArgumentParser(description="Phone call reminder")
@@ -17,6 +29,9 @@ def main():
     parser.add_argument("--confirm", action="store_true", help="Confirm real call placement")
     parser.add_argument("--cancel", help="Cancel scheduled call by ID")
     args = parser.parse_args()
+
+    # Strict E.164 validation gate - reject before any processing
+    validate_e164(args.to)
 
     api_key = os.environ.get("CALLE_API_KEY", "")
 
