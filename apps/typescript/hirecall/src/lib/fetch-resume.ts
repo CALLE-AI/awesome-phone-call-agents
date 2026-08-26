@@ -1,3 +1,5 @@
+import { fetchPublicHttps } from "@/lib/public-https";
+
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_CHARS = 100_000;
 const FETCH_MS = 20_000;
@@ -24,7 +26,7 @@ export function readableResumeUrl(raw: string): string {
     throw new Error("Resume link is not a valid URL.");
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Resume link must be http or https.");
+    throw new Error("Resume link must be public https.");
   }
 
   const host = parsed.hostname.toLowerCase();
@@ -94,8 +96,7 @@ function clip(text: string): string {
 
 export async function readResumeTextFromUrl(resumeUrl: string): Promise<ResumeReadResult> {
   const target = readableResumeUrl(resumeUrl);
-  const response = await fetch(target, {
-    redirect: "follow",
+  const response = await fetchPublicHttps(target, {
     signal: AbortSignal.timeout(FETCH_MS),
     headers: { Accept: "application/pdf,text/plain,text/html,*/*" },
   });

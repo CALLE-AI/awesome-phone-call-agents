@@ -302,7 +302,7 @@ export function Dashboard() {
                 <tr className="border-t border-line">
                   <td className="px-4 py-3 font-medium text-ink">resume_link</td>
                   <td className="px-4 py-3">No</td>
-                  <td className="px-4 py-3 text-muted">Google Drive or other resume URL</td>
+                  <td className="px-4 py-3 text-muted">Public HTTPS Google Drive or file URL</td>
                 </tr>
               </tbody>
             </table>

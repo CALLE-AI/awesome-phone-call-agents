@@ -20,7 +20,7 @@ A **Judge test** on the home page lets reviewers hear a live call without an Exc
 ## What it does
 
 - Excel/CSV batches with job role, consent, and resume links. Rows are stored; the file is discarded.
-- Prepare resume stores Drive/HTTP **text only**. Gemini writes the CALL-E `call_prompt` from that resume.
+- Prepare resume stores Drive/HTTPS **text only**. Private, loopback, and HTTP resume URLs are refused; redirects are re-checked. Gemini writes the CALL-E `call_prompt` from that resume.
 - Live CALL-E with poll status: calling, talking, completed, no answer, failed. Time, duration, and CALL-E id are stored on the candidate and the batch.
 - Sequential queue: hang up, Gemini score + summary, then dial the next queued person.
 - Scoring criteria per Excel (ticks, notes, pass mark, Gemini auto-mark vs recruiter mark).
@@ -42,6 +42,7 @@ Setup for a judge is in `apps/typescript/hirecall/README.md`: copy `.env.example
 - Credentials from `.env` only. `.env` and SQLite (`data/hirecall.db`) are gitignored.
 - Samples use reserved fictional NANP numbers (`+14155550123`, `+14155550124`, `+14155550125`). Judge test stores the number the reviewer types and dials it only when live calls are on.
 - `CALLE_BASE_URL` defaults to and accepts only `https://api.heycall-e.com`. The production `CALLE_API_KEY` is not sent to loopback or any other host.
+- Resume fetch is public HTTPS only. Private, loopback, and insecure URLs are blocked; each redirect hop is revalidated.
 - Deactivate is a soft delete (`active = 0`). Restore from Inactive. No scheduler daemon; the desk only polls while the batch page is open. Deactivating a batch stops further queueing and dialing in that Excel.
 - Default path is dry-run: Call does not create a CALL-E task. Live calls require `HIRECALL_LIVE_CALLS=true` and `CALLE_API_KEY`. Without `GEMINI_API_KEY`, post-call scoring uses a fallback instead of a Gemini summary.
 
