@@ -231,6 +231,19 @@ def build_task_text(
     lines += [
         '3. "Is there anything worrying you?" -> her own words, verbatim',
         '4. "Would you like the surgery to see you again?" -> wants_seen',
+        '5. Only if she said yes to question 4: "Are mornings or afternoons easier '
+        'for you?" -> when_easier',
+        "",
+        "Question 5 is asked only when she said yes to question 4. If she said no or "
+        "was not sure, do not ask it and record when_easier as \"not_asked\". Asking "
+        "somebody who has just said no when she is free presses her towards an "
+        "appointment she did not want.",
+        "",
+        "It books nothing and promises nothing. Do not say a time is available, do "
+        "not offer one, and do not tell her when she will be seen. If she names a day "
+        'rather than a half of the day, record "unsure" and let a person read what she '
+        "said: this call cannot carry a weekday to a receptionist and a field it "
+        "cannot act on would mislead whoever reads it.",
         "",
         "Question 3 is the only source of the quote. Store a substring of what she "
         "actually said, with the turn it came from. Never summarise it, correct her "
@@ -599,16 +612,17 @@ def finish(conn: sqlite3.Connection, provider, attempt_id: int) -> int:
         review = conn.execute(
             """
             INSERT INTO review_item
-                (call_attempt_id, feeling, medication_ok, wants_seen,
+                (call_attempt_id, feeling, medication_ok, wants_seen, when_easier,
                  carried_words_text, carried_words_turn,
                  stop_condition, stop_reason, status, created_at, answers_from)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 attempt_id,
                 extraction.feeling.value if extraction.feeling else None,
                 extraction.medication_ok.value if extraction.medication_ok else None,
                 extraction.wants_seen.value if extraction.wants_seen else None,
+                extraction.when_easier.value if extraction.when_easier else None,
                 extraction.carried_words_text,
                 extraction.carried_words_turn,
                 int(stop_condition),

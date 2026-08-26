@@ -29,6 +29,7 @@ SELECT review_item.id                 AS id,
        review_item.feeling            AS feeling,
        review_item.medication_ok      AS medication_ok,
        review_item.wants_seen         AS wants_seen,
+       review_item.when_easier        AS when_easier,
        review_item.carried_words_text AS carried_words_text,
        review_item.carried_words_turn AS carried_words_turn,
        review_item.stop_condition     AS stop_condition,
@@ -540,6 +541,10 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
         "turns": [asdict(turn) for turn in turns],
         "anchors": review.anchors(item, turns),
         "rebooking_state": rebooking["state"] if rebooking else None,
+        # What reception said out loud, and when. Never phrased as an appointment the
+        # practice holds: `rebooking.run` deliberately never writes `followup_booked`,
+        # for the reason its docstring gives, and this page may not claim more.
+        "booked": _booked(rebooking),
         "rebooking_turns": [
             asdict(turn)
             for turn in review.load_turns(
@@ -554,6 +559,25 @@ def detail_payload(conn: sqlite3.Connection, review_item_id: int) -> dict:
         # makes `review.release` refuse them. A template holding its own copy of this
         # list would eventually offer a form the server rejects.
         "red_flag_reasons": scan.RED_FLAG_REASONS,
+    }
+
+
+def _booked(rebooking) -> dict | None:
+    """The slot the Rebooking Call accepted, or nothing.
+
+    Nothing covers three different calls that all end without one: no rebooking placed,
+    one placed that accepted nothing, and one that accepted something the envelope did
+    not allow. None of the three has a slot to show, and all three are already named by
+    the status chip beside it.
+    """
+    if rebooking is None or rebooking["booked_date"] is None:
+        return None
+    return {
+        "date": rebooking["booked_date"],
+        "time": rebooking["booked_time"],
+        "words": rebooking["booked_words"],
+        "turn": rebooking["booked_turn"],
+        "verdict": rebooking["booked_verdict"],
     }
 
 

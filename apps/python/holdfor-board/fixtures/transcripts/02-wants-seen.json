@@ -54,6 +54,16 @@
     {
       "index": 10,
       "speaker": "agent",
+      "text": "Are mornings or afternoons easier for you?"
+    },
+    {
+      "index": 11,
+      "speaker": "other",
+      "text": "Afternoons, if you can. My daughter drives me and she's at work till one."
+    },
+    {
+      "index": 12,
+      "speaker": "agent",
       "text": "Thank you. Someone at the practice will read this today. Goodbye."
     }
   ],
@@ -61,6 +71,7 @@
     "feeling": "worse",
     "medication_ok": "unsure",
     "wants_seen": "yes",
+    "when_easier": "afternoon",
     "carried_words_text": "I can't get up the stairs the way I could a fortnight ago, and I'm having to stop halfway.",
     "carried_words_turn": 7,
     "stop_condition": false,

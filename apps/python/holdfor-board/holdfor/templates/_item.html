@@ -47,6 +47,13 @@
             {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
           {%- if "wants_seen" in anchors %}<span class="stamp">turn {{ anchors.wants_seen }}</span>{% endif %}</dd>
 
+        <dt>Easier time</dt>
+        <dd>{% if item.when_easier and item.when_easier != "not_asked" %}
+            <span class="chip when {{ item.when_easier }}">{{ item.when_easier }}</span>
+            {%- elif item.wants_seen == "yes" %}<span class="chip unanswered">not answered</span>
+            {%- else %}<span class="chip unanswered">not asked</span>{% endif %}
+          {%- if "when_easier" in anchors %}<span class="stamp">turn {{ anchors.when_easier }}</span>{% endif %}</dd>
+
         <dt>Their words</dt>
         <dd class="words">
           {%- if item.carried_words_text %}
@@ -76,6 +83,19 @@
       Placed on their behalf after a Release.
       <span class="chip state">{{ rebooking_state.replace("_", " ") }}</span>
     </p>
+    {%- if booked %}
+    <dl class="recorded booked">
+      <dt>Reception offered</dt>
+      <dd><b>{{ booked.date }}{% if booked.time %} at {{ booked.time }}{% endif %}</b>
+        <span class="stamp">turn {{ booked.turn }}</span></dd>
+      <dt>In their words</dt>
+      <dd class="words"><q>{{ booked.words }}</q></dd>
+    </dl>
+    <p class="note" style="margin:0 0 .9rem">
+      This is what was said on the call, not an appointment this board holds. Nothing
+      has told them the time. If you want them to know it, that is a call somebody makes.
+    </p>
+    {%- endif %}
     {% if rebooking_turns %}
       {% for turn in rebooking_turns %}
       <div class="turn {{ turn.speaker }}">
@@ -130,6 +150,14 @@
     This authorises one call to the practice's booking line on their behalf. The agent
     accepts an offer inside the dates and times below and refuses anything outside
     them. It will speak the words in the box and nothing else.
+    {%- if item.when_easier in ("morning", "afternoon") %}
+    <b>They said {{ item.when_easier }}s are easier</b>, so that is what the time below
+    starts on. The dates are still yours to choose, and nothing has asked them about
+    those.
+    {%- elif item.wants_seen == "yes" %}
+    Nothing was recorded about when they are free, so the times below are your judgement
+    rather than theirs.
+    {%- endif %}
   </p>
 
   <fieldset>
@@ -140,10 +168,13 @@
     </div>
     <div class="row three">
       <label>Time of day
+        {#- Their own answer is the default, and you may change it. The same rule the
+            quote follows: this box starts from what they said rather than from what
+            somebody guessed on their behalf. #}
         <select name="time_of_day">
-          <option value="any">any</option>
-          <option value="morning">morning</option>
-          <option value="afternoon">afternoon</option>
+          <option value="any"{% if item.when_easier not in ("morning", "afternoon") %} selected{% endif %}>any</option>
+          <option value="morning"{% if item.when_easier == "morning" %} selected{% endif %}>morning</option>
+          <option value="afternoon"{% if item.when_easier == "afternoon" %} selected{% endif %}>afternoon</option>
         </select>
       </label>
       <label>Appointment mode

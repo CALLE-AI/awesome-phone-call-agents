@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Check-in Call result",
-  "description": "What one Check-in Call is permitted to return. Four bounded answers, a verbatim quote or nothing, and the agent's own report of whether it stopped early. The agent's stop report is advisory: the deterministic scanner over the finished transcript is the authority. See docs/adr/0005-stop-conditions-are-enforced-twice.md.",
+  "description": "What one Check-in Call is permitted to return. Five bounded answers, a verbatim quote or nothing, and the agent's own report of whether it stopped early. The agent's stop report is advisory: the deterministic scanner over the finished transcript is the authority. See docs/adr/0005-stop-conditions-are-enforced-twice.md.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -29,6 +29,16 @@
         "yes",
         "no",
         "unsure"
+      ]
+    },
+    "when_easier": {
+      "description": "Answer to 'Are mornings or afternoons easier for you?'. Asked only when wants_seen is yes; must be not_asked otherwise, because the question is then never put to her. Use either when both suit her, and unsure when she answered with something that is neither half of the day, such as a weekday. This does not book anything and does not authorise a Rebooking Call; it tells a Reviewer which half of the day to ask the practice for.",
+      "enum": [
+        "morning",
+        "afternoon",
+        "either",
+        "unsure",
+        "not_asked"
       ]
     },
     "carried_words_text": {

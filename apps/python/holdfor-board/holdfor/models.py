@@ -25,6 +25,25 @@ class WantsSeen(StrEnum):
     UNSURE = "unsure"
 
 
+class WhenEasier(StrEnum):
+    """Which half of the day suits her, asked only when she wants to be seen.
+
+    Deliberately not "availability". It does not carry a day of the week, a carer's
+    working pattern or a hospital transport booking, because a Rebooking Call cannot
+    negotiate any of those with a receptionist and a field this app cannot act on is a
+    field that misleads whoever reads it. A day named and nothing else is `unsure`, and
+    the Reviewer reads the transcript.
+    """
+
+    MORNING = "morning"
+    AFTERNOON = "afternoon"
+    EITHER = "either"
+    UNSURE = "unsure"
+    # The same shape `medication_ok` uses: a question nobody put to her is not an
+    # answer she failed to give.
+    NOT_ASKED = "not_asked"
+
+
 class CallKind(StrEnum):
     CHECKIN = "checkin"
     REBOOKING = "rebooking"
@@ -163,6 +182,7 @@ class Extraction:
     feeling: Feeling | None
     medication_ok: MedicationOk | None
     wants_seen: WantsSeen | None
+    when_easier: WhenEasier | None
     carried_words_text: str | None
     carried_words_turn: int | None
     stop_condition: bool

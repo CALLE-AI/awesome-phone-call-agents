@@ -58,6 +58,7 @@ QUESTION_MARKERS = {
     "feeling": "better, about the same, or worse",
     "medication_ok": "getting on alright",
     "wants_seen": "see you again",
+    "when_easier": "mornings or afternoons",
 }
 
 PATIENT = "other"
@@ -127,9 +128,20 @@ def fetch(conn: sqlite3.Connection, review_item_id: int) -> sqlite3.Row | None:
 
 REBOOKING_CALL = """
 SELECT call_attempt.state           AS state,
-       call_attempt.transcript_path AS transcript_path
+       call_attempt.transcript_path AS transcript_path,
+       booked.matched_date          AS booked_date,
+       booked.matched_time          AS booked_time,
+       booked.spoken_text           AS booked_words,
+       booked.turn_index            AS booked_turn,
+       booked.verdict               AS booked_verdict
 FROM release
 JOIN call_attempt ON call_attempt.idempotency_key = 'rebooking:' || release.id
+LEFT JOIN rebooking_offer AS booked
+       ON booked.id = (
+           SELECT id FROM rebooking_offer
+           WHERE call_attempt_id = call_attempt.id AND accepted = 1
+           ORDER BY id DESC LIMIT 1
+       )
 WHERE release.review_item_id = ?
 """
 
@@ -144,6 +156,12 @@ def rebooking_call(conn: sqlite3.Connection, review_item_id: int):
     and then the call left the building; without this the only thing that comes back is
     a status chip, and "what was the call about" has no answer for the one call she is
     accountable for.
+
+    The Binding Acceptance comes back with it: the last accepted offer, by the same
+    rule `record_offers` binds on. `rebooking.run` computed the date and time and
+    returned them in its JSON, and no page ever rendered them, so a board reading
+    `booked` could not say what had been booked. Nobody could tell the patient, who is
+    not told by anything else either.
     """
     return conn.execute(REBOOKING_CALL, (review_item_id,)).fetchone()
 

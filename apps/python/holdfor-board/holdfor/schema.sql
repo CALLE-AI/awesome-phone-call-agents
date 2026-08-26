@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS review_item (
     feeling            TEXT,
     medication_ok      TEXT,
     wants_seen         TEXT,
+    when_easier        TEXT,
     carried_words_text TEXT,
     carried_words_turn INTEGER,
     stop_condition     INTEGER NOT NULL,

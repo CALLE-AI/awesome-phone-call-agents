@@ -143,8 +143,9 @@ def test_the_prompt_says_which_answer_the_medication_question_may_have():
     changed = reextract.prompt(SPOKEN, medication_changed=True)
     unchanged = reextract.prompt(SPOKEN, medication_changed=False)
 
-    assert "not_asked" in unchanged
-    assert "not_asked" not in changed
+    assert reextract.MEDICATION_NOT_ASKED in unchanged
+    assert reextract.MEDICATION_ASKED in changed
+    assert reextract.MEDICATION_ASKED not in unchanged
 
 
 def test_the_tool_schema_is_the_published_one():

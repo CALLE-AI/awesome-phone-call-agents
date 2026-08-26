@@ -58,11 +58,16 @@ judge whether an answer sounds concerning, do not infer an answer that was not g
 and do not resolve an ambiguous answer into a clean one. Where an answer was given but
 maps to none of the choices, that is what "unsure" is for.
 
-The four questions, in the order they are asked:
+The questions, in the order they are asked:
 1. feeling — "are you feeling better, about the same, or worse?"
 2. medication_ok — "are you getting on alright with what they gave you?"
 3. carried_words_text — "is there anything worrying you?"
 4. wants_seen — "would you like the surgery to see you again?"
+5. when_easier — "are mornings or afternoons easier for you?"
+
+Question 5 is put to her only when she answered yes to question 4. Record
+when_easier as "not_asked" when she did not, whether or not the agent asked it anyway.
+A day of the week and nothing else is "unsure": that is neither half of the day.
 
 carried_words_text must be a verbatim substring of one single patient turn, copied
 character for character, and carried_words_turn must be the index of that turn. Never

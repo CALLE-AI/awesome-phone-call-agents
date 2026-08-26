@@ -89,7 +89,7 @@ the no is also honoured.
 So the absent answers carry no meaning here. They are absent because the questions
 were never asked, and `declined` is what says so.
 
-## The four questions
+## The five questions
 
 Asked one at a time, at her pace. The agent waits. It does not stack two questions
 into one breath, and it does not fill her silence.
@@ -138,6 +138,57 @@ Would you like the surgery to see you again?
 ```
 
 → `wants_seen`: `yes` | `no` | `unsure`
+
+### 5 — Which half of the day
+
+Asked **only** when she answered `yes` to question 4. Otherwise it is not asked at all
+and the field is recorded as `not_asked`.
+
+```
+Are mornings or afternoons easier for you?
+```
+
+→ `when_easier`: `morning` | `afternoon` | `either` | `unsure` | `not_asked`
+
+Until this question existed, the **Booking Envelope** was authored entirely by the
+Reviewer. She said yes to being seen; a Reviewer who had never spoken to her picked a
+window; the **Rebooking Call** accepted a slot inside it; and the first she heard of the
+time was when she was expected. For somebody who does not drive and depends on a lift,
+a time nobody asked her about is a missed appointment, and missed appointments in this
+population are the thing the whole workflow claims to reduce.
+
+It is also the same distinction the Closing is written around. A call made on her
+behalf that she was never told about is acting over her rather than for her; a *time*
+chosen on her behalf that she was never asked about is that distinction one step
+further along.
+
+Three deliberate limits:
+
+- **It books nothing and promises nothing.** The agent does not say a time is
+  available, does not offer one, and does not tell her when she will be seen. Nothing
+  is held at this point in the workflow — a **Release** has not happened and no human
+  has read the call.
+- **Not asked of somebody who said no.** Asking when she is free, straight after she
+  has said she does not want to be seen, presses her towards an appointment she
+  declined. `not_asked` is the same shape `medication_ok` uses: a question nobody put
+  to her is not an answer she failed to give, and `extract` enforces it rather than
+  trusting the agent to have obeyed.
+- **A weekday is `unsure`, not a guess.** "Thursdays, when my daughter's off" is
+  neither half of the day. The Booking Envelope has no room for a weekday and the
+  Rebooking Call cannot negotiate one with a receptionist, so recording it as `morning`
+  would put a constraint into the envelope she never gave. It is recorded as `unsure`
+  and a person reads the transcript. Carer patterns and hospital transport are the
+  practice's to arrange, not this call's to collect.
+
+Her answer becomes the **default** on the Release form's time of day, which the Reviewer
+may still change — the same rule the quote follows. It is the starting point rather than
+the decision, and where she gave no answer the form says so, so a Reviewer knows the
+window is her own judgement.
+
+Its absence never refuses a call. It is the one bounded answer whose gap is not
+`extraction_failed`: a call placed before this question existed, or one where the agent
+skipped it, is still a call a Reviewer can read, and the item is already in front of a
+person because she said yes.
 
 ## Closing
 

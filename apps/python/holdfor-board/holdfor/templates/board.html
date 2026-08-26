@@ -180,7 +180,8 @@
     <td>{% if item.medication_ok %}<span class="chip med {{ item.medication_ok }}">{{ item.medication_ok.replace("_", " ") }}</span>
         {%- else %}<span class="chip unanswered">not answered</span>{% endif %}</td>
     <td>{% if item.wants_seen %}<span class="chip seen {{ item.wants_seen }}">{{ item.wants_seen }}</span>
-        {%- else %}<span class="chip unanswered">not answered</span>{% endif %}</td>
+        {%- else %}<span class="chip unanswered">not answered</span>{% endif %}
+      {%- if item.when_easier and item.when_easier != "not_asked" %}<span class="stamp">{{ item.when_easier }}s easier</span>{% endif %}</td>
     <td class="words">
       {%- if item.carried_words_text %}
       <q>{{ item.carried_words_text }}</q><span class="stamp">turn {{ item.carried_words_turn }}</span>

@@ -29,7 +29,10 @@ def connect(path: str | None = None) -> sqlite3.Connection:
 # nothing to a database that has the table already, so a new column has to be added by
 # name — and `init` runs on every start, over ledgers that hold real calls, so each one
 # has to be safe to attempt twice.
-ADDED_COLUMNS = (("review_item", "answers_from", "TEXT"),)
+ADDED_COLUMNS = (
+    ("review_item", "answers_from", "TEXT"),
+    ("review_item", "when_easier", "TEXT"),
+)
 
 
 def init(conn: sqlite3.Connection) -> None:

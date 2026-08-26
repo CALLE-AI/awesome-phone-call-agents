@@ -26,7 +26,7 @@ from holdfor.checkin import (
     settle_stop_condition,
     weekday_of,
 )
-from holdfor.extract import EXTRACTION_FAILED, NOT_VERBATIM
+from holdfor.extract import EXTRACTION_FAILED, NOT_VERBATIM, extract
 from holdfor.models import (
     CallResult,
     CallState,
@@ -36,6 +36,7 @@ from holdfor.models import (
     MedicationOk,
     Turn,
     WantsSeen,
+    WhenEasier,
 )
 from holdfor.scan import (
     CLINICAL_QUESTION,
@@ -154,6 +155,34 @@ def test_all_four_questions_are_in_the_script():
     assert "Are you getting on alright with what they gave you?" in text
     assert "Is there anything worrying you?" in text
     assert "Would you like the surgery to see you again?" in text
+
+
+def test_the_call_asks_which_half_of_the_day_suits_her():
+    """Nothing used to ask, and the Booking Envelope was authored from nothing.
+
+    She said yes to being seen, a Reviewer picked a window she had never been asked
+    about, and an agent booked a slot inside it. For somebody who does not drive and
+    depends on a lift, a time nobody asked her about is a missed appointment.
+    """
+    text = build_task_text(MARGARET, medication_changed=False, weekday="Wednesday")
+
+    assert "Are mornings or afternoons easier for you?" in text
+    assert "Only if she said yes to question 4" in text
+
+
+def test_the_fifth_question_is_not_put_to_someone_who_said_no():
+    """Asking when she is free, after she has said no, is a sales call."""
+    text = build_task_text(MARGARET, medication_changed=False, weekday="Wednesday")
+
+    assert "do not ask it and record when_easier as" in text
+    assert "presses her towards an appointment she did not want" in text
+
+
+def test_the_fifth_question_promises_her_nothing():
+    text = build_task_text(MARGARET, medication_changed=False, weekday="Wednesday")
+
+    assert "It books nothing and promises nothing" in text
+    assert "do not tell her when she will be seen" in text
 
 
 def test_question_two_is_not_asked_when_the_medication_did_not_change():
@@ -419,11 +448,75 @@ def test_it_never_takes_words_from_the_agents_own_turn():
 # --- the two layers, reconciled ---------------------------------------------------
 
 
+def as_answers(**overrides) -> dict:
+    return {
+        "feeling": "same",
+        "medication_ok": "not_asked",
+        "wants_seen": "yes",
+        "when_easier": "afternoon",
+        "stop_condition": False,
+    } | overrides
+
+
+def spoken_call(*, wants_seen: str, when_easier: str | None) -> Extraction:
+    answers = as_answers(wants_seen=wants_seen)
+    if when_easier is None:
+        answers.pop("when_easier")
+    else:
+        answers["when_easier"] = when_easier
+    result = CallResult(
+        state=CallState.TERMINAL_VERIFIED, transcript=[], structured=answers
+    )
+    return extract(result, medication_changed=False)
+
+
+def test_the_easier_time_is_read_back_when_she_asked_to_be_seen():
+    assert spoken_call(wants_seen="yes", when_easier="afternoon").when_easier is (
+        WhenEasier.AFTERNOON
+    )
+
+
+def test_a_day_of_the_week_is_unsure_rather_than_forced_into_half_a_day():
+    """It is neither morning nor afternoon, and this call cannot carry a weekday.
+
+    A Rebooking Call negotiates a time with a receptionist inside a Booking Envelope
+    that has no room for "Thursdays". Recording one as `morning` would put a constraint
+    into the envelope that she never gave.
+    """
+    assert spoken_call(wants_seen="yes", when_easier="unsure").when_easier is (
+        WhenEasier.UNSURE
+    )
+
+
+def test_an_answer_from_someone_who_said_no_is_a_question_nobody_asked():
+    """Enforced here, not trusted to the agent. An agent that asked anyway, or
+    reported an answer to a question it skipped, does not get to write one down."""
+    for said in ("no", "unsure"):
+        assert spoken_call(wants_seen=said, when_easier="morning").when_easier is (
+            WhenEasier.NOT_ASKED
+        ), said
+
+
+def test_a_missing_easier_time_never_refuses_the_call():
+    """The one bounded field whose absence refuses nothing.
+
+    Every call placed before this question existed has no answer to it, and a call
+    where the agent skipped one question is still a call a Reviewer can read. She said
+    yes, so a person is looking at it regardless.
+    """
+    extraction = spoken_call(wants_seen="yes", when_easier=None)
+
+    assert extraction.when_easier is None
+    assert extraction.stop_reason is None
+    assert extraction.wants_seen is WantsSeen.YES
+
+
 def clean_extraction(**overrides) -> Extraction:
     fields = {
         "feeling": Feeling.SAME,
         "medication_ok": MedicationOk.NOT_ASKED,
         "wants_seen": WantsSeen.NO,
+        "when_easier": WhenEasier.NOT_ASKED,
         "carried_words_text": None,
         "carried_words_turn": None,
         "stop_condition": False,

@@ -87,6 +87,7 @@ def add_item(
     reason=None,
     transcript_path=None,
     status=ReviewStatus.NEEDS_REVIEW,
+    when_easier=None,
 ) -> int:
     stamp = db.now_iso()
     attempt = conn.execute(
@@ -101,16 +102,17 @@ def add_item(
     item = conn.execute(
         """
         INSERT INTO review_item
-            (call_attempt_id, feeling, medication_ok, wants_seen,
+            (call_attempt_id, feeling, medication_ok, wants_seen, when_easier,
              carried_words_text, carried_words_turn,
              stop_condition, stop_reason, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             attempt.lastrowid,
             feeling,
             medication_ok,
             wants_seen,
+            when_easier,
             carried,
             carried_turn,
             int(stop),
@@ -470,6 +472,112 @@ def test_an_unknown_appointment_mode_is_refused(conn, client):
 # second agent ring reception on her behalf, carrying her own words about it: the exact
 # call the first agent correctly declined to set up, one layer up, with the refusal
 # already spent. `auto_closes` had always gated on `stop_condition`; `release` had not.
+
+
+# --- when she is free, and what was booked ----------------------------------------
+
+
+def test_her_own_answer_is_what_the_time_of_day_starts_on(conn, client):
+    """The envelope used to be authored from nothing she had ever been asked.
+
+    She says yes to being seen, a Reviewer picks a window, an agent books inside it,
+    and the first she hears of the time is when she is expected. Her answer is the
+    default now; the Reviewer may still change it, the way she may narrow the quote.
+    """
+    item_id = add_item(conn, wants_seen="yes", when_easier="afternoon")
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert '<option value="afternoon" selected>afternoon</option>' in page
+    assert "They said afternoons are easier" in page
+
+
+def test_a_reviewer_is_told_when_the_window_is_her_own_judgement(conn, client):
+    item_id = add_item(conn, wants_seen="yes", when_easier=None)
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert '<option value="any" selected>any</option>' in page
+    assert "so the times below are your judgement" in page
+
+
+def test_an_easier_time_nobody_asked_for_is_not_shown_as_a_missing_answer(conn, client):
+    """She said no, so there is no gap here. `not_asked`, like the medication."""
+    item_id = add_item(conn, wants_seen="no", when_easier="not_asked")
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "not asked" in page
+
+
+def test_the_board_shows_what_reception_actually_offered(conn, client):
+    """`rebooking.run` computed the date and time, returned them, and no page read them.
+
+    A board reading `booked` could not say what had been booked, so nobody could tell
+    the patient — who is told by nothing else in this system either.
+    """
+    item_id = add_item(conn, wants_seen="yes")
+    client.post(f"/review-items/{item_id}/release", json=envelope())
+    release_id = conn.execute("SELECT id FROM release").fetchone()["id"]
+    stamp = db.now_iso()
+    attempt = conn.execute(
+        """
+        INSERT INTO call_attempt
+            (appointment_id, kind, idempotency_key, state, created_at, updated_at)
+        VALUES (1, 'rebooking', ?, 'terminal_verified', ?, ?)
+        """,
+        (f"rebooking:{release_id}", stamp, stamp),
+    )
+    conn.execute(
+        """
+        INSERT INTO rebooking_offer
+            (call_attempt_id, turn_index, spoken_text, accepted,
+             matched_date, matched_time, verdict, created_at)
+        VALUES (?, 4, 'I can do Thursday the 27th at ten past nine.', 1,
+                '2026-08-27', '09:10', 'inside', ?)
+        """,
+        (attempt.lastrowid, stamp),
+    )
+    conn.commit()
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "2026-08-27" in page
+    assert "09:10" in page
+    assert "Thursday the 27th at ten past nine" in page
+    assert "not an appointment this board holds" in page
+
+
+def test_an_offer_the_envelope_refused_is_not_shown_as_a_booking(conn, client):
+    """Only the Binding Acceptance. An offer nobody accepted booked nothing."""
+    item_id = add_item(conn, wants_seen="yes")
+    client.post(f"/review-items/{item_id}/release", json=envelope())
+    release_id = conn.execute("SELECT id FROM release").fetchone()["id"]
+    stamp = db.now_iso()
+    attempt = conn.execute(
+        """
+        INSERT INTO call_attempt
+            (appointment_id, kind, idempotency_key, state, created_at, updated_at)
+        VALUES (1, 'rebooking', ?, 'terminal_verified', ?, ?)
+        """,
+        (f"rebooking:{release_id}", stamp, stamp),
+    )
+    conn.execute(
+        """
+        INSERT INTO rebooking_offer
+            (call_attempt_id, turn_index, spoken_text, accepted,
+             matched_date, matched_time, verdict, created_at)
+        VALUES (?, 4, 'We could do the fifteenth of September.', 0,
+                '2026-09-15', '11:00', 'outside', ?)
+        """,
+        (attempt.lastrowid, stamp),
+    )
+    conn.commit()
+
+    page = client.get(f"/?open={item_id}").text
+
+    assert "2026-09-15" not in page
+    assert "Reception offered" not in page
 
 
 def test_a_red_flagged_item_cannot_be_released_for_a_rebooking_call(conn, client):
