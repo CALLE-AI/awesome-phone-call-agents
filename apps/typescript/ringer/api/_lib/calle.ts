@@ -101,11 +101,9 @@ export async function createCalleCall(
   return { id: call.id }
 }
 
-/** Derive the signed-webhook URL for this deployment, when configured. */
-export function deriveWebhookUrl(host?: string): string | undefined {
-  if (process.env.CALLE_WEBHOOK_URL) return process.env.CALLE_WEBHOOK_URL
-  if (process.env.CALLE_WEBHOOK_SECRET && host) return `https://${host}/api/webhook`
-  return undefined
+/** Return the explicitly configured current unsigned-webhook URL. */
+export function deriveWebhookUrl(): string | undefined {
+  return process.env.CALLE_WEBHOOK_URL?.trim() || undefined
 }
 
 /**

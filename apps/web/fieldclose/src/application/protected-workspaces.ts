@@ -268,7 +268,7 @@ function requireLiveSettingConfirmation(
   }
 }
 
-function publicWorkspaceView(workspaceRecord: {
+function publicWorkspaceView(workspaceValue: {
   id: string;
   slug: string;
   displayName: string;
@@ -277,11 +277,11 @@ function publicWorkspaceView(workspaceRecord: {
   liveCallsAllowed: boolean;
 }) {
   return {
-    id: workspaceRecord.id,
-    slug: workspaceRecord.slug,
-    displayName: workspaceRecord.displayName,
-    kind: workspaceRecord.kind,
-    provider: workspaceRecord.provider,
-    liveCallsAllowed: workspaceRecord.liveCallsAllowed,
+    id: workspaceValue.id,
+    slug: workspaceValue.slug,
+    displayName: workspaceValue.displayName,
+    kind: workspaceValue.kind,
+    provider: workspaceValue.provider,
+    liveCallsAllowed: workspaceValue.liveCallsAllowed,
   };
 }

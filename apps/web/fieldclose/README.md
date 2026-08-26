@@ -18,25 +18,21 @@ protected-workspace operator UI, allow-listed protected-workspace provisioning
 with immutable administration evidence, and the durable, role-gated
 human-disposition closure through its browser and audit evidence.
 
-The fake-only judge environment is deployed at
-<https://fieldclose.dramaforge.icu/>. On 2026-08-06, one explicitly authorized
-CALL-E attempt was completed from a local protected workspace. CALL-E accepted
-and completed one provider task, but the call reached a Sonetel free-trial
-forwarding announcement instead of the intended participant. FieldClose kept
-all three HVAC answers as `not_asked`, routed the case to `human_follow_up` and
-`contact_review`, and required the operator to record the final
-`manual_follow_up_handoff`. The redacted private evidence records one attempt,
-one provider creation, one result, one disposition, and no retry or duplicate
-creation.
+The fake-only judge environment is available at
+<https://fieldclose.dramaforge.icu/>. Its publicly reviewable path is permanently
+fake-only and contains no CALL-E credential.
 
-That run verifies the live provider boundary, conservative normalization,
-idempotent creation, and human decision boundary. It does not verify a
-successful participant conversation or an isolated protected-staging
-deployment. Inspectable staging isolation, production authentication, and
-deployed CALL-E/SMTP evidence remain pending. The global live-call kill switch
-is paused and workspace live permission is disabled after the test. End-to-end
-deployed authentication-email delivery, GitHub OAuth, and general
-role-management UI are not claimed.
+This tree also describes maintainer-reported, redacted operational observations
+from one explicitly authorized local CALL-E attempt and a protected staging
+environment. Those private observations are not independently accessible and
+are not offered as public source, build, deployment, or validation provenance.
+They report one provider creation, conservative handling of a structured-result
+discrepancy, one human disposition, no retry, and a paused live-call gate after
+the test. They do not establish accurate structured capture of the participant's
+answers. The only public source provenance for this contribution is the
+`apps/web/fieldclose/` tree in this repository and its visible pull-request and
+CI history. Hosted Resend delivery, GitHub OAuth, and a general role-management
+UI are not claimed.
 
 ## Competition focus
 
@@ -226,15 +222,15 @@ credentials. All deployed authentication modes require a high-entropy
 The human-owned functional loop is complete: an authorized operator can persist
 a bounded disposition, resolve or cancel the human task, produce the final
 FieldClose case state, and audit the decision without mutating an external work
-order. The fake-only judge environment is deployed; protected-staging
-deployment, isolation, and production-authentication evidence remain pending.
-A redacted local evidence set now records one authorized CALL-E attempt with a
-contact exception and the resulting human disposition. The upstream
-contribution is open for review as
-[`apps/web/fieldclose/` PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96).
-Remaining submission gates are protected-staging verification, a stable
-sub-three-minute golden path, final upstream review fixes, and Devpost
-packaging. See the
+order. The fake-only judge environment is available for public review. Private
+staging and live-attempt observations are intentionally qualified as
+maintainer-reported operational evidence rather than public deployment
+provenance. The upstream
+[`apps/web/fieldclose/` PR #96](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/96)
+was merged on 2026-08-10, and
+[PR #222](https://github.com/CALLE-AI/awesome-phone-call-agents/pull/222)
+contains the focused reviewer-release update. Remaining submission gates are
+tracked in the
 [Hackathon submission plan](docs/hackathon-submission-plan.md) for status and
 acceptance gates. Submission-only drafts are kept under the local `submission/`
 directory and are ignored by Git.

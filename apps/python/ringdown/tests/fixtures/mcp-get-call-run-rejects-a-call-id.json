@@ -1,0 +1,19 @@
+{
+  "what": "get_call_run called with the argument name Ringdown used to send, call_id",
+  "source": "shape observed against the live MCP endpoint on 2026-08-20, for a call placed over REST. The identifier the tool quotes back was written for this repository; the surrounding text is the validation library's own, which is the finding",
+  "unobserved": "nothing elided; this is the whole JSON-RPC envelope, down to the call id quoted back inside the validation error, which is a fictional identifier here",
+  "why_it_matters": "the tool takes run_id and rejects call_id outright, so the request Ringdown sent could never have been answered. It arrives as HTTP 200 with result.isError true and no JSON-RPC error key, so a parser that only looks for an error envelope reads it as a successful result",
+  "payload": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "2 validation errors for call[get_call_run]\nrun_id\n  Missing required argument [type=missing_argument, input_value={'call_id': 'call_example_declined'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing_argument\ncall_id\n  Unexpected keyword argument [type=unexpected_keyword_argument, input_value='call_example_declined', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/unexpected_keyword_argument"
+        }
+      ],
+      "isError": true
+    }
+  }
+}
