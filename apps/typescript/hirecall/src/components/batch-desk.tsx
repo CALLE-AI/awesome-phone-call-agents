@@ -174,7 +174,7 @@ export function BatchDesk() {
   async function setActive(active: boolean) {
     const message = active
       ? "Restore this Excel batch to the active roster?"
-      : "Deactivate this Excel? It moves to Inactive and can be restored.";
+      : "Deactivate this Excel? It moves to Inactive and can be restored. HireCall will not start the next call. A call that is already ringing may keep ringing.";
     if (!confirm(message)) return;
     setBusy(true);
     setError("");

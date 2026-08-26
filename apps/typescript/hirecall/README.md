@@ -87,9 +87,19 @@ Copy `.env.example` to `.env`. Keys stay on the server. Do not commit `.env`. Se
 
 There is **no recurring scheduler**. Nothing runs unattended.
 
-**Deactivate** (or **Deactivate all**) is a soft delete: `active = 0`. Restore from **Inactive** on the dashboard or **Restore Excel** on the batch page. Deactivating a batch stops the desk from queuing or dialing more people in that Excel. Polling only runs while the batch page is open.
+**Deactivate** (or **Deactivate all**) is a soft delete: `active = 0`. Restore from **Inactive** on the dashboard or **Restore Excel** on the batch page. Polling only runs while the batch page is open.
 
-Once a live CALL-E call has started, HireCall cannot cancel the phone-network side effect. Stop clicking Call, deactivate the batch, and use CALL-E's own controls if you need to intervene.
+Deactivate stops HireCall from **starting the next** call in that Excel. It does **not** hang up a call that CALL-E already started. That phone may keep ringing.
+
+HireCall has no hang-up or cancel API. The CALL-E SDK does not expose one.
+
+To try to stop a live ringing call:
+
+1. Open the CALL-E dashboard: https://dashboard.heycall-e.com
+2. Copy the **CALL-E id** from Screening for that person.
+3. Look that id up in the dashboard. Use a stop control there if CALL-E offers one. If they do not, the call may run until it ends on its own.
+
+In **dry-run**, Call never reaches the phone network, so there is nothing to cancel there.
 
 If CALL-E create or poll does not clearly succeed or fail (timeout, 5xx, network), HireCall leaves that person queued or calling and **does not** mark them failed or dial the next number. A definite CALL-E rejection (4xx) can mark that row failed; the rest of the queue still waits until you click Call or Call ready.
 

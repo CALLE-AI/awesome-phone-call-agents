@@ -88,7 +88,7 @@ export function Dashboard() {
   }
 
   async function clearRoster() {
-    if (!confirm("Deactivate every Excel batch? They move to Inactive and can be restored.")) {
+    if (!confirm("Deactivate every Excel batch? They move to Inactive and can be restored. HireCall will not start the next call. A call that is already ringing may keep ringing.")) {
       return;
     }
     setBusy(true);

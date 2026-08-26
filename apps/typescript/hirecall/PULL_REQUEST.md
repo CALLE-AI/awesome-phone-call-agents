@@ -43,7 +43,7 @@ Setup for a judge is in `apps/typescript/hirecall/README.md`: copy `.env.example
 - Samples use reserved fictional NANP numbers (`+14155550123`, `+14155550124`, `+14155550125`). Judge test stores the number the reviewer types and dials it only when live calls are on.
 - `CALLE_BASE_URL` defaults to and accepts only `https://api.heycall-e.com`. The production `CALLE_API_KEY` is not sent to loopback or any other host.
 - Resume fetch is public HTTPS only. Private, loopback, and insecure URLs are blocked; each redirect hop is revalidated.
-- Deactivate is a soft delete (`active = 0`). Restore from Inactive. No scheduler daemon; the desk only polls while the batch page is open. Deactivating a batch stops further queueing and dialing in that Excel.
+- Deactivate is a soft delete (`active = 0`). Restore from Inactive. No scheduler daemon; the desk only polls while the batch page is open. Deactivate stops HireCall from starting the next call in that Excel. A call CALL-E already started keeps ringing; HireCall cannot hang it up. To try to stop it, use the CALL-E dashboard (https://dashboard.heycall-e.com) with the CALL-E id from Screening. In dry-run there is nothing to cancel on the phone network.
 - If CALL-E create or poll is unclear, the queue stops. HireCall does not mark that person failed and does not auto-dial the next number.
 - Screening answers are used only when the CALL-E result matches this candidate’s task, phone, and metadata and the call completed. Gemini may score 0–10. Next round and Rejected are saved only when the recruiter clicks.
 - The CALL-E idempotency key is hashed from the full create payload (script, phone, schema, metadata, attempt), not from batch/candidate/attempt alone.
