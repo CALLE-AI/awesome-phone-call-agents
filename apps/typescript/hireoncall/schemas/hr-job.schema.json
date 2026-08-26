@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HireOnCall Call 1 — HR job profile",
+  "description": "Structured result CALL-E must return after the hiring-manager call. Skill chips in the HR portal are this list — they become Call 2 questions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "roleName",
+    "mustHaveSkills",
+    "niceToHaveSkills",
+    "experienceMinYears",
+    "experienceMaxYears",
+    "workMode",
+    "interviewSlots",
+    "jdSummary"
+  ],
+  "properties": {
+    "roleName": {
+      "type": "string",
+      "description": "Job title as the hiring manager said it, e.g. Laravel Developer."
+    },
+    "mustHaveSkills": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "3–6 must-have skills spoken on the call. Do not invent skills."
+    },
+    "niceToHaveSkills": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "experienceMinYears": { "type": "number", "minimum": 0 },
+    "experienceMaxYears": { "type": "number", "minimum": 0 },
+    "workMode": { "type": "string", "enum": ["remote", "hybrid", "onsite"] },
+    "budget": {
+      "type": "string",
+      "description": "Optional CTC / budget band. Empty string if not given."
+    },
+    "interviewSlots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Screening slots the hiring manager can offer."
+    },
+    "jdSummary": {
+      "type": "string",
+      "description": "2–4 sentence JD written from what they said, not a generic template."
+    }
+  }
+}

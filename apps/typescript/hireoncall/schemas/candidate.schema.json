@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HireOnCall Call 2 — candidate apply-on-call",
+  "description": "Structured result CALL-E must return after the employee call. skillAnswers must cover the HR must-have list from Call 1 — never a hardcoded PHP question.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fullName",
+    "currentRole",
+    "yearsExperience",
+    "projectsStack",
+    "noticePeriod",
+    "expectedCtc",
+    "availability",
+    "skillAnswers"
+  ],
+  "properties": {
+    "fullName": { "type": "string" },
+    "currentRole": { "type": "string" },
+    "yearsExperience": { "type": "number", "minimum": 0 },
+    "projectsStack": {
+      "type": "string",
+      "description": "Projects and stack to put on the one-page voice resume."
+    },
+    "noticePeriod": { "type": "string" },
+    "expectedCtc": { "type": "string" },
+    "availability": { "type": "string" },
+    "skillAnswers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["skill", "claimed", "evidence", "rating"],
+        "properties": {
+          "skill": {
+            "type": "string",
+            "description": "Must match an HR must-have skill from Call 1."
+          },
+          "claimed": { "type": "boolean" },
+          "years": { "type": "number", "minimum": 0 },
+          "evidence": {
+            "type": "string",
+            "description": "One concrete example they spoke."
+          },
+          "rating": {
+            "type": "string",
+            "enum": ["none", "basic", "working", "expert"]
+          }
+        }
+      }
+    }
+  }
+}

@@ -149,11 +149,13 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
+- [HireOnCall](https://hireoncall.vercel.app) - Closed-loop hiring: one CALL-E call captures the JD from HR, a second call asks the candidate those same skills, and structured results fill the scoreboard without a form.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
 | App | Language | Purpose |
 | --- | --- | --- |
+| [`apps/typescript/hireoncall`](apps/typescript/hireoncall/) | TypeScript | Closed-loop hiring scoreboard: HR call captures the JD, employee call asks those skills, structured results file the application. Rehearsal replay is the no-call default; live `@call-e/calle` createAndWait is opt-in. |
 | [`apps/typescript/asyncfounders`](apps/typescript/asyncfounders/) | TypeScript | Callback-first persistent team memory: consented CALL-E interviews capture updates, brief unseen company deltas, and resolve open questions into evidence-linked typed memory. |
 | [`apps/typescript/one-more-story`](apps/typescript/one-more-story/) | TypeScript | Consent-first oral-history call that discloses AI use, preserves the storyteller's correction, and creates no story until the corrected read-back is explicitly confirmed. |
 | [`apps/web/callproof`](apps/web/callproof/) | Ruby / Python | Closed-loop CALL-E workflow that checks transcript evidence against an immutable call contract and routes policy exceptions to persisted AgentKit human review. |
