@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "rea
 import { DEMO_CALL_PROMPT, DEMO_JOB_ROLE, DEMO_NAME, DEMO_RESUME_TEXT } from "@/lib/demo-candidate";
 import { formatUploadedAt, shortBatchId } from "@/lib/status";
 import type { Batch } from "@/lib/types";
-import { ApiError, hirecallApi } from "@/services/hirecall-api";
+import { ApiError, clearOperatorToken, getOperatorToken, hirecallApi, setOperatorToken } from "@/services/hirecall-api";
 
 export function Dashboard() {
   const router = useRouter();
@@ -19,6 +19,8 @@ export function Dashboard() {
   const [notice, setNotice] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [liveCallsEnabled, setLiveCallsEnabled] = useState<boolean | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [tokenInput, setTokenInput] = useState("");
 
   const load = useCallback(async () => {
     const data = await hirecallApi.listRoster();
@@ -28,10 +30,27 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    setUnlocked(Boolean(getOperatorToken()));
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     load()
-      .catch(() => setError("Could not load the roster."))
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 401) {
+          clearOperatorToken();
+          setUnlocked(false);
+          setError("That operator token is wrong. Check HIRECALL_OPERATOR_TOKEN in .env.");
+          return;
+        }
+        setError("Could not load the roster.");
+      })
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [unlocked, load]);
 
   const stats = useMemo(() => {
     return {
@@ -55,6 +74,7 @@ export function Dashboard() {
         `${data.imported} candidate(s) saved as a new Excel batch. Open that row to call them.${extra}`,
       );
     } catch (err) {
+      if (rejectIfUnauthorized(err)) return;
       setError(err instanceof ApiError ? err.message : "Upload failed. Try again.");
     } finally {
       setBusy(false);
@@ -79,6 +99,7 @@ export function Dashboard() {
       setInactiveBatches(data.inactiveBatches);
       setNotice("Active batches moved to Inactive.");
     } catch (err) {
+      if (rejectIfUnauthorized(err)) return;
       setError(err instanceof ApiError ? err.message : "Could not clear the roster.");
     } finally {
       setBusy(false);
@@ -93,10 +114,40 @@ export function Dashboard() {
       await load();
       setNotice("Excel restored to the active roster.");
     } catch (err) {
+      if (rejectIfUnauthorized(err)) return;
       setError(err instanceof ApiError ? err.message : "Could not restore that Excel.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function unlockDesk() {
+    const token = tokenInput.trim();
+    if (!token) {
+      setError("Enter the operator token from HIRECALL_OPERATOR_TOKEN in .env.");
+      return;
+    }
+    setError("");
+    setOperatorToken(token);
+    setUnlocked(true);
+  }
+
+  function lockDesk() {
+    clearOperatorToken();
+    setUnlocked(false);
+    setBatches([]);
+    setInactiveBatches([]);
+    setLiveCallsEnabled(null);
+    setNotice("");
+  }
+
+  function rejectIfUnauthorized(err: unknown) {
+    if (err instanceof ApiError && err.status === 401) {
+      lockDesk();
+      setError("That operator token is wrong. Check HIRECALL_OPERATOR_TOKEN in .env.");
+      return true;
+    }
+    return false;
   }
 
   return (
@@ -115,11 +166,58 @@ export function Dashboard() {
               candidate or re-upload a corrected file into that same batch.
             </p>
           </div>
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-paper shadow-[var(--shadow)] md:h-20 md:w-20">
-            <span className="font-display text-3xl md:text-4xl">H</span>
+          <div className="flex items-center gap-3">
+            {unlocked ? (
+              <button
+                type="button"
+                onClick={lockDesk}
+                className="rounded-full border border-line bg-paper px-4 py-2 text-sm font-medium text-ink"
+              >
+                Sign out
+              </button>
+            ) : null}
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-paper shadow-[var(--shadow)] md:h-20 md:w-20">
+              <span className="font-display text-3xl md:text-4xl">H</span>
+            </div>
           </div>
         </header>
 
+        {!unlocked ? (
+          <section className="max-w-lg rounded-[28px] border border-line bg-paper p-6 shadow-[var(--shadow)]">
+            <h2 className="font-display text-2xl text-ink">Enter operator token</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Paste the same value as <span className="font-medium text-ink">HIRECALL_OPERATOR_TOKEN</span>{" "}
+              in <span className="font-medium text-ink">.env</span>. The desk stores it in this
+              browser tab only. Without it, the APIs will not list candidates or place calls.
+            </p>
+            <form
+              className="mt-4 flex flex-col gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                unlockDesk();
+              }}
+            >
+              <input
+                type="password"
+                autoComplete="off"
+                value={tokenInput}
+                onChange={(event) => setTokenInput(event.target.value)}
+                placeholder="Operator token"
+                className="rounded-2xl border border-line bg-wash px-4 py-3 text-sm text-ink"
+              />
+              <button
+                type="submit"
+                className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-paper"
+              >
+                Unlock desk
+              </button>
+            </form>
+            {error ? <p className="mt-3 text-sm text-rose-800">{error}</p> : null}
+          </section>
+        ) : null}
+
+        {unlocked ? (
+          <>
         {liveCallsEnabled === false ? (
           <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
             Live calls are off. Clicking Call completes a local dry-run and does not
@@ -258,6 +356,10 @@ export function Dashboard() {
           onBusy={setBusy}
           onError={setError}
           onNotice={setNotice}
+          onUnauthorized={() => {
+            lockDesk();
+            setError("That operator token is wrong. Check HIRECALL_OPERATOR_TOKEN in .env.");
+          }}
           onCreated={(batchId) => router.push(`/batches/${batchId}`)}
         />
 
@@ -383,6 +485,8 @@ export function Dashboard() {
             </div>
           </section>
         ) : null}
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -393,12 +497,14 @@ function JudgeTestForm({
   onBusy,
   onError,
   onNotice,
+  onUnauthorized,
   onCreated,
 }: {
   busy: boolean;
   onBusy: (value: boolean) => void;
   onError: (value: string) => void;
   onNotice: (value: string) => void;
+  onUnauthorized: () => void;
   onCreated: (batchId: string) => void;
 }) {
   const [name, setName] = useState(DEMO_NAME);
@@ -419,6 +525,10 @@ function JudgeTestForm({
       onNotice("Judge test batch ready. Call that row — resume and script are already filled.");
       onCreated(data.batch.id);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        onUnauthorized();
+        return;
+      }
       onError(err instanceof ApiError ? err.message : "Could not create the judge test.");
     } finally {
       onBusy(false);

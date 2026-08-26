@@ -22,6 +22,7 @@ Put these values in `.env` (never commit this file).
 
 | Key | Default | Needed for |
 | --- | --- | --- |
+| `HIRECALL_OPERATOR_TOKEN` | empty (APIs return 401) | Unlock the desk. Enter the same value on the home page. Without it, candidate and call APIs refuse anonymous requests. |
 | `HIRECALL_LIVE_CALLS` | `false` (no-call dry-run) | Set `true` only to place a real CALL-E call, including Judge test. |
 | `CALLE_API_KEY` | empty | Live phone call when live calls are on. |
 | `GEMINI_API_KEY` | empty | After hangup (or dry-run complete), Gemini writes 0–10 and the summary. The fake Judge test script is already saved, so Gemini is not used to write the prompt. |
@@ -32,7 +33,7 @@ Restart after editing `.env`:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Enter the operator token from `.env` before the roster loads.
 
 ### How Judge test works
 
@@ -80,7 +81,7 @@ Optional: `consent` (`yes` / `no`), `resume_link` (Drive or HTTP; file stays on 
 
 ## Credentials
 
-Copy `.env.example` to `.env`. Keys stay on the server. Do not commit `.env`.
+Copy `.env.example` to `.env`. Keys stay on the server. Do not commit `.env`. Set `HIRECALL_OPERATOR_TOKEN` and type that same value on the home page. APIs return 401 without it.
 
 ## Cancellation
 

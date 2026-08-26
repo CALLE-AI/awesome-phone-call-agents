@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { CALL_COPY, DECISION_COPY, STATUS_COPY, canPlaceCall, formatCallClock, formatCallDuration, formatUploadedAt, isInFlightCall, isQueueBusy, queueActivity, rosterStatus, shortBatchId, shortCalleId, type QueueActivity } from "@/lib/status";
 import { DEFAULT_SCORE_CONFIG, SCORE_CRITERIA_OPTIONS, decisionFromScore, scoreCriteriaLines, type ScoreConfig } from "@/lib/score-config";
 import type { Batch, Candidate, RecruiterDecision } from "@/lib/types";
-import { ApiError, hirecallApi } from "@/services/hirecall-api";
+import { ApiError, clearOperatorToken, hirecallApi } from "@/services/hirecall-api";
 
 export function BatchDesk() {
   const params = useParams<{ id: string }>();
@@ -28,6 +28,18 @@ export function BatchDesk() {
   const [agentDismissed, setAgentDismissed] = useState("");
   const [liveCallsEnabled, setLiveCallsEnabled] = useState<boolean | null>(null);
 
+  const sendHomeIfUnauthorized = useCallback(
+    (err: unknown) => {
+      if (err instanceof ApiError && err.status === 401) {
+        clearOperatorToken();
+        router.push("/");
+        return true;
+      }
+      return false;
+    },
+    [router],
+  );
+
   const load = useCallback(async () => {
     const data = await hirecallApi.getBatch(batchId);
     setBatch(data.batch);
@@ -40,10 +52,11 @@ export function BatchDesk() {
   useEffect(() => {
     load()
       .catch((err: unknown) => {
+        if (sendHomeIfUnauthorized(err)) return;
         setError(err instanceof Error ? err.message : "Could not load this Excel batch.");
       })
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [load, sendHomeIfUnauthorized]);
 
   useEffect(() => {
     if (!batch || criteriaPrompted) return;
@@ -58,10 +71,12 @@ export function BatchDesk() {
   useEffect(() => {
     if (!queueBusy) return;
     const timer = window.setInterval(() => {
-      void load().catch(() => undefined);
+      void load().catch((err: unknown) => {
+        if (sendHomeIfUnauthorized(err)) return;
+      });
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [queueBusy, load]);
+  }, [queueBusy, load, sendHomeIfUnauthorized]);
 
   function applyDetail(data: { batch?: Batch; candidates?: Candidate[] }) {
     if (data.batch) setBatch(data.batch);
@@ -89,6 +104,7 @@ export function BatchDesk() {
         );
       }
     } catch (err) {
+      if (sendHomeIfUnauthorized(err)) return;
       if (err instanceof ApiError) {
         applyDetail(err.payload as { batch?: Batch; candidates?: Candidate[] });
         setError(err.message);
@@ -124,6 +140,7 @@ export function BatchDesk() {
         );
       }
     } catch (err) {
+      if (sendHomeIfUnauthorized(err)) return;
       if (err instanceof ApiError) {
         applyDetail(err.payload as { batch?: Batch; candidates?: Candidate[] });
         setError(err.message);

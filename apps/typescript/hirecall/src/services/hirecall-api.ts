@@ -51,8 +51,30 @@ function errorMessage(body: Record<string, unknown>, fallback: string) {
   return typeof body.error === "string" && body.error ? body.error : fallback;
 }
 
+const OPERATOR_TOKEN_KEY = "hirecall-operator-token";
+
+export function getOperatorToken() {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(OPERATOR_TOKEN_KEY)?.trim() ?? "";
+}
+
+export function setOperatorToken(token: string) {
+  sessionStorage.setItem(OPERATOR_TOKEN_KEY, token.trim());
+}
+
+export function clearOperatorToken() {
+  sessionStorage.removeItem(OPERATOR_TOKEN_KEY);
+}
+
+function withAuth(init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers);
+  const token = getOperatorToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return { ...init, headers };
+}
+
 async function requestJson<T>(url: string, init?: RequestInit, fallback = "Request failed"): Promise<T> {
-  const response = await fetch(url, init);
+  const response = await fetch(url, withAuth(init));
   const body = await parseBody(response);
   if (!response.ok) {
     throw new ApiError(errorMessage(body, fallback), response.status, body);
