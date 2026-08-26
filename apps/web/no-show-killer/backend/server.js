@@ -75,10 +75,22 @@ function isAuthorizedDestination(phone) {
 // internally to actually place the call.
 function maskPhone(phone) {
   if (typeof phone !== "string") return phone;
-  const digits = phone.replace(/[^\d+]/g, "");
-  if (digits.length < 6) return "•".repeat(digits.length);
-  const prefixLen = digits.startsWith("+") ? 5 : 4;
-  return `${digits.slice(0, prefixLen)}••••${digits.slice(-4)}`;
+  const hasPlus = phone.trim().startsWith("+");
+  const digits = phone.replace(/\D/g, "");
+  const total = digits.length;
+  if (total === 0) return phone;
+  if (total <= 4) return "•".repeat(total);
+
+  // Reveal at most 3 digits on each side, and never so many that fewer than
+  // 3 digits are actually left masked in between. A fixed 4+4 reveal (the
+  // previous scheme) overlaps for the shortest accepted E.164 numbers -
+  // prefix and suffix can span the *entire* number, so what looks masked
+  // (dots included) actually still shows every digit.
+  const minMasked = 3;
+  const revealEach = Math.max(0, Math.min(3, Math.floor((total - minMasked) / 2)));
+  const prefix = digits.slice(0, revealEach);
+  const suffix = revealEach > 0 ? digits.slice(-revealEach) : "";
+  return `${hasPlus ? "+" : ""}${prefix}••••${suffix}`;
 }
 
 function toPublicAppointment(appt) {

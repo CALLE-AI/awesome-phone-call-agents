@@ -71,9 +71,11 @@ same shape a real call produces (status `COMPLETED`, a fake `run_id`, a
 `[DRY RUN]`-prefixed summary), so the rest of the app - status polling, the WebSocket
 updates, the dashboard, `appointments.json` - exercises its real code paths without
 spending a CALL-E credit or ringing anyone's phone. The backend logs
-`[dry-run] would call <number> - goal: "..."` for every simulated call, and
-`GET /api/health` reports the current `dryRun` value so the dashboard (or you, via
-curl) can tell at a glance.
+`[dry-run] would call <masked number> (goal set, not logged)` for every simulated
+call - the destination is masked and the goal text (which includes the patient's
+name and appointment details) is never printed at all - and `GET /api/health`
+reports the current `dryRun` value so the dashboard (or you, via curl) can tell at
+a glance.
 
 ### Going live
 
@@ -116,9 +118,9 @@ while one is already in flight.
 
 | To stop | Do this |
 | --- | --- |
-| All real calls, immediately | Set `DRY_RUN=true` (or unset it) and restart. No in-flight call is left orphaned, because nothing is queued beyond the one call already dialing. |
+| All *future* real calls | Set `DRY_RUN=true` (or unset it) and restart. This stops any *new* call from being dispatched going forward. It does **not** stop a call that's already been handed to CALL-E and is ringing/in progress at the moment you flip the flag - see the next row. Restarting the app has no effect on a call already placed with the provider; there's nothing on this app's side left to stop. |
 | The nightly cron | Set `CRON_ENABLED=false` and restart - the recurring job is skipped entirely, without touching code. The one-off `POST /api/confirm-tomorrow` and `POST /api/appointments/:id/confirm` endpoints keep working either way. Stopping the `npm start` process also stops it, since the schedule only runs while that process is alive. |
-| A call that's already ringing | Not possible from this app or the `calle` CLI - there is no cancel/hangup command exposed. This is why `triggerCall()`'s in-flight guard (above) is the only protection against a duplicate dial. |
+| A call that's already ringing | **Not possible, from this app, the `calle` CLI, or by restarting/killing the process.** There is no cancel/hangup command exposed, and the call exists on CALL-E's side independent of whether this app is even still running. This is why `triggerCall()`'s in-flight guard (above) is the only protection against a duplicate dial - prevention, not cancellation, since cancellation isn't available at all. |
 
 ## Credential handling
 
@@ -135,7 +137,7 @@ blank.
 | No unauthenticated access | Every route that reads appointment data or can trigger a call requires `Authorization: Bearer <API_TOKEN>`. The WebSocket requires a `{type:"auth",token}` message sent right after connecting, not a URL query param - a query string can end up in proxy/access logs and browser history. The server refuses to start at all without `API_TOKEN` set. |
 | Only authorized destinations get called | `ALLOWED_CALL_NUMBERS` is an explicit, comma-separated E.164 allowlist. Empty by default, so nothing is authorized until you configure it - appointment creation and call dispatch both reject anything not on the list. |
 | E.164 phone numbers | Appointments store `phone` in E.164; `phone-region.js` reads it to hint CALL-E's `region` parameter, it does not reformat or guess numbers. |
-| Phone numbers masked everywhere | Every API response, WebSocket broadcast, and the appointment-creation error path returns a masked number (`+1202••••0142`); the real number is only ever used internally to place the call. Provider-derived free text - activity messages, summaries, transcripts, error messages - is also scanned and redacted before persistence, since a transcript can restate the number in the body of the text even with the structured `phone` field masked. |
+| Phone numbers masked everywhere | Every API response, WebSocket broadcast, and the appointment-creation error path returns a masked number (`+1202••••0142`); the real number is only ever used internally to place the call. Provider-derived free text - activity messages, summaries, transcripts, error messages - is also scanned and redacted before persistence, since a transcript can restate the number in the body of the text even with the structured `phone` field masked. `maskPhone()` scales how much it reveals to the number's length, so the shortest accepted E.164 values never have their prefix and suffix overlap enough to reconstruct the full number. Dry-run mode masks the destination in its own log line and never logs the goal text at all. |
 | Masking numbers in samples | `data/appointments.json`'s sample appointment uses `+12025550142`, in the reserved NANP `555-01xx` fictional range. |
 | No credential exposure | See [Credential handling](#credential-handling) above. |
 | No duplicate jobs, race-safe | `triggerCall()` closes the gap between two near-simultaneous requests with an in-memory lock, and persists an unresolved `DISPATCHING` status *before* calling CALL-E - so a crash or an ambiguous response can't leave an attempt untracked and retryable into a duplicate dial. |

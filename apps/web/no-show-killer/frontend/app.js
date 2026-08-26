@@ -313,8 +313,8 @@ function connectWebSocket() {
         if (data.type === "appointment_update") {
           refresh();
         }
-      } catch (err) {
-        console.error("WebSocket message error:", err);
+      } catch {
+        // Malformed message from the server - nothing to recover, ignore it.
       }
     };
 
@@ -326,7 +326,6 @@ function connectWebSocket() {
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
         const delay = Math.min(5000 * reconnectAttempts, 30000);
-        console.log(`Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
         setTimeout(connectWebSocket, delay);
       } else if (!window.pollingInterval) {
         // Fallback to polling if WebSocket fails permanently
@@ -334,11 +333,12 @@ function connectWebSocket() {
       }
     };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    ws.onerror = () => {
+      // Swallow - onclose fires right after and drives reconnect/fallback.
     };
-  } catch (err) {
-    console.error("Failed to create WebSocket:", err);
+  } catch {
+    // WebSocket constructor threw (e.g. unsupported environment) - the
+    // 30s polling safety net in startIntervals() still covers updates.
   }
 }
 
@@ -347,7 +347,6 @@ async function refresh() {
     const appointments = await fetchAppointments();
     render(appointments);
   } catch (err) {
-    console.error("Failed to load appointments:", err);
     appointmentsEl.innerHTML = `
       <div class="error">
         <strong>⚠️ Couldn't load appointments</strong>
@@ -374,8 +373,7 @@ runBatchBtn.addEventListener("click", async () => {
     } else if (!response.ok) {
       throw new Error(`Backend returned ${response.status}`);
     } else {
-      const result = await response.json();
-      console.log("Batch call result:", result);
+      await response.json();
     }
   } catch (err) {
     alert(`Failed to start batch calls: ${err.message}`);

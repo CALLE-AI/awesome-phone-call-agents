@@ -31,11 +31,31 @@ const DEFAULT_TIMEOUT_SECONDS = process.env.CALLE_TIMEOUT_SECONDS || null;
 // real calls - see README "Go live with real calls".
 const DRY_RUN = process.env.DRY_RUN !== "false";
 
+// Mirrors maskPhone() in server.js - kept local since this module has no
+// dependency on server.js (it's the lower-level one). Non-overlapping: for
+// the shortest accepted E.164 numbers, a fixed-width reveal on each side can
+// span the entire number, leaving nothing actually hidden despite the dots.
+function maskPhone(phone) {
+  if (typeof phone !== "string") return phone;
+  const hasPlus = phone.trim().startsWith("+");
+  const digits = phone.replace(/\D/g, "");
+  const total = digits.length;
+  if (total === 0) return phone;
+  if (total <= 4) return "•".repeat(total);
+  const revealEach = Math.max(0, Math.min(3, Math.floor((total - 3) / 2)));
+  const prefix = digits.slice(0, revealEach);
+  const suffix = revealEach > 0 ? digits.slice(-revealEach) : "";
+  return `${hasPlus ? "+" : ""}${prefix}••••${suffix}`;
+}
+
 function fakeRunId() {
   return `dryrun_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function fakeStructuredContent(toPhone, goal) {
+// No destination or goal text embedded here, even masked - a real call's
+// activity messages (see the actual CALL-E responses this simulates) never
+// restate the appointment's PII either, they're generic status updates.
+function fakeStructuredContent() {
   return {
     status: "COMPLETED",
     activity: [
@@ -43,7 +63,7 @@ function fakeStructuredContent(toPhone, goal) {
         ts: new Date().toISOString(),
         level: "info",
         kind: "dry_run",
-        message: `[DRY RUN] Would call ${toPhone} with goal: "${goal}". No real call was placed.`,
+        message: "[DRY RUN] Simulated call completed. No real call was placed.",
         data: {},
       },
     ],
@@ -101,11 +121,11 @@ export function authStatus() {
 // vars when not passed explicitly, so you can tune them without code changes.
 export function startCall({ toPhone, goal, region, timeoutSeconds }) {
   if (DRY_RUN) {
-    console.log(`[dry-run] would call ${toPhone} - goal: "${goal}"`);
+    console.log(`[dry-run] would call ${maskPhone(toPhone)} (goal set, not logged)`);
     return Promise.resolve({
       ok: true,
       run_id: fakeRunId(),
-      status_result: { structuredContent: fakeStructuredContent(toPhone, goal) },
+      status_result: { structuredContent: fakeStructuredContent() },
     });
   }
 
@@ -129,7 +149,7 @@ export function callStatus({ runId }) {
   if (DRY_RUN || runId.startsWith("dryrun_")) {
     return Promise.resolve({
       ok: true,
-      result: { structuredContent: fakeStructuredContent("(dry run)", "(dry run)") },
+      result: { structuredContent: fakeStructuredContent() },
     });
   }
   return runCalle(["call", "status", "--run-id", runId]);
