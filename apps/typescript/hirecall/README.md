@@ -95,6 +95,8 @@ If CALL-E create or poll does not clearly succeed or fail (timeout, 5xx, network
 
 HireCall uses a screening result only when the CALL-E snapshot matches this candidate’s script, phone, and metadata and the call completed. Gemini may write a 0–10 score. **Next round** and **Rejected** are saved only when you click them.
 
+The CALL-E idempotency key is a hash of the full create payload (script, phone, schema, metadata including attempt). The same retry keeps the same key. A changed script or phone, or Call again, gets a new key.
+
 ## Dry-run / no-call
 
 **Dry-run is the default.** `HIRECALL_LIVE_CALLS` is not `true`, so Call does not create a CALL-E task and does not dial. It stores a completed local result with a `dry-run:` id.

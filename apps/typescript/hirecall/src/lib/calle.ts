@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { SCREENING_RESULT_SCHEMA } from "@/lib/call-result-schema";
 
 export const DEFAULT_CALLE_BASE_URL = "https://api.heycall-e.com";
@@ -213,12 +215,28 @@ export function calleRegionForPhone(phone: string): { region: string; locale: st
   return match ?? { region: "US", locale: "en-US" };
 }
 
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const item = value as Record<string, unknown>;
+    return `{${Object.keys(item)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(item[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function hirecallIdempotencyKey(payload: unknown) {
+  return `hirecall-${createHash("sha256").update(canonicalJson(payload)).digest("hex").slice(0, 40)}`;
+}
+
 export async function createCalleCall(input: {
   task: string;
   phone: string;
   batchId: string;
   candidateId: string;
-  idempotencyKey: string;
+  attempt: number;
 }): Promise<CalleSnapshot> {
   if (!liveCallsEnabled()) {
     return dryRunSnapshot(newDryRunCallId(input.candidateId), {
@@ -231,19 +249,19 @@ export async function createCalleCall(input: {
   try {
     const client = await sdkClient();
     const { region, locale } = calleRegionForPhone(input.phone);
-    return (await client.calls.create(
-      {
-        task: input.task,
-        recipients: [{ phones: [input.phone], region, locale }],
-        resultSchema: SCREENING_RESULT_SCHEMA as unknown as Record<string, unknown>,
-        metadata: {
-          skill: "hirecall",
-          batch_id: input.batchId,
-          candidate_id: input.candidateId,
-        },
+    const body = {
+      task: input.task,
+      recipients: [{ phones: [input.phone], region, locale }],
+      resultSchema: SCREENING_RESULT_SCHEMA as unknown as Record<string, unknown>,
+      metadata: {
+        skill: "hirecall",
+        batch_id: input.batchId,
+        candidate_id: input.candidateId,
+        attempt: input.attempt,
       },
-      { idempotencyKey: input.idempotencyKey },
-    )) as unknown as CalleSnapshot;
+    };
+    const idempotencyKey = hirecallIdempotencyKey(body);
+    return (await client.calls.create(body, { idempotencyKey })) as unknown as CalleSnapshot;
   } catch (error) {
     return rethrow(error);
   }

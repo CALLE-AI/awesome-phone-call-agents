@@ -106,7 +106,7 @@ async function dialCandidate(batchId: string, candidate: Candidate): Promise<Can
       phone: candidate.phone,
       batchId,
       candidateId: candidate.id,
-      idempotencyKey: `hirecall:${batchId}:${candidate.id}:${attempt}`,
+      attempt,
     });
     const expected = bindExpected(batchId, candidate);
     const status = progressStatus(snapshot, expected);
