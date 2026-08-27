@@ -30,9 +30,9 @@ def place(conn, provider, appointment_id: int) -> None:
     """One appointment, one line of output, whichever provider is in hand."""
     now = window.clock()
     if window.pinned():
-        # Never quietly. The Reading Window is the rule this appears to bend, and a
-        # line saying which clock refused or allowed a call is the difference between
-        # a test and a call nobody can account for.
+        # Never quietly. The due day is the rule this appears to bend, and a line
+        # saying which clock refused or allowed a call is the difference between a
+        # test and a call nobody can account for.
         print(f"{window.PINNED} is set: this call is judged against {now:%a %d %b %H:%M}.")
     try:
         review_item_id = checkin.run(conn, provider, appointment_id, now=now)

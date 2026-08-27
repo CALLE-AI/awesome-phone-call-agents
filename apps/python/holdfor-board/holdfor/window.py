@@ -4,8 +4,6 @@ import os
 from datetime import date, datetime, time, timedelta
 
 CHECKIN_DAY = 3
-OPENS = time(10, 0)
-CLOSES = time(16, 0)
 SATURDAY = 5
 
 
@@ -22,49 +20,29 @@ def due_date(seen_on: str) -> date:
     return due
 
 
-def open_at(now: datetime) -> bool:
-    """Whether a Reviewer will be there to read what this call brings back today.
-
-    The Reading Window is bound to human availability, not to what would suit the
-    Patient. 10:00 because before that she may still be getting up; 16:00 because
-    after that she is tired and the surgery is closing, so a flagged Review Item
-    would sit unread overnight. Weekends are excluded for the same reason.
-
-    Local time throughout. `db.now_iso()` is UTC because a stored timestamp has to
-    be comparable across three machines; this is a question about the hours a
-    person is at a desk, which is a local fact and nothing else.
-    """
-    if now.weekday() >= SATURDAY:
-        return False
-    return OPENS <= now.time() < CLOSES
-
-
-# The clock this process is told it is. Not an override of the Reading Window: the rule
-# stays 10:00 to 16:00 on a weekday and nothing here relaxes it. What this changes is
-# what time the app believes it is, which is the same lever `create_app(clock=...)` and
-# `start(now=...)` already hand a test — the docstrings above say so — and which was
-# reachable from nowhere else.
+# The clock this process is told it is. The same lever `create_app(clock=...)` and
+# `start(now=...)` already hand a test, reachable from outside the suite.
 #
-# The distinction matters because the window has no override on purpose: 16:00 exists
-# because a flagged Review Item after it sits unread overnight, and a switch that let
-# somebody call at 18:00 anyway would quietly delete the reason. A pinned clock cannot
-# be mistaken for the real one, because everything that reads it says so out loud — the
-# board carries a banner and the CLI prints a line. Whoever set it can see they set it,
-# and so can anybody watching a recording.
+# What it moves is the day. A Check-in Call goes out on day 3 and on no other day, so
+# the due list is the thing this changes: `HOLDFOR_NOW=2026-08-20T11:00` puts the app
+# on a date where somebody is due, which is what a recording made on the wrong afternoon
+# needs. A pinned clock cannot be mistaken for the real one, because everything that
+# reads it says so out loud — the board carries a banner and the CLI prints a line.
+# Whoever set it can see they set it, and so can anybody watching a recording.
 PINNED = "HOLDFOR_NOW"
 
 
 def pinned() -> datetime | None:
     """The time somebody has told this process it is, or nothing.
 
-    Accepts a full ISO datetime, or a bare `HH:MM` meaning that time today. The bare
-    form is the one worth reaching for: the due list is judged against this clock too,
-    so pinning a different date silently changes which Appointments come due, and
-    `HOLDFOR_NOW=11:00` moves the hour without touching the day.
+    Accepts a full ISO datetime, or a bare `HH:MM` meaning that time today. The full
+    form is the one worth reaching for: the due list is judged against this clock, so
+    the date is what decides whose call can go out, and `HOLDFOR_NOW=11:00` moves the
+    hour without touching the day.
 
     A value that cannot be read raises rather than falling back to the real clock. The
-    fallback would refuse a call for being outside the window while the setting meant
-    to open it sat there misspelt.
+    fallback would refuse a call for falling on the wrong day while the setting meant
+    to move it sat there misspelt.
     """
     raw = (os.environ.get(PINNED) or "").strip()
     if not raw:

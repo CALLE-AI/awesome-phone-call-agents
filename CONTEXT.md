@@ -82,12 +82,16 @@ The single fixed, human-authored sentence the agent reads when a Stop Condition
 fires. Never improvised, never varied by the model.
 _Avoid_: fallback, disclaimer, script
 
-**Reading Window**:
-The hours during which a flagged Review Item will be read by a Reviewer the same
-day. No Check-in Call is placed outside it. The schedule is bound to human
-availability, not to what would suit the Patient — a call nobody can catch the
-result of should not be made.
-_Avoid_: calling hours, business hours, schedule
+**Due Day**:
+The one day a Check-in Call may be placed: day 3 after the Appointment, stepped
+forward off a weekend. Day 3 because 48 to 72 hours is when a post-procedure
+problem actually shows. Any other day is a refusal, whatever the hour.
+
+There was a **Reading Window** beside this — weekdays, 10:00 to 16:00 — on the
+grounds that a flagged Review Item nobody reads until morning is worse than a
+call not placed. It was removed; the hour is now nobody's business but the
+Patient's. The Due Day is what remains of the rule.
+_Avoid_: calling hours, business hours, schedule, reading window
 
 **Carried Words**:
 The Patient's own verbatim quote that travels from the Check-in Call into the

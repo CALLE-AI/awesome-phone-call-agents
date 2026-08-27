@@ -31,7 +31,7 @@ def handed_over(monkeypatch):
     """Records which appointments the CLI hands to `checkin.run`.
 
     The CLI's job is choosing what to place and how many times. What happens
-    inside a placement — preflight, the Reading Window, the state machine — is
+    inside a placement — preflight, the due day, the state machine — is
     tested against `checkin.run` itself, so stubbing it here keeps these tests
     off the wall clock.
 

@@ -24,7 +24,7 @@ from .scan import RED_FLAG_REASONS, extract_carried_words, scan
 
 NO_CONSENT = "no_consent"
 DECLINED = "declined"
-OUTSIDE_READING_WINDOW = "outside_reading_window"
+NOT_DUE_TODAY = "not_due_today"
 
 PRACTICE_NAME = "Fieldgate Surgery"
 
@@ -166,23 +166,22 @@ def preflight(
     Nothing here touches the network, the provider, or the environment, which is
     what lets `run` call it above the point where any credential is loaded. A
     refusal is the expected path rather than an error condition: two of the twelve
-    seeded Patients withhold consent, and on most hours of most days the Reading
-    Window is shut. `run` raises `Refused` and the board answers 409.
+    seeded Patients withhold consent, and an Appointment is due on one day only.
+    `run` raises `Refused` and the board answers 409.
 
-    Consent is asked first because it is the only one of the three that is about
-    her rather than about us.
+    Consent is asked first because it is the only one of the two that is about her
+    rather than about us.
 
-    The two window checks return the same reason on purpose. A Reviewer reading
-    the board does not need to know whether the clock or the calendar refused —
-    both mean nobody would have read the result today, and a reason string that
-    split them would invite an attempt to satisfy one by adjusting the other.
+    There used to be a third check here, and it was about the hour: no call before
+    10:00 or after 16:00, and none at a weekend, on the grounds that a flagged
+    Review Item nobody reads until morning is worse than a call not placed. The
+    day still holds — `window.due_date` steps day 3 off a weekend — but the clock
+    does not, and nothing here reads it.
     """
     if not patient.consent_to_call:
         return NO_CONSENT
-    if not window.open_at(now):
-        return OUTSIDE_READING_WINDOW
     if now.date() != window.due_date(appointment.seen_on):
-        return OUTSIDE_READING_WINDOW
+        return NOT_DUE_TODAY
     return None
 
 
@@ -442,9 +441,9 @@ def start(
     rather than the length of a conversation. `finish` is what turns the attempt it
     hands back into a Review Item.
 
-    `now` is injected rather than read here so that a test can sit inside the
-    Reading Window without the suite passing or failing on the hour it is run at.
-    Local time: see `window.open_at`.
+    `now` is injected rather than read here so that a test can sit on the due day
+    without the suite passing or failing on the day it happens to be run.
+    Local time: `window.due_date` compares dates, and the day is a local fact.
     """
     now = now or datetime.now()
     appointment = db.appointment(conn, appointment_id)

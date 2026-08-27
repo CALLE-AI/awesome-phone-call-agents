@@ -35,15 +35,15 @@ the transcript, places the second call. See
 
 - An appointment happened, the practice operates this workflow, and the patient has
   recorded consent to be called.
-- It is inside the **Reading Window** — the hours when a flagged result will actually
-  be read by a human today. A call whose result nobody can read is not worth placing.
+- It is the patient's **Due Day** — day 3 after the appointment, stepped forward off a
+  weekend. One day, and the call is not placed on any other.
 - The patient is an adult with an existing care relationship with the practice.
 
 ## When not to use
 
 - No recorded consent. There is no fallback and no implied consent; the call is simply
   not placed.
-- Outside the Reading Window, including weekends. This is a refusal, not an error.
+- Any day but the Due Day, weekends included. This is a refusal, not an error.
 - The patient can use the online portal comfortably. Then "use the portal" is a
   complete answer and this call has no reason to exist.
 - Anything clinical is being asked of the agent. Read the **Safety Line** and stop.

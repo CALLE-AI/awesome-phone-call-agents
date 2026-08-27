@@ -813,9 +813,9 @@ def test_a_patient_without_consent_is_never_offered_as_due(conn, client):
 def test_placing_todays_checkins_twice_places_them_once(conn, db_path, now):
     """On the pinned clock, like everything else that places a call.
 
-    On the real one this passed only between 10:00 and 16:00 on a weekday: outside
-    the Reading Window nothing is placed and `placed` is 0. The window is the thing
-    under test elsewhere, not a condition for running the suite.
+    On the real one this passed only on the one day the seeded Appointments come
+    due, and `placed` was 0 on every other. The due day is the thing under test
+    elsewhere, not a condition for running the suite.
     """
     client = TestClient(create_app(db_path=db_path, clock=lambda: now))
     first = client.post("/checkins", headers={"content-type": "application/json"})
@@ -995,10 +995,10 @@ def test_the_patient_on_the_row_is_not_assumed_to_be_a_woman(conn, client):
 
 
 def test_a_pinned_clock_is_announced_on_the_board(db_path, monkeypatch):
-    """The Reading Window has no override, and this is not one: it tells the app what
-    time it is, which is the lever every test already uses. What it must never be is
-    quiet — the hour is the whole reason a call is allowed, so a board judged against
-    a made-up one says so where a reader, or a recording, cannot miss it."""
+    """It tells the app what time it is, which is the lever every test already uses.
+    What it must never be is quiet — the day is the whole reason a call is allowed, so
+    a board judged against a made-up clock says so where a reader, or a recording,
+    cannot miss it."""
     monkeypatch.setenv("HOLDFOR_NOW", "11:00")
     page = TestClient(create_app(db_path=db_path)).get("/").text
 

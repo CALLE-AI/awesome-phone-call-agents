@@ -37,14 +37,14 @@
 {% endif %}
 
 {% if pinned_clock %}
-{#- Loud on purpose. The Reading Window has no override; this is the app being told
-    what time it is, which is the same lever the tests use. It is still the one thing
+{#- Loud on purpose. This is the app being told what day it is, which is the same
+    lever the tests use, and which decides whose call may go out. It is the one thing
     on this page that is not true of the world, so it says so where nobody reading the
     board — or watching a recording of it — could miss it. #}
 <p class="banner pinned">
   <strong>The clock is pinned.</strong> This board is judged against
   <strong>{{ pinned_clock.strftime("%A %d %B, %H:%M") }}</strong>, not the real time.
-  Calls will be placed or refused by that clock. Unset <code>HOLDFOR_NOW</code> and
+  Whose call is due is decided by that clock. Unset <code>HOLDFOR_NOW</code> and
   restart to use the real one.
 </p>
 {% endif %}

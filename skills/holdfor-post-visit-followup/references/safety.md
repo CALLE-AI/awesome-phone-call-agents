@@ -18,9 +18,10 @@ choose to speak to a computer. She answered her phone. Everything follows from t
 - **One call per appointment.** `idempotency_key` is `UNIQUE` in the schema. An
   unknown submission outcome is reconciled by a human, never retried by code —
   redialling on ambiguity is how an 82-year-old gets rung twice by a machine.
-- **Never outside the Reading Window.** Weekdays, 10:00 to 16:00. A call placed when
-  nobody can read the result is a call that risks frightening someone with no one on
-  the other end of it.
+- **One day, not a range.** Day 3 after the appointment, stepped forward off a
+  weekend, and no call on any other day. There was an hours rule beside it — 10:00 to
+  16:00, so that a flagged result reached a human the same day — and it was removed.
+  What that guarantee protected now rests on a Reviewer watching the board.
 
 ## Never ask her for anything
 

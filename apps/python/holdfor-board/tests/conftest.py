@@ -69,12 +69,10 @@ def today():
 
 @pytest.fixture
 def now(today):
-    """A Thursday at 11:00 — inside the Reading Window, on the day the seeded
-    day-3 appointments come due.
+    """A Thursday at 11:00, on the day the seeded day-3 appointments come due.
 
-    Pinned so that the suite proves the Reading Window rather than depending on
-    it: with the real clock, every check-in test would pass only between 10:00
-    and 16:00 on one weekday of one week.
+    Pinned so the suite proves the due-day rule rather than depending on it: with
+    the real clock, every check-in test would pass only on one day of one week.
     """
     return datetime(today.year, today.month, today.day, 11, 0)
 

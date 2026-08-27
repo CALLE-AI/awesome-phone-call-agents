@@ -169,6 +169,11 @@ placed unless a Reviewer will be there to catch what comes back the same day.* A
 whose result nobody can read should not be made. Weekends are excluded for the same
 reason, and a day-3 date landing on a weekend shifts to the next weekday.
 
+> **Superseded.** The hours were removed to record the demonstration; day 3 and the
+> weekend shift are unchanged, so no call lands on a Saturday. What the Reading Window
+> guaranteed is not replaced by anything. See
+> [ADR 0013](../adr/0013-the-reading-window-is-removed.md).
+
 ### When she does not answer, and when she refuses
 
 One attempt. Never two — and the board records *which* of these happened, because they

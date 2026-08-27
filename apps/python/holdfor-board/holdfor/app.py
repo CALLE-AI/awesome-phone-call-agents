@@ -206,7 +206,7 @@ def create_app(
 ) -> FastAPI:
     """Build the board.
 
-    `clock` returns the local time the Reading Window is judged against. It is
+    `clock` returns the local time the due day is judged against. It is
     injected so a test can sit inside the window deliberately rather than pass or
     fail on the hour the suite happens to run at; nothing in production passes it.
 
@@ -680,9 +680,9 @@ def board_payload(
     ringing, unreconciled = unfinished(conn)
     return {
         # Said out loud because it is the one thing on this page that is not true of
-        # the world. A pinned clock is the price of testing outside the Reading Window
-        # and it must never be the quiet kind: whoever set it can see they set it, and
-        # so can anybody watching a recording of this screen.
+        # the world. A pinned clock is the price of demonstrating this on a day when
+        # nobody is due, and it must never be the quiet kind: whoever set it can see
+        # they set it, and so can anybody watching a recording of this screen.
         "pinned_clock": window.pinned(),
         # Whether pressing a button on this page spends one of twenty calls. The
         # board says so before it is pressed rather than after.

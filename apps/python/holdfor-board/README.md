@@ -12,7 +12,7 @@ runs offline with no credentials and places no phone call. Live calls are opt-in
 on the command line, and counted.
 
 Domain terms used here (Review Item, Release, Booking Envelope, Carried Words, Stop
-Condition, Read Scope, Reading Window) are defined in the repository's `CONTEXT.md` and
+Condition, Read Scope, Due Day) are defined in the repository's `CONTEXT.md` and
 are load-bearing. The skill that packages the workflow is
 [`skills/holdfor-post-visit-followup`](../../../skills/holdfor-post-visit-followup/).
 
@@ -65,7 +65,7 @@ by the file. `CALLE_LIVE` is the exception and is never read from it at all — 
 | `HOLDFOR_DB` | `holdfor.db` | Where state lives |
 | `HOLDFOR_BOOKING_LINE` | *(none)* | The practice's appointments line. No default on purpose |
 | `HOLDFOR_MY_HANDSET` | *(none)* | The handset at the board, so a row can be seen to be aimed at a phone in the room. Masked before it reaches the page |
-| `HOLDFOR_NOW` | *(real clock)* | What time the app believes it is. Not an override of the Reading Window |
+| `HOLDFOR_NOW` | *(real clock)* | What day and time the app believes it is. The due list is judged against it |
 | `HOLDFOR_REGION` / `HOLDFOR_LANGUAGE` | *(none)* | Passed to CALL-E when set. Never inferred from a phone number |
 | `HOLDFOR_TRANSCRIPTS` | `transcripts` | Where live transcripts are written |
 | `HOLDFOR_ROUTE` | *(none)* | Pin a fixture to an idempotency key, so a demo recording does not vary between takes |
@@ -75,17 +75,23 @@ by the file. `CALLE_LIVE` is the exception and is never read from it at all — 
 `.env.example` is tracked and holds only Ofcom-reserved fictional numbers. Real handsets
 go in `.env`, which is gitignored, and nowhere else.
 
-## The Reading Window
+## The Due Day
 
-Check-in calls are placed on weekdays between 10:00 and 16:00 local time, and there is
-no override. 16:00 exists because a flagged Review Item after it sits unread overnight:
-a call whose result nobody can read today is not worth placing. A refused call outside
-those hours is a refusal, not an error, and the board says so.
+A Check-in Call goes out on day 3 after the appointment and on no other day. Day 3
+because 48 to 72 hours is when a post-procedure problem actually shows, and the day
+steps forward off a weekend rather than back, so nobody is ever due on a Saturday. A
+call on any other day is a refusal, not an error, and the board says so.
 
-`HOLDFOR_NOW` sets the clock that rule is applied to, for testing outside those hours.
-It does not widen the rule. Everything that reads it says so out loud — the board
-carries a banner and the CLI prints a line — because the due list is judged against the
-same clock, so a whole date silently changes which appointments come due.
+There was an hours rule beside it — weekdays, 10:00 to 16:00, no override — so that a
+flagged Review Item reached a Reviewer the same day rather than sitting unread
+overnight. It has been removed: the hour is now the Patient's business and nobody
+else's. What it protected now rests on somebody watching the board. See
+[ADR 0013](../../../docs/adr/0013-the-reading-window-is-removed.md).
+
+`HOLDFOR_NOW` sets the clock the due day is judged against, so a recording can be made
+on an afternoon when nobody is actually due. Everything that reads it says so out loud
+— the board carries a banner and the CLI prints a line — because a pinned date silently
+changes which appointments come due.
 
 ## Live CALL-E calls
 
@@ -173,7 +179,7 @@ is a real person's sentences and must never be committed.
 ## Side effects
 
 - **Real outbound phone calls**, but only under `CALLE_LIVE=1`, only to one named
-  appointment at a time, and only inside the Reading Window with recorded consent.
+  appointment at a time, and only on that appointment's Due Day with recorded consent.
 - **Writes to one SQLite file** and one transcripts directory, both local.
 - **Sends transcript text to the Anthropic API**, but only when `ANTHROPIC_API_KEY` is
   set and `HOLDFOR_EXTRACT` is not `0`.
