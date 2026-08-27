@@ -16,6 +16,7 @@ from .core import (
     idempotency_key,
     rank_results,
 )
+from .web import serve_web
 
 
 def _print_json(data: Any) -> None:
@@ -161,6 +162,11 @@ def summarize(
     return 0
 
 
+def web(request_path: str, result_path: str, host: str, port: int) -> int:
+    serve_web(request_path, result_path, host=host, port=port)
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(
         prog="partline",
@@ -179,6 +185,19 @@ def parser() -> argparse.ArgumentParser:
     summarize_parser.add_argument("result")
     summarize_parser.add_argument("--request", help="Validate exact matches against the original request.")
     summarize_parser.add_argument("--json", action="store_true", help="Print machine-readable output.")
+    web_parser = commands.add_parser("web", help="Open the local evidence review console.")
+    web_parser.add_argument(
+        "--request",
+        default="fixtures/example-request.json",
+        help="Sourcing request used by the console.",
+    )
+    web_parser.add_argument(
+        "--result",
+        default="fixtures/completed-call.json",
+        help="Completed CALL-E result used by the console.",
+    )
+    web_parser.add_argument("--host", default="127.0.0.1", choices=("127.0.0.1", "localhost", "::1"))
+    web_parser.add_argument("--port", default=8787, type=int)
     return root
 
 
@@ -191,7 +210,9 @@ def main(argv: list[str] | None = None) -> int:
             return run_live(args.request, args.live, args.confirm, args.no_wait)
         if args.command == "summarize":
             return summarize(args.result, args.request, args.json)
-    except (PartLineError, CalleAPIError, OSError, json.JSONDecodeError) as exc:
+        if args.command == "web":
+            return web(args.request, args.result, args.host, args.port)
+    except (PartLineError, CalleAPIError, OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"PartLine refused: {exc}", file=sys.stderr)
         return 2
     return 1

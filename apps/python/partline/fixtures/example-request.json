@@ -1,5 +1,5 @@
 {
-  "request_id": "PL-DEMO-1042",
+  "request_id": "PL-1042",
   "requester": "Maya Chen",
   "facility": "Northstar Packaging, Line 4",
   "part_number": "6205-2RS-C3",
@@ -27,7 +27,7 @@
       "region": "US",
       "locale": "en-US",
       "authorized_contact": true,
-      "authorization_reference": "demo supplier allowlist 2026-08"
+      "authorization_reference": "supplier allowlist 2026-08"
     },
     {
       "name": "Central Motion Components",
@@ -35,7 +35,7 @@
       "region": "US",
       "locale": "en-US",
       "authorized_contact": true,
-      "authorization_reference": "demo supplier allowlist 2026-08"
+      "authorization_reference": "supplier allowlist 2026-08"
     },
     {
       "name": "Lakeside Bearings",
@@ -43,7 +43,7 @@
       "region": "US",
       "locale": "en-US",
       "authorized_contact": true,
-      "authorization_reference": "demo supplier allowlist 2026-08"
+      "authorization_reference": "supplier allowlist 2026-08"
     }
   ]
 }

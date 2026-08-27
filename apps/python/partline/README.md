@@ -29,7 +29,10 @@ pip install -e .
 
 partline preview fixtures/example-request.json
 partline summarize fixtures/completed-call.json --request fixtures/example-request.json
+partline web
 ```
+
+`partline web` opens the local evidence console at `http://127.0.0.1:8787`. It renders a masked call plan and completed supplier evidence from the included fixtures. The browser receives no API key or full phone number and it has no route that can place a call.
 
 The preview prints an approval token and the exact live command. To place real calls, set `CALLE_API_KEY`, run during the configured call window and explicitly approve the preview:
 
@@ -85,6 +88,7 @@ PartLine ranks exact matches first, then compatible matches. Ambiguous results n
 partline preview REQUEST.json
 partline run REQUEST.json --live --confirm TOKEN
 partline summarize CALL-E-RESULT.json --request REQUEST.json
+partline web --request REQUEST.json --result CALL-E-RESULT.json
 ```
 
 ## Tests
@@ -102,4 +106,4 @@ PartLine uses the CALL-E Developer API:
 - `result_schema` and `recipient_result_schema` constrain machine-actionable output
 - `Idempotency-Key` is derived from the approved request, not a retry attempt
 
-See `docs/DEMO.md` for a three-minute demo script.
+See `docs/WALKTHROUGH.md` for a concise product recording guide.

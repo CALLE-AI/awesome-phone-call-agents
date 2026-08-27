@@ -1,4 +1,4 @@
-# Three-minute demo
+# Three-minute product walkthrough
 
 ## 0:00 to 0:25, the problem
 
@@ -20,13 +20,13 @@ After replacing the fictional numbers with owned test numbers and obtaining appr
 
 ## 1:40 to 2:30, evidence-backed comparison
 
-For a deterministic recording, run:
+Open the local evidence console:
 
 ```bash
-partline summarize fixtures/completed-call.json --request fixtures/example-request.json
+partline web
 ```
 
-Show that the exact match ranks first. The alternate requires human follow-up and the email-only response remains unresolved. Highlight the short spoken evidence retained with each outcome.
+Show that the exact match ranks first. The alternate requires human follow-up and the email-only response remains unresolved. Inspect the masked call plan, then record a local buyer review to reinforce that evidence and purchase authority are separate.
 
 ## 2:30 to 3:00, impact
 
