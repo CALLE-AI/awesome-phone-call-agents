@@ -801,3 +801,51 @@ def test_the_run_id_is_bound_before_anything_waits_for_the_call(
 
     assert row["provider_run_id"]
     assert row["state"] == "accepted"
+
+
+# --- the button itself -------------------------------------------------------------
+
+
+def test_the_run_button_hands_the_board_back_while_the_call_is_still_going(
+    conn, db_path, released, line, tmp_path
+):
+    """What she was filming. The response used to be held open for the length of the
+    call, so the page she was looking at still had the Run button on it."""
+    from fastapi.testclient import TestClient
+
+    from holdfor.app import create_app
+
+    release_id = released["release_id"]
+    (tmp_path / "reception.json").write_text(
+        json.dumps(transcript([{"turn": 5, "time": "09:10", "accepted": True}])),
+        encoding="utf-8",
+    )
+    provider = StillOnThePhone(
+        fixtures_dir=tmp_path,
+        route={rebooking.idempotency_key(release_id): "reception.json"},
+    )
+    waited = []
+    client = TestClient(
+        create_app(db_path=db_path, provider=provider, background=waited.append),
+        follow_redirects=False,
+    )
+
+    pressed = client.post(f"/releases/{release_id}/run", data={})
+
+    assert pressed.status_code == 303
+    assert provider.dialled == ["+447700900500"]
+    assert waited, "the poll was not handed to the background"
+
+    # The board that lands has no Run button on it, and says a call is on the phone.
+    board = client.get("/")
+    assert "ringing" in board.text
+    assert f"/releases/{release_id}/run" not in board.text
+    assert 'http-equiv="refresh"' in board.text
+
+    # And pressing again, as she did, dials nothing.
+    again = client.post(f"/releases/{release_id}/run", data={})
+    assert again.status_code == 303
+    assert provider.dialled == ["+447700900500"]
+
+    provider.may_hang_up.set()
+    waited[0]()
