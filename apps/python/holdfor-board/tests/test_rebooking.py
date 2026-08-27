@@ -12,6 +12,7 @@ catch — see the postscript on docs/adr/0008.
 from __future__ import annotations
 
 import json
+import threading
 from datetime import date, time
 
 import pytest
@@ -687,3 +688,116 @@ def test_nothing_spoken_carries_punctuation_a_voice_cannot_read():
     the wrong place for a bracket."""
     for line in (rebooking.DIDNT_CATCH, rebooking.PASSING_BACK, rebooking.FIXED_LINE):
         assert not set(line) & set("—–()[]{}*_/")
+
+
+# --- pressing Run while the call is still going ------------------------------------
+
+
+class StillOnThePhone(FakeProvider):
+    """A provider that has not hung up yet when the second press lands.
+
+    The gap this holds open is the one every real call has and no test had: between
+    `place` returning a run id and `poll` returning a conversation.
+    """
+
+    live = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.answered = threading.Event()
+        self.may_hang_up = threading.Event()
+        self.dialled = []
+        self._lock = threading.Lock()
+
+    def place(self, req):
+        with self._lock:
+            self.dialled.append(req.to_e164)
+        return super().place(req)
+
+    def poll(self, run_id):
+        self.answered.set()
+        self.may_hang_up.wait(timeout=5)
+        return super().poll(run_id)
+
+
+def test_a_second_press_mid_call_never_dials_reception_again(
+    conn, db_path, released, line, tmp_path
+):
+    """The bug this file did not catch: the guard against a second dial read
+    `provider_run_id`, which was not written until the call had ended, so every press
+    between dialling and hanging up fell straight through it and rang the practice
+    again. The board held the response open for the length of the call, so a button
+    that appeared to do nothing was the whole invitation to press it again.
+    """
+    release_id = released["release_id"]
+    (tmp_path / "reception.json").write_text(
+        json.dumps(transcript([{"turn": 5, "time": "09:10", "accepted": True}])),
+        encoding="utf-8",
+    )
+    provider = StillOnThePhone(
+        fixtures_dir=tmp_path, route={rebooking.idempotency_key(release_id): "reception.json"}
+    )
+
+    def first_press():
+        own = db.connect(db_path)
+        try:
+            rebooking.run(own, provider, release_id)
+        finally:
+            own.close()
+
+    caller = threading.Thread(target=first_press, daemon=True)
+    caller.start()
+    assert provider.answered.wait(timeout=5), "the first call never reached the phone"
+
+    second = db.connect(db_path)
+    try:
+        outcome = rebooking.run(second, provider, release_id)
+    finally:
+        second.close()
+
+    provider.may_hang_up.set()
+    caller.join(timeout=5)
+
+    assert provider.dialled == ["+447700900500"]
+    assert outcome["placed"] is False
+    assert conn.execute("SELECT COUNT(*) n FROM live_call").fetchone()["n"] == 1
+
+
+def test_the_run_id_is_bound_before_anything_waits_for_the_call(
+    conn, db_path, released, line, tmp_path
+):
+    """A process killed mid-call must still leave a row naming a real run. Until this
+    ran, an interrupted Rebooking Call left a reserved row with no run id on it:
+    nothing to recover against, and indistinguishable from a call never placed."""
+    release_id = released["release_id"]
+    (tmp_path / "reception.json").write_text(
+        json.dumps(transcript([])), encoding="utf-8"
+    )
+    provider = StillOnThePhone(
+        fixtures_dir=tmp_path, route={rebooking.idempotency_key(release_id): "reception.json"}
+    )
+
+    def press():
+        own = db.connect(db_path)
+        try:
+            rebooking.run(own, provider, release_id)
+        finally:
+            own.close()
+
+    caller = threading.Thread(target=press, daemon=True)
+    caller.start()
+    assert provider.answered.wait(timeout=5)
+
+    reading = db.connect(db_path)
+    try:
+        row = reading.execute(
+            "SELECT state, provider_run_id FROM call_attempt WHERE kind = 'rebooking'"
+        ).fetchone()
+    finally:
+        reading.close()
+
+    provider.may_hang_up.set()
+    caller.join(timeout=5)
+
+    assert row["provider_run_id"]
+    assert row["state"] == "accepted"

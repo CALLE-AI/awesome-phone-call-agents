@@ -68,3 +68,30 @@ be re-entered rather than in the tail of a response.
 
 The cost is that a call which genuinely never rang cannot be retried by the board at all.
 A human rings instead, and the board says so.
+
+## Postscript — the guard read a column that was written too late
+
+Both halves of the amendment above were decided and only half implemented. The check-in
+path followed it; the Rebooking Call did not, and the gap was found by somebody trying to
+film the demo rather than by the suite.
+
+The second-press guard tested `provider_run_id`, which was written in the same statement
+that recorded the finished conversation. So it was null for the whole length of the call,
+and a press that landed while the agent was on the phone fell through the guard and
+dialled the practice again. `reserve()` returning an existing row on a second press —
+correct, and the thing that makes a second press harmless — is what removed the `UNIQUE`
+constraint's protection here, and `count_against_the_budget` uses `INSERT OR IGNORE`, so
+the budget stayed at one while the second call went out unrecorded.
+
+The response was also held open for the length of the call, which the amendment says it
+should not be. That is what made the defect reachable: the board sat there with the Run
+button still on it and nothing to show that a call had gone, so pressing it again was the
+only reasonable thing to do. The bug needed a person to trigger it and the interface
+asked them to.
+
+Two changes close it. The guard now tests whether an attempt exists at all, which is what
+the amendment always said. The run id is bound the moment the provider accepts, before
+anything waits on the call, so a process killed mid-call still leaves a row naming a real
+run for `calle call recover` — the old order left a reserved row with no run id, which is
+indistinguishable from a call that was never placed, and CALL-E offers no way to list
+runs or cancel one.

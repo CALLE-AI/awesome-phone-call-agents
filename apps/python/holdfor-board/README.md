@@ -47,6 +47,12 @@ item and placing its Rebooking Call are both done from the item's page — `POST
 places a Rebooking Call, because it is a human's act and it belongs behind a button that
 names them.
 
+Both buttons hand the page straight back and wait for the call behind it, so the board
+shows the call is out rather than a browser spinning. Pressing Run twice never rings
+twice: the attempt is reserved before the call is submitted and any later press answers
+with the first call. A call already placed cannot be cancelled from here — CALL-E has no
+hang-up and no way to list runs — so the attempt row is what names it afterwards.
+
 ## Settings
 
 Everything is an environment variable. `python -m holdfor <command>` reads `.env` at

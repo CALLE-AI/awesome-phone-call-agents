@@ -151,6 +151,19 @@ class Refused(Exception):
         self.reason = reason
 
 
+class AlreadyPlaced(Exception):
+    """This Release has spent its call. Carries what happened, and never dials.
+
+    Raised from the moment the attempt is reserved, not from the moment the call
+    finishes. The difference is the whole ticket: while a call was in flight this
+    module used to answer a second press by dialling the practice again.
+    """
+
+    def __init__(self, outcome: dict) -> None:
+        super().__init__(str(outcome.get("attempt_id")))
+        self.outcome = outcome
+
+
 def idempotency_key(release_id: int) -> str:
     return f"rebooking:{release_id}"
 
@@ -521,13 +534,11 @@ def status_for(
     return ReviewStatus.NEEDS_REVIEW
 
 
-def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
-    """Place the one call this Release granted, then read what happened.
+def start(conn: sqlite3.Connection, provider, release_id: int) -> int:
+    """Reserve this Release's one call and submit it. Returns the attempt in flight.
 
-    `followup_booked` is never written, whatever reception says. The board records that
-    she said she booked it, which is a fact about a phone call; whether an appointment
-    exists is a fact about the practice's own book, and not ours to claim.
-    See docs/adr/0001, amendment.
+    Nothing here waits for a conversation: it returns once the provider has named
+    the run, which is seconds. `finish` is what turns the attempt into an outcome.
     """
     row = release_row(conn, release_id)
     if row is None:
@@ -537,17 +548,23 @@ def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
     # `released`, so checking the status first would answer a second press with
     # "not released" about the very Release that placed the call. The honest answer to
     # pressing Run twice is what happened the first time.
+    #
+    # The existence of the attempt is the whole test. It used to also require a bound
+    # run id, which is written after the call ends, so every press between submitting
+    # and hanging up fell through this and dialled the practice again — and because a
+    # press held the browser open for the length of the call, pressing again is exactly
+    # what the board invited. See docs/adr/0006, amendment.
     key = idempotency_key(release_id)
     placed = existing_attempt(conn, key)
-    if placed is not None and placed["provider_run_id"]:
-        # Never a second dial. The way out of an uncertain submission is
-        # `calle call recover`, never a redial. See docs/adr/0006, amendment.
-        return {
-            "attempt_id": placed["id"],
-            "state": placed["state"],
-            "status": row["review_status"],
-            "placed": False,
-        }
+    if placed is not None:
+        raise AlreadyPlaced(
+            {
+                "attempt_id": placed["id"],
+                "state": placed["state"],
+                "status": row["review_status"],
+                "placed": False,
+            }
+        )
 
     if row["review_status"] != ReviewStatus.RELEASED.value:
         raise Refused(NOT_RELEASED)
@@ -572,17 +589,58 @@ def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
         idempotency_key=key,
     )
     run_id = provider.place(request)
+    bind(conn, attempt_id, run_id)
+    return attempt_id
+
+
+def bind(conn: sqlite3.Connection, attempt_id: int, run_id: str) -> None:
+    """Name the call the moment it is accepted, before anything waits on it.
+
+    A process that dies mid-poll then still leaves a row that names a real call, which
+    is what makes `calle call recover` possible. Until this ran, an interrupted
+    Rebooking Call left a reserved row with no run id on it: unfindable afterwards, and
+    indistinguishable from a call that was never placed at all.
+    """
+    conn.execute(
+        "UPDATE call_attempt SET provider_run_id = ?, state = ?, updated_at = ? WHERE id = ?",
+        (run_id, CallState.ACCEPTED.value, db.now_iso(), attempt_id),
+    )
+    conn.commit()
+
+
+def finish(
+    conn: sqlite3.Connection, provider, release_id: int, attempt_id: int
+) -> dict:
+    """Wait for a call already placed, and write what reception said.
+
+    Nothing here can dial. The run id was bound before this became reachable, so a
+    status read is the only thing that leaves the machine.
+
+    `followup_booked` is never written, whatever reception says. The board records that
+    she said she booked it, which is a fact about a phone call; whether an appointment
+    exists is a fact about the practice's own book, and not ours to claim.
+    See docs/adr/0001, amendment.
+    """
+    row = release_row(conn, release_id)
+    if row is None:
+        raise LookupError(f"No release {release_id}")
+    attempt = conn.execute(
+        "SELECT provider_run_id FROM call_attempt WHERE id = ?", (attempt_id,)
+    ).fetchone()
+    if attempt is None or not attempt["provider_run_id"]:
+        raise LookupError(f"No placed call {attempt_id}")
+    run_id = attempt["provider_run_id"]
+
     result = provider.poll(run_id)
 
     getter = getattr(provider, "transcript_path", None)
     conn.execute(
         """
         UPDATE call_attempt
-        SET provider_run_id = ?, state = ?, transcript_path = ?, updated_at = ?
+        SET state = ?, transcript_path = ?, updated_at = ?
         WHERE id = ?
         """,
         (
-            run_id,
             result.state.value,
             getter(run_id) if getter else None,
             db.now_iso(),
@@ -619,3 +677,16 @@ def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
         "booked_date": day.isoformat() if booked and day else None,
         "booked_time": clock.strftime("%H:%M") if booked and clock else None,
     }
+
+
+def run(conn: sqlite3.Connection, provider, release_id: int) -> dict:
+    """Place this Release's call and wait for it, for a caller that wants the outcome.
+
+    The board splits these two so a browser gets a page back while the call is still
+    going; a JSON caller and the CLI asked for what happened, so they wait here.
+    """
+    try:
+        attempt_id = start(conn, provider, release_id)
+    except AlreadyPlaced as already:
+        return already.outcome
+    return finish(conn, provider, release_id, attempt_id)

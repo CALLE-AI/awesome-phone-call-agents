@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{%- if in_flight and not open_item %}
+{%- if (in_flight or rebooking_in_flight) and not open_item %}
 {#- Only while a call is in progress, and never behind an open sheet: a reload would
     empty the half-filled Release form in front of her to update a count behind it.
     A settled board sits still, which matters on a recording and matters more to
@@ -250,7 +250,7 @@
     </td>
     <td>{{ item.reviewer_name }}</td>
     <td>
-      {%- if item.rebooking_state %}<span class="chip state">{{ item.rebooking_state.replace("_", " ") }}</span>
+      {%- if item.rebooking_state %}<span class="chip state">{{ "ringing" if item.rebooking_state in ("reserved", "accepted") else item.rebooking_state.replace("_", " ") }}</span>
       {%- else %}
       <details class="confirm compact">
         <summary><span class="caret">&#9656;</span> Run</summary>

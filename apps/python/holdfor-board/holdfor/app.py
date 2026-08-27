@@ -90,6 +90,13 @@ WHERE review_item.id IS NULL
 ORDER BY call_attempt.id
 """
 
+REBOOKING_IN_FLIGHT_QUERY = """
+SELECT call_attempt.updated_at AS updated_at
+FROM call_attempt
+WHERE call_attempt.kind = 'rebooking'
+  AND call_attempt.state IN (?, ?)
+"""
+
 # A call still worth waiting for is one that was submitted and is bound to a run.
 # `.value` on both, because a StrEnum member does not hash as its own string and a
 # set of members would silently match nothing a query returns.
@@ -160,6 +167,26 @@ def unfinished(conn) -> tuple[list[dict], int]:
         row["phone_masked"] = masked(row.pop("phone_e164"))
         ringing.append(row)
     return ringing, unreconciled
+
+
+def rebooking_in_flight(conn) -> int:
+    """How many Rebooking Calls are on the phone right now.
+
+    A count rather than a list. `unfinished` returns rows because the check-in
+    section names the patient and shows the handset being rung; a Rebooking Call
+    rings the practice's booking line, and putting her name beside that number
+    would say the wrong thing about who is on the phone. The board already shows
+    the state on her row — this is only what keeps the page refreshing until it
+    changes, so a call that lands is seen without a reload.
+    """
+    now = datetime.now(timezone.utc)
+    return sum(
+        1
+        for row in conn.execute(
+            REBOOKING_IN_FLIGHT_QUERY, tuple(sorted(STILL_RINGING))
+        ).fetchall()
+        if now - datetime.fromisoformat(row["updated_at"]) < RINGING_GRACE
+    )
 
 
 def in_the_background(work) -> None:
@@ -315,13 +342,21 @@ def create_app(
 
     @app.post("/releases/{release_id}/run", status_code=201)
     async def run_rebooking(release_id: int, request: Request):
-        """Place the one call a Release granted. Pressing this twice never rings twice."""
+        """Place the one call a Release granted. Pressing this twice never rings twice.
+
+        A browser gets the board back as soon as the call is out of the door, for the
+        same reason `place_checkin` does and for one more: holding the response open
+        for the length of the call left the Run button on screen, so the way this
+        looked to somebody filming it was a button that did nothing, and the way
+        through was to press it again. See `rebooking.start`.
+        """
         return await run_in_threadpool(
             _run_rebooking_now,
             app.state.db_path,
             app.state.provider,
             release_id,
             _wants_html(request),
+            app.state.background,
         )
 
     @app.post("/review-items/{review_item_id}/manual", status_code=201)
@@ -377,27 +412,61 @@ def _terminate_now(
     return JSONResponse(status_code=201, content={"status": settled})
 
 
-def _run_rebooking_now(db_path: str, provider, release_id: int, html: bool):
+def _run_rebooking_now(db_path: str, provider, release_id: int, html: bool, background):
     conn = db.connect(db_path)
     try:
-        outcome = rebooking.run(conn, provider, release_id)
-    except rebooking.Refused as refused:
-        if html:
-            # The reason travels in the query string rather than being swallowed: a
-            # missing booking line looks exactly like a broken button otherwise.
-            return RedirectResponse(f"/?refused={refused.reason}", 303)
-        return JSONResponse(status_code=409, content={"refused": refused.reason})
-    except review.Rejected as rejected:
-        return JSONResponse(
-            status_code=rejected.status, content={"error": rejected.code}
-        )
-    except LookupError as missing:
-        raise HTTPException(status_code=404, detail=str(missing))
+        try:
+            attempt_id = rebooking.start(conn, provider, release_id)
+            if html:
+                # Out of the door, so the board goes back now and the waiting happens
+                # on its own connection. The row already carries the attempt, so the
+                # page that lands has a state chip where the Run button was.
+                background(
+                    lambda: _finish_rebooking_now(
+                        db_path, provider, release_id, attempt_id
+                    )
+                )
+                return RedirectResponse("/", 303)
+            outcome = rebooking.finish(conn, provider, release_id, attempt_id)
+        except rebooking.AlreadyPlaced as already:
+            # A second press. It never dials; it answers with the first call.
+            if html:
+                return RedirectResponse("/", 303)
+            return JSONResponse(status_code=201, content=already.outcome)
+        except rebooking.Refused as refused:
+            if html:
+                # The reason travels in the query string rather than being swallowed: a
+                # missing booking line looks exactly like a broken button otherwise.
+                return RedirectResponse(f"/?refused={refused.reason}", 303)
+            return JSONResponse(status_code=409, content={"refused": refused.reason})
+        except review.Rejected as rejected:
+            return JSONResponse(
+                status_code=rejected.status, content={"error": rejected.code}
+            )
+        except LookupError as missing:
+            raise HTTPException(status_code=404, detail=str(missing))
     finally:
         conn.close()
-    if html:
-        return RedirectResponse("/", 303)
     return JSONResponse(status_code=201, content=outcome)
+
+
+def _finish_rebooking_now(
+    db_path: str, provider, release_id: int, attempt_id: int
+) -> None:
+    """Wait for a Rebooking Call that no request is waiting for.
+
+    Its own connection, opened in the thread that uses it. Nothing is retried and
+    nothing is raised onward: a call this cannot finish stays on the board as an
+    attempt naming a run id, which is what `calle call recover` needs and what the
+    check-in path already does.
+    """
+    conn = db.connect(db_path)
+    try:
+        rebooking.finish(conn, provider, release_id, attempt_id)
+    except (review.Rejected, LookupError):
+        pass
+    finally:
+        conn.close()
 
 
 async def _body(request: Request) -> dict:
@@ -629,6 +698,8 @@ def board_payload(
         # A call on the phone right now. The page refreshes itself while this is not
         # empty, and stops when it empties, so a settled board sits still.
         "in_flight": ringing,
+        # Not shown as a list, but the page keeps refreshing while it is not zero.
+        "rebooking_in_flight": rebooking_in_flight(conn),
         "awaiting_reconciliation": unreconciled,
         "auto_closed": sum(
             1 for item in todays if item["status"] == ReviewStatus.AUTO_CLOSED
