@@ -1,0 +1,29 @@
+{
+  "fixture_id": "sla_risk_globex",
+  "trigger_id": "sla_risk",
+  "severity": "critical",
+  "summary": "Globex enterprise P1 — roughly 15 minutes to SLA breach.",
+  "brief": "Globex has a P1 on the enterprise tier and the clock is under fifteen minutes to SLA breach. Stage Manager needs the CS owner to own the ticket now, page backup, or explicitly accept the risk.",
+  "ticket_id": "P1-2207",
+  "account": {
+    "id": "acct_globex",
+    "name": "Globex",
+    "tier": "enterprise",
+    "health_flags": ["sla_red"]
+  },
+  "cs_owner": {
+    "id": "cs_jordan",
+    "name": "Jordan Lee",
+    "e164": "+15555550100",
+    "opt_in_phone": true,
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "07:00",
+      "timezone": "America/New_York"
+    }
+  },
+  "metadata": {
+    "minutes_to_breach": 15,
+    "priority": "P1"
+  }
+}
