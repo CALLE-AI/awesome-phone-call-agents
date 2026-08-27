@@ -1,0 +1,10 @@
+{
+  "assistive_tech": "screen_reader",
+  "task_attempted": "Submitting a benefits enrollment form on the pilot site",
+  "barrier_category": "operable",
+  "barrier_description": "Focus jumped away from the form after entering the second field, so the caller couldn't tell where they were in the form and gave up after three attempts.",
+  "severity": "blocked_entirely",
+  "consent_followup": true,
+  "followup_contact": "caller provided email during call, redacted in this example",
+  "followup_contact_confirmed": true
+}

@@ -1,0 +1,41 @@
+{
+  "status": "COMPLETED",
+  "result": {
+    "outcome": {
+      "task_completed": true,
+      "completion_confidence": {
+        "score": 0.93,
+        "label": "high"
+      },
+      "evidence": [
+        "La persona respondió en vivo durante la llamada.",
+        "Se informó que era una prueba de CallProof y que la llamada estaba siendo grabada.",
+        "La persona confirmó que la prueba fue exitosa y luego agradeció."
+      ]
+    },
+    "summary": "La llamada de prueba se completó correctamente. La persona confirmó que escuchaba el mensaje y que la prueba fue exitosa.",
+    "transcript": "[00:00:00] BOT: Hola,\n[00:00:01] BOT: soy un asistente automático de prueba de CallProof; esta llamada está siendo grabada.\n[00:00:02] USER: Sí.\n[00:00:04] BOT: Hola,\n[00:00:05] BOT: soy un asistente automático de prueba de CallProof; esta llamada está siendo grabada.\n[00:00:09] BOT: ¿Me confirma, por favor, si escucha este mensaje con claridad y si la prueba fue exitosa?\n[00:00:18] USER: Sí, la prueba fue exitosa.\n[00:00:23] BOT: Gracias por su ayuda,\n[00:00:24] USER: Gracias.\n[00:00:25] BOT: adiós.",
+    "call_id": "a77773082c6b4891881e91131fce61c0",
+    "extracted": {
+      "calling": {
+        "calls": [
+          {
+            "status": "finished",
+            "reason_code": "0",
+            "call_end_time": "2026-08-05T22:32:54.036049+00:00",
+            "call_start_time": "2026-08-05T22:32:25.873530+00:00",
+            "duration_seconds": 28
+          }
+        ],
+        "status": "finished",
+        "ended_at": "2026-08-05T22:32:54.036049+00:00",
+        "started_at": "2026-08-05T22:32:25.873530+00:00",
+        "callee_count": 1,
+        "duration_seconds": 28
+      },
+      "to_phones": [
+        "+522214324074"
+      ]
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "ticket_id": "FR-1842",
+  "sku": "PL-9F21",
+  "spoken_time_budget_s": 90,
+  "parties": [
+    {
+      "role": "warehouse",
+      "label": "A",
+      "phone": "+15550100184",
+      "consent": true
+    },
+    {
+      "role": "driver",
+      "label": "B",
+      "phone": "+15550100185",
+      "consent": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "dock",
+      "text": "Pallet PL-9F21 left dock 3.",
+      "evidence": {
+        "span": {
+          "quote": "pallet left dock 3"
+        }
+      },
+      "observable_of": "dock_location",
+      "status": "UNTESTED",
+      "confidence": 0.92,
+      "party": "A"
+    },
+    {
+      "id": "arrival",
+      "text": "Driver arrived at the receiving gate.",
+      "evidence": {
+        "span": {
+          "quote": "arrived at the gate"
+        }
+      },
+      "observable_of": "driver_arrival",
+      "status": "UNTESTED",
+      "confidence": 0.88,
+      "party": "A"
+    },
+    {
+      "id": "seal",
+      "text": "A seal number was recorded on the trailer.",
+      "evidence": {
+        "span": {
+          "quote": ""
+        }
+      },
+      "observable_of": "seal_recorded",
+      "status": "UNTESTED",
+      "confidence": 0.51,
+      "party": "A"
+    }
+  ],
+  "candidate_questions": [
+    {
+      "id": "q-short-leak",
+      "text": "warehouse said dock 3?",
+      "targets": ["dock"]
+    },
+    {
+      "id": "q-dock-empty",
+      "text": "Was dock 3 empty when you pulled in?",
+      "targets": ["dock"]
+    },
+    {
+      "id": "q-warehouse-said",
+      "text": "The warehouse said dock 3 still held pallet PL-9F21. Is that what you saw?",
+      "targets": ["dock"]
+    },
+    {
+      "id": "q-seal",
+      "text": "Did you read a seal number on the trailer at receiving?",
+      "targets": ["seal"]
+    }
+  ],
+  "call": {
+    "id": "call-nplus1-fr-1842",
+    "disposition": "completed",
+    "quotes": [
+      {
+        "claim_id": "dock",
+        "quote": "Dock 3 was empty. I waited at dock 1.",
+        "polarity": "contradicts",
+        "tested_by": "q-dock-empty"
+      },
+      {
+        "claim_id": "arrival",
+        "quote": "Yes, I arrived at the gate.",
+        "polarity": "supports",
+        "tested_by": "call-nplus1-fr-1842"
+      }
+    ]
+  }
+}

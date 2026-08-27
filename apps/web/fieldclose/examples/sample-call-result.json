@@ -1,0 +1,48 @@
+{
+  "fixture": {
+    "id": "resolved-clear-demo-result",
+    "fictional": true,
+    "provider": "fake",
+    "description": "Deterministic normalized result fixture; not evidence of a live CALL-E call"
+  },
+  "result": {
+    "id": "018f7b56-8e66-7b4a-9e41-4d47f731a201",
+    "caseId": "018f7b56-8e66-7b4a-9e41-4d47f731a101",
+    "attemptId": "018f7b56-8e66-7b4a-9e41-4d47f731a202",
+    "providerCallId": "fake_call_resolved_clear_001",
+    "providerTaskStatus": "completed",
+    "contactVerification": "authorized_role",
+    "observedOperatingStatus": "operating_as_expected",
+    "unresolvedIssue": {
+      "value": "no",
+      "confidence": "high",
+      "evidenceRefs": [
+        "fake-provider:unresolved-issue"
+      ],
+      "note": "The fictional contact reported no remaining issue related to the visit."
+    },
+    "returnVisitRequested": {
+      "value": "no",
+      "confidence": "high",
+      "evidenceRefs": [
+        "fake-provider:return-visit-request"
+      ],
+      "note": null
+    },
+    "preferredWindows": [],
+    "administrativeResults": {},
+    "outOfScopeTopics": [],
+    "escalationReasons": [],
+    "summary": "The fictional authorized site role reported that RTU-2 was operating as expected and reported no unresolved issue or return-visit request.",
+    "evidenceRefs": [
+      "fake-provider:contact-verification",
+      "fake-provider:observed-operating-status",
+      "fake-provider:unresolved-issue",
+      "fake-provider:return-visit-request"
+    ],
+    "route": "ready_for_closeout_review",
+    "normalizerVersion": "fixture-v1",
+    "normalizedAt": "2026-07-28T08:15:00Z"
+  },
+  "humanDisposition": null
+}

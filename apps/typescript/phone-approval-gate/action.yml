@@ -1,0 +1,69 @@
+name: "Phone approval gate"
+description: "Require a spoken human approval by phone before a workflow step continues."
+branding:
+  icon: "phone-call"
+  color: "blue"
+inputs:
+  request-file:
+    description: "Path to the approval request JSON in the workspace."
+    required: true
+  api-key:
+    description: "CALL-E API key. Pass a repository or environment secret, never a literal."
+    required: true
+  audit-file:
+    description: "Path to append the hash-chained approval record to. Every run appends one, including runs nobody approved."
+    required: false
+    default: "phone-approval-audit.jsonl"
+  base-url:
+    description: "CALL-E Developer API base URL. Must be https. Plain http is accepted on loopback for a local fake."
+    required: false
+    default: "https://api.heycall-e.com"
+  node-version:
+    description: "Node version used to run the gate."
+    required: false
+    default: "20"
+outputs:
+  verdict:
+    description: "approved, rejected or not_approved."
+    value: ${{ steps.gate.outputs.verdict }}
+  reason:
+    description: "Why an approval was not granted. Empty when approved."
+    value: ${{ steps.gate.outputs.reason }}
+  approved-by:
+    description: "Comma separated approver ids that approved."
+    value: ${{ steps.gate.outputs.approved-by }}
+  audit-record-hash:
+    description: "Hash of the approval record this run appended."
+    value: ${{ steps.gate.outputs.audit-record-hash }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install the gate
+      shell: bash
+      run: npm install --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund
+
+    # The step fails when nobody approves, which is what holds the deploy back.
+    # Exit codes: 0 approved, 10 rejected by a person, 20 no approval, 30 request error.
+    - name: Ask a person by phone
+      id: gate
+      shell: bash
+      env:
+        # Inputs are passed as environment values on purpose. Interpolating them
+        # into the script body would let a crafted file name run shell code.
+        GATE_REQUEST_FILE: ${{ inputs.request-file }}
+        GATE_AUDIT_FILE: ${{ inputs.audit-file }}
+        CALLE_API_KEY: ${{ inputs.api-key }}
+        CALLE_BASE_URL: ${{ inputs.base-url }}
+      run: |
+        set -uo pipefail
+        if [ -z "$GATE_AUDIT_FILE" ]; then
+          echo "audit-file must name a path. Every run appends one approval record." >&2
+          exit 30
+        fi
+        args=(request --request "$GATE_REQUEST_FILE" --live --json --github-output)
+        args+=(--audit "$GATE_AUDIT_FILE")
+        "$GITHUB_ACTION_PATH/node_modules/.bin/tsx" "$GITHUB_ACTION_PATH/src/cli.ts" "${args[@]}"
