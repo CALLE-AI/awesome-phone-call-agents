@@ -149,6 +149,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
+- [Cooldown Caller](https://github.com/jayblast-spec/cooldown-caller) - Dashboard that evaluates rate-limited recurring actions on a daily cron or manual trigger, places a CALL-E call only when that check finds an item ready, prevents duplicate calls with cycle-scoped idempotency, and exposes only a privacy-redacted status log.
 
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
