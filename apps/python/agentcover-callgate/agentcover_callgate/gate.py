@@ -1,24 +1,45 @@
-"""AgentCover CallGate — bounded autonomy around CALL-E phone calls.
+"""AgentCover CallGate — experimental bounded-autonomy demo around CALL-E calls.
 
-Every CALL-E call intent is turned into an ActionRequest and run through the
-real safety_protocol.SafetyProtocol before any dispatch. Only ALLOWED intents
-reach CalleClient.calls.create_and_wait (the real SDK).
+This is an IN-MEMORY DEMO. Every CALL-E call intent is turned into an
+ActionRequest and run through a small, vendored enforcement layer
+(`_engine.py`) before any dispatch. Only ALLOWED intents reach
+`CalleClient.calls.create_and_wait` (the real SDK).
+
+The audit trail and gating state are in-memory and experimental — NOT a
+production system of record, NOT immutable, NOT claims-ready. See README.
 """
 from __future__ import annotations
 
 import hashlib
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from calle import CalleClient
 
-from safety_protocol.core import ActionRequest, AuditTrail, Monitor, ScopeRule
-from safety_protocol.protocol import SafetyProtocol
-
 from . import mock_calle
+from ._engine import (
+    ActionOutcome,
+    ActionRequest,
+    AuditTrail,
+    SafetyProtocol,
+    ScopeRule,
+)
 from .rules import DEFAULT_RULES, ALLOWED_VERBS
+
+# Official CALL-E API origin. Live (credential-bearing) requests are restricted
+# to this exact HTTPS origin; never a custom or http base_url with credentials.
+OFFICIAL_CALLE_BASE_URL = "https://api.heycall-e.com"
+
+# Strict E.164: leading +, 1-15 digits, no spaces/letters/punctuation.
+_E164_RE = re.compile(r"^\+[1-9]\d{1,14}$")
+
+
+def is_e164(phone: str) -> bool:
+    """Return True only for a strict E.164 number."""
+    return bool(_E164_RE.match(phone or ""))
 
 
 def _fp(phone: str) -> str:
@@ -65,7 +86,7 @@ class GateResult:
 
 
 class AgentCoverCallGate:
-    """Wraps CALL-E in the safety_protocol enforcement layer."""
+    """Wraps CALL-E in a small, experimental enforcement layer (in-memory)."""
 
     def __init__(
         self,
@@ -73,28 +94,32 @@ class AgentCoverCallGate:
         agent_id: str,
         user_id: str,
         api_key: str | None = None,
-        base_url: str = "https://api.heycall-e.com",
+        base_url: str = OFFICIAL_CALLE_BASE_URL,
         budget_limit: float = 5000.0,
         rules: list[ScopeRule] | None = None,
         calle_client: CalleClient | None = None,
         offline: bool = False,
     ):
+        if base_url != OFFICIAL_CALLE_BASE_URL:
+            raise ValueError(
+                f"Live CALL-E requests are restricted to the official origin "
+                f"{OFFICIAL_CALLE_BASE_URL}; got {base_url!r}"
+            )
         self.agent_id = agent_id
         self.user_id = user_id
         self.offline = offline
 
         audit = AuditTrail()
-        monitor = Monitor(audit, agent_id)
         self.protocol = SafetyProtocol(
             agent_id=agent_id,
             user_id=user_id,
             scope_rules=rules if rules is not None else DEFAULT_RULES,
             budget_limit=budget_limit,
             approval_threshold_cost=10.0,
-            audit=audit,
-            monitor=monitor,
             allowed_action_types=ALLOWED_VERBS,
         )
+        # reuse the same audit instance
+        self.protocol.audit = audit
 
         self._api_key = api_key or os.environ.get("CALLE_API_KEY")
         if calle_client is not None:
@@ -105,11 +130,12 @@ class AgentCoverCallGate:
             # attaches the idempotency header, and polls to a terminal state.
             self.calle = CalleClient(
                 api_key=self._api_key or "agentcover_offline",
-                base_url=base_url,
+                base_url=OFFICIAL_CALLE_BASE_URL,
                 http_client=mock_calle.offline_client(),
             )
         else:
-            self.calle = CalleClient(api_key=self._api_key, base_url=base_url)
+            self.calle = CalleClient(api_key=self._api_key,
+                                    base_url=OFFICIAL_CALLE_BASE_URL)
 
     # -- human controls ----------------------------------------------------
     def kill(self, reason: str = "operator") -> None:
@@ -125,6 +151,7 @@ class AgentCoverCallGate:
             "budget": self.protocol.budget_limit,
             "pending": self.protocol.get_pending_approvals(),
             "audit_tail": self.protocol.audit._entries[-3:],
+            "note": "in-memory experimental demo; not a system of record",
         }
 
     # -- the gate ----------------------------------------------------------
@@ -133,8 +160,9 @@ class AgentCoverCallGate:
 
         If ALLOWED and ``execute`` is True, dispatch through the real SDK.
         If ALLOWED and ``execute`` is False, return allowed but do NOT call.
+        Live dispatch (--execute with CALLE_API_KEY) validates each recipient
+        as strict E.164 before dialing.
         """
-        # One ActionRequest per recipient (each is its own real call).
         results = []
         for phone in plan.phones:
             req = ActionRequest(
@@ -172,17 +200,26 @@ class AgentCoverCallGate:
                 call_result=call_result,
             ))
 
-        # Collapse single-recipient plans to one result; multi → first wins.
         r = results[0]
         if len(results) > 1:
-            # If any blocked, report blocked with first reason.
             for x in results:
                 if x.outcome != "allowed":
                     return x
         return r
 
     def _dispatch(self, plan: CallPlan, phone: str) -> dict:
-        """Call the real CALL-E SDK. Returns the structured call result."""
+        """Call the real CALL-E SDK. Returns the structured call result.
+
+        Live recipients must be strict E.164. Use only the official origin.
+        """
+        # In offline/demo mode the "phone" may be a masked placeholder; the
+        # mock transport never dials. For a REAL call we require strict E.164.
+        if not self.offline and not is_e164(phone):
+            self.protocol.audit.append("call_rejected_bad_number", self.agent_id,
+                                        {"target": _fp(phone)})
+            raise ValueError(
+                f"Refusing live dispatch: recipient {phone!r} is not strict E.164"
+            )
         call = self.calle.calls.create_and_wait(
             task=plan.task,
             recipients=[{
