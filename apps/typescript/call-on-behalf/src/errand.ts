@@ -13,11 +13,18 @@
  * is a claim of its own. Only a call CALL-E has finished with is read at all: a
  * queued, ringing or running call is an unknown outcome too, because its transcript
  * is still being written.
+ *
+ * The other half of that rule is that a status is not a claim either. A call CALL-E
+ * ended as failed or canceled can still have carried the whole errand, so what was
+ * said is read from the transcript and the status goes in the notes. A create
+ * nobody could reconcile stays unknown whatever the second answer was, because a
+ * refusal to the reconciliation can be decided before the idempotency lookup and is
+ * no evidence that the first request never landed.
  */
 
 import { blocking, sensitiveTopicFindings, spokenItems, unauthorizedFindings, withoutKnownNumbers } from "./disclosure.js";
 import { CalleCallError, CalleWaitTimeout, isTerminalCallStatus, type CallePort } from "./calle.js";
-import { agreementEvidence, codeNamedAround, mentionsDatetime, readTranscript, supportingTurn } from "./read.js";
+import { agreementEvidence, codeNamedBefore, mentionsDatetime, readTranscript, refusalEvidence, supportingTurn } from "./read.js";
 import {
   buildCallInput,
   buildTask,
@@ -102,6 +109,8 @@ function nextStep(
   request: ErrandRequest,
   offered: string,
   stillOpen = false,
+  /** Why the commitment is unconfirmed, so the instruction says the right thing. */
+  reason: "agreement" | "refusal" | "conflict" = "agreement",
 ): string {
   if (outcome === "outcome_unknown") {
     return stillOpen ? UNFINISHED_NEXT_STEP : UNREAD_NEXT_STEP;
@@ -119,6 +128,18 @@ function nextStep(
     return "The call did not connect to a person. Nothing was said on your behalf and nothing was arranged.";
   }
   if (commitment === "unconfirmed") {
+    if (reason === "conflict") {
+      // Both claims have a turn behind them. Picking either one means telling
+      // somebody their errand went a way the same call contradicts, so this says
+      // what the call holds and hands it to a person.
+      return "This call holds both somebody agreeing to it and somebody refusing it, so nothing here can tell you which one stands. Read the transcript below and call to check before you rely on either.";
+    }
+    if (reason === "refusal") {
+      // A claimed refusal nobody voiced. The report will not tell somebody their
+      // errand was turned down on the extraction's word alone, so it says the
+      // outcome is unknown rather than picking a side.
+      return "CALL-E reported that they would not arrange it and no turn in the transcript refuses it, so nothing is settled either way. Read the transcript below, then call to check.";
+    }
     return "Something was reported as agreed and the transcript does not show anybody agreeing to it, so treat nothing as booked. Read the transcript below, then call to check if you need it.";
   }
   if (commitment === "outside_authorized_window") {
@@ -129,6 +150,11 @@ function nextStep(
   }
   if (commitment === "committed") {
     return "That is arranged. The confirmation, if they gave one, is in the report above.";
+  }
+  if (commitment === "declined_by_callee") {
+    // Whatever else came back, the thing the errand asked for did not happen, so
+    // the next step says that instead of reporting the errand as done.
+    return `${request.callee.name} would not arrange it on this call, so nothing is booked. Anything they did answer is above and the transcript is below.`;
   }
   if (outcome === "goal_met") {
     return "Everything you asked was answered. Nothing was agreed, because this errand did not ask for anything to be agreed.";
@@ -182,12 +208,14 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
         callId = reconciled.id;
         progress(`Reconciled to call ${reconciled.id}.`);
       } catch (secondError) {
+        // Getting the call back is the only thing that resolves this. The first
+        // request may already have been accepted. A definite refusal here can be
+        // decided before the idempotency lookup ever happens, so it is no evidence
+        // that no call exists. Whatever class the second answer is, the call stays
+        // unaccounted for.
         const second = asCallError(secondError);
-        if (second.ambiguous) {
-          unknown = `the call could not be reconciled (${problem.code}, then ${second.code})`;
-        } else {
-          refusal = second;
-        }
+        progress(`Reconciling returned ${second.code}, so a call may be live under that key.`);
+        unknown = `the call could not be reconciled (${problem.code}, then ${second.code})`;
       }
     } else {
       refusal = problem;
@@ -310,11 +338,26 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   let commitment: CommitmentState = "none_sought";
   let agreedQuote = "";
   let agreedIndex = -1;
+  /** The turn that refuses the arrangement, when one does, for the note. */
+  let refusedQuote = "";
   /** Why the report will not stand behind a claimed agreement, for the note. */
   let unconfirmedNote = "";
+  /** Why the commitment is unconfirmed, so the next step can say the right thing. */
+  let unconfirmedReason: "agreement" | "refusal" | "conflict" = "agreement";
   if (request.goal.commitment !== "none") {
-    if (madeRaw === "accepted") {
-      const agreement = agreementEvidence(turns, request.goal.commitment, offered);
+    const agreement = agreementEvidence(turns, request.goal.commitment, offered);
+    // Held to the same standard and bound the same way. A turn that refuses one of
+    // the questions does not refuse the arrangement. A turn that refuses another
+    // time does not refuse this one.
+    const refusal = refusalEvidence(turns, offered, request.questions);
+    if (madeRaw.length > 0 && agreement.quote.length > 0 && refusal.quote.length > 0) {
+      // Both claims have a turn behind them, so the transcript does not decide this
+      // and neither does this app. Reporting either side means stating an outcome
+      // the same call contradicts.
+      commitment = "unconfirmed";
+      unconfirmedReason = "conflict";
+      unconfirmedNote = `This call holds an agreement and a refusal for the same arrangement, so this report stands behind neither. They said: "${agreement.quote}" and also: "${refusal.quote}"`;
+    } else if (madeRaw === "accepted") {
       if (agreement.quote.length === 0) {
         // An agreement about a time nobody said is not an agreement this app can
         // report, so it does not become committed and it does not become an
@@ -342,37 +385,57 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     } else if (madeRaw === "other_time_offered") {
       commitment = "proposal_only";
     } else if (madeRaw === "declined_by_callee") {
-      commitment = "declined_by_callee";
+      // A refusal is a claim about the errand's outcome, so it is held to the
+      // same standard as an agreement: somebody has to have said it, about the
+      // thing the errand asked for. Without such a turn the report will not state
+      // as fact that they would not arrange it, because the next step is an
+      // instruction and an instruction built on the extraction alone is the thing
+      // this app exists to avoid.
+      if (refusal.quote.length > 0 || reading.declinedAutomated) {
+        commitment = "declined_by_callee";
+        refusedQuote = refusal.quote;
+      } else {
+        commitment = "unconfirmed";
+        unconfirmedReason = "refusal";
+        unconfirmedNote =
+          refusal.otherQuote.length > 0
+            ? `CALL-E reported that they would not arrange it and no turn refuses the arrangement the call asked for. What they did turn down was something else: "${refusal.otherQuote}"`
+            : "CALL-E reported that they would not arrange it and no turn in the transcript refuses anything, so this report does not treat the errand as turned down.";
+      }
     }
   }
 
   // A reference number belongs to an agreement, so it is held to the same standard:
-  // somebody has to have read it out where the agreement was made.
+  // somebody has to have read it out by the time the agreement was made.
   const claimedCode = readString(structured, "confirmation_code");
-  const confirmationCode = codeNamedAround(turns, agreedIndex, claimedCode) ? claimedCode : "";
+  const confirmationCode = codeNamedBefore(turns, agreedIndex, claimedCode) ? claimedCode : "";
 
   const answered = answers.filter((answer) => answer.answered).length;
+  // Terminal and not completed, so CALL-E ended the call before the conversation
+  // was done. That says the line went, not that nothing was said on it.
+  const endedEarly = call.status !== "completed";
   let outcome: ErrandOutcome;
-  if (call.status !== "completed") {
-    // Terminal and not completed, so the call ended before the conversation did.
-    // The failure code says why when there is one and the status says it otherwise.
-    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode ?? call.status);
-  } else if (reading.declinedAutomated) {
+  if (reading.declinedAutomated) {
     outcome = "callee_declined_automated";
   } else if (reading.machineAnswered) {
     outcome = "voicemail";
+  } else if (endedEarly && !reading.reachedPerson) {
+    // Nobody was on the line and the call is over, so nothing was asked. The
+    // failure code says why when there is one and the status says it otherwise.
+    outcome = failureOutcome(attempt?.failureCode ?? call.failureCode ?? call.status);
   } else if (!reading.reachedPerson) {
     outcome = "not_reached";
   } else {
-    const commitmentSettled =
-      request.goal.commitment === "none" || commitment === "committed" || commitment === "declined_by_callee";
+    const commitmentSettled = request.goal.commitment === "none" || commitment === "committed";
     outcome =
       answered === answers.length && commitmentSettled
         ? "goal_met"
         : answered > 0 || commitment !== "none_sought"
           ? "partially_met"
           : "not_met";
-    if (lowConfidence && outcome === "goal_met") {
+    // A call that ended early may have been cut off partway through the errand, so
+    // what the transcript holds is reported and the errand is not called done.
+    if ((lowConfidence || endedEarly) && outcome === "goal_met") {
       outcome = "partially_met";
     }
   }
@@ -388,6 +451,12 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
   const notes = [claimedNote.length > 0 ? `CALL-E's note, unchecked: "${claimedNote}"` : ""];
   if (lowConfidence) {
     notes.push(`CALL-E scored its own completion low (${String(confidence?.score)}), so treat the answers with care.`);
+  }
+  if (endedEarly && reading.reachedPerson) {
+    const why = attempt?.failureCode ?? call.failureCode ?? "";
+    notes.push(
+      `CALL-E ended this call as call_${call.status}${why.length > 0 ? ` (${why})` : ""} and somebody was on the line, so everything above is read from the transcript and not from that status.`,
+    );
   }
   if (unsupported > 0) {
     notes.push(
@@ -407,6 +476,11 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
       unconfirmedNote.length > 0
         ? unconfirmedNote
         : "CALL-E reported an agreement and no turn in the transcript shows anybody agreeing.",
+    );
+  }
+  if (commitment === "declined_by_callee" && refusedQuote.length > 0) {
+    notes.push(
+      `CALL-E reported that they would not arrange it and a turn in the transcript refuses it. They said: "${refusedQuote}"`,
     );
   }
   if (reading.declineQuote.length > 0) {
@@ -429,7 +503,14 @@ export async function runErrand(options: RunOptions): Promise<ErrandReport> {
     callee_notes: notes.filter((note) => note.length > 0).join(" "),
     // A time only the extraction knows about is not read back to the person as if
     // they had been offered it.
-    next_step: nextStep(outcome, commitment, request, commitment === "proposal_only" && !offeredSaid ? "" : offeredSpoken),
+    next_step: nextStep(
+      outcome,
+      commitment,
+      request,
+      commitment === "proposal_only" && !offeredSaid ? "" : offeredSpoken,
+      false,
+      unconfirmedReason,
+    ),
     call_id: call.id,
     provider_call_id: attempt?.providerCallId ?? null,
     call_status: call.status,

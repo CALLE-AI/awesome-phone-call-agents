@@ -1,0 +1,14 @@
+{
+  "name": "fish-audio",
+  "endpoint": "https://api.fish.audio/v1/tts",
+  "method": "POST",
+  "authHeader": "authorization",
+  "authPrefix": "Bearer ",
+  "authEnv": "FISH_AUDIO_TOKEN",
+  "headers": { "model": "s1" },
+  "bodyTemplate": "{\"text\":\"{text}\",\"reference_id\":\"{voice}\",\"format\":\"mp3\",\"mp3_bitrate\":128}",
+  "audio": { "kind": "body" },
+  "format": "mp3",
+  "maxChars": 4000,
+  "languages": ["en-US", "en-GB", "zh-CN", "ja-JP", "ko-KR", "de-DE", "fr-FR", "es-ES", "ar-SA"]
+}

@@ -1,0 +1,44 @@
+{
+  "name": "asyncfounders",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@call-e/calle": "0.6.0",
+    "@fontsource/instrument-serif": "^5.2.7",
+    "@fontsource/poppins": "^5.2.7",
+    "@supabase/supabase-js": "2.111.0",
+    "lucide-react": "^0.468.0",
+    "next": "16.2.12",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "unpdf": "^1.8.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "nanoid": "3.3.17",
+    "postcss": "8.5.25",
+    "sharp": "0.35.3"
+  },
+  "type": "module",
+  "displayName": "AsyncFounders"
+}

@@ -1,0 +1,6 @@
+Screener: Hi, can you tell me what company this call is regarding?
+Caller: This is the account verification department. There's an unpaid balance on your account.
+Screener: Okay, how would I go about paying that if it's real?
+Caller: The fastest way for us to process this today is for you to buy a gift card, something like a Google Play card, and read me the codes on the back.
+Screener: That seems unusual for a billing department — why can't I pay through my normal account?
+Caller: I understand the concern, but your account will be suspended today if this isn't resolved right now.

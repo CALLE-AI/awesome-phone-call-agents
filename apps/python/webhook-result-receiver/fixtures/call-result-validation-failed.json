@@ -1,0 +1,30 @@
+{
+  "id": "evt_fixture_validation_failed_001",
+  "type": "call.result_validation_failed",
+  "created_at": "2026-01-15T12:00:00Z",
+  "data": {
+    "id": "call_fixture_validation_failed_001",
+    "status": "completed",
+    "created_at": "2026-01-15T11:58:00Z",
+    "completed_at": "2026-01-15T12:00:00Z",
+    "task": "Synthetic privacy task for a fictional validation failure.",
+    "summary": "Synthetic privacy summary for a fictional validation failure.",
+    "evidence": [
+      "Synthetic privacy evidence for a fictional validation failure."
+    ],
+    "transcript": [
+      {
+        "speaker": "user",
+        "text": "Synthetic private validation-failure transcript."
+      }
+    ],
+    "recipient": {
+      "phone": "+12025550123"
+    },
+    "metadata": {
+      "workflow": "webhook-result-receiver",
+      "workflow_id": "workflow_fixture_validation_failed"
+    },
+    "structured_result": null
+  }
+}
