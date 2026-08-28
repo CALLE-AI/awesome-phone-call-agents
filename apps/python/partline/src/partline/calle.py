@@ -11,12 +11,20 @@ class CalleAPIError(RuntimeError):
     pass
 
 
+OFFICIAL_CALLE_BASE_URL = "https://api.heycall-e.com"
+
+
 class CalleClient:
-    def __init__(self, api_key: str, base_url: str = "https://api.heycall-e.com") -> None:
+    def __init__(self, api_key: str, base_url: str = OFFICIAL_CALLE_BASE_URL) -> None:
         if not api_key:
             raise CalleAPIError("CALLE_API_KEY is required for a live run.")
+        normalized_base_url = base_url.rstrip("/")
+        if normalized_base_url != OFFICIAL_CALLE_BASE_URL:
+            raise CalleAPIError(
+                "Live CALL-E credentials may only be sent to the official HTTPS API origin."
+            )
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
+        self.base_url = normalized_base_url
 
     def _request(
         self,

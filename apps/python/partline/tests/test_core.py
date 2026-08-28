@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from partline.calle import CalleAPIError, CalleClient
 from partline.core import (
     PartLineError,
     SourcingRequest,
@@ -76,6 +77,16 @@ class PartLineCoreTests(unittest.TestCase):
 
     def test_mask_phone(self) -> None:
         self.assertEqual(mask_phone("+1555010101"), "+15******01")
+
+    def test_live_credentials_require_official_https_origin(self) -> None:
+        with self.assertRaises(CalleAPIError):
+            CalleClient("test-key", "http://127.0.0.1:8787")
+        with self.assertRaises(CalleAPIError):
+            CalleClient("test-key", "https://example.invalid")
+        self.assertEqual(
+            CalleClient("test-key", "https://api.heycall-e.com/").base_url,
+            "https://api.heycall-e.com",
+        )
 
 
 if __name__ == "__main__":

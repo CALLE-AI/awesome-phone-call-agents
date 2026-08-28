@@ -55,7 +55,7 @@ The live action is accepted only when all three conditions hold:
 
 ## Credentials
 
-PartLine reads `CALLE_API_KEY` from the process environment only. It does not load a `.env` file, write the key to disk or print the key. `.env.example` contains placeholders only. Do not commit a real CALL-E key.
+PartLine reads `CALLE_API_KEY` from the process environment only. It does not load a `.env` file, write the key to disk or print the key. Live credentials are accepted only for the official `https://api.heycall-e.com` origin; any other `CALLE_BASE_URL` fails closed. `.env.example` contains placeholders only. Do not commit a real CALL-E key.
 
 ## Cancellation and recovery
 
