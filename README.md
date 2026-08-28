@@ -149,7 +149,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
 - [SchemaRelay](https://github.com/14188769700lbk-dev/schemarelay) - Consent-gated CALL-E owner interviews that turn data schema-change questions into human-review evidence packets, with a no-call dry run by default.
 - [ShohojSheba Voice](https://shohojsheba-call-e-preview.redwan-rahman.workers.dev/judge) - Consent-gated healthcare staffing dispatch that uses structured CALL-E results to advance after a verified decline, pauses on acceptance, and keeps final assignment human-controlled.
-- [VoltGuard](https://github.com/Rubenskiada/VoltGuard) - An experimental, non-production voice-escalation code sketch.
+
 Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do not define a supported application API.
 
 | App | Language | Purpose |
@@ -159,6 +159,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/web/callproof`](apps/web/callproof/) | Ruby / Python | Closed-loop CALL-E workflow that checks transcript evidence against an immutable call contract and routes policy exceptions to persisted AgentKit human review. |
 | [`apps/typescript/evidence-grounded-callback`](apps/typescript/evidence-grounded-callback/) | TypeScript | Compiles owner-reviewed source evidence and positive callback consent into a masked CALL-E preview and separately gated MCP plan. |
 | [`apps/typescript/kincall`](apps/typescript/kincall/) | TypeScript | Consent-first check-in and trusted-circle coordination: a stated request for help overrides the agent's own judgement, contacts are called one at a time until somebody commits, and the monitored person is called back with the outcome. |
+| [`apps/typescript/revisit-zero`](apps/typescript/revisit-zero/) | TypeScript | Controlled meter-access recovery workbench with deterministic safety gates, exact call approval, one-recipient CALL-E execution, strict structured-result validation, and human-approved rebook export. |
 | [`apps/typescript/verify-contact-claim`](apps/typescript/verify-contact-claim/) | TypeScript | Contact-claim verifier for a suspicious voicemail, text or missed call: dials only the number printed on the customer's own card, asks whether that contact was genuine and returns the words that came back with a hash-chained record. |
 | [`apps/typescript/call-neuron`](apps/typescript/call-neuron/) | TypeScript | Functional consent-first scholarship outreach prototype with manual/file intake, identity-first disclosure, neutral voicemail, one-recipient CALL-E planning and confirmation, live status, human dispositions, and browser-local campaign data. |
 | [`apps/typescript/callparity`](apps/typescript/callparity/) | TypeScript / Python | Catalog pointer to CallParity. ClaimKill in this repo compiles leak-scored refute plans from fixtures with zero live CALL-E calls. |
