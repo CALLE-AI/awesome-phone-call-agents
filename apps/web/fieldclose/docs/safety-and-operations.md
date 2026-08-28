@@ -304,7 +304,7 @@ The application should have a server-side kill switch that prevents new live cal
 - [ ] An owner or operator can record a bounded, audited disposition that
   resolves the human task without performing an external scheduling, invoicing,
   or work-order action.
-- [ ] At least one authorized live test has inspectable evidence.
+- [x] At least one authorized live test has inspectable evidence.
 - [ ] The demo clearly distinguishes fixtures from live evidence.
 
 ## Known policy decisions still open

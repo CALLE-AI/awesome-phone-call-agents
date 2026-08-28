@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --canvas: #ffffff;
+  --paper: #ffffff;
+  --ink: #171717;
+  --muted: #6b7280;
+  --line: #e5e5e5;
+  --accent: #c45c26;
+  --accent-deep: #9a4318;
+  --forest: #2f6b4f;
+  --warn: #a15c12;
+  --danger: #9a3b2f;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.06);
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-forest: var(--forest);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-fraunces);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--canvas);
+  font-family: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, white);
+}
+
+.desk-grid {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}

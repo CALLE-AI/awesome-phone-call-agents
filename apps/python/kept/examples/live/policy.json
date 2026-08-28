@@ -1,0 +1,10 @@
+{
+  "grace_days_after_due": 3,
+  "quiet_hours_start": 22,
+  "quiet_hours_end": 7,
+  "min_days_between_calls": 0,
+  "promise_grace_days": 2,
+  "min_confidence_to_record": 0.7,
+  "max_promise_horizon_days": 45,
+  "max_calls_per_run": 1
+}

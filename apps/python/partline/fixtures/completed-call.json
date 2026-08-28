@@ -1,0 +1,65 @@
+{
+  "id": "call_partline_1042",
+  "status": "completed",
+  "task_completed": true,
+  "structured_result": {
+    "completed_count": 3,
+    "unresolved_count": 1
+  },
+  "recipients": [
+    {
+      "name": "Acme Industrial Supply",
+      "structured_result": {
+        "match_status": "exact",
+        "manufacturer_confirmed": "Fictional Bearing Co.",
+        "part_number_confirmed": "6205-2RS-C3",
+        "quantity_available": 8,
+        "unit_price": 24.5,
+        "currency": "USD",
+        "earliest_ship_date": "2026-08-28",
+        "shipping_cutoff": "15:30 America/Chicago",
+        "lead_time_days": 1,
+        "alternative_part_number": null,
+        "alternative_caveats": null,
+        "evidence_quote": "I have eight of 6205-2RS-C3 on the shelf and can ship six tomorrow.",
+        "needs_human_followup": false
+      }
+    },
+    {
+      "name": "Central Motion Components",
+      "structured_result": {
+        "match_status": "compatible",
+        "manufacturer_confirmed": "Example Motion",
+        "part_number_confirmed": "EM-6205-2RSC3",
+        "quantity_available": 12,
+        "unit_price": 19.75,
+        "currency": "USD",
+        "earliest_ship_date": "2026-08-28",
+        "shipping_cutoff": "14:00 America/Chicago",
+        "lead_time_days": 1,
+        "alternative_part_number": "EM-6205-2RSC3",
+        "alternative_caveats": "Supplier states dimensions, seals and C3 clearance match. Engineering approval required.",
+        "evidence_quote": "It is dimensionally the same with two rubber seals and C3 clearance.",
+        "needs_human_followup": true
+      }
+    },
+    {
+      "name": "Lakeside Bearings",
+      "structured_result": {
+        "match_status": "unknown",
+        "manufacturer_confirmed": null,
+        "part_number_confirmed": null,
+        "quantity_available": null,
+        "unit_price": null,
+        "currency": null,
+        "earliest_ship_date": null,
+        "shipping_cutoff": null,
+        "lead_time_days": null,
+        "alternative_part_number": null,
+        "alternative_caveats": null,
+        "evidence_quote": "Please email the request to our applications desk.",
+        "needs_human_followup": true
+      }
+    }
+  ]
+}

@@ -197,7 +197,7 @@ describe("protected live closeout workflow", () => {
         db,
         "live-owner",
         workspaceId,
-        protectedCaseInput("WO-LIVE-NON-US", "+861012345678"),
+        protectedCaseInput("WO-LIVE-NON-US", "+442079460000"),
         keys,
       ),
     ).rejects.toMatchObject({

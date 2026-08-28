@@ -128,6 +128,14 @@ without a second provider invocation. At 600 seconds, an unresolved
 final lookup moves the case to manual reconciliation; the operator can still
 refresh that same call later without redialing.
 
+Status polling is foreground-only. The first automatic check is scheduled about
+five seconds after the accepted case detail is displayed. Leaving or closing
+the page stops the timer because FieldClose has no background browser or server
+worker for this loop. Reopening a nonterminal case loads the persisted accepted
+attempt and resumes five-second status checks against that same provider call.
+If the case already reached manual reconciliation, reopen leaves automatic
+polling stopped and keeps the explicit `Refresh provider status` action.
+
 ### 6. Review the result
 
 The result keeps provider task status separate from business recommendation. It shows:
@@ -187,6 +195,10 @@ The Audit view shows append-only case transitions in order, including a human-re
 - Invalid case fields receive a field-specific message, `aria-invalid`, and
   focus. Safe not-found and access-denied states settle without leaving a
   loading indicator active.
+- Field and form validation stays beside the affected input or form. Approval,
+  execution, refresh, disposition, and sign-out failures use the single global
+  action alert. A visible multi-field registration summary is not a second live
+  region; the field-specific messages provide the alert announcements.
 - Disabled approval communicates the three required attestations structurally.
 - A skip link reaches the main content when focused.
 - Reduced-motion preferences disable entrance, drawer, route, spinner, and

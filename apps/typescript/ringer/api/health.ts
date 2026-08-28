@@ -25,7 +25,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     serverKeyLocked: keySet && !secretSet,
     // Scheduled calls fire server-side, so they need KV and a usable server key.
     hasScheduler: serverKeyUsable && kvConfigured(),
-    webhookConfigured: Boolean(process.env.CALLE_WEBHOOK_SECRET),
+    webhookConfigured: Boolean(process.env.CALLE_WEBHOOK_URL?.trim()),
     baseUrl: (process.env.CALLE_BASE_URL || 'https://api.heycall-e.com').replace(/\/$/, ''),
   })
 }

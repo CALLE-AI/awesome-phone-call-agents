@@ -1,0 +1,19 @@
+{
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "checkout p99 latency above 3s",
+        "severity": "sev2",
+        "service": "checkout-api"
+      },
+      "annotations": {
+        "summary": "p99 latency is 3.4s against a 1.2s objective and has been climbing for 12 minutes.",
+        "runbook_url": "https://runbooks.example.com/checkout-latency"
+      },
+      "fingerprint": "inc-2026-08-09-0113",
+      "startsAt": "2026-08-09T01:13:00-03:00"
+    }
+  ]
+}

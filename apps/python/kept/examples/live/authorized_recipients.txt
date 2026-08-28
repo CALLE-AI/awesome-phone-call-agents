@@ -1,0 +1,4 @@
+# One E.164 number per line. Every live call is checked against this file.
+# A run confirmation authorises the run; this file authorises the destination.
+# Replace the placeholder with a number you own and consent to being called on.
++910000000000
