@@ -1,5 +1,5 @@
 {
-  "checkin:1": "02-wants-seen.json",
+  "checkin:1": "demo/margaret-checkin.json",
   "checkin:2": "06-red-flag-mid-call.json",
   "checkin:3": "03-cannot-hear.json",
   "checkin:4": "05-declined.json",

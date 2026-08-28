@@ -148,7 +148,10 @@ def booked(conn, routed, monkeypatch, today, now):
             "time_of_day": "morning",
             "mode": "in_person",
             "clinician": "",
-            "approved_words": "I can't get up the stairs the way I could",
+            # A narrowing of what `recover_carried_words` sliced out of her own turn
+            # in the routed transcript. The live call returned no structured block, so
+            # this quote is the one the recovery found, not one the agent chose.
+            "approved_words": "i can get up the stairs the way i could",
             "reviewer_name": "Aimee",
         },
     )
