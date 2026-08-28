@@ -48,6 +48,7 @@ function isCandidateShape(value: Record<string, unknown>): boolean {
 
 function maskUnknown(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(maskUnknown);
+  if (typeof value === "string") return maskE164InText(value);
   if (!value || typeof value !== "object") return value;
   const record = value as Record<string, unknown>;
   if (isCandidateShape(record)) {
