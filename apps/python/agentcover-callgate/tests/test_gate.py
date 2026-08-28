@@ -1,17 +1,11 @@
-"""Tests: prove the gate allows, blocks, budgets, and kills — offline."""
-import json
-import os
-import sys
+"""Tests: prove the gate allows, blocks, budgets, and kills — offline.
+
+No external path hacks: the enforcement engine is vendored in
+agentcover_callgate/_engine.py, so this runs from a clean checkout.
+"""
 import unittest
 
-# Make the safety_protocol engine importable (it lives in the sibling repo).
-sys.path.insert(0, os.environ.get(
-    "SAFETY_PROTOCOL_SRC",
-    r"C:/Users/michael/safety-protocol/src",
-))
-
-from agentcover_callgate import AgentCoverCallGate, CallPlan
-from agentcover_callgate import rules as R
+from agentcover_callgate import AgentCoverCallGate, CallPlan, is_e164
 
 
 def gate(offline=True, budget=5000.0):
@@ -28,7 +22,7 @@ class TestGate(unittest.TestCase):
         g = gate()
         plan = CallPlan(
             task="Confirm Tuesday 2pm appointment.",
-            phones=["+15551234567"],
+            phones=["+155****4567"],
             region="US",
             locale="en-US",
             estimated_cost=1.0,
@@ -42,7 +36,7 @@ class TestGate(unittest.TestCase):
 
     def test_block_unknown_verb(self):
         g = gate()
-        from safety_protocol.core import ActionRequest
+        from agentcover_callgate._engine import ActionRequest
         res = g.protocol.execute(ActionRequest(
             action_type="spawn_subagent", target="x", estimated_cost=0.0))
         self.assertEqual(res.outcome.value, "blocked_scope")
@@ -51,7 +45,7 @@ class TestGate(unittest.TestCase):
         g = gate()
         plan = CallPlan(
             task="Hi.",
-            phones=["+19999999999"],  # not in the allowlist
+            phones=["+199****9999"],  # not in the allowlist
             region="US",
             locale="en-US",
             estimated_cost=1.0,
@@ -64,9 +58,9 @@ class TestGate(unittest.TestCase):
     def test_block_over_budget(self):
         g = gate(budget=2.0)
         # Two $1 calls: second should be blocked by budget.
-        p1 = CallPlan(task="a", phones=["+15551234567"], estimated_cost=1.0,
+        p1 = CallPlan(task="a", phones=["+155****4567"], estimated_cost=1.0,
                       idempotency_key="b1")
-        p2 = CallPlan(task="b", phones=["+15551234567"], estimated_cost=1.5,
+        p2 = CallPlan(task="b", phones=["+155****4567"], estimated_cost=1.5,
                       idempotency_key="b2")
         g.gate(p1, execute=True)
         res = g.gate(p2, execute=True)
@@ -75,7 +69,7 @@ class TestGate(unittest.TestCase):
     def test_kill_switch(self):
         g = gate()
         g.kill("operator test")
-        plan = CallPlan(task="a", phones=["+15551234567"], estimated_cost=1.0,
+        plan = CallPlan(task="a", phones=["+155****4567"], estimated_cost=1.0,
                         idempotency_key="k1")
         res = g.gate(plan, execute=True)
         self.assertEqual(res.outcome, "blocked_killswitch")
@@ -83,11 +77,19 @@ class TestGate(unittest.TestCase):
 
     def test_audit_present(self):
         g = gate()
-        g.gate(CallPlan(task="a", phones=["+15551234567"], estimated_cost=1.0,
+        g.gate(CallPlan(task="a", phones=["+155****4567"], estimated_cost=1.0,
                         idempotency_key="au1"), execute=True)
         self.assertGreater(len(g.protocol.audit._entries), 0)
         events = [e["event_type"] for e in g.protocol.audit._entries]
         self.assertIn("action_allowed", events)
+
+    def test_e164_validation(self):
+        # strict E.164 only
+        self.assertTrue(is_e164("+15551234567"))
+        self.assertFalse(is_e164("+155****4567"))      # masked placeholder
+        self.assertFalse(is_e164("15551234567"))       # no leading +
+        self.assertFalse(is_e164("+1 555 123 4567"))   # spaces
+        self.assertFalse(is_e164("+abc"))              # letters
 
 
 if __name__ == "__main__":
