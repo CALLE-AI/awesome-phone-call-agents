@@ -13,13 +13,13 @@ ALLOWED_VERBS = ["run_call"]
 DEFAULT_RULES: list[ScopeRule] = [
     ScopeRule(
         action_type="run_call",
-        # Allowlist of recipient fingerprints this agent may dial.
-        # In production these come from the scheduler's own patient roster;
-        # here we show the shape. broad prefixes are rejected by the linter
-        # philosophy — use exact/known fingerprints.
+        # Allowlist of recipient fingerprints this agent may dial (demo values).
+        # In a real deployment these come from the scheduler's own patient
+        # roster; here we show the shape. broad prefixes are rejected by the
+        # deny-by-default philosophy — use exact/known fingerprints.
         allowed_targets=[
-            "calle:call:fp:8a59780bb8cd2ba0",  # +15551234567 (demo patient line)
-            "calle:call:fp:5afca772560f2d44",  # +15557654321 (demo clinic line)
+            "calle:call:fp:80ec4b4820b9e577",  # +155****4567 (demo patient line, masked)
+            "calle:call:fp:5fd48603d08c533a",  # +155****4321 (demo clinic line, masked)
         ],
         match="exact",
         methods=["POST"],
@@ -32,7 +32,7 @@ DEFAULT_RULES: list[ScopeRule] = [
             "required": ["region", "locale", "task_len"],
             "additional_properties": False,
         },
-        max_cost=5.0,            # per-call cap
+        max_cost=5.0,            # per-call cap (demo)
         requires_approval=False,
     ),
 ]
