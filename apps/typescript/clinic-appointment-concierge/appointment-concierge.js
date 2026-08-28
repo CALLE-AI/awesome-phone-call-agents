@@ -123,8 +123,6 @@ class SafetyError extends Error {}
 
 function sanitizeForLog(text, maxLen = 200) {
   if (typeof text !== 'string') return '';
-  // Strip control characters and cap length so nothing unexpected (e.g.
-  // raw provider transcripts) gets dumped to stdout/logs unbounded.
   const cleaned = text.replace(/[\u0000-\u001F\u007F]/g, ' ').trim();
   return cleaned.length > maxLen ? `${cleaned.slice(0, maxLen)}…` : cleaned;
 }
@@ -179,23 +177,28 @@ function parseJsonSafely(raw, context) {
 // Core flow
 // ---------------------------------------------------------------------
 
+function buildGoal({ patient, reason, preferred }) {
+  return `Schedule a clinic appointment for patient ${patient}. ` +
+    `Reason for visit: ${reason}. Preferred time: ${preferred}. ` +
+    `If that exact time is not available, negotiate and accept the ` +
+    `closest available alternative time.`;
+}
+
 async function planCall({ phone, patient, reason, preferred }) {
+  const goal = buildGoal({ patient, reason, preferred });
   const raw = await runCalleCommand('call', [
     'plan',
-    '--phone', phone,
-    '--patient-name', patient,
-    '--reason', reason,
-    '--preferred-time', preferred,
-    '--format', 'json',
+    '--to-phone', phone,
+    '--goal', goal,
   ]);
   return parseJsonSafely(raw, 'plan_call');
 }
 
-async function runCall(planId) {
+async function runCall(planId, confirmToken) {
   const raw = await runCalleCommand('call', [
     'run',
     '--plan-id', planId,
-    '--format', 'json',
+    '--confirm-token', confirmToken,
   ]);
   return parseJsonSafely(raw, 'run_call');
 }
@@ -205,7 +208,6 @@ async function pollCallResult(runId, { maxAttempts = 6, delayMs = 5000 } = {}) {
     const raw = await runCalleCommand('call', [
       'status',
       '--run-id', runId,
-      '--format', 'json',
     ]);
     const result = parseJsonSafely(raw, 'get_call_run');
 
@@ -237,8 +239,6 @@ function summarizeOutcome(result) {
     };
   }
 
-  // Any status we don't explicitly recognize is treated as ambiguous —
-  // we do not assume success.
   return {
     status: 'AMBIGUOUS',
     message: `Unrecognized outcome status "${status}". Treating as ambiguous; no assumption of success is made.`,
@@ -247,7 +247,7 @@ function summarizeOutcome(result) {
 }
 
 async function handleRetryDecision(outcome, planContext) {
-  if (outcome.status === 'COMPLETED') return;
+  if (outcome.status === 'COMPLETED') return outcome;
 
   console.log('\n--- Retry decision required ---');
   console.log(sanitizeForLog(outcome.message));
@@ -258,21 +258,22 @@ async function handleRetryDecision(outcome, planContext) {
   const shouldRetry = await confirm('Retry the call now?');
   if (!shouldRetry) {
     console.log('Not retrying. Exiting without placing another call.');
-    return;
+    return outcome;
   }
 
   console.log('Retrying...');
-  await executeLiveCall(planContext, { isRetry: true });
+  return executeLiveCall(planContext, { isRetry: true });
 }
 
 async function executeLiveCall(planContext, { isRetry = false } = {}) {
   const plan = await planCall(planContext);
   const planId = plan.plan_id;
-  if (!planId) {
-    throw new Error('plan_call did not return a plan_id.');
+  const confirmToken = plan.confirm_token;
+  if (!planId || !confirmToken) {
+    throw new Error('plan_call did not return a plan_id and confirm_token.');
   }
 
-  const started = await runCall(planId);
+  const started = await runCall(planId, confirmToken);
   const runId = started.run_id;
   if (!runId) {
     throw new Error('run_call did not return a run_id.');
@@ -286,7 +287,7 @@ async function executeLiveCall(planContext, { isRetry = false } = {}) {
   console.log('\n--- Result ---');
   console.log(JSON.stringify(outcome, null, 2));
 
-  await handleRetryDecision(outcome, planContext);
+  return handleRetryDecision(outcome, planContext);
 }
 
 function printDryRun(planContext) {
@@ -370,12 +371,16 @@ async function main() {
     );
     if (!proceed) {
       console.log('Cancelled by user. No call was placed.');
+      process.exitCode = 1;
       return;
     }
   }
 
   try {
-    await executeLiveCall(planContext);
+    const finalOutcome = await executeLiveCall(planContext);
+    if (finalOutcome.status !== 'COMPLETED') {
+      process.exitCode = 1;
+    }
   } catch (err) {
     console.error(`Call failed: ${sanitizeForLog(err.message, 500)}`);
     process.exitCode = 1;

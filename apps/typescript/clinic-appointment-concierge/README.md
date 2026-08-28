@@ -1,10 +1,10 @@
 # Clinic Appointment Concierge
 
-A CALL-E-powered workflow plugin that calls a clinic on behalf of a patient to schedule an appointment, negotiates a different time if the preferred slot is unavailable, and returns a structured result.
+A CALL-E-powered runnable app that calls a clinic on behalf of a patient to schedule an appointment, negotiates a different time if the preferred slot is unavailable, and returns a structured result.
 
 ## Problem
 
-Booking a clinic appointment often means being put on hold, calling back multiple times, or waiting for office hours. This plugin automates the phone call itself: it dials the clinic, states the patient's request, and if the first-choice time isn't available, it can retry at a different time or ask the user to confirm a retry — all without the patient having to make the call.
+Booking a clinic appointment often means being put on hold, calling back multiple times, or waiting for office hours. This app automates the phone call itself: it dials the clinic, states the patient's request, and if the first-choice time isn't available, it can retry at a different time or ask the user to confirm a retry — all without the patient having to make the call.
 
 ## Who it's for
 
@@ -12,7 +12,7 @@ Anyone who needs to book a routine clinic appointment (check-up, follow-up, pres
 
 ## Safety model
 
-This plugin is built so it cannot place an unintended or unauthorized call:
+This app is built so it cannot place an unintended or unauthorized call:
 
 - **Dry-run by default.** Running the script without `--live` never places a call — it only prints what would happen.
 - **Explicit live confirmation.** `--live` mode asks for interactive `y/N` confirmation before dialing, unless `--yes` is also passed.
@@ -25,17 +25,17 @@ This plugin is built so it cannot place an unintended or unauthorized call:
 
 ## How it works
 
-The plugin uses three CALL-E CLI operations in sequence:
+The app uses the real CALL-E CLI contract in sequence:
 
-1. **`calle call plan`** — builds a call plan with the clinic's phone number, the patient's name, the reason for the visit, and the preferred appointment time.
-2. **`calle call run`** — executes the planned call.
-3. **`calle call status`** — polls for the call's status and result. If the call fails to connect or the requested time isn't available, the script surfaces a retry decision and prompts the user interactively (retry now, or stop).
+1. **`calle call plan --to-phone <clinic-number> --goal <text>`** — builds a call plan. The patient's name, reason for visit, and preferred time are combined into the `--goal` text. This returns a `plan_id` and a `confirm_token`.
+2. **`calle call run --plan-id <plan_id> --confirm-token <confirm_token>`** — executes the planned call. Both the plan ID and the confirmation token returned by `plan` are required to run the call.
+3. **`calle call status --run-id <run_id>`** — polls for the call's status and result. If the call fails to connect or the requested time isn't available, the script surfaces a retry decision and prompts the user interactively (retry now, or stop). A failed, timed-out, or declined-retry outcome exits with a non-zero status.
 
 ## Setup
 
 ```bash
 git clone <this-repo-url>
-cd plugins/clinic-appointment-concierge
+cd apps/typescript/clinic-appointment-concierge
 npm install
 ```
 
