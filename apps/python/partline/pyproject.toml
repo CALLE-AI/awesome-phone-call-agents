@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "partline"
+version = "0.2.0"
+description = "Evidence-backed industrial part sourcing through CALL-E phone agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "PartLine contributors" }]
+dependencies = []
+
+[project.scripts]
+partline = "partline.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"partline.web_static" = ["*.html", "*.css", "*.js"]
