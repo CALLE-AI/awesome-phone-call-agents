@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const schema = z.object({
+  ADMIN_API_KEY: z
+    .string()
+    .min(16, "ADMIN_API_KEY must be set to a random string of at least 16 characters (e.g. `openssl rand -hex 32`)."),
   CALLE_API_KEY: z.string().default(""),
   CALLE_BASE_URL: z.string().url().default("https://api.heycall-e.com"),
   CALLE_DRY_RUN: z

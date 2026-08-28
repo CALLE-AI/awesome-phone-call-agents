@@ -1,12 +1,14 @@
 import { runCall } from "../../calle/client.js";
+import { assessEvidence } from "../../calle/evidence.js";
 import { prisma } from "../../db/client.js";
-import { bookContactIntoSlot, findNextOpenSlot } from "../../services/booking.service.js";
+import { bookContactIntoSlot, findNextOpenSlot, SlotUnavailableError } from "../../services/booking.service.js";
 import { buildQualifyTask } from "./prompt.js";
 
 export interface QualifyOutcome {
   leadId: string;
-  callLogId: string;
-  result: "booked" | "waitlisted" | "not_qualified" | "no_answer" | "failed";
+  callLogId: string | null;
+  result: "booked" | "waitlisted" | "not_qualified" | "no_answer" | "failed" | "already_in_progress";
+  reason?: string | undefined;
 }
 
 export async function qualifyOne(leadId: string): Promise<QualifyOutcome> {
@@ -18,8 +20,18 @@ export async function qualifyOne(leadId: string): Promise<QualifyOutcome> {
     throw new Error(`Lead ${leadId} has no contact to call.`);
   }
 
+  // Atomic claim: only one caller can move this lead out of NEW. A retry or
+  // double-click that lands here while a call is already in flight (or
+  // already resolved) is a no-op instead of placing a second call.
+  const claimed = await prisma.lead.updateMany({
+    where: { id: leadId, status: "NEW" },
+    data: { status: "CALLING" },
+  });
+  if (claimed.count === 0) {
+    return { leadId, callLogId: null, result: "already_in_progress" };
+  }
+
   const nextOpenSlot = await findNextOpenSlot(lead.businessId);
-  await prisma.lead.update({ where: { id: leadId }, data: { status: "CALLING" } });
 
   const { task, resultSchema } = buildQualifyTask({
     businessName: lead.business.name,
@@ -42,12 +54,13 @@ export async function qualifyOne(leadId: string): Promise<QualifyOutcome> {
       preferred_timeframe: "This week if possible",
       wants_offered_slot: nextOpenSlot === null ? "unknown" : "yes",
     },
-    idempotencyKey: `qualify_${leadId}_${Date.now()}`,
+    idempotencyKey: `qualify:${leadId}`,
   });
 
-  if (call.status !== "completed" && call.status !== "dry_run") {
+  const evidence = assessEvidence(call, resultSchema);
+  if (!evidence.trusted) {
     await prisma.lead.update({ where: { id: leadId }, data: { status: "FAILED" } });
-    return { leadId, callLogId: call.callLogId, result: "failed" };
+    return { leadId, callLogId: call.callLogId, result: "failed", reason: evidence.reason };
   }
 
   const parsed = call.structuredResult ?? {};
@@ -68,9 +81,16 @@ export async function qualifyOne(leadId: string): Promise<QualifyOutcome> {
   }
 
   if (nextOpenSlot !== null && wantsSlot === "yes") {
-    await bookContactIntoSlot({ businessId: lead.businessId, contactId: lead.contact.id, slotId: nextOpenSlot.id });
-    await prisma.lead.update({ where: { id: leadId }, data: { ...enrichment, status: "BOOKED" } });
-    return { leadId, callLogId: call.callLogId, result: "booked" };
+    try {
+      await bookContactIntoSlot({ businessId: lead.businessId, contactId: lead.contact.id, slotId: nextOpenSlot.id });
+      await prisma.lead.update({ where: { id: leadId }, data: { ...enrichment, status: "BOOKED" } });
+      return { leadId, callLogId: call.callLogId, result: "booked" };
+    } catch (error) {
+      if (!(error instanceof SlotUnavailableError)) {
+        throw error;
+      }
+      // Someone else took the slot between our lookup and the booking attempt; fall through to waitlist.
+    }
   }
 
   const lowestPriority = await prisma.waitlistEntry.aggregate({

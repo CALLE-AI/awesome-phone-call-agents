@@ -60,8 +60,35 @@ export interface AppStatus {
   freeTierTotal: number;
 }
 
+const API_KEY_STORAGE_KEY = "ai-front-desk:api-key";
+
+export function getStoredApiKey(): string | null {
+  return localStorage.getItem(API_KEY_STORAGE_KEY);
+}
+
+export function setStoredApiKey(key: string): void {
+  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+}
+
+export function clearStoredApiKey(): void {
+  localStorage.removeItem(API_KEY_STORAGE_KEY);
+}
+
+/** Fired whenever a request comes back 401, so the app can drop the stored key and re-show the auth gate. */
+export const UNAUTHORIZED_EVENT = "ai-front-desk:unauthorized";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+  const apiKey = getStoredApiKey();
+  const headers = new Headers(init?.headers);
+  if (apiKey !== null) {
+    headers.set("Authorization", `Bearer ${apiKey}`);
+  }
+  const response = await fetch(path, { ...init, headers });
+  if (response.status === 401) {
+    clearStoredApiKey();
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    throw new Error("Unauthorized");
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `${response.status} ${response.statusText}`);

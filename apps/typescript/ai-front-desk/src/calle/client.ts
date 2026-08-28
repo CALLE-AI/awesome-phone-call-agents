@@ -6,6 +6,7 @@
 import { readCalleRuntimeConfig, assertLiveCallAllowed, type CalleRuntimeConfig } from "../config/env.js";
 import { prisma } from "../db/client.js";
 import type { NormalizedCallResult, RunCallInput, TranscriptTurn } from "./types.js";
+import type { CalleClient } from "@call-e/calle";
 
 const TERMINAL_WAIT = { timeoutMs: 5 * 60 * 1000, intervalMs: 7000 };
 
@@ -80,11 +81,55 @@ async function runDry(input: RunCallInput): Promise<NormalizedCallResult> {
     calleCallId: null,
     status: "dry_run",
     taskCompleted: true,
+    completionConfidence: { score: 1, label: "dry_run" },
     structuredResult: input.dryRunResult,
     summary: log.summary,
     transcript,
     dryRun: true,
   };
+}
+
+/**
+ * Looks up (or creates) the durable claim for this idempotencyKey and
+ * returns a CALL-E call id to wait on. If a claim already recorded an
+ * accepted call, client.calls.create() is never called again — a retry
+ * (after a crash, a duplicate request, anything) resumes on the existing
+ * call instead of placing a second one. If no call was accepted yet, create()
+ * is called with the SAME idempotencyKey so CALL-E's own server-side dedup
+ * protects against a race between two concurrent attempts.
+ */
+async function claimCall(
+  input: RunCallInput,
+  client: { calls: Pick<CalleClient["calls"], "create"> },
+  phone: string,
+): Promise<string> {
+  const existing = await prisma.callClaim.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+  if (existing?.calleCallId != null) {
+    return existing.calleCallId;
+  }
+  if (existing === null) {
+    try {
+      await prisma.callClaim.create({ data: { idempotencyKey: input.idempotencyKey, status: "PENDING" } });
+    } catch {
+      // Lost a create race to a concurrent caller with the same key; fall through and reuse it.
+    }
+  }
+
+  const created = await client.calls.create(
+    {
+      task: input.task,
+      recipients: [{ phones: [phone], region: "US", locale: "en-US" }],
+      resultSchema: input.resultSchema as unknown as Record<string, unknown>,
+      metadata: { flow: input.flow, app: "ai-front-desk" },
+    },
+    { idempotencyKey: input.idempotencyKey },
+  );
+
+  await prisma.callClaim.update({
+    where: { idempotencyKey: input.idempotencyKey },
+    data: { calleCallId: created.id, status: "CREATED" },
+  });
+  return created.id;
 }
 
 async function runLive(input: RunCallInput, config: CalleRuntimeConfig): Promise<NormalizedCallResult> {
@@ -96,17 +141,9 @@ async function runLive(input: RunCallInput, config: CalleRuntimeConfig): Promise
   const { CalleClient } = await import("@call-e/calle");
   const client = new CalleClient({ apiKey: config.CALLE_API_KEY, baseUrl: config.CALLE_BASE_URL });
 
-  const created = (await client.calls.create(
-    {
-      task: input.task,
-      recipients: [{ phones: [phone], region: "US", locale: "en-US" }],
-      resultSchema: input.resultSchema as unknown as Record<string, unknown>,
-      metadata: { flow: input.flow, app: "ai-front-desk" },
-    },
-    { idempotencyKey: input.idempotencyKey },
-  )) as { id: string };
+  const calleCallId = await claimCall(input, client, phone);
 
-  const snapshot = (await client.calls.waitForResult(created.id, TERMINAL_WAIT)) as {
+  const snapshot = (await client.calls.waitForResult(calleCallId, TERMINAL_WAIT)) as {
     id: string;
     status: string;
     taskCompleted: boolean | null;
@@ -138,12 +175,14 @@ async function runLive(input: RunCallInput, config: CalleRuntimeConfig): Promise
       dryRun: false,
     },
   });
+  await prisma.callClaim.update({ where: { idempotencyKey: input.idempotencyKey }, data: { status: "DONE" } });
   console.log(`[calle:LIVE] flow=${input.flow} call=${snapshot.id} status=${snapshot.status} phone=${mask(phone)}`);
   return {
     callLogId: log.id,
     calleCallId: snapshot.id,
     status: snapshot.status,
     taskCompleted: snapshot.taskCompleted,
+    completionConfidence: snapshot.completionConfidence,
     structuredResult: snapshot.structuredResult,
     summary: snapshot.summary,
     transcript,

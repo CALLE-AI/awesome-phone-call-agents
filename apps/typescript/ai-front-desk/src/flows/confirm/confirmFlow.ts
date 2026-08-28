@@ -1,13 +1,33 @@
 import { runCall } from "../../calle/client.js";
+import { assessEvidence } from "../../calle/evidence.js";
 import { prisma } from "../../db/client.js";
-import { freeSlotFromAppointment } from "../../services/booking.service.js";
+import { freeSlotFromAppointment, SlotUnavailableError } from "../../services/booking.service.js";
 import { startBackfillForSlot } from "../backfill/backfillFlow.js";
 import { buildConfirmTask } from "./prompt.js";
 
 export interface ConfirmOutcome {
   appointmentId: string;
-  callLogId: string;
-  result: "confirmed" | "rescheduled" | "cancelled_backfilling" | "no_answer" | "failed";
+  callLogId: string | null;
+  result: "confirmed" | "rescheduled" | "cancelled_backfilling" | "no_answer" | "failed" | "already_in_progress";
+  reason?: string | undefined;
+}
+
+/**
+ * Moves an appointment onto a different, currently-OPEN slot, atomically.
+ * Guards the target slot's OPEN->BOOKED flip the same way bookContactIntoSlot
+ * does, so a reschedule can never land on a slot someone else just took.
+ */
+async function rescheduleAppointmentToSlot(appointmentId: string, targetSlotId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.slot.updateMany({ where: { id: targetSlotId, status: "OPEN" }, data: { status: "BOOKED" } });
+    if (count === 0) {
+      throw new SlotUnavailableError(targetSlotId);
+    }
+    await tx.appointment.update({
+      where: { id: appointmentId },
+      data: { slotId: targetSlotId, status: "CONFIRMED", confirmationCallStatus: "CONFIRMED" },
+    });
+  });
 }
 
 /** Dry-run mock: confirms attendance. Pass mock="decline" to exercise the cancel→backfill branch offline. */
@@ -20,6 +40,18 @@ export async function confirmOne(appointmentId: string, mock: "attend" | "declin
     throw new Error(`Appointment ${appointmentId} has no slot; nothing to confirm.`);
   }
 
+  // Atomic claim: only one caller can move this appointment out of
+  // NOT_CALLED/pending states. A retry or double-click that lands here while
+  // a call is already in flight (or already resolved) is a no-op instead of
+  // placing a second call.
+  const claimed = await prisma.appointment.updateMany({
+    where: { id: appointmentId, confirmationCallStatus: "NOT_CALLED" },
+    data: { confirmationCallStatus: "CALLING" },
+  });
+  if (claimed.count === 0) {
+    return { appointmentId, callLogId: null, result: "already_in_progress" };
+  }
+
   const alternativeSlots = await prisma.slot.findMany({
     where: {
       businessId: appointment.businessId,
@@ -30,8 +62,6 @@ export async function confirmOne(appointmentId: string, mock: "attend" | "declin
     orderBy: { startsAt: "asc" },
     take: 2,
   });
-
-  await prisma.appointment.update({ where: { id: appointmentId }, data: { confirmationCallStatus: "CALLING" } });
 
   const { task, resultSchema } = buildConfirmTask({
     businessName: appointment.business.name,
@@ -52,16 +82,24 @@ export async function confirmOne(appointmentId: string, mock: "attend" | "declin
       mock === "attend"
         ? { will_attend: "yes", wants_reschedule: "no", chosen_alternative: "", reached_voicemail: "no" }
         : { will_attend: "no", wants_reschedule: "no", chosen_alternative: "", reached_voicemail: "no" },
-    idempotencyKey: `confirm_${appointmentId}_${Date.now()}`,
+    idempotencyKey: `confirm:${appointmentId}`,
   });
+
+  const evidence = assessEvidence(call, resultSchema);
+  if (!evidence.trusted) {
+    await prisma.appointment.update({ where: { id: appointmentId }, data: { confirmationCallStatus: "FAILED" } });
+    return { appointmentId, callLogId: call.callLogId, result: "failed", reason: evidence.reason };
+  }
 
   const parsed = call.structuredResult ?? {};
   const willAttend = String(parsed["will_attend"] ?? "unknown");
   const chosenAlternative = String(parsed["chosen_alternative"] ?? "");
+  const reachedVoicemail = String(parsed["reached_voicemail"] ?? "no") === "yes";
 
-  if (call.status !== "completed" && call.status !== "dry_run") {
-    await prisma.appointment.update({ where: { id: appointmentId }, data: { confirmationCallStatus: "FAILED" } });
-    return { appointmentId, callLogId: call.callLogId, result: "failed" };
+  // Voicemail is never a real confirmation, no matter what will_attend says.
+  if (reachedVoicemail) {
+    await prisma.appointment.update({ where: { id: appointmentId }, data: { confirmationCallStatus: "NO_ANSWER" } });
+    return { appointmentId, callLogId: call.callLogId, result: "no_answer" };
   }
 
   if (willAttend === "yes") {
@@ -77,11 +115,15 @@ export async function confirmOne(appointmentId: string, mock: "attend" | "declin
     const chosenSlot = optionMatch ? alternativeSlots[Number(optionMatch[1]) - 1] : undefined;
     if (chosenSlot !== undefined) {
       const freedSlotId = appointment.slotId;
-      await prisma.appointment.update({
-        where: { id: appointmentId },
-        data: { slotId: chosenSlot.id, status: "CONFIRMED", confirmationCallStatus: "CONFIRMED" },
-      });
-      await prisma.slot.update({ where: { id: chosenSlot.id }, data: { status: "BOOKED" } });
+      try {
+        await rescheduleAppointmentToSlot(appointmentId, chosenSlot.id);
+      } catch (error) {
+        if (error instanceof SlotUnavailableError) {
+          await prisma.appointment.update({ where: { id: appointmentId }, data: { confirmationCallStatus: "FAILED" } });
+          return { appointmentId, callLogId: call.callLogId, result: "failed", reason: error.message };
+        }
+        throw error;
+      }
       if (freedSlotId !== null) {
         await prisma.slot.update({ where: { id: freedSlotId }, data: { status: "OPEN" } });
         void startBackfillForSlot(freedSlotId).catch((error) => console.error("[backfill] failed:", error));
@@ -115,7 +157,12 @@ export async function runConfirmSweep(windowHours = 24): Promise<ConfirmOutcome[
   console.log(`[confirm-sweep] ${due.length} appointment(s) due for confirmation`);
   const outcomes: ConfirmOutcome[] = [];
   for (const { id } of due) {
-    outcomes.push(await confirmOne(id));
+    try {
+      outcomes.push(await confirmOne(id));
+    } catch (error) {
+      console.error(`[confirm-sweep] appointment ${id} failed:`, error);
+      outcomes.push({ appointmentId: id, callLogId: null, result: "failed", reason: String(error) });
+    }
   }
   return outcomes;
 }

@@ -3,12 +3,13 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { env } from "./config/env.js";
 import { api } from "./routes/index.js";
+import { requireApiKey } from "./middleware/auth.js";
 import { startScheduler } from "./cron/scheduler.js";
 
 const app = express();
 app.use(express.json());
 
-app.use("/api", api);
+app.use("/api", requireApiKey, api);
 
 const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web/dist");
 app.use(express.static(webDist));

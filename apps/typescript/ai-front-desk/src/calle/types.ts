@@ -45,6 +45,7 @@ export interface NormalizedCallResult {
   calleCallId: string | null;
   status: string; // completed | failed | canceled | dry_run
   taskCompleted: boolean | null;
+  completionConfidence: Confidence | null;
   structuredResult: Record<string, unknown> | null;
   summary: string | null;
   transcript: TranscriptTurn[];

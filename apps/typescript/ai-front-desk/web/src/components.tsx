@@ -24,6 +24,8 @@ const TAG_CLASS: Record<string, string> = {
   FAILED: "tag-outline",
   failed: "tag-outline",
   canceled: "tag-outline",
+  NEEDS_REVIEW: "tag-warning",
+  already_in_progress: "tag-warning",
 };
 
 export function StatusBadge({ status }: { status: string }) {

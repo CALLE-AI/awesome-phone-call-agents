@@ -42,10 +42,16 @@ multi-candidate backfill waterfall — is exercisable offline.
 cd apps/typescript/ai-front-desk
 npm install
 cp .env.example .env
+# set ADMIN_API_KEY in .env — e.g. `openssl rand -hex 32` — every /api route requires it
 npm run db:migrate     # creates dev.db and seeds Riverside Dental Clinic
 npm run web:build      # builds the dashboard once
 npm start              # http://localhost:3000 (set PORT in .env to change)
 ```
+
+The dashboard prompts for the admin API key on first load (stored in
+`localStorage`) and attaches it as `Authorization: Bearer <key>` on every
+request; a wrong or missing key gets a 401 from every `/api` route, including
+the simulate endpoints.
 
 Open the dashboard and:
 
@@ -57,7 +63,7 @@ Open the dashboard and:
 - **Call Activity** — expand any row to see the exact goal sent to CALL-E,
   the structured result, and the transcript.
 
-Automated tests (13, no credentials, no network beyond loopback):
+Automated tests (19, no credentials, no network beyond loopback):
 
 ```bash
 npm test        # tsc has already run in check; this runs prompt, flow, and
@@ -117,6 +123,31 @@ counter).
   explicitly instructs it not to give medical, legal, or financial advice,
   and to leave a voicemail and report an unknown/no-booking outcome rather
   than guess when it can't reach a person.
+- **Authenticated API**: every `/api` route (including the simulate triggers)
+  requires `Authorization: Bearer <ADMIN_API_KEY>`, checked with a
+  constant-time comparison ([`src/middleware/auth.ts`](src/middleware/auth.ts)).
+  There is no unauthenticated read of contacts/phones/transcripts and no
+  unauthenticated way to trigger a call, live or dry-run.
+- **Evidence gate before trusting a result**: a flow only mutates a booking
+  off a CALL-E structured result if the call actually completed, CALL-E
+  itself reported the task as completed, its confidence score cleared a
+  threshold, there's a transcript to back it up, and the JSON matches the
+  schema it was asked for ([`src/calle/evidence.ts`](src/calle/evidence.ts)).
+  An untrusted result marks the flow `FAILED`/`NEEDS_REVIEW` instead of
+  acting on unverified data; dry-run results are always trusted.
+- **Idempotent live calls**: idempotency keys are deterministic per logical
+  operation (`confirm:<appointmentId>`, `qualify:<leadId>`,
+  `backfill_<slotId>_<entryId>`), and a durable `CallClaim` row records the
+  CALL-E call id as soon as it's accepted — so a crash or a duplicate
+  request resumes waiting on the existing call instead of placing a second
+  real phone call. Each flow also atomically claims the record it's about to
+  call (`updateMany` on the expected prior status) so a second concurrent
+  invocation is a no-op rather than a duplicate call.
+- **Backfill waterfall halts on ambiguity**: if a waterfall candidate's call
+  result is untrusted (unclear, failed, low-confidence) it is **not**
+  treated as a decline. The waterfall stops, the entry is marked
+  `NEEDS_REVIEW`, and the slot stays open rather than risking a second
+  candidate also being offered — and later accepted — the same slot.
 
 ## Architecture
 
