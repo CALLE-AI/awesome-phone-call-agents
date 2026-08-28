@@ -1,4 +1,4 @@
-"""AgentCover CallGate CLI.
+"""AgentCover CallGate CLI — experimental in-memory demo.
 
 Usage:
   python -m agentcover_callgate demo
@@ -6,6 +6,10 @@ Usage:
   python -m agentcover_callgate gate examples/appointment.json --execute
   python -m agentcover_callgate status
   python -m agentcover_callgate kill "operator"
+
+NOTE: This is a demo. State is in-memory and not a system of record. Live
+dispatch (--execute with CALLE_API_KEY) requires strict E.164 recipients and
+uses only the official CALL-E HTTPS origin.
 """
 from __future__ import annotations
 
@@ -13,9 +17,6 @@ import argparse
 import json
 import os
 import sys
-
-sys.path.insert(0, os.environ.get(
-    "SAFETY_PROTOCOL_SRC", r"C:/Users/michael/safety-protocol/src"))
 
 from agentcover_callgate import AgentCoverCallGate, CallPlan, evidence_bundle
 
@@ -31,11 +32,11 @@ def _build_gate(args) -> AgentCoverCallGate:
 
 def cmd_demo(args) -> int:
     g = _build_gate(args)
-    print("== AgentCover CallGate demo (offline, real SDK via mock transport) ==")
+    print("== AgentCover CallGate demo (in-memory, offline, real SDK via mock transport) ==")
     print(f"bound agent {g.agent_id} -> owner {g.user_id}")
     plan = CallPlan(
         task="Confirm Tuesday 2:00 PM appointment for patient #4471.",
-        phones=["+15551234567"],
+        phones=["+155****4567"],
         region="US",
         locale="en-US",
         estimated_cost=1.0,
@@ -45,12 +46,14 @@ def cmd_demo(args) -> int:
     print(f"[GATE] outcome={res.outcome} reason={res.reason}")
     print(f"[SDK ] call returned status={res.call_result and res.call_result.get('status')}")
     ev = evidence_bundle(g)
-    print("[AUDIT] events:", len(ev["agentcover_insurance_bundle"]["immutable_audit_trail"]))
-    print("[AUDIT] sample:", ev["agentcover_insurance_bundle"]["immutable_audit_trail"][-1]["event_type"])
-    print("[INSURANCE] summary:", ev["agentcover_insurance_bundle"]["summary"])
+    print("[AUDIT] events:", len(ev["agentcover_demo_evidence"]["experimental_audit_trail"]))
+    print("[AUDIT] sample:", ev["agentcover_demo_evidence"]["experimental_audit_trail"][-1]["event_type"])
+    print("[EVIDENCE] summary:", ev["agentcover_demo_evidence"]["summary"])
+    print("[EVIDENCE] claims_ready:", ev["agentcover_demo_evidence"]["claims_ready"],
+          "(expected False — this is a demo)")
     # now exercise the kill switch
     g.kill("demo")
-    res2 = g.gate(CallPlan(task="x", phones=["+15551234567"],
+    res2 = g.gate(CallPlan(task="x", phones=["+155****4567"],
                            estimated_cost=1.0, idempotency_key="demo_k"),
                   execute=True)
     print(f"[KILL] subsequent call outcome={res2.outcome}")
@@ -88,7 +91,7 @@ def cmd_kill(args) -> int:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="agentcover-callgate",
-                                description="Bounded-autonomy gate for CALL-E calls.")
+                                description="Experimental bounded-autonomy gate for CALL-E calls (in-memory demo).")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pd = sub.add_parser("demo", help="offline full walkthrough")
@@ -96,7 +99,7 @@ def main(argv=None) -> int:
 
     pg = sub.add_parser("gate", help="gate a call plan JSON")
     pg.add_argument("plan", help="path to call plan JSON")
-    pg.add_argument("--execute", action="store_true", help="place real calls")
+    pg.add_argument("--execute", action="store_true", help="place real calls (requires CALLE_API_KEY + E.164)")
     pg.add_argument("--agent-id", default="sched_agent_01")
     pg.set_defaults(func=cmd_gate)
 
