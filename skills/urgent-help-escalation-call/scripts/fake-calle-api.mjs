@@ -25,22 +25,28 @@ const SCENARIOS = {
   acknowledged: {
     structured: { reached: 'caregiver', acknowledged: 'yes' },
     turns: [
-      { speaker: 'bot', text: 'Thomas, this is Yadira. Eleanor pressed the help button at 3:14 and is asking for you.' },
-      { speaker: 'user', text: 'Understood, I am going now.' },
+      { speaker: 'bot', text: 'Hello, this is Yadira. Am I speaking with Thomas?' },
+      { speaker: 'user', text: 'Yes, this is Thomas.' },
+      { speaker: 'bot', text: 'Eleanor pressed the help button at 3:14 and is asking for you. Are you able to get to them?' },
+      { speaker: 'user', text: 'Yes, I am going now.' },
     ],
   },
   heardNotGoing: {
     structured: { reached: 'caregiver', acknowledged: 'no' },
     turns: [
-      { speaker: 'bot', text: 'Thomas, this is Yadira. Eleanor pressed the help button at 3:14.' },
+      { speaker: 'bot', text: 'Hello, this is Yadira. Am I speaking with Thomas?' },
+      { speaker: 'user', text: 'Yes, this is Thomas.' },
+      { speaker: 'bot', text: 'Eleanor pressed the help button at 3:14 and is asking for you. Are you able to get to them?' },
       { speaker: 'user', text: 'I am two hours away, I cannot get there.' },
     ],
   },
   // The tempting failure: a message exists, but nobody has heard it. The ladder
-  // must continue.
+  // must continue. The voicemail text intentionally names nobody.
   voicemail: {
     structured: { reached: 'voicemail', acknowledged: 'unknown' },
-    turns: [{ speaker: 'bot', text: 'Leaving a message.' }],
+    turns: [
+      { speaker: 'bot', text: 'This is Yadira calling. There is an alert waiting in your app. Please check it now.' },
+    ],
   },
   noAnswer: {
     structured: { reached: 'no_answer', acknowledged: 'unknown' },
@@ -49,8 +55,9 @@ const SCENARIOS = {
   stranger: {
     structured: { reached: 'someone_else', acknowledged: 'unknown' },
     turns: [
-      { speaker: 'bot', text: 'Is this Thomas?' },
+      { speaker: 'bot', text: 'Hello, this is Yadira. Am I speaking with Thomas?' },
       { speaker: 'user', text: 'No, wrong number.' },
+      { speaker: 'bot', text: 'Sorry to have troubled you. Goodbye.' },
     ],
   },
 };
