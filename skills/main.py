@@ -31,19 +31,17 @@ except sr.UnknownValueError:
 except sr.RequestError:
     speak("Sorry, speech recognition is not available.")
     exit()
-if "washing" in request or "machine" in request:
+if "bus" in request or "bus available" in request or "bus arrival" in request:
+    result = bus_enquiry()
 
+elif "washing" in request or "machine" in request:
     result = washing_machine()
 
 elif "college" in request or "tnea" in request or "admission" in request:
-
     result = tnea_enquiry()
-elif "clinic" in request or "doctor" in request or "token" in request:
+
+elif "clinic" in request or "doctor" in request:
     result = clinic_enquiry()
-
-elif "bus" in request:
-
-    result = bus_enquiry()
 else:
 
     result = "Sorry, I don't understand your request."
