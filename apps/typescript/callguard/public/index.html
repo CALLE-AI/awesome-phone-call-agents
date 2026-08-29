@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>CallGuard</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+</head>
+
+
+<body>
+
+    <!-- =========================================
+         HEADER
+    ========================================== -->
+
+    <header class="header">
+
+        <div class="brand">
+
+            <div class="logo">
+                🚨
+            </div>
+
+            <div>
+
+                <h1>CallGuard</h1>
+
+                <p>
+                    AI Scam-Call Counter-Intelligence
+                </p>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- =========================================
+         HERO
+    ========================================== -->
+
+    <main>
+
+        <section class="hero">
+
+            <h2>
+                Don't just identify suspicious calls.
+                <br>
+                <span>Investigate them.</span>
+            </h2>
+
+            <p>
+
+                CallGuard uses CALL-E to conduct a real
+                phone investigation and analyze
+                conversational evidence for potential
+                scam patterns.
+
+            </p>
+
+        </section>
+
+
+        <!-- =====================================
+             INVESTIGATION
+        ====================================== -->
+
+        <section class="investigation-card">
+
+            <label for="phoneNumber">
+                Suspicious phone number
+            </label>
+
+            <input
+                id="phoneNumber"
+                type="tel"
+                placeholder="+91XXXXXXXXXX"
+            >
+
+            <button
+                id="investigateButton"
+                onclick="investigateCall()"
+            >
+
+                🔍 Investigate Call
+
+            </button>
+
+            <div
+                id="status"
+                class="status hidden"
+            ></div>
+
+        </section>
+
+
+        <!-- =====================================
+             INVESTIGATION REPORT
+        ====================================== -->
+
+        <section
+            id="report"
+            class="report hidden"
+        >
+
+            <div class="section-title">
+
+                <span>📋</span>
+
+                <h2>
+                    Investigation Report
+                </h2>
+
+            </div>
+
+
+            <div
+                id="riskCard"
+                class="risk-card"
+            >
+
+                <div>
+
+                    <span class="risk-label">
+                        RISK LEVEL
+                    </span>
+
+                    <strong id="riskLevel">
+                        —
+                    </strong>
+
+                </div>
+
+                <div class="risk-score">
+
+                    <span>
+                        Risk Score
+                    </span>
+
+                    <strong>
+                        <span id="riskScore">
+                            —
+                        </span>/100
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- Scam Type -->
+
+            <div class="report-section">
+
+                <h3>
+                    🎯 Likely Scam Type
+                </h3>
+
+                <p id="scamType">
+                    —
+                </p>
+
+            </div>
+
+
+            <!-- Indicators -->
+
+            <div class="report-section">
+
+                <h3>
+                    🚩 Detected Red Flags
+                </h3>
+
+                <div
+                    id="indicators"
+                    class="indicator-list"
+                ></div>
+
+            </div>
+
+
+            <!-- Signature -->
+
+            <div class="signature-box">
+
+                <h3>
+                    🧬 Scam Signature
+                </h3>
+
+                <code id="scamSignature">
+                    —
+                </code>
+
+            </div>
+
+
+            <!-- Recommendation -->
+
+            <div class="report-section recommendation">
+
+                <h3>
+                    🛡️ Safety Recommendation
+                </h3>
+
+                <p id="recommendation">
+                    —
+                </p>
+
+            </div>
+
+
+            <!-- Summary -->
+
+            <div class="report-section">
+
+                <h3>
+                    📞 Call Summary
+                </h3>
+
+                <p id="callSummary">
+                    —
+                </p>
+
+            </div>
+
+
+            <!-- Transcript -->
+
+            <div class="report-section">
+
+                <h3>
+                    📝 Conversation Transcript
+                </h3>
+
+                <div
+                    id="transcript"
+                    class="transcript"
+                ></div>
+
+            </div>
+
+
+            <!-- Intelligence Match -->
+
+            <div
+                id="matchCard"
+                class="match-card hidden"
+            >
+
+                <h3>
+                    🧬 Scam Intelligence Match
+                </h3>
+
+                <p id="matchMessage">
+                    —
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================
+             SCAM INTELLIGENCE
+        ====================================== -->
+
+        <section class="intelligence">
+
+            <div class="section-title">
+
+                <span>🧬</span>
+
+                <div>
+
+                    <h2>
+                        Scam Intelligence
+                    </h2>
+
+                    <p>
+                        Reusable patterns discovered
+                        from investigated calls.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="signatureCount"
+                class="signature-count"
+            >
+                Loading intelligence...
+            </div>
+
+
+            <div
+                id="signatureList"
+                class="signature-list"
+            ></div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================================
+         FOOTER
+    ========================================== -->
+
+    <footer>
+
+        CallGuard
+        <span>•</span>
+        Powered by CALL-E
+
+    </footer>
+
+
+    <script src="app.js"></script>
+
+</body>
+
+</html>

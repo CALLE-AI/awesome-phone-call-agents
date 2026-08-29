@@ -1,0 +1,24 @@
+{
+  "name": "callguard",
+  "version": "1.0.0",
+  "description": "AI scam-call counter-intelligence agent powered by CALL-E",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "call-e",
+    "ai",
+    "phone-calls",
+    "scam-detection",
+    "fraud-detection",
+    "voice-agent"
+  ],
+  "author": "Chalini",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
