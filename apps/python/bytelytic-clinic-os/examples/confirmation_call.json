@@ -1,0 +1,28 @@
+{
+  "description": "Dispatch a 24-hour appointment confirmation call (dry-run safe)",
+  "endpoint": "POST /calls/confirmation",
+  "headers": {
+    "X-API-Key": "bytelytic_demo_key_2026"
+  },
+  "body": {
+    "phone_number": "+15550192834",
+    "patient_name": "Jane Doe",
+    "appointment_time": "Tomorrow at 10:30 AM",
+    "appointment_id": "apt-101"
+  },
+  "example_response": {
+    "success": true,
+    "recipient": "+1555***2834",
+    "call_result": {
+      "status": "completed",
+      "task_completed": true,
+      "structured_result": {
+        "will_attend": "yes",
+        "preferred_reschedule_time": null,
+        "cancellation_reason": null,
+        "special_instructions_acknowledged": true
+      },
+      "dry_run": true
+    }
+  }
+}

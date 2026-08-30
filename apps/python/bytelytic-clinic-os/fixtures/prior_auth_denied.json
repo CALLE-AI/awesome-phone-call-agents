@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.97,
+    "label": "high"
+  },
+  "evidence": [
+    "Representative denied CPT 99213 \u2014 not medically necessary per payor guidelines."
+  ],
+  "structured_result": {
+    "auth_status": "denied",
+    "authorization_number": null,
+    "representative_name": "Marcus T. (Ext 812)",
+    "reference_number": "REF-99213-DENY-0821",
+    "denial_reason": "Service not medically necessary per payer clinical criteria."
+  },
+  "dry_run": true
+}

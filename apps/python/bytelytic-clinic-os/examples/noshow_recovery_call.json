@@ -1,0 +1,26 @@
+{
+  "description": "Dispatch a 2-hour no-show recovery call to missed patient",
+  "endpoint": "POST /calls/no-show",
+  "headers": {
+    "X-API-Key": "bytelytic_demo_key_2026"
+  },
+  "body": {
+    "phone_number": "+15550192834",
+    "patient_name": "Jane Doe",
+    "missed_appointment_time": "Today at 9:00 AM"
+  },
+  "example_response": {
+    "success": true,
+    "recipient": "+1555***2834",
+    "call_result": {
+      "status": "completed",
+      "task_completed": true,
+      "structured_result": {
+        "wants_rebook": "yes",
+        "preferred_time": "Next Tuesday at 2:00 PM",
+        "reason_for_no_show": "Transportation delay"
+      },
+      "dry_run": true
+    }
+  }
+}
