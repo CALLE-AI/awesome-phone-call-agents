@@ -114,10 +114,6 @@ class TheContradiction(unittest.TestCase):
         self.assertIsNone(contradiction(self.p, None))
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
-
 class SchemaAgainstTheProviderContract(unittest.TestCase):
     """Witnesses for the schema validator.
 
@@ -190,3 +186,7 @@ class TheFamilyThatNeedsContext(unittest.TestCase):
         for family in FAMILIES:
             if family != "country restricted":
                 call_task(NUM, family, "Some clause", "s")
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
