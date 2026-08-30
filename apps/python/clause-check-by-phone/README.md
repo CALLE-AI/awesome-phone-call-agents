@@ -80,10 +80,52 @@ and this module creates no schedule, no retry and no follow-up. Cancelling
 means not sending the task, or cancelling the call at the provider before it
 is dialled. Nothing in this contribution stores state between runs.
 
+## The schema is checked before the phone rings
+
+`validate_result_schema` compares the schema this module emits against the
+provider's own OpenAPI contract, not against JSON Schema in general. The
+contract names what it supports, `type`, `properties`, `required`, `enum`,
+nested objects, simple `array.items`, `description` and
+`additionalProperties: false`, and what it refuses, `$ref`, `oneOf`, `anyOf`,
+`allOf`, recursion, complex format validation and open objects.
+
+The reason to check early is that a malformed schema is **not** refused when
+the call is created. The call is placed, someone's phone rings, someone
+answers, and the structured result comes back `null` once the call reaches a
+terminal state. You have spent a call and a stranger's minute to learn
+nothing. The check moves that penalty to before the call, where it is free.
+
+One rule in the validator is not in the contract's refusal list, and it is the
+one worth arguing about. **An enum with no way to say the call settled nothing
+is rejected.** A yes/no schema is perfectly valid for the provider, it simply
+leaves the extraction model no choice but to pick a side when the call
+produced neither. Nothing flags it, and the invented answer looks exactly like
+an answer. The provider's own contract recommends including such a value; this
+module makes it mandatory.
+
+## A question that cannot be evaluated is not asked
+
+One family used to send an open question, *which countries of residence are
+accepted*, while expecting a yes or no field back. The extraction model
+received prose and a binary field, and was never told which country was at
+stake. It would have returned a value, and that value would have been
+invented.
+
+Families listed in `CONTEXT_REQUIRED` now refuse to produce a call task unless
+the missing piece is supplied.
+
+```bash
+python dry_run.py "country restricted" "Open to selected countries" --country France
+```
+
+Without `--country`, no call goes out and the reason is printed. This is the
+same principle as the rest of the module. A call is worth placing only when its
+answer can change something, and an answer nobody can interpret changes nothing.
+
 ## Tests
 
 ```bash
-python tests_bridge.py       # 14 witnesses, no call, no network, no key
+python tests_bridge.py       # 23 witnesses, no call, no network, no key
 ```
 
 Three of them are refusals, an unknown family, a clause with no quotation, and
@@ -91,6 +133,12 @@ a malformed number. Two guard the quotation itself, because it will be SPOKEN,
 and text meant for the eye tolerates a broken character that a speech engine
 pronounces. One guards the answer `unknown`, which must never be read as a
 contradiction, since an absence of answer is not a denial.
+
+Six more guard the schema validator, and every one of them is a schema built
+to be **refused**. A validator that rejects nothing proves nothing, so each
+conforming case is paired with a hostile one, an unsupported composition, an
+open object, an enum with no way out, a reserved field name, and a required
+field that was never declared.
 
 ## Phone numbers in this contribution
 

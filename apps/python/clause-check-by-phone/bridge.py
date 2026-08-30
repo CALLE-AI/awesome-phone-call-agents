@@ -39,7 +39,10 @@ FAMILIES = {
         {"open_to_non_students": ["yes", "no", "unknown"]},
     ),
     "country restricted": (
-        "which countries of residence are accepted",
+        # CONTEXT IS MANDATORY HERE, AND ONLY HERE. Without the country the
+        # question goes out open-ended and the field comes back binary, and
+        # nobody can connect the two. See CONTEXT_REQUIRED.
+        "whether someone who resides in {country} may take part",
         {"country_accepted": ["yes", "no", "unknown"]},
     ),
     "team required": (
@@ -58,6 +61,13 @@ CANCELS = {
     "country restricted": "yes",
     "team required": "yes",
 }
+
+
+# Families whose question means nothing without a piece of context.
+# A question the extraction model cannot evaluate still gets an answer, and
+# that answer is invented. Refusing to ask is cheaper than reading a fabricated
+# result as if it were evidence.
+CONTEXT_REQUIRED = {"country restricted": "country"}
 
 
 class NothingToAsk(Exception):
@@ -85,12 +95,17 @@ def readable(quote: str, limit: int = 220) -> str:
     return t
 
 
-def call_task(phone: str, family: str, quote: str, source: str) -> dict:
+def call_task(phone: str, family: str, quote: str, source: str,
+              context: dict | None = None) -> dict:
     """Return the call task and the result schema for ONE clause.
 
     `phone` is in international form. It is never logged and never returned
     anywhere except inside the task, which is the only place the provider
     needs it.
+
+    `context` carries the values some questions need in order to mean anything,
+    see CONTEXT_REQUIRED. A family that asks for one and does not get it places
+    NO call at all.
     """
     if family not in FAMILIES:
         raise NothingToAsk("unknown family, %r, no call is justified" % family)
@@ -99,7 +114,15 @@ def call_task(phone: str, family: str, quote: str, source: str) -> dict:
     if not re.match(r"^\+\d{7,15}$", phone or ""):
         raise NothingToAsk("invalid phone number, a call needs a recipient")
 
+    needed = CONTEXT_REQUIRED.get(family)
+    if needed and not (context or {}).get(needed):
+        raise NothingToAsk(
+            "family %r needs the %r context, without it the question goes out "
+            "open-ended and the answer comes back unusable" % (family, needed))
+
     question, fields = FAMILIES[family]
+    if needed:
+        question = question.format(**{needed: context[needed]})
     name, values = next(iter(fields.items()))
     task = (
         "Call {phone}. Speak the language of the person who answers. Say plainly "
@@ -146,3 +169,68 @@ def contradiction(prepared: dict, answer: dict) -> str | None:
                 "opposite. Their words, %s"
                 % (prepared["quote"], answer.get("their_words") or "not recorded"))
     return None
+
+
+# What the provider accepts inside a `result_schema`, and what it rejects.
+# Taken from its own OpenAPI contract rather than from JSON Schema in general.
+# The contract is explicit, unsupported features include `$ref`, `oneOf`,
+# `anyOf`, `allOf`, recursive schemas, complex format validation and
+# `additionalProperties: true`.
+SCHEMA_SUPPORTED = {"type", "properties", "required", "enum", "items",
+                    "description", "additionalProperties"}
+SCHEMA_REJECTED = {"$ref", "oneOf", "anyOf", "allOf", "not", "patternProperties",
+                   "format", "pattern", "minimum", "maximum"}
+RESERVED_NAMES = {"summary", "status", "transcript", "call_id"}
+
+
+def validate_result_schema(schema: dict, path: str = "$") -> list[str]:
+    """Return the list of departures from the provider contract. Empty is good.
+
+    WHY VALIDATE INSTEAD OF TRUSTING. A malformed schema is not rejected when
+    the call is created. The call runs, the caller's time is spent, and the
+    structured result comes back `null` once the call reaches a terminal state.
+    You pay for the call and learn nothing. This moves the penalty to before
+    the call, where it is free.
+
+    Returns a list rather than raising, because a schema can have several
+    faults and you want to see them all at once.
+    """
+    problems = []
+    if not isinstance(schema, dict):
+        return ["%s is not an object" % path]
+
+    for key in schema:
+        if key in SCHEMA_REJECTED:
+            problems.append("%s.%s is rejected by the provider" % (path, key))
+        elif key not in SCHEMA_SUPPORTED:
+            problems.append("%s.%s is outside the supported set" % (path, key))
+
+    if schema.get("type") == "object":
+        if schema.get("additionalProperties") is not False:
+            problems.append("%s must set additionalProperties to false" % path)
+        properties = schema.get("properties") or {}
+        if not properties:
+            problems.append("%s is an object with no property" % path)
+        for name, sub in properties.items():
+            if name in RESERVED_NAMES:
+                problems.append("%s.%s reuses a name the provider reserves" % (path, name))
+            problems += validate_result_schema(sub, "%s.%s" % (path, name))
+        for name in schema.get("required") or []:
+            if name not in properties:
+                problems.append("%s requires %r which is not declared" % (path, name))
+
+    values = schema.get("enum")
+    if values is not None:
+        if not values:
+            problems.append("%s has an empty enum" % path)
+        elif not any(str(v).lower() in ("unknown", "inconnu") for v in values):
+            # The provider contract recommends this in so many words. Without a
+            # way to say nothing was learned, the extraction model has to pick
+            # between yes and no when the call produced neither, and it will.
+            problems.append("%s offers no way to say the call settled nothing" % path)
+        if not schema.get("description"):
+            problems.append("%s enumerates without explaining how to choose" % path)
+
+    if schema.get("type") == "array" and "items" not in schema:
+        problems.append("%s is an array without items" % path)
+    return problems

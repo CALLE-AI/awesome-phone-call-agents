@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import sys
 
-from bridge import call_task, FAMILIES, NothingToAsk
+from bridge import call_task, FAMILIES, NothingToAsk, validate_result_schema
 
 # A fictional number, in the range reserved for documentation. It is never
 # dialled by this script, which places no call at all.
@@ -34,9 +34,17 @@ def main(argv=None):
         for f in FAMILIES:
             print("  %s" % f)
         return 2
-    family, quote = a[0], " ".join(a[1:])
+    family = a[0]
+    # A trailing `--country X` supplies the context some families require.
+    context, rest = {}, a[1:]
+    if "--country" in rest:
+        at = rest.index("--country")
+        if at + 1 < len(rest):
+            context["country"] = rest[at + 1]
+        rest = rest[:at] + rest[at + 2:]
+    quote = " ".join(rest)
     try:
-        prepared = call_task(FICTIONAL, family, quote, "dry run")
+        prepared = call_task(FICTIONAL, family, quote, "dry run", context)
     except NothingToAsk as e:
         print("NO CALL JUSTIFIED, %s" % e)
         print("This is not a failure. It is the common case, and it is the")
@@ -51,6 +59,18 @@ def main(argv=None):
             print("  %s." % part.strip().rstrip("."))
     print("\nEXPECTED RESULT SCHEMA")
     print(json.dumps(prepared["result_schema"], ensure_ascii=False, indent=2))
+
+    problems = validate_result_schema(prepared["result_schema"])
+    print("\nSCHEMA CHECKED AGAINST THE PROVIDER CONTRACT")
+    if problems:
+        for problem in problems:
+            print("  REJECTED, %s" % problem)
+        print("  A malformed schema is not refused when the call is created.")
+        print("  The call runs and the structured result comes back null, so")
+        print("  the check belongs here, before anyone's phone rings.")
+        return 1
+    print("  conforming, the provider will be able to return a result")
+
     print("\nNo call was placed. The number above is fictional.")
     return 0
 
