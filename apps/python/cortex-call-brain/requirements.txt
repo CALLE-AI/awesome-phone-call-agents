@@ -1,0 +1,7 @@
+# Core (brain + learning loop)
+google-genai>=0.3.0
+numpy>=1.26
+python-dotenv>=1.0
+
+# Dashboard only (optional — the operator console + brain map)
+streamlit>=1.40
