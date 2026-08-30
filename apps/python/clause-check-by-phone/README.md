@@ -59,6 +59,34 @@ prepared = call_task("+33XXXXXXXXX", "students only",
 verdict = contradiction(prepared, structured_result)   # None, or one sentence
 ```
 
+## Usage, the call actually placed
+
+`place_call.py` is the runtime path. It posts to `POST /v1/calls` on
+`api.heycall-e.com` with a Bearer key read from the environment, and reads the
+finished call back from `GET /v1/calls/{id}`.
+
+```bash
+export CALLE_API_KEY=...
+python place_call.py "students only" "Students only" --to +33XXXXXXXXX
+```
+
+```python
+from place_call import place, collect
+
+prepared, queued = place("+33XXXXXXXXX", "students only",
+                         "Students only", "https://example.com/offer")
+payload, verdict = collect(queued["id"], prepared)     # None, or one sentence
+```
+
+Three refusals happen before anything rings, and none of them costs a call. A
+clause outside the six families never becomes a request. A schema the provider
+would accept and then fail to fill is refused here. A missing key stops the run
+with a sentence rather than with a `401` that reads like a permissions problem.
+
+The transport is a parameter of `place` and `collect`, which is why the
+witnesses can exercise every path through this file without a key and without
+dialling anyone.
+
 ## Side effects
 
 **It places a real phone call to a real person.** That is the whole side
@@ -126,6 +154,7 @@ answer can change something, and an answer nobody can interpret changes nothing.
 
 ```bash
 python tests_bridge.py       # 23 witnesses, no call, no network, no key
+python tests_place_call.py   # 10 more, on the file that dials, same rule
 ```
 
 Three of them are refusals, an unknown family, a clause with no quotation, and
