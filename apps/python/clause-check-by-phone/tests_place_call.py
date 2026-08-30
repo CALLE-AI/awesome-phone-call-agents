@@ -8,6 +8,8 @@ can be exercised with a stub that records what would have left the machine.
 The witnesses below assert as much about what is NOT sent as about what is.
 """
 from __future__ import annotations
+import contextlib
+import io
 import json
 import os
 import sys
@@ -68,7 +70,11 @@ class NothingLeavesTheMachine(unittest.TestCase):
         self.assertEqual(transport.sent, [])
 
     def test_the_command_line_without_a_number_asks_and_sends_nothing(self):
-        self.assertEqual(main([]), 2)
+        aide = io.StringIO()
+        with contextlib.redirect_stdout(aide):
+            code = main([])
+        self.assertEqual(code, 2)
+        self.assertIn('--to', aide.getvalue())
 
 
 class WhatIsActuallySent(unittest.TestCase):
