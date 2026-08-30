@@ -142,5 +142,7 @@ field that was never declared.
 
 ## Phone numbers in this contribution
 
-Every sample uses `+33000000000`, which is fictional and never dialled. No real
-number appears in the code, the tests, or this file.
+Every sample uses `+33000000000`, which is fictional and never dialled. The one
+test that needs a badly formed number uses `00 00 00 00 00`, all zeros, so that
+nothing in this contribution reads like a real number to a person scanning the
+file or to a tool scanning the repository for leaked data.

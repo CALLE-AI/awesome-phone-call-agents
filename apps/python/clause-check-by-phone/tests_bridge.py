@@ -79,8 +79,14 @@ class WhatDoesNotJustifyACall(unittest.TestCase):
             call_task(NUM, "students only", "   ", "s")
 
     def test_a_number_that_is_not_one(self):
+        """A nationally formatted number is not E.164, and must be refused.
+
+        The sample below is all zeros on purpose. An illustrative number with
+        varied digits reads like a real one to anyone scanning the file, and to
+        any tool that scans a repository for leaked personal data.
+        """
         with self.assertRaises(NothingToAsk):
-            call_task("06 12 34 56 78", "students only", "Students only", "s")
+            call_task("00 00 00 00 00", "students only", "Students only", "s")
 
 
 class TheContradiction(unittest.TestCase):
