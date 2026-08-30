@@ -19,7 +19,16 @@ const {
 
 const app = express();
 
-const PORT = 3000;
+const PORT =
+    process.env.PORT || 3000;
+
+
+// --------------------------------------------------
+// IN-MEMORY INVESTIGATION STATE
+// --------------------------------------------------
+
+const investigations =
+    new Map();
 
 
 // --------------------------------------------------
@@ -27,73 +36,280 @@ const PORT = 3000;
 // --------------------------------------------------
 
 app.use(cors());
-app.use(express.json());
+
+app.use(
+    express.json({
+        limit: "100kb"
+    })
+);
 
 
-// Serve frontend files from /public
-app.use(express.static(
-    path.join(__dirname, "..", "public")
-));
+// Serve frontend files
+app.use(
+    express.static(
+        path.join(
+            __dirname,
+            "..",
+            "public"
+        )
+    )
+);
+
+
+// --------------------------------------------------
+// HELPERS
+// --------------------------------------------------
+
+function isValidE164(
+    phoneNumber
+) {
+
+    return (
+        typeof phoneNumber === "string" &&
+        /^\+[1-9]\d{7,14}$/.test(
+            phoneNumber.trim()
+        )
+    );
+
+}
+
+
+function sanitizePhoneNumber(
+    phoneNumber
+) {
+
+    if (
+        !phoneNumber ||
+        typeof phoneNumber !== "string"
+    ) {
+
+        return null;
+
+    }
+
+    const value =
+        phoneNumber.trim();
+
+    if (
+        value.length <= 4
+    ) {
+
+        return "****";
+
+    }
+
+    return (
+        "*".repeat(
+            Math.max(
+                0,
+                value.length - 4
+            )
+        ) +
+        value.slice(-4)
+    );
+
+}
+
+
+function getSafeCallStatus(
+    status
+) {
+
+    return {
+        status:
+            status || "UNKNOWN"
+    };
+
+}
+
+
+function getRunId(
+    callResult
+) {
+
+    return (
+        callResult?.run_id ||
+        callResult?.result?.structuredContent?.run_id ||
+        callResult?.result?.run_id ||
+        null
+    );
+
+}
 
 
 // --------------------------------------------------
 // HEALTH CHECK
 // --------------------------------------------------
 
-app.get("/api/health", (req, res) => {
+app.get(
+    "/api/health",
+    (req, res) => {
 
-    res.json({
-        ok: true,
-        service: "CallGuard",
-        message: "CallGuard server is running"
-    });
+        res.json({
 
-});
+            ok: true,
+
+            service:
+                "CallGuard",
+
+            message:
+                "CallGuard server is running"
+
+        });
+
+    }
+);
 
 
 // --------------------------------------------------
 // START INVESTIGATION CALL
 // --------------------------------------------------
 
-app.post("/api/investigate", async (req, res) => {
+app.post(
+    "/api/investigate",
+    async (req, res) => {
 
-    try {
+        try {
 
-        const {
-            phoneNumber
-        } = req.body;
+            const {
 
+                phoneNumber,
 
-        // Basic validation
-        if (!phoneNumber) {
+                authorizedRecipient,
 
-            return res.status(400).json({
-                ok: false,
-                error: "Phone number is required"
-            });
+                confirmLiveCall
 
-        }
+            } = req.body || {};
 
 
-        console.log(
-            `\n📞 Starting CallGuard investigation for ${phoneNumber}`
-        );
+            // ------------------------------------------
+            // PHONE NUMBER VALIDATION
+            // ------------------------------------------
+
+            if (
+                !isValidE164(
+                    phoneNumber
+                )
+            ) {
+
+                return res.status(400).json({
+
+                    ok: false,
+
+                    error:
+                        "A valid E.164 phone number is required. Example: +916364353485"
+
+                });
+
+            }
 
 
-        // Investigation instructions
-        // Investigation instructions
-const goal = `
+            const normalizedPhoneNumber =
+                phoneNumber.trim();
+
+
+            // ------------------------------------------
+            // EXPLICIT AUTHORIZATION
+            // ------------------------------------------
+
+            if (
+                authorizedRecipient !== true ||
+                confirmLiveCall !== true
+            ) {
+
+                return res.status(403).json({
+
+                    ok: false,
+
+                    error:
+                        "Explicit authorization and live-call confirmation are required before placing a real call."
+
+                });
+
+            }
+
+
+            // ------------------------------------------
+            // IDEMPOTENCY
+            // ------------------------------------------
+
+            const idempotencyKey =
+                req.get(
+                    "X-Idempotency-Key"
+                );
+
+
+            if (
+                !idempotencyKey ||
+                typeof idempotencyKey !== "string" ||
+                idempotencyKey.length < 16 ||
+                idempotencyKey.length > 200
+            ) {
+
+                return res.status(400).json({
+
+                    ok: false,
+
+                    error:
+                        "A valid X-Idempotency-Key is required."
+
+                });
+
+            }
+
+
+            // Prevent the same request from
+            // starting another real call.
+
+            const existing =
+                investigations.get(
+                    idempotencyKey
+                );
+
+
+            if (existing) {
+
+                return res.json({
+
+                    ok: true,
+
+                    status:
+                        existing.status,
+
+                    runId:
+                        existing.runId,
+
+                    message:
+                        "This investigation request has already been accepted."
+
+                });
+
+            }
+
+
+            console.log(
+                `\nStarting CallGuard investigation for ${sanitizePhoneNumber(normalizedPhoneNumber)}`
+            );
+
+
+            // ------------------------------------------
+            // INVESTIGATION GOAL
+            // ------------------------------------------
+
+            const goal = `
+
 You are CallGuard, an AI phone security investigator.
 
 You are conducting a controlled defensive investigation of a potentially suspicious
 phone communication.
 
 IMPORTANT SAFETY RULES:
+
 - Identify yourself honestly as an AI assistant conducting a security investigation.
-- Do not impersonate a bank employee, government official, police officer, recruiter,
-  company representative, or any real person.
-- Do not request, collect, repeat, or confirm any real OTP, password, PIN, CVV,
-  banking credential, payment credential, or remote-access credential.
+- Do not impersonate a bank employee, government official, police officer,
+  recruiter, company representative, or any real person.
+- Do not request, collect, repeat, or confirm any real OTP, password, PIN,
+  CVV, banking credential, payment credential, or remote-access credential.
 - Do not ask the caller to transfer money or provide sensitive personal information.
 - Ask neutral questions and gather conversational evidence only.
 - Do not make accusations or threaten the caller.
@@ -108,6 +324,7 @@ INVESTIGATION OBJECTIVES:
 3. Ask what action they want the recipient to take.
 
 4. Determine whether the caller is requesting or discussing:
+
    - OTPs or verification codes
    - passwords, PINs, CVVs, or other credentials
    - payments or money transfers
@@ -118,6 +335,7 @@ INVESTIGATION OBJECTIVES:
    through an official channel.
 
 6. Pay attention to conversational evidence such as:
+
    - bank or financial-service claims
    - KYC or account-verification claims
    - urgency or deadlines
@@ -128,6 +346,7 @@ INVESTIGATION OBJECTIVES:
    - refusal or inability to provide independent verification
 
 CONVERSATION STYLE:
+
 - Ask one concise question at a time.
 - Wait for the caller's response before asking the next question.
 - Do not reveal the scam indicators you are looking for.
@@ -135,131 +354,253 @@ CONVERSATION STYLE:
 - Once enough evidence has been collected, thank the caller and politely end the call.
 
 This is a CallGuard defensive security investigation.
+
 `;
 
 
-        // Start CALL-E call
-        const callResult = await startCall(
-            phoneNumber,
-            goal
-        );
+            // ------------------------------------------
+            // START CALL-E CALL
+            // ------------------------------------------
+
+            const callResult =
+                await startCall(
+                    normalizedPhoneNumber,
+                    goal
+                );
 
 
-        console.log(
-            "✅ CALL-E call started"
-        );
+            const runId =
+                getRunId(
+                    callResult
+                );
 
 
-        // Extract run ID
-        const runId =
-            callResult?.run_id ||
-            callResult?.result?.structuredContent?.run_id ||
-            callResult?.result?.run_id;
+            if (!runId) {
+
+                console.error(
+                    "CALL-E did not return a run ID."
+                );
+
+                return res.status(502).json({
+
+                    ok: false,
+
+                    error:
+                        "CALL-E did not return a run ID."
+
+                });
+
+            }
 
 
-        if (!runId) {
+            // Store only the information
+            // needed for retry protection.
 
-            console.error(
-                "CALL-E did not return a run ID:",
-                callResult
+            investigations.set(
+                idempotencyKey,
+                {
+
+                    runId,
+
+                    status:
+                        "CALL_STARTED",
+
+                    phoneNumber:
+                        sanitizePhoneNumber(
+                            normalizedPhoneNumber
+                        ),
+
+                    createdAt:
+                        new Date().toISOString()
+
+                }
             );
 
+
+            console.log(
+                "CALL-E investigation started:",
+                runId
+            );
+
+
+            return res.json({
+
+                ok: true,
+
+                status:
+                    "CALL_STARTED",
+
+                runId,
+
+                message:
+                    "CallGuard investigation call has started."
+
+            });
+
+
+        } catch (error) {
+
+            console.error(
+                "CallGuard investigation error:",
+                error.message
+            );
+
+
             return res.status(500).json({
+
                 ok: false,
-                error: "CALL-E did not return a run ID",
-                raw: callResult
+
+                error:
+                    "Unable to start the CallGuard investigation."
+
             });
 
         }
 
-
-        // Return immediately.
-        // The frontend can poll for the result.
-        res.json({
-
-            ok: true,
-
-            status: "CALL_STARTED",
-
-            runId,
-
-            message:
-                "CallGuard investigation call has started."
-        });
-
-
-    } catch (error) {
-
-        console.error(
-            "❌ Investigation error:",
-            error
-        );
-
-        res.status(500).json({
-
-            ok: false,
-
-            error: error.message
-        });
-
     }
-
-});
+);
 
 
 // --------------------------------------------------
-// GET INVESTIGATION RESULT
+// GET INVESTIGATION STATUS / REPORT
 // --------------------------------------------------
 
-app.get("/api/investigate/:runId", async (req, res) => {
-
-    try {
+app.get(
+    "/api/investigate/:runId",
+    async (req, res) => {
 
         const {
             runId
         } = req.params;
 
 
-        console.log(
-            `🔍 Checking CALL-E run: ${runId}`
-        );
+        if (
+            !runId ||
+            runId.length > 200
+        ) {
 
+            return res.status(400).json({
 
-        const callResult =
-            await getCallStatus(runId);
+                ok: false,
 
+                error:
+                    "Invalid investigation ID."
 
-        const structured =
-            callResult?.result?.structuredContent;
-
-
-        // If structuredContent is not present,
-        // return raw result for debugging.
-        if (!structured) {
-
-            return res.json({
-
-                ok: true,
-
-                status: "PROCESSING",
-
-                raw: callResult
             });
 
         }
 
 
-        const status =
-            structured.status;
+        try {
+
+            console.log(
+                "Checking CALL-E investigation:",
+                runId
+            );
 
 
-        // Call is still running
-        if (
-            status !== "COMPLETED" &&
-            status !== "FAILED" &&
-            status !== "NO ANSWER" &&
-            status !== "DECLINED"
-        ) {
+            const callResult =
+                await getCallStatus(
+                    runId
+                );
+
+
+            const structured =
+                callResult?.result?.structuredContent;
+
+
+            // ------------------------------------------
+            // PROVIDER RESPONSE NOT READY
+            // ------------------------------------------
+
+            if (!structured) {
+
+                return res.json({
+
+                    ok: true,
+
+                    status:
+                        "PROCESSING",
+
+                    message:
+                        "Investigation is still being processed."
+
+                });
+
+            }
+
+
+            const status =
+                structured.status ||
+                "UNKNOWN";
+
+
+            // ------------------------------------------
+            // CALL STILL RUNNING
+            // ------------------------------------------
+
+            if (
+
+                status !== "COMPLETED" &&
+                status !== "FAILED" &&
+                status !== "NO ANSWER" &&
+                status !== "DECLINED"
+
+            ) {
+
+                return res.json({
+
+                    ok: true,
+
+                    status,
+
+                    message:
+                        "Call is still in progress."
+
+                });
+
+            }
+
+
+            // ------------------------------------------
+            // CALL FINISHED
+            // ------------------------------------------
+
+            const result =
+                structured.result || {};
+
+
+            const transcript =
+                typeof result.transcript === "string"
+                    ? result.transcript
+                    : "";
+
+
+            const analysis =
+                analyzeTranscript(
+                    transcript
+                );
+
+
+            // ------------------------------------------
+            // SAVE REUSABLE SCAM INTELLIGENCE
+            // ------------------------------------------
+
+            const savedSignature =
+                saveScamInvestigation(
+
+                    null,
+
+                    analysis,
+
+                    result.summary || ""
+
+                );
+
+
+            // ------------------------------------------
+            // SAFE RESPONSE
+            // ------------------------------------------
 
             return res.json({
 
@@ -267,78 +608,186 @@ app.get("/api/investigate/:runId", async (req, res) => {
 
                 status,
 
-                message:
-                    structured.message ||
-                    "Call is still in progress."
+                runId,
+
+                signatureMatch:
+
+                    savedSignature
+
+                        ? {
+
+                            id:
+                                savedSignature.id,
+
+                            signature:
+                                savedSignature.signature,
+
+                            occurrences:
+                                savedSignature.occurrences
+
+                        }
+
+                        : null,
+
+                callSummary:
+                    result.summary || null,
+
+                transcript,
+
+                callOutcome:
+                    result.outcome || null,
+
+                analysis
+
+            });
+
+
+        } catch (error) {
+
+            console.error(
+                "CallGuard status error:",
+                error.message
+            );
+
+
+            return res.status(500).json({
+
+                ok: false,
+
+                error:
+                    "Unable to retrieve the investigation status."
+
             });
 
         }
 
-
-        // --------------------------------------------------
-        // CALL FINISHED
-        // --------------------------------------------------
-
-        const result =
-            structured.result || {};
+    }
+);
 
 
-        const transcript =
-            result.transcript || "";
-
-
-        // Analyze transcript
-        const analysis =
-            analyzeTranscript(transcript);
-
-        // --------------------------------------------------
-// Save reusable scam intelligence
+// --------------------------------------------------
+// SCAM INTELLIGENCE
 // --------------------------------------------------
 
-        const savedSignature =
-            saveScamInvestigation(
-                null,
-                analysis,
-                result.summary || ""
-           );
+app.get(
+    "/api/signatures",
+    (req, res) => {
+
+        try {
+
+            const signatures =
+                require("./database/scamDatabase")
+                    .getAllSignatures();
 
 
-        // Send complete CallGuard report
-        res.json({
+            // Return only the fields required
+            // by the frontend.
 
-    ok: true,
+            const safeSignatures =
+                signatures.map(
+                    signature => ({
 
-    status,
+                        id:
+                            signature.id,
 
-    runId,
+                        signature:
+                            signature.signature,
 
-    signatureMatch:
-        savedSignature
-            ? {
-                id: savedSignature.id,
-                signature: savedSignature.signature,
-                occurrences: savedSignature.occurrences
-            }
-            : null,
+                        scamType:
+                            signature.scamType,
 
-            callSummary:
-                result.summary || null,
+                        riskLevel:
+                            signature.riskLevel,
 
-            transcript,
+                        riskScore:
+                            signature.riskScore,
 
-            callOutcome:
-                result.outcome || null,
+                        confidence:
+                            signature.confidence,
 
-            analysis
+                        occurrences:
+                            signature.occurrences,
+
+                        firstSeen:
+                            signature.firstSeen,
+
+                        lastSeen:
+                            signature.lastSeen,
+
+                        latestSummary:
+                            signature.latestSummary
+
+                    })
+                );
+
+
+            return res.json({
+
+                ok: true,
+
+                count:
+                    safeSignatures.length,
+
+                signatures:
+                    safeSignatures
+
+            });
+
+
+        } catch (error) {
+
+            console.error(
+                "Scam intelligence error:",
+                error.message
+            );
+
+
+            return res.status(500).json({
+
+                ok: false,
+
+                error:
+                    "Unable to load scam intelligence."
+
+            });
+
+        }
+
+    }
+);
+
+
+// --------------------------------------------------
+// 404 API HANDLER
+// --------------------------------------------------
+
+app.use(
+    "/api",
+    (req, res) => {
+
+        res.status(404).json({
+
+            ok: false,
+
+            error:
+                "API endpoint not found."
 
         });
 
+    }
+);
 
-    } catch (error) {
+
+// --------------------------------------------------
+// ERROR HANDLER
+// --------------------------------------------------
+
+app.use(
+    (error, req, res, next) => {
 
         console.error(
-            "❌ Status error:",
-            error
+            "Unhandled server error:",
+            error.message
         );
 
 
@@ -346,86 +795,30 @@ app.get("/api/investigate/:runId", async (req, res) => {
 
             ok: false,
 
-            error: error.message
+            error:
+                "Internal server error."
 
         });
 
     }
-
-});
+);
 
 
 // --------------------------------------------------
 // START SERVER
 // --------------------------------------------------
-// --------------------------------------------------
-// SCAM INTELLIGENCE
-// --------------------------------------------------
 
-app.get("/api/signatures", (req, res) => {
+app.listen(
+    PORT,
+    () => {
 
-    try {
-
-        const {
-            getAllSignatures
-        } = require("./database/scamDatabase");
-
-
-        const signatures =
-            getAllSignatures();
-
-
-        res.json({
-
-            ok: true,
-
-            count:
-                signatures.length,
-
-            signatures
-
-        });
-
-    } catch (error) {
-
-        console.error(
-            "❌ Signature database error:",
-            error
+        console.log(
+            `CallGuard server running on port ${PORT}`
         );
 
-
-        res.status(500).json({
-
-            ok: false,
-
-            error: error.message
-
-        });
+        console.log(
+            `Local URL: http://localhost:${PORT}`
+        );
 
     }
-
-});
-
-
-
-
-app.listen(PORT, () => {
-
-    console.log("");
-    console.log("======================================");
-    console.log("       🚨 CALLGUARD SERVER 🚨");
-    console.log("======================================");
-    console.log("");
-    console.log(
-        `🌐 http://localhost:${PORT}`
-    );
-    console.log("");
-    console.log(
-        "📞 CALL-E integration: READY"
-    );
-    console.log(
-        "🧠 Scam analyzer: READY"
-    );
-    console.log("");
-
-});
+);

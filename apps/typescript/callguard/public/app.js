@@ -9,6 +9,9 @@ let statusTimer = null;
 const phoneInput =
     document.getElementById("phoneNumber");
 
+const authorizeCall =
+    document.getElementById("authorizeCall");
+
 const investigateButton =
     document.getElementById("investigateButton");
 
@@ -46,6 +49,32 @@ function hideStatus() {
 
 
 // ==================================================
+// GENERATE IDEMPOTENCY KEY
+// ==================================================
+
+function generateIdempotencyKey() {
+
+    if (
+        window.crypto &&
+        typeof window.crypto.randomUUID === "function"
+    ) {
+
+        return window.crypto.randomUUID();
+
+    }
+
+    return (
+        Date.now().toString(36) +
+        "-" +
+        Math.random()
+            .toString(36)
+            .substring(2)
+    );
+
+}
+
+
+// ==================================================
 // INVESTIGATE CALL
 // ==================================================
 
@@ -54,6 +83,10 @@ async function investigateCall() {
     const phoneNumber =
         phoneInput.value.trim();
 
+
+    // ------------------------------------------
+    // Phone number required
+    // ------------------------------------------
 
     if (!phoneNumber) {
 
@@ -65,6 +98,55 @@ async function investigateCall() {
         return;
 
     }
+
+
+    // ------------------------------------------
+    // Explicit authorization required
+    // ------------------------------------------
+
+    if (
+        !authorizeCall ||
+        !authorizeCall.checked
+    ) {
+
+        showStatus(
+            "Please confirm that you are authorized to investigate this number.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    // ------------------------------------------
+    // E.164 validation
+    // ------------------------------------------
+
+    const e164PhoneNumber =
+        /^\+[1-9]\d{7,14}$/;
+
+
+    if (
+        !e164PhoneNumber.test(phoneNumber)
+    ) {
+
+        showStatus(
+            "Please enter a valid E.164 phone number, for example +916364353485.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    // ------------------------------------------
+    // Create unique request key
+    // ------------------------------------------
+
+    const idempotencyKey =
+        generateIdempotencyKey();
 
 
     investigateButton.disabled =
@@ -94,13 +176,25 @@ async function investigateCall() {
                     method: "POST",
 
                     headers: {
+
                         "Content-Type":
-                            "application/json"
+                            "application/json",
+
+                        "X-Idempotency-Key":
+                            idempotencyKey
+
                     },
 
                     body: JSON.stringify({
-                        phoneNumber
+
+                        phoneNumber,
+
+                        authorizedRecipient: true,
+
+                        confirmLiveCall: true
+
                     })
+
                 }
             );
 
@@ -109,7 +203,10 @@ async function investigateCall() {
             await response.json();
 
 
-        if (!response.ok || !data.ok) {
+        if (
+            !response.ok ||
+            !data.ok
+        ) {
 
             throw new Error(
                 data.error ||
@@ -138,7 +235,9 @@ async function investigateCall() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
 
 
         showStatus(
@@ -165,7 +264,9 @@ async function investigateCall() {
 async function pollInvestigation() {
 
     if (!currentRunId) {
+
         return;
+
     }
 
 
@@ -181,7 +282,10 @@ async function pollInvestigation() {
             await response.json();
 
 
-        if (!response.ok || !data.ok) {
+        if (
+            !response.ok ||
+            !data.ok
+        ) {
 
             throw new Error(
                 data.error ||
@@ -206,9 +310,13 @@ async function pollInvestigation() {
         // ------------------------------------------
 
         if (
+
             status === "PREPARING" ||
+
             status === "RUNNING" ||
+
             status === "IN_PROGRESS"
+
         ) {
 
             showStatus(
@@ -234,9 +342,13 @@ async function pollInvestigation() {
         // ------------------------------------------
 
         if (
+
             status === "COMPLETED" ||
+
             status === "SUCCEEDED" ||
+
             data.analysis
+
         ) {
 
             clearTimeout(
@@ -275,8 +387,11 @@ async function pollInvestigation() {
         // ------------------------------------------
 
         if (
+
             status === "FAILED" ||
+
             status === "ERROR"
+
         ) {
 
             throw new Error(
@@ -300,7 +415,9 @@ async function pollInvestigation() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
 
 
         showStatus(
@@ -495,7 +612,9 @@ function displayReport(
                 line => {
 
                     if (!line.trim()) {
+
                         return;
+
                     }
 
 
@@ -516,7 +635,9 @@ function displayReport(
 
 
                     transcriptContainer
-                        .appendChild(element);
+                        .appendChild(
+                            element
+                        );
 
                 }
             );
@@ -540,8 +661,11 @@ function displayReport(
 
 
     if (
+
         data.signatureMatch &&
+
         data.signatureMatch.occurrences > 1
+
     ) {
 
         matchCard.classList.remove(
@@ -563,7 +687,9 @@ function displayReport(
     }
 
 
+    // ------------------------------------------
     // Scroll to report
+    // ------------------------------------------
 
     report.scrollIntoView({
         behavior: "smooth"
@@ -679,7 +805,10 @@ async function loadSignatures() {
 
 
                         <p>
-                            ${escapeHtml(signature.latestSummary || "No summary available.")}
+                            ${escapeHtml(
+                                signature.latestSummary ||
+                                "No summary available."
+                            )}
                         </p>
 
                     `;
@@ -717,22 +846,27 @@ function escapeHtml(
 ) {
 
     return String(value)
+
         .replace(
             /&/g,
             "&amp;"
         )
+
         .replace(
             /</g,
             "&lt;"
         )
+
         .replace(
             />/g,
             "&gt;"
         )
+
         .replace(
             /"/g,
             "&quot;"
         )
+
         .replace(
             /'/g,
             "&#039;"
