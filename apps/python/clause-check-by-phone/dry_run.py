@@ -23,7 +23,7 @@ from bridge import call_task, FAMILIES, NothingToAsk, validate_result_schema
 
 # A fictional number, in the range reserved for documentation. It is never
 # dialled by this script, which places no call at all.
-FICTIONAL = "+33000000000"
+FICTIONAL = "+447700900123"   # Ofcom drama range, 07700 900xxx
 
 
 def main(argv=None):

@@ -5,7 +5,12 @@ report only when the voice CONTRADICTS the page.
 
 **Host and provider.** Any agent host that can run Python 3.9 or later. The
 call itself is placed against the CALL-E API, `POST /v1/calls`, with a Bearer
-key. This contribution contains no key, no client, and no call.
+key. **This contribution contains no key and places no call on its own, but it
+does ship a client.** `place_call.py` reads a Bearer key from the environment
+and can dial a real person. It is the only file here that opens a socket, and
+it is opt-in twice over, once by the key and once by the authorised recipient
+list described below. Everything else, including the whole test suite, runs
+with no key and no network.
 
 ## Why it exists
 
@@ -52,7 +57,7 @@ task by placing it.
 ```python
 from bridge import call_task, contradiction
 
-prepared = call_task("+33XXXXXXXXX", "students only",
+prepared = call_task("+447700900123", "students only",
                      "Students only", "https://example.com/offer")
 # POST prepared["task"] and prepared["result_schema"] to /v1/calls
 # then, once the call reaches a terminal state
@@ -67,21 +72,24 @@ finished call back from `GET /v1/calls/{id}`.
 
 ```bash
 export CALLE_API_KEY=...
-python place_call.py "students only" "Students only" --to +33XXXXXXXXX
+export CALLE_ALLOWED_RECIPIENTS=+447700900123
+python place_call.py "students only" "Students only" --to +447700900123
 ```
 
 ```python
 from place_call import place, collect
 
-prepared, queued = place("+33XXXXXXXXX", "students only",
+prepared, queued = place("+447700900123", "students only",
                          "Students only", "https://example.com/offer")
 payload, verdict = collect(queued["id"], prepared)     # None, or one sentence
 ```
 
-Three refusals happen before anything rings, and none of them costs a call. A
-clause outside the six families never becomes a request. A schema the provider
-would accept and then fail to fill is refused here. A missing key stops the run
-with a sentence rather than with a `401` that reads like a permissions problem.
+Four refusals happen before anything rings, and none of them costs a call. A
+clause outside the six families never becomes a request. A recipient the
+operator has not authorised is refused even when the number is well formed. A
+schema the provider would accept and then fail to fill is refused here. A
+missing key stops the run with a sentence rather than with a `401` that reads
+like a permissions problem.
 
 The transport is a parameter of `place` and `collect`, which is why the
 witnesses can exercise every path through this file without a key and without
@@ -98,8 +106,14 @@ effect, and it is not reversible once the phone rings.
   to build into a tool whose subject is what people hide from you.
 - The task asks one question and only one, and says so twice.
 - It never argues and never sells.
-- Call the number you are authorised to call. There is no sandbox and no echo
-  number, so the dry-run path above is the only safe way to iterate.
+- A recipient has to be listed in `CALLE_ALLOWED_RECIPIENTS` before it can be
+  dialled, and an absent or empty list authorises nothing. This is enforced in
+  `place_call.place`, before the request is built. A well formed number is not
+  the same thing as a number you are allowed to call.
+- Numbers are validated as strict E.164, so a country code cannot start with a
+  zero and a trailing newline does not slip through.
+- There is no sandbox and no echo number, so the dry-run path above is the only
+  safe way to iterate.
 
 ## Cancellation and rollback
 
@@ -153,12 +167,17 @@ answer can change something, and an answer nobody can interpret changes nothing.
 ## Tests
 
 ```bash
-python tests_bridge.py       # 23 witnesses, no call, no network, no key
-python tests_place_call.py   # 10 more, on the file that dials, same rule
+python tests_bridge.py       # 26 witnesses, no call, no network, no key
+python tests_place_call.py   # 13 more, on the file that dials, same rule
 ```
 
-Three of them are refusals, an unknown family, a clause with no quotation, and
-a malformed number. Two guard the quotation itself, because it will be SPOKEN,
+Seven of the twenty-six refuse something, an unknown family, a clause with no
+quotation, a nationally formatted number, a country code starting with a zero,
+a number that kept its trailing newline, a number one digit past the E.164
+ceiling, and a question asked without the context it needs. Three witnesses in
+the second file hold the authorised recipient list, an empty list authorises
+nothing, an unlisted number never reaches the transport, and a list of several
+numbers is read with its spacing ignored. Two guard the quotation itself, because it will be SPOKEN,
 and text meant for the eye tolerates a broken character that a speech engine
 pronounces. One guards the answer `unknown`, which must never be read as a
 contradiction, since an absence of answer is not a denial.
@@ -171,7 +190,9 @@ field that was never declared.
 
 ## Phone numbers in this contribution
 
-Every sample uses `+33000000000`, which is fictional and never dialled. The one
-test that needs a badly formed number uses `00 00 00 00 00`, all zeros, so that
-nothing in this contribution reads like a real number to a person scanning the
-file or to a tool scanning the repository for leaked data.
+Every sample uses `+447700900123`, which sits in the block Ofcom reserves for
+drama, `07700 900xxx`. It is a valid E.164 number, so the snippets above run as
+written, and it is reserved, so it reaches nobody. The tests that need a badly
+formed number use `00 00 00 00 00` and `+0123456789`, neither of which is a
+number, so nothing in this contribution reads like a real one to a person
+scanning the file or to a tool scanning the repository for leaked data.
