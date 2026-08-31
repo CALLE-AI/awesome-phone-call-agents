@@ -19,12 +19,17 @@ orders are marked dispatchable.
    item, price.
 2. `OrdersService` creates the order in `PENDING_CALL`, then immediately
    calls `CallVerificationService.confirmOrder()`.
-3. `CallVerificationService` calls `calle.calls.createAndWait()` with:
-   - a `task` prompt describing what to confirm on the call
-   - a `recipient` (phone + name)
+3. `CallVerificationService` calls `calle.calls.create()` (not the SDK's
+   `createAndWait()` — see "Key design decisions" below for why), then polls
+   with `waitForResult()`. The call request includes:
+   - a `task` prompt describing what to confirm on the call, with the
+     customer's phone number embedded directly in the text (CALL-E infers
+     the target number from the task when `recipients` is omitted — the
+     live API rejects a separate `recipient` field despite what the SDK's
+     types suggest)
    - a `resultSchema` (JSON Schema) so CALL-E's agent returns a structured
-     `outcome` (`confirmed` / `declined` / `address_mismatch`) instead of
-     free text we'd have to parse ourselves
+     `outcome` (`confirmed` / `declined` / `address_mismatch` / `unknown`)
+     instead of free text we'd have to parse ourselves
 4. The order's status becomes `CONFIRMED`, `DECLINED`, `ADDRESS_MISMATCH`,
    or `UNREACHABLE` (fail-safe default if the call never connects).
 5. `GET /orders` lists everything for a dashboard; only `CONFIRMED` orders
@@ -32,20 +37,39 @@ orders are marked dispatchable.
 
 ## Setup
 
+### Quick start (safe demo — no API key needed)
+
 ```bash
 cp .env.example .env
-# edit .env and add your real CALLE_API_KEY (from the CALL-E install guide)
-
 npm install
-npm run build
-npm start
+npm run start:dev
 ```
+
+This runs in `CALLE_MODE=dry_run` by default. Orders are created and
+"confirmed" against a synthetic result — no outbound call is placed and no
+CALL-E account is required. You still need to set `DASHBOARD_API_KEY` in
+`.env` (already filled in with a dev default in `.env.example`), since
+`GET`/`POST /orders` require it.
+
+### Enabling real calls
+
+Only do this with a CALL-E account and phone numbers you're explicitly
+authorized to dial — this will place real outbound calls. In `.env`, set:
+
+- `CALLE_MODE=live`
+- `CALLE_API_KEY=<your real key>`
+- `CALLE_LIVE_CONFIRM=I_UNDERSTAND_THIS_DIALS_REAL_CUSTOMERS`
+- `ALLOWED_RECIPIENT_NUMBERS=<comma-separated E.164 numbers>`
+
+Numbers not on the allowlist are blocked before any call is placed.
 
 ## Try it
 
 Open **http://localhost:3000** in a browser — that's the dashboard
-(`public/index.html`). Fill in a customer name, phone, address, item, and
-price, and submit. The card shows the live status of every order: a
+(`public/index.html`). On first load it'll ask for the dashboard API key
+(matches `DASHBOARD_API_KEY` in your `.env`) and remember it in your
+browser. Fill in a customer name, phone, address, item, and price, and
+submit.
 pulsing "calling…" pill while CALL-E is on the phone, then confirmed
 (green) / declined or unreachable (red) / address issue (amber). Only
 confirmed orders get an enabled "Dispatch" button.
@@ -55,16 +79,20 @@ Or hit the API directly:
 ```bash
 curl -X POST http://localhost:3000/orders \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: changeme_dev_only" \
   -d '{
-    "customerName": "Ada Obi",
-    "phoneNumber": "+2348012345678",
-    "deliveryAddress": "12 Allen Avenue, Ikeja, Lagos",
+    "customerName": "Test Customer",
+    "phoneNumber": "+2340000000000",
+    "deliveryAddress": "1 Example Street, Example Town",
     "itemDescription": "Bluetooth headphones",
     "price": 15000
   }'
 ```
 
-With a real API key, this places an actual outbound call to that number.
+`X-API-Key` must match `DASHBOARD_API_KEY` in your `.env`. In the default
+`CALLE_MODE=dry_run` setting, this returns a synthetic `CONFIRMED` result
+with no real call placed. Real calls only happen when `CALLE_MODE=live` is
+explicitly set — see "Enabling real calls" above.
 
 ## A note on the CALL-E SDK integration
 
@@ -77,6 +105,18 @@ invisible to `tsc`'s transpiler and survives as a real ESM import at
 runtime. This was verified by inspecting the compiled `dist/` output
 directly, not assumed.
 
+## Auth & privacy
+
+- All `/orders` routes require an `X-API-Key` header matching
+  `DASHBOARD_API_KEY` in `.env`. There's no user system beyond this single
+  shared key — fine for an internal demo, not for a public deployment.
+- Phone numbers are masked (e.g. `+234****00`) in API responses, dashboard
+  rendering, and application logs. The full number is only ever sent
+  directly to CALL-E as part of placing the call.
+- In live mode, only numbers listed in `ALLOWED_RECIPIENT_NUMBERS` can be
+  called — this exists specifically to prevent this demo from being pointed
+  at arbitrary real customers without an explicit allowlist.
+
 ## What's a stub vs. real
 
 - Order storage is in-memory (`Map`) — swap for Postgres/Mongo for
@@ -87,3 +127,5 @@ directly, not assumed.
 - The dashboard (`public/index.html`) is plain HTML/CSS/JS served as a
   static file by NestJS itself (no separate frontend build) — good enough
   for the demo video; swap for a real frontend if this goes further.
+- Auth is a single shared `X-API-Key` — swap for real per-operator auth
+  (JWT, SSO, etc.) before this is exposed beyond a trusted internal team.

@@ -1,308 +1,421 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>DispatchCheck</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #12141c;
-    --surface: #191c26;
-    --surface-2: #1f2330;
-    --border: #2a2f3d;
-    --text: #e7e5de;
-    --text-dim: #8b90a3;
-    --go: #34d399;
-    --go-dim: #16302a;
-    --hold: #f5a623;
-    --hold-dim: #332a15;
-    --stop: #ef4444;
-    --stop-dim: #351d1d;
-    --pending: #6c7ae0;
-    --pending-dim: #1e2140;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    min-height: 100vh;
-  }
-  header {
-    padding: 28px 32px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .brand {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-  }
-  .brand-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--go);
-    box-shadow: 0 0 12px var(--go);
-    flex-shrink: 0;
-    position: relative;
-    top: -2px;
-  }
-  h1 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    margin: 0;
-  }
-  .tagline {
-    color: var(--text-dim);
-    font-size: 13px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  main {
-    padding: 28px 32px 60px;
-    max-width: 1100px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 340px 1fr;
-    gap: 24px;
-  }
-  @media (max-width: 820px) {
-    main { grid-template-columns: 1fr; }
-  }
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-  }
-  .panel h2 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-    margin: 0 0 16px;
-  }
-  label {
-    display: block;
-    font-size: 12px;
-    color: var(--text-dim);
-    margin: 14px 0 6px;
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  label:first-of-type { margin-top: 0; }
-  input {
-    width: 100%;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 12px;
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-  }
-  input:focus {
-    outline: none;
-    border-color: var(--pending);
-  }
-  button {
-    width: 100%;
-    margin-top: 20px;
-    background: var(--go);
-    color: #0a1410;
-    border: none;
-    border-radius: 6px;
-    padding: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    font-family: 'Space Grotesk', sans-serif;
-  }
-  button:hover { filter: brightness(1.08); }
-  button:disabled {
-    background: var(--surface-2);
-    color: var(--text-dim);
-    cursor: wait;
-  }
-  .hint {
-    margin-top: 12px;
-    font-size: 12px;
-    color: var(--text-dim);
-    line-height: 1.5;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  th {
-    text-align: left;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-dim);
-    padding: 0 10px 10px;
-    border-bottom: 1px solid var(--border);
-  }
-  td {
-    padding: 12px 10px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-  }
-  tr:last-child td { border-bottom: none; }
-  .mono { font-family: 'IBM Plex Mono', monospace; color: var(--text-dim); }
-  .item-name { font-weight: 500; }
-  .item-sub { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    padding: 4px 9px;
-    border-radius: 100px;
-    white-space: nowrap;
-  }
-  .status-pill .light { width: 7px; height: 7px; border-radius: 50%; }
-  .st-CONFIRMED { background: var(--go-dim); color: var(--go); }
-  .st-CONFIRMED .light { background: var(--go); box-shadow: 0 0 6px var(--go); }
-  .st-PENDING_CALL { background: var(--pending-dim); color: var(--pending); }
-  .st-PENDING_CALL .light { background: var(--pending); animation: pulse 1s infinite; }
-  .st-DECLINED { background: var(--stop-dim); color: var(--stop); }
-  .st-DECLINED .light { background: var(--stop); }
-  .st-UNREACHABLE { background: var(--stop-dim); color: var(--stop); }
-  .st-UNREACHABLE .light { background: var(--stop); }
-  .st-ADDRESS_MISMATCH { background: var(--hold-dim); color: var(--hold); }
-  .st-ADDRESS_MISMATCH .light { background: var(--hold); }
-  @keyframes pulse { 50% { opacity: 0.3; } }
-  .dispatch-btn {
-    width: auto;
-    margin: 0;
-    padding: 6px 12px;
-    font-size: 12px;
-    background: var(--go);
-  }
-  .dispatch-btn.blocked {
-    background: var(--surface-2);
-    color: var(--text-dim);
-    cursor: not-allowed;
-  }
-  .empty {
-    color: var(--text-dim);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-    padding: 30px 10px;
-    text-align: center;
-  }
-  .summary {
-    max-width: 260px;
-    font-size: 12px;
-    color: var(--text-dim);
-    line-height: 1.4;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DispatchCheck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #12141c;
+      --surface: #191c26;
+      --surface-2: #1f2330;
+      --border: #2a2f3d;
+      --text: #e7e5de;
+      --text-dim: #8b90a3;
+      --go: #34d399;
+      --go-dim: #16302a;
+      --hold: #f5a623;
+      --hold-dim: #332a15;
+      --stop: #ef4444;
+      --stop-dim: #351d1d;
+      --pending: #6c7ae0;
+      --pending-dim: #1e2140;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 28px 32px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--go);
+      box-shadow: 0 0 12px var(--go);
+      flex-shrink: 0;
+      position: relative;
+      top: -2px;
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+
+    .tagline {
+      color: var(--text-dim);
+      font-size: 13px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    main {
+      padding: 28px 32px 60px;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 820px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .panel h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin: 0 0 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 14px 0 6px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    label:first-of-type {
+      margin-top: 0;
+    }
+
+    input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--pending);
+    }
+
+    button {
+      width: 100%;
+      margin-top: 20px;
+      background: var(--go);
+      color: #0a1410;
+      border: none;
+      border-radius: 6px;
+      padding: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    button:disabled {
+      background: var(--surface-2);
+      color: var(--text-dim);
+      cursor: wait;
+    }
+
+    .hint {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      padding: 0 10px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .mono {
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--text-dim);
+    }
+
+    .item-name {
+      font-weight: 500;
+    }
+
+    .item-sub {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      padding: 4px 9px;
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+
+    .status-pill .light {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .st-CONFIRMED {
+      background: var(--go-dim);
+      color: var(--go);
+    }
+
+    .st-CONFIRMED .light {
+      background: var(--go);
+      box-shadow: 0 0 6px var(--go);
+    }
+
+    .st-PENDING_CALL {
+      background: var(--pending-dim);
+      color: var(--pending);
+    }
+
+    .st-PENDING_CALL .light {
+      background: var(--pending);
+      animation: pulse 1s infinite;
+    }
+
+    .st-DECLINED {
+      background: var(--stop-dim);
+      color: var(--stop);
+    }
+
+    .st-DECLINED .light {
+      background: var(--stop);
+    }
+
+    .st-UNREACHABLE {
+      background: var(--stop-dim);
+      color: var(--stop);
+    }
+
+    .st-UNREACHABLE .light {
+      background: var(--stop);
+    }
+
+    .st-ADDRESS_MISMATCH {
+      background: var(--hold-dim);
+      color: var(--hold);
+    }
+
+    .st-ADDRESS_MISMATCH .light {
+      background: var(--hold);
+    }
+
+    @keyframes pulse {
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .dispatch-btn {
+      width: auto;
+      margin: 0;
+      padding: 6px 12px;
+      font-size: 12px;
+      background: var(--go);
+    }
+
+    .dispatch-btn.blocked {
+      background: var(--surface-2);
+      color: var(--text-dim);
+      cursor: not-allowed;
+    }
+
+    .empty {
+      color: var(--text-dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      padding: 30px 10px;
+      text-align: center;
+    }
+
+    .summary {
+      max-width: 260px;
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+  </style>
 </head>
+
 <body>
 
-<header>
-  <div class="brand">
-    <span class="brand-dot"></span>
-    <div>
-      <h1>DispatchCheck</h1>
+  <header>
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <div>
+        <h1>DispatchCheck</h1>
+      </div>
     </div>
-  </div>
-  <div class="tagline">confirm before you send &mdash; powered by CALL-E</div>
-</header>
+    <div class="tagline">confirm before you send &mdash; powered by CALL-E</div>
+  </header>
 
-<main>
-  <section class="panel">
-    <h2>New order</h2>
-    <form id="order-form">
-      <label for="customerName">Customer name</label>
-      <input id="customerName" required placeholder="Ada Obi" />
+  <main>
+    <section class="panel">
+      <h2>New order</h2>
+      <form id="order-form">
+        <label for="customerName">Customer name</label>
+        <input id="customerName" required placeholder="Test Customer" />
 
-      <label for="phoneNumber">Phone (E.164 format)</label>
-      <input id="phoneNumber" required placeholder="+2348012345678" />
+        <label for="phoneNumber">Phone (E.164 format)</label>
+        <input id="phoneNumber" required placeholder="+2340000000000" />
 
-      <label for="deliveryAddress">Delivery address</label>
-      <input id="deliveryAddress" required placeholder="12 Allen Avenue, Ikeja, Lagos" />
+        <label for="deliveryAddress">Delivery address</label>
+        <input id="deliveryAddress" required placeholder="1 Example Street, Example Town" />
+        <label for="itemDescription">Item</label>
+        <input id="itemDescription" required placeholder="Bluetooth headphones" />
 
-      <label for="itemDescription">Item</label>
-      <input id="itemDescription" required placeholder="Bluetooth headphones" />
+        <label for="price">Price (₦)</label>
+        <input id="price" required type="number" min="0" placeholder="15000" />
 
-      <label for="price">Price (₦)</label>
-      <input id="price" required type="number" min="0" placeholder="15000" />
+        <button type="submit" id="submit-btn">Place order &amp; call to confirm</button>
+        <div class="hint">By default this runs in dry-run mode (CALLE_MODE=dry_run) — no real call is placed. Live mode
+          requires explicit operator confirmation in your .env.</div>
+      </form>
+    </section>
 
-      <button type="submit" id="submit-btn">Place order &amp; call to confirm</button>
-      <div class="hint">Submitting places a real CALL-E call to the number above to confirm the order before dispatch.</div>
-    </form>
-  </section>
+    <section class="panel">
+      <h2>Order manifest</h2>
+      <table id="orders-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Customer</th>
+            <th>Item</th>
+            <th>Status</th>
+            <th>Call notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="orders-body">
+          <tr>
+            <td colspan="6" class="empty">No orders yet &mdash; place one on the left.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
 
-  <section class="panel">
-    <h2>Order manifest</h2>
-    <table id="orders-table">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Customer</th>
-          <th>Item</th>
-          <th>Status</th>
-          <th>Call notes</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="orders-body">
-        <tr><td colspan="6" class="empty">No orders yet &mdash; place one on the left.</td></tr>
-      </tbody>
-    </table>
-  </section>
-</main>
+  <script>
+    const form = document.getElementById('order-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const ordersBody = document.getElementById('orders-body');
 
-<script>
-  const form = document.getElementById('order-form');
-  const submitBtn = document.getElementById('submit-btn');
-  const ordersBody = document.getElementById('orders-body');
-
-  const STATUS_LABEL = {
-    PENDING_CALL: 'calling…',
-    CONFIRMED: 'confirmed',
-    DECLINED: 'declined',
-    UNREACHABLE: 'unreachable',
-    ADDRESS_MISMATCH: 'address issue',
-  };
-
-  function statusPill(status) {
-    const label = STATUS_LABEL[status] || status;
-    return `<span class="status-pill st-${status}"><span class="light"></span>${label}</span>`;
-  }
-
-  function formatTimestamp(isoString) {
-    const d = new Date(isoString);
-    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
-    return { display: `${time}`, sub: date, title: d.toISOString() };
-  }
-
-  function renderOrders(orders) {
-    if (!orders.length) {
-      ordersBody.innerHTML = '<tr><td colspan="6" class="empty">No orders yet &mdash; place one on the left.</td></tr>';
-      return;
+    // Dev-only convenience: dashboard prompts once for the API key and
+    // remembers it in this browser. Must match DASHBOARD_API_KEY in your .env.
+    let apiKey = localStorage.getItem('dispatchcheck_api_key');
+    if (!apiKey) {
+      apiKey = prompt('Enter the dashboard API key (see your .env DASHBOARD_API_KEY):') || '';
+      localStorage.setItem('dispatchcheck_api_key', apiKey);
     }
-    ordersBody.innerHTML = orders.map((o) => {
-      const canDispatch = o.status === 'CONFIRMED';
-      const notes = o.callSummary || o.declineReason || o.correctedAddress || '—';
-      const ts = formatTimestamp(o.createdAt);
-      return `
+
+    const STATUS_LABEL = {
+      PENDING_CALL: 'calling…',
+      CONFIRMED: 'confirmed',
+      DECLINED: 'declined',
+      UNREACHABLE: 'unreachable',
+      ADDRESS_MISMATCH: 'address issue',
+    };
+
+    function statusPill(status) {
+      const label = STATUS_LABEL[status] || status;
+      return `<span class="status-pill st-${status}"><span class="light"></span>${label}</span>`;
+    }
+
+    function formatTimestamp(isoString) {
+      const d = new Date(isoString);
+      const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      const date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+      return { display: `${time}`, sub: date, title: d.toISOString() };
+    }
+
+    function renderOrders(orders) {
+      if (!orders.length) {
+        ordersBody.innerHTML = '<tr><td colspan="6" class="empty">No orders yet &mdash; place one on the left.</td></tr>';
+        return;
+      }
+      ordersBody.innerHTML = orders.map((o) => {
+        const canDispatch = o.status === 'CONFIRMED';
+        const notes = o.callSummary || o.declineReason || o.correctedAddress || '—';
+        const ts = formatTimestamp(o.createdAt);
+        return `
         <tr>
           <td title="${ts.title}">
             <div class="item-name mono">${ts.display}</div>
@@ -310,8 +423,7 @@
           </td>
           <td>
             <div class="item-name">${escapeHtml(o.customerName)}</div>
-            <div class="item-sub mono">${escapeHtml(o.phoneNumber)}</div>
-          </td>
+            <div class="item-sub mono">${escapeHtml(maskPhone(o.phoneNumber))}</div>          </td>
           <td>
             <div class="item-name">${escapeHtml(o.itemDescription)}</div>
             <div class="item-sub mono">${o.currency} ${Number(o.price).toLocaleString()}</div>
@@ -325,58 +437,67 @@
           </td>
         </tr>
       `;
-    }).join('');
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-  }
-
-  async function loadOrders() {
-    const res = await fetch('/orders');
-    const orders = await res.json();
-    renderOrders(orders);
-  }
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Calling customer…';
-
-    const payload = {
-      customerName: document.getElementById('customerName').value,
-      phoneNumber: document.getElementById('phoneNumber').value,
-      deliveryAddress: document.getElementById('deliveryAddress').value,
-      itemDescription: document.getElementById('itemDescription').value,
-      price: Number(document.getElementById('price').value),
-    };
-
-    try {
-      const res = await fetch('/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        alert('Could not place order: ' + (err.message || res.statusText));
-      } else {
-        form.reset();
-      }
-    } catch (err) {
-      alert('Network error: ' + err.message);
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Place order & call to confirm';
-      loadOrders();
+      }).join('');
     }
-  });
 
-  loadOrders();
-  setInterval(loadOrders, 5000);
-</script>
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str ?? '';
+      return div.innerHTML;
+    }
 
+    function maskPhone(p) {
+      if (!p || p.length < 6) return '***';
+      return p.slice(0, 4) + '*'.repeat(p.length - 6) + p.slice(-2);
+    }
+
+    async function loadOrders() {
+      const res = await fetch('/orders', { headers: { 'X-API-Key': apiKey } });
+      if (!res.ok) {
+        console.error('Failed to load orders:', res.status, await res.text());
+        ordersBody.innerHTML = `<tr><td colspan="6" class="empty">Auth error (${res.status}) — check your API key. Refresh to re-enter it.</td></tr>`;
+        return;
+      }
+      const orders = await res.json();
+      renderOrders(orders);
+    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Calling customer…';
+
+      const payload = {
+        customerName: document.getElementById('customerName').value,
+        phoneNumber: document.getElementById('phoneNumber').value,
+        deliveryAddress: document.getElementById('deliveryAddress').value,
+        itemDescription: document.getElementById('itemDescription').value,
+        price: Number(document.getElementById('price').value),
+      };
+
+      try {
+        const res = await fetch('/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert('Could not place order: ' + (err.message || res.statusText));
+        } else {
+          form.reset();
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Place order & call to confirm';
+        loadOrders();
+      }
+    });
+
+    loadOrders();
+    setInterval(loadOrders, 5000);
+  </script>
 </body>
+
 </html>

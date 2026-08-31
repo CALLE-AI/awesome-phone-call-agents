@@ -4,16 +4,32 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { Order } from './order.entity';
 import { OrderStatus } from './order-status.enum';
 import { CallVerificationService } from '../call-verification/call-verification.service';
+import { ConfigService } from '@nestjs/config';
+
 
 @Injectable()
 export class OrdersService {
+
+  private maskPhone(phone: string): string {
+    if (!phone || phone.length < 6) return '***';
+    return `${phone.slice(0, 4)}${'*'.repeat(phone.length - 6)}${phone.slice(-2)}`;
+  }
+
+  toPublicOrder(order: Order) {
+    return { ...order, phoneNumber: this.maskPhone(order.phoneNumber) };
+  }
+
+
   private readonly logger = new Logger(OrdersService.name);
 
   // In-memory store for the demo. Swap for Postgres/Mongo before going to
   // production - the interface below is small enough to lift out cleanly.
   private readonly orders = new Map<string, Order>();
 
-  constructor(private readonly callVerification: CallVerificationService) {}
+  constructor(
+    private readonly callVerification: CallVerificationService,
+    private readonly config: ConfigService,
+  ) { }
 
   findAll(): Order[] {
     return [...this.orders.values()].sort(
@@ -26,7 +42,6 @@ export class OrdersService {
     if (!order) throw new NotFoundException(`Order ${id} not found`);
     return order;
   }
-
   /**
    * Creates the order in PENDING_CALL state, then immediately triggers the
    * CALL-E confirmation call. The HTTP response returns once the call
@@ -49,6 +64,13 @@ export class OrdersService {
     this.orders.set(order.id, order);
 
     try {
+      if (!this.isRecipientAuthorized(dto.phoneNumber)) {
+        order.status = OrderStatus.UNREACHABLE;
+        order.callSummary = 'Blocked: recipient is not on the authorized-numbers list.';
+        order.updatedAt = new Date();
+        this.orders.set(order.id, order);
+        return order;
+      }
       const result = await this.callVerification.confirmOrder(dto, order.id);
       order.status = result.status;
       order.callSummary = result.summary;
@@ -67,9 +89,9 @@ export class OrdersService {
       };
       this.logger.error(
         `Confirmation call failed for order ${order.id}: ` +
-          `code=${calleErr.code ?? 'unknown'} status=${calleErr.status ?? 'unknown'} ` +
-          `message=${calleErr.message ?? String(err)} ` +
-          `details=${JSON.stringify(calleErr.details ?? {})}`,
+        `code=${calleErr.code ?? 'unknown'} status=${calleErr.status ?? 'unknown'} ` +
+        `message=${calleErr.message ?? String(err)} ` +
+        `details=${JSON.stringify(calleErr.details ?? {})}`,
       );
       order.status = OrderStatus.UNREACHABLE;
       order.callSummary = 'Call could not be completed due to an internal error.';
@@ -80,8 +102,20 @@ export class OrdersService {
     return order;
   }
 
-  /** Only CONFIRMED orders should ever be dispatched. */
+   /** Only CONFIRMED orders should ever be dispatched. */
   canDispatch(order: Order): boolean {
     return order.status === OrderStatus.CONFIRMED;
+  }
+
+  private isRecipientAuthorized(phoneNumber: string): boolean {
+    // Only enforced in live mode — dry_run never dials anyone, so it's a no-op.
+    if (this.config.get<string>('CALLE_MODE', 'dry_run') !== 'live') return true;
+
+    const allowlist = (this.config.get<string>('ALLOWED_RECIPIENT_NUMBERS') ?? '')
+      .split(',')
+      .map((n) => n.trim())
+      .filter(Boolean);
+
+    return allowlist.includes(phoneNumber);
   }
 }

@@ -66,7 +66,12 @@ const ORDER_CONFIRMATION_RESULT_SCHEMA = {
 export class CallVerificationService {
   private readonly logger = new Logger(CallVerificationService.name);
 
-  constructor(@Inject(CALLE_CLIENT) private readonly calle: CalleClient) {}
+  constructor(@Inject(CALLE_CLIENT) private readonly calle: CalleClient) { }
+
+  private maskPhone(phone: string): string {
+    if (!phone || phone.length < 6) return '***';
+    return `${phone.slice(0, 4)}${'*'.repeat(phone.length - 6)}${phone.slice(-2)}`;
+  }
 
   /**
    * Places an outbound call to the customer to confirm the order before a
@@ -74,51 +79,52 @@ export class CallVerificationService {
    * app never has to deal with raw call transcripts.
    */
   async confirmOrder(order: CreateOrderDto, orderId: string): Promise<CallVerificationResult> {
-    // CALL-E's current API has no separate `recipient` field - the phone
-    // number is inferred directly from the task text (see
-    // docs.heycall-e.com/calls: "recipients is optional. When it is
-    // omitted, include the phone target in task and CALL-E will infer it.")
-    const input: DispatchCallRequest = {
-      task: this.buildTaskPrompt(order),
-      resultSchema: ORDER_CONFIRMATION_RESULT_SCHEMA,
-      metadata: {
-        source: 'dispatchcheck',
-        orderId,
-        itemDescription: order.itemDescription,
-      },
-    };
+     
+  // CALL-E's current API has no separate `recipient` field - the phone
+  // number is inferred directly from the task text (see
+  // docs.heycall-e.com/calls: "recipients is optional. When it is
+  // omitted, include the phone target in task and CALL-E will infer it.")
+  const input: DispatchCallRequest = {
+    task: this.buildTaskPrompt(order),
+    resultSchema: ORDER_CONFIRMATION_RESULT_SCHEMA,
+    metadata: {
+      source: 'dispatchcheck',
+      orderId,
+      itemDescription: order.itemDescription,
+    },
+  };
 
     this.logger.log(
-      `Placing confirmation call to ${order.phoneNumber} for order: ${order.itemDescription}`,
-    );
+    `Placing confirmation call to ${this.maskPhone(order.phoneNumber)} for order: ${order.itemDescription}`,
+  );
 
-    // `as any`: see DispatchCallRequest comment above - the installed
-    // package's createAndWait(input: CreateCallInput) type is stale and
-    // would force us to send a field the live API rejects.
-    //
-    // We deliberately do NOT use the SDK's createAndWait() convenience
-    // method here. It bundles call creation and result-polling into one
-    // call, so a transient network error partway through polling (e.g. a
-    // dropped "fetch failed") throws away the call.id along with it - even
-    // though the call itself may have completed fine on CALL-E's side. By
-    // creating first and polling separately, a polling hiccup can retry
-    // against the SAME call instead of silently losing track of a real,
-    // possibly-successful phone call.
-    const created: Call = await this.calle.calls.create(input as any, {
-      idempotencyKey: `dispatchcheck_order_${orderId}`,
-    });
+// `as any`: see DispatchCallRequest comment above - the installed
+// package's createAndWait(input: CreateCallInput) type is stale and
+// would force us to send a field the live API rejects.
+//
+// It deliberately do NOT use the SDK's createAndWait() convenience
+// method here. It bundles call creation and result-polling into one
+// call, so a transient network error partway through polling (e.g. a
+// dropped "fetch failed") throws away the call.id along with it - even
+// though the call itself may have completed fine on CALL-E's side. By
+// creating first and polling separately, a polling hiccup can retry
+// against the SAME call instead of silently losing track of a real,
+// possibly-successful phone call.
+const created: Call = await this.calle.calls.create(input as any, {
+  idempotencyKey: `dispatchcheck_order_${orderId}`,
+});
 
-    this.logger.log(`Call ${created.id} created, waiting for result...`);
+this.logger.log(`Call ${created.id} created, waiting for result...`);
 
-    const call = await this.waitForResultWithRetry(created.id);
+const call = await this.waitForResultWithRetry(created.id);
 
-    this.logger.log(
-      `Call ${call.id} finished with status=${call.status} structuredResult=${JSON.stringify(
-        call.structuredResult,
-      )}`,
-    );
+this.logger.log(
+  `Call ${call.id} finished with status=${call.status} structuredResult=${JSON.stringify(
+    call.structuredResult,
+  )}`,
+);
 
-    return this.interpretResult(call);
+return this.interpretResult(call);
   }
 
   /**
@@ -128,60 +134,59 @@ export class CallVerificationService {
    * our polling connection drops, so retrying against the same call.id is
    * always safe and never re-dials the customer.
    */
-  private async waitForResultWithRetry(callId: string, maxAttempts = 3): Promise<Call> {
-    let lastError: unknown;
+  private async waitForResultWithRetry(callId: string, maxAttempts = 3): Promise < Call > {
+  let lastError: unknown;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        return await this.calle.calls.waitForResult(callId, {
-          timeoutMs: 120_000,
-          intervalMs: 2_000,
-        });
-      } catch (err) {
-        lastError = err;
-        this.logger.warn(
-          `waitForResult attempt ${attempt}/${maxAttempts} failed for call ${callId}: ${
-            (err as Error).message
-          }`,
-        );
-        if (attempt < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
-        }
-      }
-    }
-
-    // Polling never succeeded - fall back to a single direct read of
-    // whatever state the call is actually in right now. This still beats
-    // assuming UNREACHABLE outright, since the call may already be done.
+  for(let attempt = 1; attempt <= maxAttempts; attempt++) {
+  try {
+    return await this.calle.calls.waitForResult(callId, {
+      timeoutMs: 120_000,
+      intervalMs: 2_000,
+    });
+  } catch (err) {
+    lastError = err;
     this.logger.warn(
-      `Polling failed ${maxAttempts}x for call ${callId}, falling back to a direct GET.`,
+      `waitForResult attempt ${attempt}/${maxAttempts} failed for call ${callId}: ${(err as Error).message
+      }`,
     );
-    try {
-      return await this.calle.calls.get(callId);
-    } catch (err) {
-      this.logger.error(
-        `Direct GET also failed for call ${callId}: ${(err as Error).message}. ` +
-          `Original polling error: ${(lastError as Error)?.message}`,
-      );
-      throw lastError;
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
     }
+  }
+}
+
+// Polling never succeeded - fall back to a single direct read of
+// whatever state the call is actually in right now. This still beats
+// assuming UNREACHABLE outright, since the call may already be done.
+this.logger.warn(
+  `Polling failed ${maxAttempts}x for call ${callId}, falling back to a direct GET.`,
+);
+try {
+  return await this.calle.calls.get(callId);
+} catch (err) {
+  this.logger.error(
+    `Direct GET also failed for call ${callId}: ${(err as Error).message}. ` +
+    `Original polling error: ${(lastError as Error)?.message}`,
+  );
+  throw lastError;
+}
   }
 
   private buildTaskPrompt(order: CreateOrderDto): string {
-    return [
-      `Call ${order.phoneNumber} to confirm an order before it is dispatched for delivery.`,
-      `Ask for ${order.customerName}.`,
-      `Order: ${order.itemDescription}, price ${order.price} ${order.currency ?? 'NGN'}.`,
-      `Delivery address on file: ${order.deliveryAddress}.`,
-      `Politely confirm: `,
-      `(1) they still want this order, `,
-      `(2) the delivery address above is correct, `,
-      `(3) they will be available to receive it today.`,
-      `If they no longer want the order, ask for a one-sentence reason and end the call politely.`,
-      `If the address is wrong, ask them to state the correct address in full.`,
-      `Keep the call short and friendly.`,
-    ].join(' ');
-  }
+  return [
+    `Call ${order.phoneNumber} to confirm an order before it is dispatched for delivery.`,
+    `Ask for ${order.customerName}.`,
+    `Order: ${order.itemDescription}, price ${order.price} ${order.currency ?? 'NGN'}.`,
+    `Delivery address on file: ${order.deliveryAddress}.`,
+    `Politely confirm: `,
+    `(1) they still want this order, `,
+    `(2) the delivery address above is correct, `,
+    `(3) they will be available to receive it today.`,
+    `If they no longer want the order, ask for a one-sentence reason and end the call politely.`,
+    `If the address is wrong, ask them to state the correct address in full.`,
+    `Keep the call short and friendly.`,
+  ].join(' ');
+}
 
   /**
    * Prefers the structured result CALL-E's agent explicitly filled in.
@@ -190,44 +195,44 @@ export class CallVerificationService {
    * structuredResult at all, and per the docs it comes back as null.
    */
   private interpretResult(call: Call): CallVerificationResult {
-    const structured = call.structuredResult as
-      | { outcome?: string; correctedAddress?: string; declineReason?: string }
-      | null;
+  const structured = call.structuredResult as
+    | { outcome?: string; correctedAddress?: string; declineReason?: string }
+    | null;
 
-    if (structured?.outcome === 'confirmed') {
-      return {
-        status: OrderStatus.CONFIRMED,
-        rawCallStatus: call.status,
-        summary: call.summary ?? '',
-      };
-    }
-    if (structured?.outcome === 'declined') {
-      return {
-        status: OrderStatus.DECLINED,
-        rawCallStatus: call.status,
-        summary: call.summary ?? '',
-        declineReason: structured.declineReason,
-      };
-    }
-    if (structured?.outcome === 'address_mismatch') {
-      return {
-        status: OrderStatus.ADDRESS_MISMATCH,
-        rawCallStatus: call.status,
-        summary: call.summary ?? '',
-        correctedAddress: structured.correctedAddress,
-      };
-    }
-
-    // outcome is 'unknown', structuredResult is null, or the call never
-    // connected. Fail safe: never let an unconfirmed order look dispatchable.
-    this.logger.warn(
-      `Call ${call.id} produced no confirmed outcome (status=${call.status}, ` +
-        `structuredResult=${JSON.stringify(call.structuredResult)}). Treating as UNREACHABLE.`,
-    );
+  if (structured?.outcome === 'confirmed') {
     return {
-      status: OrderStatus.UNREACHABLE,
+      status: OrderStatus.CONFIRMED,
       rawCallStatus: call.status,
-      summary: call.summary ?? 'No answer or call could not be completed.',
+      summary: call.summary ?? '',
     };
   }
+  if (structured?.outcome === 'declined') {
+    return {
+      status: OrderStatus.DECLINED,
+      rawCallStatus: call.status,
+      summary: call.summary ?? '',
+      declineReason: structured.declineReason,
+    };
+  }
+  if (structured?.outcome === 'address_mismatch') {
+    return {
+      status: OrderStatus.ADDRESS_MISMATCH,
+      rawCallStatus: call.status,
+      summary: call.summary ?? '',
+      correctedAddress: structured.correctedAddress,
+    };
+  }
+
+  // outcome is 'unknown', structuredResult is null, or the call never
+  // connected. Fail safe: never let an unconfirmed order look dispatchable.
+  this.logger.warn(
+    `Call ${call.id} produced no confirmed outcome (status=${call.status}, ` +
+    `structuredResult=${JSON.stringify(call.structuredResult)}). Treating as UNREACHABLE.`,
+  );
+  return {
+    status: OrderStatus.UNREACHABLE,
+    rawCallStatus: call.status,
+    summary: call.summary ?? 'No answer or call could not be completed.',
+  };
+}
 }
