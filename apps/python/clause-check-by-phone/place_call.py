@@ -2,19 +2,22 @@
 """Place the call that `bridge.py` prepared, against the CALL-E API.
 
     export CALLE_API_KEY=...
-    python place_call.py "students only" "Students only" --to +33XXXXXXXXX
+    export CALLE_ALLOWED_RECIPIENTS=+447700900123
+    python place_call.py "students only" "Students only" --to +447700900123
 
 This is the only file in the contribution that opens a socket. Everything that
 can be settled without dialling is settled in `dry_run.py`, and this module
 refuses to send anything that path would have rejected.
 
-THREE REFUSALS BEFORE ANYTHING RINGS, and they are the reason this file is
-short. A clause outside the callable families never becomes a request. A schema
-the provider cannot fill is refused here rather than after the call, because
-the provider accepts it at creation and only fails at extraction, once the
-call, the budget and a stranger's minute are already spent. And a missing key
-stops the run with a sentence rather than with a 401 that reads like a
-permissions problem.
+FOUR REFUSALS BEFORE ANYTHING RINGS, and they are the reason this file is
+short. A clause outside the callable families never becomes a request. A
+recipient the operator has not authorised is refused even when the number is
+well formed, because a valid number is not the same thing as a number you are
+allowed to call. A schema the provider cannot fill is refused here rather than
+after the call, because the provider accepts it at creation and only fails at
+extraction, once the call, the budget and a stranger's minute are already
+spent. And a missing key stops the run with a sentence rather than with a 401
+that reads like a permissions problem.
 
 The network call goes through `send`, which is a parameter. That is not
 ceremony, it is what lets the witnesses exercise this file without a key and
@@ -30,10 +33,24 @@ import urllib.request
 from bridge import call_task, contradiction, NothingToAsk, validate_result_schema
 
 CALLS = "https://api.heycall-e.com/v1/calls"
+ALLOWED = "CALLE_ALLOWED_RECIPIENTS"
 
 
 class Refused(Exception):
     """Raised before any request leaves the machine."""
+
+
+def authorised(phone: str) -> bool:
+    """True when the operator has listed this number as callable.
+
+    The list is read from CALLE_ALLOWED_RECIPIENTS, comma separated, in the
+    same international form the bridge validates. An absent or empty list
+    authorises nothing. That is the right default for the one file here that
+    can make a stranger's phone ring, and it means a wrong number in a shell
+    history cannot dial on its own.
+    """
+    listed = os.environ.get(ALLOWED, "")
+    return phone in [n.strip() for n in listed.split(",") if n.strip()]
 
 
 def _http(url: str, key: str, body: bytes | None = None, timeout: int = 45):
@@ -66,6 +83,11 @@ def place(phone: str, family: str, quote: str, source: str,
         raise Refused("no CALLE_API_KEY in the environment, nothing was sent")
 
     prepared = call_task(phone, family, quote, source, context)
+
+    if not authorised(phone):
+        raise Refused("%s is not listed in %s, no call was placed. A recipient "
+                      "has to be authorised by the operator before it can be "
+                      "dialled." % (phone, ALLOWED))
 
     problems = validate_result_schema(prepared["result_schema"])
     if problems:
@@ -115,7 +137,8 @@ def main(argv=None):
         argv = argv[:at] + argv[at + 2:]
 
     family, quote = argv[0], " ".join(argv[1:])
-    print("This dials a real person. Use a number you are authorised to call.")
+    print("This dials a real person. The recipient must be listed in %s."
+          % ALLOWED)
     try:
         prepared, payload = place(phone, family, quote, "place_call", context)
     except NothingToAsk as settled:

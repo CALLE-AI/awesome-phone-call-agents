@@ -18,10 +18,21 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import place_call                                                # noqa: E402
 from bridge import NothingToAsk                                  # noqa: E402
-from place_call import collect, main, place, Refused             # noqa: E402
+from place_call import ALLOWED, collect, main, place, Refused    # noqa: E402
 
-NUM = "+33000000000"          # fictional, never dialled by these tests
+NUM = "+447700900123"        # Ofcom drama range, 07700 900xxx, never dialled
 KEY = "not-a-key"
+
+
+def setUpModule():
+    """Most witnesses below exercise the path where a call WOULD go out, so the
+    recipient has to be authorised for them to reach it at all. The three that
+    test the authorisation itself set the variable themselves."""
+    os.environ[ALLOWED] = NUM
+
+
+def tearDownModule():
+    os.environ.pop(ALLOWED, None)
 
 
 class Transport:
@@ -75,6 +86,40 @@ class NothingLeavesTheMachine(unittest.TestCase):
             code = main([])
         self.assertEqual(code, 2)
         self.assertIn('--to', aide.getvalue())
+
+
+class OnlyAnAuthorisedRecipientIsDialled(unittest.TestCase):
+    """A well formed number is not the same thing as a number you may call.
+    These three witnesses are the difference."""
+
+    def setUp(self):
+        self.saved = os.environ.get(ALLOWED)
+
+    def tearDown(self):
+        if self.saved is None:
+            os.environ.pop(ALLOWED, None)
+        else:
+            os.environ[ALLOWED] = self.saved
+
+    def test_an_empty_list_authorises_nothing(self):
+        transport = Transport()
+        os.environ.pop(ALLOWED, None)
+        with self.assertRaises(Refused):
+            place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+        self.assertEqual(transport.sent, [])
+
+    def test_a_number_absent_from_the_list_is_refused(self):
+        transport = Transport()
+        os.environ[ALLOWED] = "+447700900999"
+        with self.assertRaises(Refused):
+            place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+        self.assertEqual(transport.sent, [])
+
+    def test_the_list_takes_several_numbers_and_ignores_the_spacing(self):
+        transport = Transport(201, {"id": "call_x"})
+        os.environ[ALLOWED] = " +447700900999 , %s " % NUM
+        place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+        self.assertEqual(len(transport.sent), 1)
 
 
 class WhatIsActuallySent(unittest.TestCase):
