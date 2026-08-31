@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shift Safety Call Agent — Local demo</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="identity">
+        <p class="eyebrow">Shift ledger / simulated check-ins</p>
+        <h1>Shift Safety Call Agent</h1>
+        <p class="subtitle">Structured safety check-ins from simulated phone interviews</p>
+      </div>
+      <div class="demo-notice" aria-label="Demo safety status">
+        <strong>DEMO MODE</strong>
+        <span>Fake provider only. No phone call will be placed.</span>
+      </div>
+    </div>
+    <div class="safety-strip" aria-label="Runtime boundaries">
+      <strong>Local only</strong>
+      <span>Same-origin workspace</span>
+      <span>Fictional records</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <p id="app-status" class="global-status" role="status" aria-live="polite">Loading local records…</p>
+
+    <div class="primary-grid">
+      <section class="panel create-panel" aria-labelledby="new-interview-title">
+        <div class="section-heading">
+          <p class="section-marker">New record</p>
+          <h2 id="new-interview-title">New simulated interview</h2>
+          <p>Create a fictional safety record using the local Fake Provider.</p>
+        </div>
+
+        <form id="interview-form" novalidate aria-busy="false">
+          <div class="field-group">
+            <label for="scenario">Scenario</label>
+            <select id="scenario" name="scenario" required disabled>
+              <option value="">Loading scenarios…</option>
+            </select>
+            <p id="scenario-description" class="field-note">Scenario details will appear here.</p>
+          </div>
+
+          <div class="field-group">
+            <label for="recipient-alias">Recipient alias</label>
+            <input
+              id="recipient-alias"
+              name="recipient_alias"
+              type="text"
+              value="demo-worker"
+              minlength="5"
+              maxlength="64"
+              pattern="(?:demo|fictional)-[A-Za-z0-9_-]+"
+              autocomplete="off"
+              spellcheck="false"
+              required
+              aria-describedby="alias-guidance alias-error"
+            >
+            <p id="alias-guidance" class="field-note">Use a short fictional alias such as demo-worker. Do not enter a phone number, email address, real name, or company name.</p>
+            <p id="alias-error" class="field-error" aria-live="polite"></p>
+          </div>
+
+          <button id="run-interview" class="primary-action" type="submit" disabled>Run simulated interview</button>
+          <p id="run-status" class="action-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="panel history-panel" aria-labelledby="history-title">
+        <div class="section-heading history-heading">
+          <div>
+            <p class="section-marker">Local history</p>
+            <h2 id="history-title">Interview records</h2>
+            <p id="record-count">Loading records…</p>
+          </div>
+          <button id="refresh-records" class="secondary-action" type="button">Refresh</button>
+        </div>
+
+        <div class="review-overview" aria-label="Review queue overview">
+          <div><span>Action required</span><strong id="review-count-action">0</strong></div>
+          <div><span>Needs clarification</span><strong id="review-count-clarification">0</strong></div>
+          <div><span>No immediate action</span><strong id="review-count-clear">0</strong></div>
+          <div><span>Not assessed</span><strong id="review-count-unassessed">0</strong></div>
+        </div>
+
+        <form id="filter-form" class="filters" aria-label="Interview filters" aria-busy="false">
+          <div class="field-group compact-field">
+            <label for="review-filter">Review disposition</label>
+            <select id="review-filter" name="review_disposition">
+              <option value="">All</option>
+              <option value="action_required">Action required</option>
+              <option value="needs_clarification">Needs clarification</option>
+              <option value="no_immediate_action">No immediate action</option>
+              <option value="not_assessed">Not assessed</option>
+            </select>
+          </div>
+          <div class="field-group compact-field">
+            <label for="incident-filter">Incident level</label>
+            <select id="incident-filter" name="incident_level">
+              <option value="">All levels</option>
+              <option value="none">None</option>
+              <option value="minor">Minor</option>
+              <option value="moderate">Moderate</option>
+              <option value="critical">Critical</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+          <div class="field-group compact-field">
+            <label for="follow-up-filter">Follow-up required</label>
+            <select id="follow-up-filter" name="requires_follow_up">
+              <option value="">All records</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div class="field-group compact-field">
+            <label for="status-filter">Status</label>
+            <select id="status-filter" name="status">
+              <option value="">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="planned">Planned</option>
+              <option value="awaiting_confirmation">Awaiting confirmation</option>
+              <option value="calling">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </form>
+
+        <p id="filter-status" class="filter-status" aria-live="polite">No filters applied.</p>
+        <div id="interview-list-region" class="list-region" aria-busy="true">
+          <ol id="interview-list" class="interview-list" aria-label="Saved interview records"></ol>
+          <div id="empty-list" class="empty-state" hidden>
+            <strong id="empty-list-title">No interview records yet.</strong>
+            <span id="empty-list-guidance">Run a Fake Provider simulated safety check to see how answers become structured follow-up records.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section id="detail-panel" class="panel detail-panel" aria-labelledby="detail-title" aria-busy="false">
+      <div class="detail-heading">
+        <div>
+          <p class="section-marker">Selected record</p>
+          <h2 id="detail-title">Interview detail</h2>
+          <p id="detail-identity" class="record-alias">Select Details from a record to inspect its structured result.</p>
+          <p class="technical-meta"><span>Record ID</span><code id="detail-record-id">Not selected</code></p>
+        </div>
+        <p class="timezone-note">Times are shown in Japan Standard Time (JST).</p>
+      </div>
+
+      <p id="detail-status" class="detail-status" role="status" aria-live="polite"></p>
+      <div id="detail-content" hidden>
+        <div id="detail-summary-strip" class="decision-summary" aria-label="Key record decisions">
+          <div><span>Incident</span><strong id="detail-summary-incident" class="status-badge status-badge--unavailable">Not available</strong></div>
+          <div><span>Follow-up</span><strong id="detail-summary-follow-up" class="status-badge status-badge--unavailable">Not available</strong></div>
+          <div><span>Equipment issue</span><strong id="detail-summary-equipment" class="status-badge status-badge--unavailable">Not available</strong></div>
+          <div><span>Status</span><strong id="detail-summary-status" class="status-badge status-badge--unavailable">Not available</strong></div>
+          <div><span>Review disposition</span><strong id="detail-summary-review" class="status-badge status-badge--unavailable">Not available</strong></div>
+        </div>
+        <p class="status-explainer"><strong>CALL STATUS</strong> describes provider/workflow execution. It is not safety clearance.</p>
+
+        <div class="review-guidance">
+          <section class="detail-group" aria-labelledby="review-basis-title">
+            <h3 id="review-basis-title">Review basis</h3>
+            <ul id="detail-review-basis"></ul>
+          </section>
+          <section id="human-action-panel" class="detail-group" aria-labelledby="human-action-title" hidden>
+            <h3 id="human-action-title">Suggested human action</h3>
+            <p class="metric-note">Not an automated safety decision.</p>
+            <ul id="detail-human-actions"></ul>
+          </section>
+        </div>
+
+        <div class="detail-grid">
+          <section class="detail-group" aria-labelledby="facts-title">
+            <h3 id="facts-title">Facts</h3>
+            <dl>
+              <div><dt>Work summary</dt><dd id="detail-work-summary">Not available</dd></div>
+              <div><dt>Near miss</dt><dd id="detail-near-miss">Not available</dd></div>
+              <div><dt>Equipment issue</dt><dd id="detail-equipment">Not available</dd></div>
+              <div><dt>Injury or health issue</dt><dd id="detail-injury">Not available</dd></div>
+              <div><dt>Handover notes</dt><dd id="detail-handover">Not available</dd></div>
+            </dl>
+          </section>
+
+          <section class="detail-group" aria-labelledby="assessment-title">
+            <h3 id="assessment-title">Assessment</h3>
+            <dl>
+              <div><dt>Incident level</dt><dd id="detail-incident">Not available</dd></div>
+              <div><dt>Follow-up required</dt><dd id="detail-follow-up">Not available</dd></div>
+              <div><dt>Structured result confidence <span class="metric-note">Not a safety severity score.</span></dt><dd id="detail-confidence">Not available</dd></div>
+              <div><dt>Summary</dt><dd id="detail-summary">Not available</dd></div>
+            </dl>
+          </section>
+
+          <section class="detail-group" aria-labelledby="provenance-title">
+            <h3 id="provenance-title">Provenance</h3>
+            <dl>
+              <div><dt>Provider</dt><dd id="detail-provider">Not available</dd></div>
+              <div class="technical-field"><dt>Provider run ID</dt><dd id="detail-run-id" class="technical-value">Not available</dd></div>
+              <div><dt>Created at</dt><dd id="detail-created">Not available</dd></div>
+              <div><dt>Completed at</dt><dd id="detail-completed">Not available</dd></div>
+              <div><dt>Evidence count</dt><dd id="detail-evidence-count">0</dd></div>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <details class="panel trust-panel">
+      <summary>Worker trust and privacy</summary>
+      <ul>
+        <li>No productivity or emotion scoring and no voice biometrics.</li>
+        <li>No raw conversation text, phone number, or API key is stored in the safety ledger.</li>
+        <li>Unknown is not converted to safe; human review remains required.</li>
+        <li>A worker may decline the check-in.</li>
+      </ul>
+    </details>
+  </main>
+
+  <footer class="site-footer">
+    <p>Local demonstration workspace. Fictional aliases and simulated records only.</p>
+  </footer>
+</body>
+</html>

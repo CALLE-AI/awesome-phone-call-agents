@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shift-safety-call-agent"
+dynamic = ["version"]
+description = "Offline foundation for structured shift safety interviews"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+authors = [{name = "Shift Safety Call Agent contributors"}]
+dependencies = []
+
+[project.optional-dependencies]
+calle = [
+    "calle-ai==0.6.0",
+]
+web = [
+    "fastapi==0.139.2",
+    "uvicorn==0.51.0",
+    "httpx==0.28.1",
+]
+
+[project.scripts]
+shift-safety-call-agent = "shift_safety_call_agent.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"shift_safety_call_agent.adapters.web" = [
+    "static/*.html",
+    "static/*.css",
+    "static/*.js",
+]
+
+[tool.setuptools.dynamic]
+version = {file = ["VERSION"]}
