@@ -192,9 +192,14 @@ field that was never declared.
 
 ## Phone numbers in this contribution
 
-Every sample uses `+447700900123`, which sits in the block Ofcom reserves for
-drama, `07700 900xxx`. It is a valid E.164 number, so the snippets above run as
-written, and it is reserved, so it reaches nobody. The tests that need a badly
-formed number use `00 00 00 00 00` and `+0123456789`, neither of which is a
-number, so nothing in this contribution reads like a real one to a person
-scanning the file or to a tool scanning the repository for leaked data.
+Every number you are invited to run is `+447700900123`, which sits in the block
+Ofcom reserves for drama, `07700 900xxx`. It is a valid E.164 number, so the
+snippets above run as written, and it is reserved, so it reaches nobody.
+
+Four other values appear, and all of them live inside witnesses. `+447700900999`
+is reserved too, and stands for a recipient the operator has **not** authorised.
+`00 00 00 00 00` and `+0123456789` are not numbers at all, one is nationally
+formatted and the other starts a country code with a zero. `+1234567` tests the
+shortest length E.164 allows. **None of the five reaches a person**, and none
+reads like a real number to someone scanning the file or to a tool scanning the
+repository for leaked data.
