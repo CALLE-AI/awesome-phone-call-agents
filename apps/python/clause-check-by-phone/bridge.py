@@ -111,8 +111,9 @@ def call_task(phone: str, family: str, quote: str, source: str,
         raise NothingToAsk("unknown family, %r, no call is justified" % family)
     if not readable(quote):
         raise NothingToAsk("no quotation, nothing to have confirmed out loud")
-    if not re.match(r"^\+\d{7,15}$", phone or ""):
-        raise NothingToAsk("invalid phone number, a call needs a recipient")
+    if not re.fullmatch(r"\+[1-9]\d{6,14}", phone or ""):
+        raise NothingToAsk("invalid phone number, a call needs a recipient in "
+                           "strict E.164 form")
 
     needed = CONTEXT_REQUIRED.get(family)
     if needed and not (context or {}).get(needed):

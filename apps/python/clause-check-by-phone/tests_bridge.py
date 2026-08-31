@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bridge import (call_task, contradiction, NothingToAsk,      # noqa: E402
                     validate_result_schema, FAMILIES)
 
-NUM = "+33000000000"          # fictional, never dialled by these tests
+NUM = "+447700900123"        # Ofcom drama range, 07700 900xxx, never dialled
 
 
 class TheCallTask(unittest.TestCase):
@@ -87,6 +87,27 @@ class WhatDoesNotJustifyACall(unittest.TestCase):
         """
         with self.assertRaises(NothingToAsk):
             call_task("00 00 00 00 00", "students only", "Students only", "s")
+
+    def test_a_country_code_cannot_start_with_zero(self):
+        """E.164 has no leading zero, so +0 is not a short number, it is not a
+        number at all. The old pattern let it through and would have handed it
+        to the provider."""
+        for wrong in ("+0123456789", "+00000000000"):
+            with self.assertRaises(NothingToAsk):
+                call_task(wrong, "students only", "Students only", "s")
+
+    def test_a_trailing_newline_does_not_slip_past_the_pattern(self):
+        """A number read from a file keeps its newline, and an anchored match
+        on `$` accepts one. That is how a malformed value reaches a dialler."""
+        with self.assertRaises(NothingToAsk):
+            call_task(NUM + "\n", "students only", "Students only", "s")
+
+    def test_the_longest_and_shortest_numbers_e164_allows(self):
+        for right in ("+1234567", "+" + "1" * 15):
+            self.assertIn(right, call_task(right, "students only",
+                                           "Students only", "s")["task"])
+        with self.assertRaises(NothingToAsk):
+            call_task("+" + "1" * 16, "students only", "Students only", "s")
 
 
 class TheContradiction(unittest.TestCase):
