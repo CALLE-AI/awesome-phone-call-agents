@@ -159,7 +159,7 @@ class CalleSdkAdapterBoundaryTests(unittest.TestCase):
 
 
 class CalleSdkResponseTests(unittest.TestCase):
-    """Verify conservative reuse of the Phase 1C-1 snapshot and mapper."""
+    """Verify conservative reuse of the structured response boundary."""
 
     def test_three_complete_scenarios_map_through_existing_domain_result(self) -> None:
         cases = (

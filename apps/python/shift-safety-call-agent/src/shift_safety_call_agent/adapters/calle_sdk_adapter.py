@@ -182,7 +182,7 @@ def _normalize_structured_result(value: object) -> object:
 
 
 def normalize_calle_sdk_response(payload: object) -> CalleResponseSnapshot:
-    """Select non-sensitive SDK fields and reuse the Phase 1C-1 snapshot parser."""
+    """Select SDK fields for the internal structured response boundary."""
 
     selected = _selected_mapping(payload, _TOP_LEVEL_FIELDS)
     selected["evidence"] = [] if selected.get("evidence") is None else selected["evidence"]

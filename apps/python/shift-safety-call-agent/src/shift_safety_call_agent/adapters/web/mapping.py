@@ -38,7 +38,7 @@ def to_interview_detail(interview: SafetyInterview) -> InterviewDetailResponse:
         recipient_alias=interview.recipient_alias,
         status=interview.status,
         provider=interview.call_provider,
-        provider_run_id=interview.call_provider_run_id,
+        provider_run_id=None,
         started_at=interview.started_at,
         completed_at=interview.completed_at,
         failure_reason=interview.failure_reason,

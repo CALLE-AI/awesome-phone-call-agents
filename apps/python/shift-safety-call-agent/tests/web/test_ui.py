@@ -501,6 +501,11 @@ class LocalUiTests(unittest.TestCase):
         self.assertNotIn("100vw", css)
         self.assertNotRegex(css, r"min-width:\s*[1-9]\d*px")
 
+    def test_ui_does_not_render_provider_run_identifiers(self) -> None:
+        javascript = (STATIC_ROOT / "app.js").read_text(encoding="utf-8")
+        self.assertNotIn("interview.provider_run_id", javascript)
+        self.assertIn('detailFields.provider_run_id.textContent = "Withheld";', javascript)
+
     def test_package_data_and_import_are_non_mutating(self) -> None:
         with (REPOSITORY_ROOT / "pyproject.toml").open("rb") as file:
             project = tomllib.load(file)

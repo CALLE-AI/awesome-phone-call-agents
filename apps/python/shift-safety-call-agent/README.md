@@ -154,9 +154,16 @@ numbers, keys, authorization values, or raw provider payloads. This is not a
 general-purpose anonymizer: use fictional data only. Provider-side retention is
 outside this application's control.
 
+Live provider identifiers are not printed or persisted. Live saves set the
+provider run ID to null, without hashing, truncation, encoding, or substitution.
+Fake Provider synthetic run IDs may remain internally as fictional test data.
+CLI detail views, API responses, and the Web UI withhold provider run identifiers,
+including any identifier present in an older or injected record. Application-owned
+interview IDs are separate local record identifiers, not provider IDs. Existing
+databases are not rewritten or migrated by this change.
+
 UI/API responses omit tasks, evidence text, transcripts, credentials, recipients,
-raw provider data, and database paths. The optional live CLI can show a sanitized
-provider identifier; do not capture or publish it. Public assets must omit real
+raw provider data, and database paths. Public assets must omit real
 phone numbers, keys, call/run/dashboard IDs, personal email/paths, transcripts,
 raw evidence/payloads, live audio, and unredacted account/dashboard screens.
 No recordings, screenshots, logos, databases, or private Git history are shipped.

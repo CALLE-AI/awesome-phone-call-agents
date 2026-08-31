@@ -179,19 +179,6 @@ def format_live_call_preflight(preflight: LiveCallPreflight) -> str:
     )
 
 
-def _safe_provider_identifier(value: str | None) -> str:
-    """Render only a short identifier alphabet that cannot contain a phone value."""
-
-    if (
-        value is not None
-        and 1 <= len(value) <= 128
-        and any(character.isalpha() for character in value)
-        and all(character.isascii() and (character.isalnum() or character in "-_") for character in value)
-    ):
-        return value
-    return "unknown"
-
-
 def _safe_provider_status(value: str) -> str:
     if value in {"queued", "in_progress", "completed", "failed", "canceled"}:
         return value
@@ -208,7 +195,7 @@ def format_live_call_outcome(outcome: LiveCallOutcome) -> str:
             "LIVE CALL RESULT",
             "- Task version: en-safety-v2",
             "- Result schema version: safety-result-v1",
-            f"- Call/run ID: {_safe_provider_identifier(outcome.snapshot.provider_id)}",
+            "- Provider identifiers: withheld",
             f"- Status: {_safe_provider_status(outcome.snapshot.raw_status)}",
             f"- Task completed: {_tri_state(outcome.snapshot.task_completed)}",
             f"- Review disposition: {redacted_evidence['review_disposition']}",
@@ -267,7 +254,7 @@ def format_stored_interview(interview: SafetyInterview) -> str:
             "",
             "PROVENANCE",
             f"- Provider: {_safe_display_text(interview.call_provider)}",
-            f"- Provider run ID: {_safe_display_text(interview.call_provider_run_id)}",
+            "- Provider run ID: withheld",
             f"- Created at: {interview.created_at.isoformat()}",
             f"- Completed at: {_optional(interview.completed_at.isoformat() if interview.completed_at else None)}",
             f"- Evidence count: {len(result.evidence) if result else 0}",
@@ -525,7 +512,7 @@ def main(
             recipient_alias="fictional-self-test",
             status=InterviewStatus.COMPLETED,
             call_provider="calle",
-            call_provider_run_id=outcome.snapshot.provider_id,
+            call_provider_run_id=None,
             started_at=plan.created_at,
             completed_at=completed_at,
             result=outcome.normalized_result,

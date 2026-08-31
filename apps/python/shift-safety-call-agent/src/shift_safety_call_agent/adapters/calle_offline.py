@@ -268,7 +268,7 @@ def map_calle_response(snapshot: CalleResponseSnapshot) -> SafetyInterviewResult
         injury_or_health_issue=_status_to_bool(_require_string(values, "injury_or_health_status")),
         handover_notes=_nullable_text(_require_string(values, "handover_notes")),
         requires_follow_up=_status_to_bool(_require_string(values, "requires_follow_up_status")),
-        # Phase 1C-2 confirms the structure only; it adds no safety meaning.
+        # The SDK contract confirms structure only; it adds no safety meaning.
         confidence=None,
         evidence=combined_evidence,
         summary=_require_string(values, "summary"),
@@ -308,22 +308,22 @@ class OfflineCalleAdapter:
     def start_call(self, plan: CallPlan) -> str:
         """Refuse the unavailable real-call operation."""
 
-        raise RealCallDisabledError("Real calls are disabled in Phase 1C-1")
+        raise RealCallDisabledError("Real calls are disabled at the offline boundary")
 
     def get_status(self, run_id: str) -> InterviewStatus:
         """Refuse provider status access while the SDK is absent."""
 
-        raise CalleSdkNotConnectedError("CALL-E SDK is not connected in Phase 1C-1")
+        raise CalleSdkNotConnectedError("CALL-E SDK is not connected at the offline boundary")
 
     def get_result(self, run_id: str) -> SafetyInterviewResult | None:
         """Refuse provider result access while the SDK is absent."""
 
-        raise CalleSdkNotConnectedError("CALL-E SDK is not connected in Phase 1C-1")
+        raise CalleSdkNotConnectedError("CALL-E SDK is not connected at the offline boundary")
 
     def cancel_call(self, run_id: str) -> None:
         """Refuse cancellation because no SDK operation is connected."""
 
-        raise CalleSdkNotConnectedError("CALL-E SDK is not connected in Phase 1C-1")
+        raise CalleSdkNotConnectedError("CALL-E SDK is not connected at the offline boundary")
 
     @staticmethod
     def map_response(payload: object) -> SafetyInterviewResult:

@@ -461,7 +461,7 @@ function renderInterviewDetail(interview) {
   detailFields.confidence.textContent = formatConfidence(interview.confidence);
   detailFields.summary.textContent = formatText(interview.summary);
   detailFields.provider.textContent = formatEnum(interview.provider);
-  detailFields.provider_run_id.textContent = formatText(interview.provider_run_id);
+  detailFields.provider_run_id.textContent = "Withheld";
   detailFields.created_at.textContent = formatDate(interview.created_at);
   detailFields.completed_at.textContent = formatDate(interview.completed_at);
   detailFields.evidence_count.textContent = Number.isInteger(interview.evidence_count)

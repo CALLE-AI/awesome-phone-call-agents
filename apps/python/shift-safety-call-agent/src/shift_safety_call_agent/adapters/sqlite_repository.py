@@ -331,7 +331,10 @@ class SqliteInterviewRepository:
                             interview.recipient_alias,
                             interview.status.value,
                             interview.call_provider,
-                            interview.call_provider_run_id,
+                            (
+                                interview.call_provider_run_id
+                                if interview.call_provider == "fake" else None
+                            ),
                             _serialize_datetime(interview.started_at),
                             _serialize_datetime(interview.completed_at),
                             interview.failure_reason,

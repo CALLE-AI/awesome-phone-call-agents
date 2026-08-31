@@ -506,6 +506,28 @@ class LocalApiTests(unittest.TestCase):
         self.assertIn("scenario", request_schema["required"])
         self.assertIn("ErrorResponse", components["schemas"])
 
+    def test_live_provider_identifiers_are_withheld_for_injected_records(self) -> None:
+        record = SafetyInterview(
+            interview_id="interview-live-redaction",
+            created_at=FIXED_TIME,
+            scenario_name="live-self-test",
+            recipient_alias="fictional-self-test",
+            status=InterviewStatus.COMPLETED,
+            call_provider="calle",
+            call_provider_run_id="call-synthetic-withheld",
+        )
+        with (
+            patch.object(self.repository, "get", return_value=record),
+            patch.object(self.repository, "list", return_value=(record,)),
+        ):
+            detail = self.client.get(f"{API_PREFIX}/interviews/{record.interview_id}")
+            listing = self.client.get(f"{API_PREFIX}/interviews")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(listing.status_code, 200)
+        self.assertIsNone(detail.json()["provider_run_id"])
+        self.assertNotIn("call-synthetic-withheld", detail.text + listing.text)
+        self.assert_public_payload(detail.json())
+
     def test_cors_is_absent(self) -> None:
         self.assertEqual(self.app.user_middleware, [])
         response = self.client.options(

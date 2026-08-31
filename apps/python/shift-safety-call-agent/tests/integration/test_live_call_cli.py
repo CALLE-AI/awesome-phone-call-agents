@@ -180,7 +180,8 @@ class LiveCallCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         runner.assert_called_once()
         rendered = output.getvalue()
-        self.assertIn("Call/run ID: call_synthetic_cli", rendered)
+        self.assertIn("Provider identifiers: withheld", rendered)
+        self.assertNotIn("call_synthetic_cli", rendered)
         self.assertIn("Structured result: safely normalized", rendered)
         self.assertIn("Evidence count: 1", rendered)
         self.assertIn("Transcript persisted: false", rendered)
@@ -194,7 +195,10 @@ class LiveCallCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             database_path = Path(temp_dir) / "live-result.db"
             output = StringIO()
-            with network_blocked():
+            with network_blocked(), patch.object(
+                SqliteInterviewRepository, "save", autospec=True,
+                side_effect=SqliteInterviewRepository.save,
+            ) as save_record:
                 exit_code = main(
                     ["live-call-self", "--save", "--db-path", str(database_path)],
                     output=output,
@@ -206,15 +210,32 @@ class LiveCallCliTests(unittest.TestCase):
                     id_generator=iter(("interview-live-safe", "plan-live-safe")).__next__,
                 )
             self.assertEqual(exit_code, 0)
+            self.assertIsNone(save_record.call_args.args[1].call_provider_run_id)
+            self.assertNotIn("call_synthetic_cli", output.getvalue())
             record = SqliteInterviewRepository(database_path).get("interview-live-safe")
             self.assertIsNotNone(record)
             assert record is not None
             self.assertEqual(record.call_provider, "calle")
+            self.assertIsNone(record.call_provider_run_id)
             self.assertIsNotNone(record.result)
             database_bytes = database_path.read_bytes()
+            self.assertNotIn(b"call_synthetic_cli", database_bytes)
             self.assertNotIn(b"transcript", database_bytes.lower())
             self.assertNotIn(self.environment["CALLE_API_KEY"].encode(), database_bytes)
             self.assertNotIn(self.environment["CALLE_RECIPIENT_E164"].encode(), database_bytes)
+
+            # Older/injected records must not leak an identifier through db-show.
+            record.call_provider_run_id = "call_synthetic_cli"
+            detail_output = StringIO()
+            with network_blocked(), patch.object(
+                SqliteInterviewRepository, "get", return_value=record
+            ):
+                self.assertEqual(main(
+                    ["db-show", "--id", record.interview_id, "--db-path", str(database_path)],
+                    output=detail_output,
+                ), 0)
+            self.assertNotIn("call_synthetic_cli", detail_output.getvalue())
+            self.assertIn("Provider run ID: withheld", detail_output.getvalue())
 
 
 if __name__ == "__main__":

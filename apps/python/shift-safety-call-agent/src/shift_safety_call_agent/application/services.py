@@ -80,7 +80,7 @@ class InterviewService:
         """Run an interview through the configured provider and save it once."""
 
         if self._provider.name != "fake":
-            raise RuntimeError("Phase 1C-1 permits execution only through the fake call provider")
+            raise RuntimeError("The application service permits execution only through the fake call provider")
         if interview.status is not InterviewStatus.DRAFT:
             raise ValueError("Only a draft interview can be executed")
 

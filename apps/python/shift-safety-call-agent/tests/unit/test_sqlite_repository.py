@@ -204,6 +204,22 @@ class SqliteRepositoryTests(unittest.TestCase):
         self.assertIsNone(loaded.result.confidence)
         self.assertEqual(loaded.result.evidence, ("Confirmed in fictional answers.",))
 
+    def test_live_provider_identifier_is_never_written_even_if_supplied(self) -> None:
+        source = _interview("interview-live", result=_result(nullable=True))
+        source.call_provider = "calle"
+        source.call_provider_run_id = "call-synthetic-withheld"
+        self.repository.save(source)
+        loaded = self.repository.get(source.interview_id)
+        assert loaded is not None
+        self.assertIsNone(loaded.call_provider_run_id)
+        with _database(self.path) as connection:
+            stored = connection.execute(
+                "SELECT call_provider_run_id FROM safety_interviews WHERE interview_id = ?",
+                (source.interview_id,),
+            ).fetchone()
+        self.assertEqual(stored, (None,))
+        self.assertNotIn(b"call-synthetic-withheld", self.path.read_bytes())
+
     def test_round_trip_without_result_and_missing_identifier(self) -> None:
         source = _interview("interview-a")
         self.repository.save(source)
