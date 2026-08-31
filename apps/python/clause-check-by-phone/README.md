@@ -182,8 +182,10 @@ and text meant for the eye tolerates a broken character that a speech engine
 pronounces. One guards the answer `unknown`, which must never be read as a
 contradiction, since an absence of answer is not a denial.
 
-Six more guard the schema validator, and every one of them is a schema built
-to be **refused**. A validator that rejects nothing proves nothing, so each
+Six more guard the schema validator. **Five of them are schemas built to be
+refused, and the sixth checks that every family still emits a conforming one**,
+because a validator that only ever refuses is as useless as one that only ever
+accepts. A validator that rejects nothing proves nothing, so each
 conforming case is paired with a hostile one, an unsupported composition, an
 open object, an enum with no way out, a reserved field name, and a required
 field that was never declared.
