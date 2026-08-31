@@ -3,23 +3,125 @@ let statusTimer = null;
 
 
 // ==================================================
+// SERVER AUTHENTICATION
+// ==================================================
+
+const API_KEY_STORAGE =
+    "callguard_server_api_key";
+
+
+function getApiKey() {
+
+    return sessionStorage.getItem(
+        API_KEY_STORAGE
+    ) || "";
+
+}
+
+
+function requestApiKey() {
+
+    let apiKey =
+        getApiKey();
+
+
+    if (apiKey) {
+
+        return apiKey;
+
+    }
+
+
+    apiKey =
+        window.prompt(
+            "Enter the CallGuard server API key:"
+        );
+
+
+    if (
+        !apiKey ||
+        !apiKey.trim()
+    ) {
+
+        return "";
+
+    }
+
+
+    apiKey =
+        apiKey.trim();
+
+
+    sessionStorage.setItem(
+        API_KEY_STORAGE,
+        apiKey
+    );
+
+
+    return apiKey;
+
+}
+
+
+function authenticatedHeaders(
+    includeJson = false
+) {
+
+    const apiKey =
+        getApiKey();
+
+
+    const headers = {
+
+        "Authorization":
+            `Bearer ${apiKey}`
+
+    };
+
+
+    if (includeJson) {
+
+        headers[
+            "Content-Type"
+        ] =
+            "application/json";
+
+    }
+
+
+    return headers;
+
+}
+
+
+// ==================================================
 // ELEMENTS
 // ==================================================
 
 const phoneInput =
-    document.getElementById("phoneNumber");
+    document.getElementById(
+        "phoneNumber"
+    );
 
 const authorizeCall =
-    document.getElementById("authorizeCall");
+    document.getElementById(
+        "authorizeCall"
+    );
 
 const investigateButton =
-    document.getElementById("investigateButton");
+    document.getElementById(
+        "investigateButton"
+    );
 
 const statusBox =
-    document.getElementById("status");
+    document.getElementById(
+        "status"
+    );
 
 const report =
-    document.getElementById("report");
+    document.getElementById(
+        "report"
+    );
 
 
 // ==================================================
@@ -31,6 +133,13 @@ function showStatus(
     type = "info"
 ) {
 
+    if (!statusBox) {
+
+        return;
+
+    }
+
+
     statusBox.className =
         `status ${type}`;
 
@@ -41,6 +150,13 @@ function showStatus(
 
 
 function hideStatus() {
+
+    if (!statusBox) {
+
+        return;
+
+    }
+
 
     statusBox.className =
         "status hidden";
@@ -55,20 +171,48 @@ function hideStatus() {
 function generateIdempotencyKey() {
 
     if (
+
         window.crypto &&
-        typeof window.crypto.randomUUID === "function"
+
+        typeof window.crypto.randomUUID ===
+            "function"
+
     ) {
 
         return window.crypto.randomUUID();
 
     }
 
+
     return (
+
         Date.now().toString(36) +
+
         "-" +
+
         Math.random()
             .toString(36)
             .substring(2)
+
+    );
+
+}
+
+
+// ==================================================
+// HANDLE AUTHENTICATION ERROR
+// ==================================================
+
+function handleAuthenticationFailure() {
+
+    sessionStorage.removeItem(
+        API_KEY_STORAGE
+    );
+
+
+    showStatus(
+        "🔐 Server authentication failed. Please try again with the correct CallGuard API key.",
+        "error"
     );
 
 }
@@ -81,7 +225,9 @@ function generateIdempotencyKey() {
 async function investigateCall() {
 
     const phoneNumber =
-        phoneInput.value.trim();
+        phoneInput
+            ? phoneInput.value.trim()
+            : "";
 
 
     // ------------------------------------------
@@ -101,16 +247,47 @@ async function investigateCall() {
 
 
     // ------------------------------------------
-    // Explicit authorization required
+    // Explicit recipient authorization
     // ------------------------------------------
 
     if (
+
         !authorizeCall ||
+
         !authorizeCall.checked
+
     ) {
 
         showStatus(
             "Please confirm that you are authorized to investigate this number.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    // ------------------------------------------
+    // Explicit real-call confirmation
+    // ------------------------------------------
+
+    const confirmLiveCall =
+        document.getElementById(
+            "confirmLiveCall"
+        );
+
+
+    if (
+
+        !confirmLiveCall ||
+
+        !confirmLiveCall.checked
+
+    ) {
+
+        showStatus(
+            "Please confirm that you understand this action will place a real phone call.",
             "error"
         );
 
@@ -128,11 +305,33 @@ async function investigateCall() {
 
 
     if (
-        !e164PhoneNumber.test(phoneNumber)
+        !e164PhoneNumber.test(
+            phoneNumber
+        )
     ) {
 
         showStatus(
             "Please enter a valid E.164 phone number, for example +916364353485.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    // ------------------------------------------
+    // Get server authentication
+    // ------------------------------------------
+
+    const apiKey =
+        requestApiKey();
+
+
+    if (!apiKey) {
+
+        showStatus(
+            "🔐 A CallGuard server API key is required.",
             "error"
         );
 
@@ -156,9 +355,13 @@ async function investigateCall() {
         "📞 Starting investigation...";
 
 
-    report.classList.add(
-        "hidden"
-    );
+    if (report) {
+
+        report.classList.add(
+            "hidden"
+        );
+
+    }
 
 
     showStatus(
@@ -171,32 +374,62 @@ async function investigateCall() {
 
         const response =
             await fetch(
+
                 "/api/investigate",
+
                 {
-                    method: "POST",
+
+                    method:
+                        "POST",
 
                     headers: {
 
-                        "Content-Type":
-                            "application/json",
+                        ...authenticatedHeaders(
+                            true
+                        ),
 
                         "X-Idempotency-Key":
                             idempotencyKey
 
                     },
 
-                    body: JSON.stringify({
+                    body:
+                        JSON.stringify({
 
-                        phoneNumber,
+                            phoneNumber,
 
-                        authorizedRecipient: true,
+                            // This value comes from
+                            // the authorization checkbox.
+                            authorizedRecipient:
+                                authorizeCall.checked,
 
-                        confirmLiveCall: true
+                            // This value comes from
+                            // the real-call confirmation.
+                            confirmLiveCall:
+                                confirmLiveCall.checked
 
-                    })
+                        })
 
                 }
+
             );
+
+
+        // ------------------------------------------
+        // Authentication failure
+        // ------------------------------------------
+
+        if (
+            response.status === 401
+        ) {
+
+            handleAuthenticationFailure();
+
+            throw new Error(
+                "Server authentication failed."
+            );
+
+        }
 
 
         const data =
@@ -204,13 +437,19 @@ async function investigateCall() {
 
 
         if (
+
             !response.ok ||
+
             !data.ok
+
         ) {
 
             throw new Error(
+
                 data.error ||
+
                 "Investigation could not be started."
+
             );
 
         }
@@ -221,7 +460,7 @@ async function investigateCall() {
 
 
         showStatus(
-            "📞 CALL-E is calling the number. Please answer your phone...",
+            "📞 CALL-E is calling the authorized number. Please answer your phone...",
             "info"
         );
 
@@ -274,8 +513,35 @@ async function pollInvestigation() {
 
         const response =
             await fetch(
-                `/api/investigate/${encodeURIComponent(currentRunId)}`
+
+                `/api/investigate/${encodeURIComponent(
+                    currentRunId
+                )}`,
+
+                {
+
+                    method:
+                        "GET",
+
+                    headers:
+                        authenticatedHeaders()
+
+                }
+
             );
+
+
+        if (
+            response.status === 401
+        ) {
+
+            handleAuthenticationFailure();
+
+            throw new Error(
+                "Server authentication failed."
+            );
+
+        }
 
 
         const data =
@@ -283,13 +549,19 @@ async function pollInvestigation() {
 
 
         if (
+
             !response.ok ||
+
             !data.ok
+
         ) {
 
             throw new Error(
+
                 data.error ||
+
                 "Could not retrieve investigation status."
+
             );
 
         }
@@ -315,7 +587,13 @@ async function pollInvestigation() {
 
             status === "RUNNING" ||
 
-            status === "IN_PROGRESS"
+            status === "IN_PROGRESS" ||
+
+            status === "PROCESSING" ||
+
+            status === "CALL_STARTING" ||
+
+            status === "CALL_STARTED"
 
         ) {
 
@@ -333,6 +611,26 @@ async function pollInvestigation() {
 
 
             return;
+
+        }
+
+
+        // ------------------------------------------
+        // UNKNOWN CALL START
+        // ------------------------------------------
+
+        if (
+
+            status ===
+                "CALL_START_UNKNOWN"
+
+        ) {
+
+            throw new Error(
+
+                "The CALL-E call status could not be confirmed. The request remains locked to prevent a duplicate call."
+
+            );
 
         }
 
@@ -390,13 +688,20 @@ async function pollInvestigation() {
 
             status === "FAILED" ||
 
-            status === "ERROR"
+            status === "ERROR" ||
+
+            status === "NO ANSWER" ||
+
+            status === "DECLINED"
 
         ) {
 
             throw new Error(
+
                 data.error ||
-                "CALL-E investigation failed."
+
+                `CALL-E investigation ended with status: ${status}`
+
             );
 
         }
@@ -449,6 +754,13 @@ function displayReport(
         data.analysis || {};
 
 
+    if (!report) {
+
+        return;
+
+    }
+
+
     report.classList.remove(
         "hidden"
     );
@@ -468,16 +780,32 @@ function displayReport(
         0;
 
 
-    document.getElementById(
-        "riskLevel"
-    ).textContent =
-        riskLevel;
+    const riskLevelElement =
+        document.getElementById(
+            "riskLevel"
+        );
 
 
-    document.getElementById(
-        "riskScore"
-    ).textContent =
-        riskScore;
+    const riskScoreElement =
+        document.getElementById(
+            "riskScore"
+        );
+
+
+    if (riskLevelElement) {
+
+        riskLevelElement.textContent =
+            riskLevel;
+
+    }
+
+
+    if (riskScoreElement) {
+
+        riskScoreElement.textContent =
+            riskScore;
+
+    }
 
 
     const riskCard =
@@ -486,53 +814,89 @@ function displayReport(
         );
 
 
-    riskCard.className =
-        `risk-card ${riskLevel.toLowerCase()}`;
+    if (riskCard) {
+
+        riskCard.className =
+            `risk-card ${riskLevel.toLowerCase()}`;
+
+    }
 
 
     // ------------------------------------------
     // Scam Type
     // ------------------------------------------
 
-    document.getElementById(
-        "scamType"
-    ).textContent =
-        analysis.scamType ||
-        "No specific scam pattern identified";
+    const scamTypeElement =
+        document.getElementById(
+            "scamType"
+        );
+
+
+    if (scamTypeElement) {
+
+        scamTypeElement.textContent =
+            analysis.scamType ||
+            "No specific scam pattern identified";
+
+    }
 
 
     // ------------------------------------------
     // Signature
     // ------------------------------------------
 
-    document.getElementById(
-        "scamSignature"
-    ).textContent =
-        analysis.scamSignature ||
-        "NO_STRONG_SIGNATURE";
+    const signatureElement =
+        document.getElementById(
+            "scamSignature"
+        );
+
+
+    if (signatureElement) {
+
+        signatureElement.textContent =
+            analysis.scamSignature ||
+            "NO_STRONG_SIGNATURE";
+
+    }
 
 
     // ------------------------------------------
     // Recommendation
     // ------------------------------------------
 
-    document.getElementById(
-        "recommendation"
-    ).textContent =
-        analysis.recommendation ||
-        "Exercise caution and verify the caller independently.";
+    const recommendationElement =
+        document.getElementById(
+            "recommendation"
+        );
+
+
+    if (recommendationElement) {
+
+        recommendationElement.textContent =
+            analysis.recommendation ||
+            "Exercise caution and verify the caller independently.";
+
+    }
 
 
     // ------------------------------------------
     // Summary
     // ------------------------------------------
 
-    document.getElementById(
-        "callSummary"
-    ).textContent =
-        data.summary ||
-        data.callSummary ||
-        "No summary available.";
+    const summaryElement =
+        document.getElementById(
+            "callSummary"
+        );
+
+
+    if (summaryElement) {
+
+        summaryElement.textContent =
+            data.summary ||
+            data.callSummary ||
+            "No summary available.";
+
+    }
 
 
     // ------------------------------------------
@@ -545,17 +909,31 @@ function displayReport(
         );
 
 
-    indicatorContainer.innerHTML =
-        "";
+    if (indicatorContainer) {
+
+        indicatorContainer.innerHTML =
+            "";
+
+    }
 
 
     const indicators =
-        analysis.indicators ||
-        [];
+        Array.isArray(
+            analysis.indicators
+        )
+            ? analysis.indicators
+            : [];
 
 
     indicators.forEach(
         indicator => {
+
+            if (!indicatorContainer) {
+
+                return;
+
+            }
+
 
             const element =
                 document.createElement(
@@ -570,8 +948,15 @@ function displayReport(
             element.innerHTML = `
                 <span>🚩</span>
                 <div>
-                    <strong>${escapeHtml(indicator.type)}</strong>
-                    <p>${escapeHtml(indicator.description)}</p>
+                    <strong>${escapeHtml(
+                        indicator.type ||
+                        "Indicator"
+                    )}</strong>
+
+                    <p>${escapeHtml(
+                        indicator.description ||
+                        ""
+                    )}</p>
                 </div>
             `;
 
@@ -594,8 +979,12 @@ function displayReport(
         );
 
 
-    transcriptContainer.innerHTML =
-        "";
+    if (transcriptContainer) {
+
+        transcriptContainer.innerHTML =
+            "";
+
+    }
 
 
     const transcript =
@@ -611,7 +1000,18 @@ function displayReport(
             .forEach(
                 line => {
 
-                    if (!line.trim()) {
+                    if (
+                        !line.trim()
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    if (
+                        !transcriptContainer
+                    ) {
 
                         return;
 
@@ -642,7 +1042,9 @@ function displayReport(
                 }
             );
 
-    } else {
+    } else if (
+        transcriptContainer
+    ) {
 
         transcriptContainer.textContent =
             "Transcript unavailable.";
@@ -662,6 +1064,8 @@ function displayReport(
 
     if (
 
+        matchCard &&
+
         data.signatureMatch &&
 
         data.signatureMatch.occurrences > 1
@@ -673,12 +1077,20 @@ function displayReport(
         );
 
 
-        document.getElementById(
-            "matchMessage"
-        ).textContent =
-            `This scam pattern has been observed ${data.signatureMatch.occurrences} times.`;
+        const matchMessage =
+            document.getElementById(
+                "matchMessage"
+            );
 
-    } else {
+
+        if (matchMessage) {
+
+            matchMessage.textContent =
+                `This scam pattern has been observed ${data.signatureMatch.occurrences} times.`;
+
+        }
+
+    } else if (matchCard) {
 
         matchCard.classList.add(
             "hidden"
@@ -692,7 +1104,8 @@ function displayReport(
     // ------------------------------------------
 
     report.scrollIntoView({
-        behavior: "smooth"
+        behavior:
+            "smooth"
     });
 
 }
@@ -720,8 +1133,43 @@ async function loadSignatures() {
 
         const response =
             await fetch(
-                "/api/signatures"
+
+                "/api/signatures",
+
+                {
+
+                    method:
+                        "GET",
+
+                    headers:
+                        authenticatedHeaders()
+
+                }
+
             );
+
+
+        if (
+            response.status === 401
+        ) {
+
+            if (getApiKey()) {
+
+                handleAuthenticationFailure();
+
+            }
+
+
+            if (count) {
+
+                count.textContent =
+                    "Authentication required";
+
+            }
+
+            return;
+
+        }
 
 
         const data =
@@ -731,6 +1179,7 @@ async function loadSignatures() {
         if (!data.ok) {
 
             throw new Error(
+                data.error ||
                 "Could not load signatures."
             );
 
@@ -742,15 +1191,32 @@ async function loadSignatures() {
             [];
 
 
-        count.textContent =
-            `${signatures.length} known scam pattern${signatures.length === 1 ? "" : "s"}`;
+        if (count) {
+
+            count.textContent =
+                `${signatures.length} known scam pattern${
+                    signatures.length === 1
+                        ? ""
+                        : "s"
+                }`;
+
+        }
+
+
+        if (!list) {
+
+            return;
+
+        }
 
 
         list.innerHTML =
             "";
 
 
-        if (signatures.length === 0) {
+        if (
+            signatures.length === 0
+        ) {
 
             list.innerHTML = `
                 <div class="empty-state">
@@ -784,23 +1250,35 @@ async function loadSignatures() {
                         <div class="signature-header">
 
                             <span class="badge">
-                                ${escapeHtml(signature.riskLevel)}
+                                ${escapeHtml(
+                                    signature.riskLevel
+                                )}
                             </span>
 
                             <span>
-                                Seen ${signature.occurrences} time${signature.occurrences === 1 ? "" : "s"}
+                                Seen ${
+                                    signature.occurrences
+                                } time${
+                                    signature.occurrences === 1
+                                        ? ""
+                                        : "s"
+                                }
                             </span>
 
                         </div>
 
 
                         <h3>
-                            ${escapeHtml(signature.scamType)}
+                            ${escapeHtml(
+                                signature.scamType
+                            )}
                         </h3>
 
 
                         <code>
-                            ${escapeHtml(signature.signature)}
+                            ${escapeHtml(
+                                signature.signature
+                            )}
                         </code>
 
 
@@ -829,8 +1307,12 @@ async function loadSignatures() {
         );
 
 
-        count.textContent =
-            "Intelligence unavailable";
+        if (count) {
+
+            count.textContent =
+                "Intelligence unavailable";
+
+        }
 
     }
 
@@ -845,7 +1327,9 @@ function escapeHtml(
     value
 ) {
 
-    return String(value)
+    return String(
+        value ?? ""
+    )
 
         .replace(
             /&/g,
@@ -871,6 +1355,263 @@ function escapeHtml(
             /'/g,
             "&#039;"
         );
+
+}
+
+
+// ==================================================
+// DRY RUN ANALYSIS
+// ==================================================
+
+async function runDryRun() {
+
+    const transcriptInput =
+        document.getElementById(
+            "dryRunTranscript"
+        );
+
+    const dryRunButton =
+        document.getElementById(
+            "dryRunButton"
+        );
+
+    const dryRunStatus =
+        document.getElementById(
+            "dryRunStatus"
+        );
+
+    const dryRunResult =
+        document.getElementById(
+            "dryRunResult"
+        );
+
+
+    const transcript =
+        transcriptInput
+            ? transcriptInput.value.trim()
+            : "";
+
+
+    if (!transcript) {
+
+        dryRunStatus.className =
+            "status error";
+
+        dryRunStatus.textContent =
+            "Please enter a call transcript.";
+
+        return;
+
+    }
+
+
+    const apiKey =
+        requestApiKey();
+
+
+    if (!apiKey) {
+
+        dryRunStatus.className =
+            "status error";
+
+        dryRunStatus.textContent =
+            "🔐 A CallGuard server API key is required.";
+
+        return;
+
+    }
+
+
+    dryRunButton.disabled =
+        true;
+
+    dryRunButton.textContent =
+        "🧪 Analyzing...";
+
+
+    dryRunStatus.className =
+        "status info";
+
+    dryRunStatus.textContent =
+        "🧪 Analyzing transcript without making a phone call.";
+
+
+    if (dryRunResult) {
+
+        dryRunResult.classList.add(
+            "hidden"
+        );
+
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+
+                "/api/investigate/dry-run",
+
+                {
+
+                    method:
+                        "POST",
+
+                    headers:
+                        authenticatedHeaders(
+                            true
+                        ),
+
+                    body:
+                        JSON.stringify({
+
+                            transcript
+
+                        })
+
+                }
+
+            );
+
+
+        if (
+            response.status === 401
+        ) {
+
+            handleAuthenticationFailure();
+
+            throw new Error(
+                "Server authentication failed."
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        if (
+
+            !response.ok ||
+
+            !data.ok
+
+        ) {
+
+            throw new Error(
+
+                data.error ||
+
+                "Dry-run analysis failed."
+
+            );
+
+        }
+
+
+        const analysis =
+            data.analysis || {};
+
+
+        const riskLevel =
+            document.getElementById(
+                "dryRunRiskLevel"
+            );
+
+
+        const riskScore =
+            document.getElementById(
+                "dryRunRiskScore"
+            );
+
+
+        const scamType =
+            document.getElementById(
+                "dryRunScamType"
+            );
+
+
+        const confidence =
+            document.getElementById(
+                "dryRunConfidence"
+            );
+
+
+        if (riskLevel) {
+
+            riskLevel.textContent =
+                analysis.riskLevel ||
+                "UNKNOWN";
+
+        }
+
+
+        if (riskScore) {
+
+            riskScore.textContent =
+                analysis.riskScore ??
+                0;
+
+        }
+
+
+        if (scamType) {
+
+            scamType.textContent =
+                analysis.scamType ||
+                "No specific scam pattern identified";
+
+        }
+
+
+        if (confidence) {
+
+            confidence.textContent =
+                analysis.confidence ??
+                0;
+
+        }
+
+
+        if (dryRunResult) {
+
+            dryRunResult.classList.remove(
+                "hidden"
+            );
+
+        }
+
+
+        dryRunStatus.className =
+            "status success";
+
+        dryRunStatus.textContent =
+            "✅ Dry run completed. No phone call was made.";
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        dryRunStatus.className =
+            "status error";
+
+        dryRunStatus.textContent =
+            `❌ ${error.message}`;
+
+    } finally {
+
+        dryRunButton.disabled =
+            false;
+
+        dryRunButton.textContent =
+            "🧪 Analyze Without Calling";
+
+    }
 
 }
 

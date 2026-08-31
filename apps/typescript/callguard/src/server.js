@@ -12,8 +12,7 @@ const {
 } = require("./analysis/scamAnalyzer");
 
 const {
-    saveScamInvestigation,
-    findSignature
+    saveScamInvestigation
 } = require("./database/scamDatabase");
 
 
@@ -21,6 +20,36 @@ const app = express();
 
 const PORT =
     process.env.PORT || 3000;
+
+
+// --------------------------------------------------
+// SERVER SECURITY CONFIGURATION
+// --------------------------------------------------
+
+// IMPORTANT:
+// Set CALLGUARD_API_KEY in the environment before
+// starting the server.
+//
+// Example PowerShell:
+// $env:CALLGUARD_API_KEY="your-long-random-key"
+//
+const CALLGUARD_API_KEY =
+    process.env.CALLGUARD_API_KEY || "";
+
+
+// Comma-separated E.164 numbers that CallGuard is
+// allowed to call.
+//
+// Example:
+// +916364353485,+919876543210
+//
+const AUTHORIZED_RECIPIENTS =
+    new Set(
+        (process.env.CALLE_AUTHORIZED_RECIPIENTS || "")
+            .split(",")
+            .map(value => value.trim())
+            .filter(Boolean)
+    );
 
 
 // --------------------------------------------------
@@ -35,7 +64,9 @@ const investigations =
 // MIDDLEWARE
 // --------------------------------------------------
 
-app.use(cors());
+app.use(
+    cors()
+);
 
 app.use(
     express.json({
@@ -111,18 +142,6 @@ function sanitizePhoneNumber(
 }
 
 
-function getSafeCallStatus(
-    status
-) {
-
-    return {
-        status:
-            status || "UNKNOWN"
-    };
-
-}
-
-
 function getRunId(
     callResult
 ) {
@@ -132,6 +151,78 @@ function getRunId(
         callResult?.result?.structuredContent?.run_id ||
         callResult?.result?.run_id ||
         null
+    );
+
+}
+
+
+// --------------------------------------------------
+// SERVER AUTHENTICATION
+// --------------------------------------------------
+
+function requireServerAuthentication(
+    req,
+    res,
+    next
+) {
+
+    if (!CALLGUARD_API_KEY) {
+
+        console.error(
+            "CALLGUARD_API_KEY is not configured."
+        );
+
+        return res.status(503).json({
+
+            ok: false,
+
+            error:
+                "CallGuard server authentication is not configured."
+
+        });
+
+    }
+
+
+    const authorization =
+        req.get("Authorization");
+
+
+    const expected =
+        `Bearer ${CALLGUARD_API_KEY}`;
+
+
+    if (
+        authorization !== expected
+    ) {
+
+        return res.status(401).json({
+
+            ok: false,
+
+            error:
+                "Authentication required."
+
+        });
+
+    }
+
+
+    next();
+
+}
+
+
+// --------------------------------------------------
+// AUTHORIZED RECIPIENT CHECK
+// --------------------------------------------------
+
+function isAuthorizedRecipient(
+    phoneNumber
+) {
+
+    return AUTHORIZED_RECIPIENTS.has(
+        phoneNumber
     );
 
 }
@@ -162,12 +253,117 @@ app.get(
 
 
 // --------------------------------------------------
+// DRY-RUN INVESTIGATION
+// --------------------------------------------------
+//
+// This endpoint NEVER calls CALL-E.
+//
+// It accepts a supplied transcript and runs the
+// existing CallGuard analysis locally.
+//
+// This gives reviewers a safe way to test the
+// investigation logic without making a real call.
+//
+
+app.post(
+    "/api/investigate/dry-run",
+    requireServerAuthentication,
+    (req, res) => {
+
+        try {
+
+            const {
+                transcript
+            } = req.body || {};
+
+
+            if (
+                typeof transcript !== "string" ||
+                transcript.trim().length === 0
+            ) {
+
+                return res.status(400).json({
+
+                    ok: false,
+
+                    error:
+                        "A non-empty transcript is required for dry-run mode."
+
+                });
+
+            }
+
+
+            if (
+                transcript.length > 50000
+            ) {
+
+                return res.status(400).json({
+
+                    ok: false,
+
+                    error:
+                        "Transcript is too large."
+
+                });
+
+            }
+
+
+            const analysis =
+                analyzeTranscript(
+                    transcript
+                );
+
+
+            return res.json({
+
+                ok: true,
+
+                mode:
+                    "DRY_RUN",
+
+                status:
+                    "COMPLETED",
+
+                analysis
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "CallGuard dry-run error:",
+                error.message
+            );
+
+
+            return res.status(500).json({
+
+                ok: false,
+
+                error:
+                    "Unable to analyze the supplied transcript."
+
+            });
+
+        }
+
+    }
+);
+
+
+// --------------------------------------------------
 // START INVESTIGATION CALL
 // --------------------------------------------------
 
 app.post(
     "/api/investigate",
+    requireServerAuthentication,
     async (req, res) => {
+
+        let idempotencyKey = null;
+
 
         try {
 
@@ -209,7 +405,29 @@ app.post(
 
 
             // ------------------------------------------
-            // EXPLICIT AUTHORIZATION
+            // SERVER-SIDE RECIPIENT ALLOWLIST
+            // ------------------------------------------
+
+            if (
+                !isAuthorizedRecipient(
+                    normalizedPhoneNumber
+                )
+            ) {
+
+                return res.status(403).json({
+
+                    ok: false,
+
+                    error:
+                        "This phone number is not on the server authorized-recipient allowlist."
+
+                });
+
+            }
+
+
+            // ------------------------------------------
+            // EXPLICIT USER AUTHORIZATION
             // ------------------------------------------
 
             if (
@@ -230,10 +448,10 @@ app.post(
 
 
             // ------------------------------------------
-            // IDEMPOTENCY
+            // IDEMPOTENCY KEY
             // ------------------------------------------
 
-            const idempotencyKey =
+            idempotencyKey =
                 req.get(
                     "X-Idempotency-Key"
                 );
@@ -258,8 +476,9 @@ app.post(
             }
 
 
-            // Prevent the same request from
-            // starting another real call.
+            // ------------------------------------------
+            // CHECK EXISTING REQUEST
+            // ------------------------------------------
 
             const existing =
                 investigations.get(
@@ -285,11 +504,6 @@ app.post(
                 });
 
             }
-
-
-            console.log(
-                `\nStarting CallGuard investigation for ${sanitizePhoneNumber(normalizedPhoneNumber)}`
-            );
 
 
             // ------------------------------------------
@@ -359,6 +573,42 @@ This is a CallGuard defensive security investigation.
 
 
             // ------------------------------------------
+            // RESERVE IDEMPOTENCY KEY BEFORE CALL
+            // ------------------------------------------
+            //
+            // IMPORTANT:
+            // The reservation happens BEFORE the await
+            // that starts the real call.
+            //
+
+            investigations.set(
+                idempotencyKey,
+                {
+
+                    runId:
+                        null,
+
+                    status:
+                        "CALL_STARTING",
+
+                    phoneNumber:
+                        sanitizePhoneNumber(
+                            normalizedPhoneNumber
+                        ),
+
+                    createdAt:
+                        new Date().toISOString()
+
+                }
+            );
+
+
+            console.log(
+                `Starting CallGuard investigation for ${sanitizePhoneNumber(normalizedPhoneNumber)}`
+            );
+
+
+            // ------------------------------------------
             // START CALL-E CALL
             // ------------------------------------------
 
@@ -375,26 +625,54 @@ This is a CallGuard defensive security investigation.
                 );
 
 
+            // ------------------------------------------
+            // UNKNOWN CALL STATUS
+            // ------------------------------------------
+
             if (!runId) {
+
+                investigations.set(
+                    idempotencyKey,
+                    {
+
+                        runId:
+                            null,
+
+                        status:
+                            "CALL_START_UNKNOWN",
+
+                        phoneNumber:
+                            sanitizePhoneNumber(
+                                normalizedPhoneNumber
+                            ),
+
+                        createdAt:
+                            new Date().toISOString()
+
+                    }
+                );
+
 
                 console.error(
                     "CALL-E did not return a run ID."
                 );
+
 
                 return res.status(502).json({
 
                     ok: false,
 
                     error:
-                        "CALL-E did not return a run ID."
+                        "CALL-E call status could not be confirmed. The request is locked to prevent a duplicate call."
 
                 });
 
             }
 
 
-            // Store only the information
-            // needed for retry protection.
+            // ------------------------------------------
+            // UPDATE RESERVED REQUEST
+            // ------------------------------------------
 
             investigations.set(
                 idempotencyKey,
@@ -446,12 +724,45 @@ This is a CallGuard defensive security investigation.
             );
 
 
+            // ------------------------------------------
+            // FAIL CLOSED
+            // ------------------------------------------
+
+            if (
+                idempotencyKey
+            ) {
+
+                const existing =
+                    investigations.get(
+                        idempotencyKey
+                    );
+
+
+                if (existing) {
+
+                    investigations.set(
+                        idempotencyKey,
+                        {
+
+                            ...existing,
+
+                            status:
+                                "CALL_START_UNKNOWN"
+
+                        }
+                    );
+
+                }
+
+            }
+
+
             return res.status(500).json({
 
                 ok: false,
 
                 error:
-                    "Unable to start the CallGuard investigation."
+                    "Unable to confirm the CALL-E call status. The request is locked to prevent a duplicate call."
 
             });
 
@@ -467,6 +778,7 @@ This is a CallGuard defensive security investigation.
 
 app.get(
     "/api/investigate/:runId",
+    requireServerAuthentication,
     async (req, res) => {
 
         const {
@@ -671,6 +983,7 @@ app.get(
 
 app.get(
     "/api/signatures",
+    requireServerAuthentication,
     (req, res) => {
 
         try {
@@ -679,9 +992,6 @@ app.get(
                 require("./database/scamDatabase")
                     .getAllSignatures();
 
-
-            // Return only the fields required
-            // by the frontend.
 
             const safeSignatures =
                 signatures.map(
@@ -732,7 +1042,6 @@ app.get(
                     safeSignatures
 
             });
-
 
         } catch (error) {
 

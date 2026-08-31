@@ -50,10 +50,15 @@
 
 
     <!-- =========================================
-         HERO
+         MAIN
     ========================================== -->
 
     <main>
+
+
+        <!-- =====================================
+             HERO
+        ====================================== -->
 
         <section class="hero">
 
@@ -76,46 +81,239 @@
 
 
         <!-- =====================================
-             INVESTIGATION
+             REAL PHONE INVESTIGATION
         ====================================== -->
 
         <section class="investigation-card">
 
+            <div class="section-title">
+
+                <span>📞</span>
+
+                <div>
+
+                    <h2>
+                        Real Phone Investigation
+                    </h2>
+
+                    <p>
+                        Use CALL-E to conduct a live,
+                        authorized security investigation.
+                    </p>
+
+                </div>
+
+            </div>
+
+
             <label for="phoneNumber">
-                Suspicious phone number
+                Authorized recipient phone number
             </label>
+
 
             <input
                 id="phoneNumber"
                 type="tel"
                 placeholder="+91XXXXXXXXXX"
+                autocomplete="tel"
             >
+
+
+            <!-- AUTHORIZATION -->
+
             <label class="authorization-check">
 
-    <input
-        id="authorizeCall"
-        type="checkbox"
-    >
+                <input
+                    id="authorizeCall"
+                    type="checkbox"
+                >
 
-    I confirm that I am authorized to investigate
-    this number and understand that this action
-    may place a real phone call.
+                <span>
+                    I confirm that I am authorized to
+                    investigate this phone number.
+                </span>
 
-</label>
+            </label>
+
+
+            <!-- REAL CALL CONFIRMATION -->
+
+            <label class="authorization-check">
+
+                <input
+                    id="confirmLiveCall"
+                    type="checkbox"
+                >
+
+                <span>
+                    I understand that clicking the button
+                    will place a real phone call.
+                </span>
+
+            </label>
+
 
             <button
                 id="investigateButton"
-                onclick="investigateCall()"
+                type="button"
             >
 
                 🔍 Investigate Call
 
             </button>
 
+
             <div
                 id="status"
                 class="status hidden"
             ></div>
+
+
+            <p class="safety-note">
+
+                🔒 Real calls are restricted by server-side
+                authentication and an authorized-recipient
+                allowlist.
+
+            </p>
+
+        </section>
+
+
+        <!-- =====================================
+             SAFE DRY RUN
+        ====================================== -->
+
+        <section class="investigation-card dry-run-card">
+
+            <div class="section-title">
+
+                <span>🧪</span>
+
+                <div>
+
+                    <h2>
+                        Safe Dry Run
+                    </h2>
+
+                    <p>
+                        Test CallGuard's scam analysis without
+                        making a phone call or using CALL-E.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <label for="dryRunTranscript">
+                Example call transcript
+            </label>
+
+
+            <!--
+                IMPORTANT:
+                This is a REAL VALUE, not just a placeholder.
+                Therefore the dry-run button can analyze it
+                immediately.
+            -->
+
+            <textarea
+                id="dryRunTranscript"
+                rows="8"
+            >Caller: Hello, I am calling from your bank's verification department.
+
+Recipient: What is the purpose of this call?
+
+Caller: Your account KYC is incomplete and your account may be suspended today.
+
+Recipient: How can I verify this independently?
+
+Caller: You need to complete the verification immediately.</textarea>
+
+
+            <button
+                id="dryRunButton"
+                type="button"
+            >
+
+                🧪 Analyze Without Calling
+
+            </button>
+
+
+            <div
+                id="dryRunStatus"
+                class="status hidden"
+            ></div>
+
+
+            <!-- DRY RUN RESULT -->
+
+            <div
+                id="dryRunResult"
+                class="dry-run-result hidden"
+            >
+
+                <h3>
+                    🧪 Dry-Run Analysis
+                </h3>
+
+
+                <p>
+
+                    <strong>
+                        Risk Level:
+                    </strong>
+
+                    <span id="dryRunRiskLevel">
+                        —
+                    </span>
+
+                </p>
+
+
+                <p>
+
+                    <strong>
+                        Risk Score:
+                    </strong>
+
+                    <span id="dryRunRiskScore">
+                        —
+                    </span>
+
+                    /100
+
+                </p>
+
+
+                <p>
+
+                    <strong>
+                        Scam Type:
+                    </strong>
+
+                    <span id="dryRunScamType">
+                        —
+                    </span>
+
+                </p>
+
+
+                <p>
+
+                    <strong>
+                        Confidence:
+                    </strong>
+
+                    <span id="dryRunConfidence">
+                        —
+                    </span>
+
+                </p>
+
+            </div>
 
         </section>
 
@@ -157,6 +355,7 @@
 
                 </div>
 
+
                 <div class="risk-score">
 
                     <span>
@@ -164,9 +363,13 @@
                     </span>
 
                     <strong>
+
                         <span id="riskScore">
                             —
-                        </span>/100
+                        </span>
+
+                        /100
+
                     </strong>
 
                 </div>
@@ -174,7 +377,7 @@
             </div>
 
 
-            <!-- Scam Type -->
+            <!-- SCAM TYPE -->
 
             <div class="report-section">
 
@@ -189,7 +392,7 @@
             </div>
 
 
-            <!-- Indicators -->
+            <!-- INDICATORS -->
 
             <div class="report-section">
 
@@ -205,7 +408,7 @@
             </div>
 
 
-            <!-- Signature -->
+            <!-- SIGNATURE -->
 
             <div class="signature-box">
 
@@ -220,7 +423,7 @@
             </div>
 
 
-            <!-- Recommendation -->
+            <!-- RECOMMENDATION -->
 
             <div class="report-section recommendation">
 
@@ -235,7 +438,7 @@
             </div>
 
 
-            <!-- Summary -->
+            <!-- SUMMARY -->
 
             <div class="report-section">
 
@@ -250,7 +453,7 @@
             </div>
 
 
-            <!-- Transcript -->
+            <!-- TRANSCRIPT -->
 
             <div class="report-section">
 
@@ -266,7 +469,7 @@
             </div>
 
 
-            <!-- Intelligence Match -->
+            <!-- MATCH -->
 
             <div
                 id="matchCard"
@@ -337,13 +540,49 @@
     <footer>
 
         CallGuard
-        <span>•</span>
+
+        <span>
+            •
+        </span>
+
         Powered by CALL-E
 
     </footer>
 
 
+    <!-- =========================================
+         JAVASCRIPT
+    ========================================== -->
+
     <script src="app.js"></script>
+
+
+    <!--
+        Make the buttons explicitly call the
+        JavaScript functions.
+
+        This makes the connection reliable.
+    -->
+
+    <script>
+
+        document
+            .getElementById("investigateButton")
+            ?.addEventListener(
+                "click",
+                investigateCall
+            );
+
+
+        document
+            .getElementById("dryRunButton")
+            ?.addEventListener(
+                "click",
+                runDryRun
+            );
+
+    </script>
+
 
 </body>
 

@@ -3,15 +3,17 @@ const path = require("path");
 
 
 // --------------------------------------------------
-// CALL-E configuration
+// CALL-E CONFIGURATION
 // --------------------------------------------------
 
-// Use the Node executable that is already running this server.
+// Use the Node executable that is already running
+// this server.
 const NODE_EXECUTABLE =
     process.execPath;
 
 
-// CALL-E CLI JavaScript entry point installed globally by npm.
+// CALL-E CLI JavaScript entry point installed
+// globally by npm.
 const CALLE_JS =
     path.join(
         process.env.APPDATA || "",
@@ -24,15 +26,71 @@ const CALLE_JS =
     );
 
 
-// Official CALL-E server.
-// Can be overridden explicitly through the environment.
-const CALLE_SERVER_URL =
-    process.env.CALLE_SERVER_URL ||
+// --------------------------------------------------
+// CALL-E SERVER
+// --------------------------------------------------
+//
+// The default is the CALL-E server currently used
+// by this integration.
+//
+// A custom URL is allowed only when it is explicitly
+// listed as an approved CALL-E host.
+//
+// This prevents the application from accidentally
+// sending CALL-E credentials to an arbitrary server.
+//
+
+const DEFAULT_CALLE_SERVER_URL =
     "https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth";
 
 
-// CALL-E CLI authentication cache.
-// Defaults to the standard local CLI location.
+const CALLE_SERVER_URL =
+    process.env.CALLE_SERVER_URL ||
+    DEFAULT_CALLE_SERVER_URL;
+
+
+// Only these hosts are accepted.
+//
+// Additional hosts can be explicitly approved through:
+//
+// CALLE_ALLOWED_SERVER_HOSTS
+//
+// Example:
+// CALLE_ALLOWED_SERVER_HOSTS=another-approved-host.example
+//
+
+const DEFAULT_ALLOWED_HOSTS = new Set([
+
+    "seleven-mcp-sg.airudder.com"
+
+]);
+
+
+const configuredAdditionalHosts =
+    (process.env.CALLE_ALLOWED_SERVER_HOSTS || "")
+        .split(",")
+        .map(
+            value => value.trim().toLowerCase()
+        )
+        .filter(Boolean);
+
+
+for (
+    const host
+    of configuredAdditionalHosts
+) {
+
+    DEFAULT_ALLOWED_HOSTS.add(
+        host
+    );
+
+}
+
+
+// --------------------------------------------------
+// CALL-E CLI AUTHENTICATION CACHE
+// --------------------------------------------------
+
 const CALLE_CACHE_ROOT =
     process.env.CALLE_CACHE_ROOT ||
     path.join(
@@ -43,7 +101,7 @@ const CALLE_CACHE_ROOT =
 
 
 // --------------------------------------------------
-// Validate CALL-E configuration
+// VALIDATE CALL-E CONFIGURATION
 // --------------------------------------------------
 
 function validateConfiguration() {
@@ -57,10 +115,28 @@ function validateConfiguration() {
     }
 
 
+    let parsedUrl;
+
+
+    try {
+
+        parsedUrl =
+            new URL(
+                CALLE_SERVER_URL
+            );
+
+    } catch (error) {
+
+        throw new Error(
+            "CALL-E server URL is invalid."
+        );
+
+    }
+
+
+    // HTTPS only.
     if (
-        !CALLE_SERVER_URL.startsWith(
-            "https://"
-        )
+        parsedUrl.protocol !== "https:"
     ) {
 
         throw new Error(
@@ -69,11 +145,43 @@ function validateConfiguration() {
 
     }
 
+
+    const hostname =
+        parsedUrl.hostname
+            .toLowerCase();
+
+
+    // Only approved CALL-E hosts.
+    if (
+        !DEFAULT_ALLOWED_HOSTS.has(
+            hostname
+        )
+    ) {
+
+        throw new Error(
+            "CALL-E server URL is not an approved CALL-E host."
+        );
+
+    }
+
+
+    // Prevent embedded credentials.
+    if (
+        parsedUrl.username ||
+        parsedUrl.password
+    ) {
+
+        throw new Error(
+            "CALL-E server URL must not contain embedded credentials."
+        );
+
+    }
+
 }
 
 
 // --------------------------------------------------
-// Run CALL-E directly through Node
+// RUN CALL-E DIRECTLY THROUGH NODE
 // --------------------------------------------------
 
 function runCalle(
@@ -181,7 +289,7 @@ function runCalle(
 
 
 // --------------------------------------------------
-// Start CALL-E investigation
+// START CALL-E INVESTIGATION
 // --------------------------------------------------
 
 async function startCall(
@@ -221,7 +329,7 @@ async function startCall(
 
 
 // --------------------------------------------------
-// Get CALL-E investigation status
+// GET CALL-E INVESTIGATION STATUS
 // --------------------------------------------------
 
 async function getCallStatus(
@@ -263,7 +371,7 @@ async function getCallStatus(
 
 
 // --------------------------------------------------
-// Exports
+// EXPORTS
 // --------------------------------------------------
 
 module.exports = {
