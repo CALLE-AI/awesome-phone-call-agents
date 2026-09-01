@@ -58,3 +58,31 @@ def test_cancel_marks_run(tmp_path):
     assert exit_code == 0
     records = read_jsonl(state_dir / "runs" / "run-test" / "audit.jsonl")
     assert records[-1]["status"] == "CANCELLED_BY_OPERATOR"
+
+
+def test_run_missing_data_files_fails_cleanly(tmp_path, capsys):
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    exit_code = main(
+        [
+            "run",
+            "--data-dir", str(empty_dir),
+            "--state-dir", str(tmp_path / "state"),
+            "--run-id", "x",
+        ]
+    )
+    assert exit_code == 1
+    assert "not found" in capsys.readouterr().err
+
+
+def test_module_entrypoint_runs():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "table_rescue.cli", "--help"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert "table-rescue" in result.stdout

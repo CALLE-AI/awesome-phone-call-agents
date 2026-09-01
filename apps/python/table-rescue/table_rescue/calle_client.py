@@ -26,7 +26,17 @@ TERMINAL_STATUSES = {
     "NO_ANSWER",
     "VOICEMAIL",
 }
-OUTCOME_RE = re.compile(r"OUTCOME:\s*([A-Z_]+)")
+OUTCOME_RE = re.compile(r"\bOUTCOME:\s*([A-Z_]+)\b", re.IGNORECASE)
+
+# Last-resort keyword hints when the agent omits the OUTCOME token. Order matters:
+# negative/definitive verbs are checked before the affirmative "confirm".
+KEYWORD_FALLBACKS: tuple[tuple[str, CallStatus], ...] = (
+    ("cancel", CallStatus.CANCELLED),
+    ("reschedul", CallStatus.RESCHEDULED),
+    ("accept", CallStatus.ACCEPTED),
+    ("declin", CallStatus.DECLINED),
+    ("confirm", CallStatus.CONFIRMED),
+)
 
 CONFIRM_GOAL = (
     "You are calling {name} about their restaurant reservation for a party of "
@@ -65,15 +75,20 @@ def build_offer_goal(name: str, party_size: int, slot: str) -> str:
 
 
 def parse_outcome(summary: str | None) -> CallStatus | None:
+    """Parse the OUTCOME token; fall back to keyword hints before giving up."""
     if not summary:
         return None
     match = OUTCOME_RE.search(summary)
-    if not match:
-        return None
-    try:
-        return CallStatus(match.group(1))
-    except ValueError:
-        return None
+    if match:
+        try:
+            return CallStatus(match.group(1).upper())
+        except ValueError:
+            pass
+    lowered = summary.lower()
+    for keyword, status in KEYWORD_FALLBACKS:
+        if keyword in lowered:
+            return status
+    return None
 
 
 def map_terminal_status(status: str, summary: str | None) -> CallStatus:
