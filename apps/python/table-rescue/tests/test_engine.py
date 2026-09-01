@@ -137,3 +137,92 @@ def test_cancelled_run_refuses_to_dial(tmp_path):
     outcome = engine.confirm_reservation("run-1", make_reservation(), NOW)
     assert outcome.status == CallStatus.CANCELLED_BY_OPERATOR
     assert client.dialed == []
+
+
+def test_fill_slot_walks_waitlist_in_priority_order_until_accepted(tmp_path):
+    payloads = {
+        "W-002": [{"status": "DECLINED", "new_slot": None, "notes": "no"}],
+        "W-001": [{"status": "ACCEPTED", "new_slot": None, "notes": "yes"}],
+    }
+    engine, client, _ = make_engine(tmp_path, payloads)
+    slot = make_reservation()
+    entries = [make_entry("W-002", priority=1), make_entry("W-001", priority=2)]
+    outcome = engine.fill_slot("run-1", slot, entries, NOW)
+    assert outcome.status == CallStatus.ACCEPTED
+    assert slot.status == ReservationStatus.RECOVERED
+    assert entries[0].status == WaitlistStatus.DECLINED
+    assert entries[1].status == WaitlistStatus.ACCEPTED
+    assert client.dialed == ["W-002", "W-001"]
+
+
+def test_select_candidates_filters_party_size_and_window(tmp_path):
+    engine, client, _ = make_engine(
+        tmp_path, {"W-001": [{"status": "ACCEPTED", "new_slot": None, "notes": "yes"}]}
+    )
+    slot = make_reservation(party_size=4)
+    too_small = make_entry("W-001", party_size=2)
+    assert engine.select_candidates(slot, [too_small]) == []
+    out_of_window = make_entry("W-001")
+    out_of_window.window_end = "2026-09-10T17:00:00+07:00"
+    assert engine.select_candidates(slot, [out_of_window]) == []
+    no_consent = make_entry("W-001", consent=False)
+    assert engine.select_candidates(slot, [no_consent]) == []
+    matching = make_entry("W-001")
+    assert engine.select_candidates(slot, [matching]) == [matching]
+    assert client.dialed == []
+
+
+def test_party_size_tolerance_allows_smaller_parties(tmp_path):
+    engine, _, _ = make_engine(tmp_path, {}, EngineConfig(party_size_tolerance=2))
+    slot = make_reservation(party_size=4)
+    smaller = make_entry("W-001", party_size=2)
+    assert engine.select_candidates(slot, [smaller]) == [smaller]
+    bigger = make_entry("W-002", party_size=6)
+    assert engine.select_candidates(slot, [bigger]) == []
+
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+DIAL_STATUSES = ["CONFIRMED", "CANCELLED", "NO_ANSWER"]
+
+
+@given(
+    statuses=st.lists(st.sampled_from(DIAL_STATUSES), min_size=0, max_size=6),
+    max_calls=st.integers(min_value=1, max_value=4),
+)
+@settings(max_examples=50, deadline=None)
+def test_engine_never_exceeds_budget(tmp_path_factory, statuses, max_calls):
+    tmp_path = tmp_path_factory.mktemp("prop")
+    payloads = {
+        f"R-{i:03d}": [{"status": status, "new_slot": None, "notes": ""}]
+        for i, status in enumerate(statuses)
+    }
+    engine, client, _ = make_engine(
+        tmp_path, payloads, EngineConfig(max_calls=max_calls, no_answer_retries=0)
+    )
+    try:
+        for i in range(len(statuses)):
+            engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
+    except BudgetExceededError:
+        pass
+    assert engine.calls_made <= max_calls
+    assert len(client.dialed) <= max_calls
+
+
+@given(
+    statuses=st.lists(st.sampled_from(DIAL_STATUSES), min_size=1, max_size=6),
+)
+@settings(max_examples=50, deadline=None)
+def test_engine_never_dials_a_target_twice_in_one_run(tmp_path_factory, statuses):
+    tmp_path = tmp_path_factory.mktemp("prop")
+    payloads = {
+        f"R-{i:03d}": [{"status": status, "new_slot": None, "notes": ""}]
+        for i, status in enumerate(statuses)
+    }
+    engine, client, _ = make_engine(tmp_path, payloads, EngineConfig(no_answer_retries=0))
+    for i in range(len(statuses)):
+        engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
+        second = engine.confirm_reservation("run-1", make_reservation(f"R-{i:03d}"), NOW)
+        assert second.status == CallStatus.SKIPPED_DUPLICATE
+    assert len(client.dialed) == len(set(client.dialed))
