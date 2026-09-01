@@ -41,11 +41,19 @@ def test_full_dry_run_recovers_cancelled_table(tmp_path):
         for row in read_jsonl(data_dir / "waitlist.jsonl")
     }
     assert waitlist_statuses["W-001"] == "DECLINED"
+    assert waitlist_statuses["W-002"] == "WAITING"
     assert waitlist_statuses["W-003"] == "ACCEPTED"
     audit = read_jsonl(state_dir / "runs" / "e2e-1" / "audit.jsonl")
     dialed = [row for row in audit if row["status"] in DIALLED]
     assert len(dialed) == 4
+    assert [(row["target_id"], row["status"]) for row in dialed] == [
+        ("R-001", "CANCELLED"),
+        ("W-001", "DECLINED"),
+        ("W-003", "ACCEPTED"),
+        ("R-002", "CONFIRMED"),
+    ]
     skipped = [row for row in audit if row["status"] == "SKIPPED_NO_CONSENT"]
     assert len(skipped) == 1
+    assert skipped[0]["target_id"] == "R-003"
     report = (state_dir / "runs" / "e2e-1" / "report.md").read_text(encoding="utf-8")
     assert "Slots recovered: 1" in report
