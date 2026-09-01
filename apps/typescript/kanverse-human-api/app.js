@@ -91,6 +91,41 @@ function isTerminal(status) {
   return ['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED'].includes(String(status || '').toUpperCase());
 }
 
+function classifyMissionOutcome(result, summary) {
+  const completed =
+    result?.outcome?.task_completed ??
+    result?.result?.outcome?.task_completed;
+
+  const status = String(result?.status || result?.state || '').toUpperCase();
+  const text = String(summary || '').toLowerCase();
+
+  const clearNoMatch = [
+    'did not reach a live',
+    'no live representative',
+    'no live person',
+    'could not reach',
+    'could not be reached',
+    'no answer',
+    'line is no longer in use',
+    'number is no longer in use',
+    'number is not in service',
+    'invalid number',
+    'disconnected',
+    'goal not achieved',
+    'goal not satisfied',
+    'could not confirm'
+  ].some(marker => text.includes(marker));
+
+  if (['FAILED', 'CANCELLED', 'CANCELED'].includes(status) || clearNoMatch) {
+    return 'failed';
+  }
+
+  if (completed === true) return 'success';
+  if (completed === false) return 'failed';
+
+  return 'review';
+}
+
 function setDecision(text) {
   decisionText.textContent = text;
 }
@@ -117,7 +152,13 @@ function renderHistory() {
   }
   historyList.innerHTML = history.map(item => {
     const safeResult = item.result === 'success' ? 'success' : item.result === 'failed' ? 'failed' : 'running';
-    const label = safeResult === 'success' ? 'SUCCESS' : safeResult === 'failed' ? 'NOT A MATCH' : 'IN PROGRESS';
+    const label = item.result === 'review'
+      ? 'REVIEW NEEDED'
+      : safeResult === 'success'
+        ? 'SUCCESS'
+        : safeResult === 'failed'
+          ? 'NOT A MATCH'
+          : 'IN PROGRESS';
     return `<div class="history-item"><div class="history-index">${item.index + 1}</div><div class="history-main"><strong>Target ${item.index + 1} · ${maskPhone(item.phone)}</strong><span>${item.detail}</span></div><span class="result-pill ${safeResult}">${label}</span></div>`;
   }).join('');
 }
@@ -209,17 +250,50 @@ async function pollStatus(runId) {
       clearTimeout(pollTimer);
       confirmCallBtn.disabled = false;
       cancelPlanBtn.disabled = false;
-      const detail = summary || (completed ? 'Mission goal satisfied.' : 'Goal not satisfied.');
-      recordHistory(activePlan.targetIndex, activePlan.phone, completed === true ? 'success' : 'failed', detail);
+      const missionOutcome = classifyMissionOutcome(result, summary);
+
+      const detail = summary || (
+        missionOutcome === 'success'
+          ? 'Mission goal satisfied.'
+          : missionOutcome === 'failed'
+            ? 'Goal not satisfied.'
+            : 'Outcome requires human review.'
+      );
+
+      recordHistory(
+        activePlan.targetIndex,
+        activePlan.phone,
+        missionOutcome,
+        detail
+      );
+
       setStage(4);
-      if (completed === false && mission && activePlan?.targetIndex + 1 < mission.targets.length) {
-        statusBadge.textContent = 'CONTINUING';
-        setDecision('Goal not achieved. Preparing the next target…');
-        await prepareTarget(activePlan.targetIndex + 1);
-      } else {
-        if (completed === true) statusBadge.textContent = 'GOAL ACHIEVED';
+
+      if (missionOutcome === 'failed') {
+        if (mission && activePlan?.targetIndex + 1 < mission.targets.length) {
+          statusBadge.textContent = 'CONTINUING';
+          setDecision('Goal not achieved. Preparing the next target…');
+          await prepareTarget(activePlan.targetIndex + 1);
+        } else {
+          statusBadge.textContent = 'NO MATCH';
+          statusBadge.className = 'badge idle';
+          setDecision(summary || 'Mission finished: the goal was not achieved.');
+          completeTimeline();
+        }
+      } else if (missionOutcome === 'success') {
+        statusBadge.textContent = 'GOAL ACHIEVED';
+        statusBadge.className = 'badge ready';
+        setDecision(summary || 'Mission goal satisfied.');
         completeTimeline();
+      } else {
+        statusBadge.textContent = 'REVIEW NEEDED';
+        statusBadge.className = 'badge idle';
+        setDecision(
+          (summary || 'CALL-E returned an unclear outcome.') +
+          ' Human review is required before Human API continues.'
+        );
       }
+
       return;
     }
     pollTimer = setTimeout(() => pollStatus(runId), 7000);
