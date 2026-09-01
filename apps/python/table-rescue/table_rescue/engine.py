@@ -119,3 +119,54 @@ class CascadeEngine:
             reservation.status = new_status
         if outcome.status == CallStatus.RESCHEDULED and outcome.new_slot:
             reservation.slot = outcome.new_slot
+
+    def select_candidates(
+        self, slot: Reservation, waitlist: list[WaitlistEntry]
+    ) -> list[WaitlistEntry]:
+        slot_dt = datetime.fromisoformat(slot.slot)
+        candidates: list[WaitlistEntry] = []
+        for entry in waitlist:
+            if entry.status != WaitlistStatus.WAITING or not entry.consent:
+                continue
+            window_start = datetime.fromisoformat(entry.window_start)
+            window_end = datetime.fromisoformat(entry.window_end)
+            if not (window_start <= slot_dt <= window_end):
+                continue
+            gap = slot.party_size - entry.party_size
+            if not (0 <= gap <= self.config.party_size_tolerance):
+                continue
+            candidates.append(entry)
+        candidates.sort(key=lambda entry: entry.priority)
+        return candidates
+
+    def fill_slot(
+        self,
+        run_id: str,
+        slot: Reservation,
+        waitlist: list[WaitlistEntry],
+        now: datetime,
+    ) -> CallOutcome | None:
+        """Offer a freed slot to waitlist candidates in priority order."""
+        for entry in self.select_candidates(slot, waitlist):
+            entry.status = WaitlistStatus.OFFERED
+            goal = build_offer_goal(entry.name, entry.party_size, slot.slot)
+            outcome = self._place_or_skip(
+                run_id=run_id,
+                phone=entry.phone,
+                target_id=entry.entry_id,
+                consent=entry.consent,
+                goal=goal,
+                now=now,
+            )
+            if outcome.status == CallStatus.ACCEPTED:
+                entry.status = WaitlistStatus.ACCEPTED
+                slot.status = ReservationStatus.RECOVERED
+                return outcome
+            if outcome.status == CallStatus.DECLINED:
+                entry.status = WaitlistStatus.DECLINED
+            elif outcome.status == CallStatus.NO_ANSWER:
+                entry.status = WaitlistStatus.NO_ANSWER
+            else:
+                # Skip outcomes and ERROR: keep the entry on the waitlist.
+                entry.status = WaitlistStatus.WAITING
+        return None
