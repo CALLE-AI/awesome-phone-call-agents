@@ -42,3 +42,70 @@ def test_dry_run_client_uses_fixtures(tmp_path):
     assert client.place_call(request).status == CallStatus.CANCELLED
     other = CallRequest(run_id="run-1", target_id="R-999", phone="+15550199", goal="confirm")
     assert client.place_call(other).status == CallStatus.NO_ANSWER
+
+
+import asyncio
+import json
+
+import pytest
+
+from table_rescue.calle_client import McpCallClient
+
+
+class FakeToolResult:
+    def __init__(self, structured):
+        self.structured_content = structured
+
+
+class ScriptedMcpClient:
+    def __init__(self, script):
+        self.script = script
+        self.calls = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return False
+
+    async def call_tool(self, name, arguments):
+        self.calls.append((name, arguments))
+        return FakeToolResult(self.script[name].pop(0))
+
+
+def make_mcp_client(tmp_path, script):
+    token_file = tmp_path / "token.json"
+    token_file.write_text(
+        json.dumps({"token": {"access_token": "tok"}}), encoding="utf-8"
+    )
+    client = McpCallClient(
+        poll_interval_seconds=0,
+        client_factory=lambda: ScriptedMcpClient(script),
+    )
+    client._run_calle_json = lambda args: {"usable": True, "cache_path": str(token_file)}
+    return client
+
+
+def test_mcp_client_executes_plan_run_poll(tmp_path):
+    script = {
+        "plan_call": [{"plan_id": "p1", "confirm_token": "c1", "ready_to_run": True}],
+        "run_call": [{"run_id": "call-1"}],
+        "get_call_run": [
+            {"status": "RUNNING"},
+            {"status": "COMPLETED", "post_summary": "guest said OUTCOME: CANCELLED"},
+        ],
+    }
+    client = make_mcp_client(tmp_path, script)
+    request = CallRequest(
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+    )
+    outcome = asyncio.run(client._execute(request))
+    assert outcome.status == CallStatus.CANCELLED
+    assert outcome.transcript_ref == "call-1"
+
+
+def test_ensure_access_token_requires_login():
+    client = McpCallClient()
+    client._run_calle_json = lambda args: {"usable": False}
+    with pytest.raises(RuntimeError, match="not logged in"):
+        client.ensure_access_token()
