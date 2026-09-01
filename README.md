@@ -118,8 +118,6 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Skills
 
-- [RELAY](https://github.com/eyadarshad/RELAY) - Autonomous multi-call business operations agent that plans, discovers suppliers, conducts outbound inquiries and leverage negotiations via CALL-E, and locks in purchase orders behind a human approval gate.
-  
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
@@ -147,8 +145,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 
 ### Apps
 
-- [RELAY](https://github.com/eyadarshad/RELAY) - Autonomous multi-call business operations agent that plans, discovers suppliers, conducts outbound inquiries and leverage negotiations via CALL-E, and locks in purchase orders behind a human approval gate.
-
+- [RELAY](https://github.com/eyadarshad/RELAY) - Autonomous multi-call business operations agent with a real-time web console that plans missions, queries suppliers via CALL-E, negotiates volume discounts, and enforces human approval before locking purchase orders.
 - [CallParity](https://github.com/ruddro-roy/callparity) - Two-call ops workbench for Party A claims, a Party B falsification CALL-E task, and a merged claim graph. Preview and fixture mode by default.
 - [CallmeMaybe](https://github.com/jongan69/callmemaybe) - Shopify order-exception phone workflows that use CALL-E for carrier traces and consent-first customer callbacks, with a no-call fixture mode and merchant approval before every Shopify mutation.
 - [Later, Me.](https://github.com/shirosenagi-design/later-me) - Windows CALL-E app for scheduling a real phone call to your future self, with a four-hour minimum, one pending reservation, and optional post-call Relationship Trace.
