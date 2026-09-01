@@ -277,7 +277,7 @@ with a general-purpose conversational prompt. It's the recommended target for
 exercising this skill live without calling a business.
 
 ```bash
-printf 'name,phone,address\nCALL-E Hotline,+12763229632,Inbound testing hotline\n' \
+printf 'name,phone,address\nCALL-E Hotline,+14155550132,Inbound testing hotline\n' \
   > pharmacies.hotline.csv
 
 python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv           # offline

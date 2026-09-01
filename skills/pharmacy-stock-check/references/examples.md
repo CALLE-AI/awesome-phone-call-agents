@@ -220,7 +220,7 @@ answers with a general-purpose prompt rather than role-playing a pharmacist, so
 this is a pipeline check, not a source of stock data.
 
 ```bash
-$ printf 'name,phone,address\nCALL-E Hotline,+12763229632,Testing hotline\n' \
+$ printf 'name,phone,address\nCALL-E Hotline,+14155550132,Testing hotline\n' \
     > pharmacies.hotline.csv
 $ python3 scripts/pharmacy_search.py --pharmacies pharmacies.hotline.csv --live
 
