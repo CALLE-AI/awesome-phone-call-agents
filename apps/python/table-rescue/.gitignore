@@ -5,3 +5,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Working data and run state may contain real phone numbers - never commit
+state/
+data/reservations.jsonl
+data/waitlist.jsonl
