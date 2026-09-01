@@ -79,15 +79,11 @@ FastAPI exposes an allowlisted local review view, with packaged HTML/CSS/JavaScr
 The Web UI/API cannot invoke CALL-E. The optional one-shot live CLI has a separate
 guarded production factory; contract-test permits are never production permits.
 
-The hackathon project was live-validated with a Japanese-localized task. This
-upstream contribution contains an English reference equivalent to comply with
-the repository's English-only contribution policy.
-
-- Private `ja-safety-v2`: the revised Japanese flow completed a controlled self-call
-  with `task_completed=true`, a normalized structured result, and `action_required`.
-  Its implementation and historical evidence are not included here.
-- Public `en-safety-v2`: a distinct English reference task. It has NOT been
-  live-call validated and does not inherit the Japanese task's empirical claims.
+The public `en-safety-v2` task is an English reference task for this repository.
+It has NOT been live-call validated. Public verification in this contribution is
+limited to deterministic Fake Provider scenarios, offline contract tests, and
+the documented no-call reviewer path. It does not establish live-call behavior
+or English speech quality.
 
 The English reference retains six sequential checks: fictional work overview,
 safety concerns, near miss, equipment/tool abnormality, injury/feeling unwell, and
@@ -99,12 +95,11 @@ makes no emergency, medical, or legal judgments. The public task and fixtures ar
 English-only. The optional recipient gate still restricts self-calls to Japan;
 English localization does not broaden dialing permissions.
 
-`safety-result-v1` retains the same fields, enums, required fields, and strict
-normalizer; only its human-readable descriptions are translated. Unknown remains
-unknown. Call completion and task completion are separate: a terminal call can
-have an incomplete task or no usable structured result. The public triage keeps
-the existing English handover-note recognition for the fixed tool-inspection
-guidance; it does not contain the private Japanese phrase-matching branch.
+`safety-result-v1` defines fixed fields, enums, required fields, and a strict
+normalizer for the public English reference task. Unknown remains unknown. Call
+completion and task completion are separate: a terminal call can have an
+incomplete task or no usable structured result. The public triage keeps the
+existing English handover-note recognition for the fixed tool-inspection guidance.
 
 An offline preview shows the English task without loading credentials or calling:
 

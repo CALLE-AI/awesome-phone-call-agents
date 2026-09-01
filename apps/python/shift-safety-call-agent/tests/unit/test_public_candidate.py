@@ -25,15 +25,30 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 
 
 class PublicCandidateTests(unittest.TestCase):
-    def test_reference_and_readme_do_not_inherit_private_live_evidence(self) -> None:
+    def test_reference_and_readme_make_only_publicly_verifiable_validation_claims(self) -> None:
         self.assertEqual(ENGLISH_SAFETY_TASK_VERSION, "en-safety-v2")
         self.assertTrue(build_english_safety_task().isascii())
         self.assertEqual(create_calle_preview_plan("no-incident").language, "English")
+
         readme = (APP_ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Private `ja-safety-v2`", readme)
-        self.assertIn("Public `en-safety-v2`", readme)
-        self.assertIn("It has NOT been\nlive-call validated", readme.replace("  ", ""))
-        self.assertIn("does not inherit the Japanese task's empirical claims", readme)
+
+        self.assertIn(
+            "The public `en-safety-v2` task is an English reference task",
+            readme,
+        )
+        self.assertIn("It has NOT been live-call validated", readme)
+        self.assertIn("deterministic Fake Provider scenarios", readme)
+
+        self.assertNotIn(
+            "The hackathon project was live-validated with a Japanese-localized task",
+            readme,
+        )
+        self.assertNotIn("Private `ja-safety-v2`", readme)
+        self.assertNotIn(
+            "a normalized structured result, and `action_required`",
+            readme,
+        )
+
         self.assertIn("does not provide automated safety clearance", readme)
 
     def test_candidate_has_no_cjk_content_or_shipped_runtime_artifacts(self) -> None:
