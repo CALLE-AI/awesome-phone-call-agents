@@ -119,6 +119,7 @@ This project is an awesome list for AI-agent phone-call workflows. Add resources
 ### Skills
 
 - [`accesscall`](skills/accesscall/) - Phone-based accessibility intake for VPAT 2.4/Section 508 audits. Run `npm install` in `skills/accesscall/` before using `scripts/format-to-vpat.js`, or it fails with `Cannot find module 'jszip'`.
+- [`appointment-confirm`](skills/appointment-confirm/) - Confirms one existing appointment by phone, captures yes/no plus time as structured JSON, and leaves calendar writes to a human.
 - [`candidate-availability-call`](skills/candidate-availability-call/) - Recruiting coordination skill that confirms candidate interview availability by phone, returns evidence-backed time windows, and leaves scheduling commitments to a human.
 - [`call-reminder`](skills/call-reminder/) - Scheduler wrapper skill for recurring CALL-E phone-call reminders.
 - [`callparity-claimkill`](skills/callparity-claimkill/) - ClaimKill (CallParity) compiles the next CALL-E call as a leak-scored refute of a quoted claim; pytest runs on fixtures with zero live calls.
@@ -175,6 +176,7 @@ Runnable demo apps live under [`apps/`](apps/). They are not a CALL-E SDK and do
 | [`apps/typescript/call-on-behalf`](apps/typescript/call-on-behalf/) | TypeScript | Delegated errand caller with a disclosure budget: says only the details the person authorized, commits only inside authorized windows, and returns the answers plus the transcript. |
 | [`apps/typescript/lost-line-coordinator`](apps/typescript/lost-line-coordinator/) | TypeScript | Consent-first lost-property route coordinator with inspectable calls, locally validated feature evidence, adaptive early stopping, and privacy-minimized results. |
 | [`apps/typescript/surplus-signal`](apps/typescript/surplus-signal/) | TypeScript | Consent-first surplus-food pickup confirmations with strict structured results and a redacted candidate manifest that still requires human dispatch approval. |
+| [`apps/python/appointment-confirm`](apps/python/appointment-confirm/) | Python | Consent-first appointment confirmation with a no-call preview, fixture mock, and one-shot CALL-E execute path that returns yes/no + time as fail-closed JSON. |
 | [`apps/python/leash`](apps/python/leash/) | Python | Revokes an unattended agent's Google credential unless one call clears twelve conditions; silence, a machine answering, or a result that disagrees with its own transcript all end the lease. |
 | [`apps/typescript/recallready`](apps/typescript/recallready/) | TypeScript | Consent-gated product-recall qualification calls grounded in official CPSC records, with masked destinations, single-use previews, structured remedies, and a no-call default. |
 | [`apps/typescript/readyline`](apps/typescript/readyline/) | TypeScript | Event load-in coordinator that turns authorized CALL-E vendor results into deterministic access, dock, power, and deadline checks, with a no-call demo and human-approved follow-up. |
