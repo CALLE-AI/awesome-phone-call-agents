@@ -362,7 +362,7 @@ if __name__ == "__main__":
     numbers_to_call = []
 
     if choice == "1":
-        entered_number = input("Farmer's phone number (e.g., +237699166726): ").strip()
+        entered_number = input("Farmer's phone number (e.g.,  +15550101234): ").strip()
         numbers_to_call = [normalize_phone_number(entered_number)]
 
     elif choice == "2":
