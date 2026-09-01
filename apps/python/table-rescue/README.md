@@ -15,7 +15,8 @@ inside a call budget.
    WAITING status, party size within tolerance, slot inside their window) in priority
    order until one ACCEPTED. The slot is marked RECOVERED.
 3. Writeback: reservations and waitlist files are rewritten atomically, every decision
-   is appended to the run audit log, and a masked staff report is written.
+   is appended to the run audit log, and a masked staff report is written, optionally
+   with a protected-revenue estimate (`--avg-check-per-guest`).
 
 ## Safety model
 
@@ -25,6 +26,8 @@ inside a call budget.
   before dialing once the budget is exhausted.
 - Consent: records with `consent: false` are never dialled (audited as
   SKIPPED_NO_CONSENT).
+- Disclosure by design: every call goal instructs the agent to identify itself as an
+  automated assistant before proceeding.
 - Idempotency: reruns with the same `--run-id` skip already-dialled targets
   (SKIPPED_DUPLICATE).
 - Cancel: `table-rescue cancel --run-id <id>` marks the run cancelled; later
@@ -59,7 +62,7 @@ Dry-run (no calls):
 ```bash
 cp data/reservations.sample.jsonl data/reservations.jsonl
 cp data/waitlist.sample.jsonl data/waitlist.jsonl
-table-rescue run --run-id smoke-1
+table-rescue run --run-id smoke-1 --avg-check-per-guest 25
 ```
 
 Live (real calls through CALL-E MCP Streamable HTTP using the CALL-E CLI token cache):
@@ -102,13 +105,15 @@ phone you control.
 - **The problem is measurable revenue loss.** Restaurant seats are perishable inventory:
   an empty table at 8pm is inventory gone forever. Cornell's restaurant revenue
   management research treats no-shows and overbooking as core levers of restaurant
-  revenue ([Kimes et al., Cornell Center for Hospitality Research](https://ecommons.cornell.edu/bitstreams/56f1b36d-beb8-42fb-aeea-9fdb59be6c29/download)).
-- **Proactive reminder calls work.** Systematic reviews consistently find reminder calls
-  and messages reduce no-shows and improve attendance
-  ([McLean et al. 2016](https://pmc.ncbi.nlm.nih.gov/articles/PMC4831598/);
-  [Al-Turbag et al. 2026 meta-analysis](https://jhmhp.amegroups.org/article/view/10215/html)),
-  and live conversational calls outperform one-way automated reminders in some settings
-  ([Parikh et al. 2010, American Journal of Medicine](https://www.amjmed.com/article/S0002-9343(10)00108-7/fulltext)).
+  revenue ([Kimes 2004, Cornell Center for Hospitality Research](https://ecommons.cornell.edu/entities/publication/779ca191-03a2-4abe-8e4b-2de7fdd4f7ff)).
+- **Proactive reminder calls work.** Systematic reviews consistently find reminders
+  improve attendance across modalities
+  ([Gurol-Urganci et al. 2013, Cochrane review](https://pubmed.ncbi.nlm.nih.gov/24310741/);
+  [McLean et al. 2016](https://pmc.ncbi.nlm.nih.gov/articles/PMC4831598/)). Simple
+  one-way reminders are the floor, not the ceiling: McLean et al. find "reminder plus"
+  designs that enable a response outperform bare reminders, and in one outpatient study
+  live conversational reminders beat automated ones
+  ([Parikh et al. 2010, American Journal of Medicine](https://pubmed.ncbi.nlm.nih.gov/20569761/)).
   A conversational agent that can actually accept "move it to 8pm" as an answer is the
   natural next step of that evidence.
 - **Consent-first is a legal requirement, not a nicety.** The FCC's 2024 declaratory
@@ -119,7 +124,7 @@ phone you control.
 - **Structured results need a protocol plus a fallback.** Structured-output techniques
   improve machine-readability of LLM responses but do not guarantee semantic validity;
   empirical studies document failure modes such as well-formed but wrong or missing
-  fields ([arXiv empirical study](https://arxiv.org/html/2606.09395v1)). The OUTCOME
+  fields ([Song et al. 2026, arXiv:2606.09395](https://arxiv.org/abs/2606.09395)). The OUTCOME
   token protocol, keyword fallback, and ERROR escalation are a pragmatic
   trust-but-verify design for the same problem on voice summaries.
 - **Idempotency keys and budgets are proven reliability patterns.** Duplicate-call
@@ -127,10 +132,36 @@ phone you control.
   call budget is a circuit-breaker against runaway automation.
 - **Escalate ambiguity to humans.** No-answer and error targets get exactly one retry,
   then a staff escalation in the report - human-in-the-loop practice for consequential
-  automated actions, in the spirit of disclosure-by-design popularized by early
-  phone-calling agents ([Google Duplex disclosure debate, 2018](https://www.theverge.com/2018/5/10/17342414/google-duplex-ai-assistant-voice-calling-identify-itself-update)).
+  automated actions, in the spirit of disclosure-by-design that the first
+  consumer phone-calling agent adopted after public debate ([Google Duplex, 2018](https://research.google/blog/google-duplex-an-ai-system-for-accomplishing-real-world-tasks-over-the-phone/)).
 
 ## Limitations
 
 - Cascade runs only for reservations cancelled during the same run.
 - One retry per no-answer target (`--no-answer-retries`).
+
+## References
+
+1. Kimes, S. E. (2004). _Restaurant Revenue Management_. Cornell Center for Hospitality
+   Research Reports 4(2).
+   https://ecommons.cornell.edu/entities/publication/779ca191-03a2-4abe-8e4b-2de7fdd4f7ff
+2. Gurol-Urganci, I., de Jongh, T., Vodopivec-Jamsek, V., Atun, R., & Car, J. (2013).
+   _Mobile phone messaging reminders for attendance at healthcare appointments._
+   Cochrane Database of Systematic Reviews, CD007458.
+   https://pubmed.ncbi.nlm.nih.gov/24310741/
+3. McLean, S., Booth, A., Gee, M., Salway, S., Cobb, M., Bhanbhro, S., & Nancarrow, S.
+   (2016). _Appointment reminder systems are effective but not optimal._ Patient
+   Preference and Adherence. https://pmc.ncbi.nlm.nih.gov/articles/PMC4831598/
+4. Parikh, A., Gupta, K., Wilson, A. C., Fields, K., Cosgrove, N. M., & Kostis, J. B.
+   (2010). _The effectiveness of outpatient appointment reminder systems in reducing
+   no-show rates._ American Journal of Medicine 123(6), 542-548.
+   https://pubmed.ncbi.nlm.nih.gov/20569761/
+5. Federal Communications Commission (2024). _Declaratory Ruling FCC 24-17: AI-generated
+   voices in robocalls are "artificial" under the TCPA._
+   https://docs.fcc.gov/public/attachments/FCC-24-17A1.pdf
+6. Song, Y., Rajput, P., Sun, T., Ezzini, S., Bissyande, T. F., & Klein, J. (2026).
+   _Empirical Study for Structured Output Control in LLMs for Software Engineering._
+   arXiv:2606.09395. https://arxiv.org/abs/2606.09395
+7. Google Research (2018). _Google Duplex: An AI System for Accomplishing Real-World
+   Tasks Over the Phone._
+   https://research.google/blog/google-duplex-an-ai-system-for-accomplishing-real-world-tasks-over-the-phone/
