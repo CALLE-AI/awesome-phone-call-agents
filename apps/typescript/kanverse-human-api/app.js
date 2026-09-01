@@ -101,6 +101,11 @@ function classifyMissionOutcome(result, summary) {
 
   const clearNoMatch = [
     'did not reach a live',
+    'never reached a live',
+    'automated phone menu',
+    'keypad menu',
+    'request was not completed',
+    'was not completed',
     'no live representative',
     'no live person',
     'could not reach',
