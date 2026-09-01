@@ -366,9 +366,9 @@ if __name__ == "__main__":
         numbers_to_call = [normalize_phone_number(entered_number)]
 
     elif choice == "2":
-        demo_numbers = ["+237699166726", "+237677123456", "+237655987654"]
-        print(f"Demo list: {demo_numbers}")
-        numbers_to_call = demo_numbers
+        from demo_numbers import DEMO_NUMBERS
+        print(f"Demo list: {DEMO_NUMBERS}")
+        numbers_to_call = DEMO_NUMBERS
 
     elif choice == "3":
         csv_path = input("CSV file path (one 'phone_number' column): ").strip()
