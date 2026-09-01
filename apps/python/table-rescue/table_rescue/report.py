@@ -25,6 +25,7 @@ def render_report(
     outcomes: list[CallOutcome],
     reservations: list[Reservation],
     waitlist: list[WaitlistEntry],
+    avg_check_per_guest: float | None = None,
 ) -> str:
     phones = {entry.booking_id: entry.phone for entry in reservations}
     phones.update({entry.entry_id: entry.phone for entry in waitlist})
@@ -41,6 +42,14 @@ def render_report(
         f"- Slots recovered: {len(recovered)}",
         f"- Waitlist entries accepted: {len(accepted)}",
         f"- Needs staff attention (no answer or error): {len(escalated)}",
+        *(
+            [
+                f"- Estimated revenue protected: {sum(r.party_size for r in recovered) * avg_check_per_guest:.0f} "
+                f"({sum(r.party_size for r in recovered)} recovered seats x {avg_check_per_guest:.0f} per guest)"
+            ]
+            if avg_check_per_guest is not None and recovered
+            else []
+        ),
         "",
         "| Target | Phone | Outcome | Notes |",
         "| --- | --- | --- | --- |",

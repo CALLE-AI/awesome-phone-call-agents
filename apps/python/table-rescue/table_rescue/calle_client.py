@@ -39,18 +39,22 @@ KEYWORD_FALLBACKS: tuple[tuple[str, CallStatus], ...] = (
 )
 
 CONFIRM_GOAL = (
-    "You are calling {name} about their restaurant reservation for a party of "
-    "{party_size} at {slot}. Ask whether they will keep the booking, cancel it, or move "
-    "it to another time; if they want another time, agree on a new slot. End the call by "
-    "stating exactly one of: OUTCOME: CONFIRMED, OUTCOME: CANCELLED, OUTCOME: RESCHEDULED, "
-    "or OUTCOME: NO_ANSWER."
+    "You are an automated calling assistant working for a restaurant. Begin the call "
+    "by identifying yourself as an automated assistant and asking whether it is a good "
+    "time to talk. You are calling {name} about their restaurant reservation for a "
+    "party of {party_size} at {slot}. Ask whether they will keep the booking, cancel "
+    "it, or move it to another time; if they want another time, agree on a new slot. "
+    "End the call by stating exactly one of: OUTCOME: CONFIRMED, OUTCOME: CANCELLED, "
+    "OUTCOME: RESCHEDULED, or OUTCOME: NO_ANSWER."
 )
 
 OFFER_GOAL = (
-    "You are calling {name} from a restaurant waitlist. A table for a party of "
-    "{party_size} just became available at {slot}. Ask whether they accept the table. "
-    "End the call by stating exactly one of: OUTCOME: ACCEPTED, OUTCOME: DECLINED, or "
-    "OUTCOME: NO_ANSWER."
+    "You are an automated calling assistant working for a restaurant. Begin the call "
+    "by identifying yourself as an automated assistant and asking whether it is a good "
+    "time to talk. You are calling {name} from the restaurant waitlist. A table for a "
+    "party of {party_size} just became available at {slot}. Ask whether they accept "
+    "the table. End the call by stating exactly one of: OUTCOME: ACCEPTED, OUTCOME: "
+    "DECLINED, or OUTCOME: NO_ANSWER."
 )
 
 

@@ -39,6 +39,8 @@ accepts. Works for restaurants, tours, classes, and any booking system with a wa
 - Dry-run is the default; live requires `--live`.
 - Never exceed the call budget; the engine stops before dialing when the budget is out.
 - Never dial a record without consent.
+- The call goals instruct the agent to identify itself as an automated assistant at the
+  start of every call (disclosure by design).
 - Reruns with the same run id skip already-dialled targets (duplicate prevention).
 - Cancel a run with `table-rescue cancel --run-id <id>`; later runs refuse to dial.
 - Mask phone numbers in any output you produce; never log full numbers or tokens.

@@ -41,3 +41,23 @@ def test_render_report_masks_phones_and_counts():
     assert "Waitlist entries accepted: 1" in report
     assert "+15550101" not in report
     assert "+******01" in report
+
+
+def test_render_report_estimates_protected_revenue():
+    reservation = Reservation(
+        booking_id="R-001",
+        name="Fictional Guest",
+        phone="+15550101",
+        party_size=4,
+        slot="2026-09-10T19:00:00+07:00",
+        consent=True,
+        status=ReservationStatus.RECOVERED,
+    )
+    report = render_report(
+        "run-1", [], [reservation], [], avg_check_per_guest=25.0
+    )
+    assert (
+        "Estimated revenue protected: 100 (4 recovered seats x 25 per guest)" in report
+    )
+    plain = render_report("run-1", [], [reservation], [])
+    assert "Estimated revenue protected" not in plain

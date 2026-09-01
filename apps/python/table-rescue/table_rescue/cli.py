@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=0,
         help="How much smaller than the slot a waitlist party may be",
     )
+    run.add_argument(
+        "--avg-check-per-guest",
+        type=float,
+        default=None,
+        help="Optional average check per guest used to estimate protected revenue",
+    )
     run.add_argument("--no-answer-retries", type=int, default=1)
     run.add_argument("--call-window-start", default="09:00")
     run.add_argument("--call-window-end", default="21:00")
@@ -125,7 +131,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         data_dir / "reservations.jsonl", [r.to_line() for r in reservations]
     )
     write_jsonl_atomic(data_dir / "waitlist.jsonl", [w.to_line() for w in waitlist])
-    report = render_report(run_id, outcomes, reservations, waitlist)
+    report = render_report(
+        run_id, outcomes, reservations, waitlist,
+        avg_check_per_guest=args.avg_check_per_guest,
+    )
     report_path = audit.run_dir / "report.md"
     report_path.write_text(report, encoding="utf-8")
     print(report)

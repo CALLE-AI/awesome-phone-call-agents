@@ -131,3 +131,4 @@ Before live execution:
 5. Check sample outputs for proper masking
 
 Only when the dry-run plan is correct, run with `--live`.
+- Call goals begin with self-identification as an automated assistant (disclosure by design).
