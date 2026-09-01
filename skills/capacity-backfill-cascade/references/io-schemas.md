@@ -28,7 +28,9 @@
 
 ## OUTCOME protocol
 
-Every live call goal instructs the agent to end the call by stating exactly one of:
+Every live call goal begins with self-identification as an automated assistant
+(disclosure by design) and instructs the agent to end the call by stating exactly one
+of:
 
 - Confirm calls: OUTCOME: CONFIRMED, OUTCOME: CANCELLED, OUTCOME: RESCHEDULED,
   OUTCOME: NO_ANSWER
