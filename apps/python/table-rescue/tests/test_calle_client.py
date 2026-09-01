@@ -109,3 +109,11 @@ def test_ensure_access_token_requires_login():
     client._run_calle_json = lambda args: {"usable": False}
     with pytest.raises(RuntimeError, match="not logged in"):
         client.ensure_access_token()
+
+
+def test_parse_outcome_hardening():
+    assert parse_outcome("agent said outcome: cancelled") == CallStatus.CANCELLED
+    assert parse_outcome("The guest will cancel the booking.") == CallStatus.CANCELLED
+    assert parse_outcome("Guest would like to reschedule to Friday.") == CallStatus.RESCHEDULED
+    assert parse_outcome("OUTCOME: BANANA but guest confirmed") == CallStatus.CONFIRMED
+    assert parse_outcome("no decision was reached") is None

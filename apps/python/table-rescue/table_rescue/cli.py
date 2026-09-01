@@ -74,8 +74,19 @@ def cmd_run(args: argparse.Namespace) -> int:
         call_window_start=parse_window(args.call_window_start),
         call_window_end=parse_window(args.call_window_end),
     )
-    reservations = load_reservations(data_dir / "reservations.jsonl")
-    waitlist = load_waitlist(data_dir / "waitlist.jsonl")
+    reservations_path = data_dir / "reservations.jsonl"
+    waitlist_path = data_dir / "waitlist.jsonl"
+    for missing in (reservations_path, waitlist_path):
+        if not missing.exists():
+            print(
+                f"ERROR: {missing} not found. Copy the samples first, e.g. "
+                "cp data/reservations.sample.jsonl data/reservations.jsonl "
+                "(see README Setup).",
+                file=sys.stderr,
+            )
+            return 1
+    reservations = load_reservations(reservations_path)
+    waitlist = load_waitlist(waitlist_path)
 
     if args.live:
         client = McpCallClient(
@@ -87,6 +98,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             language=args.language,
         )
     else:
+        if not Path(fixture).exists():
+            print(f"ERROR: dry-run fixture {fixture} not found.", file=sys.stderr)
+            return 1
         client = DryRunClient(fixture)
 
     audit = AuditLog(state_dir / "runs" / run_id)
@@ -136,3 +150,7 @@ def cmd_cancel(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
