@@ -28,6 +28,8 @@ def test_goal_builders_include_outcome_protocol():
     offer = build_offer_goal("Fictional Waitlist", 2, "2026-09-10T19:00:00+07:00")
     assert "OUTCOME: CONFIRMED" in confirm
     assert "OUTCOME: ACCEPTED" in offer
+    assert "automated assistant" in confirm
+    assert "automated assistant" in offer
 
 
 def test_dry_run_client_uses_fixtures(tmp_path):
