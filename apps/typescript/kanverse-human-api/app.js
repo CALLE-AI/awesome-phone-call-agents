@@ -20,6 +20,8 @@ const modeDescription = document.querySelector('#modeDescription');
 const modeSwitchText = document.querySelector('#modeSwitchText');
 const safetyText = document.querySelector('#safetyText');
 
+const E164_RE = /^\+[1-9]\d{7,14}$/;
+
 let dryRun = true;
 let activePlan = null;
 let pollTimer = null;
@@ -31,11 +33,11 @@ function updateModeUI() {
   modeTitle.textContent = dryRun ? 'Dry Run' : 'LIVE MODE';
   modeSwitchText.textContent = dryRun ? 'DRY RUN' : 'LIVE';
   modeDescription.textContent = dryRun
-    ? 'Safe simulation. No CALL-E call credits are used.'
-    : 'Real CALL-E calls are enabled. Each call still requires confirmation.';
+    ? 'Fully local simulation. No CALL-E authentication, network request, or call credit is used.'
+    : 'Real CALL-E calls are enabled. The server must authorize the destination and every run still requires confirmation.';
   safetyText.textContent = dryRun
-    ? 'Dry-run mode is enabled. Simulated calls use no CALL-E call credits. Switch to Live only when you intentionally want to place real calls.'
-    : 'LIVE MODE is enabled. Planning remains non-destructive, but pressing Confirm & Call will place a real CALL-E phone call and may consume a call credit.';
+    ? 'Dry Run is local-only. Previewing and simulating a mission never contacts CALL-E.'
+    : 'LIVE MODE is enabled. The server independently requires authentication, an authorized E.164 destination, explicit live intent, and a one-time approval token before a call can run.';
   document.body.classList.toggle('live-mode', !dryRun);
 }
 
@@ -70,12 +72,10 @@ function completeTimeline() {
 }
 
 function getTargets() {
-  return phonesInput.value.split('\n').map(value => value.trim()).filter(Boolean);
-}
-
-function parseCalle(raw) {
-  const outer = JSON.parse(raw);
-  return outer?.result?.structuredContent || outer?.result || outer;
+  return phonesInput.value
+    .split('\n')
+    .map(value => value.trim())
+    .filter(Boolean);
 }
 
 function maskPhone(phone) {
@@ -83,20 +83,22 @@ function maskPhone(phone) {
   return clean.length > 4 ? `...${clean.slice(-4)}` : clean;
 }
 
-function findRunId(result) {
-  return result?.run_id || result?.runId || result?.id || result?.call_run_id || null;
-}
-
 function isTerminal(status) {
-  return ['COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED'].includes(String(status || '').toUpperCase());
+  return [
+    'COMPLETED',
+    'FAILED',
+    'ERROR',
+    'NO_ANSWER',
+    'NO ANSWER',
+    'DECLINED',
+    'CANCELLED',
+    'CANCELED'
+  ].includes(String(status || '').toUpperCase());
 }
 
 function classifyMissionOutcome(result, summary) {
-  const completed =
-    result?.outcome?.task_completed ??
-    result?.result?.outcome?.task_completed;
-
-  const status = String(result?.status || result?.state || '').toUpperCase();
+  const completed = result?.taskCompleted;
+  const status = String(result?.status || '').toUpperCase();
   const text = String(summary || '').toLowerCase();
 
   const clearNoMatch = [
@@ -121,13 +123,15 @@ function classifyMissionOutcome(result, summary) {
     'could not confirm'
   ].some(marker => text.includes(marker));
 
-  if (['FAILED', 'CANCELLED', 'CANCELED'].includes(status) || clearNoMatch) {
+  if (
+    ['FAILED', 'ERROR', 'NO_ANSWER', 'NO ANSWER', 'DECLINED', 'CANCELLED', 'CANCELED'].includes(status) ||
+    clearNoMatch
+  ) {
     return 'failed';
   }
 
   if (completed === true) return 'success';
   if (completed === false) return 'failed';
-
   return 'review';
 }
 
@@ -142,7 +146,7 @@ function resetHistory() {
 
 function recordHistory(index, phone, result, detail) {
   const existing = history.find(item => item.index === index);
-  const entry = { index, phone, result, detail };
+  const entry = { index, phone, result, detail: String(detail || '') };
   if (existing) Object.assign(existing, entry);
   else history.push(entry);
   history.sort((a, b) => a.index - b.index);
@@ -151,12 +155,23 @@ function recordHistory(index, phone, result, detail) {
 
 function renderHistory() {
   historyCount.textContent = `${history.length} result${history.length === 1 ? '' : 's'}`;
+  historyList.replaceChildren();
+
   if (!history.length) {
-    historyList.innerHTML = '<div class="history-empty">No targets evaluated yet.</div>';
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = 'No targets evaluated yet.';
+    historyList.append(empty);
     return;
   }
-  historyList.innerHTML = history.map(item => {
-    const safeResult = item.result === 'success' ? 'success' : item.result === 'failed' ? 'failed' : 'running';
+
+  for (const item of history) {
+    const safeResult = item.result === 'success'
+      ? 'success'
+      : item.result === 'failed'
+        ? 'failed'
+        : 'running';
+
     const label = item.result === 'review'
       ? 'REVIEW NEEDED'
       : safeResult === 'success'
@@ -164,12 +179,46 @@ function renderHistory() {
         : safeResult === 'failed'
           ? 'NOT A MATCH'
           : 'IN PROGRESS';
-    return `<div class="history-item"><div class="history-index">${item.index + 1}</div><div class="history-main"><strong>Target ${item.index + 1} · ${maskPhone(item.phone)}</strong><span>${item.detail}</span></div><span class="result-pill ${safeResult}">${label}</span></div>`;
-  }).join('');
+
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    const index = document.createElement('div');
+    index.className = 'history-index';
+    index.textContent = String(item.index + 1);
+
+    const main = document.createElement('div');
+    main.className = 'history-main';
+
+    const title = document.createElement('strong');
+    title.textContent = `Target ${item.index + 1} · ${maskPhone(item.phone)}`;
+
+    const detail = document.createElement('span');
+    detail.textContent = item.detail;
+
+    const pill = document.createElement('span');
+    pill.className = `result-pill ${safeResult}`;
+    pill.textContent = label;
+
+    main.append(title, detail);
+    row.append(index, main, pill);
+    historyList.append(row);
+  }
+}
+
+function createLocalPlan(index, phone) {
+  return {
+    readyToRun: true,
+    approvalToken: null,
+    phone,
+    targetIndex: index,
+    confirmSummary: 'Local Dry Run only. No CALL-E request will be made.'
+  };
 }
 
 async function prepareTarget(index) {
   setStage(1);
+
   if (!mission || index >= mission.targets.length) {
     statusBadge.textContent = 'NO MATCH';
     statusBadge.className = 'badge idle';
@@ -179,84 +228,184 @@ async function prepareTarget(index) {
     completeTimeline();
     return;
   }
+
   mission.index = index;
   const phone = mission.targets[index];
-  statusBadge.textContent = dryRun ? `PLANNING ${index + 1}/${mission.targets.length} · DRY RUN` : `PLANNING ${index + 1}/${mission.targets.length} · LIVE`;
+
+  statusBadge.textContent = dryRun
+    ? `LOCAL PLAN ${index + 1}/${mission.targets.length} · DRY RUN`
+    : `PLANNING ${index + 1}/${mission.targets.length} · LIVE`;
   statusBadge.className = 'badge ready';
-  setDecision(`Preparing target ${index + 1} of ${mission.targets.length}: ${maskPhone(phone)}…`);
-  const response = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal: mission.goal, phone, language: 'English', region: 'GB' }) });
-  const data = await response.json();
-  if (!response.ok || !data.ok) throw new Error(data.error || 'CALL-E planning failed');
-  const plan = parseCalle(data.raw);
-  if (!plan?.plan_id) throw new Error('CALL-E returned no structured plan.');
-  activePlan = { ...plan, phone, targetIndex: index };
-  if (!plan.ready_to_run) {
-    statusBadge.textContent = 'NEEDS INFO';
-    setDecision(plan.clarifying_questions?.join(' ') || 'CALL-E needs more information.');
-    return;
+
+  setDecision(
+    dryRun
+      ? `Preparing local simulation for target ${index + 1} of ${mission.targets.length}: ${maskPhone(phone)}.`
+      : `Requesting an authorized CALL-E plan for target ${index + 1} of ${mission.targets.length}: ${maskPhone(phone)}.`
+  );
+
+  if (dryRun) {
+    activePlan = createLocalPlan(index, phone);
+  } else {
+    const response = await fetch('/api/plan', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        goal: mission.goal,
+        phone,
+        language: 'English',
+        region: 'GB',
+        liveIntent: true
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'CALL-E planning failed');
+    }
+
+    const plan = data.plan;
+    if (!plan || typeof plan.readyToRun !== 'boolean') {
+      throw new Error('CALL-E returned no structured plan.');
+    }
+
+    activePlan = {
+      ...plan,
+      phone,
+      targetIndex: index
+    };
+
+    if (!plan.readyToRun) {
+      statusBadge.textContent = 'NEEDS INFO';
+      setDecision(
+        plan.clarifyingQuestions?.join(' ') ||
+        plan.nextStep ||
+        'CALL-E needs more information.'
+      );
+      return;
+    }
+
+    if (!plan.approvalToken) {
+      throw new Error('Server did not issue a one-time live approval token.');
+    }
   }
-  statusBadge.textContent = dryRun ? `PLAN READY ${index + 1}/${mission.targets.length} · DRY RUN` : `PLAN READY ${index + 1}/${mission.targets.length} · LIVE`;
-  planGoal.textContent = plan.display_goal || mission.goal;
+
+  statusBadge.textContent = dryRun
+    ? `PLAN READY ${index + 1}/${mission.targets.length} · LOCAL`
+    : `PLAN READY ${index + 1}/${mission.targets.length} · LIVE`;
+
+  planGoal.textContent = mission.goal;
   planTarget.textContent = `Target ${index + 1}/${mission.targets.length}: ${maskPhone(phone)}`;
-  planSummary.textContent = plan.confirm_summary || 'Ready for explicit confirmation.';
+  planSummary.textContent = activePlan.confirmSummary || 'Ready for explicit confirmation.';
   confirmCallBtn.textContent = dryRun ? 'Simulate Call' : 'Confirm & Call';
   planCard.classList.remove('hidden');
-  setDecision(dryRun ? 'Review this target. Dry-run mode is ON, so no real call will be placed.' : 'LIVE MODE: review carefully. Confirm & Call will place a real phone call.');
+
+  setDecision(
+    dryRun
+      ? 'Review this local fake plan. Simulate Call will not contact CALL-E or use the network.'
+      : 'LIVE MODE: review carefully. The server will accept only an authorized destination and a one-time approval token.'
+  );
 }
 
 function simulateCall() {
   const currentIndex = activePlan.targetIndex;
   const currentPhone = activePlan.phone;
+
   setStage(2);
   confirmCallBtn.disabled = true;
   cancelPlanBtn.disabled = true;
   planCard.classList.add('hidden');
-  recordHistory(currentIndex, currentPhone, 'running', 'Simulated CALL-E call is being evaluated.');
+
+  recordHistory(
+    currentIndex,
+    currentPhone,
+    'running',
+    'Local fake call is being evaluated. No CALL-E request was made.'
+  );
+
   statusBadge.textContent = `SIMULATING ${currentIndex + 1}/${mission.targets.length}`;
   statusBadge.className = 'badge ready';
-  setDecision(`Dry run: simulating CALL-E call to ${maskPhone(currentPhone)}. No credit is being used.`);
-  setTimeout(() => { statusBadge.textContent = 'CALL STARTED'; setDecision(`Dry run: simulated call to ${maskPhone(currentPhone)} started.`); }, 900);
+  setDecision(`Dry Run: locally simulating target ${maskPhone(currentPhone)}.`);
+
+  setTimeout(() => {
+    statusBadge.textContent = 'LOCAL CALL STARTED';
+    setDecision(`Dry Run: local fake call to ${maskPhone(currentPhone)} started.`);
+  }, 500);
+
   setTimeout(async () => {
     setStage(3);
     const success = currentIndex === mission.targets.length - 1;
+
     if (success) {
-      recordHistory(currentIndex, currentPhone, 'success', 'Mission goal satisfied. CallChain stopped here.');
+      recordHistory(
+        currentIndex,
+        currentPhone,
+        'success',
+        'Local simulation marked the mission goal satisfied. CallChain stopped here.'
+      );
       statusBadge.textContent = 'GOAL ACHIEVED';
-      setDecision(`Dry run: target ${currentIndex + 1} satisfied the mission goal. Human API stopped automatically. No CALL-E call credits were used.`);
+      setDecision(
+        `Dry Run: target ${currentIndex + 1} satisfied the simulated mission. No CALL-E authentication, network access, or call credits were used.`
+      );
       completeTimeline();
       confirmCallBtn.disabled = false;
       cancelPlanBtn.disabled = false;
       return;
     }
-    recordHistory(currentIndex, currentPhone, 'failed', 'Goal not satisfied. CallChain continued to the next target.');
+
+    recordHistory(
+      currentIndex,
+      currentPhone,
+      'failed',
+      'Local simulation marked the goal unsatisfied. CallChain continued to the next target.'
+    );
+
     setStage(4);
     statusBadge.textContent = 'CONTINUING';
-    setDecision(`Dry run: target ${currentIndex + 1} did not satisfy the goal. Human API is moving to target ${currentIndex + 2}.`);
-    try { await prepareTarget(currentIndex + 1); }
-    catch (error) { statusBadge.textContent = 'ERROR'; statusBadge.className = 'badge idle'; setDecision(error.message); }
-    finally { confirmCallBtn.disabled = false; cancelPlanBtn.disabled = false; }
-  }, 2800);
+    setDecision(
+      `Dry Run: target ${currentIndex + 1} did not satisfy the simulated goal. Human API is moving to target ${currentIndex + 2}.`
+    );
+
+    try {
+      await prepareTarget(currentIndex + 1);
+    } catch (error) {
+      statusBadge.textContent = 'ERROR';
+      statusBadge.className = 'badge idle';
+      setDecision(error.message);
+    } finally {
+      confirmCallBtn.disabled = false;
+      cancelPlanBtn.disabled = false;
+    }
+  }, 1800);
 }
 
-async function pollStatus(runId) {
+async function pollStatus(statusToken) {
   try {
     setStage(3);
-    const response = await fetch(`/api/status/${encodeURIComponent(runId)}`);
+
+    const response = await fetch(
+      `/api/status/${encodeURIComponent(statusToken)}`,
+      { credentials: 'same-origin' }
+    );
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || 'Status check failed');
-    const result = parseCalle(data.raw);
-    const status = result?.status || result?.state || 'RUNNING';
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'Status check failed');
+    }
+
+    const status = data.status || 'RUNNING';
+    const summary = data.summary || '';
+
     statusBadge.textContent = String(status).toUpperCase();
     statusBadge.className = 'badge ready';
-    const summary = result?.result?.summary || result?.summary || result?.outcome?.summary || result?.post_summary;
-    const completed = result?.outcome?.task_completed ?? result?.result?.outcome?.task_completed;
     setDecision(summary || `CALL-E status: ${status}`);
+
     if (isTerminal(status)) {
       clearTimeout(pollTimer);
       confirmCallBtn.disabled = false;
       cancelPlanBtn.disabled = false;
-      const missionOutcome = classifyMissionOutcome(result, summary);
 
+      const missionOutcome = classifyMissionOutcome(data, summary);
       const detail = summary || (
         missionOutcome === 'success'
           ? 'Mission goal satisfied.'
@@ -275,9 +424,12 @@ async function pollStatus(runId) {
       setStage(4);
 
       if (missionOutcome === 'failed') {
-        if (mission && activePlan?.targetIndex + 1 < mission.targets.length) {
+        if (
+          mission &&
+          activePlan?.targetIndex + 1 < mission.targets.length
+        ) {
           statusBadge.textContent = 'CONTINUING';
-          setDecision('Goal not achieved. Preparing the next target…');
+          setDecision('Goal not achieved. Preparing the next authorized target for user confirmation.');
           await prepareTarget(activePlan.targetIndex + 1);
         } else {
           statusBadge.textContent = 'NO MATCH';
@@ -301,47 +453,136 @@ async function pollStatus(runId) {
 
       return;
     }
-    pollTimer = setTimeout(() => pollStatus(runId), 7000);
+
+    pollTimer = setTimeout(() => pollStatus(statusToken), 7000);
   } catch (error) {
-    statusBadge.textContent = 'STATUS ERROR'; statusBadge.className = 'badge idle'; setDecision(error.message); confirmCallBtn.disabled = false; cancelPlanBtn.disabled = false;
+    statusBadge.textContent = 'STATUS ERROR';
+    statusBadge.className = 'badge idle';
+    setDecision(error.message);
+    confirmCallBtn.disabled = false;
+    cancelPlanBtn.disabled = false;
   }
 }
 
 previewBtn.addEventListener('click', async () => {
   const goal = goalInput.value.trim();
   const targets = getTargets();
-  activePlan = null; mission = null; planCard.classList.add('hidden'); resetHistory(); setStage(0);
-  if (!goal || targets.length === 0) { statusBadge.textContent = 'INCOMPLETE'; statusBadge.className = 'badge idle'; setDecision('Add a goal and at least one phone number.'); return; }
+
+  activePlan = null;
+  mission = null;
+  planCard.classList.add('hidden');
+  resetHistory();
+  setStage(0);
+
+  if (!goal || targets.length === 0) {
+    statusBadge.textContent = 'INCOMPLETE';
+    statusBadge.className = 'badge idle';
+    setDecision('Add a goal and at least one phone number.');
+    return;
+  }
+
+  const invalidTarget = targets.find(phone => !E164_RE.test(phone));
+  if (invalidTarget) {
+    statusBadge.textContent = 'INVALID NUMBER';
+    statusBadge.className = 'badge idle';
+    setDecision('Every destination must use strict E.164 format, for example +442073238000.');
+    return;
+  }
+
   mission = { goal, targets, index: 0 };
   goalPreview.textContent = goal;
   targetCount.textContent = `${targets.length} phone number${targets.length === 1 ? '' : 's'}`;
   previewBtn.disabled = true;
-  try { await prepareTarget(0); }
-  catch (error) { statusBadge.textContent = 'ERROR'; statusBadge.className = 'badge idle'; setDecision(error.message); }
-  finally { previewBtn.disabled = false; }
+
+  try {
+    await prepareTarget(0);
+  } catch (error) {
+    statusBadge.textContent = 'ERROR';
+    statusBadge.className = 'badge idle';
+    setDecision(error.message);
+  } finally {
+    previewBtn.disabled = false;
+  }
 });
 
 confirmCallBtn.addEventListener('click', async () => {
-  if (!activePlan?.plan_id || !activePlan?.confirm_token) return;
-  if (dryRun) { simulateCall(); return; }
+  if (!activePlan) return;
+
+  if (dryRun) {
+    simulateCall();
+    return;
+  }
+
+  if (!activePlan.approvalToken) {
+    statusBadge.textContent = 'RE-PLAN REQUIRED';
+    statusBadge.className = 'badge idle';
+    setDecision('The one-time server approval token is missing. Preview the mission again before attempting a live call.');
+    return;
+  }
+
   setStage(2);
-  confirmCallBtn.disabled = true; cancelPlanBtn.disabled = true;
-  recordHistory(activePlan.targetIndex, activePlan.phone, 'running', 'Real CALL-E call started; awaiting structured outcome.');
-  statusBadge.textContent = 'STARTING LIVE CALL'; statusBadge.className = 'badge ready';
-  setDecision(`LIVE: user confirmed. Starting CALL-E call to ${maskPhone(activePlan.phone)}…`);
+  confirmCallBtn.disabled = true;
+  cancelPlanBtn.disabled = true;
+
+  recordHistory(
+    activePlan.targetIndex,
+    activePlan.phone,
+    'running',
+    'Authorized CALL-E call started; awaiting bounded structured outcome.'
+  );
+
+  statusBadge.textContent = 'STARTING LIVE CALL';
+  statusBadge.className = 'badge ready';
+  setDecision(`LIVE: user confirmed target ${maskPhone(activePlan.phone)}. Requesting the one-time server-authorized run.`);
+
   try {
-    const response = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planId: activePlan.plan_id, confirmToken: activePlan.confirm_token }) });
+    const response = await fetch('/api/run', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approvalToken: activePlan.approvalToken,
+        liveIntent: true
+      })
+    });
+
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || 'CALL-E call failed to start');
-    const result = parseCalle(data.raw);
-    const runId = findRunId(result);
-    if (!runId) throw new Error('CALL-E started but no run ID was returned. Do not press Confirm again; check the terminal before retrying.');
-    statusBadge.textContent = 'CALL STARTED'; setDecision('Real call started. Waiting for CALL-E result…'); planCard.classList.add('hidden'); setTimeout(() => pollStatus(runId), 10000);
-  } catch (error) { statusBadge.textContent = 'CALL ERROR'; statusBadge.className = 'badge idle'; setDecision(error.message); confirmCallBtn.disabled = false; cancelPlanBtn.disabled = false; }
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'CALL-E call failed to start');
+    }
+
+    if (!data.statusToken) {
+      throw new Error('CALL-E started but the server returned no status token. Do not press Confirm again; re-plan before retrying.');
+    }
+
+    activePlan.approvalToken = null;
+    statusBadge.textContent = 'CALL STARTED';
+    setDecision('Real call started. Waiting for the bounded CALL-E result…');
+    planCard.classList.add('hidden');
+    pollTimer = setTimeout(() => pollStatus(data.statusToken), 10000);
+  } catch (error) {
+    activePlan.approvalToken = null;
+    statusBadge.textContent = 'CALL ERROR';
+    statusBadge.className = 'badge idle';
+    setDecision(`${error.message} Re-plan before retrying a live call.`);
+    confirmCallBtn.disabled = false;
+    cancelPlanBtn.disabled = false;
+  }
 });
 
 cancelPlanBtn.addEventListener('click', () => {
-  activePlan = null; mission = null; planCard.classList.add('hidden'); statusBadge.textContent = 'CANCELLED'; statusBadge.className = 'badge idle'; setDecision('Mission cancelled. No further calls will be placed.'); setStage(0);
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+
+  activePlan = null;
+  mission = null;
+  planCard.classList.add('hidden');
+  statusBadge.textContent = 'CANCELLED';
+  statusBadge.className = 'badge idle';
+  setDecision('Mission cancelled. No further calls will be placed.');
+  setStage(0);
 });
 
 renderHistory();
