@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "task_completed": true,
+  "recipient_masked": "+1555***2834",
+  "completion_confidence": {
+    "score": 0.89,
+    "label": "high"
+  },
+  "evidence": [
+    "Patient interested in scheduling 30-day preventive visit."
+  ],
+  "structured_result": {
+    "interested": "yes",
+    "preferred_day": "Wednesday",
+    "preferred_time": "Morning, before 11:00 AM",
+    "notes": "Patient mentioned mild knee stiffness."
+  },
+  "dry_run": true
+}

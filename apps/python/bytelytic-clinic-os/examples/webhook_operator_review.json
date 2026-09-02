@@ -1,0 +1,32 @@
+{
+  "description": "Simulate a CALL-E webhook callback with operator review gate",
+  "endpoint": "POST /calle/webhook",
+  "headers": {
+    "X-API-Key": "bytelytic_demo_key_2026"
+  },
+  "body_unreviewed": {
+    "structured_result": {
+      "will_attend": "yes"
+    },
+    "operator_reviewed": false,
+    "appointment_id": "apt-101"
+  },
+  "body_operator_reviewed": {
+    "structured_result": {
+      "will_attend": "yes"
+    },
+    "operator_reviewed": true,
+    "appointment_id": "apt-101"
+  },
+  "example_response_staged": {
+    "received": true,
+    "operator_review_required": true,
+    "ehr_mutation_gated": true
+  },
+  "example_response_committed": {
+    "received": true,
+    "operator_review_required": false,
+    "ehr_mutation_gated": false,
+    "appointment_status": "confirmed"
+  }
+}
