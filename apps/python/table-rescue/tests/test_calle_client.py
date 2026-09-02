@@ -82,6 +82,7 @@ def make_mcp_client(tmp_path, script):
     )
     client = McpCallClient(
         poll_interval_seconds=0,
+        plan_retry_delay_seconds=0,
         client_factory=lambda: ScriptedMcpClient(script),
     )
     client._run_calle_json = lambda args: {"usable": True, "cache_path": str(token_file)}
@@ -131,6 +132,43 @@ def test_mcp_client_reads_nested_post_summary(tmp_path):
     outcome = asyncio.run(client._execute(request))
     assert outcome.status == CallStatus.CONFIRMED
     assert outcome.notes is not None and "successfully confirmed" in outcome.notes
+
+
+def test_mcp_client_retries_transient_not_ready_plan(tmp_path):
+    # Regression: back-to-back calls to the same number can make plan_call
+    # report ready_to_run=false once; the client must retry, not crash.
+    script = {
+        "plan_call": [
+            {"plan_id": None, "confirm_token": None, "ready_to_run": False},
+            {"plan_id": "p1", "confirm_token": "c1", "ready_to_run": True},
+        ],
+        "run_call": [{"run_id": "call-1"}],
+        "get_call_run": [
+            {
+                "status": "COMPLETED",
+                "result": {"post_summary": "The guest confirmed they will keep it."},
+            },
+        ],
+    }
+    client = make_mcp_client(tmp_path, script)
+    request = CallRequest(
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+    )
+    outcome = asyncio.run(client._execute(request))
+    assert outcome.status == CallStatus.CONFIRMED
+
+
+def test_mcp_client_plan_retry_exhaustion_raises_with_detail(tmp_path):
+    not_ready = {"plan_id": None, "confirm_token": None, "ready_to_run": False}
+    script = {
+        "plan_call": [dict(not_ready), dict(not_ready), dict(not_ready)],
+    }
+    client = make_mcp_client(tmp_path, script)
+    request = CallRequest(
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+    )
+    with pytest.raises(RuntimeError, match="after .* attempts"):
+        asyncio.run(client._execute(request))
 
 
 def test_ensure_access_token_requires_login():
