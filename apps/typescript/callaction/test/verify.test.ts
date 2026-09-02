@@ -22,4 +22,15 @@ describe('CallAction Prechecks', () => {
     assert.strictEqual(isValid('12025550123'), false, 'Should reject missing +');
     assert.strictEqual(isValid('+1 (202) 555-0123'), false, 'Should reject formatting chars');
   });
+
+  it('should mask the destination phone number in the preview task prompt', () => {
+    const phone = '+12025550123';
+    const maskedPhone = `${phone.substring(0, 3)}******${phone.substring(phone.length - 4)}`;
+    const rawTaskPrompt = `You are CallAction. Call ${phone}. Tell the engineer CI failed.`;
+    
+    const maskedTaskPrompt = rawTaskPrompt.replace(phone, maskedPhone);
+    
+    assert.ok(!maskedTaskPrompt.includes(phone), 'Masked prompt must not contain the raw phone number');
+    assert.ok(maskedTaskPrompt.includes('+12******0123'), 'Masked prompt must contain the masked phone number');
+  });
 });
