@@ -152,6 +152,18 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(result["recipient_call"]["disposition"], "no_consent")
         self.assertEqual(result["requester_call"]["disposition"], "skipped")
 
+    def test_missing_wrong_person_fails_closed(self):
+        canned = copy.deepcopy(json.loads(HAPPY.read_text()))
+        canned["rec_status"]["result"]["structuredContent"]["structured_output"].pop("wrong_person")
+        path = write_temp(canned)
+        code, out = run_main(["--request", str(SAMPLE), "--fixture", str(path)])
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertEqual(result["relay"], "needs_human")
+        self.assertEqual(result["calls_placed"], 1)
+        self.assertEqual(result["recipient_call"]["disposition"], "schema_drift")
+        self.assertEqual(result["requester_call"]["disposition"], "skipped")
+
     def test_answer_type_drift_fails_closed(self):
         canned = copy.deepcopy(json.loads(HAPPY.read_text()))
         canned["rec_status"]["result"]["structuredContent"]["structured_output"]["understood"] = "true"
