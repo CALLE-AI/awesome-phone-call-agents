@@ -43,3 +43,11 @@ record status. Unparsable completed calls become ERROR and are escalated to staf
 
 - `state/runs/<run-id>/audit.jsonl` - append-only decision log
 - `state/runs/<run-id>/report.md` - masked staff report
+
+## Sourcing the inputs
+
+These schemas are the integration boundary. Hosts keep waitlists and reservations in
+whatever system they already use - a booking platform, a POS, or a shared sheet - and
+any export or API poll that maps records into the fields above feeds the cascade. The
+consent flag is captured when a guest joins the waitlist; records without consent are
+skipped and audited, never dialed.

@@ -85,6 +85,16 @@ table-rescue cancel --run-id live-1
 - The app rewrites `data/reservations.jsonl` and `data/waitlist.jsonl` in place and
   writes `state/runs/<run-id>/audit.jsonl` plus `state/runs/<run-id>/report.md`.
 
+## Where the data comes from
+
+The JSONL files are the integration boundary, not a product UI: restaurants keep their
+waitlist and reservations wherever they live today - a booking platform (OpenTable,
+Resy), the POS, or a shared sheet - and any export or API poll that maps those records
+into the documented schema (see the skill's `io-schemas.md`) feeds the cascade. The
+consent flag is captured by staff when a guest joins the waitlist; guests without
+consent are skipped and audited. Native connectors (booking-platform writebacks,
+n8n/Dify plugins) are the natural next step.
+
 ## Credential handling
 
 Access tokens are read from the CALL-E CLI token cache at call time, held in memory
