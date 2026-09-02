@@ -40,7 +40,7 @@ ANSWER_TYPES = {
     "confidence": float, "choice": str, "counter_window": str, "notes": str,
 }
 # consent_given presence is enforced by the value gate in recipient_usable (missing = no_consent).
-REQUIRED_ANSWER_KEYS = ("understood", "confidence")
+REQUIRED_ANSWER_KEYS = ("understood", "wrong_person", "confidence")
 STATE_DIR_ENV = "LANGUAGE_BRIDGE_CALL_STATE_DIR"
 
 
