@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from ..identifiers import TranscriptTurn
 from ..outcome import TransportOutcome
 
 
@@ -25,15 +26,16 @@ class CallRequest:
 class ProviderCall:
     """A terminal call as this application models it.
 
-    ``transcript_turns`` carries only the counterparty's turns, because that is
-    what an evidence quote has to be grounded in. It is empty when the provider
-    exposes no transcript, which is a reason to refuse a confirmation, never a
-    reason to assume one.
+    ``transcript`` carries the full ordered turn list for the attempt on the
+    number that was dialled, agent turns included, because a confirmation has
+    to bind to the read-back it answered. It is empty when the provider exposes
+    no transcript, which is a reason to refuse a confirmation, never a reason
+    to assume one.
     """
 
     transport: TransportOutcome
     structured_result: dict[str, Any] | None
-    transcript_turns: tuple[str, ...] = ()
+    transcript: tuple[TranscriptTurn, ...] = ()
     raw: dict[str, Any] = field(default_factory=dict)
 
 

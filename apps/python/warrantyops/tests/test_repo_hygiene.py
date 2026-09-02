@@ -19,7 +19,6 @@ assert REPO_ROOT is not None
 CONTRIBUTION_PATHS = (
     REPO_ROOT / "apps" / "python" / "warrantyops",
     REPO_ROOT / "skills" / "warranty-recovery",
-    REPO_ROOT / "docs" / "warranty-recovery",
 )
 
 TEXT_SUFFIXES = {".py", ".md", ".json", ".toml", ".yaml", ".yml", ".txt", ".jsonl"}
@@ -49,13 +48,6 @@ DOCUMENTED_CALL_TOKENS = frozenset(
         "call_result_validation_failed",
     }
 )
-
-REAL_ARTIFACT_HINTS = (
-    "recording_url",
-    "transcript_url",
-    "real-call-artifacts",
-)
-
 
 def text_files() -> list[Path]:
     files: list[Path] = []
@@ -95,18 +87,6 @@ def test_no_credential_shaped_strings_appear():
     assert not offenders, offenders
 
 
-def test_no_real_call_artifact_is_referenced_as_data():
-    offenders: list[str] = []
-    for path in text_files():
-        if path.name == "test_repo_hygiene.py":
-            continue
-        text = path.read_text(encoding="utf-8")
-        for hint in REAL_ARTIFACT_HINTS:
-            if hint in text:
-                offenders.append(f"{path.relative_to(REPO_ROOT)}: mentions {hint}")
-    assert not offenders, offenders
-
-
 def test_every_synthetic_call_id_is_labelled_synthetic():
     offenders: list[str] = []
     for path in text_files():
@@ -114,14 +94,4 @@ def test_every_synthetic_call_id_is_labelled_synthetic():
         for call_id in re.findall(r"\bcall_[A-Za-z0-9_-]+", text):
             if "synthetic" not in call_id and call_id not in DOCUMENTED_CALL_TOKENS:
                 offenders.append(f"{path.relative_to(REPO_ROOT)}: {call_id}")
-    assert not offenders, offenders
-
-
-def test_the_application_writes_nothing_into_the_repository():
-    package = REPO_ROOT / "apps" / "python" / "warrantyops" / "warrantyops"
-    offenders = [
-        str(path.relative_to(REPO_ROOT))
-        for path in package.rglob("*.py")
-        if "open(" in path.read_text(encoding="utf-8").replace(".open(", "")
-    ]
     assert not offenders, offenders

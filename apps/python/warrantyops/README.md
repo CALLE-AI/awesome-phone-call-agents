@@ -33,11 +33,16 @@ Representative  "No, that last digit is an eight. Four eight one seven eight, th
 ```
 
 So `authorization_reference` is not populated by extraction. It is populated by
-a state machine that requires a read-back, an affirmative answer, and that
-answer to be present in the counterparty's own transcript turns. Anything short
-of that leaves the identifier at `UNCONFIRMED_IDENTIFIER`, and the resolution
-is downgraded to `HUMAN_ACTION_REQUIRED` rather than the reference being
-reported.
+a state machine that requires a read-back, an affirmative and unhedged answer,
+and that answer to bind to **the exchange the number was read back in** — the
+counterparty's turn plus the agent turn it was answering. An affirmative
+sentence from elsewhere in the call confirms nothing, which is the failure mode
+naive grounding walks into: "yes, that is fine, go ahead" is a real, quotable,
+affirmative counterparty turn and it is an answer to a different question.
+
+Anything short of that leaves the identifier at `UNCONFIRMED_IDENTIFIER`, and
+the resolution is downgraded to `HUMAN_ACTION_REQUIRED` rather than the
+reference being reported.
 
 ## What it does
 
@@ -153,5 +158,5 @@ warrantyops/
 Only `contract.py` knows what a warranty is. The rest is domain-independent on
 purpose, so the same machinery survives a change of workflow.
 
-The portable skill is `skills/warranty-recovery/`. Longer background is in
-`docs/warranty-recovery/README.md`.
+The portable skill, and the reasoning behind each control, is
+`skills/warranty-recovery/`.

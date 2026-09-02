@@ -4,11 +4,16 @@ An RMA number is not a fact about a conversation, it is an instruction to ship
 a unit. A single wrong digit produces a result that passes every schema check
 and is still false, so extraction alone is never allowed to establish one.
 
-The rule this module enforces is that a high-consequence identifier is only
-CONFIRMED when the representative was read the value back and said so, in
-words that are present in the transcript. Model confidence is not an input:
-:func:`evaluate_identifier` takes no confidence argument and there is nothing a
-caller can pass that substitutes for the read-back.
+The rule is that a high-consequence identifier is only CONFIRMED when the
+counterparty was read the value back and agreed **to that value**. The second
+half is the hard part. An affirmative sentence somewhere in a transcript proves
+nothing: a person answering "yes" to "is now a good moment?" produces exactly
+the same words as a person confirming a number. So a confirmation has to bind
+to the exchange the identifier was actually read back in.
+
+Model confidence is not an input: :func:`evaluate_identifier` takes no
+confidence argument, and there is nothing a caller can pass that substitutes
+for the read-back.
 """
 
 from __future__ import annotations
@@ -19,6 +24,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 MIN_CONFIRMATION_QUOTE_CHARS = 12
+#: Shortest digit run treated as a candidate identifier inside a spoken turn.
+MIN_IDENTIFIER_DIGITS = 4
+
+#: CALL-E speaker labels, as documented for
+#: ``recipients[].attempts[].transcript_turns[].speaker``.
+AGENT_SPEAKER = "bot"
+COUNTERPARTY_SPEAKER = "user"
 
 _AFFIRMATIONS = (
     "correct",
@@ -28,6 +40,7 @@ _AFFIRMATIONS = (
     "thats it",
     "yes",
     "yep",
+    "yeah",
     "confirmed",
     "exactly",
     "you got it",
@@ -44,6 +57,23 @@ _NEGATIONS = (
     "that is not",
     "other way",
     "let me repeat",
+    "no that",
+    "no it",
+)
+
+#: A hedge is not an agreement, however affirmative the first word sounds.
+_HEDGES = (
+    "i think",
+    "i believe",
+    "probably",
+    "should be",
+    "pretty sure",
+    "fairly sure",
+    "more or less",
+    "something like",
+    "i guess",
+    "maybe",
+    "roughly",
 )
 
 _SPELLED_DIGITS = {
@@ -59,6 +89,14 @@ _SPELLED_DIGITS = {
     "eight": "8",
     "nine": "9",
 }
+
+
+@dataclass(frozen=True)
+class TranscriptTurn:
+    """One turn as CALL-E reports it."""
+
+    speaker: str
+    text: str
 
 
 class IdentifierState(str, Enum):
@@ -79,7 +117,11 @@ class IdentifierRefusal(str, Enum):
     QUOTE_TOO_SHORT = "QUOTE_TOO_SHORT"
     QUOTE_NOT_AFFIRMATIVE = "QUOTE_NOT_AFFIRMATIVE"
     QUOTE_NEGATED = "QUOTE_NEGATED"
-    QUOTE_NOT_GROUNDED = "QUOTE_NOT_GROUNDED"
+    QUOTE_HEDGED = "QUOTE_HEDGED"
+    TRANSCRIPT_UNAVAILABLE = "TRANSCRIPT_UNAVAILABLE"
+    QUOTE_NOT_IN_COUNTERPARTY_TURN = "QUOTE_NOT_IN_COUNTERPARTY_TURN"
+    IDENTIFIER_NOT_IN_EXCHANGE = "IDENTIFIER_NOT_IN_EXCHANGE"
+    AMBIGUOUS_EXCHANGE = "AMBIGUOUS_EXCHANGE"
     PATTERN_MISMATCH = "PATTERN_MISMATCH"
 
 
@@ -103,10 +145,6 @@ class IdentifierDecision:
     corrected: bool
     refusals: tuple[IdentifierRefusal, ...]
 
-    @property
-    def is_confirmed(self) -> bool:
-        return self.state is IdentifierState.CONFIRMED_IDENTIFIER
-
     def to_dict(self) -> dict[str, object]:
         return {
             "state": self.state.value,
@@ -122,17 +160,20 @@ def _fold(text: str) -> str:
 
     decomposed = unicodedata.normalize("NFKD", text)
     stripped = "".join(char for char in decomposed if not unicodedata.combining(char))
-    lowered = stripped.lower()
-    cleaned = re.sub(r"[^a-z0-9\s]+", " ", lowered)
+    cleaned = re.sub(r"[^a-z0-9\s]+", " ", stripped.lower())
     return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _tokens_to_digits(folded: str) -> list[str]:
+    return [_SPELLED_DIGITS.get(word, word) for word in folded.split(" ") if word]
 
 
 def normalize_identifier(value: str | None, prefix: str | None = None) -> str | None:
     """Turn a spoken or written reference into one canonical string.
 
-    ``"four eight one seven one"`` and ``"RMA 4 8 1 7 1"`` both normalize to
-    the same value, which is what lets a read-back be compared with what was
-    first heard.
+    ``"four eight one seven one"`` and ``"RMA 48171"`` both normalize to the
+    same value, which is what lets a read-back be compared with what was first
+    heard.
     """
 
     if value is None:
@@ -140,53 +181,99 @@ def normalize_identifier(value: str | None, prefix: str | None = None) -> str | 
     folded = _fold(value)
     if not folded:
         return None
-    words = folded.split(" ")
-    converted = [_SPELLED_DIGITS.get(word, word) for word in words]
-    joined = "".join(converted)
+    joined = "".join(_tokens_to_digits(folded))
     if prefix:
-        lowered_prefix = prefix.lower()
-        if joined.startswith(lowered_prefix):
-            joined = joined[len(lowered_prefix):]
+        lowered = prefix.lower()
+        if joined.startswith(lowered):
+            joined = joined[len(lowered):]
         body = joined.upper()
         return f"{prefix.upper()}-{body}" if body else None
     return joined.upper()
 
 
-def _quote_is_grounded(quote: str, transcript_turns: tuple[str, ...] | None) -> bool:
-    """A quote binds when it is one whole turn, or a long substring of one.
+def digits_of(value: str | None) -> str:
+    """The digit run inside a canonical identifier, or an empty string."""
 
-    The 12-character substring floor is the same test the repository's
-    ``local-atlas`` evidence binding uses, kept identical on purpose so the two
-    behave the same way for a reader comparing them.
+    return "".join(char for char in (value or "") if char.isdigit())
+
+
+def digit_runs(text: str) -> set[str]:
+    """Every candidate identifier spoken in a turn, spelled or written.
+
+    ``"no, that last digit is an eight, four eight one seven eight"`` yields
+    ``{"48178"}``; a turn naming a case number and an RMA yields both, which is
+    the signal that a read-back covered more than one thing at once.
     """
 
-    if transcript_turns is None:
-        return True
+    runs: set[str] = set()
+    current = ""
+    for token in _tokens_to_digits(_fold(text)):
+        if token.isdigit():
+            current += token
+        else:
+            if len(current) >= MIN_IDENTIFIER_DIGITS:
+                runs.add(current)
+            current = ""
+    if len(current) >= MIN_IDENTIFIER_DIGITS:
+        runs.add(current)
+    return runs
+
+
+def _bound_turn_index(quote: str, transcript: tuple[TranscriptTurn, ...]) -> int | None:
+    """Index of the counterparty turn the quote came from, or None.
+
+    A quote binds when it is one whole counterparty turn, or a substring of one
+    that is long enough not to be a coincidence. The twelve-character floor is
+    the same test the repository's ``local-atlas`` evidence binding uses.
+    """
+
     folded_quote = _fold(quote)
     if not folded_quote:
-        return False
-    for turn in transcript_turns:
-        folded_turn = _fold(turn)
+        return None
+    for index in range(len(transcript) - 1, -1, -1):
+        turn = transcript[index]
+        if turn.speaker != COUNTERPARTY_SPEAKER:
+            continue
+        folded_turn = _fold(turn.text)
         if folded_quote == folded_turn:
-            return True
+            return index
         if len(folded_quote) >= MIN_CONFIRMATION_QUOTE_CHARS and folded_quote in folded_turn:
-            return True
-    return False
+            return index
+    return None
+
+
+def _preceding_readback(
+    transcript: tuple[TranscriptTurn, ...], index: int
+) -> TranscriptTurn | None:
+    """The agent turn this answer replies to, if the answer replies to one.
+
+    Walking back stops at the previous counterparty turn: an agent turn from
+    earlier in the call is not what this "correct" was answering.
+    """
+
+    for position in range(index - 1, -1, -1):
+        turn = transcript[position]
+        if turn.speaker == COUNTERPARTY_SPEAKER:
+            return None
+        if turn.speaker == AGENT_SPEAKER:
+            return turn
+    return None
 
 
 def evaluate_identifier(
     claim: IdentifierClaim,
     *,
-    transcript_turns: tuple[str, ...] | None = None,
+    transcript: tuple[TranscriptTurn, ...] | None = None,
     expected_pattern: str | None = None,
     prefix: str | None = None,
 ) -> IdentifierDecision:
     """Decide whether a high-consequence identifier may be asserted.
 
-    ``transcript_turns`` should carry only the counterparty's turns. Passing
-    ``None`` means no transcript was available and skips the grounding test;
-    every other test still applies, so a missing transcript can never by itself
-    promote an identifier.
+    ``transcript`` is the full ordered turn list for the attempt on the number
+    that was dialled, agent turns included, because the agent's read-back is
+    half of the exchange the confirmation has to bind to. Passing ``None``
+    means no transcript was available, which is a refusal: there is then no way
+    to tell what the counterparty was agreeing to.
     """
 
     refusals: list[IdentifierRefusal] = []
@@ -208,6 +295,7 @@ def evaluate_identifier(
         refusals.append(IdentifierRefusal.NO_CONFIRMATION_VALUE)
 
     quote = (claim.confirmation_quote or "").strip()
+    negated = False
     if not quote:
         refusals.append(IdentifierRefusal.QUOTE_MISSING)
     else:
@@ -216,12 +304,15 @@ def evaluate_identifier(
             refusals.append(IdentifierRefusal.QUOTE_TOO_SHORT)
         affirmative = any(token in folded_quote for token in _AFFIRMATIONS)
         negated = any(token in folded_quote for token in _NEGATIONS)
-        if negated and not affirmative:
+        if any(token in folded_quote for token in _HEDGES):
+            refusals.append(IdentifierRefusal.QUOTE_HEDGED)
+        elif negated and not affirmative:
             refusals.append(IdentifierRefusal.QUOTE_NEGATED)
         elif not affirmative:
             refusals.append(IdentifierRefusal.QUOTE_NOT_AFFIRMATIVE)
-        if not _quote_is_grounded(quote, transcript_turns):
-            refusals.append(IdentifierRefusal.QUOTE_NOT_GROUNDED)
+
+    if quote and confirmed is not None:
+        refusals.extend(_exchange_refusals(quote, confirmed, transcript, negated))
 
     if confirmed is not None and expected_pattern is not None:
         if re.fullmatch(expected_pattern, confirmed) is None:
@@ -233,7 +324,7 @@ def evaluate_identifier(
             value=None,
             heard_value=heard,
             corrected=False,
-            refusals=tuple(refusals),
+            refusals=tuple(dict.fromkeys(refusals)),
         )
 
     return IdentifierDecision(
@@ -243,3 +334,53 @@ def evaluate_identifier(
         corrected=heard is not None and heard != confirmed,
         refusals=(),
     )
+
+
+def _exchange_refusals(
+    quote: str,
+    confirmed: str,
+    transcript: tuple[TranscriptTurn, ...] | None,
+    negated: bool,
+) -> list[IdentifierRefusal]:
+    """Bind the confirmation to the exchange the identifier was read back in."""
+
+    if transcript is None:
+        return [IdentifierRefusal.TRANSCRIPT_UNAVAILABLE]
+
+    index = _bound_turn_index(quote, transcript)
+    if index is None:
+        return [IdentifierRefusal.QUOTE_NOT_IN_COUNTERPARTY_TURN]
+
+    answer = transcript[index]
+    readback = _preceding_readback(transcript, index)
+
+    answer_runs = digit_runs(answer.text)
+    # A correction has to be spoken by the counterparty. When the answer
+    # contradicts the read-back, the agent's turn carries the value being
+    # rejected, so it is not admissible as the value being agreed to.
+    if negated or readback is None:
+        exchange_runs = answer_runs
+    else:
+        exchange_runs = answer_runs | digit_runs(readback.text)
+
+    wanted = digits_of(confirmed)
+    if not wanted:
+        return [IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE]
+
+    # Containment rather than equality, because speech runs digits together:
+    # "that last digit is an eight, four eight one seven eight" extracts as
+    # 848178. A wrong value still fails, since 48171 is not inside 848178.
+    if not any(wanted in run for run in exchange_runs):
+        return [IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE]
+
+    # Another candidate was in play, so a bare "correct" cannot say which one
+    # was meant. Only the counterparty naming this one, and nothing else,
+    # resolves it.
+    others = {run for run in exchange_runs if wanted not in run}
+    if others:
+        answer_matches = {run for run in answer_runs if wanted in run}
+        answer_others = {run for run in answer_runs if wanted not in run}
+        if not answer_matches or answer_others:
+            return [IdentifierRefusal.AMBIGUOUS_EXCHANGE]
+
+    return []

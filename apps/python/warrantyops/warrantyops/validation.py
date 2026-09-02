@@ -20,14 +20,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-_TYPE_MAP: dict[str, tuple[type, ...] | None] = {
+_TYPE_MAP: dict[str, tuple[type, ...]] = {
     "object": (dict,),
     "string": (str,),
     "number": (int, float),
     "integer": (int,),
     "boolean": (bool,),
     "array": (list,),
-    "null": None,
 }
 
 
@@ -45,22 +44,14 @@ class ValidationResult:
         return {"ok": self.ok, "errors": list(self.errors), "value": self.value}
 
 
-def _matches_type(value: Any, declared: Any, path: str) -> list[str]:
-    names = declared if isinstance(declared, list) else [declared]
-    for name in names:
-        if name not in _TYPE_MAP:
-            raise SchemaError(f"unsupported JSON Schema type at {path}: {name!r}")
-    for name in names:
-        expected = _TYPE_MAP[name]
-        if expected is None:
-            if value is None:
-                return []
-            continue
-        if name in ("number", "integer") and isinstance(value, bool):
-            continue
-        if isinstance(value, expected):
-            return []
-    return [f"{path}: expected type {names}, got {type(value).__name__}"]
+def _matches_type(value: Any, declared: str, path: str) -> list[str]:
+    if declared not in _TYPE_MAP:
+        raise SchemaError(f"unsupported JSON Schema type at {path}: {declared!r}")
+    if declared in ("number", "integer") and isinstance(value, bool):
+        return [f"{path}: expected {declared}, got bool"]
+    if isinstance(value, _TYPE_MAP[declared]):
+        return []
+    return [f"{path}: expected {declared}, got {type(value).__name__}"]
 
 
 def _validate_node(value: Any, schema: dict[str, Any], path: str) -> list[str]:
@@ -76,7 +67,8 @@ def _validate_node(value: Any, schema: dict[str, Any], path: str) -> list[str]:
             errors.append(f"{path}: {value!r} is not one of {schema['enum']}")
     if isinstance(value, dict):
         properties = schema.get("properties", {})
-        for name in schema.get("required", []):
+        required = set(schema.get("required", []))
+        for name in required:
             if name not in value:
                 errors.append(f"{path}.{name}: required field is missing")
         if schema.get("additionalProperties") is False:
@@ -84,8 +76,16 @@ def _validate_node(value: Any, schema: dict[str, Any], path: str) -> list[str]:
                 if name not in properties:
                     errors.append(f"{path}.{name}: unexpected field")
         for name, child in properties.items():
-            if name in value:
-                errors.extend(_validate_node(value[name], child, f"{path}.{name}"))
+            if name not in value:
+                continue
+            # An optional field that came back null means the same thing as an
+            # optional field that was omitted: not stated. The schema this
+            # workflow sends asks for omission, because a type array including
+            # "null" is not a documented CALL-E feature, but a provider that
+            # returns null anyway must not fail the whole result.
+            if value[name] is None and name not in required:
+                continue
+            errors.extend(_validate_node(value[name], child, f"{path}.{name}"))
     if isinstance(value, list) and "items" in schema:
         for index, item in enumerate(value):
             errors.extend(_validate_node(item, schema["items"], f"{path}[{index}]"))
@@ -120,3 +120,44 @@ def validate_structured_result(
     if errors:
         return ValidationResult(ok=False, errors=tuple(errors), value=None)
     return ValidationResult(ok=True, errors=(), value=structured_result)
+
+
+#: Schema keywords CALL-E documents as supported for ``result_schema``.
+DOCUMENTED_KEYWORDS = frozenset(
+    {"type", "properties", "required", "enum", "items", "description",
+     "additionalProperties"}
+)
+DOCUMENTED_TYPES = frozenset(
+    {"object", "string", "number", "integer", "boolean", "array"}
+)
+UNSUPPORTED_KEYWORDS = ("$ref", "oneOf", "anyOf", "allOf")
+
+
+def documented_schema_violations(schema: dict[str, Any], path: str = "$") -> list[str]:
+    """Report every way a schema depends on something CALL-E does not document.
+
+    Used as a guard on the schema this workflow sends, so that a dependency on
+    an undocumented feature fails here rather than as a rejected call.
+    """
+
+    problems: list[str] = []
+    for keyword in schema:
+        if keyword in UNSUPPORTED_KEYWORDS:
+            problems.append(f"{path}: {keyword} is documented as unsupported")
+        elif keyword not in DOCUMENTED_KEYWORDS:
+            problems.append(f"{path}: {keyword} is not a documented keyword")
+    declared = schema.get("type")
+    if isinstance(declared, list):
+        problems.append(
+            f"{path}: type must be a single documented value, not {declared}"
+        )
+    elif declared is not None and declared not in DOCUMENTED_TYPES:
+        problems.append(f"{path}: {declared!r} is not a documented type")
+    if schema.get("additionalProperties") not in (None, False):
+        problems.append(f"{path}: only additionalProperties false is supported")
+    for name, child in (schema.get("properties") or {}).items():
+        problems.extend(documented_schema_violations(child, f"{path}.{name}"))
+    items = schema.get("items")
+    if isinstance(items, dict):
+        problems.extend(documented_schema_violations(items, f"{path}[]"))
+    return problems

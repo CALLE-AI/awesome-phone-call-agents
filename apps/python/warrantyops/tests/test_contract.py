@@ -9,8 +9,7 @@ from warrantyops.contract import (
     ResolutionStatus,
     build_extraction_schema,
 )
-
-SUPPORTED_TYPES = {"object", "string", "number", "integer", "boolean", "array", "null"}
+from warrantyops.validation import documented_schema_violations
 
 
 def test_schema_is_closed_and_complete():
@@ -20,12 +19,15 @@ def test_schema_is_closed_and_complete():
     assert tuple(schema["required"]) == REQUIRED_EXTRACTION_FIELDS
 
 
-def test_schema_uses_only_documented_types():
-    schema = build_extraction_schema()
-    for name, node in schema["properties"].items():
-        declared = node["type"]
-        names = declared if isinstance(declared, list) else [declared]
-        assert set(names) <= SUPPORTED_TYPES, name
+def test_schema_depends_on_nothing_call_e_leaves_undocumented():
+    """No type arrays, no $ref/oneOf/anyOf/allOf, no additionalProperties true.
+
+    CALL-E documents `type` as one of six single values. `["string", "null"]`
+    is used by several merged contributions here but is not documented, so
+    "not stated" is expressed by omitting the field instead.
+    """
+
+    assert documented_schema_violations(build_extraction_schema()) == []
 
 
 def test_unknown_is_always_reachable():

@@ -28,6 +28,7 @@ from .identifiers import (
     IdentifierClaim,
     IdentifierDecision,
     IdentifierState,
+    TranscriptTurn,
     evaluate_identifier,
 )
 from .validation import ValidationResult
@@ -132,7 +133,7 @@ def derive_outcome(
     transport: TransportOutcome,
     validation: ValidationResult,
     *,
-    transcript_turns: tuple[str, ...] | None = None,
+    transcript: tuple[TranscriptTurn, ...] | None = None,
     expected_identifier_pattern: str | None = None,
     identifier_prefix: str | None = None,
 ) -> WorkflowOutcome:
@@ -188,7 +189,7 @@ def derive_outcome(
     resolution = ResolutionStatus(extraction["resolution_status"])
     identifier = evaluate_identifier(
         _claim_from(extraction),
-        transcript_turns=transcript_turns,
+        transcript=transcript,
         expected_pattern=expected_identifier_pattern,
         prefix=identifier_prefix,
     )

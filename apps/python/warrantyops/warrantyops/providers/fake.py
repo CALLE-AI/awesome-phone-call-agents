@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..identifiers import TranscriptTurn
 from ..outcome import TransportOutcome, TransportState
 from .base import CallRequest, ProviderCall
 
@@ -59,6 +60,9 @@ class FakeCallProvider:
         return ProviderCall(
             transport=transport,
             structured_result=fixture.get("structured_result"),
-            transcript_turns=tuple(fixture.get("counterparty_turns", ())),
+            transcript=tuple(
+                TranscriptTurn(speaker=turn["speaker"], text=turn["text"])
+                for turn in fixture.get("transcript_turns", ())
+            ),
             raw={"scenario": self.scenario, "idempotency_key": request.idempotency_key},
         )

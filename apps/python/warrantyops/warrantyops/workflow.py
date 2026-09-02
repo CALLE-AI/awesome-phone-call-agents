@@ -20,8 +20,7 @@ from .authorization import (
 )
 from .contract import CONTRACT_VERSION, build_extraction_schema
 from .idempotency import derive_idempotency_key
-from .outcome import TerminalState, TransportOutcome, TransportState, WorkflowOutcome, derive_outcome
-from .contract import unresolved_result
+from .outcome import WorkflowOutcome, derive_outcome
 from .providers.base import CallProvider, CallRequest
 from .validation import validate_structured_result
 
@@ -135,7 +134,7 @@ def run_case(
     return derive_outcome(
         call.transport,
         validation,
-        transcript_turns=call.transcript_turns or None,
+        transcript=call.transcript or None,
         expected_identifier_pattern=DEFAULT_IDENTIFIER_PATTERN,
         identifier_prefix=DEFAULT_IDENTIFIER_PREFIX,
     )
@@ -149,17 +148,3 @@ def masked_report(
     body = outcome.to_dict()
     body["recipient"] = mask_e164(recipient_e164)
     return body
-
-
-__all__ = [
-    "CaseInput",
-    "WorkflowRefusal",
-    "build_task",
-    "run_case",
-    "masked_report",
-    "READBACK_INSTRUCTION",
-    "TerminalState",
-    "TransportOutcome",
-    "TransportState",
-    "unresolved_result",
-]

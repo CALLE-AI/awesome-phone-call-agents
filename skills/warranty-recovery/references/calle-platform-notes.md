@@ -21,15 +21,32 @@ returns `409 idempotency_conflict`.
 **Structured results.** `result_schema` is validated server-side before a
 terminal call is returned. `structured_result` is `null` when CALL-E could not
 produce a schema-valid task-level result from the terminal evidence, or when no
-schema was supplied. Supported JSON Schema types are `object`, `string`,
-`number`, `integer`, `boolean` and `array`.
+schema was supplied.
+
+The documented schema subset is `type` (one of `object`, `string`, `number`,
+`integer`, `boolean`, `array`), `properties`, `required`, `enum`, nested
+objects, simple `array.items`, `description` and `additionalProperties: false`.
+`$ref`, `oneOf`, `anyOf`, `allOf`, recursive schemas, complex format validation
+and `additionalProperties: true` are documented as unsupported.
+
+**Nullable fields are not in that subset.** `type` takes a single value, so
+`{"type": ["string", "null"]}` is not documented, although several merged
+contributions in this repository use it. This workflow does not depend on it:
+optional fields are declared as plain strings, kept out of `required`, and the
+description tells the model to omit the field when nothing was stated. Local
+validation still accepts a null for an optional field, so a provider that
+returns one does not fail the whole result.
 
 **Transcripts.** Attempt transcripts appear at
 `recipients[].attempts[].transcript_turns`, each turn carrying
 `offset_seconds`, `speaker` and `text`, with `speaker` one of `bot`, `user` or
-`unknown`. This is what makes an evidence quote checkable rather than
-decorative: a quote attributed to the counterparty has to appear in a `user`
-turn.
+`unknown`. The array is empty when no transcript is available. No other field
+name is used for the speaker.
+
+Both labels matter. `user` is what makes a quote attributable to the
+counterparty; `bot` is what identifies the read-back a confirmation was
+answering. Dropping the agent's turns would leave a bare "correct" attached to
+nothing, which is the failure `identifier-confirmation.md` is built around.
 
 **Keypad IVR.** CALL-E added phone keypad IVR support on 2026-08-15, so a
 menu-fronted support line is not automatically out of scope.
@@ -90,9 +107,8 @@ than a function.
 
 ## Unverified
 
-- Whether `"null"` is accepted inside a `type` array. The documented list of
-  supported types does not name it, while several merged contributions in this
-  repository use `{"type": ["string", "null"]}`. This workflow uses that form
-  and validates it locally as well, so a rejection surfaces as a schema error
-  rather than as a missing field.
-- Whether a `GoalRun` result exposes transcripts or attempts.
+- Whether a `GoalRun` result exposes transcripts or attempts. Until that is
+  known, the read-back binding cannot be assumed to work on the Goal Runs path.
+- Whether a model asked to omit an optional field reliably omits it rather than
+  returning null. Both are handled, so this is a question about which branch
+  gets exercised, not a risk to the result.

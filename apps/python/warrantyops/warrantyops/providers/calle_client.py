@@ -21,6 +21,7 @@ from typing import Any
 
 from ..authorization import AuthorizationDecision
 from ..config import ConfigError, RuntimeConfig, live_call_refusals
+from ..identifiers import TranscriptTurn
 from ..outcome import TransportOutcome, TransportState
 from .base import CallRequest, ProviderCall
 
@@ -29,19 +30,18 @@ class LiveCallRefused(RuntimeError):
     """Raised instead of placing a call that has not cleared every gate."""
 
 
-COUNTERPARTY_SPEAKER = "user"
-
-
-def counterparty_turns(payload: dict[str, Any], recipient_e164: str) -> tuple[str, ...]:
-    """Return the counterparty's own words, from the attempt on our number.
+def attempt_transcript(
+    payload: dict[str, Any], recipient_e164: str
+) -> tuple[TranscriptTurn, ...]:
+    """Return the ordered turns of the attempt on the number we dialled.
 
     Reading ``recipients[0]`` would be wrong for a task with several
-    recipients, and reading every speaker would let the agent's own read-back
-    ground its own confirmation. Both mistakes are silent, so this function
-    filters on the dialled number and on ``speaker == "user"``.
+    recipients, so this filters on the dialled number. Agent turns are kept:
+    the read-back is half of the exchange a confirmation has to bind to, and
+    dropping it would leave a bare "correct" attached to nothing.
     """
 
-    turns: list[str] = []
+    turns: list[TranscriptTurn] = []
     for recipient in payload.get("recipients") or []:
         phones = recipient.get("phones") or []
         for attempt in recipient.get("attempts") or []:
@@ -52,10 +52,11 @@ def counterparty_turns(payload: dict[str, Any], recipient_e164: str) -> tuple[st
             elif recipient_e164 not in phones:
                 continue
             for turn in attempt.get("transcript_turns") or []:
-                if turn.get("speaker") == COUNTERPARTY_SPEAKER:
-                    text = (turn.get("text") or "").strip()
-                    if text:
-                        turns.append(text)
+                text = (turn.get("text") or "").strip()
+                if text:
+                    turns.append(
+                        TranscriptTurn(speaker=turn.get("speaker") or "unknown", text=text)
+                    )
     return tuple(turns)
 
 
@@ -105,6 +106,6 @@ class CalleCallProvider:
                 diagnostic_failure_message=payload.get("failure_message"),
             ),
             structured_result=payload.get("structured_result"),
-            transcript_turns=counterparty_turns(payload, request.recipient_e164),
+            transcript=attempt_transcript(payload, request.recipient_e164),
             raw={},
         )

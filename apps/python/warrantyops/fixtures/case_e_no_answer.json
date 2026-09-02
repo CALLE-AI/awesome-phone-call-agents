@@ -8,7 +8,7 @@
     "failure_code": "synthetic_transport_failure",
     "failure_message": "Synthetic fixture: the call did not reach a completed state."
   },
-  "counterparty_turns": [],
+  "transcript_turns": [],
   "structured_result": null,
   "expected": {
     "terminal_state": "TRANSPORT_FAILED",

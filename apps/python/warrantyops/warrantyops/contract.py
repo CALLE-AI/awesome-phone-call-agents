@@ -82,9 +82,18 @@ def build_extraction_schema() -> dict[str, Any]:
     ``UNKNOWN`` member wherever the call may not contain enough evidence,
     ``additionalProperties: false``, and evidence fields beside every value
     this workflow would act on.
+
+    It uses only the schema features CALL-E documents as supported: ``type``
+    with a single value, ``properties``, ``required``, ``enum``, simple
+    ``array.items``, ``description`` and ``additionalProperties: false``.
     """
 
-    nullable_string = {"type": ["string", "null"]}
+    # The documented `type` keyword takes one of six single values. A type
+    # array such as ["string", "null"] is not among them, so "not stated" is
+    # expressed by omitting the field rather than by returning null. Several
+    # merged contributions in this repository do use type arrays; that is
+    # convention, not documentation, and this schema does not depend on it.
+    optional_string = {"type": "string"}
     return {
         "type": "object",
         "additionalProperties": False,
@@ -101,11 +110,11 @@ def build_extraction_schema() -> dict[str, Any]:
                 ),
             },
             "coverage_evidence_quote": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "The representative's own words that establish "
-                    "coverage_status, at most 200 characters. Null when they "
-                    "said nothing that establishes it."
+                    "coverage_status, at most 200 characters. Omit this field "
+                    "when they said nothing that establishes it."
                 ),
             },
             "resolution_status": {
@@ -121,19 +130,19 @@ def build_extraction_schema() -> dict[str, Any]:
                 ),
             },
             "resolution_evidence_quote": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "The representative's own words that establish "
-                    "resolution_status, at most 200 characters. Null when they "
-                    "said nothing that establishes it."
+                    "resolution_status, at most 200 characters. Omit this field "
+                    "when they said nothing that establishes it."
                 ),
             },
             "authorization_reference_heard": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "The authorization, RMA, claim or case reference exactly as "
-                    "first heard, before any read-back. Null when none was "
-                    "given."
+                    "first heard, before any read-back. Omit this field when "
+                    "none was given."
                 ),
             },
             "authorization_reference_readback_performed": {
@@ -146,34 +155,35 @@ def build_extraction_schema() -> dict[str, Any]:
                 ),
             },
             "authorization_reference_confirmed": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "The reference as the representative confirmed it during "
                     "the read-back. When they corrected the read-back, this is "
-                    "the corrected value. Null unless they explicitly confirmed "
-                    "a value."
+                    "the corrected value. Omit this field unless they explicitly "
+                    "confirmed a value."
                 ),
             },
             "authorization_reference_confirmation_quote": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "The representative's own words confirming or correcting "
-                    "the read-back, at most 200 characters. Null when they did "
-                    "not respond to a read-back."
+                    "the read-back, at most 200 characters. Omit this field when "
+                    "they did not respond to a read-back."
                 ),
             },
             "replacement_eta": {
-                **nullable_string,
+                **optional_string,
                 "description": (
-                    "Replacement or shipment timing exactly as stated. Null "
-                    "when not stated. Do not compute a date from a duration."
+                    "Replacement or shipment timing exactly as stated. Omit this "
+                    "field when not stated. Do not compute a date from a "
+                    "duration."
                 ),
             },
             "return_deadline": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "Deadline for returning the failed unit exactly as stated. "
-                    "Null when not stated."
+                    "Omit this field when not stated."
                 ),
             },
             "required_documents": {
@@ -186,10 +196,10 @@ def build_extraction_schema() -> dict[str, Any]:
                 ),
             },
             "next_action": {
-                **nullable_string,
+                **optional_string,
                 "description": (
                     "The single next step the representative asked for, in one "
-                    "sentence. Null when they asked for nothing."
+                    "sentence. Omit this field when they asked for nothing."
                 ),
             },
         },

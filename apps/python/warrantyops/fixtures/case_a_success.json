@@ -8,12 +8,47 @@
     "failure_code": null,
     "failure_message": null
   },
-  "counterparty_turns": [
-    "Yes, that unit is still inside the five year parts warranty, I have it here.",
-    "I can raise a return authorization for you now.",
-    "Correct, that is RMA four eight one seven one.",
-    "We need the failed unit back within thirty days of the authorization date.",
-    "I cannot give you a shipping date, the replacement comes from the manufacturer."
+  "transcript_turns": [
+    {
+      "speaker": "bot",
+      "text": "Is this failure covered under the parts warranty?"
+    },
+    {
+      "speaker": "user",
+      "text": "Yes, that unit is still inside the five year parts warranty, I have it here."
+    },
+    {
+      "speaker": "bot",
+      "text": "What can you do about it?"
+    },
+    {
+      "speaker": "user",
+      "text": "I can raise a return authorization for you now."
+    },
+    {
+      "speaker": "bot",
+      "text": "Just to confirm, that is RMA four eight one seven one, correct?"
+    },
+    {
+      "speaker": "user",
+      "text": "Correct, that is RMA four eight one seven one."
+    },
+    {
+      "speaker": "bot",
+      "text": "Is there a deadline for returning the failed unit?"
+    },
+    {
+      "speaker": "user",
+      "text": "We need the failed unit back within thirty days of the authorization date."
+    },
+    {
+      "speaker": "bot",
+      "text": "And when would the replacement ship?"
+    },
+    {
+      "speaker": "user",
+      "text": "I cannot give you a shipping date, the replacement comes from the manufacturer."
+    }
   ],
   "structured_result": {
     "coverage_status": "COVERED",

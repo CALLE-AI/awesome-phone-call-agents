@@ -30,23 +30,73 @@ read-back.
 ## The states
 
 ```text
-ABSENT ─────────────► no reference was given
-UNCONFIRMED_IDENTIFIER ─► a value exists but did not survive the checks
-CONFIRMED_IDENTIFIER ───► every check passed
+ABSENT                    no reference was given
+UNCONFIRMED_IDENTIFIER    a value exists but did not survive the checks
+CONFIRMED_IDENTIFIER      every check passed
 ```
 
 A value is promoted to `CONFIRMED_IDENTIFIER` only when all of these hold:
 
 1. a confirmed value is present;
 2. a read-back was performed and the representative responded to it;
-3. a confirmation quote exists, is at least twelve characters, and is
-   affirmative rather than a denial;
-4. the quote is grounded in the counterparty's own turns of the transcript;
-5. the confirmed value matches the expected shape for that identifier.
+3. a confirmation quote exists, is at least twelve characters, is affirmative
+   rather than a denial, and is not a hedge;
+4. the quote is one of the counterparty's own turns, or a long substring of
+   one;
+5. **the confirmation binds to the exchange the identifier was read back in**;
+6. the confirmed value matches the expected shape for that identifier.
 
 Anything else leaves the state at `UNCONFIRMED_IDENTIFIER`, and the business
 result carries no reference at all. Losing a reference costs a call back.
 Publishing a wrong one costs a shipment sent to the wrong authorization.
+
+## Rule 5 is the one that matters
+
+Rules 1 to 4 are what most workflows already do, and together they are not
+enough. Consider a transcript that contains this, truthfully:
+
+```text
+bot   "Is now a good moment for a couple of questions?"
+user  "Yes, that is fine, go ahead."
+```
+
+That is an affirmative counterparty turn, twelve characters and more, present
+in the transcript, quotable. A workflow that grounds a confirmation by looking
+for an affirmative turn will accept it as agreement to a number that had not
+been mentioned yet.
+
+So the confirmation is bound to an exchange rather than to the transcript as a
+whole:
+
+- the quote is located as a specific counterparty turn, by index;
+- the agent turn that turn was answering is the one immediately before it,
+  with no other counterparty turn in between;
+- the confirmed value's digits must appear in that pair, spelled or written,
+  so `"four eight one seven one"` and `"48171"` are the same digits;
+- when more than one number was in play, a bare "correct" resolves nothing.
+  Only the counterparty naming this number, and no other, resolves it.
+
+A correction is treated more strictly still. When the counterparty contradicts
+the read-back, the agent's turn carries the value being *rejected*, so it stops
+being admissible: the corrected value has to come out of the counterparty's own
+mouth in the same turn.
+
+## What this refuses, and should
+
+| Situation | Result |
+| --- | --- |
+| "Yes, that is fine, go ahead" to an earlier question | `IDENTIFIER_NOT_IN_EXCHANGE` |
+| "Yeah, I think so" | `QUOTE_HEDGED` |
+| "No, it is four eight one seven one", nothing further | `QUOTE_NEGATED` |
+| One read-back naming a case number and an RMA, answered "correct" | `AMBIGUOUS_EXCHANGE` |
+| A confirmation of the case number, reused for the RMA | `IDENTIFIER_NOT_IN_EXCHANGE` |
+| The agent's own read-back quoted as the confirmation | `QUOTE_NOT_IN_COUNTERPARTY_TURN` |
+| No transcript at all | `TRANSCRIPT_UNAVAILABLE` |
+
+The last row is deliberate. Without a transcript there is no way to know what
+the counterparty was agreeing to, so no identifier is ever confirmed on a call
+whose transcript is empty. That is a workflow that returns less, not one that
+guesses.
 
 ## Corrections
 
@@ -58,4 +108,9 @@ as corrected, so a reviewer can see the catch happened.
 
 The read-back is a property of the task text, not of the schema. A schema can
 record that a read-back happened; only the instruction in the task can make it
-happen. Read `calle-platform-notes.md` for what CALL-E guarantees here.
+happen.
+
+The binding above needs the agent's turns as well as the counterparty's, which
+CALL-E provides: `recipients[].attempts[].transcript_turns`, each turn carrying
+`speaker` as `bot`, `user` or `unknown`. Read `calle-platform-notes.md` for the
+rest of what is guaranteed and what is not.

@@ -8,11 +8,35 @@
     "failure_code": null,
     "failure_message": null
   },
-  "counterparty_turns": [
-    "Yes, it is covered, that model had a known compressor fault.",
-    "Right, your authorization is four eight one seven one.",
-    "No, that last digit is an eight. Four eight one seven eight, that is correct.",
-    "Return it inside twenty one days please."
+  "transcript_turns": [
+    {
+      "speaker": "user",
+      "text": "Yes, it is covered, that model had a known compressor fault."
+    },
+    {
+      "speaker": "bot",
+      "text": "What happens next?"
+    },
+    {
+      "speaker": "user",
+      "text": "Right, your authorization is four eight one seven one."
+    },
+    {
+      "speaker": "bot",
+      "text": "Just to confirm, that is RMA four eight one seven one, correct?"
+    },
+    {
+      "speaker": "user",
+      "text": "No, that last digit is an eight. Four eight one seven eight, that is correct."
+    },
+    {
+      "speaker": "bot",
+      "text": "Understood. Is there a return deadline?"
+    },
+    {
+      "speaker": "user",
+      "text": "Return it inside twenty one days please."
+    }
   ],
   "structured_result": {
     "coverage_status": "COVERED",

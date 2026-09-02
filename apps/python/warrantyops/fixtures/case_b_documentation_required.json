@@ -8,10 +8,27 @@
     "failure_code": null,
     "failure_message": null
   },
-  "counterparty_turns": [
-    "I am not able to confirm coverage from what I have on screen.",
-    "Send me a photograph of the serial plate and the installation invoice and I can look again.",
-    "Once I have those I can tell you whether it is in warranty."
+  "transcript_turns": [
+    {
+      "speaker": "user",
+      "text": "I am not able to confirm coverage from what I have on screen."
+    },
+    {
+      "speaker": "bot",
+      "text": "What would you need to check it?"
+    },
+    {
+      "speaker": "user",
+      "text": "Send me a photograph of the serial plate and the installation invoice and I can look again."
+    },
+    {
+      "speaker": "bot",
+      "text": "And then you can tell us whether it is covered?"
+    },
+    {
+      "speaker": "user",
+      "text": "Once I have those I can tell you whether it is in warranty."
+    }
   ],
   "structured_result": {
     "coverage_status": "UNKNOWN",

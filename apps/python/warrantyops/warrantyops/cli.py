@@ -5,8 +5,8 @@
 
 Nothing in this module can place a call: it only ever constructs the fake
 provider. Live calling is deliberately not wired to a flag, because a flag is
-the wrong place for a decision that dials a stranger. See
-``docs/warranty-recovery/README.md`` for how a live run is authorized.
+the wrong place for a decision that dials a stranger. The README documents the
+gates a live run has to pass.
 """
 
 from __future__ import annotations

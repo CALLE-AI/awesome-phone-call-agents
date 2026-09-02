@@ -50,15 +50,6 @@ class RuntimeConfig:
     api_key: str | None = None
     artifact_dir: Path | None = None
 
-    def redacted(self) -> dict[str, object]:
-        return {
-            "dry_run": self.dry_run,
-            "base_url": self.base_url,
-            "idempotency_namespace": self.idempotency_namespace,
-            "api_key_present": self.api_key is not None,
-            "artifact_dir": str(self.artifact_dir) if self.artifact_dir else None,
-        }
-
 
 def _origin(url: str) -> str:
     parsed = urlparse(url)

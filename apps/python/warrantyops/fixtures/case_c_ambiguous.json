@@ -8,9 +8,23 @@
     "failure_code": null,
     "failure_message": null
   },
-  "counterparty_turns": [
-    "It should probably be covered, but I cannot confirm without the installation record.",
-    "If you can find the installation date we can pick this up again."
+  "transcript_turns": [
+    {
+      "speaker": "bot",
+      "text": "I am an AI assistant calling for Example Field Services. Is this failure covered?"
+    },
+    {
+      "speaker": "user",
+      "text": "It should probably be covered, but I cannot confirm without the installation record."
+    },
+    {
+      "speaker": "bot",
+      "text": "What would move this forward?"
+    },
+    {
+      "speaker": "user",
+      "text": "If you can find the installation date we can pick this up again."
+    }
   ],
   "structured_result": {
     "coverage_status": "UNKNOWN",
