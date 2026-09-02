@@ -6,10 +6,13 @@ from __future__ import annotations
 import copy
 import io
 import json
+import os
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 SKILL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL / "scripts"))
@@ -25,6 +28,13 @@ def run_main(argv: list[str]) -> tuple[int, str]:
     with redirect_stdout(buffer):
         code = relay_call.main(argv)
     return code, buffer.getvalue()
+
+
+def capture_stderr(argv: list[str]) -> tuple[int, str]:
+    err = io.StringIO()
+    with mock.patch("sys.stderr", err):
+        code = relay_call.main(argv)
+    return code, err.getvalue()
 
 
 class UnitTests(unittest.TestCase):
@@ -130,9 +140,62 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertNotIn("ctok_", out)
 
+    def test_missing_consent_fails_closed(self):
+        canned = copy.deepcopy(json.loads(HAPPY.read_text()))
+        canned["rec_status"]["result"]["structuredContent"]["structured_output"].pop("consent_given")
+        path = write_temp(canned)
+        code, out = run_main(["--request", str(SAMPLE), "--fixture", str(path)])
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertEqual(result["relay"], "needs_human")
+        self.assertEqual(result["calls_placed"], 1)
+        self.assertEqual(result["recipient_call"]["disposition"], "no_consent")
+        self.assertEqual(result["requester_call"]["disposition"], "skipped")
+
+    def test_answer_type_drift_fails_closed(self):
+        canned = copy.deepcopy(json.loads(HAPPY.read_text()))
+        canned["rec_status"]["result"]["structuredContent"]["structured_output"]["understood"] = "true"
+        path = write_temp(canned)
+        code, out = run_main(["--request", str(SAMPLE), "--fixture", str(path)])
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertEqual(result["relay"], "needs_human")
+        self.assertEqual(result["calls_placed"], 1)
+        self.assertEqual(result["recipient_call"]["disposition"], "schema_drift")
+
+    def test_low_confidence_fails_closed(self):
+        canned = copy.deepcopy(json.loads(HAPPY.read_text()))
+        canned["rec_status"]["result"]["structuredContent"]["structured_output"]["confidence"] = 0.3
+        path = write_temp(canned)
+        code, out = run_main(["--request", str(SAMPLE), "--fixture", str(path)])
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertEqual(result["relay"], "needs_human")
+        self.assertEqual(result["calls_placed"], 1)
+        self.assertEqual(result["recipient_call"]["disposition"], "low_confidence")
+
+    def test_requester_answer_type_drift_fails_closed(self):
+        canned = copy.deepcopy(json.loads(HAPPY.read_text()))
+        canned["req_status"]["result"]["structuredContent"]["structured_output"]["accepted"] = "true"
+        path = write_temp(canned)
+        code, out = run_main(["--request", str(SAMPLE), "--fixture", str(path)])
+        self.assertEqual(code, 0)
+        result = json.loads(out)
+        self.assertEqual(result["relay"], "needs_human")
+        self.assertIn("schema validation", result["needs_human_reason"])
+
+    def test_execute_refuses_repeated_request(self):
+        with tempfile.TemporaryDirectory() as state_dir:
+            env = {"LANGUAGE_BRIDGE_CALL_STATE_DIR": state_dir}
+            with mock.patch.dict(os.environ, env):
+                relay_call.write_state("relay-2026-09-08-unit-12", {"status": "done"})
+                code, err = capture_stderr(["--request", str(SAMPLE), "--execute", "--confirm-consent"])
+                self.assertEqual(code, 2)
+                self.assertIn("refusing to re-run", err)
+                self.assertIn("status: done", err)
+
 
 def write_temp(data) -> str:
-    import tempfile
     handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
     json.dump(data, handle)
     handle.close()

@@ -38,6 +38,7 @@
           "understood": true,
           "wrong_person": false,
           "consent_given": true,
+          "confidence": 0.92,
           "choice": "2026-09-08T15:00:00-07:00",
           "counter_window": "",
           "notes": "Perfecto, el lunes a las tres me viene bien."

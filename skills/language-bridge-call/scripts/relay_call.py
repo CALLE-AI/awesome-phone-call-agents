@@ -12,7 +12,9 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -29,7 +31,70 @@ TERMINAL_STATUSES = {
 MAX_WINDOWS = 4
 POLL_INTERVAL_SECONDS = 15
 DEFAULT_POLL_TIMEOUT_SECONDS = 300
+MIN_CONFIDENCE = 0.7
 SECRET_KEYS = {"confirm_token", "access_token", "refresh_token", "session_secret"}
+# Structured-answer contract bound before any downstream call. Required keys must be
+# present with exactly the listed type; optional string keys must be strings if present.
+ANSWER_TYPES = {
+    "understood": bool, "consent_given": bool, "wrong_person": bool,
+    "confidence": float, "choice": str, "counter_window": str, "notes": str,
+}
+# consent_given presence is enforced by the value gate in recipient_usable (missing = no_consent).
+REQUIRED_ANSWER_KEYS = ("understood", "confidence")
+STATE_DIR_ENV = "LANGUAGE_BRIDGE_CALL_STATE_DIR"
+
+
+def state_dir() -> Path:
+    return Path(os.environ.get(STATE_DIR_ENV, Path.home() / ".cache" / "language-bridge-call"))
+
+
+def state_path(request_id: str) -> Path:
+    # sha256: filename-safe and collision-free for arbitrary request_id strings.
+    return state_dir() / (hashlib.sha256(request_id.encode("utf-8")).hexdigest() + ".json")
+
+
+def read_state(request_id: str) -> dict | None:
+    path = state_path(request_id)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"status": "unreadable"}  # corrupted state: refuse rather than risk a duplicate relay
+
+
+def write_state(request_id: str, payload: dict) -> None:
+    path = state_path(request_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"request_id": request_id, **payload}
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _type_ok(value, expected) -> bool:
+    if expected is bool:
+        return isinstance(value, bool)  # bool is an int subclass; reject ints masquerading
+    if expected is float:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, str)
+
+
+def validate_answer_schema(answer: dict, call: dict) -> bool:
+    """Type-bind the recipient's structured answer; any violation fails closed as schema_drift."""
+    for key in REQUIRED_ANSWER_KEYS:
+        if not _type_ok(answer.get(key), ANSWER_TYPES[key]):
+            call["disposition"] = "schema_drift"
+            call["detail"] = f"answer.{key} is missing or not {ANSWER_TYPES[key].__name__}"
+            return False
+    if not 0.0 <= float(answer["confidence"]) <= 1.0:
+        call["disposition"] = "schema_drift"
+        call["detail"] = "answer.confidence outside [0, 1]"
+        return False
+    for key in ANSWER_TYPES:
+        if key not in REQUIRED_ANSWER_KEYS and key in answer and not _type_ok(answer[key], ANSWER_TYPES[key]):
+            call["disposition"] = "schema_drift"
+            call["detail"] = f"answer.{key} must be a string"
+            return False
+    return True
 
 
 def mask_phone(phone: str) -> str:
@@ -105,6 +170,11 @@ def goal_for_recipient(req: dict) -> str:
         f"Ask {req['recipient']['first_name']} to choose a window, propose a different time, or decline.",
         "Do not discuss payments, contracts, deposits, or legal matters. Do not promise anything.",
         "Close politely once you have captured the answer.",
+        "Before closing, record the answer as JSON with exactly these fields: understood (boolean), "
+        "consent_given (boolean), wrong_person (boolean), confidence (number between 0 and 1), "
+        "choice (one of the offered windows, or an empty string), "
+        "counter_window (ISO-8601 time with UTC offset, or an empty string), "
+        "notes (one short sentence quoting the person, in their language).",
     ]
     return "\n".join(lines)
 
@@ -126,6 +196,8 @@ def goal_for_requester(req: dict, answer: dict) -> str:
         "If they agreed to a time, read it back and ask the requester to accept it.",
         "If they proposed a different time or declined, relay that without negotiation.",
         "Capture accept, decline, or next instruction. Do not commit to anything beyond relaying.",
+        "Record the outcome as JSON with exactly these fields: accepted (boolean), "
+        "agreed_window (one of the offered windows, or an empty string), notes (one short sentence).",
     ])
 
 
@@ -233,11 +305,18 @@ def recipient_usable(req: dict, call: dict) -> bool:
     if call["disposition"] != "completed":
         return False
     answer = call["answer"]
+    if not validate_answer_schema(answer, call):
+        return False
     if answer.get("wrong_person"):
         call["disposition"] = "wrong_number"
         return False
-    if answer.get("consent_given") is False:
+    # Fail closed: consent must be explicitly true; missing/null/false all refuse.
+    if answer.get("consent_given") is not True:
         call["disposition"] = "no_consent"
+        return False
+    if float(answer["confidence"]) < MIN_CONFIDENCE:
+        call["disposition"] = "low_confidence"
+        call["detail"] = f"recipient answer confidence {answer['confidence']} below {MIN_CONFIDENCE}"
         return False
     if answer.get("understood") is not True:
         call["disposition"], call["detail"] = "schema_drift", "recipient answer missing understood=true"
@@ -299,6 +378,10 @@ def relay(req: dict, runner) -> dict:
         result["needs_human_reason"] = f"requester call ended: {requester_call['disposition']} {requester_call['detail']}".strip()
         return result
     accepted = requester_call["answer"]
+    if not (isinstance(accepted.get("accepted"), bool) and isinstance(accepted.get("agreed_window"), str)
+            and isinstance(accepted.get("notes", ""), str)):
+        result["needs_human_reason"] = "requester answer failed schema validation; relay manually"
+        return result
     agreed = str(accepted.get("agreed_window") or "")
     if accepted.get("accepted") is True and agreed in req.get("proposed_windows", []):
         result["relay"] = "agreed"
@@ -348,7 +431,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args.confirm_consent:
             print("--execute requires --confirm-consent", file=sys.stderr)
             return 2
+        prior = read_state(req["request_id"])
+        if prior:
+            print(
+                f"refusing to re-run: request {req['request_id']} already has relay state "
+                f"(status: {prior.get('status')}). One relay per request. If no call was placed, remove "
+                f"{state_path(req['request_id'])}; otherwise resolve the prior run (recover command or manual "
+                f"check) and use a new request_id.", file=sys.stderr)
+            return 2
         runner = CliRunner()
+        write_state(req["request_id"], {"status": "started"})
     elif args.fixture:
         runner = FixtureRunner(json.loads(Path(args.fixture).read_text(encoding="utf-8")))
     else:
@@ -360,6 +452,8 @@ def main(argv: list[str] | None = None) -> int:
     except (RuntimeError, OSError, ValueError) as exc:
         print(f"relay aborted: {exc}", file=sys.stderr)
         return 1
+    if args.execute:
+        write_state(req["request_id"], {"status": "done", "result": scrub(result)})
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
