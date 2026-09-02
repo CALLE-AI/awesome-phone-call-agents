@@ -1,0 +1,52 @@
+{
+  "call_id": "call_mock_confirm_yes",
+  "status": "completed",
+  "task_completed": true,
+  "completion_confidence": {
+    "score": 0.94,
+    "label": "high"
+  },
+  "description": "Recipient confirms the booked Thursday 10:00 slot.",
+  "transcript_turns": [
+    {
+      "offset_seconds": 0,
+      "speaker": "bot",
+      "text": "Hi Amelia, this is an AI assistant calling from KAY2 Studios. I am calling to confirm your brand strategy session on Thursday 3 September at 10:00. Is this Amelia?"
+    },
+    {
+      "offset_seconds": 6,
+      "speaker": "user",
+      "text": "Yes, that's me."
+    },
+    {
+      "offset_seconds": 9,
+      "speaker": "bot",
+      "text": "Great. Can you confirm you can attend the 10:00 session on Thursday 3 September at KAY2 Studios, London?"
+    },
+    {
+      "offset_seconds": 14,
+      "speaker": "user",
+      "text": "Yes, I'll be there at 10."
+    },
+    {
+      "offset_seconds": 18,
+      "speaker": "bot",
+      "text": "Thank you. You are confirmed for 10:00 on Thursday. A human at the studio will keep the booking. Goodbye."
+    },
+    {
+      "offset_seconds": 24,
+      "speaker": "user",
+      "text": "See you then."
+    }
+  ],
+  "expected_structured_result": {
+    "can_attend": "yes",
+    "confirmed_time": "2026-09-03T10:00:00+01:00",
+    "requested_time": "",
+    "disposition": "confirmed"
+  },
+  "evidence": [
+    "Yes, that's me.",
+    "Yes, I'll be there at 10."
+  ]
+}
