@@ -38,6 +38,26 @@ const calleConfig = {
   timeoutSeconds: 30,
 };
 
+function unwrapMcpResult(response) {
+  if (!response || typeof response !== "object") {
+    return response;
+  }
+
+  if (response.isError === true) {
+    throw new Error("CALL-E MCP tool returned an error.");
+  }
+
+  if (
+    response.structuredContent &&
+    typeof response.structuredContent === "object" &&
+    !Array.isArray(response.structuredContent)
+  ) {
+    return response.structuredContent;
+  }
+
+  return response;
+}
+
 function safeEqual(left, right) {
   const a = Buffer.from(String(left), 'utf8');
   const b = Buffer.from(String(right), 'utf8');
@@ -243,7 +263,7 @@ app.post('/api/plan', async (req, res) => {
   }
 
   try {
-    const plan = await callMcpTool({
+    const planResult = await callMcpTool({
       config: calleConfig,
       toolName: 'plan_call',
       toolArguments: {
@@ -255,6 +275,8 @@ app.post('/api/plan', async (req, res) => {
           'Plan the call exactly as specified in the goal.',
       },
     });
+
+    const plan = unwrapMcpResult(planResult);
 
     if (!plan?.plan_id) {
       return res.status(502).json({
@@ -357,7 +379,7 @@ app.post('/api/run', async (req, res) => {
   approval.used = true;
 
   try {
-    const run = await callMcpTool({
+    const runResult = await callMcpTool({
       config: calleConfig,
       toolName: 'run_call',
       toolArguments: {
@@ -365,6 +387,8 @@ app.post('/api/run', async (req, res) => {
         confirm_token: approval.confirmToken,
       },
     });
+
+    const run = unwrapMcpResult(runResult);
 
     if (!run?.run_id) {
       return res.status(502).json({
@@ -423,13 +447,15 @@ app.get('/api/status/:statusToken', async (req, res) => {
   }
 
   try {
-    const run = await callMcpTool({
+    const runResult = await callMcpTool({
       config: calleConfig,
       toolName: 'get_call_run',
       toolArguments: {
         run_id: record.runId,
       },
     });
+
+    const run = unwrapMcpResult(runResult);
 
     const outcome =
       run?.result?.outcome ||
