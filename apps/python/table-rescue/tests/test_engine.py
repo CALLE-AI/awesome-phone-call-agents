@@ -147,8 +147,8 @@ def test_fill_slot_walks_waitlist_in_priority_order_until_accepted(tmp_path):
     engine, client, _ = make_engine(tmp_path, payloads)
     slot = make_reservation()
     entries = [make_entry("W-002", priority=1), make_entry("W-001", priority=2)]
-    outcome = engine.fill_slot("run-1", slot, entries, NOW)
-    assert outcome.status == CallStatus.ACCEPTED
+    placed = engine.fill_slot("run-1", slot, entries, NOW)
+    assert [o.status for o in placed] == [CallStatus.DECLINED, CallStatus.ACCEPTED]
     assert slot.status == ReservationStatus.RECOVERED
     assert entries[0].status == WaitlistStatus.DECLINED
     assert entries[1].status == WaitlistStatus.ACCEPTED

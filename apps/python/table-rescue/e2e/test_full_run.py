@@ -57,3 +57,7 @@ def test_full_dry_run_recovers_cancelled_table(tmp_path):
     assert skipped[0]["target_id"] == "R-003"
     report = (state_dir / "runs" / "e2e-1" / "report.md").read_text(encoding="utf-8")
     assert "Slots recovered: 1" in report
+    assert "Calls placed: 4" in report
+    # The staff report must show the declined waitlist offer, not just the
+    # accepted one (regression: fill_slot used to swallow non-accepted outcomes).
+    assert "| W-001 |" in report and "DECLINED" in report

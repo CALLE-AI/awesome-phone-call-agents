@@ -145,8 +145,13 @@ class CascadeEngine:
         slot: Reservation,
         waitlist: list[WaitlistEntry],
         now: datetime,
-    ) -> CallOutcome | None:
-        """Offer a freed slot to waitlist candidates in priority order."""
+    ) -> list[CallOutcome]:
+        """Offer a freed slot to waitlist candidates in priority order.
+
+        Returns every outcome placed during the cascade attempt so the staff
+        report shows declined/no-answer offers, not just the accepted one.
+        """
+        placed: list[CallOutcome] = []
         for entry in self.select_candidates(slot, waitlist):
             entry.status = WaitlistStatus.OFFERED
             goal = build_offer_goal(entry.name, entry.party_size, slot.slot)
@@ -158,10 +163,11 @@ class CascadeEngine:
                 goal=goal,
                 now=now,
             )
+            placed.append(outcome)
             if outcome.status == CallStatus.ACCEPTED:
                 entry.status = WaitlistStatus.ACCEPTED
                 slot.status = ReservationStatus.RECOVERED
-                return outcome
+                break
             if outcome.status == CallStatus.DECLINED:
                 entry.status = WaitlistStatus.DECLINED
             elif outcome.status == CallStatus.NO_ANSWER:
@@ -169,4 +175,4 @@ class CascadeEngine:
             else:
                 # Skip outcomes and ERROR: keep the entry on the waitlist.
                 entry.status = WaitlistStatus.WAITING
-        return None
+        return placed
