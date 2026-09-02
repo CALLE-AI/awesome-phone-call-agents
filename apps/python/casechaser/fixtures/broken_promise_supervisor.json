@@ -1,0 +1,82 @@
+{
+ "status": "completed",
+ "task_completed": true,
+ "completion_confidence": "medium",
+ "summary": "Supervisor reached. Payment was not sent; a new date was given.",
+ "evidence": [
+  "Supervisor Daniel acknowledged the payment 'was held by a system flag'.",
+  "New commitment: payment released 'by Friday the 18th'."
+ ],
+ "structured_result": {
+  "outcome": "in_progress",
+  "status_statement": "The payment was held by a system flag and has now been released for processing.",
+  "reference_number": "EXAMPLE-CLAIM-0001",
+  "representative": "Daniel, Claims supervisor",
+  "commitment_action": "Release the reimbursement payment",
+  "commitment_by_date": "2026-09-18",
+  "commitment_quote": "It will be in the account by Friday the 18th, I have escalated it myself.",
+  "customer_action_required": "",
+  "offer_quote": "",
+  "ivr_path": "2, 3, say 'existing claim'",
+  "needs_human": false,
+  "needs_human_reason": ""
+ },
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12125550100"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": null,
+   "summary": "Supervisor released the payment, new date 18 September.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12125550100",
+     "status": "completed",
+     "started_at": "2026-09-02T09:00:10Z",
+     "completed_at": "2026-09-02T09:06:40Z",
+     "summary": "Supervisor released the payment, new date 18 September.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "agent",
+       "text": "Hello, I'm an AI assistant calling on behalf of Alex Example about claim EXAMPLE-CLAIM-0001. On the second of September, Maria committed to payment within five business days. It has not arrived. May I speak with a supervisor?"
+      },
+      {
+       "offset_seconds": 12,
+       "speaker": "recipient",
+       "text": "One moment, transferring you."
+      },
+      {
+       "offset_seconds": 24,
+       "speaker": "recipient",
+       "text": "This is Daniel, claims supervisor."
+      },
+      {
+       "offset_seconds": 36,
+       "speaker": "agent",
+       "text": "Thank you. The payment promised for the ninth has not arrived."
+      },
+      {
+       "offset_seconds": 48,
+       "speaker": "recipient",
+       "text": "I see it. The payment was held by a system flag and has now been released for processing. It will be in the account by Friday the 18th, I have escalated it myself."
+      },
+      {
+       "offset_seconds": 60,
+       "speaker": "agent",
+       "text": "Thank you, Daniel. To confirm: payment by Friday the 18th."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}

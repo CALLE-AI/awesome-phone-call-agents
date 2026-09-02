@@ -1,0 +1,66 @@
+{
+ "status": "completed",
+ "task_completed": true,
+ "completion_confidence": "high",
+ "summary": "The company needs a signed form from the customer before proceeding.",
+ "evidence": [
+  "Representative said the claim 'cannot move until the signed release form is received'."
+ ],
+ "structured_result": {
+  "outcome": "needs_customer_action",
+  "status_statement": "The claim cannot move until the signed release form is received.",
+  "reference_number": "EXAMPLE-CLAIM-0001",
+  "representative": "Omar, Claims",
+  "commitment_action": "",
+  "commitment_by_date": "",
+  "commitment_quote": "",
+  "customer_action_required": "Sign and return the release form sent by email on 28 August.",
+  "offer_quote": "",
+  "ivr_path": "2, 3, say 'existing claim'",
+  "needs_human": false,
+  "needs_human_reason": ""
+ },
+ "recipients": [
+  {
+   "id": "rcp_1",
+   "phones": [
+    "+12125550100"
+   ],
+   "locale": "en-US",
+   "region": "US",
+   "status": "completed",
+   "structured_result": null,
+   "summary": "Customer must return a signed form.",
+   "attempts": [
+    {
+     "id": "att_1",
+     "phone": "+12125550100",
+     "status": "completed",
+     "started_at": "2026-09-02T09:00:10Z",
+     "completed_at": "2026-09-02T09:06:40Z",
+     "summary": "Customer must return a signed form.",
+     "transcript_turns": [
+      {
+       "offset_seconds": 0,
+       "speaker": "agent",
+       "text": "Hello, I'm an AI assistant calling on behalf of Alex Example about claim EXAMPLE-CLAIM-0001."
+      },
+      {
+       "offset_seconds": 12,
+       "speaker": "recipient",
+       "text": "The claim cannot move until the signed release form is received. It was emailed on the 28th."
+      },
+      {
+       "offset_seconds": 24,
+       "speaker": "agent",
+       "text": "Understood. I'll make sure Alex returns it. Thank you, Omar."
+      }
+     ],
+     "provider_call_id": null,
+     "failure_code": null,
+     "failure_message": null
+    }
+   ]
+  }
+ ]
+}
