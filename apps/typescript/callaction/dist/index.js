@@ -21088,7 +21088,7 @@ var RequestError = class extends Error {
 };
 
 // node_modules/@octokit/request/dist-bundle/index.js
-var VERSION2 = "10.0.15";
+var VERSION2 = "10.0.16";
 var defaults_default = {
   headers: {
     "user-agent": `octokit-request.js/${VERSION2} ${getUserAgent()}`
@@ -21425,7 +21425,7 @@ var createTokenAuth = function createTokenAuth2(token) {
 };
 
 // node_modules/@octokit/core/dist-src/version.js
-var VERSION4 = "7.0.7";
+var VERSION4 = "7.0.8";
 
 // node_modules/@octokit/core/dist-src/index.js
 var noop2 = () => {
@@ -25094,32 +25094,50 @@ var CalleClient = class {
 };
 
 // src/index.ts
+function redactPhoneLike(text) {
+  if (!text) return "";
+  const phoneLikeRegex = /(?:\+?\d[\d\s\-\.\(\)]{5,}\d)/g;
+  return text.replace(phoneLikeRegex, "[phone-redacted]");
+}
 async function run() {
   try {
     const apiKey = getInput("calle_api_key", { required: true });
     const phone = getInput("phone_number", { required: true });
     const token = getInput("github_token", { required: true });
+    const mode = getInput("mode") || "preview";
+    const authorizeLiveCallTo = getInput("authorize_live_call_to");
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-      throw new Error(`Invalid phone number: ${phone}. Must be strict E.164 (e.g., +12025550123). +0 is not allowed.`);
+      throw new Error("Invalid phone number format provided. Must be strict E.164 (e.g., +12025550123). +0 is not allowed.");
     }
     const maskedPhone = `${phone.substring(0, 3)}******${phone.substring(phone.length - 4)}`;
-    info(`Starting CallAction escalation to ${maskedPhone}...`);
-    const client = new CalleClient({ apiKey });
-    const prNumber = context2.payload.pull_request?.number || context2.issue.number;
-    const runId = context2.runId;
-    if (!prNumber) {
-      warning("Not running in a Pull Request context. Skipping GitHub comment posting.");
+    if (mode === "live") {
+      if (phone !== authorizeLiveCallTo) {
+        throw new Error("Refusing to dial: authorize_live_call_to must exactly match phone_number when in live mode.");
+      }
     }
+    const prNumber = context2.payload.pull_request?.number || context2.issue?.number;
+    const runId = context2.runId || "local-preview";
+    const taskPrompt = `You are CallAction, a DevOps escalation assistant. Call ${phone}. Disclose that you are an AI immediately. Tell the engineer that GitHub Action run ${runId} just failed. Ask if they acknowledge the error, and what the next step should be: revert the commit, escalate to management, or they will fix it. Do not ask for passwords or secrets.`;
+    const maskedTaskPrompt = taskPrompt.replace(phone, maskedPhone);
+    if (mode !== "live") {
+      info(`PREVIEW MODE: No call will be placed. To execute, set mode: 'live' and pass authorize_live_call_to.`);
+      info(`Would call: ${maskedPhone}`);
+      info(`Task preview:
+${maskedTaskPrompt}`);
+      return;
+    }
+    info(`Starting LIVE CallAction escalation to ${maskedPhone}...`);
+    const client = new CalleClient({ apiKey });
     const call = await client.calls.createAndWait(
       {
-        task: `You are CallAction, a DevOps escalation assistant. Call ${phone}. Disclose that you are an AI immediately. Tell the engineer that GitHub Action run ${runId} just failed. Ask if they acknowledge the error, and what the next step should be: revert the commit, escalate to management, or they will fix it. Do not ask for passwords or secrets.`,
+        task: taskPrompt,
         recipients: [{ phones: [phone], locale: "en-US" }],
         resultSchema: {
           type: "object",
           required: ["action_decision", "engineer_notes"],
           properties: {
             action_decision: { type: "string", enum: ["revert", "escalate", "will_fix", "unknown"] },
-            engineer_notes: { type: "string" }
+            engineer_notes: { type: "string", description: "Short summary. Do not include phone numbers or sensitive data." }
           },
           additionalProperties: false
         }
@@ -25133,13 +25151,20 @@ async function run() {
     if (call.status === "completed" && result.action_decision && result.action_decision !== "unknown") {
       finalDecision = result.action_decision;
     }
+    let safeNotes = "No notes captured or call failed.";
+    const rawNotes = result.engineer_notes;
+    if (typeof rawNotes === "string" && rawNotes.trim().length > 0) {
+      const truncated = rawNotes.substring(0, 300);
+      const redacted = redactPhoneLike(truncated);
+      safeNotes = redacted.replace(/\[.*\]\(.*\)/g, "[link-removed]");
+    }
     const report = `
 \u{1F6A8} **CallAction Escalation Report** \u{1F6A8}
 - **Contacted:** \`${maskedPhone}\`
 - **Call Status:** \`${call.status}\`
 - **Engineer Decision:** \`${finalDecision.toUpperCase()}\`
-- **Notes:** ${result.engineer_notes || "No notes captured or call failed."}
-    `;
+- **Notes:** ${safeNotes}
+    `.trim();
     info(`Call Status: ${call.status}`);
     info(`Decision: ${finalDecision}`);
     if (prNumber) {
@@ -25151,6 +25176,8 @@ async function run() {
         body: report
       });
       info(`Successfully posted comment to PR #${prNumber}`);
+    } else {
+      warning("Not running in a Pull Request context. Skipping GitHub comment posting.");
     }
     if (finalDecision === "needs_human" || finalDecision === "escalate") {
       setFailed(`Escalation required or call failed to reach resolution. Status: ${finalDecision}`);
