@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -111,6 +112,22 @@ def compact_summary(summary: Any) -> str | None:
     return " ".join(str(summary).split())[:200]
 
 
+def extract_post_summary(payload: dict[str, Any]) -> str | None:
+    """Read the post-call summary from a get_call_run payload.
+
+    CALL-E nests the summary under "result" (post_summary mirrors summary);
+    tolerate a flat payload as well.
+    """
+    result_block = payload.get("result")
+    if not isinstance(result_block, dict):
+        result_block = {}
+    return (
+        payload.get("post_summary")
+        or result_block.get("post_summary")
+        or result_block.get("summary")
+    )
+
+
 class DryRunClient:
     """Returns fixture outcomes keyed by target_id; never touches the network."""
 
@@ -171,6 +188,11 @@ class McpCallClient:
             str(Path(self.cache_root).expanduser()),
             "--json",
         ]
+        # npm installs the CLI as a .cmd shim on Windows; resolve the real
+        # executable so subprocess can launch it without shell=True.
+        resolved = shutil.which(command[0])
+        if resolved:
+            command[0] = resolved
         completed = subprocess.run(command, capture_output=True, text=True, check=False)
         if completed.returncode != 0:
             detail = completed.stderr.strip() or completed.stdout.strip()
@@ -261,7 +283,7 @@ class McpCallClient:
             payload = await self._call_tool(client, "get_call_run", {"run_id": call_run_id})
             status = str(payload.get("status") or "").upper()
             if status in TERMINAL_STATUSES:
-                summary = payload.get("post_summary")
+                summary = extract_post_summary(payload)
                 return CallOutcome(
                     run_id=request.run_id,
                     target_id=request.target_id,
