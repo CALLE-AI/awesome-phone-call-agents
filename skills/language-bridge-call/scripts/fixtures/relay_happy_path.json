@@ -1,0 +1,91 @@
+{
+  "rec_plan": {
+    "ok": true,
+    "tool_name": "plan_call",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"plan_id\":\"plan_rec_8841\",\"ready_to_run\":true,\"confirm_token\":\"ctok_rec_7f2a\"}"
+        }
+      ],
+      "structuredContent": {
+        "plan_id": "plan_rec_8841",
+        "ready_to_run": true,
+        "confirm_token": "ctok_rec_7f2a"
+      }
+    }
+  },
+  "rec_run": {
+    "ok": true,
+    "call_started": true,
+    "run_id": "run_rec_5102",
+    "status_result": {
+      "structuredContent": {
+        "run_id": "run_rec_5102",
+        "status": "RUNNING"
+      }
+    }
+  },
+  "rec_status": {
+    "ok": true,
+    "tool_name": "get_call_run",
+    "result": {
+      "structuredContent": {
+        "run_id": "run_rec_5102",
+        "status": "COMPLETED",
+        "structured_output": {
+          "understood": true,
+          "wrong_person": false,
+          "consent_given": true,
+          "choice": "2026-09-08T15:00:00-07:00",
+          "counter_window": "",
+          "notes": "Perfecto, el lunes a las tres me viene bien."
+        }
+      }
+    }
+  },
+  "req_plan": {
+    "ok": true,
+    "tool_name": "plan_call",
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"plan_id\":\"plan_req_7730\",\"ready_to_run\":true,\"confirm_token\":\"ctok_req_1b8c\"}"
+        }
+      ],
+      "structuredContent": {
+        "plan_id": "plan_req_7730",
+        "ready_to_run": true,
+        "confirm_token": "ctok_req_1b8c"
+      }
+    }
+  },
+  "req_run": {
+    "ok": true,
+    "call_started": true,
+    "run_id": "run_req_7731",
+    "status_result": {
+      "structuredContent": {
+        "run_id": "run_req_7731",
+        "status": "RUNNING"
+      }
+    }
+  },
+  "req_status": {
+    "ok": true,
+    "tool_name": "get_call_run",
+    "result": {
+      "structuredContent": {
+        "run_id": "run_req_7731",
+        "status": "COMPLETED",
+        "structured_output": {
+          "accepted": true,
+          "agreed_window": "2026-09-08T15:00:00-07:00",
+          "notes": "Works for me, thanks."
+        }
+      }
+    }
+  }
+}

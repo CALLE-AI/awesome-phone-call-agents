@@ -1,0 +1,27 @@
+{
+  "request_id": "relay-2026-09-08-unit-12",
+  "topic": "maintenance access",
+  "message_to_recipient": "The building plumber needs access to your unit to repair a leak that is affecting the unit below. We are asking for a two-hour access window next Monday.",
+  "requester": {
+    "display_name": "Harbor Property Management",
+    "role": "property manager",
+    "first_name": "Dana",
+    "phone": "+14085550142",
+    "language": "English",
+    "region": "US"
+  },
+  "recipient": {
+    "first_name": "Rosa",
+    "phone": "+14085550163",
+    "language": "Spanish",
+    "region": "US"
+  },
+  "proposed_windows": [
+    "2026-09-08T09:00:00-07:00",
+    "2026-09-08T15:00:00-07:00"
+  ],
+  "timezone": "America/Los_Angeles",
+  "consent": true,
+  "authorized_reason": "Rosa reported the leak herself and the lease grants maintenance access with notice; both numbers come from the management records.",
+  "do_not_call": false
+}
