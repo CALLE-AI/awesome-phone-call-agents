@@ -106,6 +106,33 @@ def test_mcp_client_executes_plan_run_poll(tmp_path):
     assert outcome.transcript_ref == "call-1"
 
 
+def test_mcp_client_reads_nested_post_summary(tmp_path):
+    # Regression: the real get_call_run payload nests the summary under
+    # "result" and the agent states the outcome in prose, not an OUTCOME token.
+    script = {
+        "plan_call": [{"plan_id": "p1", "confirm_token": "c1", "ready_to_run": True}],
+        "run_call": [{"run_id": "call-1"}],
+        "get_call_run": [
+            {
+                "run_id": "call-1",
+                "status": "COMPLETED",
+                "result": {
+                    "post_summary": "The reservation was successfully confirmed. "
+                    "Fictional Guest chose to keep the booking for 4.",
+                    "outcome": {"task_completed": True},
+                },
+            }
+        ],
+    }
+    client = make_mcp_client(tmp_path, script)
+    request = CallRequest(
+        run_id="run-1", target_id="R-001", phone="+15550101", goal="confirm"
+    )
+    outcome = asyncio.run(client._execute(request))
+    assert outcome.status == CallStatus.CONFIRMED
+    assert outcome.notes is not None and "successfully confirmed" in outcome.notes
+
+
 def test_ensure_access_token_requires_login():
     client = McpCallClient()
     client._run_calle_json = lambda args: {"usable": False}
