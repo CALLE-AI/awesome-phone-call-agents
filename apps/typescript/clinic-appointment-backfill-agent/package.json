@@ -1,0 +1,55 @@
+{
+  "name": "appointment-backfill-operator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Clinic-side appointment recovery via CALL-E: automatic waitlist backfill when appointments are cancelled, with priority ordering, transcript storage, and HIPAA-ready phone masking.",
+  "keywords": [
+    "call-e",
+    "healthcare",
+    "appointments",
+    "backfill",
+    "phone-calls",
+    "clinic-operations"
+  ],
+  "homepage": "https://github.com/CALLE-AI/awesome-phone-call-agents#readme",
+  "bugs": {
+    "url": "https://github.com/CALLE-AI/awesome-phone-call-agents/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CALLE-AI/awesome-phone-call-agents.git",
+    "directory": "apps/typescript/appointment-backfill-operator"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0",
+    "@prisma/client": "^5.0.0",
+    "axios": "^1.4.0",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.30",
+    "prisma": "^5.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
