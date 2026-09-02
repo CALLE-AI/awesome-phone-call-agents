@@ -61,6 +61,10 @@ _NEGATIONS = (
     "no it",
 )
 
+#: A reply that opens with a bare "no" is a denial even when the rest of the
+#: sentence names no fault, as in "No, four eight one seven one".
+_LEADING_DENIAL = re.compile(r"^no(?:\s|$)")
+
 #: A hedge is not an agreement, however affirmative the first word sounds.
 _HEDGES = (
     "i think",
@@ -219,27 +223,33 @@ def digit_runs(text: str) -> set[str]:
     return runs
 
 
-def _bound_turn_index(quote: str, transcript: tuple[TranscriptTurn, ...]) -> int | None:
-    """Index of the counterparty turn the quote came from, or None.
+def _matching_turn_indices(
+    quote: str, transcript: tuple[TranscriptTurn, ...]
+) -> tuple[list[int], bool]:
+    """Counterparty turns this quote came from, and whether it is a whole turn.
 
-    A quote binds when it is one whole counterparty turn, or a substring of one
-    that is long enough not to be a coincidence. The twelve-character floor is
-    the same test the repository's ``local-atlas`` evidence binding uses.
+    A whole-turn match is exact, so length is irrelevant to it: "Correct." is
+    the entire answer, not a fragment that happened to appear inside a longer
+    sentence. A substring match is the case the twelve-character floor exists
+    for, and it keeps it.
     """
 
     folded_quote = _fold(quote)
     if not folded_quote:
-        return None
-    for index in range(len(transcript) - 1, -1, -1):
-        turn = transcript[index]
-        if turn.speaker != COUNTERPARTY_SPEAKER:
-            continue
-        folded_turn = _fold(turn.text)
-        if folded_quote == folded_turn:
-            return index
-        if len(folded_quote) >= MIN_CONFIRMATION_QUOTE_CHARS and folded_quote in folded_turn:
-            return index
-    return None
+        return [], False
+    exact = [
+        index
+        for index, turn in enumerate(transcript)
+        if turn.speaker == COUNTERPARTY_SPEAKER and _fold(turn.text) == folded_quote
+    ]
+    if exact:
+        return exact, True
+    if len(folded_quote) >= MIN_CONFIRMATION_QUOTE_CHARS:
+        for index in range(len(transcript) - 1, -1, -1):
+            turn = transcript[index]
+            if turn.speaker == COUNTERPARTY_SPEAKER and folded_quote in _fold(turn.text):
+                return [index], False
+    return [], False
 
 
 def _preceding_readback(
@@ -300,10 +310,10 @@ def evaluate_identifier(
         refusals.append(IdentifierRefusal.QUOTE_MISSING)
     else:
         folded_quote = _fold(quote)
-        if len(folded_quote) < MIN_CONFIRMATION_QUOTE_CHARS:
-            refusals.append(IdentifierRefusal.QUOTE_TOO_SHORT)
         affirmative = any(token in folded_quote for token in _AFFIRMATIONS)
-        negated = any(token in folded_quote for token in _NEGATIONS)
+        negated = any(token in folded_quote for token in _NEGATIONS) or bool(
+            _LEADING_DENIAL.match(folded_quote)
+        )
         if any(token in folded_quote for token in _HEDGES):
             refusals.append(IdentifierRefusal.QUOTE_HEDGED)
         elif negated and not affirmative:
@@ -347,14 +357,53 @@ def _exchange_refusals(
     if transcript is None:
         return [IdentifierRefusal.TRANSCRIPT_UNAVAILABLE]
 
-    index = _bound_turn_index(quote, transcript)
-    if index is None:
-        return [IdentifierRefusal.QUOTE_NOT_IN_COUNTERPARTY_TURN]
+    indices, whole_turn = _matching_turn_indices(quote, transcript)
+    short = len(_fold(quote)) < MIN_CONFIRMATION_QUOTE_CHARS
+    if not indices:
+        return [
+            IdentifierRefusal.QUOTE_TOO_SHORT
+            if short
+            else IdentifierRefusal.QUOTE_NOT_IN_COUNTERPARTY_TURN
+        ]
+    if short and not whole_turn:
+        return [IdentifierRefusal.QUOTE_TOO_SHORT]
 
+    # A short reply such as "Correct." can occur more than once in a call. It
+    # carries no words of its own to tell the occurrences apart, so every one
+    # of them has to bind to the same identifier or none of them counts.
+    for index in indices:
+        refusals = _bind_one(index, confirmed, transcript, negated, short)
+        if refusals:
+            return refusals
+    return []
+
+
+def _bind_one(
+    index: int,
+    confirmed: str,
+    transcript: tuple[TranscriptTurn, ...],
+    negated: bool,
+    short: bool,
+) -> list[IdentifierRefusal]:
     answer = transcript[index]
     readback = _preceding_readback(transcript, index)
-
     answer_runs = digit_runs(answer.text)
+    wanted = digits_of(confirmed)
+    if not wanted:
+        return [IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE]
+
+    if short:
+        # A short affirmative says nothing on its own. It only means anything
+        # as an answer to a read-back, and only when that read-back put
+        # exactly one identifier in front of the counterparty.
+        if readback is None:
+            return [IdentifierRefusal.QUOTE_TOO_SHORT]
+        readback_runs = digit_runs(readback.text)
+        if not readback_runs:
+            return [IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE]
+        if len(readback_runs) > 1:
+            return [IdentifierRefusal.AMBIGUOUS_EXCHANGE]
+
     # A correction has to be spoken by the counterparty. When the answer
     # contradicts the read-back, the agent's turn carries the value being
     # rejected, so it is not admissible as the value being agreed to.
@@ -362,10 +411,6 @@ def _exchange_refusals(
         exchange_runs = answer_runs
     else:
         exchange_runs = answer_runs | digit_runs(readback.text)
-
-    wanted = digits_of(confirmed)
-    if not wanted:
-        return [IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE]
 
     # Containment rather than equality, because speech runs digits together:
     # "that last digit is an eight, four eight one seven eight" extracts as

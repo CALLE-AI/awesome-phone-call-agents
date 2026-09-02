@@ -39,10 +39,10 @@ A value is promoted to `CONFIRMED_IDENTIFIER` only when all of these hold:
 
 1. a confirmed value is present;
 2. a read-back was performed and the representative responded to it;
-3. a confirmation quote exists, is at least twelve characters, is affirmative
-   rather than a denial, and is not a hedge;
-4. the quote is one of the counterparty's own turns, or a long substring of
-   one;
+3. a confirmation quote exists, is affirmative rather than a denial, and is
+   not a hedge;
+4. the quote is one of the counterparty's own turns, or a substring of one
+   that is at least twelve characters;
 5. **the confirmation binds to the exchange the identifier was read back in**;
 6. the confirmed value matches the expected shape for that identifier.
 
@@ -81,6 +81,28 @@ the read-back, the agent's turn carries the value being *rejected*, so it stops
 being admissible: the corrected value has to come out of the counterparty's own
 mouth in the same turn.
 
+## Short replies
+
+"Correct." is the most common thing a warranty desk says, and an early version
+refused every one of them: a twelve-character floor, inherited from an evidence
+check that guards *substring* matches against long turns, was being applied to
+whole turns as well. Failing closed on the most natural confirmation in English
+is not conservatism, it is a workflow that never confirms anything.
+
+The floor now applies where it belongs, to substring matches. A short reply is
+admitted when it is the complete counterparty turn, and then held to stricter
+conditions than a long one, because it carries no words of its own:
+
+- it must immediately answer an agent read-back;
+- that read-back must put **exactly one** identifier in front of the
+  counterparty, so a read-back naming a case number and an RMA together cannot
+  be resolved by "Correct.";
+- and because the same short string can occur several times in one call, every
+  occurrence of it must bind to the same identifier, or none of them counts.
+
+A long quote carries enough of its own words to locate itself. A short one does
+not, so the exchange has to do all the work.
+
 ## What this refuses, and should
 
 | Situation | Result |
@@ -88,6 +110,9 @@ mouth in the same turn.
 | "Yes, that is fine, go ahead" to an earlier question | `IDENTIFIER_NOT_IN_EXCHANGE` |
 | "Yeah, I think so" | `QUOTE_HEDGED` |
 | "No, it is four eight one seven one", nothing further | `QUOTE_NEGATED` |
+| "Correct." answering a read-back that named two numbers | `AMBIGUOUS_EXCHANGE` |
+| "Correct." answering "am I through to the warranty desk?" | `IDENTIFIER_NOT_IN_EXCHANGE` |
+| "Correct." with no read-back before it | `QUOTE_TOO_SHORT` |
 | One read-back naming a case number and an RMA, answered "correct" | `AMBIGUOUS_EXCHANGE` |
 | A confirmation of the case number, reused for the RMA | `IDENTIFIER_NOT_IN_EXCHANGE` |
 | The agent's own read-back quoted as the confirmation | `QUOTE_NOT_IN_COUNTERPARTY_TURN` |

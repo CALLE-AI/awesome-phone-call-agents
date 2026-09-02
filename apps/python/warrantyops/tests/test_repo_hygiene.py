@@ -19,6 +19,7 @@ assert REPO_ROOT is not None
 CONTRIBUTION_PATHS = (
     REPO_ROOT / "apps" / "python" / "warrantyops",
     REPO_ROOT / "skills" / "warranty-recovery",
+    REPO_ROOT / "PHASE0_HANDOFF.md",
 )
 
 TEXT_SUFFIXES = {".py", ".md", ".json", ".toml", ".yaml", ".yml", ".txt", ".jsonl"}
@@ -53,6 +54,9 @@ def text_files() -> list[Path]:
     files: list[Path] = []
     for root in CONTRIBUTION_PATHS:
         if not root.exists():
+            continue
+        if root.is_file():
+            files.append(root)
             continue
         for path in root.rglob("*"):
             if not path.is_file() or path.suffix not in TEXT_SUFFIXES:

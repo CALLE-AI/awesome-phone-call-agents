@@ -314,21 +314,163 @@ def test_without_a_transcript_nothing_can_be_confirmed():
     assert IdentifierRefusal.TRANSCRIPT_UNAVAILABLE in decision.refusals
 
 
-def test_a_one_word_confirmation_is_too_thin_to_bind():
+# --- short affirmative replies ---------------------------------------------
+#
+# "Correct." is the most common thing a warranty desk says, and the inherited
+# twelve-character floor refused all of them. The floor now applies only to a
+# substring match, which is the case it was protecting; a short reply that is
+# the whole turn is admitted, on stricter conditions.
+
+def test_a_bare_correct_confirms_an_unambiguous_readback():
     transcript = turns(
-        ("bot", "Just to confirm, that is RMA four eight one seven one, correct?"),
+        ("bot", "Just confirming, RMA four eight one seven eight?"),
+        ("user", "Correct."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one seven one",
+            confirmed="RMA four eight one seven eight",
+            quote="Correct.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.CONFIRMED_IDENTIFIER
+    assert decision.value == "RMA-48178"
+    assert decision.corrected is True
+
+
+def test_a_bare_yes_confirms_an_unambiguous_readback():
+    transcript = turns(
+        ("bot", "Just confirming, RMA four eight one seven eight?"),
         ("user", "Yes."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one seven eight",
+            confirmed="RMA four eight one seven eight",
+            quote="Yes.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.CONFIRMED_IDENTIFIER
+    assert decision.value == "RMA-48178"
+
+
+def test_attack_a_bare_correct_cannot_resolve_a_two_number_readback():
+    transcript = turns(
+        (
+            "bot",
+            "So that is case nine zero two one zero and RMA four eight one seven one?",
+        ),
+        ("user", "Correct."),
     )
     decision = evaluate(
         claim(
             heard="RMA four eight one seven one",
             confirmed="RMA four eight one seven one",
-            quote="Yes.",
+            quote="Correct.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.AMBIGUOUS_EXCHANGE in decision.refusals
+
+
+def test_attack_a_bare_correct_answering_an_unrelated_question_confirms_nothing():
+    transcript = turns(
+        ("bot", "Am I through to the warranty desk?"),
+        ("user", "Correct."),
+        ("bot", "Thank you."),
+        ("user", "Your authorization is four eight one seven one."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one seven one",
+            confirmed="RMA four eight one seven one",
+            quote="Correct.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.IDENTIFIER_NOT_IN_EXCHANGE in decision.refusals
+
+
+def test_attack_a_short_reply_that_recurs_must_bind_everywhere_or_nowhere():
+    """"Correct." twice, once for the case number and once for the RMA.
+
+    The two occurrences are the same string, so nothing in the extracted quote
+    says which one was meant.
+    """
+
+    transcript = turns(
+        ("bot", "The case number is nine zero two one zero?"),
+        ("user", "Correct."),
+        ("bot", "And RMA four eight one seven one?"),
+        ("user", "Correct."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one seven one",
+            confirmed="RMA four eight one seven one",
+            quote="Correct.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+
+
+def test_a_short_reply_with_no_readback_before_it_confirms_nothing():
+    transcript = turns(
+        ("user", "Your authorization is four eight one seven one."),
+        ("user", "Correct."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one seven one",
+            confirmed="RMA four eight one seven one",
+            quote="Correct.",
         ),
         transcript,
     )
     assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
     assert IdentifierRefusal.QUOTE_TOO_SHORT in decision.refusals
+
+
+def test_a_short_fragment_of_a_longer_turn_still_needs_the_length_floor():
+    transcript = turns(
+        ("bot", "Just confirming, RMA four eight one seven eight?"),
+        ("user", "Well, the paperwork says one thing and the label says another."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one seven eight",
+            confirmed="RMA four eight one seven eight",
+            quote="says one",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.QUOTE_TOO_SHORT in decision.refusals
+
+
+def test_a_denial_naming_the_correct_value_is_still_a_denial():
+    """Required case 4: the wrong read-back is rejected and nothing is confirmed."""
+
+    transcript = turns(
+        ("bot", "Just confirming, RMA four eight one one seven?"),
+        ("user", "No, four eight one seven one."),
+    )
+    decision = evaluate(
+        claim(
+            heard="RMA four eight one one seven",
+            confirmed="RMA four eight one seven one",
+            quote="No, four eight one seven one.",
+        ),
+        transcript,
+    )
+    assert decision.state is IdentifierState.UNCONFIRMED_IDENTIFIER
+    assert IdentifierRefusal.QUOTE_NEGATED in decision.refusals
+    assert decision.value is None
 
 
 def test_a_value_of_the_wrong_shape_is_refused():
