@@ -29,6 +29,12 @@ TERMINAL_STATUSES = {
 }
 OUTCOME_RE = re.compile(r"\bOUTCOME:\s*([A-Z_]+)\b", re.IGNORECASE)
 
+# plan_call can report ready_to_run=false transiently when the callee was just
+# called (observed live: back-to-back calls to the same number). Retry with a
+# pause before giving up.
+PLAN_RETRY_ATTEMPTS = 3
+PLAN_RETRY_DELAY_SECONDS = 10.0
+
 # Last-resort keyword hints when the agent omits the OUTCOME token. Order matters:
 # negative/definitive verbs are checked before the affirmative "confirm".
 KEYWORD_FALLBACKS: tuple[tuple[str, CallStatus], ...] = (
@@ -161,6 +167,8 @@ class McpCallClient:
         language: str | None = None,
         poll_interval_seconds: float = 10.0,
         poll_timeout_seconds: float = 900.0,
+        plan_retry_attempts: int = PLAN_RETRY_ATTEMPTS,
+        plan_retry_delay_seconds: float = PLAN_RETRY_DELAY_SECONDS,
         client_factory: Callable[[], Any] | None = None,
     ):
         self.base_url = base_url.rstrip("/")
@@ -172,6 +180,8 @@ class McpCallClient:
         self.language = language
         self.poll_interval_seconds = poll_interval_seconds
         self.poll_timeout_seconds = poll_timeout_seconds
+        self.plan_retry_attempts = plan_retry_attempts
+        self.plan_retry_delay_seconds = plan_retry_delay_seconds
         self._client_factory = client_factory
 
     def _run_calle_json(self, args: list[str]) -> dict[str, Any]:
@@ -234,11 +244,9 @@ class McpCallClient:
         if self.language:
             arguments["language"] = self.language
         async with factory() as client:
-            plan = await self._call_tool(client, "plan_call", arguments)
-            plan_id = plan.get("plan_id")
-            confirm_token = plan.get("confirm_token")
-            if not plan.get("ready_to_run") or not plan_id or not confirm_token:
-                raise RuntimeError(f"plan_call not ready for target {request.target_id}")
+            plan = await self._plan_with_retry(client, arguments, request.target_id)
+            plan_id = plan["plan_id"]
+            confirm_token = plan["confirm_token"]
             run = await self._call_tool(
                 client, "run_call", {"plan_id": plan_id, "confirm_token": confirm_token}
             )
@@ -248,6 +256,31 @@ class McpCallClient:
                     f"run_call returned no run_id for target {request.target_id}"
                 )
             return await self._poll(client, request, call_run_id)
+
+    async def _plan_with_retry(
+        self,
+        client: Any,
+        arguments: dict[str, Any],
+        target_id: str,
+    ) -> dict[str, Any]:
+        attempts = self.plan_retry_attempts
+        delay_seconds = self.plan_retry_delay_seconds
+        plan: dict[str, Any] = {}
+        for attempt in range(attempts):
+            plan = await self._call_tool(client, "plan_call", arguments)
+            if (
+                plan.get("ready_to_run")
+                and plan.get("plan_id")
+                and plan.get("confirm_token")
+            ):
+                return plan
+            if attempt < attempts - 1:
+                await asyncio.sleep(delay_seconds)
+        detail = json.dumps(plan, default=str)[:300]
+        raise RuntimeError(
+            f"plan_call not ready for target {target_id} "
+            f"after {attempts} attempts: {detail}"
+        )
 
     def _default_factory(self, token: str) -> Callable[[], Any]:
         def build():
