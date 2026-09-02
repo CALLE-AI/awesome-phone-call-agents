@@ -1,19 +1,42 @@
 """
-AgroVoice — Automated data-collection pipeline for cocoa farmers via
-AI-powered phone calls (CALL-E) with native structured extraction.
+AgroVoice — Cocoa farmer callback app (CALL-E), safety-reviewed version.
 
-IMPORTANT NOTE ON LANGUAGE: this codebase, console output, and comments
-are in English for hackathon judging purposes. The actual PHONE CALL
-SCRIPT (TASK_TEMPLATE below) intentionally remains in French with a
-Bulu-language greeting/closing ('Mbolo' / 'Akiba'), because the real
-recipients of these calls are cocoa farmers in Cameroon who speak
-French and local languages — translating the call script itself to
-English would break the real-world use case.
+CHANGES FOLLOWING PR #281 REVIEW (Ray-56) — each numbered item maps
+directly to a "Must Fix" point from the review:
 
-Official CALL-E documentation used: https://docs.heycall-e.com/calls
+  1. Preview/dry-run is now the DEFAULT entry point. No API key is
+     required, and no call can be placed, unless the operator
+     explicitly chooses a LIVE path and then explicitly confirms
+     per-recipient (typing "CALL", not just pressing Enter).
+
+  2. Destination handling now enforces strict E.164 validation (no
+     more "prepend a country code to arbitrary input") AND an
+     explicit local allowlist (authorized_numbers.txt) — a number
+     must be BOTH valid E.164 AND present on the allowlist before any
+     live call can be placed. Demo numbers now use the real
+     standards-reserved fictional block (+1-202-555-01xx, NANPA).
+
+  3. Full phone numbers are no longer printed, sent as metadata, or
+     persisted. mask_number() is applied everywhere except the one
+     place CALL-E actually needs the real number to dial
+     (payload["recipient"]["phone"]). The phone number has also been
+     removed entirely from the request's "metadata" field and from
+     the natural-language task text (CALL-E's `recipient` field
+     handles dialing — the number never needs to appear in prose).
+
+  4. Any ambiguous outcome (local timeout while still "queued", or a
+     network/HTTP error during call creation whose real server-side
+     result is unknown) now STOPS the batch run entirely for operator
+     reconciliation — it no longer auto-retries or silently advances
+     to the next number.
+
+  5. Non-English prose (the call task itself) is unchanged, pending
+     explicit maintainer approval requested in the PR thread — see
+     the note in TASK_TEMPLATE below.
 """
 
 import os
+import re
 import json
 import time
 import csv
@@ -29,60 +52,57 @@ CALLE_API_KEY = os.environ.get("CALLE_API_KEY", "")
 CALLE_BASE_URL = "https://api.heycall-e.com/v1"
 
 POLLING_INTERVAL_SEC = 5
-CALL_TIMEOUT_SEC = 600  # 10 minutes — CALL-E calls can stay "queued"
-                         # for several minutes under high load (observed
-                         # during hackathon peak traffic)
+CALL_TIMEOUT_SEC = 600
 
-# Structured result schema — CALL-E will validate and fill THESE exact
-# fields during the call, extracted from the real conversation. Each
-# field has an explicit fallback value for unclear answers — never a
-# silently fabricated value (see doc: "structured_result is null" when
-# extraction fails; handled explicitly below).
+ALLOWLIST_PATH = "authorized_numbers.txt"
+
+# Real, standards-reserved fictional numbers (NANPA drop-in block:
+# area code 202 + exchange 555 + 0100-0199 range is permanently
+# reserved for fictional use in samples/media — these are guaranteed
+# to never be a real, assignable destination).
+DEMO_NUMBERS = [
+    "+12025550142",
+    "+12025550163",
+    "+12025550188",
+]
+
 RESULT_SCHEMA = {
     "type": "object",
     "required": ["village", "harvest_bags", "logistics_issues", "call_outcome"],
     "properties": {
         "village": {
             "type": "string",
-            "description": (
-                "Name of the village mentioned by the farmer. "
-                "Empty string if not mentioned or unclear."
-            ),
+            "description": "Name of the village mentioned by the farmer. Empty string if not mentioned.",
         },
         "harvest_bags": {
             "type": "integer",
-            "description": (
-                "Number of cocoa bags harvested this week, as stated "
-                "by the farmer. Use -1 if the number was not clearly given."
-            ),
+            "description": "Number of cocoa bags harvested this week. Use -1 if not clearly given.",
         },
         "logistics_issues": {
             "type": "string",
-            "description": (
-                "Short summary of any road/logistics difficulties "
-                "mentioned. Empty string if none were mentioned."
-            ),
+            "description": "Short summary of road/logistics difficulties mentioned. Empty string if none.",
         },
         "call_outcome": {
             "type": "string",
             "enum": ["completed_full", "completed_partial", "no_answer", "declined", "unknown"],
-            "description": (
-                "completed_full: all questions were clearly answered. "
-                "completed_partial: the farmer answered some questions only. "
-                "no_answer: nobody picked up or the line was unreachable. "
-                "declined: the farmer refused to answer. "
-                "unknown: outcome cannot be determined from call evidence."
-            ),
+            "description": "Outcome classification of the call.",
         },
     },
     "additionalProperties": False,
 }
 
-# ⚠️ Kept in FRENCH + BULU on purpose — this is the real conversation
-# heard by real cocoa farmers in Cameroon, who speak French and local
-# languages, not English. See module docstring above.
+# NOTE ON LANGUAGE (review point 5): this task text is intentionally
+# in French with Bulu-language greetings, because the real recipients
+# are Cameroonian cocoa farmers who speak French and local languages
+# — not the maintainers' English-only convention for repository-facing
+# content. Explicit maintainer approval for this exception has been
+# requested in the PR thread; this file will be updated to reflect
+# the outcome of that discussion.
+#
+# The number is intentionally NOT embedded in this text (unlike the
+# previous version) — CALL-E's structured `recipient` field carries
+# the real destination, so the task itself never needs to expose it.
 TASK_TEMPLATE = (
-    "Appelle immédiatement le {numero}. "
     "Commence par dire distinctement en langue Bulu : 'Mbolo ! Je suis l'assistant "
     "de la coopérative.' Demande ensuite, dans un français simple et clair : "
     "le nom du village, le nombre de sacs de cacao récoltés cette semaine, "
@@ -95,7 +115,54 @@ TASK_TEMPLATE = (
 
 
 # ═══════════════════════════════════════════════════════════════
-# CALL-E REST API CALLS
+# REVIEW FIX #2 — strict E.164 validation + local allowlist
+# ═══════════════════════════════════════════════════════════════
+E164_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+def is_valid_e164(number):
+    """Strict E.164 check. No auto-fixing, no guessing a country
+    code — an invalid number is simply rejected."""
+    return bool(E164_PATTERN.match(number))
+
+
+def load_allowlist(path=ALLOWLIST_PATH):
+    """
+    Loads operator-authorized numbers from a local text file (one
+    E.164 number per line, '#' comments allowed). This file is NOT
+    part of the repository (see .gitignore) — each operator maintains
+    their own, containing only numbers they are personally authorized
+    to call.
+    """
+    if not os.path.exists(path):
+        return set()
+    with open(path, encoding="utf-8") as f:
+        return {
+            line.strip() for line in f
+            if line.strip() and not line.strip().startswith("#")
+        }
+
+
+def is_authorized(number, allowlist):
+    return number in allowlist
+
+
+# ═══════════════════════════════════════════════════════════════
+# REVIEW FIX #3 — mask numbers everywhere except the real API dial target
+# ═══════════════════════════════════════════════════════════════
+def mask_number(e164_number):
+    """
+    Returns a masked version for display, logs, and storage. The
+    real number is used ONLY in the actual CALL-E API payload
+    (payload["recipient"]["phone"]) — never here.
+    """
+    if len(e164_number) < 8:
+        return "*" * len(e164_number)
+    return e164_number[:4] + "*" * (len(e164_number) - 7) + e164_number[-3:]
+
+
+# ═══════════════════════════════════════════════════════════════
+# CALL-E REST API
 # ═══════════════════════════════════════════════════════════════
 def _headers(idempotency_key=None):
     h = {
@@ -107,43 +174,53 @@ def _headers(idempotency_key=None):
     return h
 
 
-def create_call(phone_number, idempotency_key):
+class AmbiguousOutcome(Exception):
     """
-    Creates a call via POST /v1/calls, with the structured result_schema.
-    Returns the created call id. Retries once on timeout (the call may
-    have been accepted server-side despite the local timeout — the
-    Idempotency-Key guarantees a retry won't trigger a second real call).
+    Raised whenever we cannot be certain whether a real call was or
+    was not placed/completed server-side (review fix #4). Callers
+    MUST stop and surface this for human reconciliation — never
+    catch-and-retry, never silently advance to the next recipient.
+    """
+    pass
+
+
+def create_call(real_number, idempotency_key):
+    """
+    Creates a call via POST /v1/calls. The real E.164 number is used
+    ONLY here, in the structured `recipient` field — never in the
+    task text, never in metadata (review fix #3).
+
+    On ANY ambiguous failure (timeout, connection error — cases where
+    we genuinely don't know if CALL-E received/processed the request),
+    raises AmbiguousOutcome instead of retrying (review fix #4).
     """
     payload = {
-        "task": TASK_TEMPLATE.format(numero=phone_number),
+        "task": TASK_TEMPLATE,
+        "recipient": {"phone": real_number},
         "result_schema": RESULT_SCHEMA,
-        "metadata": {"project": "agrovoice", "phone": phone_number},
+        "metadata": {"project": "agrovoice"},  # no phone number here
     }
-
-    for attempt in range(1, 3):
-        try:
-            response = requests.post(
-                f"{CALLE_BASE_URL}/calls",
-                headers=_headers(idempotency_key=idempotency_key),
-                json=payload,
-                timeout=40,
-            )
-            response.raise_for_status()
-            return response.json()["id"]
-        except requests.exceptions.Timeout:
-            print(f"⏱️  Timeout (attempt {attempt}/2) — retrying with the "
-                  f"same idempotency key...")
-            if attempt == 2:
-                raise
-            time.sleep(3)
+    try:
+        response = requests.post(
+            f"{CALLE_BASE_URL}/calls",
+            headers=_headers(idempotency_key=idempotency_key),
+            json=payload,
+            timeout=40,
+        )
+        response.raise_for_status()
+        return response.json()["id"]
+    except requests.exceptions.Timeout:
+        raise AmbiguousOutcome(
+            "Timeout while creating the call — CALL-E may or may not have "
+            "received the request. Do not retry automatically."
+        )
+    except requests.exceptions.RequestException as e:
+        raise AmbiguousOutcome(f"Ambiguous error during call creation: {e}")
 
 
 def get_call_state(call_id):
-    """Reads the current call state via GET /v1/calls/{call_id}."""
     response = requests.get(
-        f"{CALLE_BASE_URL}/calls/{call_id}",
-        headers=_headers(),
-        timeout=15,
+        f"{CALLE_BASE_URL}/calls/{call_id}", headers=_headers(), timeout=15
     )
     response.raise_for_status()
     return response.json()
@@ -151,30 +228,30 @@ def get_call_state(call_id):
 
 def wait_for_result(call_id, timeout_sec=CALL_TIMEOUT_SEC):
     """
-    Polls the call until structured_result or a terminal state is
-    available. structured_result may be null when CALL-E cannot
-    produce a schema-valid result from the call evidence (handled
-    explicitly downstream — never fabricated).
+    Polls until a terminal status or a local timeout. A local timeout
+    is treated as AMBIGUOUS (review fix #4) — we do not know the real
+    server-side outcome, so we raise rather than guessing.
     """
     start_time = time.time()
-    last_queued_notice = 0
+    last_notice = 0
 
     while True:
-        if time.time() - start_time > timeout_sec:
-            return {"status": "timeout", "structured_result": None}
+        elapsed = time.time() - start_time
+        if elapsed > timeout_sec:
+            raise AmbiguousOutcome(
+                f"Local polling timeout after {timeout_sec}s — the call's "
+                f"real status is unknown. Check the CALL-E dashboard before "
+                f"resuming."
+            )
 
         state = get_call_state(call_id)
         status = state.get("status", "unknown")
-        elapsed = time.time() - start_time
         print(f"   Status: {status}... ({elapsed:.0f}s elapsed)")
 
-        # "queued" can last several minutes under high CALL-E load
-        # (observed during hackathon peak traffic) — reassure the user
-        # every ~60s that this is expected, not a script hang.
-        if status == "queued" and elapsed - last_queued_notice > 60:
-            print(f"   ℹ️  Still queued after {elapsed:.0f}s — this can "
-                  f"happen under high CALL-E traffic, please wait...")
-            last_queued_notice = elapsed
+        if status == "queued" and elapsed - last_notice > 60:
+            print(f"   Still queued after {elapsed:.0f}s — this can happen "
+                  f"under high CALL-E traffic.")
+            last_notice = elapsed
 
         if status in ("completed", "failed", "canceled", "no_answer"):
             return state
@@ -182,28 +259,17 @@ def wait_for_result(call_id, timeout_sec=CALL_TIMEOUT_SEC):
         time.sleep(POLLING_INTERVAL_SEC)
 
 
-# ═══════════════════════════════════════════════════════════════
-# CREDITS CHECK — full honesty, no fabricated balance
-# ═══════════════════════════════════════════════════════════════
 def check_credits():
-    """
-    The official CALL-E documentation (docs.heycall-e.com) does not
-    reference any public balance/credits endpoint in the Calls or Goal
-    Runs API as of this writing. We therefore do NOT simulate any
-    check — we say so clearly, instead of displaying a fabricated
-    number like earlier versions of this script did.
-    """
-    print("💰 [Credits] No documented balance endpoint in the current CALL-E API.")
+    print("[Credits] No documented balance endpoint in the current CALL-E API.")
     print("    Check your balance manually at https://dashboard.heycall-e.com/")
-    print("    before launching a large number of calls.")
     if not CALLE_API_KEY:
-        print("❌ [Error] CALLE_API_KEY environment variable is not set.")
+        print("[Error] CALLE_API_KEY environment variable is not set.")
         return False
     return True
 
 
 # ═══════════════════════════════════════════════════════════════
-# SQLITE DATABASE
+# SQLITE — masked numbers only (review fix #3)
 # ═══════════════════════════════════════════════════════════════
 def init_db():
     conn = sqlite3.connect("agrovoice.db")
@@ -211,7 +277,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS advanced_harvests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone_number TEXT,
+            phone_number_masked TEXT,
             village TEXT,
             call_date TEXT,
             harvest_bags INTEGER,
@@ -230,67 +296,55 @@ def save_to_db(data):
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO advanced_harvests
-            (phone_number, village, call_date, harvest_bags, logistics_issues,
+            (phone_number_masked, village, call_date, harvest_bags, logistics_issues,
              call_outcome, call_status, structured_result_raw)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        data["phone_number"], data["village"], data["call_date"], data["bags"],
+        data["phone_masked"], data["village"], data["call_date"], data["bags"],
         data["issues"], data["call_outcome"], data["call_status"], data["raw_json"],
     ))
     conn.commit()
     conn.close()
-    print("💾 [Load] Record saved to SQLite.")
+    print("[Load] Record saved to SQLite (masked number only).")
 
 
 # ═══════════════════════════════════════════════════════════════
-# SINGLE CALL PROCESSING
+# CALL PROCESSING — no auto-retry, no auto-advance on ambiguity
 # ═══════════════════════════════════════════════════════════════
-def process_one_call(phone_number):
-    print(f"\n{'='*55}\n📞 Calling {phone_number}\n{'='*55}")
+def process_one_call(real_number):
+    """
+    Places and tracks ONE live call. Raises AmbiguousOutcome on any
+    uncertain failure — the CALLER (batch loop) is responsible for
+    stopping the whole run when that happens (review fix #4).
+    """
+    masked = mask_number(real_number)
+    print(f"\n{'='*55}\nCalling {masked}\n{'='*55}")
 
-    idempotency_key = f"agrovoice:{phone_number}:{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    idempotency_key = f"agrovoice:{real_number}:{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    try:
-        print("1. [Extract] Creating the call (with extraction schema)...")
-        call_id = create_call(phone_number, idempotency_key)
-        print(f"   Call ID: {call_id}")
-    except requests.exceptions.HTTPError as e:
-        print(f"❌ Call creation error: {e}")
-        print(f"   Response: {e.response.text[:300] if e.response is not None else 'N/A'}")
-        return None
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        return None
+    call_id = create_call(real_number, idempotency_key)  # may raise AmbiguousOutcome
+    print(f"   Call ID: {call_id}")
 
-    print("2. [Monitor] Tracking the call until a result is available...")
-    final_state = wait_for_result(call_id)
+    print("Tracking the call until a result is available...")
+    final_state = wait_for_result(call_id)  # may raise AmbiguousOutcome
 
     status = final_state.get("status", "unknown")
     structured_result = final_state.get("structured_result")
-
     print(f"   Final status: {status}")
 
     if structured_result is None:
-        # Explicitly documented CALL-E behavior: extraction could not
-        # produce a schema-valid result — recorded AS-IS, never faked.
-        print("⚠️  [Transform] No valid structured result (structured_result = null).")
-        print("    Possible causes: no answer, conversation too ambiguous,")
-        print("    or the schema was not satisfied by the call evidence.")
+        print("[Transform] No valid structured result (structured_result = null).")
         record = {
-            "phone_number": phone_number,
-            "village": "NOT_EXTRACTED",
+            "phone_masked": masked, "village": "NOT_EXTRACTED",
             "call_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "bags": -1,
-            "issues": "NOT_EXTRACTED",
-            "call_outcome": "unknown",
-            "call_status": status,
-            "raw_json": json.dumps(final_state, ensure_ascii=False),
+            "bags": -1, "issues": "NOT_EXTRACTED", "call_outcome": "unknown",
+            "call_status": status, "raw_json": json.dumps(final_state, ensure_ascii=False),
         }
     else:
-        print(f"🔄 [Transform] Structured result received and validated by CALL-E:")
+        print(f"[Transform] Structured result received:")
         print(f"    {json.dumps(structured_result, ensure_ascii=False, indent=2)}")
         record = {
-            "phone_number": phone_number,
+            "phone_masked": masked,
             "village": structured_result.get("village") or "NOT_MENTIONED",
             "call_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "bags": structured_result.get("harvest_bags", -1),
@@ -305,7 +359,7 @@ def process_one_call(phone_number):
 
 
 # ═══════════════════════════════════════════════════════════════
-# EXCEL EXPORT & ANALYSIS
+# EXPORT & ANALYSIS
 # ═══════════════════════════════════════════════════════════════
 def export_to_excel():
     conn = sqlite3.connect("agrovoice.db")
@@ -314,84 +368,110 @@ def export_to_excel():
 
     excel_path = "Cocoa_Monitoring_Report.xlsx"
     df.to_excel(excel_path, index=False)
-    print(f"📊 [ETL] Report exported to: {excel_path}")
-
-    print("\n" + "=" * 55)
-    print("📈 OPERATIONAL ANALYSIS")
-    print("=" * 55)
+    print(f"[ETL] Report exported to: {excel_path} (masked numbers only)")
 
     valid_df = df[df["harvest_bags"] >= 0]
     total_bags = valid_df["harvest_bags"].sum()
-    not_extracted_count = len(df[df["harvest_bags"] == -1])
+    print(f"• Total harvest volume: {total_bags} bags")
+    print(f"• Farmers contacted: {df['phone_number_masked'].nunique()}")
 
-    print(f"• Total harvest volume (valid data): {total_bags} bags")
-    print(f"• Farmers contacted: {df['phone_number'].nunique()}")
-    if len(valid_df) > 0:
-        print(f"• Referenced villages: {sorted(valid_df['village'].unique().tolist())}")
-    if not_extracted_count > 0:
-        print(f"⚠️  {not_extracted_count} call(s) without valid extraction "
-              f"— see 'structured_result_raw' column for diagnostics")
+
+# ═══════════════════════════════════════════════════════════════
+# REVIEW FIX #1 — preview-by-default, explicit per-call confirmation
+# ═══════════════════════════════════════════════════════════════
+def show_preview(number_display):
+    """No API key needed. No call placed. Shows exactly what a live
+    call WOULD send."""
+    print("\n" + "=" * 55)
+    print("PREVIEW — no call will be placed")
+    print("=" * 55)
+    print(f"Recipient: {number_display}")
+    print(f"\nTask text that would be sent:\n{TASK_TEMPLATE}")
+    print(f"\nResult schema that would be requested:")
+    print(json.dumps(RESULT_SCHEMA, indent=2))
     print("=" * 55)
 
 
-# ═══════════════════════════════════════════════════════════════
-# PHONE NUMBER NORMALIZATION
-# ═══════════════════════════════════════════════════════════════
-def normalize_phone_number(raw_number):
-    number = raw_number.strip()
-    if not number.startswith("+"):
-        number = "+237" + number.lstrip("0")
-    return number
+def confirm_live_call(masked_display):
+    """Explicit per-recipient confirmation. Anything other than the
+    exact word CALL cancels — pressing Enter does NOT confirm."""
+    answer = input(
+        f"\nType CALL (all caps) to place a REAL call to {masked_display}, "
+        f"anything else cancels: "
+    ).strip()
+    return answer == "CALL"
 
 
 # ═══════════════════════════════════════════════════════════════
 # MAIN PROGRAM
 # ═══════════════════════════════════════════════════════════════
 if __name__ == "__main__":
+    print("=== AgroVoice — Cocoa Farmer Data Collection ===")
+    print("0. PREVIEW only — see the task/schema, no call, no API key needed [default]")
+    print("1. LIVE call — ONE farmer from the allowlist")
+    print("2. LIVE call — demo/fictional numbers (safe, no real destination)")
+    choice = input("Choice (0/1/2) [0]: ").strip() or "0"
+
+    if choice == "0":
+        num = input("Number to preview (any format, not validated): ").strip()
+        show_preview(num)
+        exit(0)
+
+    # Anything beyond preview requires credentials and validation
     if not check_credits():
         exit(1)
-
     init_db()
-
-    print("\n=== AgroVoice — Cocoa Farmer Data Collection ===")
-    print("1. Call ONE farmer (manual entry)")
-    print("2. Call MULTIPLE farmers (built-in demo list)")
-    print("3. Call MULTIPLE farmers (from a CSV file)")
-    choice = input("Choice (1/2/3): ").strip()
 
     numbers_to_call = []
 
     if choice == "1":
-        entered_number = input("Farmer's phone number (e.g.,  +15550101234): ").strip()
-        numbers_to_call = [normalize_phone_number(entered_number)]
+        allowlist = load_allowlist()
+        if not allowlist:
+            print(f"[Error] No authorized numbers found in {ALLOWLIST_PATH}.")
+            print(f"    Create this file locally (one E.164 number per line) "
+                  f"— it is NOT part of the repository.")
+            exit(1)
+        entered = input("Farmer's phone number (E.164, e.g. +237699166726): ").strip()
+        if not is_valid_e164(entered):
+            print("[Error] Not a valid E.164 number (expected format: +<digits>).")
+            exit(1)
+        if not is_authorized(entered, allowlist):
+            print(f"[Error] {mask_number(entered)} is not on the authorized allowlist.")
+            print(f"    Add it to {ALLOWLIST_PATH} first if you are authorized to call it.")
+            exit(1)
+        numbers_to_call = [entered]
 
     elif choice == "2":
-        from demo_numbers import DEMO_NUMBERS
-        print(f"Demo list: {DEMO_NUMBERS}")
+        print(f"Using standards-reserved fictional numbers (safe to run, will "
+              f"not reach a real destination): {[mask_number(n) for n in DEMO_NUMBERS]}")
         numbers_to_call = DEMO_NUMBERS
-
-    elif choice == "3":
-        csv_path = input("CSV file path (one 'phone_number' column): ").strip()
-        try:
-            with open(csv_path, newline="", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                numbers_to_call = [normalize_phone_number(row["phone_number"]) for row in reader]
-            print(f"{len(numbers_to_call)} number(s) loaded from {csv_path}")
-        except Exception as e:
-            print(f"❌ CSV read error: {e}")
-            exit(1)
     else:
         print("Invalid choice.")
         exit(1)
 
     results = []
     for i, number in enumerate(numbers_to_call, 1):
-        print(f"\n### Call {i}/{len(numbers_to_call)} ###")
-        result = process_one_call(number)
-        if result:
+        masked = mask_number(number)
+        print(f"\n### Call {i}/{len(numbers_to_call)} ({masked}) ###")
+
+        show_preview(masked)
+        if not confirm_live_call(masked):
+            print("Cancelled by operator — moving to next number.")
+            continue
+
+        try:
+            result = process_one_call(number)
             results.append(result)
+        except AmbiguousOutcome as e:
+            print(f"\n[STOPPED] Ambiguous outcome — halting the entire run "
+                  f"for operator reconciliation:")
+            print(f"    {e}")
+            print(f"    Check https://dashboard.heycall-e.com/ before restarting.")
+            break  # stop the batch entirely — no auto-advance (review fix #4)
+
         if i < len(numbers_to_call):
             time.sleep(3)
 
-    print(f"\n✅ {len(results)}/{len(numbers_to_call)} call(s) processed.")
-    export_to_excel()
+    print(f"\n{len(results)}/{len(numbers_to_call)} call(s) completed successfully.")
+    if results:
+        export_to_excel()
