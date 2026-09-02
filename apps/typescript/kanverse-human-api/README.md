@@ -63,6 +63,19 @@ calle auth login
 
 By default that cache is read from `~/.calle-mcp/cli`. `CALLE_MCP_CACHE_ROOT` and `CALLE_MCP_SERVER_URL` can be used when a different CALL-E setup is required.
 
+If the CLI authentication status reports a full MCP server URL, set the same URL before starting Live Mode. For example:
+
+```powershell
+$env:CALLE_MCP_SERVER_URL="https://seleven-mcp-sg.airudder.com/mcp/openagent_oauth"
+```
+
+You can confirm the URL used by your authenticated CLI with:
+
+```powershell
+calle.cmd auth status
+```
+
+
 ## CallChain
 
 If a call does not satisfy the goal, Human API prepares the next authorized target for **new user confirmation**.
