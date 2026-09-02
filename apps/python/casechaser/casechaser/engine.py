@@ -205,16 +205,15 @@ def run_cycle(ledger: Ledger, case_id: str, mode: str, client: Optional[CalleCli
     if mode == "live" and force:
         raise ValueError("force is not available in live mode: every policy hold applies to a real call")
     case = ledger.get(case_id)
+    if mode == "live":
+        problems = authorization_problems(case, authorization, unattended)
+        if problems:
+            return ChaseResult(placed=False, reason="not authorized: " + "; ".join(problems), call=None, case=case)
     check_broken_commitments(case)
     reasons = policy.suppression_reasons(case)
     if reasons and not force:
         ledger.upsert(case)
         return ChaseResult(placed=False, reason="; ".join(f"{k}: {v}" for k, v in reasons), call=None, case=case)
-    if mode == "live":
-        problems = authorization_problems(case, authorization, unattended)
-        if problems:
-            ledger.upsert(case)
-            return ChaseResult(placed=False, reason="not authorized: " + "; ".join(problems), call=None, case=case)
     key = idempotency_key()
     request = build_request(case, key, webhook_url)
     if mode == "fixture" and fixture_scenario:

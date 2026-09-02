@@ -118,9 +118,14 @@ class Ledger:
         raise KeyError(case_id)
 
     def upsert(self, case: Dict[str, Any]) -> None:
+        """Replace in place so list order is stable across writes (cases created in the same second keep their order)."""
         payload = self._read()
-        cases = [c for c in payload["cases"] if c["id"] != case["id"]]
-        cases.append(case)
+        cases = payload["cases"]
+        for i, c in enumerate(cases):
+            if c["id"] == case["id"]:
+                cases[i] = case
+                break
+        else:
+            cases.append(case)
         cases.sort(key=lambda c: c["created_at"])
-        payload["cases"] = cases
         self._write(payload)
