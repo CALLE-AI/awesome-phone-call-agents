@@ -8,34 +8,68 @@ Kanverse Human API uses CALL-E for individual phone calls while a CallChain orch
 
 > Find a repair shop that can replace my phone screen tomorrow for under £80.
 
-Human API can work through multiple authorized phone targets, evaluate the structured result of each CALL-E interaction, and stop when the user's goal is achieved.
+Human API can work through multiple **authorized** phone targets, evaluate the bounded structured result of each CALL-E interaction, and stop when the user's goal is achieved.
 
 ## Flow
 
-Goal → CALL-E Plan → Human Approval → Call → Evaluate → Continue or Stop
+Goal → Plan → Human Approval → CALL-E Call → Evaluate → Continue or Stop
 
-## Safety
+## Safety model
 
-- Dry Run is the default mode.
-- Live mode must be deliberately enabled.
-- Every real call requires explicit user confirmation.
-- Changing execution mode invalidates the existing plan.
-- Phone numbers are masked in the dashboard.
-- Automatic orchestration never bypasses approval for a real call.
+Dry Run and Live Mode have deliberately different execution paths.
+
+### Dry Run
+
+- Dry Run is the default.
+- It is fully local in the browser.
+- Previewing or simulating a Dry Run does **not** contact CALL-E.
+- It does not require CALL-E authentication or network access.
+- It consumes no CALL-E call credit.
+
+### Live Mode
+
+Live Mode fails closed unless the server is explicitly configured.
+
+The server requires:
+
+- HTTP Basic authentication for every `/api/*` request.
+- `HUMAN_API_LIVE_ENABLED=true`.
+- Strict E.164 destination validation.
+- An explicit destination allowlist in `HUMAN_API_ALLOWED_NUMBERS`.
+- `liveIntent: true` for planning and again for each run.
+- A fresh one-time, short-lived server approval token before `run_call` can execute.
+
+The browser never receives the CALL-E `plan_id`, `confirm_token`, or real `run_id`. The server keeps those values in memory and exposes only opaque temporary tokens to the client.
+
+Status responses are intentionally bounded and phone-number-redacted. Raw transcripts, raw CALL-E output, and raw phone numbers are not returned to the browser.
+
+Changing execution mode invalidates the current mission/plan. Every real call still requires an explicit **Confirm & Call** action in the UI.
 
 ## CALL-E integration
 
-The prototype integrates CALL-E planning, execution, and status retrieval.
+The server uses the official `@call-e/core` MCP client directly:
 
-A real outbound CALL-E test validated the complete lifecycle:
+- `plan_call`
+- `run_call`
+- `get_call_run`
 
-Plan → Confirmation → Real Call → Status → Transcript → Structured Outcome → Next-Step Decision
+No request-controlled shell command is constructed or executed.
+
+Authentication reuses the token cache created by:
+
+```bash
+calle auth login
+```
+
+By default that cache is read from `~/.calle-mcp/cli`. `CALLE_MCP_CACHE_ROOT` and `CALLE_MCP_SERVER_URL` can be used when a different CALL-E setup is required.
 
 ## CallChain
 
-If a call does not satisfy the goal, Human API prepares the next target for user confirmation.
+If a call does not satisfy the goal, Human API prepares the next authorized target for **new user confirmation**.
 
-If a structured outcome satisfies the goal, the chain stops with **GOAL ACHIEVED**.
+If the structured outcome satisfies the goal, the chain stops with **GOAL ACHIEVED**.
+
+If the outcome is ambiguous, Human API stops with **REVIEW NEEDED** rather than continuing automatically.
 
 This separates responsibilities:
 
@@ -45,28 +79,59 @@ This separates responsibilities:
 
 Requirements:
 
-- Node.js
+- Node.js 18+
 - npm
-- CALL-E CLI
-- Authenticated CALL-E account
+- CALL-E CLI authenticated with `calle auth login` for Live Mode
 
-Install and start:
+Install dependencies:
 
-    npm install
-    npm start
+```bash
+npm install
+```
 
-On Windows PowerShell systems where `.ps1` wrappers are blocked:
+For Dry Run only, start the server without Live configuration:
 
-    npm.cmd install
-    npm.cmd start
+```bash
+npm start
+```
 
 Then open:
 
-    http://localhost:3000
+```text
+http://localhost:3000
+```
 
-Use **Dry Run** for no-call testing.
+Dry Run remains local and does not call `/api/plan`, `/api/run`, or `/api/status`.
 
-Real calls create external side effects and consume CALL-E call capacity. Enable Live mode only when you intend to place a call, and review each CALL-E plan before confirming it.
+### Enabling Live Mode locally
+
+Use test-only credentials and explicitly authorize only the phone numbers you intend to call.
+
+PowerShell example:
+
+```powershell
+$env:HUMAN_API_USER="demo-user"
+$env:HUMAN_API_PASSWORD="replace-with-a-strong-local-password"
+$env:HUMAN_API_LIVE_ENABLED="true"
+$env:HUMAN_API_ALLOWED_NUMBERS="+442073238000"
+npm.cmd start
+```
+
+Multiple authorized destinations can be comma-separated:
+
+```powershell
+$env:HUMAN_API_ALLOWED_NUMBERS="+441234567890,+442071234567"
+```
+
+Do not commit real credentials or secrets to the repository.
+
+## Security notes
+
+This hackathon prototype intentionally uses in-memory approval/run token maps. Restarting the Node process invalidates outstanding tokens.
+
+The server exposes only the minimum result data needed by the orchestration UI: status, a bounded/redacted summary, task-completion boolean, and bounded confidence metadata.
+
+The browser history is rendered with DOM `textContent` rather than interpolating CALL-E result text into HTML.
 
 ## Technology
 
@@ -74,10 +139,11 @@ Real calls create external side effects and consume CALL-E call capacity. Enable
 - HTML / CSS
 - Node.js
 - Express
-- CALL-E
+- `@call-e/core`
+- CALL-E MCP tools
 
 ## Project
 
-Created for the CALL-E “Your Code Is Calling” Hackathon.
+Created for the CALL-E **Your Code Is Calling** Hackathon.
 
 **Human ↔ Machine ↔ World**
