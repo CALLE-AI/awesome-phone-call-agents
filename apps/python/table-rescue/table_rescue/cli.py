@@ -120,9 +120,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             outcome = engine.confirm_reservation(run_id, reservation, now)
             outcomes.append(outcome)
             if outcome.status == CallStatus.CANCELLED:
-                fill = engine.fill_slot(run_id, reservation, waitlist, now)
-                if fill is not None:
-                    outcomes.append(fill)
+                outcomes.extend(engine.fill_slot(run_id, reservation, waitlist, now))
     except BudgetExceededError as error:
         print(f"WARNING: {error}; writing back state collected so far", file=sys.stderr)
         exit_code = 2
