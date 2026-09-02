@@ -547,12 +547,34 @@ confirmCallBtn.addEventListener('click', async () => {
     });
 
     const data = await response.json();
+
+    if (data.indeterminate === true) {
+      activePlan.approvalToken = null;
+      statusBadge.textContent = 'RECONCILE REQUIRED';
+      statusBadge.className = 'badge idle';
+      setDecision(
+        data.error ||
+          'CALL-E run status is uncertain. Do not retry. Verify CALL-E call history before attempting another call.'
+      );
+      confirmCallBtn.disabled = true;
+      cancelPlanBtn.disabled = false;
+      return;
+    }
+
     if (!response.ok || !data.ok) {
       throw new Error(data.error || 'CALL-E call failed to start');
     }
 
     if (!data.statusToken) {
-      throw new Error('CALL-E started but the server returned no status token. Do not press Confirm again; re-plan before retrying.');
+      activePlan.approvalToken = null;
+      statusBadge.textContent = 'RECONCILE REQUIRED';
+      statusBadge.className = 'badge idle';
+      setDecision(
+        'CALL-E returned no status token. Do not retry. Verify CALL-E call history before attempting another call.'
+      );
+      confirmCallBtn.disabled = true;
+      cancelPlanBtn.disabled = false;
+      return;
     }
 
     activePlan.approvalToken = null;
@@ -564,8 +586,10 @@ confirmCallBtn.addEventListener('click', async () => {
     activePlan.approvalToken = null;
     statusBadge.textContent = 'CALL ERROR';
     statusBadge.className = 'badge idle';
-    setDecision(`${error.message} Re-plan before retrying a live call.`);
-    confirmCallBtn.disabled = false;
+    setDecision(
+      `${error.message} Do not immediately retry if the request may have reached CALL-E. Verify call history first.`
+    );
+    confirmCallBtn.disabled = true;
     cancelPlanBtn.disabled = false;
   }
 });

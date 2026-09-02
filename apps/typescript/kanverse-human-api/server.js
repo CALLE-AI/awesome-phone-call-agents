@@ -1,6 +1,6 @@
 import express from 'express';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { expandHomePath, resolveServerUrl } from '@call-e/core/config';
+import { expandHomePath } from '@call-e/core/config';
 import { callMcpTool } from '@call-e/core/mcp-client';
 
 const app = express();
@@ -28,13 +28,34 @@ const RUN_TTL_MS = 30 * 60 * 1000;
 const approvals = new Map();
 const runs = new Map();
 
+const OFFICIAL_CALLE_MCP_ORIGIN =
+  'https://seleven-mcp-sg.airudder.com';
+const DEFAULT_CALLE_MCP_SERVER_URL =
+  `${OFFICIAL_CALLE_MCP_ORIGIN}/mcp/openagent_oauth`;
+
+function getPinnedCalleServerUrl() {
+  const configured =
+    process.env.CALLE_MCP_SERVER_URL || DEFAULT_CALLE_MCP_SERVER_URL;
+
+  const url = new URL(configured);
+
+  if (
+    url.protocol !== 'https:' ||
+    url.origin !== OFFICIAL_CALLE_MCP_ORIGIN
+  ) {
+    throw new Error(
+      'CALLE_MCP_SERVER_URL must use the official HTTPS CALL-E origin.'
+    );
+  }
+
+  return url.toString();
+}
+
 const calleConfig = {
   cacheRoot: expandHomePath(
     process.env.CALLE_MCP_CACHE_ROOT || '~/.calle-mcp/cli'
   ),
-  serverUrl: resolveServerUrl({
-    serverUrl: process.env.CALLE_MCP_SERVER_URL,
-  }),
+  serverUrl: getPinnedCalleServerUrl(),
   timeoutSeconds: 30,
 };
 
@@ -393,7 +414,9 @@ app.post('/api/run', async (req, res) => {
     if (!run?.run_id) {
       return res.status(502).json({
         ok: false,
-        error: 'CALL-E did not return a run identifier.',
+        indeterminate: true,
+        error:
+          'CALL-E may have accepted the call but returned no run identifier. Do not retry or re-plan. Verify CALL-E call history before attempting another call.',
       });
     }
 
@@ -417,8 +440,9 @@ app.post('/api/run', async (req, res) => {
 
     return res.status(502).json({
       ok: false,
+      indeterminate: true,
       error:
-        'CALL-E call failed to start. Re-plan before retrying.',
+        'CALL-E run status is uncertain. The call may already have been accepted. Do not retry or re-plan; verify CALL-E call history before attempting another call.',
     });
   } finally {
     approvals.delete(approvalToken);
