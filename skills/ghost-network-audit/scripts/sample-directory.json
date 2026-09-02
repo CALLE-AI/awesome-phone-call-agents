@@ -1,0 +1,206 @@
+{
+  "plan_name": "Sample Health Choice PPO",
+  "directory_as_of": "2024-06-01",
+  "note": "Fictional listings. All numbers are in the reserved 555-01xx fictional range and none of them ring anywhere.",
+  "suppression_list": ["+12125550188"],
+  "listings": [
+    {
+      "listing_id": "L-001",
+      "provider_name": "Dr. Alice Nguyen",
+      "specialty": "Psychiatry",
+      "office_name": "Riverbend Behavioral Health",
+      "phone": "+12125550142",
+      "timezone": "America/New_York",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-002",
+      "provider_name": "Dr. Ben Okafor",
+      "specialty": "Psychiatry",
+      "office_name": "Riverbend Behavioral Health",
+      "phone": "+12125550142",
+      "timezone": "America/New_York",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-003",
+      "provider_name": "Dr. Carla Mendes",
+      "specialty": "Child Psychiatry",
+      "office_name": "Riverbend Behavioral Health",
+      "phone": "+12125550142",
+      "timezone": "America/New_York",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-004",
+      "provider_name": "Dr. Daniel Ruiz",
+      "specialty": "Clinical Psychology",
+      "office_name": "Halstead Counseling Group",
+      "phone": "+12125550117",
+      "timezone": "America/New_York",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-005",
+      "provider_name": "Dr. Emily Park",
+      "specialty": "Psychiatry",
+      "office_name": "Northgate Psychiatric Associates",
+      "phone": "+13125550163",
+      "timezone": "America/Chicago",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-006",
+      "provider_name": "Dr. Farid Haddad",
+      "specialty": "Addiction Medicine",
+      "office_name": "Northgate Psychiatric Associates",
+      "phone": "+13125550163",
+      "timezone": "America/Chicago",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-007",
+      "provider_name": "Dr. Grace Lindqvist",
+      "specialty": "Clinical Psychology",
+      "office_name": "Sunview Therapy",
+      "phone": "+14155550129",
+      "timezone": "America/Los_Angeles",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-008",
+      "provider_name": "Dr. Hector Alvarez",
+      "specialty": "Psychiatry",
+      "office_name": "Sunview Therapy",
+      "phone": "+14155550151",
+      "timezone": "America/Los_Angeles",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-009",
+      "provider_name": "Dr. Ingrid Sorenson",
+      "specialty": "Child Psychiatry",
+      "office_name": "Lakeshore Youth Services",
+      "phone": "+12065550134",
+      "timezone": "America/Los_Angeles",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-010",
+      "provider_name": "Dr. Jonas Whitfield",
+      "specialty": "Psychiatry",
+      "office_name": "Lakeshore Youth Services",
+      "phone": "+12065550177",
+      "timezone": "America/Los_Angeles",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-011",
+      "provider_name": "Dr. Keiko Tanaka",
+      "specialty": "Clinical Psychology",
+      "office_name": "Meridian Mental Health",
+      "phone": "+16175550109",
+      "timezone": "America/New_York",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-012",
+      "provider_name": "Dr. Luis Fontaine",
+      "specialty": "Psychiatry",
+      "office_name": "Meridian Mental Health",
+      "phone": "+16175550194",
+      "timezone": "America/New_York",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-013",
+      "provider_name": "Dr. Maya Brennan",
+      "specialty": "Psychiatry",
+      "office_name": "Cedar Point Behavioral",
+      "phone": "+13035550122",
+      "timezone": "America/Denver",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-014",
+      "provider_name": "Dr. Nadia Osei",
+      "specialty": "Clinical Psychology",
+      "office_name": "Cedar Point Behavioral",
+      "phone": "+13035550171",
+      "timezone": "America/Denver",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-015",
+      "provider_name": "Dr. Omar Castellanos",
+      "specialty": "Psychiatry",
+      "office_name": "Cedar Point Behavioral",
+      "label": "24-hour crisis line",
+      "phone": "+13035550101",
+      "timezone": "America/Denver",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "crisis"
+    },
+    {
+      "listing_id": "L-016",
+      "provider_name": "Dr. Priya Raman",
+      "specialty": "Psychiatry",
+      "office_name": "Willow Creek Clinic",
+      "phone": "555-0155",
+      "timezone": "America/Chicago",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-017",
+      "provider_name": "Dr. Quentin Moreau",
+      "specialty": "Clinical Psychology",
+      "office_name": "Willow Creek Clinic",
+      "phone": "+12125550188",
+      "timezone": "America/Chicago",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    },
+    {
+      "listing_id": "L-018",
+      "provider_name": "Dr. Rosa Delgado",
+      "specialty": "Child Psychiatry",
+      "office_name": "Harbor Family Practice",
+      "phone": "+17135550166",
+      "region": "US",
+      "locale": "en-US",
+      "line_type": "office"
+    }
+  ]
+}
