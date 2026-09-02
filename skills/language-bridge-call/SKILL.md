@@ -81,6 +81,11 @@ Offer only these windows, one at a time: {proposed_windows}.
 Ask {recipient_first_name} to choose a window, propose a different time, or decline.
 Do not discuss payments, contracts, deposits, or legal matters. Do not promise anything.
 Close politely once you have captured the answer.
+
+Before closing, record the answer as JSON with exactly these fields: understood (boolean),
+consent_given (boolean), wrong_person (boolean), confidence (number between 0 and 1),
+choice (one of the offered windows, or an empty string), counter_window (ISO-8601 time with
+UTC offset, or an empty string), notes (one short sentence quoting the person, in their language).
 ```
 
 Requester call, rendered and spoken in `requester.language`, includes the recipient's captured answer verbatim:
@@ -94,6 +99,9 @@ Relay the recipient's answer exactly: {recipient_answer_summary}
 If they chose a window, read it back and ask the requester to accept it.
 If they proposed a different time or declined, relay that without negotiation.
 Capture accept, decline, or next instruction. Do not commit to anything beyond relaying.
+
+Record the outcome as JSON with exactly these fields: accepted (boolean),
+agreed_window (one of the offered windows, or an empty string), notes (one short sentence).
 ```
 
 ## Structured Result
@@ -105,15 +113,15 @@ Capture accept, decline, or next instruction. Do not commit to anything beyond r
   "agreed_window": "ISO-8601 or null",
   "calls_placed": "0, 1, or 2",
   "recipient_call": {
-    "disposition": "completed | voicemail | no_answer | wrong_number | no_consent | schema_drift",
-    "answer": {"understood": true, "choice": "ISO or empty", "counter_window": "ISO or empty", "notes": "one sentence in recipient language"}
+    "disposition": "completed | voicemail | no_answer | wrong_number | no_consent | low_confidence | schema_drift",
+    "answer": {"understood": true, "consent_given": true, "wrong_person": false, "confidence": 0.92, "choice": "ISO or empty", "counter_window": "ISO or empty", "notes": "one sentence in recipient language"}
   },
   "requester_call": {"disposition": "completed | skipped | ...", "answer": {"accepted": true, "agreed_window": "ISO or empty", "notes": "..."}},
   "needs_human_reason": "string or null"
 }
 ```
 
-Fail closed: voicemail, no-answer, wrong person, missing consent, low-confidence answers, and schema drift all become `needs_human` with the reason filled in. An `agreed` result is a relayed confirmation, not a contract; the requester confirms any commitment themselves on the second call.
+Fail closed: voicemail, no-answer, wrong person, missing consent, low-confidence answers, and schema drift all become `needs_human` with the reason filled in. The recipient answer is bound to a typed contract before the requester call is planned: `understood`, `consent_given`, `wrong_person` must be booleans and `confidence` a number in [0, 1] — a missing or mistyped field is schema drift, a missing or non-true `consent_given` refuses the second call, and `confidence` below 0.7 routes to a human. The requester answer is type-checked the same way (`accepted` boolean, `agreed_window`/`notes` strings). An `agreed` result is a relayed confirmation, not a contract; the requester confirms any commitment themselves on the second call.
 
 ## Live Planning
 
@@ -135,7 +143,7 @@ Do not run `--execute` unless the user separately confirms both numbers and the 
 
 ## Cancellation And Idempotency
 
-Idempotency key: `language_bridge_call:{request_id}`. One request maps to at most one relay run; if a run ends uncertainly, resolve it with the printed `calle call recover` command (or restart with a new `request_id`) rather than re-running. Cancel before dial by not running `--execute`; there is no background job to cancel because the script does not schedule anything. Ambiguous outcomes route to a human rather than placing another call.
+Idempotency key: `language_bridge_call:{request_id}`, enforced by the script on `--execute`. Before any call is placed it records `status: started` in `~/.cache/language-bridge-call/<sha256 of request_id>.json` and marks it `done` with the final result afterwards; a re-run with the same `request_id` is refused (exit 2) with the prior status printed. If a run ends uncertainly, resolve it with the printed `calle call recover` command (or restart with a new `request_id`) rather than re-running; delete the state file only if you have verified no call was placed. Cancel before dial by not running `--execute`; there is no background job to cancel because the script does not schedule anything. Ambiguous outcomes route to a human rather than placing another call.
 
 ## Safety Notes
 
