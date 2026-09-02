@@ -17,14 +17,14 @@ async function run() {
     const mode = core.getInput('mode') || 'preview';
     const authorizeLiveCallTo = core.getInput('authorize_live_call_to');
 
-    // BLOCKER 3: Do not echo malformed input in the error log
+    // DO NOT ECHO MALFORMED INPUT
     if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
       throw new Error('Invalid phone number format provided. Must be strict E.164 (e.g., +12025550123). +0 is not allowed.');
     }
 
     const maskedPhone = `${phone.substring(0, 3)}******${phone.substring(phone.length - 4)}`;
 
-    // BLOCKER 1: Explicit live gate
+    // EXPLICIT LIVE GATE
     if (mode === 'live') {
       if (phone !== authorizeLiveCallTo) {
         throw new Error('Refusing to dial: authorize_live_call_to must exactly match phone_number when in live mode.');
@@ -36,22 +36,16 @@ async function run() {
 
     const taskPrompt = `You are CallAction, a DevOps escalation assistant. Call ${phone}. Disclose that you are an AI immediately. Tell the engineer that GitHub Action run ${runId} just failed. Ask if they acknowledge the error, and what the next step should be: revert the commit, escalate to management, or they will fix it. Do not ask for passwords or secrets.`;
     
-    const resultSchema = {
-      type: "object",
-      required: ["action_decision", "engineer_notes"],
-      properties: {
-        action_decision: { type: "string", enum: ["revert", "escalate", "will_fix", "unknown"] },
-        engineer_notes: { type: "string", description: "Short summary. Do not include phone numbers or sensitive data." }
-      },
-      additionalProperties: false
-    };
+    // MASKED PREVIEW (Blocker 2 Fix)
+    const maskedTaskPrompt = taskPrompt.replace(phone, maskedPhone);
 
-    // BLOCKER 1: No-call/dry-run default
+    // NO-CALL/DRY-RUN DEFAULT
     if (mode !== 'live') {
       core.info(`PREVIEW MODE: No call will be placed. To execute, set mode: 'live' and pass authorize_live_call_to.`);
       core.info(`Would call: ${maskedPhone}`);
-      core.info(`Task preview:\n${taskPrompt}`);
-      return; // Exit successfully without dialing
+      // Only log the MASKED version of the prompt!
+      core.info(`Task preview:\n${maskedTaskPrompt}`);
+      return; 
     }
 
     core.info(`Starting LIVE CallAction escalation to ${maskedPhone}...`);
@@ -61,7 +55,15 @@ async function run() {
       {
         task: taskPrompt,
         recipients: [{ phones: [phone], locale: "en-US" }],
-        resultSchema: resultSchema
+        resultSchema: {
+          type: "object",
+          required: ["action_decision", "engineer_notes"],
+          properties: {
+            action_decision: { type: "string", enum: ["revert", "escalate", "will_fix", "unknown"] },
+            engineer_notes: { type: "string", description: "Short summary. Do not include phone numbers or sensitive data." }
+          },
+          additionalProperties: false
+        }
       },
       {
         idempotencyKey: `callaction-escalate-${runId}`
@@ -75,11 +77,18 @@ async function run() {
       finalDecision = result.action_decision;
     }
 
-    // BLOCKER 4: Constrain and redact provider-derived notes
+    // CONSTRAIN AND REDACT PROVIDER NOTES (Blocker 3 Fix)
+    // We aggressively sanitize the raw LLM output before it hits the markdown report.
     let safeNotes = "No notes captured or call failed.";
-    if (result.engineer_notes) {
-      const truncated = result.engineer_notes.substring(0, 300);
-      safeNotes = redactPhoneLike(truncated);
+    const rawNotes = result.engineer_notes;
+    
+    if (typeof rawNotes === 'string' && rawNotes.trim().length > 0) {
+      // 1. Truncate to a safe maximum length
+      const truncated = rawNotes.substring(0, 300);
+      // 2. Run through phone redaction
+      const redacted = redactPhoneLike(truncated);
+      // 3. Remove markdown injection attempts (e.g., links, images)
+      safeNotes = redacted.replace(/\[.*\]\(.*\)/g, '[link-removed]');
     }
 
     const report = `
