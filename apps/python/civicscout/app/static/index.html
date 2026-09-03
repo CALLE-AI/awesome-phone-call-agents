@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CivicScout - Autonomous Public Works Voice Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: #111827;
+      --card-border: #1e293b;
+      --card-hover: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-cyan: #06b6d4;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --font-sans: 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation */
+    header {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+    }
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #fff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand-tag {
+      font-size: 0.75rem;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      font-weight: 500;
+    }
+
+    .system-badges {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .status-pill {
+      font-size: 0.75rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--card-border);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-green { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+    .dot-blue { background: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); }
+    .dot-purple { background: var(--accent-purple); box-shadow: 0 0 8px var(--accent-purple); }
+
+    /* Main Container */
+    main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+
+    /* Stats Grid */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.15rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .stat-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+    }
+
+    /* Layout Split */
+    .dashboard-split {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 1.5rem;
+    }
+
+    /* Ticket Queue Column */
+    .queue-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 210px);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .ticket-list {
+      padding: 0.85rem;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .ticket-item {
+      background: rgba(30, 41, 59, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .ticket-item:hover, .ticket-item.active {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 4px 20px rgba(6, 182, 212, 0.15);
+    }
+    .ticket-item.active::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 15%; bottom: 15%;
+      width: 4px;
+      background: var(--accent-cyan);
+      border-radius: 0 4px 4px 0;
+    }
+    .ticket-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+    .ticket-id {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .badge-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-progress { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-escalated { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-dispatched { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .ticket-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: #f1f5f9;
+    }
+    .ticket-dept {
+      font-size: 0.75rem;
+      color: #a855f7;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+    .ticket-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Right Telephony HUD Column */
+    .hud-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      height: calc(100vh - 210px);
+      overflow-y: auto;
+    }
+
+    /* Telephony Live Agent Card */
+    .telephony-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      position: relative;
+    }
+    .telephony-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .agent-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .agent-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #1e1b4b, #312e81);
+      border: 1px solid #4338ca;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      position: relative;
+    }
+    .avatar-pulse {
+      position: absolute;
+      inset: -3px;
+      border-radius: 14px;
+      border: 2px solid var(--accent-cyan);
+      animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+      display: none;
+    }
+    .call-active .avatar-pulse { display: block; }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.08); opacity: 0.2; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .agent-info h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .agent-info p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .call-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+    .btn {
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 0.85rem;
+      padding: 0.55rem 1.15rem;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+      border: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(6, 182, 212, 0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 4px 18px rgba(6, 182, 212, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-escalate {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+    }
+    .btn-secondary {
+      background: rgba(30, 41, 59, 0.8);
+      color: #e2e8f0;
+      border: 1px solid var(--card-border);
+    }
+    .btn-secondary:hover { background: rgba(51, 65, 85, 0.8); }
+
+    /* Waveform Animation */
+    .waveform-box {
+      background: #0d1322;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .waveform-status {
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent-cyan);
+    }
+    .wave-bars {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 24px;
+    }
+    .wave-bar {
+      width: 4px;
+      background: var(--accent-cyan);
+      border-radius: 2px;
+      height: 4px;
+      transition: height 0.1s ease;
+    }
+    .call-active .wave-bar {
+      animation: wave-anim 1.2s ease-in-out infinite alternate;
+    }
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.45s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.6s; }
+    .wave-bar:nth-child(6) { animation-delay: 0.75s; }
+    .wave-bar:nth-child(7) { animation-delay: 0.9s; }
+    @keyframes wave-anim {
+      0% { height: 4px; background: var(--accent-cyan); }
+      50% { height: 22px; background: var(--accent-blue); }
+      100% { height: 8px; background: var(--accent-green); }
+    }
+
+    /* Live Transcript & FastMCP Invocations Box */
+    .telephony-body {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 1rem;
+    }
+    .transcript-feed {
+      background: #0b1120;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 1rem;
+      height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      font-size: 0.85rem;
+    }
+    .dialogue-bubble {
+      padding: 0.6rem 0.85rem;
+      border-radius: 8px;
+      line-height: 1.4;
+      max-width: 92%;
+    }
+    .bubble-agent {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      color: #e0f2fe;
+      align-self: flex-start;
+    }
+    .bubble-caller {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      color: #dbeafe;
+      align-self: flex-end;
+    }
+    .bubble-role {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 0.2rem;
+      color: var(--accent-cyan);
+    }
+    .bubble-caller .bubble-role { color: #60a5fa; }
+
+    /* FastMCP Live Invocations Panel */
+    .mcp-feed {
+      background: #0b1120;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.85rem;
+      height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .mcp-feed-header {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-purple);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .mcp-tool-card {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .mcp-tool-name {
+      color: #c084fc;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .mcp-tool-result {
+      color: #34d399;
+      font-size: 0.7rem;
+      margin-top: 0.2rem;
+    }
+
+    /* Structured JSON Telemetry Panel */
+    .telemetry-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .json-card, .escalation-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .json-header {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    pre.json-viewer {
+      background: #080c14;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #38bdf8;
+      height: 160px;
+      overflow: auto;
+    }
+    .escalation-box {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px dashed rgba(239, 68, 68, 0.4);
+      border-radius: 8px;
+      padding: 0.85rem;
+      height: 160px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .esc-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: #ef4444;
+      color: #fff;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      margin-bottom: 0.4rem;
+    }
+    .esc-desc {
+      font-size: 0.8rem;
+      color: #fecaca;
+      line-height: 1.4;
+    }
+    .esc-agent-name {
+      font-size: 0.75rem;
+      color: #93c5fd;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🏙️</div>
+      <div>
+        <div class="brand-title">CivicScout</div>
+      </div>
+      <span class="brand-tag">CALL-E Hackathon</span>
+    </div>
+
+    <div class="system-badges">
+      <div class="status-pill" id="badge-cloudrun">
+        <span class="dot dot-green"></span> Google Cloud Run: Active
+      </div>
+      <div class="status-pill" id="badge-firestore">
+        <span class="dot dot-blue"></span> Firestore: Synced
+      </div>
+      <div class="status-pill" id="badge-fastmcp">
+        <span class="dot dot-purple"></span> FastMCP: Tools Ready
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Grid -->
+  <main>
+    <!-- Top KPI Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Active 311 Tickets</div>
+        <div class="stat-value" id="stat-total">3</div>
+        <div class="stat-desc">Municipal work orders in queue</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Outreach</div>
+        <div class="stat-value" style="color: #fbbf24;" id="stat-pending">3</div>
+        <div class="stat-desc">Awaiting autonomous voice dial</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Escalated Incidents</div>
+        <div class="stat-value" style="color: #f87171;" id="stat-escalated">0</div>
+        <div class="stat-desc">Transferred to Emergency Dispatch</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Field Dispatches</div>
+        <div class="stat-value" style="color: #34d399;" id="stat-dispatched">0</div>
+        <div class="stat-desc">Crews mobilized with verified data</div>
+      </div>
+    </div>
+
+    <!-- Main Split Layout -->
+    <div class="dashboard-split">
+      
+      <!-- Left Column: 311 Civic Work Orders Queue -->
+      <div class="queue-panel">
+        <div class="panel-header">
+          <div class="panel-title">📋 311 Work Orders Queue</div>
+          <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem;" id="btn-refresh" onclick="fetchTickets()">↻ Refresh</button>
+        </div>
+        <div class="ticket-list" id="ticket-list">
+          <!-- Dynamically populated via JS -->
+        </div>
+      </div>
+
+      <!-- Right Column: Telephony HUD & Multi-Agent Command Console -->
+      <div class="hud-column">
+        
+        <!-- Live Call Console Card -->
+        <div class="telephony-card" id="telephony-card">
+          <div class="telephony-header">
+            <div class="agent-profile">
+              <div class="agent-avatar" id="agent-avatar">
+                🤖
+                <div class="avatar-pulse"></div>
+              </div>
+              <div class="agent-info">
+                <h3 id="current-agent-name">CivicScout (Roads & Infrastructure)</h3>
+                <p id="current-call-target">Target: Sarah Jenkins (+14155550198)</p>
+              </div>
+            </div>
+
+            <div class="call-actions">
+              <button class="btn btn-primary" id="btn-dispatch-call" onclick="triggerCallFlow()">
+                📞 Dispatch CALL-E Voice Agent
+              </button>
+              <button class="btn btn-secondary" id="btn-reset-demo" onclick="resetDemo()">
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <!-- Waveform / Audio State -->
+          <div class="waveform-box">
+            <div class="waveform-status" id="call-status-label">
+              <span class="dot dot-green"></span> IDLE — Ready to Dial
+            </div>
+            <div class="wave-bars">
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+            </div>
+          </div>
+
+          <!-- Live Transcript & FastMCP Invocations -->
+          <div class="telephony-body">
+            
+            <!-- Left: Transcript Stream -->
+            <div class="transcript-feed" id="transcript-feed">
+              <div class="dialogue-bubble bubble-agent">
+                <div class="bubble-role">CivicScout Agent</div>
+                Ready. Click "Dispatch CALL-E Voice Agent" to initiate outbound citizen outreach.
+              </div>
+            </div>
+
+            <!-- Right: FastMCP Live Tool Invocations -->
+            <div class="mcp-feed" id="mcp-feed">
+              <div class="mcp-feed-header">⚡ FastMCP Mid-Call Invocations</div>
+              <div class="mcp-tool-card" style="border-color: #334155; opacity: 0.7;">
+                <div class="mcp-tool-name">Waiting for call activity...</div>
+                <div style="font-size: 0.7rem; color: #64748b;">FastMCP tools are invoked in real-time during live speech.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Bottom Row: Structured Telemetry & Multi-Agent Escalation Drawer -->
+        <div class="telemetry-bottom">
+          
+          <div class="json-card">
+            <div class="json-header">
+              <span>📊 Extracted Structured JSON (CALL-E Result Schema)</span>
+              <span class="badge badge-dispatched" id="badge-schema">Pydantic Enforced</span>
+            </div>
+            <pre class="json-viewer" id="json-viewer">{
+  "status": "Awaiting call completion",
+  "structured_result": null
+}</pre>
+          </div>
+
+          <div class="escalation-card">
+            <div class="json-header">
+              <span>🚨 Multi-Agent Escalation Stream</span>
+              <span class="badge badge-pending" id="esc-status-badge">Standby</span>
+            </div>
+            <div class="escalation-box" id="esc-box">
+              <div>
+                <span class="esc-badge" id="esc-badge-tag">No Active Escalation</span>
+                <p class="esc-desc" id="esc-desc-text">If hazardous conditions or multi-agency jurisdiction is detected mid-call, the orchestrator dynamically spins up a Secondary CALL-E Agent.</p>
+              </div>
+              <div class="esc-agent-name" id="esc-agent-target">Target: N/A</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    let currentTickets = [];
+    let selectedTicketId = "TKT-311-ROADS-8812";
+
+    async function fetchTickets() {
+      try {
+        const res = await fetch('/api/tickets');
+        currentTickets = await res.json();
+        renderTickets();
+        updateStats();
+      } catch (e) {
+        console.error("Error fetching tickets:", e);
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('stat-total').innerText = currentTickets.length;
+      document.getElementById('stat-pending').innerText = currentTickets.filter(t => t.status === 'PENDING_OUTREACH').length;
+      document.getElementById('stat-escalated').innerText = currentTickets.filter(t => t.status === 'ESCALATED').length;
+      document.getElementById('stat-dispatched').innerText = currentTickets.filter(t => t.status === 'FIELD_DISPATCHED').length;
+    }
+
+    function renderTickets() {
+      const container = document.getElementById('ticket-list');
+      container.innerHTML = '';
+      currentTickets.forEach(t => {
+        const item = document.createElement('div');
+        item.className = `ticket-item ${t.id === selectedTicketId ? 'active' : ''}`;
+        item.onclick = () => selectTicket(t.id);
+
+        let badgeClass = 'badge-pending';
+        if (t.status === 'CALL_IN_PROGRESS') badgeClass = 'badge-progress';
+        if (t.status === 'ESCALATED') badgeClass = 'badge-escalated';
+        if (t.status === 'FIELD_DISPATCHED') badgeClass = 'badge-dispatched';
+
+        item.innerHTML = `
+          <div class="ticket-top">
+            <span class="ticket-id">${t.id}</span>
+            <span class="badge ${badgeClass}">${t.status}</span>
+          </div>
+          <div class="ticket-title">${t.title}</div>
+          <div class="ticket-dept">📍 ${t.department}</div>
+          <div class="ticket-meta">
+            <span>👤 ${t.reporter.name}</span>
+            <span>🚨 ${t.severity}</span>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function selectTicket(id) {
+      selectedTicketId = id;
+      renderTickets();
+      const t = currentTickets.find(x => x.id === id);
+      if (t) {
+        document.getElementById('current-agent-name').innerText = `CivicScout (${t.department})`;
+        document.getElementById('current-call-target').innerText = `Target: ${t.reporter.name} (${t.reporter.phone_e164})`;
+      }
+    }
+
+    async function triggerCallFlow() {
+      const card = document.getElementById('telephony-card');
+      const statusLabel = document.getElementById('call-status-label');
+      const transcriptFeed = document.getElementById('transcript-feed');
+      const mcpFeed = document.getElementById('mcp-feed');
+      const btn = document.getElementById('btn-dispatch-call');
+
+      btn.disabled = true;
+      card.classList.add('call-active');
+      statusLabel.innerHTML = '<span class="dot dot-green"></span> 📞 LIVE CALL IN PROGRESS — CALL-E Connected';
+      
+      transcriptFeed.innerHTML = '';
+      mcpFeed.innerHTML = '<div class="mcp-feed-header">⚡ FastMCP Mid-Call Invocations</div>';
+
+      // 1. Initial greeting
+      await wait(600);
+      addDialogue("agent", "Hello Sarah Jenkins, I am CivicScout from the City Council's Roads & Infrastructure Department calling regarding 311 Ticket #TKT-311-ROADS-8812 at 742 Evergreen Terrace. Can you confirm the situation on site?");
+      
+      // 2. Citizen response
+      await wait(1400);
+      addDialogue("caller", "Yes! It started as a sinkhole, but right now a massive high-pressure water main has fractured under the pavement! Water is gushing into the road and nearing an electrical distribution box!");
+
+      // 3. FastMCP tool invocation: query_authorization_code
+      await wait(1200);
+      addDialogue("agent", "Understood. That is a critical multi-agency hazard. Do you have an on-site permit or authorization code?");
+      await wait(1000);
+      addDialogue("caller", "Yes, my site lead gave me municipal code PW-AUTH-9921.");
+
+      await wait(800);
+      addMcpTool(
+        "query_authorization_code",
+        "{ ticket_id: 'TKT-311-ROADS-8812', auth_code: 'PW-AUTH-9921' }",
+        "✓ VALID | Issuer: Dept of Transportation Safety | Permissions: ROAD_CLOSURE, EXCAVATION_TIER_2"
+      );
+
+      // 4. FastMCP tool invocation: trigger_department_escalation
+      await wait(1400);
+      addDialogue("agent", "Authorization verified for Apex Civil Infrastructure. Because this involves active water pressure and electrical infrastructure, I am initiating an immediate inter-department escalation.");
+
+      await wait(900);
+      addMcpTool(
+        "trigger_department_escalation",
+        "{ target_dept: 'Emergency Utility & Multi-Agency Dispatch', urgency: 'CRITICAL_EMERGENCY' }",
+        "🚨 ESCALATION_TRIGGERED -> Secondary Agent Provisioned"
+      );
+
+      // 5. Execute API simulation in backend
+      const res = await fetch(`/api/tickets/${selectedTicketId}/simulate-call?simulate_escalation=true`, { method: 'POST' });
+      const data = await res.json();
+
+      // 6. Display Structured Result & Escalation Drawer
+      await wait(1000);
+      statusLabel.innerHTML = '<span class="dot dot-purple"></span> 🏁 CALL COMPLETED — Telemetry Ingested & Escalated';
+      card.classList.remove('call-active');
+
+      document.getElementById('json-viewer').innerText = JSON.stringify(data.webhook_result.structured_result, null, 2);
+
+      // Update Escalation Box
+      document.getElementById('esc-status-badge').className = 'badge badge-escalated';
+      document.getElementById('esc-status-badge').innerText = 'EMERGENCY ESCALATED';
+      document.getElementById('esc-badge-tag').innerText = '🚨 MULTI-AGENCY ESCALATION ACTIVE';
+      document.getElementById('esc-desc-text').innerText = data.webhook_result.escalation.reason;
+      document.getElementById('esc-agent-target').innerText = `Secondary Agent: ${data.webhook_result.escalation.target_department} (Call ID: ${data.webhook_result.escalation.secondary_call_id})`;
+
+      btn.disabled = false;
+      await fetchTickets();
+    }
+
+    function addDialogue(role, text) {
+      const feed = document.getElementById('transcript-feed');
+      const bubble = document.createElement('div');
+      bubble.className = `dialogue-bubble bubble-${role}`;
+      bubble.innerHTML = `
+        <div class="bubble-role">${role === 'agent' ? 'CivicScout Agent' : 'Citizen (Sarah Jenkins)'}</div>
+        <div>${text}</div>
+      `;
+      feed.appendChild(bubble);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function addMcpTool(name, params, result) {
+      const feed = document.getElementById('mcp-feed');
+      const card = document.createElement('div');
+      card.className = 'mcp-tool-card';
+      card.innerHTML = `
+        <div class="mcp-tool-name">⚡ ${name}()</div>
+        <div style="color: #94a3b8; font-size: 0.7rem;">${params}</div>
+        <div class="mcp-tool-result">${result}</div>
+      `;
+      feed.appendChild(card);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function resetDemo() {
+      location.reload();
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Initial load
+    fetchTickets();
+  </script>
+</body>
+</html>
