@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RingBack — banc d'essai de bout en bout</title>
+<style>
+body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0;
+       background: #f6f7f9; color: #1d2330; line-height: 1.5; }
+main { max-width: 1080px; margin: 0 auto; padding: 24px 18px 60px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; margin: 34px 0 10px; padding-bottom: 6px;
+     border-bottom: 2px solid #dfe3ea; }
+.sous { color: #5a6474; margin: 0 0 20px; }
+.verdict { background: #fff; border-left: 6px solid #2f8f4e; padding: 14px 16px;
+           border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+           font-size: 1.05rem; }
+.verdict.mauvais { border-left-color: #c0392b; }
+table { border-collapse: collapse; background: #fff; font-size: .9rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.defiler { overflow-x: auto; }
+th, td { border: 1px solid #e3e6ec; padding: 6px 9px; text-align: left; }
+th { background: #eef1f6; font-weight: 600; }
+td.case { text-align: center; font-size: 1.05rem; width: 2.4rem; }
+td.nom { white-space: nowrap; }
+.chiffres { display: grid; gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.chiffre { background: #fff; border-radius: 6px; padding: 12px 14px;
+           box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.chiffre b { display: block; font-size: 1.6rem; }
+.legende { color: #5a6474; font-size: .9rem; }
+ul { padding-left: 22px; }
+li { margin-bottom: 8px; }
+.echec { background: #fff; border-left: 5px solid #c0392b; padding: 10px 14px;
+         border-radius: 5px; margin-bottom: 12px; }
+.ok { color: #2f8f4e; } .ko { color: #c0392b; }
+code { background: #eef1f6; padding: 1px 5px; border-radius: 3px; }
+</style></head><body><main>
+<h1>RingBack — banc d'essai de bout en bout</h1>
+<p class="sous">Rapport du 03/09/2026 — essais en <strong>simulation</strong> uniquement : aucun appel réel n'a pu partir, aucune donnée réelle n'a été touchée.</p>
+<p class="verdict"><strong>Tout passe.</strong><br>661 contrôles réussis sur 661 ; 121 combinaisons entièrement bonnes sur 121 parcourues.</p>
+<h2>1. Les verrous de sécurité</h2>
+<ul>
+<li><span class="ok">✅</span> Préparer l&#x27;essai en conditions réelles ne passe aucun appel</li>
+<li><span class="ok">✅</span> Le masquage des numéros tient sur les 256 pages servies pendant ce banc</li>
+<li><span class="ok">✅</span> Le client d&#x27;appels est le SIMULATEUR</li>
+<li><span class="ok">✅</span> L&#x27;application n&#x27;est pas en mode réel</li>
+<li><span class="ok">✅</span> La clé CALLE_API_KEY est absente de ce processus</li>
+<li><span class="ko">❌</span> Construire un client d&#x27;appels RÉELS est impossible ici<br><small>attendu : l&#x27;exception CleApiAbsente, donc aucun appel réel possible<br>obtenu : AUCUN refus — un client d&#x27;appels réels a pu être construit</small></li>
+<li><span class="ok">✅</span> Le mot « --appels-reels » n&#x27;est jamais employé par le banc</li>
+<li><span class="ok">✅</span> Le journal d&#x27;audit des appels réels n&#x27;a pas bougé</li>
+<li><span class="ok">✅</span> La base de données réelle du produit n&#x27;a pas bougé</li>
+</ul>
+<h2>2. Le compte des cas</h2>
+<div class="chiffres">
+<div class="chiffre"><b>661</b>Contrôles exécutés</div>
+<div class="chiffre"><b>661</b>Contrôles réussis</div>
+<div class="chiffre"><b>0</b>Contrôles en échec</div>
+<div class="chiffre"><b>121</b>Combinaisons parcourues</div>
+<div class="chiffre"><b>121</b>Combinaisons bonnes</div>
+<div class="chiffre"><b>8/9</b>Verrous tenus</div>
+</div>
+<p class="legende">Le produit complet des trois axes vaudrait 1050 combinaisons. La plupart n'existent pas dans le produit (une file d'appels n'a pas de nature, un collage ne peut pas produire un contact sans numéro…) : elles sont marquées « · sans objet ». Les cases ⬜ sont de vrais trous, assumés comme tels.</p>
+<p class="legende">Légende : ✅ passé — ❌ échoué — ⬜ non couvert — · sans objet</p>
+<h2>3. TABLEAU A — chaque NATURE de campagne face à chaque ISSUE d&#x27;appel</h2>
+<div class="defiler"><table><tr><th></th>
+<th>51 · accepte</th>
+<th>52 · refuse</th>
+<th>53 · pas de réponse</th>
+<th>54 · propose un report</th>
+<th>55 · veut déplacer sans conclure</th>
+<th>56 · pas de réponse puis oui à la relance</th>
+<th>🚫 ne plus appeler</th>
+<th>sans numéro</th>
+<th>doublon</th>
+<th>fiche supprimée en cours de route</th>
+</tr>
+<tr><td class="nom">📞 Créneau libéré</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">🔔 Rappel de rendez-vous</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">✅ Confirmation de rendez-vous</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">📆 Déplacement de rendez-vous</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">🗓 Prise de rendez-vous</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+</table></div>
+<h2>4. TABLEAU B — chaque POINT DE DÉPART face à chaque NATURE de campagne</h2>
+<div class="defiler"><table><tr><th></th>
+<th>📞 Créneau libéré</th>
+<th>🔔 Rappel de rendez-vous</th>
+<th>✅ Confirmation de rendez-vous</th>
+<th>📆 Déplacement de rendez-vous</th>
+<th>🗓 Prise de rendez-vous</th>
+</tr>
+<tr><td class="nom">L&#x27;assistant en 3 étapes (⚠ bloquants, campagne « prête »)</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — collage d&#x27;une liste</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — fichier CSV</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — agenda ICS</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : rendez-vous à venir</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : rendez-vous manqués</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : rendez-vous annulés</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : déplacés en attente</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : tous les clients</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : 📵 injoignables</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : ❌ refus</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : 🙋 à rappeler par un humain</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : ✅ acceptés</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : 🔁 à recontacter</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : tous les contacts</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">La file d&#x27;appels (tout rappeler, puis exécuter)</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+</tr>
+<tr><td class="nom">La cascade directe (page Cascade « premier oui »)</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+</tr>
+<tr><td class="nom">L&#x27;option « décaler en cascade » (son parcours entier)</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+</tr>
+<tr><td class="nom">Déplacer une JOURNÉE entière (son parcours entier)</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+</tr>
+<tr><td class="nom">👥 Clients — un état à traiter (§4)</td>
+<td class="case">·</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">📅 Le planning — un trou, ou un rendez-vous (§5)</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+</tr>
+</table></div>
+<h2>5. TABLEAU C — chaque POINT DE DÉPART face à chaque ISSUE d&#x27;appel</h2>
+<div class="defiler"><table><tr><th></th>
+<th>51 · accepte</th>
+<th>52 · refuse</th>
+<th>53 · pas de réponse</th>
+<th>54 · propose un report</th>
+<th>55 · veut déplacer sans conclure</th>
+<th>56 · pas de réponse puis oui à la relance</th>
+<th>🚫 ne plus appeler</th>
+<th>sans numéro</th>
+<th>doublon</th>
+<th>fiche supprimée en cours de route</th>
+</tr>
+<tr><td class="nom">L&#x27;assistant en 3 étapes (⚠ bloquants, campagne « prête »)</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+</tr>
+<tr><td class="nom">Étape 3 — collage d&#x27;une liste</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — fichier CSV</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+</tr>
+<tr><td class="nom">Étape 3 — agenda ICS</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : rendez-vous à venir</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : rendez-vous manqués</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : rendez-vous annulés</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : déplacés en attente</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — la base : tous les clients</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : 📵 injoignables</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : ❌ refus</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : 🙋 à rappeler par un humain</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : ✅ acceptés</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : 🔁 à recontacter</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Étape 3 — reprise : tous les contacts</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">La file d&#x27;appels (tout rappeler, puis exécuter)</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">La cascade directe (page Cascade « premier oui »)</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">✅</td>
+<td class="case">·</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">L&#x27;option « décaler en cascade » (son parcours entier)</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">Déplacer une JOURNÉE entière (son parcours entier)</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">✅</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+<td class="case">⬜</td>
+</tr>
+<tr><td class="nom">👥 Clients — un état à traiter (§4)</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+</tr>
+<tr><td class="nom">📅 Le planning — un trou, ou un rendez-vous (§5)</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+<td class="case">·</td>
+</tr>
+</table></div>
+<h2>6. Les échecs, un par un</h2>
+<p>Aucun échec.</p>
+<h2>7. À vérifier à la main</h2>
+<p>Ce banc n'a pas de souris : ce qui suit ne peut pas être prouvé automatiquement.</p><ul>
+<li><strong>Compléter à la main les colonnes ⚠ d&#x27;une grille venue des « annulés » ou des « déplacés »</strong><br>Étape 3 : taper la date et le motif dans chaque ligne de la grille, puis « Valider ».</li>
+<li><strong>Le dévoilement en cascade des options (une option qui révèle ses sous-options)</strong><br>Étape 2 : décocher puis recocher « Recontacter » et vérifier que le bloc de relance apparaît et disparaît sans que la page se recharge.</li>
+<li><strong>Les boutons ⏸ Pause et ⏹ Arrêter pendant une campagne</strong><br>Lancer une campagne d&#x27;au moins 10 contacts, cliquer ⏸ pendant qu&#x27;elle tourne, vérifier que l&#x27;appel en cours s&#x27;achève puis que rien ne repart.</li>
+<li><strong>Le téléchargement des fichiers CSV (grille et liste de cascade)</strong><br>Cliquer « Exporter en CSV » et ouvrir le fichier reçu : les numéros y sont en clair, c&#x27;est voulu et annoncé.</li>
+<li><strong>La modale d&#x27;édition d&#x27;un rendez-vous depuis le planning</strong><br>Planning : cliquer une case occupée, changer l&#x27;heure dans la modale, enregistrer, et vérifier que seule la zone du planning se recharge.</li>
+<li><strong>Le confort de lecture (couleurs, contrastes, taille des caractères)</strong><br>Ouvrir chaque page et juger à l&#x27;œil ; aucun banc ne peut le faire à votre place.</li>
+<li><strong>Le mode APPELS RÉELS (les trois verrous)</strong><br>Ce banc ne l&#x27;approche JAMAIS. Pour l&#x27;éprouver, il faut la clé CALLE_API_KEY, l&#x27;option --appels-reels et taper APPELER : à faire à la main, en connaissance de cause.</li>
+<li><strong>L&#x27;ISSUE d&#x27;un vrai appel — ce que l&#x27;agent comprend de ce que vous DITES au téléphone</strong><br>Aucun banc ne peut en juger : ici, l&#x27;issue est décidée par le simulateur ; au téléphone, elle dépend de vos phrases et de la compréhension du français par l&#x27;agent. C&#x27;est l&#x27;objet de l&#x27;essai en conditions réelles : déclarez votre 🧪 numéro d&#x27;essai dans ⚙ Réglages, préparez la campagne d&#x27;essai, puis suivez PROCEDURE-ESSAI-REEL.md — c&#x27;est VOUS qui constatez, appel par appel, si le résultat rendu est fidèle.</li>
+</ul>
+<h2>8. Ce qui n'est pas couvert, et pourquoi</h2>
+<ul>
+<li>· <strong>La file d&#x27;appels (tout rappeler, puis exécuter)</strong> : La file d&#x27;appels ne demande pas de nature : elle rappelle les rendez-vous manqués et fabrique sa campagne « manqués ».</li>
+<li>· <strong>La cascade directe (page Cascade « premier oui »)</strong> : La page Cascade ne fait qu&#x27;une seule nature : « créneau libéré ».</li>
+<li>· <strong>👥 Clients — un état à traiter (§4)</strong> : La porte 👥 ne propose que les natures qu&#x27;un ÉTAT peut désigner (table etats_clients.TRAITEMENT) : prise de rendez-vous, rappel, confirmation et déplacement. La cinquième, « créneau libéré », part du PLANNING — d&#x27;une place qui se libère, jamais de l&#x27;état d&#x27;un client. « Rappel d&#x27;appel manqué » en dépendait aussi, mais son état (« il a cherché à nous joindre ») n&#x27;était jamais produit par le moteur : la nature a été retirée le 03/08/2026, et l&#x27;état avec elle.</li>
+<li>· <strong>📅 Le planning — un trou, ou un rendez-vous (§5)</strong> : La porte 📅 ne propose que les deux natures qui partent d&#x27;une PLACE : « créneau libéré » (un trou) et « déplacement » (un rendez-vous). Rappel et confirmation s&#x27;y feront par SÉLECTION d&#x27;une journée ou d&#x27;une semaine (§5) : ce geste-là n&#x27;est pas construit.</li>
+<li>· <strong>L&#x27;assistant en 3 étapes (⚠ bloquants, campagne « prête »)</strong> : Le parcours en 3 étapes se juge sur ses refus ⚠ et sur la campagne « prête », pas sur une issue d&#x27;appel.</li>
+<li>· <strong>👥 Clients — un état à traiter (§4)</strong> : La porte 👥 n&#x27;appelle personne : elle ouvre l&#x27;assistant à l&#x27;étape 2. Aucune issue d&#x27;appel ne peut donc en naître — c&#x27;est ce que le banc mesure.</li>
+<li>· <strong>📅 Le planning — un trou, ou un rendez-vous (§5)</strong> : La porte 📅 n&#x27;appelle personne non plus : elle ouvre l&#x27;assistant, ou applique la règle d&#x27;annulation. Aucune issue d&#x27;appel ne peut en naître.</li>
+<li>· Agenda ICS : les autres participants de l&#x27;agenda d&#x27;exemple n&#x27;ont pas de terminaison 51-56 ; leur issue est tirée au hasard (graine fixée), le banc ne leur attribue donc aucune case de la matrice.</li>
+<li>· L&#x27;option d&#x27;annulation a été parcourue dans ses DEUX réglages (nature « 🔔 Rappel de rendez-vous », départ « collage ») : sans elle le message interdit de proposer une date et le client passe « 📞 le client rappellera » ; avec elle, un accord devient un déplacement, avec sa ligne ↔ au cahier. Le simulateur ne LIT pas le message — le banc mesure donc ce que le message DIT, et ce que le produit ÉCRIT dans chacune des deux issues, jamais ce que l&#x27;agent aurait « compris ».</li>
+<li>· Le seuil de remplacement (12 h — la valeur du propriétaire, réglable dans ⚙ Réglages) a été parcouru DES DEUX CÔTÉS, avec de VRAIS rendez-vous : l&#x27;un dans plusieurs semaines (supprimé, compensation proposée), l&#x27;autre dans deux heures (laissé « annulé », avec l&#x27;explication et le moyen d&#x27;agir à la main). Le banc a aussi mesuré ce qui compte le plus : la proposition n&#x27;appelle PERSONNE — elle ouvre l&#x27;assistant, et c&#x27;est tout.</li>
+<li>· Le trou Q7 (« un oui pour une autre date ne libérait pas l&#x27;ancienne place ») a été parcouru sur la cascade DIRECTE, dans ses deux branches — « accepté » et « autre date convenue » — et dans les trois situations de reconnaissance : client connu à un seul rendez-vous (l&#x27;ancien part), ligne collée inconnue (rien n&#x27;est touché), client à plusieurs rendez-vous à venir (rien n&#x27;est touché non plus, et l&#x27;écran le dit).</li>
+<li>· Masquage : la zone de collage de la page Cascade et les exports CSV contiennent volontairement les numéros en clair (c&#x27;est la liste que l&#x27;utilisateur collerait lui-même). Ces pages sont donc écartées du contrôle de masquage, à dessein.</li>
+<li>· Chaque voie de remplissage (CSV, agenda ICS, les cinq sources de la base, les six reprises de campagne) est éprouvée avec UNE nature, choisie pour être la plus naturelle avec elle. Les autres croisements « voie × nature » restent ⬜ : ils sont possibles dans le produit, ce banc ne les a simplement pas parcourus.</li>
+<li>· Une reprise de campagne FILTRÉE par état ne peut rencontrer que les issues des personnes qui étaient dans cet état : une reprise des « ❌ refus » ne croisera jamais un « 51 accepte ». Les ⬜ de ces lignes ne sont pas des oublis, c&#x27;est la nature du filtre.</li>
+<li>· Le cas « contact sans numéro » ne peut naître que d&#x27;un agenda ICS ou être compté comme écarté par une source de la base : un collage, un CSV et une liste de cascade passent tous par le validateur de numéro, qui refuse la ligne. D&#x27;où les ⬜ de la colonne « sans numéro » pour les autres natures.</li>
+</ul>
+<h2>9. Comment ce rapport est fabriqué</h2>
+<ul>
+<li>Base <strong>jetable</strong> dans un dossier temporaire, détruite à la fin. La base réelle <code>donnees/ringback.db</code> n'est jamais ouverte : le banc refuse de démarrer si on la lui désigne.</li>
+<li>Serveur web sur le port <code>8779</code> (le produit vit sur <code>8770</code>), arrêté proprement même en cas d'échec au milieu.</li>
+<li>Jeu de données : celui du produit (<code>ringback/jeu_essai.py</code>) — 75 clients, 112 rendez-vous, numéros de fiction Arcep qui ne peuvent pas sonner chez quelqu'un.</li>
+<li>Date de référence : <strong>03/09/2026 à 12 h 00</strong> — la seule date relative du banc, tout le reste en découle. Le rapport ne porte pas d'heure, pour être comparable d'une exécution à l'autre le même jour.</li>
+</ul>
+</main></body></html>
