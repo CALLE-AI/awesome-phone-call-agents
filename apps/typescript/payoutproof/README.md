@@ -43,7 +43,7 @@ Never put CALL-E tokens or execution confirmation data in logs, screenshots, iss
 
 ## Result handling
 
-`normalizeResult()` preserves the raw CALL-E result as untrusted call data and marks every outcome `contractual_verification: false` and `written_source_required: true`. A host can later map the enumerated answers to source URLs and decide whether the opportunity is economically usable.
+`normalizeResult()` validates status against a fixed allowlist, drops the raw provider payload (including transcripts and full phone numbers), and returns only bounded fields with the masked destination. Every outcome remains `contractual_verification: false` and `written_source_required: true`. A host can separately review provider-side records, map answers to source URLs, and decide whether the opportunity is economically usable.
 
 ## Verification status
 

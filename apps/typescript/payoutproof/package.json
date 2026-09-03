@@ -9,5 +9,10 @@
     "preview": "node src/cli.js preview --input examples/fictional-platform.json",
     "verify": "npm test && npm run preview"
   },
-  "engines": {"node": ">=20"}
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.12"
+  }
 }
