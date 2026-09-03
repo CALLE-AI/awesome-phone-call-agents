@@ -25,6 +25,14 @@ Treat the current repository as authoritative. Before making changes:
 5. Load `references/safety.md` before changing prompts, call initiation, result handling, or customer data access.
 6. Load `references/workflow.md` for the complete end-to-end sequence.
 
+## Public Implementation / Verification
+
+SERVEXA is an implemented reference application. Its public source is available at [princeakpabio8-prog/servexa](https://github.com/princeakpabio8-prog/servexa): [start-customer-call](https://github.com/princeakpabio8-prog/servexa/tree/master/supabase/functions/start-customer-call) creates and correlates calls with CALL-E, [calle-webhook](https://github.com/princeakpabio8-prog/servexa/tree/master/supabase/functions/calle-webhook) persists terminal results idempotently, and [Supabase migrations](https://github.com/princeakpabio8-prog/servexa/tree/master/supabase/migrations) define the persistent records and access policies. The [call-instruction UI](https://github.com/princeakpabio8-prog/servexa/blob/master/src/app/call-instruction.tsx) implements templates and human-directed instructions; the [activity UI](https://github.com/princeakpabio8-prog/servexa/blob/master/src/app/activity.tsx) implements reporting and pending-status refresh.
+
+The public application is the implementation reference. This contribution documents the reusable phone-call workflow and its safety boundaries; it does not copy or replace the application source.
+
+The referenced current source and relevant history for these implementation areas were reviewed for exposed secrets, credentials, private customer data, real phone numbers, recordings, and transcripts; none were found.
+
 ## Implemented Surface
 
 - `src/app/customers.tsx`: customer list, customer detail, standard call, directed-call entry, and follow-up scheduling.
