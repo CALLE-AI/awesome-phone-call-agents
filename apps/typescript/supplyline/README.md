@@ -33,7 +33,7 @@ that other agent builders can adapt.
 ## Setup
 
 ### Requirements
-- Node.js 18+
+- Node.js 20.9+
 - A CALL-E account and API key (see the main [CALL-E Developer Docs](https://docs.heycall-e.com) for how to get one)
 - (Optional) A Moonshot/Kimi API key for AI-generated recommendation summaries
 
@@ -106,7 +106,7 @@ on CALL-E's side regardless of whether the local app is running).
 
 ## Tech stack
 
-Next.js 14 (App Router), TypeScript, React, Tailwind CSS, Server Actions,
+Next.js 16 (App Router), TypeScript, React, Tailwind CSS, Server Actions,
 CALL-E SDK, Moonshot AI (Kimi) — optional.
 
 ## License
