@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { URL } from "node:url";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 export const ALLOWED_QUESTIONS = new Set([
   "payout_currency", "payout_rail", "minimum_payout", "payout_timing",
@@ -24,7 +25,10 @@ export function validatePacket(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail("packet must be an object");
   const p = structuredClone(raw);
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,80}$/.test(p.opportunity_id || "")) fail("opportunity_id is invalid");
-  if (!/^[+]?[1-9][0-9]{7,14}$/.test(p.official_phone || "")) fail("official_phone must be E.164");
+  if (!/^\+[1-9][0-9]{7,14}$/.test(p.official_phone || "")) fail("official_phone must be strict E.164 with a leading plus sign");
+  if (!/^[A-Z]{2}$/.test(p.region || "")) fail("region must be an ISO 3166-1 alpha-2 code");
+  const phone = parsePhoneNumberFromString(p.official_phone);
+  if (!phone?.isValid() || phone.country !== p.region) fail("official_phone must be valid for region");
   if (p.authorization !== "official_business_contact_publicly_listed") fail("authorization must attest a publicly listed official business contact");
   const opportunity = httpsUrl(p.opportunity_url, "opportunity_url");
   const contact = httpsUrl(p.contact_source_url, "contact_source_url");
@@ -75,7 +79,9 @@ export function compilePlan(raw) {
 }
 
 export function normalizeResult(plan, raw) {
-  const status=String(raw?.status || "UNKNOWN").toUpperCase();
+  const allowed=new Set(["QUEUED","RINGING","IN_PROGRESS","COMPLETED","FAILED","NO_ANSWER","DECLINED","CANCELED","CANCELLED","VOICEMAIL","BUSY","EXPIRED","UNKNOWN"]);
+  const candidate=String(raw?.status || "UNKNOWN").toUpperCase();
+  const status=allowed.has(candidate)?candidate:"UNKNOWN";
   const terminal=new Set(["COMPLETED","FAILED","NO_ANSWER","DECLINED","CANCELED","CANCELLED","VOICEMAIL","BUSY","EXPIRED"]);
-  return {schema:"payoutproof.result.v1",opportunity_id:plan.opportunity_id,packet_hash:plan.packet_hash,status,terminal:terminal.has(status),written_source_required:true,contractual_verification:false,raw_result:raw};
+  return {schema:"payoutproof.result.v1",opportunity_id:plan.opportunity_id,packet_hash:plan.packet_hash,masked_phone:plan.masked_phone,status,terminal:terminal.has(status),written_source_required:true,contractual_verification:false};
 }
