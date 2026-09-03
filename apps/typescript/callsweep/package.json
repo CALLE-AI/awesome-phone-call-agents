@@ -1,0 +1,20 @@
+{
+  "name": "callsweep",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outfile callsweep",
+    "start": "bun callsweep"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  },
+  "dependencies": {
+    "@call-e/calle": "^0.7.0"
+  }
+}

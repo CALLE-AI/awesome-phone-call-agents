@@ -1,0 +1,8 @@
+[
+  { "name": "Sharp Cuts", "phoneE164": "+14155550101", "region": "US" },
+  { "name": "The Barber Room", "phoneE164": "+14155550102", "region": "US" },
+  { "name": "Classic Cuts", "phoneE164": "+14155550103", "region": "US" },
+  { "name": "Fade Factory", "phoneE164": "+14155550104", "region": "US" },
+  { "name": "Style Studio", "phoneE164": "+14155550105", "region": "US" },
+  { "name": "Downtown Barbers", "phoneE164": "+14155550106", "region": "US" }
+]
