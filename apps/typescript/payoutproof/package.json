@@ -1,0 +1,13 @@
+{
+  "name": "calle-payoutproof",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consent-bounded CALL-E workflow for verifying public payout terms without sharing account data.",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "preview": "node src/cli.js preview --input examples/fictional-platform.json",
+    "verify": "npm test && npm run preview"
+  },
+  "engines": {"node": ">=20"}
+}
