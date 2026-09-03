@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import "./App.css";
-import doctorPhoto from "./assets/doctor-photo.png";
 
 const API_URL = "https://cliniccall-api.onrender.com";
 
@@ -73,26 +72,6 @@ function App() {
     }
   }
 
-  function getPatientName(patientId) {
-    const patient = patients.find(
-      (item) => Number(item.id) === Number(patientId)
-    );
-
-    return patient?.name || `Patient #${patientId}`;
-  }
-
-  function maskPhoneNumber(phone) {
-    if (!phone) return "No phone number";
-
-    const value = String(phone);
-
-    if (value.length <= 4) {
-      return "••••";
-    }
-
-    return `${value.slice(0, 4)}••••${value.slice(-2)}`;
-  }
-
   async function createPatient(event) {
     event.preventDefault();
 
@@ -111,8 +90,8 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: patientName.trim(),
-          phone_number: patientPhone.trim(),
+          name: patientName,
+          phone_number: patientPhone,
         }),
       });
 
@@ -237,9 +216,7 @@ function App() {
         try {
           data = JSON.parse(text);
         } catch {
-          data = {
-            message: text,
-          };
+          data = { message: text };
         }
       }
 
@@ -253,15 +230,13 @@ function App() {
               : JSON.stringify(data.detail);
         } else if (data.message) {
           errorMessage = data.message;
-        } else if (text) {
-          errorMessage = text;
         }
 
         setMessage(`❌ ${errorMessage}`);
         return;
       }
 
-      setMessage("Patient call started successfully!");
+      setMessage("✅ Patient call started successfully!");
 
       setSelectedAppointment("");
 
@@ -272,19 +247,23 @@ function App() {
         setMessage("");
       }, 3000);
     } catch (error) {
-      console.error("Frontend call error:", error);
+      console.error(error);
 
       setMessage(
-        "The call request could not be confirmed. Please check the Call Center."
+        "⚠️ The call request could not be confirmed. Please check the Call Center."
       );
     } finally {
       setLoading(false);
     }
   }
 
-  /* ============================================================
-     LANDING PAGE
-  ============================================================ */
+  function getPatientName(patientId) {
+    const patient = patients.find(
+      (item) => Number(item.id) === Number(patientId)
+    );
+
+    return patient?.name || `Patient #${patientId}`;
+  }
 
   if (!started) {
     return (
@@ -292,6 +271,7 @@ function App() {
         <nav className="landing-nav">
           <div className="brand">
             <div className="brand-mark">+</div>
+
             <span>ClinicCall</span>
           </div>
 
@@ -317,8 +297,8 @@ function App() {
             </h1>
 
             <p>
-              ClinicCall helps clinics reduce missed appointments with
-              intelligent automated patient calls and reminders.
+              ClinicCall helps clinics reduce missed appointments
+              with intelligent automated patient calls and reminders.
             </p>
 
             <div className="hero-actions">
@@ -345,23 +325,23 @@ function App() {
             </div>
           </div>
 
-          <div className="hero-doctor">
-            <div className="doctor-glow"></div>
-
-            <div className="doctor-frame">
-              <img
-                src={doctorPhoto}
-                alt="Doctor using ClinicCall"
-                className="doctor-image"
-              />
-
-              <div className="doctor-badge">
-                <span className="status-dot"></span>
-
-                <div>
-                  <strong>ClinicCall AI</strong>
-                  <small>System operational</small>
+          <div className="hero-art">
+            <div className="doctor-card">
+              <div className="doctor-image">
+                <div className="doctor-placeholder">
+                  <div className="doctor-head"></div>
+                  <div className="doctor-body"></div>
                 </div>
+              </div>
+
+              <div className="doctor-info">
+                <strong>ClinicCall Doctor</strong>
+                <span>Healthcare specialist</span>
+              </div>
+
+              <div className="doctor-status">
+                <span></span>
+                Available
               </div>
             </div>
 
@@ -374,6 +354,33 @@ function App() {
               </div>
 
               <div className="online-dot"></div>
+            </div>
+
+            <div className="dashboard-preview">
+              <div className="preview-top">
+                <div>
+                  <small>ClinicCall AI</small>
+                  <strong>Good morning, Doctor</strong>
+                </div>
+
+                <div className="preview-avatar">DR</div>
+              </div>
+
+              <div className="preview-number">
+                <small>Today's calls</small>
+                <strong>{callHistory.length}</strong>
+              </div>
+
+              <div className="preview-appointment">
+                <div className="preview-person">CC</div>
+
+                <div>
+                  <strong>ClinicCall</strong>
+                  <small>Appointment reminder</small>
+                </div>
+
+                <b>AI</b>
+              </div>
             </div>
 
             <div className="floating-card success-card">
@@ -457,10 +464,6 @@ function App() {
     );
   }
 
-  /* ============================================================
-     DASHBOARD
-  ============================================================ */
-
   return (
     <div className="app">
       <aside className="sidebar">
@@ -487,10 +490,7 @@ function App() {
               className={`menu-item ${
                 activePage === item ? "active" : ""
               }`}
-              onClick={() => {
-                setActivePage(item);
-                setMessage("");
-              }}
+              onClick={() => setActivePage(item)}
             >
               <span>
                 {["⌂", "▣", "♙", "☎"][index]}
@@ -514,41 +514,116 @@ function App() {
             </div>
           </div>
 
-          <div className="user">
+          <div className="user" style={{ justifyContent: "center" }}>
             <div className="avatar">DR</div>
-
-            <div>
-              <strong>Dr. Admin</strong>
-              <span>Clinic Manager</span>
-            </div>
           </div>
         </div>
       </aside>
 
       <main className="main">
-        <header className="topbar">
+        <header
+          className="topbar"
+          style={{ display: "flex", alignItems: "center", gap: 16 }}
+        >
           <div>
             <p className="welcome">CLINICCALL WORKSPACE</p>
             <h1>{activePage}</h1>
           </div>
 
-          <div className="top-actions">
-            <button
-              className="primary-btn"
-              onClick={() => {
-                setMessage("");
-                setShowAppointmentForm(true);
+          <div
+            style={{
+              flex: 1,
+              maxWidth: 380,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "#f5f6fa",
+              border: "1px solid #e6e8f0",
+              borderRadius: 10,
+              padding: "8px 14px",
+            }}
+          >
+            <span style={{ color: "#8a90a6", fontSize: 14 }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Search patients, appointments..."
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                width: "100%",
+                fontSize: 14,
               }}
-            >
-              + New appointment
-            </button>
+            />
           </div>
+
+          <button
+            aria-label="Notifications"
+            style={{
+              position: "relative",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 18,
+            }}
+          >
+            🔔
+            {appointments.length > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -6,
+                  background: "#2563eb",
+                  color: "white",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: "50%",
+                  width: 16,
+                  height: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {appointments.length > 9 ? "9+" : appointments.length}
+              </span>
+            )}
+          </button>
+
+          <div
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              background: "#eef4ff",
+              color: "#1449a6",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 700,
+              fontSize: 13,
+            }}
+            aria-label="Doctor profile"
+          >
+            DR
+          </div>
+
+          <button
+            className="primary-btn"
+            onClick={() => {
+              setMessage("");
+              setShowAppointmentForm(true);
+            }}
+          >
+            + New appointment
+          </button>
         </header>
 
         {activePage === "Dashboard" && (
           <>
             <section className="dashboard-welcome">
-              <div className="dashboard-copy">
+              <div>
                 <div className="small-label">
                   <span></span>
                   AI CALL CENTER ONLINE
@@ -562,8 +637,7 @@ function App() {
 
                 <p>
                   ClinicCall helps your clinic manage patients,
-                  appointments and communication from one simple
-                  workspace.
+                  appointments and communication.
                 </p>
 
                 <button
@@ -577,27 +651,14 @@ function App() {
               </div>
 
               <div className="dashboard-doctor">
-                <div className="dashboard-photo-glow"></div>
+                <div className="doctor-avatar-large">
+                  <div className="doctor-head-large"></div>
+                  <div className="doctor-body-large"></div>
+                </div>
 
-                <div className="dashboard-photo-wrapper">
-                  <img
-                    src={doctorPhoto}
-                    alt="ClinicCall doctor"
-                    className="dashboard-doctor-image"
-                  />
-
-                  <div className="doctor-info-card">
-                    <div className="doctor-small-avatar">
-                      DR
-                    </div>
-
-                    <div>
-                      <strong>ClinicCall AI</strong>
-                      <span>
-                        <i></i> Ready to assist
-                      </span>
-                    </div>
-                  </div>
+                <div className="doctor-badge">
+                  <span>●</span>
+                  AI Doctor Assistant
                 </div>
               </div>
             </section>
@@ -727,35 +788,61 @@ function App() {
                 )}
               </div>
 
-              <div className="panel call-panel">
+              <div className="panel">
                 <div className="panel-header">
                   <div>
-                    <h3>AI Call Center</h3>
-                    <p>Patient communication</p>
+                    <h3>Recent calls</h3>
+                    <p>Latest patient communication</p>
                   </div>
 
-                  <div className="live">
-                    <span></span> Live
+                  <button
+                    className="view-btn"
+                    onClick={() => setActivePage("Call Center")}
+                  >
+                    View all →
+                  </button>
+                </div>
+
+                {callHistory.length === 0 ? (
+                  <div className="empty-message">
+                    <div>☎</div>
+                    <h3>No calls yet</h3>
+                    <p>
+                      Calls made through ClinicCall will appear
+                      here.
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="appointment-list">
+                    {callHistory.slice(0, 5).map((call, index) => (
+                      <div
+                        className="appointment"
+                        key={call.id || index}
+                      >
+                        <div className="patient-avatar">☎</div>
 
-                <div className="call-visual">
-                  <div className="call-orb">☎</div>
-                </div>
+                        <div className="patient-info">
+                          <strong>
+                            {call.patient_id
+                              ? getPatientName(call.patient_id)
+                              : "Patient call"}
+                          </strong>
 
-                <div className="call-number">
-                  <strong>{callHistory.length}</strong>
-                  <span>calls recorded</span>
-                </div>
-
-                <button
-                  className="call-button"
-                  onClick={() =>
-                    setActivePage("Call Center")
-                  }
-                >
-                  Open call center →
-                </button>
+                          <span
+                            className={
+                              call.status === "no-answer" ||
+                              call.status === "failed"
+                                ? "status"
+                                : "status confirmed"
+                            }
+                          >
+                            {call.status || "Call completed"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
           </>
@@ -926,9 +1013,8 @@ function App() {
                       </h3>
 
                       <p>
-                        {maskPhoneNumber(
-                          patient.phone_number
-                        )}
+                        {patient.phone_number ||
+                          "No phone number"}
                       </p>
                     </div>
 
@@ -976,19 +1062,10 @@ function App() {
                 </button>
               </div>
 
-              <div className="call-center-doctor">
-                <img
-                  src={doctorPhoto}
-                  alt="ClinicCall doctor"
-                />
+              <div className="large-call-orb">
+                <div>☎</div>
               </div>
             </div>
-
-            {message && (
-              <div className="page-notice">
-                {message}
-              </div>
-            )}
 
             <div className="call-history">
               <div className="panel-header">
@@ -1044,10 +1121,6 @@ function App() {
         )}
       </main>
 
-      {/* ============================================================
-         ADD PATIENT MODAL
-      ============================================================ */}
-
       {showPatientForm && (
         <div className="modal-overlay">
           <div className="modal">
@@ -1067,9 +1140,7 @@ function App() {
 
             <h2>Add patient</h2>
 
-            <p>
-              Enter the patient's information.
-            </p>
+            <p>Enter the patient's information.</p>
 
             <form onSubmit={createPatient}>
               <label>Patient name</label>
@@ -1122,10 +1193,6 @@ function App() {
         </div>
       )}
 
-      {/* ============================================================
-         APPOINTMENT MODAL
-      ============================================================ */}
-
       {showAppointmentForm && (
         <div className="modal-overlay">
           <div className="modal">
@@ -1148,8 +1215,8 @@ function App() {
             <h2>Schedule a visit</h2>
 
             <p>
-              Select a patient and choose their
-              appointment time.
+              Select a patient and choose their appointment
+              time.
             </p>
 
             {patients.length === 0 ? (
@@ -1191,9 +1258,7 @@ function App() {
                       {patient.name ||
                         `Patient #${patient.id}`}
                       {patient.phone_number
-                        ? ` — ${maskPhoneNumber(
-                            patient.phone_number
-                          )}`
+                        ? ` — ${patient.phone_number}`
                         : ""}
                     </option>
                   ))}
@@ -1247,10 +1312,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* ============================================================
-         CALL PATIENT MODAL
-      ============================================================ */}
 
       {showCallForm && (
         <div className="modal-overlay">
