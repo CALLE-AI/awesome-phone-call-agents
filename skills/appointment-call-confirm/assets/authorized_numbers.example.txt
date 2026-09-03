@@ -1,0 +1,6 @@
+# One E.164 number per line. Copy this file to authorized_numbers.txt
+# (kept out of version control) and list only numbers you've actually
+# confirmed consent for. --confirm alone is not enough to place a call
+# to a number that isn't listed here — see references/safety.md.
++12025550147
++14155550188
