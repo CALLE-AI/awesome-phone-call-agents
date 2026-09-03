@@ -93,7 +93,7 @@ _COUNTRY_CODE_TO_REGION = {
     "254": "KE",
 }
 
-_E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
+_E164_RE = re.compile(r"\+[1-9][0-9]{6,14}")
 
 # Coarse national-numbering-plan digit-length check (country code +
 # subscriber number, total digits after the leading '+'). This is not
@@ -193,8 +193,14 @@ def _infer_region(phone: str) -> Optional[str]:
 
 def _validate_e164_for_region(phone: str, region: str) -> Optional[str]:
     """Returns None if the number passes validation, else a reason it didn't."""
-    if not _E164_RE.match(phone):
+    if not _E164_RE.fullmatch(phone):
         return f"{_mask(phone)} is not a valid E.164 number (must be + followed by 7-15 digits)"
+    inferred_region = _infer_region(phone)
+    compatible_regions = {inferred_region}
+    if inferred_region == "US":  # US and CA share country calling code +1.
+        compatible_regions.add("CA")
+    if region not in compatible_regions:
+        return f"{_mask(phone)} has a country calling code that does not match region {region!r}"
     digits = len(phone) - 1  # exclude leading '+'
     expected = _REGION_DIGIT_LENGTHS.get(region)
     if expected is None:
