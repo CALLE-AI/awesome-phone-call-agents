@@ -1,0 +1,423 @@
+/* ===== RESET & BASE ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ===== BLOQUEAR SELEÇÃO DE TEXTO EM TODA A PÁGINA ===== */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  background: #0b0e14;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  color: #e0e6f0;
+  padding: 20px;
+}
+
+/* ===== PERMITIR SELEÇÃO APENAS EM CAMPOS DE FORMULÁRIO ===== */
+input, textarea, button {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+}
+
+/* ===== BLOQUEAR ARRASTAR E COPIAR IMAGENS ===== */
+img {
+  pointer-events: none;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+}
+
+/* ===== LAYOUT PRINCIPAL ===== */
+#app {
+  width: 100%;
+  max-width: 1000px;
+  background: #121a26;
+  border-radius: 32px;
+  padding: 30px 40px 30px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 180, 255, 0.05);
+  border: 1px solid rgba(0, 180, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  min-height: 90vh;
+}
+
+.container {
+  flex: 1;
+}
+
+/* ===== HERO / LOGOTIPO ===== */
+.hero {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #1f2e3e;
+}
+
+.main-logo {
+  max-width: 280px;
+  height: auto;
+  display: block;
+  margin: 0 auto 16px;
+  filter: drop-shadow(0 0 30px rgba(0, 180, 255, 0.4));
+}
+
+.hero h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #e0e6f0;
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(0, 180, 255, 0.15);
+}
+
+.hero .subtitle {
+  color: #8899b0;
+  font-size: 16px;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+/* ===== TABS ===== */
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 30px;
+  background: #0f1620;
+  padding: 6px;
+  border-radius: 40px;
+  border: 1px solid #1f2e3e;
+}
+
+.tab-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
+  border-radius: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #8899b0;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tab-btn.active {
+  background: #00b4ff;
+  color: #0b0e14;
+  box-shadow: 0 0 25px rgba(0, 180, 255, 0.25);
+}
+
+.tab-btn:hover:not(.active) {
+  color: #c0d0e0;
+}
+
+/* ===== SECTIONS ===== */
+.section {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease;
+}
+
+.section.active {
+  display: flex;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section h2 {
+  font-size: 22px;
+  color: #e0e6f0;
+  margin-bottom: 4px;
+  text-shadow: 0 0 10px rgba(0, 180, 255, 0.08);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #1f2e3e;
+  margin: 8px 0;
+}
+
+/* ===== FORMULÁRIO ===== */
+#plan-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 600px;
+}
+
+#plan-form input,
+#plan-form textarea {
+  padding: 14px 18px;
+  background: #0f1620;
+  border: 1px solid #2a3a4a;
+  border-radius: 14px;
+  font-size: 15px;
+  color: #e0e6f0;
+  transition: 0.2s;
+}
+
+#plan-form input:focus,
+#plan-form textarea:focus {
+  border-color: #00b4ff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 180, 255, 0.15);
+}
+
+#plan-form input::placeholder,
+#plan-form textarea::placeholder {
+  color: #5a6a7a;
+}
+
+.btn-primary {
+  background: #00b4ff;
+  border: none;
+  padding: 14px;
+  border-radius: 40px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0b0e14;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: 0 4px 20px rgba(0, 180, 255, 0.25);
+}
+
+.btn-primary:hover {
+  background: #33c4ff;
+  box-shadow: 0 4px 30px rgba(0, 180, 255, 0.4);
+}
+
+.btn-primary:active { transform: scale(0.96); }
+
+.btn-secondary {
+  background: #2a3a4a;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #c0d0e0;
+  cursor: pointer;
+  transition: 0.2s;
+  max-width: fit-content;
+}
+
+.btn-secondary:hover {
+  background: #3a4a5a;
+}
+
+/* ===== LISTAS ===== */
+.plan-list, .history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 800px;
+}
+
+.plan-list li, .history-list li {
+  background: #0f1620;
+  padding: 16px 20px;
+  border-radius: 16px;
+  border-left: 4px solid #00b4ff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid #1f2e3e;
+}
+
+.history-list li {
+  border-left-color: #00ff88;
+}
+
+/* ===== PLANOS COM EDIÇÃO ===== */
+.plan-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.plan-edit-form {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  background: #0f1620;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #2a3a4a;
+}
+
+.plan-edit-form input,
+.plan-edit-form textarea {
+  padding: 10px 14px;
+  background: #121a26;
+  border: 1px solid #2a3a4a;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #e0e6f0;
+}
+
+.plan-edit-form input:focus,
+.plan-edit-form textarea:focus {
+  border-color: #00b4ff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 180, 255, 0.15);
+}
+
+.plan-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.plan-actions button {
+  background: #00b4ff;
+  color: #0b0e14;
+  border: none;
+  border-radius: 40px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.plan-actions button.edit-plan-btn {
+  background: #6a7a8a;
+  color: #e0e6f0;
+}
+
+.plan-actions button.edit-plan-btn:hover {
+  background: #8a9aaa;
+}
+
+.plan-actions button.call-plan-btn:hover {
+  background: #33c4ff;
+  box-shadow: 0 0 20px rgba(0, 180, 255, 0.3);
+}
+
+.plan-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ===== HISTÓRICO ===== */
+.history-item .h-status {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 40px;
+  background: #1a2634;
+  color: #00b4ff;
+  align-self: flex-start;
+  border: 1px solid #2a3a4a;
+}
+
+.history-item .h-status.completed {
+  background: #003d2a;
+  color: #00ff88;
+  border-color: #00ff88;
+}
+
+.history-item .h-status.failed {
+  background: #3d1a1a;
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.history-item .h-time {
+  font-size: 12px;
+  color: #5a6a7a;
+}
+
+/* ===== SETTINGS ===== */
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #1f2e3e;
+  max-width: 400px;
+}
+
+/* ===== RODAPÉ ===== */
+.app-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #1f2e3e;
+  text-align: center;
+  font-size: 13px;
+  color: #5a6a7a;
+  letter-spacing: 0.5px;
+  font-weight: 300;
+}
+
+.app-footer a {
+  color: #00b4ff;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 600px) {
+  #app {
+    padding: 20px 16px 30px;
+  }
+  .main-logo {
+    max-width: 180px;
+  }
+  .hero h1 {
+    font-size: 24px;
+  }
+  .tabs {
+    flex-direction: column;
+    border-radius: 20px;
+  }
+  .tab-btn {
+    padding: 10px;
+    font-size: 14px;
+  }
+  .plan-list li, .history-list li {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .plan-list li .plan-actions {
+    align-self: flex-end;
+  }
+  .plan-display {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .plan-actions {
+    justify-content: flex-end;
+  }
+  .app-footer {
+    font-size: 11px;
+  }
+}
