@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New stock request</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/runs">
+  <label>Blood group
+    <select name="blood_group">
+      {% for g in ('A', 'B', 'AB', 'O') %}
+      <option {% if form.get('blood_group') == g %}selected{% endif %}>{{ g }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Rhesus
+    <select name="rhesus">
+      <option value="positive" {% if form.get('rhesus') == 'positive' %}selected{% endif %}>positive</option>
+      <option value="negative" {% if form.get('rhesus') == 'negative' %}selected{% endif %}>negative</option>
+    </select>
+  </label>
+  <label>Units needed
+    <input type="number" name="units_needed" min="1" max="10" value="{{ form.get('units_needed', 1) }}">
+  </label>
+  <label>Requester (facility or your name)
+    <input name="requester" value="{{ form.get('requester', '') }}" size="30">
+  </label>
+
+  <fieldset>
+    <legend>Banks — every selected bank is dialled in parallel</legend>
+    {% if banks %}
+    <label><input type="checkbox" checked onchange="document.querySelectorAll('.bankcheck').forEach(c => c.checked = this.checked)"> Select all</label>
+    {% for b in banks %}
+    <label>
+      <input type="checkbox" class="bankcheck" name="bank_ids" value="{{ b.id }}" checked>
+      {{ b.name }} — {{ b.phone }} <span class="muted">{{ b.area or '' }}</span>
+    </label>
+    {% endfor %}
+    {% else %}
+    <p class="muted">No active banks in the registry yet.</p>
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Ad hoc number (optional)</legend>
+    <label>Phone (E.164) <input name="adhoc_phone" placeholder="+15550101234"></label>
+    <label>Label <input name="adhoc_label" placeholder="e.g. General Hospital annex"></label>
+    <label><input type="checkbox" name="adhoc_save"> Save to registry after a successful call</label>
+  </fieldset>
+
+  <button class="primary">Dispatch calls</button>
+  <span class="muted">The agent only gathers information. It never reserves or promises anything.</span>
+</form>
+{% endblock %}

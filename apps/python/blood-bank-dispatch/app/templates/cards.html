@@ -1,0 +1,49 @@
+<div class="cards">
+  {% for r in rows %}
+  <div class="card">
+    <strong>{{ r.bank_name }}</strong> <span class="muted">{{ r.phone }}</span><br>
+    <span class="badge {{ r.status }}">{{ r.status }}</span>
+    {% if r.status == 'completed' %}
+    <ul>
+      <li>Units available: {{ r.units_available if r.units_available is not none else '—' }}</li>
+      <li>Release: {{ r.release_policy or '—' }}</li>
+      <li>Screening: {{ r.screening_status or '—' }}</li>
+      <li>Transport: {{ (r.transport_minutes ~ ' min') if r.transport_minutes is not none else '—' }}</li>
+      <li>Cost per unit: {{ r.cost_per_unit if r.cost_per_unit is not none else '—' }}</li>
+      <li>Ask for: {{ r.contact_person or '—' }}</li>
+      {% if r.callback_requested %}<li><strong>They will call back</strong></li>{% endif %}
+      {% if r.alternatives %}<li>Alternatives: {{ r.alternatives | join(', ') }}</li>{% endif %}
+    </ul>
+    {% elif r.status == 'callback_requested' %}
+    <span class="muted">The bank asked us to wait for a callback.</span>
+    {% elif r.status == 'failed' and r.error %}
+    <span class="error">{{ r.error }}</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="shortlist">
+  <h2>Shortlist</h2>
+  <p class="muted">Information only — for a qualified human to act on. This agent never reserves or dispatches.</p>
+  {% if shortlist %}
+  <div class="table-wrap">
+  <table>
+    <tr><th>Bank</th><th>Phone</th><th>Units</th><th>Release</th><th>Transport</th><th>Cost/unit</th><th>Ask for</th></tr>
+    {% for r in shortlist %}
+    <tr>
+      <td>{{ r.bank_name }}</td>
+      <td>{{ r.phone }}</td>
+      <td>{{ r.units_available }}</td>
+      <td>{{ r.release_policy }}</td>
+      <td>{{ (r.transport_minutes ~ ' min') if r.transport_minutes is not none else '—' }}</td>
+      <td>{{ r.cost_per_unit if r.cost_per_unit is not none else '—' }}</td>
+      <td>{{ r.contact_person or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">No completed results yet.</p>
+  {% endif %}
+</div>
