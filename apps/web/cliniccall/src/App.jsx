@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import doctorPhoto from "./assets/doctor-photo.png";
 
 const API_URL = "https://cliniccall-api.onrender.com";
 
@@ -40,8 +41,6 @@ function App() {
 
       if (response.ok && Array.isArray(data)) {
         setPatients(data);
-      } else {
-        console.error("Patients error:", data);
       }
     } catch (error) {
       console.error("Unable to load patients:", error);
@@ -55,8 +54,6 @@ function App() {
 
       if (response.ok && Array.isArray(data)) {
         setAppointments(data);
-      } else {
-        console.error("Appointments error:", data);
       }
     } catch (error) {
       console.error("Unable to load appointments:", error);
@@ -70,12 +67,30 @@ function App() {
 
       if (response.ok && Array.isArray(data)) {
         setCallHistory(data);
-      } else {
-        console.error("Call history error:", data);
       }
     } catch (error) {
       console.error("Unable to load call history:", error);
     }
+  }
+
+  function getPatientName(patientId) {
+    const patient = patients.find(
+      (item) => Number(item.id) === Number(patientId)
+    );
+
+    return patient?.name || `Patient #${patientId}`;
+  }
+
+  function maskPhoneNumber(phone) {
+    if (!phone) return "No phone number";
+
+    const value = String(phone);
+
+    if (value.length <= 4) {
+      return "••••";
+    }
+
+    return `${value.slice(0, 4)}••••${value.slice(-2)}`;
   }
 
   async function createPatient(event) {
@@ -96,8 +111,8 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: patientName,
-          phone_number: patientPhone,
+          name: patientName.trim(),
+          phone_number: patientPhone.trim(),
         }),
       });
 
@@ -191,10 +206,6 @@ function App() {
     }
   }
 
-  // ============================================================
-  // FIXED CALL PATIENT FUNCTION
-  // ============================================================
-
   async function callPatient(event) {
     event.preventDefault();
 
@@ -232,18 +243,14 @@ function App() {
         }
       }
 
-      console.log("Call API status:", response.status);
-      console.log("Call API response:", data);
-
       if (!response.ok) {
         let errorMessage = "Unable to start patient call.";
 
         if (data.detail) {
-          if (typeof data.detail === "string") {
-            errorMessage = data.detail;
-          } else {
-            errorMessage = JSON.stringify(data.detail);
-          }
+          errorMessage =
+            typeof data.detail === "string"
+              ? data.detail
+              : JSON.stringify(data.detail);
         } else if (data.message) {
           errorMessage = data.message;
         } else if (text) {
@@ -254,21 +261,11 @@ function App() {
         return;
       }
 
-      // THE CALL WAS SUCCESSFUL
-      setMessage("✅ Patient call started successfully!");
+      setMessage("Patient call started successfully!");
 
       setSelectedAppointment("");
 
-      // Call history is separate from the actual call.
-      // If it fails, don't tell the user that the call failed.
-      try {
-        await loadCallHistory();
-      } catch (historyError) {
-        console.warn(
-          "Call succeeded, but call history could not refresh:",
-          historyError
-        );
-      }
+      await loadCallHistory();
 
       setTimeout(() => {
         setShowCallForm(false);
@@ -278,24 +275,16 @@ function App() {
       console.error("Frontend call error:", error);
 
       setMessage(
-        "⚠️ The call request could not be confirmed. Please check the Call Center."
+        "The call request could not be confirmed. Please check the Call Center."
       );
     } finally {
       setLoading(false);
     }
   }
 
-  function getPatientName(patientId) {
-    const patient = patients.find(
-      (item) => Number(item.id) === Number(patientId)
-    );
-
-    return patient?.name || `Patient #${patientId}`;
-  }
-
-  // ============================================================
-  // LANDING PAGE
-  // ============================================================
+  /* ============================================================
+     LANDING PAGE
+  ============================================================ */
 
   if (!started) {
     return (
@@ -356,8 +345,25 @@ function App() {
             </div>
           </div>
 
-          <div className="hero-art">
-            <div className="glow"></div>
+          <div className="hero-doctor">
+            <div className="doctor-glow"></div>
+
+            <div className="doctor-frame">
+              <img
+                src={doctorPhoto}
+                alt="Doctor using ClinicCall"
+                className="doctor-image"
+              />
+
+              <div className="doctor-badge">
+                <span className="status-dot"></span>
+
+                <div>
+                  <strong>ClinicCall AI</strong>
+                  <small>System operational</small>
+                </div>
+              </div>
+            </div>
 
             <div className="floating-card call-card">
               <div className="mini-icon">☎</div>
@@ -368,33 +374,6 @@ function App() {
               </div>
 
               <div className="online-dot"></div>
-            </div>
-
-            <div className="dashboard-preview">
-              <div className="preview-top">
-                <div>
-                  <small>ClinicCall AI</small>
-                  <strong>Good morning, Doctor</strong>
-                </div>
-
-                <div className="preview-avatar">DR</div>
-              </div>
-
-              <div className="preview-number">
-                <small>Today's calls</small>
-                <strong>{callHistory.length}</strong>
-              </div>
-
-              <div className="preview-appointment">
-                <div className="preview-person">CC</div>
-
-                <div>
-                  <strong>ClinicCall</strong>
-                  <small>Appointment reminder</small>
-                </div>
-
-                <b>AI</b>
-              </div>
             </div>
 
             <div className="floating-card success-card">
@@ -478,9 +457,9 @@ function App() {
     );
   }
 
-  // ============================================================
-  // DASHBOARD
-  // ============================================================
+  /* ============================================================
+     DASHBOARD
+  ============================================================ */
 
   return (
     <div className="app">
@@ -508,7 +487,10 @@ function App() {
               className={`menu-item ${
                 activePage === item ? "active" : ""
               }`}
-              onClick={() => setActivePage(item)}
+              onClick={() => {
+                setActivePage(item);
+                setMessage("");
+              }}
             >
               <span>
                 {["⌂", "▣", "♙", "☎"][index]}
@@ -566,7 +548,7 @@ function App() {
         {activePage === "Dashboard" && (
           <>
             <section className="dashboard-welcome">
-              <div>
+              <div className="dashboard-copy">
                 <div className="small-label">
                   <span></span>
                   AI CALL CENTER ONLINE
@@ -580,7 +562,8 @@ function App() {
 
                 <p>
                   ClinicCall helps your clinic manage patients,
-                  appointments and communication.
+                  appointments and communication from one simple
+                  workspace.
                 </p>
 
                 <button
@@ -593,10 +576,29 @@ function App() {
                 </button>
               </div>
 
-              <div className="dashboard-phone">
-                <div className="phone-ring ring-a"></div>
-                <div className="phone-ring ring-b"></div>
-                <div className="phone-core">☎</div>
+              <div className="dashboard-doctor">
+                <div className="dashboard-photo-glow"></div>
+
+                <div className="dashboard-photo-wrapper">
+                  <img
+                    src={doctorPhoto}
+                    alt="ClinicCall doctor"
+                    className="dashboard-doctor-image"
+                  />
+
+                  <div className="doctor-info-card">
+                    <div className="doctor-small-avatar">
+                      DR
+                    </div>
+
+                    <div>
+                      <strong>ClinicCall AI</strong>
+                      <span>
+                        <i></i> Ready to assist
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -924,8 +926,9 @@ function App() {
                       </h3>
 
                       <p>
-                        {patient.phone_number ||
-                          "No phone number"}
+                        {maskPhoneNumber(
+                          patient.phone_number
+                        )}
                       </p>
                     </div>
 
@@ -973,10 +976,19 @@ function App() {
                 </button>
               </div>
 
-              <div className="large-call-orb">
-                <div>☎</div>
+              <div className="call-center-doctor">
+                <img
+                  src={doctorPhoto}
+                  alt="ClinicCall doctor"
+                />
               </div>
             </div>
+
+            {message && (
+              <div className="page-notice">
+                {message}
+              </div>
+            )}
 
             <div className="call-history">
               <div className="panel-header">
@@ -1032,7 +1044,9 @@ function App() {
         )}
       </main>
 
-      {/* ADD PATIENT */}
+      {/* ============================================================
+         ADD PATIENT MODAL
+      ============================================================ */}
 
       {showPatientForm && (
         <div className="modal-overlay">
@@ -1108,7 +1122,9 @@ function App() {
         </div>
       )}
 
-      {/* ADD APPOINTMENT */}
+      {/* ============================================================
+         APPOINTMENT MODAL
+      ============================================================ */}
 
       {showAppointmentForm && (
         <div className="modal-overlay">
@@ -1175,7 +1191,9 @@ function App() {
                       {patient.name ||
                         `Patient #${patient.id}`}
                       {patient.phone_number
-                        ? ` — ${patient.phone_number}`
+                        ? ` — ${maskPhoneNumber(
+                            patient.phone_number
+                          )}`
                         : ""}
                     </option>
                   ))}
@@ -1230,7 +1248,9 @@ function App() {
         </div>
       )}
 
-      {/* CALL PATIENT */}
+      {/* ============================================================
+         CALL PATIENT MODAL
+      ============================================================ */}
 
       {showCallForm && (
         <div className="modal-overlay">
