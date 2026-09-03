@@ -1,0 +1,13 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { compilePlan, normalizeResult } from "../src/core.js";
+import { runCalle } from "../src/calle.js";
+const base={opportunity_id:"fictional-reward",target_name:"Example Rewards Team",opportunity_url:"https://example.org/reward",official_phone:"+12025550147",contact_source_url:"https://example.org/contact",authorization:"official_business_contact_publicly_listed",questions:["payout_currency","payout_rail","payout_timing","written_terms_location"],max_calls:1,expires_at:"2099-01-01T00:00:00Z",language:"English",region:"US"};
+test("compiles deterministic one-call plan",()=>{const a=compilePlan(base),b=compilePlan(base);assert.deepEqual(a,b);assert.equal(a.max_calls,1);assert.match(a.idempotency_key,/^payoutproof-/);assert.equal(a.safety.verbal_answers_are_not_contract,true);});
+test("preview masks phone in custody hash input",()=>{const p=compilePlan(base);assert.equal(p.masked_phone,"+12****0147");assert.ok(!p.packet_hash.includes("0147"));});
+test("rejects unsupported questions",()=>assert.throws(()=>compilePlan({...base,questions:["ask_for_bank_account"]}),/not allowed/));
+test("rejects sensitive payloads",()=>assert.throws(()=>compilePlan({...base,personal_data:{name:"A"}}),/prohibited/));
+test("rejects more than one call",()=>assert.throws(()=>compilePlan({...base,max_calls:2}),/max_calls/));
+test("planning uses official CLI without live gate",()=>{let call;const runner=(bin,args)=>{call={bin,args};return{status:0,stdout:'{"ok":true,"run_id":"r1"}',stderr:""};};const result=runCalle("plan",compilePlan(base),{runner,env:{}});assert.equal(call.bin,"calle");assert.deepEqual(call.args.slice(0,2),["call","plan"]);assert.equal(result.ok,true);});
+test("live start fails closed without enablement and exact approval",()=>{const p=compilePlan(base);assert.throws(()=>runCalle("start",p,{runner:()=>{throw new Error("must not run")},env:{},approvalId:p.approval_id}),/disabled/);assert.throws(()=>runCalle("start",p,{runner:()=>{throw new Error("must not run")},env:{PAYOUTPROOF_ENABLE_LIVE:"1"},approvalId:"wrong"}),/mismatch/);});
+test("normalizes verbal outcome without calling it contractual proof",()=>{const p=compilePlan(base),r=normalizeResult(p,{status:"COMPLETED",summary:"Example text"});assert.equal(r.terminal,true);assert.equal(r.contractual_verification,false);assert.equal(r.written_source_required,true);});

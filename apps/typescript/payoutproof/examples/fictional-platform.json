@@ -1,0 +1,13 @@
+{
+  "opportunity_id": "fictional-reward",
+  "target_name": "Example Rewards Team",
+  "opportunity_url": "https://example.org/reward",
+  "official_phone": "+12025550147",
+  "contact_source_url": "https://example.org/contact",
+  "authorization": "official_business_contact_publicly_listed",
+  "questions": ["payout_currency", "payout_rail", "payout_timing", "identity_or_tax_steps", "written_terms_location"],
+  "max_calls": 1,
+  "expires_at": "2099-01-01T00:00:00Z",
+  "language": "English",
+  "region": "US"
+}
