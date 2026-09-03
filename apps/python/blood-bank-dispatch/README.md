@@ -24,7 +24,7 @@ Python 3.12+ and a Postgres database.
 ```bash
 cd apps/python/blood-bank-dispatch
 python3 -m venv venv
-venv/bin/pip install fastapi "uvicorn[standard]" jinja2 asyncpg python-multipart python-dotenv calle-ai
+venv/bin/pip install -r requirements.txt
 
 cp .env.example .env    # fill in DATABASE_URL; CALLE_API_KEY only for live calls
 
