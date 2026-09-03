@@ -44,7 +44,7 @@ Create a `.env.local` file in the project root:
 ```
 CALLE_API_KEY=your_calle_api_key_here
 KIMI_API_KEY=your_kimi_api_key_here # optional — see "AI summary fallback" below
-MOCK_CALLS=false
+MOCK_CALLS=true
 ```
 
 ### Install and run
