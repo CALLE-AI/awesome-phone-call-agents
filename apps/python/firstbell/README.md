@@ -199,6 +199,15 @@ python -m calle_double.server --port 8787
 export CALLE_BASE_URL=http://127.0.0.1:8787
 ```
 
+## Evidence from real calls
+
+`evidence/` holds four receipts from calls placed against `api.heycall-e.com`, each with
+`reached_production_api: true`, a real `call_id` and CALL-E's own returned transcript. One
+command producing two calls in two languages with identical results, a re-run that placed
+no calls at all, an unanswered call whose three accounts of itself disagree, and a receipt
+of this app getting it wrong before the defect was fixed. `evidence/README.md` says what
+each one is worth.
+
 ## Tests
 
 ```bash
