@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import time
@@ -9,6 +10,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
 
 from fastapi import FastAPI, Form, HTTPException, Request  # noqa: E402
 from fastapi.responses import RedirectResponse  # noqa: E402
@@ -25,6 +31,7 @@ from .auth import (  # noqa: E402
     password_is_set,
 )
 from .dispatch import CallTarget, DRY_RUN, spawn  # noqa: E402
+from .util import mask_phone  # noqa: E402
 
 BASE = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE / "app" / "templates"))
@@ -35,8 +42,17 @@ RHESUS = ("positive", "negative")
 MAX_TARGETS = int(os.environ.get("MAX_TARGETS", "8"))
 RATE_LIMIT = int(os.environ.get("RATE_LIMIT_RUNS", "6"))
 RATE_WINDOW = 600.0  # seconds
+LOGIN_LIMIT = int(os.environ.get("LOGIN_LIMIT", "10"))
+NAME_MAX, AREA_MAX, NOTES_MAX, LABEL_MAX = 80, 60, 200, 80
 
 _rate: dict[str, deque[float]] = defaultdict(deque)
+_login_attempts: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _cap(field: str, value: str, limit: int) -> str:
+    if len(value) > limit:
+        raise HTTPException(400, f"{field} is limited to {limit} characters")
+    return value
 
 
 @asynccontextmanager
@@ -55,18 +71,6 @@ def render(request: Request, name: str, status_code: int = 200, **ctx):
     return templates.TemplateResponse(
         request=request, name=name, context=ctx, status_code=status_code
     )
-
-
-def mask_phone(value) -> str:
-    # Contribution-repo convention: keep the first two characters and the
-    # last four digits, e.g. +1******2671. Full numbers stay in the database
-    # and in the runtime call prompt; they must not appear in rendered views.
-    if not value:
-        return "—"
-    v = str(value)
-    if len(v) <= 6:
-        return v[0] + "*****"
-    return f"{v[:2]}{'*' * (len(v) - 6)}{v[-4:]}"
 
 
 templates.env.filters["mask"] = mask_phone
@@ -96,6 +100,17 @@ async def login_page(request: Request):
 async def login(request: Request, password: str = Form("")):
     if not password_is_set():
         return render(request, "disabled.html", status_code=503)
+    ip = request.client.host if request.client else "?"
+    now = time.monotonic()
+    window = _login_attempts[ip]
+    while window and now - window[0] > RATE_WINDOW:
+        window.popleft()
+    window.append(now)
+    if len(window) > LOGIN_LIMIT:
+        return render(
+            request, "login.html", status_code=429,
+            error="Too many attempts, try again later",
+        )
     if not check_password(password):
         return render(request, "login.html", status_code=401, error="Incorrect password")
     resp = RedirectResponse("/request", status_code=303)
@@ -147,7 +162,7 @@ async def banks_create(
     blocked = gate(request)
     if blocked:
         return blocked
-    name = name.strip()
+    name = _cap("name", name.strip(), NAME_MAX)
     if not name:
         raise HTTPException(400, "name is required")
     await db.execute(
@@ -156,8 +171,8 @@ async def banks_create(
         " area = excluded.area, notes = excluded.notes",
         name,
         _clean_phone(phone),
-        area.strip() or None,
-        notes.strip() or None,
+        _cap("area", area.strip(), AREA_MAX) or None,
+        _cap("notes", notes.strip(), NOTES_MAX) or None,
     )
     return RedirectResponse("/banks", status_code=303)
 
@@ -175,7 +190,7 @@ async def banks_update(
     blocked = gate(request)
     if blocked:
         return blocked
-    name = name.strip()
+    name = _cap("name", name.strip(), NAME_MAX)
     if not name:
         raise HTTPException(400, "name is required")
     # The phone is never rendered back into the form; a blank new_phone keeps
@@ -190,8 +205,8 @@ async def banks_update(
         bank_id,
         name,
         phone,
-        area.strip() or None,
-        notes.strip() or None,
+        _cap("area", area.strip(), AREA_MAX) or None,
+        _cap("notes", notes.strip(), NOTES_MAX) or None,
         active == "on",
     )
     return RedirectResponse("/banks", status_code=303)
@@ -259,6 +274,8 @@ async def create_run(
         errors.append("units needed must be between 1 and 10")
     if not bank_ids and not adhoc_phone.strip():
         errors.append("select at least one bank or enter an ad hoc number")
+    if len(requester.strip()) > LABEL_MAX:
+        errors.append(f"requester is limited to {LABEL_MAX} characters")
 
     bank_rows = []
     if bank_ids:
@@ -277,6 +294,8 @@ async def create_run(
     adhoc_phone = adhoc_phone.strip()
     if adhoc_phone and not E164.match(adhoc_phone):
         errors.append("ad hoc number must be E.164, e.g. +15550101234")
+    if len(adhoc_label.strip()) > LABEL_MAX:
+        errors.append(f"label is limited to {LABEL_MAX} characters")
     if adhoc_phone and not DRY_RUN and adhoc_phone not in allowed_destinations():
         errors.append(
             "live mode: ad hoc numbers must be pre-authorized in ALLOWED_DESTINATIONS"
@@ -289,62 +308,65 @@ async def create_run(
     if errors:
         return await _request_error(request, " ".join(errors), request_form())
 
-    run = await db.fetchrow(
-        "insert into call_runs (blood_group, rhesus, units_needed, requester)"
-        " values ($1, $2, $3, $4) returning *",
-        blood_group,
-        rhesus,
-        units_needed,
-        requester.strip() or None,
-    )
-
+    # One transaction: the run and all its queued rows exist or none do.
+    # A mid-sequence failure previously left a partial run behind.
     targets: list[CallTarget] = []
-    for row in bank_rows:
-        key = f"run:{run['id']}:bank:{row['id']}:v1"
-        result = await db.fetchrow(
-            "insert into call_results"
-            " (run_id, bank_id, source, bank_name, phone, idempotency_key)"
-            " values ($1, $2, 'registry', $3, $4, $5) returning id",
-            run["id"],
-            row["id"],
-            row["name"],
-            row["phone"],
-            key,
-        )
-        targets.append(
-            CallTarget(
-                result_id=result["id"],
-                name=row["name"],
-                phone=row["phone"],
-                source="registry",
-                idempotency_key=key,
-                bank_id=row["id"],
-                notes=row["notes"],
-            )
+    async with db.transaction() as conn:
+        run = await conn.fetchrow(
+            "insert into call_runs (blood_group, rhesus, units_needed, requester)"
+            " values ($1, $2, $3, $4) returning *",
+            blood_group,
+            rhesus,
+            units_needed,
+            requester.strip() or None,
         )
 
-    if adhoc_phone:
-        label = adhoc_label.strip() or adhoc_phone
-        key = f"run:{run['id']}:number:{adhoc_phone}:v1"
-        result = await db.fetchrow(
-            "insert into call_results"
-            " (run_id, source, bank_name, phone, idempotency_key)"
-            " values ($1, 'adhoc', $2, $3, $4) returning id",
-            run["id"],
-            label,
-            adhoc_phone,
-            key,
-        )
-        targets.append(
-            CallTarget(
-                result_id=result["id"],
-                name=label,
-                phone=adhoc_phone,
-                source="adhoc",
-                idempotency_key=key,
-                save_to_registry=adhoc_save == "on",
+        for row in bank_rows:
+            key = f"run:{run['id']}:bank:{row['id']}:v1"
+            result = await conn.fetchrow(
+                "insert into call_results"
+                " (run_id, bank_id, source, bank_name, phone, idempotency_key)"
+                " values ($1, $2, 'registry', $3, $4, $5) returning id",
+                run["id"],
+                row["id"],
+                row["name"],
+                row["phone"],
+                key,
             )
-        )
+            targets.append(
+                CallTarget(
+                    result_id=result["id"],
+                    name=row["name"],
+                    phone=row["phone"],
+                    source="registry",
+                    idempotency_key=key,
+                    bank_id=row["id"],
+                    notes=row["notes"],
+                )
+            )
+
+        if adhoc_phone:
+            label = adhoc_label.strip() or adhoc_phone
+            key = f"run:{run['id']}:number:{adhoc_phone}:v1"
+            result = await conn.fetchrow(
+                "insert into call_results"
+                " (run_id, source, bank_name, phone, idempotency_key)"
+                " values ($1, 'adhoc', $2, $3, $4) returning id",
+                run["id"],
+                label,
+                adhoc_phone,
+                key,
+            )
+            targets.append(
+                CallTarget(
+                    result_id=result["id"],
+                    name=label,
+                    phone=adhoc_phone,
+                    source="adhoc",
+                    idempotency_key=key,
+                    save_to_registry=adhoc_save == "on",
+                )
+            )
 
     spawn(dict(run), targets)
     return RedirectResponse(f"/runs/{run['id']}", status_code=303)

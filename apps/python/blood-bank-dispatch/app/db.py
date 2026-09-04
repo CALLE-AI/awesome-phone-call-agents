@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 
 import asyncpg
 
@@ -63,3 +64,14 @@ async def fetchrow(query: str, *args):
 
 async def execute(query: str, *args):
     return await pool().execute(query, *args)
+
+
+@asynccontextmanager
+async def transaction():
+    """One connection, one transaction: commit on success, roll back on error.
+
+    Use for multi-statement writes that must succeed or fail as a unit.
+    """
+    async with pool().acquire() as conn:
+        async with conn.transaction():
+            yield conn

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from dataclasses import dataclass
 
@@ -11,6 +12,9 @@ from calle.errors import CalleConnectionError  # noqa: E402
 
 from . import db  # noqa: E402
 from .prompt import EXTRACTION_SCHEMA, build_task  # noqa: E402
+from .util import mask_phone  # noqa: E402
+
+log = logging.getLogger("bbd.dispatch")
 
 _background_tasks: set[asyncio.Task] = set()
 _client: CalleClient | None = None
@@ -41,7 +45,13 @@ def get_client() -> CalleClient:
 def spawn(run: dict, targets: list[CallTarget]) -> None:
     task = asyncio.create_task(dispatch_run(run, targets))
     _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    task.add_done_callback(_task_done)
+
+
+def _task_done(task: asyncio.Task) -> None:
+    _background_tasks.discard(task)
+    if not task.cancelled() and task.exception():
+        log.error("dispatch task crashed: %s", task.exception())
 
 
 async def dispatch_run(run: dict, targets: list[CallTarget]) -> None:
@@ -53,10 +63,15 @@ async def dispatch_run(run: dict, targets: list[CallTarget]) -> None:
             await _call_one(run, target, variant)
 
     await asyncio.gather(*(one(t, i) for i, t in enumerate(targets)))
-    await db.execute(
-        "update call_runs set status = 'completed', completed_at = now() where id = $1",
-        run["id"],
-    )
+    try:
+        await db.execute(
+            "update call_runs set status = 'completed', completed_at = now()"
+            " where id = $1",
+            run["id"],
+        )
+    except Exception as exc:
+        # All target rows are terminal; only the run status line failed.
+        log.error("could not mark run %s completed: %s", run["id"], exc)
 
 
 async def _call_one(run: dict, target: CallTarget, variant: int = 0) -> None:
@@ -64,6 +79,10 @@ async def _call_one(run: dict, target: CallTarget, variant: int = 0) -> None:
         await db.execute(
             "update call_results set status = 'dialing' where id = $1",
             target.result_id,
+        )
+        log.info(
+            "dispatching %s target %s %s",
+            target.source, target.name, mask_phone(target.phone),
         )
         if DRY_RUN:
             # No-call mode: simulate the four mock-line personas so the UI,
@@ -103,6 +122,7 @@ async def _call_one(run: dict, target: CallTarget, variant: int = 0) -> None:
             )
         await _store_result(target, call)
     except Exception as exc:  # keep the run alive; the row shows the failure
+        log.warning("target %s failed: %s", target.name, exc)
         try:
             await db.execute(
                 "update call_results set status = 'failed', error = $2 where id = $1",
@@ -242,6 +262,7 @@ async def _store_result(target: CallTarget, call: dict) -> None:
     completion = call.get("completion_confidence")
     if isinstance(completion, dict):
         confidence = completion.get("score")
+    log.info("target %s -> %s (confidence %s)", target.name, row_status, confidence)
 
     await db.execute(
         """
