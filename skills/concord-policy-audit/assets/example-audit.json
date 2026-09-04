@@ -1,0 +1,13 @@
+{
+  "id": "AU-2026-09-03",
+  "org": "Northgate Pharmacy Group",
+  "rubric_id": "RB-EC-01",
+  "requested_by": "Priya Raman, Clinical Governance",
+  "call_window": { "timezone": "Europe/London", "start": "09:30", "end": "16:30" },
+  "branches": [
+    { "id": "B1", "name": "Northgate Pharmacy, Selby Road", "phone": "+447700900101", "authorization": "owned-estate register 2026-09-01" },
+    { "id": "B2", "name": "Northgate Pharmacy, Harbour Street", "phone": "+447700900102", "authorization": "owned-estate register 2026-09-01" },
+    { "id": "B3", "name": "Northgate Pharmacy, Mill Court", "phone": "+447700900103", "authorization": "owned-estate register 2026-09-01" },
+    { "id": "B4", "name": "Northgate Pharmacy, Eastway", "phone": "+447700900104", "authorization": "owned-estate register 2026-09-01" }
+  ]
+}

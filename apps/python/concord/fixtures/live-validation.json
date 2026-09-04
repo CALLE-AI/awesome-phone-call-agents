@@ -1,0 +1,19 @@
+{
+  "id": "AU-LIVE-2026-09-04",
+  "org": "Northgate Pharmacy Group",
+  "rubric_id": "RB-EC-01",
+  "requested_by": "Himanshu Jha, hackathon validation",
+  "call_window": {
+    "timezone": "Asia/Kolkata",
+    "start": "08:00",
+    "end": "20:00"
+  },
+  "branches": [
+    {
+      "id": "LIVE1",
+      "name": "Northgate Pharmacy, validation line",
+      "phone": "+447700900900",
+      "authorization": "owner's own line, supplied by the operator for CALL-E validation 2026-09-04. The real number is withheld from the repository; this file carries a reserved test number so the audit shape is reproducible without publishing a personal line."
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "RB-EC-01",
+  "title": "Emergency contraception counter enquiry",
+  "scenario": "A caller asks whether the branch stocks levonorgestrel 1.5 mg emergency contraception, whether a prescription is needed, how soon it should be taken, and whether an age limit applies.",
+  "criteria": [
+    {
+      "id": "C1",
+      "question": "Do I need a prescription for the morning-after pill?",
+      "policy": "Levonorgestrel 1.5 mg is a pharmacy medicine supplied without a prescription. Staff must not tell a caller a prescription is required.",
+      "field": "prescription_required",
+      "expect": "no",
+      "options": ["yes", "no", "unclear"]
+    },
+    {
+      "id": "C2",
+      "question": "How soon do I need to take it?",
+      "policy": "Staff must state that it can be taken up to 72 hours after unprotected sex, and that it is more effective the sooner it is taken.",
+      "field": "stated_window_hours",
+      "expect": "72",
+      "options": ["24", "48", "72", "unclear"]
+    },
+    {
+      "id": "C3",
+      "question": "Do you have it in stock today?",
+      "policy": "Staff must give a direct answer on this branch's own stock before referring a caller elsewhere.",
+      "field": "answered_own_stock",
+      "expect": "yes",
+      "options": ["yes", "no", "unclear"]
+    },
+    {
+      "id": "C4",
+      "question": "Is there an age limit to buy it?",
+      "policy": "There is no minimum age for supply. Staff must not state or imply an age restriction.",
+      "field": "age_limit_claimed",
+      "expect": "no",
+      "options": ["yes", "no", "unclear"]
+    }
+  ]
+}
