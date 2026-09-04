@@ -1,0 +1,26 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//RingBack//Exemple d'agenda//FR
+BEGIN:VEVENT
+UID:exemple-1@ringback
+SUMMARY:Mme Inès Fabre — Séance d'ostéopathie
+DTSTART:20260721T093000
+DTEND:20260721T103000
+END:VEVENT
+BEGIN:VEVENT
+UID:exemple-2@ringback
+SUMMARY:M. Diego Ferreira — Bilan de posture complet avec
+  compte rendu détaillé
+DTSTART;TZID=Europe/Paris:20270305T141500
+END:VEVENT
+BEGIN:VEVENT
+UID:exemple-3@ringback
+SUMMARY:Mme Léa Fontaine — Cours de chant
+DTSTART:20270312T100000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:exemple-4@ringback
+SUMMARY:Atelier collectif de poterie
+DTSTART;VALUE=DATE:20270320
+END:VEVENT
+END:VCALENDAR
