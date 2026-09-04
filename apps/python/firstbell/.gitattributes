@@ -7,8 +7,11 @@ evidence/*.json            linguist-generated=true
 
 # Keep line endings stable across platforms. A receipt whose bytes change on checkout is a
 # receipt whose digest cannot be quoted.
-*.json text eol=lf
-*.md   text eol=lf
-*.py   text eol=lf
-*.css  text eol=lf
-*.js   text eol=lf
+#
+# One pattern rather than a list of extensions. The list named .json, .md, .py, .css and
+# .js, which left four .mjs files, the example work file and both requirements files
+# outside a rule written for the whole tree, so their bytes on checkout depended on each
+# machine's core.autocrlf setting. text=auto still detects binary content; the PNGs are
+# named anyway so nothing tries to normalise a screenshot.
+* text=auto eol=lf
+*.png binary
