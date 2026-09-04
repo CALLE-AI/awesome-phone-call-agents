@@ -398,7 +398,20 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .act-00 h1 {
   font-size: clamp(2.75rem, 7.5vw, 7rem);
   line-height: 0.98; letter-spacing: -0.012em; text-wrap: balance;
-  max-width: 16ch;
+  /* Measured in em of this headline own font-size, never in ch.
+   *
+   * ch is the advance width of a zero in whatever face is rendering, so 16ch resolved to
+   * 833.68px against the local fallback and 760.32px against Freight Text Compressed.
+   * The headline wrapped to three lines instead of two and the block changed height by
+   * exactly one line box, 105.84px, which on a centred hero is a 0.0386 layout shift.
+   * It appeared in three runs out of five, which is why a single measurement had called
+   * it fixed.
+   *
+   * em scales with the type across the clamp the way ch did, and depends on no glyph.
+   * 8.2em is the narrowest value where both states wrap to two lines (tools/gates/
+   * font-diag.mjs sweeps it); 8.6em is that value plus margin, because a reader on
+   * another platform gets a different local fallback with different metrics. */
+  max-width: 8.6em;
 }
 .hero-foot {
   font-family: var(--ui); font-size: 0.8125rem; color: var(--ink-3);
