@@ -62,6 +62,17 @@ def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
 
 
+def esc_code(value: object) -> str:
+    """Escape, then turn markdown code spans into real ones.
+
+    The mutation table is lifted out of MUTATIONS.md, where identifiers are wrapped in
+    backticks. Rendering those literally puts a row of stray punctuation on the page for
+    every mutation. Escaping runs first, so the only thing this can introduce is the code
+    tag itself.
+    """
+    return re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(value))
+
+
 # ---- reading the evidence ---------------------------------------------------------------
 
 def receipts() -> list[tuple[str, dict]]:
@@ -387,7 +398,7 @@ def build(has_audio: bool) -> str:
         '<th>tests that failed</th></tr></thead><tbody>',
     ]
     for num, change, caught in muts:
-        body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc(change)}</td>'
+        body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc_code(change)}</td>'
                     f'<td class="mono caught">{esc(caught)}</td></tr>')
     body.append('</tbody></table></div></div>')
     add(act("05", "Every rule, broken", "".join(body), "act-2"))
