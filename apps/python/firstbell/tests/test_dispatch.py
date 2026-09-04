@@ -503,3 +503,37 @@ def test_the_summary_separates_the_three_provenances():
     assert "calls placed         2" in text
     assert "calls replayed       1" in text
     assert "provenance unknown   3" in text
+
+
+def test_a_real_failure_is_described_in_words_an_office_can_act_on():
+    """Captured from production, 2026-09-04, number replaced.
+
+    The response carries `call_failed` on the task and the raw SIP code `603` on the
+    attempt. Neither is one of the two codes this dispatcher was originally written
+    against, which is how an invented vocabulary gets found out.
+    """
+    call = json.loads(
+        (Path(__file__).parent / "data" / "live-call-declined.json").read_text(
+            encoding="utf-8"))
+    assert call["failure_code"] == "call_failed"
+    assert call["recipients"][0]["attempts"][0]["failure_code"] == "603"
+
+    result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
+
+    assert result.resolution is Resolution.FAILED
+    assert result.resolution.needs_a_human
+    assert result.failure_code == "call_failed", "the symbolic code is the useful one"
+    assert result.reason == "the call was declined after trying 1 number(s)", (
+        f"a queue row reading {result.reason!r} makes an administrator look up a SIP code"
+    )
+    assert "603" not in result.reason
+
+
+def test_every_sip_code_we_claim_to_translate_actually_translates():
+    dispatcher = make(CalleDouble())
+    for code, expected in dispatcher.SIP_REASONS.items():
+        described = dispatcher._describe_failure("call_failed", ("+915550000003",), code)
+        assert described.startswith(expected), code
+    # An unknown code is reported, not silently prettified into a wrong reason.
+    unknown = dispatcher._describe_failure("call_failed", ("+915550000003",), "499")
+    assert "did not connect" in unknown

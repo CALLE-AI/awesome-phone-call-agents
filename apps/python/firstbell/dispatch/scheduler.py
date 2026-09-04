@@ -257,12 +257,18 @@ class WaveDispatcher:
                               reason="the call did not reach a terminal status in time")
 
         if status in ("failed", "canceled"):
-            code = next(
+            # The same response carries two vocabularies. The task level uses a symbolic
+            # code (`call_failed`); the attempt level returns a raw SIP status (`603`).
+            # A real production failure showed both at once. Prefer the symbolic one and
+            # keep the SIP code as the detail, because "603" means nothing to an office
+            # administrator reading a queue of unresolved absences.
+            attempt_code = next(
                 (a.get("failure_code") for a in reversed(attempts) if a.get("failure_code")),
                 None,
             )
+            code = call.get("failure_code") or attempt_code
             return ItemResult(**base, resolution=Resolution.FAILED, failure_code=code,
-                              reason=self._describe_failure(code, tried))
+                              reason=self._describe_failure(code, tried, attempt_code))
 
         result = self._result_for(call, recipient, len(recipients))
         if result is None:
@@ -330,9 +336,26 @@ class WaveDispatcher:
             return result
         return call.get("structured_result")
 
-    @staticmethod
-    def _describe_failure(code: str | None, tried: Sequence[str]) -> str:
+    # SIP response codes seen at the attempt level. Written down because a raw number in
+    # a queue an administrator has to work through is not a reason, it is a lookup task.
+    SIP_REASONS = {
+        "486": "the line was busy",
+        "480": "the phone was switched off or out of coverage",
+        "603": "the call was declined",
+        "408": "nobody picked up before the network gave up",
+        "487": "the call was cancelled before it was answered",
+    }
+
+    @classmethod
+    def _describe_failure(cls, code: str | None, tried: Sequence[str],
+                          detail: str | None = None) -> str:
         where = f" after trying {len(tried)} number(s)" if tried else ""
+        if detail and detail in cls.SIP_REASONS:
+            return f"{cls.SIP_REASONS[detail]}{where}"
+        if code in cls.SIP_REASONS:
+            return f"{cls.SIP_REASONS[code]}{where}"
+        if code == "call_failed":
+            return f"the call did not connect{where}"
         if code == "no_answer":
             return f"nobody answered{where}"
         if code == "declined":
