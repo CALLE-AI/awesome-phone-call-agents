@@ -4121,12 +4121,12 @@ class TestLaPlaceProposeeEstUneVraiePlace(unittest.TestCase):
         while jour.weekday() >= 5:  # never a weekend: closed
             jour += datetime.timedelta(days=1)
         contacts = []
-        occupant = base.ajouter_client("M. Déjà Là", "03 53 10 10 99")
+        occupant = base.ajouter_client("M. Déjà Là", "03 53 01 10 99")
         for rang in range(combien):
             depart = jour.replace(hour=10, minute=rang * 20)
             quand = depart.isoformat(timespec="minutes")
             client = base.ajouter_client(f"Mme Essai {rang:02d}",
-                                         f"03 53 10 10 {60 + rang:02d}")
+                                         f"03 53 01 10 {60 + rang:02d}")
             base.ajouter_rendezvous(client, quand, "Séance", statut="prévu")
             # THE SLOT THE FORMULA WOULD AIM AT IS OCCUPIED, AND THAT IS THE
             # WHOLE TEST. Without that, `appointment + 7 days, same time` lands
@@ -4139,7 +4139,7 @@ class TestLaPlaceProposeeEstUneVraiePlace(unittest.TestCase):
                                     formule.isoformat(timespec="minutes"),
                                     "Déjà pris", statut="confirmé")
             contacts.append({"nom": f"Mme Essai {rang:02d}",
-                             "telephone": f"03 53 10 10 {60 + rang:02d}",
+                             "telephone": f"03 53 01 10 {60 + rang:02d}",
                              "champs": {"rdv_existant": quand,
                                         "motif": "Séance"}})
 

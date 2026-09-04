@@ -404,7 +404,7 @@ def est_numero_essai(telephone, numero_essai):
 
     Why not a comparison of masked numbers: masking is deliberately
     destructive, and two different numbers can mask the same way (06 39 98 00
-    51 and 06 39 12 34 51 both give `06 39 •• •• 51`). Confusing them would
+    51 and 06 39 98 12 51 both give `06 39 •• •• 51`). Confusing them would
     mark a REAL person as test data: exactly what must never be done.
     """
     references = references_essai(numero_essai)
