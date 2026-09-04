@@ -1,0 +1,13 @@
+# The generated evidence page is build output, not source.
+#
+# It is deployed as a built artifact rather than built from this repository, because the
+# call audio is deliberately not committed and a repository build would quietly publish a
+# page whose hero call has no sound. Committing the output would also put a second,
+# drifting copy of every number next to the receipts it was generated from.
+#
+# Regenerate it with: python tools/judge_page.py
+out/
+
+__pycache__/
+*.pyc
+.pytest_cache/
