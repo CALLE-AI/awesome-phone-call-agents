@@ -79,6 +79,7 @@ class WaveDispatcher:
         task_builder: Callable[[WorkItem], str],
         result_schema: dict[str, Any],
         concurrency: int = 4,
+        uninformative_values: frozenset[str] = frozenset({"unknown"}),
         idempotency_key: Callable[[WorkItem], str] | None = None,
         retry: RetryPolicy | None = None,
         webhook_url: str | None = None,
@@ -94,6 +95,7 @@ class WaveDispatcher:
         self._task_builder = task_builder
         self._schema = result_schema
         self._concurrency = concurrency
+        self._uninformative = frozenset(v.strip().lower() for v in uninformative_values)
         self._idempotency_key = idempotency_key or (lambda item: item.id)
         self._retry = retry or RetryPolicy()
         self._webhook_url = webhook_url
@@ -283,8 +285,38 @@ class WaveDispatcher:
                               structured_result=result,
                               reason="result did not satisfy the schema: " + "; ".join(found))
 
+        if self._learned_nothing(result):
+            return ItemResult(**base, resolution=Resolution.UNDETERMINED,
+                              structured_result=result,
+                              reason="the call completed but every required field came "
+                                     "back unknown")
+
         return ItemResult(**base, resolution=Resolution.RESOLVED, structured_result=result,
                           reason="schema-valid answer received")
+
+    def _learned_nothing(self, result: dict[str, Any]) -> bool:
+        """Schema-valid and useful are not the same thing.
+
+        A production call where the person said "I am at work, I cannot talk now" came
+        back with every required field set to "unknown". That satisfies the schema,
+        because a well-designed enum offers "unknown" rather than forcing a guess. It also
+        closed a record about a child nobody had heard anything about.
+
+        This is the same lie as counting a null result as contacted, wearing a different
+        hat, and it is worse because the record looks answered. A row of unknowns is a
+        conversation that happened and produced nothing, which is precisely the third
+        outcome.
+
+        Only the required fields count. An optional field left unknown is a question that
+        was not important enough to ask twice.
+        """
+        required = self._schema.get("required") or []
+        if not required or not self._uninformative:
+            return False
+        values = [result.get(name) for name in required]
+        return all(
+            isinstance(v, str) and v.strip().lower() in self._uninformative for v in values
+        )
 
     def _was_placed_now(self, call: dict[str, Any]) -> bool | None:
         """Did this run place this call, or did an idempotency key replay an older one?

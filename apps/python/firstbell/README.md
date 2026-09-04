@@ -95,6 +95,20 @@ actually heard about. `dispatch/models.py` makes it a separate member of the `Re
 enum with a `needs_a_human` property, and the platform's own
 `call.result_validation_failed` webhook is the same distinction seen from the other side.
 
+**There are two ways to learn nothing, and only one of them is obvious.** The first is a
+null result. The second was found by placing a real call: the person said "I am at work, I
+cannot talk now", and CALL-E returned a schema-valid result with every required field set
+to `"unknown"`, alongside its own note saying no reason and no return date were collected.
+A well-designed enum offers `"unknown"` rather than forcing a guess, so that result is
+correct. It is also worth nothing, and the first version of this dispatcher marked it
+resolved and closed the record.
+
+Schema-valid and useful are not the same property. A result whose required fields are all
+uninformative is now `undetermined` too. The set of values that count as uninformative is
+a constructor argument rather than a hardcoded string, because the word depends on the
+schema, and `test_a_row_of_unknowns_is_not_an_answer` runs against the captured production
+response that caused it.
+
 The summary at the end of a run reports the same three numbers, and the queue of cases
 needing a person is printed after them rather than folded into a rate.
 

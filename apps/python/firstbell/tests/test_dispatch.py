@@ -545,3 +545,44 @@ def test_every_sip_code_we_claim_to_translate_actually_translates():
     # An unknown code is reported, not silently prettified into a wrong reason.
     unknown = dispatcher._describe_failure("call_failed", ("+915550000003",), "499")
     assert "did not connect" in unknown
+
+
+def test_a_row_of_unknowns_is_not_an_answer():
+    """Captured from production, 2026-09-04, number replaced.
+
+    The person said they were at work and could not talk. CALL-E returned a schema-valid
+    result in which every required field was "unknown", and its own note said no reason
+    and no return date were collected. The first version of this dispatcher called that
+    resolved and closed the record.
+    """
+    call = json.loads(
+        (Path(__file__).parent / "data" / "live-call-learned-nothing.json").read_text(
+            encoding="utf-8"))
+    assert call["status"] == "completed"
+    result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
+
+    assert result.resolution is Resolution.UNDETERMINED
+    assert result.resolution.needs_a_human
+    assert "every required field came back unknown" in result.reason
+    # The result is kept. It is evidence of what was asked, not of what was learned.
+    assert result.structured_result["reason_category"] == "unknown"
+
+
+def test_one_real_answer_is_enough_to_count_as_answered(double):
+    """The rule is "learned nothing", not "learned everything"."""
+    partial = {"reason_category": "illness", "expected_return": "unknown"}
+    double.set_outcome(IN_A, Outcome.answered(partial, TALK))
+    report = make(double, result_schema={"type": "object",
+                                         "required": ["reason_category", "expected_return"],
+                                         "properties": LIVE_SCHEMA["properties"]}).run(
+        [WorkItem(id="S-9", phones=(IN_A,), consented=True)])
+    assert report.results[0].resolution is Resolution.RESOLVED
+
+
+def test_an_optional_field_left_unknown_does_not_condemn_the_call(double):
+    full = {"reason_category": "illness", "expected_return": "tomorrow",
+            "parent_confirmed_aware": "unknown"}
+    double.set_outcome(IN_A, Outcome.answered(full, TALK))
+    report = make(double, result_schema=LIVE_SCHEMA).run(
+        [WorkItem(id="S-9", phones=(IN_A,), consented=True)])
+    assert report.results[0].resolution is Resolution.RESOLVED
