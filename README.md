@@ -251,6 +251,9 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 - [`Fact freshness`](apps/web/local-atlas/docs/fact-freshness.md) - Expiring a call result by outcome so failures are not cached as conclusions, keeping hedges and refusals distinct from answers, and defeating idempotent replay when a reader rechecks.
 - [`Design principles`](docs/design-principles.md) - Repository-wide architecture principles for safe phone-call workflows.
 - [`Fail-closed dispositions`](plugins/zapier-calle/docs/fail-closed-dispositions.md) - Classifying phone-call outcomes so ambiguity, low confidence, and unrecognized statuses route to a human instead of a success branch.
+- [`Proving a gate fires`](apps/python/firstbell/docs/proving-a-gate-fires.md) - Breaking each rule that decides who gets dialled, how many at once, and what counts as an answer, then recording which tests notice, because a test never observed to fail has not been shown to test anything.
+- [`Receipt provenance`](apps/python/firstbell/docs/receipt-provenance.md) - Four rules that stop a run's own evidence overstating what happened: reserving "live" for the production hostname rather than a substring, printing the address beside the claim, marking per item whether this run placed the call or replayed it, and answering unknown when a clock disagrees.
+- [`Locale is not only a hint`](apps/python/firstbell/docs/locale-is-not-only-a-hint.md) - Measured behaviour of the BCP 47 locale field across two languages on one code path, what it removes from a multilingual build, and the limits of a two-call sample.
 
 ## Contributing
 
