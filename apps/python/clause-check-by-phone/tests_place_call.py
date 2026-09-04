@@ -18,7 +18,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import place_call                                                # noqa: E402
 from bridge import NothingToAsk                                  # noqa: E402
-from place_call import ALLOWED, collect, main, place, Refused    # noqa: E402
+from place_call import (ALLOWED, collect, main, masked, place,             # noqa: E402
+                        Refused)
 
 NUM = "+447700900123"        # Ofcom drama range, 07700 900xxx, never dialled
 KEY = "not-a-key"
@@ -146,6 +147,72 @@ class WhatIsActuallySent(unittest.TestCase):
         transport = Transport(402, {"error": "out of calls"})
         with self.assertRaises(Refused):
             place(NUM, "students only", "Students only", "t", key=KEY, send=transport)
+
+
+class NothingSensitiveLeavesThisFile(unittest.TestCase):
+    """A refusal is printed, so whatever it carries ends up in a terminal."""
+
+    FINISHED = {"id": "call_x", "status": "completed",
+                "structured_result": {"open_to_non_students": "yes"},
+                "transcript": "hello, this is a real person speaking",
+                "recording_url": "https://provider.example/rec/call_x.mp3",
+                "to": NUM, "from": "+447700900999"}
+
+    # Well formed but not on the list. That is the only path that prints a
+    # destination, so it is the only one where masking can be observed.
+    UNLISTED = "+447700900456"
+
+    def authorisation_refusal(self):
+        with self.assertRaises(Refused) as refused:
+            place(self.UNLISTED, "students only", "Students only", "t", key=KEY,
+                  send=Transport(201, {"id": "call_x"}))
+        return str(refused.exception)
+
+    def test_the_refusal_does_not_print_the_number_it_refuses(self):
+        self.assertNotIn(self.UNLISTED, self.authorisation_refusal())
+
+    def test_the_refusal_still_says_enough_to_recognise_the_number(self):
+        said = self.authorisation_refusal()
+        self.assertIn(self.UNLISTED[1:3], said)
+        self.assertIn(self.UNLISTED[-2:], said)
+        self.assertIn(ALLOWED, said)
+
+    def test_a_short_or_malformed_value_is_hidden_whole(self):
+        """Half of a wrong number is still half of a number."""
+        for value in ("+331", "", "not a number", "+33"):
+            hidden = masked(value)
+            self.assertEqual(hidden.lstrip("+").strip("*"), "",
+                             "%r leaked through as %r" % (value, hidden))
+            self.assertTrue(hidden.startswith("+"))
+
+    def test_the_transcript_and_the_recording_do_not_come_back(self):
+        rendu = collect("call_x", key=KEY, send=Transport(200, self.FINISHED))
+        for champ in ("transcript", "recording_url", "to", "from"):
+            self.assertNotIn(champ, rendu)
+
+    def test_what_the_project_actually_uses_does_come_back(self):
+        rendu = collect("call_x", key=KEY, send=Transport(200, self.FINISHED))
+        self.assertEqual(rendu["status"], "completed")
+        self.assertEqual(rendu["structured_result"]["open_to_non_students"], "yes")
+
+    def test_a_caller_who_asks_for_everything_gets_everything(self):
+        rendu = collect("call_x", key=KEY, send=Transport(200, self.FINISHED), raw=True)
+        self.assertIn("transcript", rendu)
+
+    def test_bounding_the_payload_does_not_break_the_verdict(self):
+        """The answer is read before the trimming, not after."""
+        prepared = place(NUM, "students only", "Students only", "t", key=KEY,
+                         send=Transport(201, {"id": "call_x"}))[0]
+        _, verdict = collect("call_x", prepared, key=KEY,
+                             send=Transport(200, self.FINISHED))
+        self.assertIsNotNone(verdict)
+
+    def test_a_provider_refusal_does_not_print_its_whole_payload(self):
+        bruyant = Transport(402, {"error": "out of calls", "to": NUM,
+                                  "transcript": "a stranger speaking"})
+        with self.assertRaises(Refused) as refus:
+            place(NUM, "students only", "Students only", "t", key=KEY, send=bruyant)
+        self.assertNotIn("a stranger speaking", str(refus.exception))
 
 
 class ReadingTheCallBack(unittest.TestCase):

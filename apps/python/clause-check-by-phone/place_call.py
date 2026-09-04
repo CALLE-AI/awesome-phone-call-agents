@@ -40,6 +40,40 @@ class Refused(Exception):
     """Raised before any request leaves the machine."""
 
 
+def masked(phone: str) -> str:
+    """A destination you can read in a log without leaking it.
+
+    Refusals are printed, and a printed refusal is the one place in this
+    contribution where a real number would end up in a terminal, a shell
+    history or a CI log. Enough is kept to recognise the number you meant, the
+    country code and the last two digits, and the rest is hidden. A short or
+    malformed value is hidden whole rather than partially revealed.
+    """
+    digits = phone[1:] if phone.startswith("+") else phone
+    if not digits.isdigit() or len(digits) < 8:
+        return "+" + "*" * max(len(digits), 1)
+    return "+%s%s%s" % (digits[:2], "*" * (len(digits) - 4), digits[-2:])
+
+
+# The fields a finished call carries that this project never needs. The
+# provider returns the recording, the full transcript and the destination
+# alongside the answer, and a caller who prints the payload prints all three.
+RAW_ONLY = ("transcript", "transcripts", "concatenated_transcript", "recording",
+            "recording_url", "to", "from", "phone_number", "customer",
+            "variables", "metadata", "corrected_duration", "call_log")
+
+
+def bounded(payload: dict) -> dict:
+    """The part of a provider payload this project is allowed to hand back.
+
+    Everything the tool needs is the identifier, the state and the structured
+    answer. The rest is a stranger's voice and a stranger's number, and a
+    default that returns them invites a caller to print them. Anyone who
+    genuinely needs the whole thing asks for it by name, `raw=True`.
+    """
+    return {c: v for c, v in payload.items() if c not in RAW_ONLY}
+
+
 def authorised(phone: str) -> bool:
     """True when the operator has listed this number as callable.
 
@@ -87,7 +121,7 @@ def place(phone: str, family: str, quote: str, source: str,
     if not authorised(phone):
         raise Refused("%s is not listed in %s, no call was placed. A recipient "
                       "has to be authorised by the operator before it can be "
-                      "dialled." % (phone, ALLOWED))
+                      "dialled." % (masked(phone), ALLOWED))
 
     problems = validate_result_schema(prepared["result_schema"])
     if problems:
@@ -98,27 +132,38 @@ def place(phone: str, family: str, quote: str, source: str,
                        "result_schema": prepared["result_schema"]}).encode("utf-8")
     status, payload = send(CALLS, key, body)
     if status >= 300:
-        raise Refused("the provider refused the call, %s %s" % (status, payload))
-    return prepared, payload
+        raise Refused("the provider refused the call, %s %s"
+                      % (status, bounded(payload)))
+    return prepared, bounded(payload)
 
 
 def collect(call_id: str, prepared: dict | None = None,
-            key: str | None = None, send=_http):
-    """Read a finished call back.
+            key: str | None = None, send=_http, raw: bool = False):
+    """Read a finished call back, without the parts nobody here needs.
 
     With `prepared`, also returns what the page and the voice disagree on, or
     None when they do not, which is the whole output of this project. Without
-    it, returns the provider payload alone.
+    it, returns the payload alone.
+
+    WHAT COMES BACK IS BOUNDED BY DEFAULT. The provider hands over the
+    recording, the transcript and the destination next to the answer, and this
+    project uses none of them. Returning them by default puts a stranger's
+    voice one `print` away from a terminal, and the obvious way to look at a
+    result is to print it. `raw=True` returns everything, for a caller who has
+    decided to.
     """
     key = key or os.environ.get("CALLE_API_KEY")
     if not key:
         raise Refused("no CALLE_API_KEY in the environment")
     status, payload = send("%s/%s" % (CALLS, call_id), key, None)
     if status >= 300:
-        raise Refused("could not read the call, %s %s" % (status, payload))
+        raise Refused("could not read the call, %s %s" % (status, bounded(payload)))
+    answer = payload.get("structured_result") or {}
+    if not raw:
+        payload = bounded(payload)
     if prepared is None:
         return payload
-    return payload, contradiction(prepared, payload.get("structured_result") or {})
+    return payload, contradiction(prepared, answer)
 
 
 def main(argv=None):
@@ -154,6 +199,8 @@ def main(argv=None):
     print("read it back later with")
     print("  python -c \"import place_call as p, json;"
           " print(json.dumps(p.collect('%s'), indent=2))\"" % payload.get("id", "..."))
+    print("that prints the identifier, the state and the answer. It does not"
+          " print the transcript, the recording or the destination.")
     return 0
 
 
