@@ -12362,7 +12362,7 @@ class TestServeurInstallation(_TestAvecServeurWeb):
         cle = assistant.cle_discours("confirmation")
         _, page = self._poster(
             "/installation/valider?page=confirmation-discours",
-            {cle: "Bonjour, rappelez-nous au 06 12 34 56 78."})
+            {cle: "Bonjour, rappelez-nous au 06 39 98 50 78."})
         self.assertIn("numéro de téléphone a été trouvé", page)
         self.assertFalse(self.application.preferences.obtenir(cle))
 
@@ -26454,8 +26454,8 @@ class TestFormeDeLaCle(unittest.TestCase):
     def test_les_autres_formes_manifestement_fausses(self):
         cas = {
             "https://dashboard.heycall-e.com/keys": "ADRESSE WEB",
-            '"cle-secrete-0123456789"': "guillemets",
-            "cle secrete 0123456789": "espace",
+            '"cle-secrete-abcdefghij"': "guillemets",
+            "cle secrete abcdefghij": "espace",
             "trop-court": "trop courte",
         }
         for brut, attendu in cas.items():

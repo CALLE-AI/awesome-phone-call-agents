@@ -190,8 +190,8 @@ def _numero(rang):
     """THE number of the person of rank `rang` — always the same one for them.
 
     ⚠ NEVER A NUMBER INVENTED AT RANDOM: the six roots are reserved by Arcep
-    for audiovisual works, hence safe. An `06 12 34 56 78` could have rung at
-    someone's home.
+    for audiovisual works, hence safe. An ordinary mobile number, invented to
+    look plausible, could have rung at someone's home.
 
     ⚠ AND IT DEPENDS ON THE PERSON, NOT ON THE APPOINTMENT. A number that
     changed from one appointment to the next caused one record per appointment
