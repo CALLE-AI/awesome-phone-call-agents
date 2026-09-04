@@ -15,7 +15,7 @@ from concord.collector import (
     window_is_open,
 )
 from concord.judge import rule_all
-from concord.models import Answer, Audit, Rubric
+from concord.models import Answer, Audit, ConcordError, Criterion, Rubric
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -96,6 +96,41 @@ class TestIdempotency(unittest.TestCase):
             audit.timezone, audit.call_window, audit.requested_by,
         )
         self.assertNotEqual(idempotency_key(audit, rubric), idempotency_key(trimmed, rubric))
+
+    def test_rewording_a_question_yields_a_different_key(self):
+        audit, rubric = load()
+        first = rubric.criteria[0]
+        changed = Criterion(
+            first.id,
+            "Can I just buy it?",
+            first.policy,
+            first.field,
+            first.expect,
+            first.options,
+        )
+        reworded = Rubric(
+            rubric.id,
+            rubric.title,
+            rubric.scenario,
+            (changed, *rubric.criteria[1:]),
+        )
+        self.assertNotEqual(
+            idempotency_key(audit, rubric), idempotency_key(audit, reworded)
+        )
+
+
+class TestInputValidation(unittest.TestCase):
+    def test_task_refuses_audit_rubric_mismatch(self):
+        from types import SimpleNamespace
+
+        from concord.cli import cmd_task
+
+        args = SimpleNamespace(
+            audit=str(ROOT / "fixtures" / "example-audit.json"),
+            rubric=str(ROOT / "rubrics" / "repair-warranty.json"),
+        )
+        with self.assertRaises(ConcordError):
+            cmd_task(args)
 
 
 class TestCallWindow(unittest.TestCase):
@@ -225,6 +260,24 @@ class TestReviewRegressions(unittest.TestCase):
             audit.timezone, ("00:00", "23:59"), audit.requested_by,
         )
         self.assertNotEqual(approval_token(audit, rubric), approval_token(widened, rubric))
+
+    def test_reordering_the_call_intent_invalidates_the_token(self):
+        from concord.cli import approval_token
+
+        audit, rubric = load()
+        reordered_audit = Audit(
+            audit.id, audit.org, audit.rubric_id, tuple(reversed(audit.branches)),
+            audit.timezone, audit.call_window, audit.requested_by,
+        )
+        reordered_rubric = Rubric(
+            rubric.id, rubric.title, rubric.scenario, tuple(reversed(rubric.criteria))
+        )
+        self.assertNotEqual(
+            approval_token(audit, rubric), approval_token(reordered_audit, rubric)
+        )
+        self.assertNotEqual(
+            approval_token(audit, rubric), approval_token(audit, reordered_rubric)
+        )
 
     def test_live_results_are_correlated_by_destination_not_position(self):
         audit, rubric = load()

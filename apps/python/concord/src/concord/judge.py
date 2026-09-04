@@ -87,16 +87,21 @@ def rule_one(criterion: Criterion, answer: Answer) -> Finding:
     )
 
 
-def rule_all(rubric: Rubric, answers: list[Answer]) -> list[Finding]:
-    """Rule every criterion for every branch that produced answers.
+def rule_all(
+    rubric: Rubric,
+    answers: list[Answer],
+    branch_ids: list[str] | None = None,
+) -> list[Finding]:
+    """Rule every criterion for every expected or observed branch.
 
-    A criterion with no answer at all still produces an UNCLEAR finding, so a
-    silently skipped question cannot disappear from the report.
+    A branch or criterion with no answer at all still produces UNCLEAR findings,
+    so incomplete recorded results cannot make outstanding work disappear.
     """
     by_key = {(a.branch_id, a.criterion_id): a for a in answers}
-    branch_ids = sorted({a.branch_id for a in answers})
+    expected = set(branch_ids or ())
+    expected.update(a.branch_id for a in answers)
     findings: list[Finding] = []
-    for branch_id in branch_ids:
+    for branch_id in sorted(expected):
         for criterion in rubric.criteria:
             answer = by_key.get(
                 (branch_id, criterion.id),

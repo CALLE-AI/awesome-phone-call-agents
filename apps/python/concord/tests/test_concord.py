@@ -242,6 +242,15 @@ class TestSummary(unittest.TestCase):
         self.assertFalse(rows["B1"].needs_attention)
         self.assertTrue(rows["B2"].needs_attention)
 
+    def test_missing_branch_is_reported_as_unclear(self):
+        audit, rubric, answers = load_all()
+        omitted = audit.branches[-1]
+        partial = [answer for answer in answers if answer.branch_id != omitted.id]
+        findings = rule_all(rubric, partial, [branch.id for branch in audit.branches])
+        missing = [finding for finding in findings if finding.branch_id == omitted.id]
+        self.assertEqual(len(missing), len(rubric.criteria))
+        self.assertTrue(all(finding.verdict == "UNCLEAR" for finding in missing))
+
 
 if __name__ == "__main__":
     unittest.main()

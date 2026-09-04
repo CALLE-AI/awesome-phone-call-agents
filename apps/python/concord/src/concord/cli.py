@@ -46,16 +46,16 @@ def approval_token(audit: Audit, rubric: Rubric) -> str:
             "requested_by": audit.requested_by,
             "timezone": audit.timezone,
             "call_window": list(audit.call_window),
-            "branches": sorted(
+            "branches": [
                 [b.id, b.name, b.phone, b.authorization] for b in audit.branches
-            ),
+            ],
             "rubric": rubric.id,
             "rubric_title": rubric.title,
             "scenario": rubric.scenario,
-            "criteria": sorted(
+            "criteria": [
                 [c.id, c.question, c.policy, c.field, c.expect, list(c.options)]
                 for c in rubric.criteria
-            ),
+            ],
         },
         sort_keys=True,
     )
@@ -111,7 +111,7 @@ def cmd_judge(args: argparse.Namespace) -> int:
     with open(args.results, encoding="utf-8") as handle:
         raw = json.load(handle)
     answers = [Answer.parse(a) for a in raw.get("answers", ())]
-    findings = rule_all(rubric, answers)
+    findings = rule_all(rubric, answers, [b.id for b in audit.branches])
     print(render(audit, rubric, findings))
     return 0
 
@@ -189,7 +189,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"Answers written to {args.save}")
 
     print()
-    print(render(audit, rubric, rule_all(rubric, answers)))
+    print(
+        render(
+            audit,
+            rubric,
+            rule_all(rubric, answers, [b.id for b in audit.branches]),
+        )
+    )
     return 0
 
 
@@ -197,6 +203,10 @@ def cmd_task(args: argparse.Namespace) -> int:
     """Print the exact call task and result schema, without placing a call."""
     audit = Audit.load(args.audit)
     rubric = Rubric.load(args.rubric)
+    if audit.rubric_id != rubric.id:
+        raise ConcordError(
+            f"Audit expects rubric {audit.rubric_id!r} but {rubric.id!r} was given."
+        )
     payload = build_payload(audit, rubric)
     print("CALL TASK")
     print("-" * 78)

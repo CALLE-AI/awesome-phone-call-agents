@@ -104,12 +104,7 @@ def idempotency_key(audit: Audit, rubric: Rubric) -> str:
     cannot produce a second round of calls to the same branches.
     """
     payload = json.dumps(
-        {
-            "audit": audit.id,
-            "rubric": rubric.id,
-            "branches": sorted(b.phone for b in audit.branches),
-        },
-        sort_keys=True,
+        build_payload(audit, rubric), sort_keys=True, separators=(",", ":")
     )
     return "concord-" + hashlib.sha256(payload.encode()).hexdigest()[:32]
 
