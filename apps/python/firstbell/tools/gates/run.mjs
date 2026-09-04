@@ -159,7 +159,7 @@ async function gateWeight() {
   }
   const kb = Math.round(total / 102.4) / 10;
   record("weight", kb <= WEIGHT_CEILING_KB ? "PASS" : "FAIL",
-    `${kb} KB gzipped over ${WEIGHT_CEILING_KB} KB ceiling, excluding GSAP, Lenis and audio. `
+    `${kb} KB gzipped over ${WEIGHT_CEILING_KB} KB ceiling, excluding Lenis and audio. `
     + Object.entries(parts).map(([k, v]) => `${k} ${v}`).join(", "),
     { kb, parts });
 }

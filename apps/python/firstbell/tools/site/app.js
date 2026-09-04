@@ -8,9 +8,9 @@
  * Six primitives may animate and nothing else: playhead-track, field-commit, act-enter,
  * curtain, rail-progress, theatre-open. A seventh requires deleting one of these.
  *
- * Lenis and GSAP are loaded from a CDN and both are optional. If either fails to arrive the
- * page still scrolls, plays and reads, which is the same state a reader gets with JavaScript
- * off or with reduced motion asked for.
+ * Lenis is loaded from a CDN and is optional. If it fails to arrive the page still scrolls,
+ * plays and reads, which is the same state a reader gets with JavaScript off or with
+ * reduced motion asked for. Nothing else on this page comes from anywhere else.
  */
 import { CallPlayer } from './player.js';
 
@@ -22,20 +22,14 @@ const AUDIO = document.documentElement.dataset.audio === 'present' ? 'audio' : n
 const players = [];
 
 /* ---- smooth scroll ------------------------------------------------------------------- */
-/* Lenis drives the native window scroll, so sticky and ScrollTrigger pins work unchanged.
- * It is not constructed on touch: phones have their own physics and fighting them is the
- * fastest way to make a page feel broken. */
+/* Lenis drives the native window scroll, so the sticky hero and the one scroll listener
+ * below work unchanged. It is not constructed on touch: phones have their own physics and
+ * fighting them is the fastest way to make a page feel broken. */
 function startScroll() {
   if (REDUCED || !DESKTOP || !window.Lenis) return null;
   const lenis = new window.Lenis({ lerp: 0.1, smoothWheel: true });
-  if (window.gsap && window.ScrollTrigger) {
-    lenis.on('scroll', window.ScrollTrigger.update);
-    window.gsap.ticker.add((t) => lenis.raf(t * 1000));
-    window.gsap.ticker.lagSmoothing(0);
-  } else {
-    const raf = (t) => { lenis.raf(t); requestAnimationFrame(raf); };
-    requestAnimationFrame(raf);
-  }
+  const raf = (t) => { lenis.raf(t); requestAnimationFrame(raf); };
+  requestAnimationFrame(raf);
   document.querySelectorAll('.rail a[href^="#"]').forEach((a) => {
     a.addEventListener('click', (e) => {
       const target = document.querySelector(a.getAttribute('href'));
@@ -158,40 +152,76 @@ function wireRail() {
 }
 
 /* ---- scrubbed motion ----------------------------------------------------------------- */
-/* The two places scroll has consequences. Declared through gsap.matchMedia so the desktop
- * and reduced-motion branches live in one place and clean themselves up. */
+/* The two places scroll has consequences, and both are one number between 0 and 1 written
+ * to a transform.
+ *
+ * This was GSAP and ScrollTrigger. They cost 131ms of main thread on load, measured on the
+ * built page: 96ms for gsap.min.js and 35ms for ScrollTrigger.min.js, in a single task,
+ * because both are deferred and run back to back before DOMContentLoaded. Deleting every
+ * trigger the page created left that number unchanged, so it was the price of the
+ * libraries arriving rather than of anything asked of them. The code below costs nothing
+ * measurable and the curtain pin is CSS position:sticky, which is what pinSpacing:false
+ * was emulating in the first place.
+ *
+ * The listener is passive and coalesced into one frame, and neither element is written
+ * unless its value moved: a transform write on a promoted layer costs a raster whether or
+ * not the new value differs from the old one. */
 function wireScrubbed() {
-  if (!window.gsap || !window.ScrollTrigger) return;
-  const { gsap, ScrollTrigger } = window;
-  gsap.registerPlugin(ScrollTrigger);
+  if (REDUCED || !DESKTOP) return;
+  const inner = document.querySelector('.act-00 .inner');
+  const next = document.querySelector('.act-01');
+  const fill = document.querySelector('[data-rail]');
+  const curtain = inner && next;
+  if (!curtain && !fill) return;
 
-  gsap.matchMedia().add(
-    { desktop: '(min-width: 60rem) and (prefers-reduced-motion: no-preference)' },
-    (ctx) => {
-      if (!ctx.conditions.desktop) return;
+  // Tells the stylesheet the curtain is wired, so a reader with JavaScript off gets the
+  // hero they had before rather than a sticky one that never fades.
+  if (curtain) document.documentElement.dataset.curtain = 'on';
 
-      // curtain: Act 0 holds while Act 1 slides over it.
-      const hero = document.querySelector('.act-00');
-      const next = document.querySelector('.act-01');
-      if (hero && next) {
-        ScrollTrigger.create({ trigger: hero, start: 'top top', end: 'bottom top',
-                               pin: true, pinSpacing: false });
-        gsap.to(hero.querySelector('.inner'), {
-          y: -40, opacity: 0.4, ease: 'none',
-          scrollTrigger: { trigger: next, start: 'top bottom', end: 'top top', scrub: true },
-          onComplete: () => hero.querySelector('.inner').style.removeProperty('will-change'),
-        });
+  let queued = false;
+  let lastCurtain = -1;
+  let lastRail = -1;
+
+  const frame = () => {
+    queued = false;
+    const y = window.scrollY;
+
+    if (curtain) {
+      // The same window ScrollTrigger used: Act 1's top crossing the viewport bottom, to
+      // Act 1's top reaching the viewport top.
+      const start = next.offsetTop - window.innerHeight;
+      const span = window.innerHeight;
+      const p = Math.min(1, Math.max(0, (y - start) / span));
+      if (Math.abs(p - lastCurtain) > 0.0015) {
+        lastCurtain = p;
+        inner.style.transform = `translate3d(0, ${(-40 * p).toFixed(2)}px, 0)`;
+        inner.style.opacity = (1 - 0.6 * p).toFixed(3);
+        // Give the layer back once the curtain has closed, which is what the old
+        // onComplete did. A promoted layer rasterises its whole box for as long as it
+        // is promoted, and this one is a full screen tall.
+        if (p >= 1) inner.style.willChange = 'auto';
+        else inner.style.removeProperty('will-change');
       }
+    }
 
-      // rail-progress: one transform per scroll frame.
-      const fill = document.querySelector('[data-rail]');
-      if (fill) {
-        gsap.fromTo(fill, { scaleY: 0 }, {
-          scaleY: 1, ease: 'none', transformOrigin: 'top',
-          scrollTrigger: { trigger: 'main', start: 'top top', end: 'bottom bottom', scrub: true },
-        });
+    if (fill) {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const p = max > 0 ? Math.min(1, Math.max(0, y / max)) : 0;
+      if (Math.abs(p - lastRail) > 0.0015) {
+        lastRail = p;
+        fill.style.transform = `scaleY(${p.toFixed(4)})`;
       }
-    });
+    }
+  };
+
+  const onScroll = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(frame);
+  };
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll, { passive: true });
+  frame();
 }
 
 /* ---- act-enter ----------------------------------------------------------------------- */
@@ -199,17 +229,22 @@ function wireScrubbed() {
  * opacity 0, so nothing here can move layout and the CLS budget stays at zero. */
 function wireReveal() {
   const targets = document.querySelectorAll('[data-reveal]');
-  if (REDUCED || !window.gsap || !window.ScrollTrigger || !DESKTOP) {
+  if (!targets.length) return;
+  if (REDUCED || !DESKTOP) {
     targets.forEach((el) => el.classList.add('shown'));
     return;
   }
-  window.gsap.utils.toArray('[data-reveal]').forEach((el) => {
-    window.gsap.fromTo(el, { opacity: 0, y: 10 }, {
-      opacity: 1, y: 0, duration: 0.24, ease: 'power3.out',
-      scrollTrigger: { trigger: el, start: 'top 88%', once: true },
-      onStart: () => el.classList.add('shown'),
-    });
-  });
+  // -12% on the bottom edge is ScrollTrigger's start:'top 88%': the element counts as
+  // entered once its top has come 12% of a viewport up from the bottom. The class is
+  // added once and the element is dropped, which is what once:true bought.
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add('shown');
+      io.unobserve(e.target);
+    }
+  }, { rootMargin: '0px 0px -12% 0px' });
+  targets.forEach((el) => io.observe(el));
 }
 
 /* ---- boot ---------------------------------------------------------------------------- */

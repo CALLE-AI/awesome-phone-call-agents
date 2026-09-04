@@ -342,10 +342,18 @@ pre {
 .theatre pre { background: var(--stage-2); }
 
 /* ---- reveal -------------------------------------------------------------------------- */
-/* The only entrance on the page. Anything still moving after 320ms is not allowed. */
-[data-reveal] { opacity: 0; }
-[data-reveal].shown { opacity: 1; }
-html:not([data-ready]) [data-reveal] { opacity: 1; }
+/* The only entrance on the page. Anything still moving after 320ms is not allowed.
+ *
+ * The transition lives on .shown rather than on the base rule, so the starting state is
+ * applied instantly and the element cannot animate backwards when the class is removed.
+ * The curve is easeOutCubic, which is the GSAP power3.out this replaced. */
+[data-reveal] { opacity: 0; transform: translateY(10px); }
+[data-reveal].shown {
+  opacity: 1; transform: none;
+  transition: opacity 240ms cubic-bezier(0.215, 0.61, 0.355, 1),
+              transform 240ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+html:not([data-ready]) [data-reveal] { opacity: 1; transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -353,7 +361,7 @@ html:not([data-ready]) [data-reveal] { opacity: 1; }
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  [data-reveal] { opacity: 1; }
+  [data-reveal] { opacity: 1; transform: none; }
 }
 
 /* ---- utility ------------------------------------------------------------------------- */
@@ -425,6 +433,15 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 /* ---- the hero ------------------------------------------------------------------------- */
 .act-00 { min-height: 100svh; display: grid; align-content: start; padding-top: 14vh; }
 .act-00 .inner { will-change: transform; }
+
+/* The curtain. Act 0 holds while Act 1, which is opaque and sits at z-index 2, slides over
+ * it. This is position:sticky doing what ScrollTrigger's pin with pinSpacing:false did,
+ * for no script. It is gated on the attribute the scroll wiring sets, so a reader with
+ * JavaScript off or reduced motion asked for gets the hero scrolling normally, which is
+ * the behaviour they had before. */
+@media (min-width: 60rem) and (prefers-reduced-motion: no-preference) {
+  html[data-curtain] .act-00 { position: sticky; top: 0; z-index: 0; }
+}
 .eyebrow {
   font-family: var(--ui); font-size: 0.8125rem; letter-spacing: 0.09em;
   text-transform: uppercase; color: var(--ink-3); margin: 0 0 1.25rem;

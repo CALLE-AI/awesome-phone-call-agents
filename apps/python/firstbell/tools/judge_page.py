@@ -66,8 +66,6 @@ SITE = Path(__file__).resolve().parent / "site"
 # scrolls, plays and reads, which is also the reduced-motion path.
 LENIS = ("https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js",
          "sha384-uxdRfmAAt0Y8V0FBZDwCzUKKrGqfMKZmVSbUXjJZJHYIWJmXWvzYBWZeVLJHqbTQ")
-GSAP = "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"
-SCROLLTRIGGER = "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"
 TYPEKIT = "https://use.typekit.net/qdx4jvs.css"
 
 ACTS = [
@@ -545,8 +543,6 @@ def build(has_audio: bool) -> str:
         'so that an unmeasured pair cannot read as a pass.</p></footer>')
 
     add(f'<script id=call-data type=application/json>{json.dumps(data, ensure_ascii=False, separators=(",", ":"))}</script>')
-    add(f'<script src="{GSAP}" defer></script>')
-    add(f'<script src="{SCROLLTRIGGER}" defer></script>')
     add(f'<script src="{LENIS[0]}" defer></script>')
     add('<script type=module src="app.js"></script>')
     add('</html>')
