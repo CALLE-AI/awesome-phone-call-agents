@@ -197,6 +197,11 @@ code { font-size: 0.88em; }
 .act {
   padding: clamp(4rem, 9vh, 8rem) var(--gutter);
   position: relative;
+  /* Every act is opaque. The first one is sticky, so it stays behind the page after the
+   * curtain closes, and an act that set no ground of its own let the hero show through it:
+   * act 8 was being read over the hero's own transcript. .theatre and the .act-2 and
+   * .act-3 grounds come later in this file and still win on the tie. */
+  background: var(--paper);
 }
 .act > .inner { max-width: 68rem; margin: 0 auto; }
 
@@ -284,6 +289,14 @@ canvas[data-waveform] {
 .turns li { opacity: 0.42; }
 .turns li[data-rel="ahead"] { opacity: 0.42; }
 html:not([data-ready]) .turns li { opacity: 0.72; }
+
+/* Unless there is nothing to play. The dimming exists to point at the line being spoken,
+ * and every line is marked ahead until a playhead passes it. With the recordings out of
+ * the repository no playhead ever runs, so every line of every transcript sat at 0.42
+ * forever: 1.07 against the paper, where 4.5 is the floor. The transcript is the evidence
+ * this page is built on, so with no audio it is set to be read rather than tracked. */
+html[data-audio="absent"] .turns li,
+html[data-audio="absent"] .turns li[data-rel="ahead"] { opacity: 1; }
 .turns li[data-rel="past"]  { opacity: 0.72; }
 .turns li[data-rel="now"]   { opacity: 1; }
 .turns li[data-who="bot"] .turn-who { color: var(--ink-3); }
@@ -399,7 +412,11 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
   .rail li + li { margin-top: 0.55rem; }
   .rail a {
     display: grid; grid-template-columns: 1.6rem auto; gap: 0.5rem;
-    text-decoration: none; color: var(--ink-4);
+    /* ink-3, not ink-4. ink-4 is 2.81 against the deepest paper and these are 12px
+     * navigation links, so they were the quietest thing on the page in the sense that
+     * matters least and the sense that matters most. ink-4 stays for the unplayed
+     * waveform bars, which are a graphic and carry no words. */
+    text-decoration: none; color: var(--ink-3);
     transition: color var(--t-micro) var(--e-both);
   }
   .rail a[aria-current="true"] { color: var(--ink); }
@@ -513,7 +530,7 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .takes { display: grid; gap: 2rem; margin-top: 2rem; }
 @media (min-width: 60rem) { .takes { grid-template-columns: repeat(3, 1fr); } }
 .take-n {
-  font-family: var(--mono); font-size: 0.8125rem; color: var(--ink-4);
+  font-family: var(--mono); font-size: 0.8125rem; color: var(--ink-3);
   border-top: 2px solid var(--ink); padding-top: 0.5rem; display: inline-block;
   min-width: 2.5rem;
 }

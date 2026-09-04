@@ -180,7 +180,8 @@ function wireRail() {
  * not the new value differs from the old one. */
 function wireScrubbed() {
   if (REDUCED || !DESKTOP) return;
-  const inner = document.querySelector('.act-00 .inner');
+  const hero = document.querySelector('.act-00');
+  const inner = hero && hero.querySelector('.inner');
   const next = document.querySelector('.act-01');
   const fill = document.querySelector('[data-rail]');
   const curtain = inner && next;
@@ -189,6 +190,20 @@ function wireScrubbed() {
   // Tells the stylesheet the curtain is wired, so a reader with JavaScript off gets the
   // hero they had before rather than a sticky one that never fades.
   if (curtain) document.documentElement.dataset.curtain = 'on';
+
+  /* Where the hero comes to rest.
+   *
+   * A sticky element taller than the window never scrolls its own overflow into view:
+   * its top is held at 0 from the first pixel and everything past the fold stays past
+   * the fold for good. This hero is 1232px on a 1440x900 screen and 1190 on a 1366x768
+   * one, so 28 to 47 runs of the transcript were unreachable, on the act that is the
+   * whole demonstration. Sticking to the bottom instead lets it scroll until its last
+   * line is on screen and holds it there, and the curtain is unchanged: Act 1 arrives
+   * at the same scroll position either way. */
+  const rest = () => {
+    if (curtain) hero.style.top = Math.min(0, window.innerHeight - hero.offsetHeight) + 'px';
+  };
+  rest();
 
   let queued = false;
   let lastCurtain = -1;
