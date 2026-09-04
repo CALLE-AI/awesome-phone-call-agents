@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Thirty-two gates broken on purpose, with how many tests noticed each one | 2 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Thirty-seven gates broken on purpose, with how many tests noticed each one | 2 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -31,12 +31,12 @@ cannot quietly rot.
 
 - The client is constructed on the live path only: `from calle import CalleClient` at
   `firstbell/cli.py:193`. The offline default never reaches it.
-- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:248`, with
+- The call is placed at `self._client.calls.create` at `dispatch/scheduler.py:303`, with
   the whole phone fallback chain and the per-family `locale` in one request.
-- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:297`, under a
+- Completion is polled at `self._client.calls.get` at `dispatch/scheduler.py:352`, under a
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
-  `dispatch/scheduler.py:240`, rather than as a string match on a message.
+  `dispatch/scheduler.py:295`, rather than as a string match on a message.
 
 ## The problem
 
@@ -126,38 +126,23 @@ matters to a budget is the seven.
 
 ## Why the last number is a ceiling and not a saving
 
-CALL-E does not publish a price per call. Any figure this app printed for what a run cost
-would therefore be invented, and an invented cost is the fastest way to lose a reader who
-knows the real one. So the run reports the other side of the same equation: the price at
-which it stops being cheaper than a person doing the work.
+CALL-E publishes no price per call, so any cost this app printed would be invented. It
+reports the other side of the equation instead: the price above which it stops being
+cheaper than a person.
 
-The arithmetic charges the app for every attempt it billed and credits it only for the
-attempts behind records it actually closed:
+Two things about that arithmetic are worth knowing beyond what the run prints. Attempts
+still open are charged and never credited, because a call that reached nobody useful still
+leaves the work on somebody's desk, and counting it as saved would be the same error as
+counting a null result as an answer. And the [sourced wage](https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm)
+understates the case in both directions it can: dividing by 2,080 hours prices a ten-month
+school contract as cheaper per hour than it is, and a salary excludes the benefits paid on
+top of it. An assumption nobody can check should point at its author, not away.
 
-```
-attempts billed     7
-attempts removed    4   behind the 3 record(s) this run closed
-attempts still open 3   on somebody's desk, so not counted as saved
-break-even          $0.22 per call, for every minute one manual attempt takes
-```
-
-Three attempts reached nobody useful, so a person still has to make them. Counting those
-as saved would be the same error as counting a null result as an answer, which is the
-defect the whole app is built around. They are charged and not credited.
-
-That leaves one unknown, and it is deliberately the one a school office can answer better
-than anybody else: how long one of these calls takes its own staff. At three minutes an
-attempt the run is cheaper than the desk below **$0.67 a call**. Substitute your own
-minute count, or your own wage with `--staff-annual`, and the number moves with it.
-
-The wage behind it is sourced rather than assumed: **$48,980**, the median for secretaries
-and administrative assistants in educational services, [US Bureau of Labor Statistics,
-Occupational Outlook Handbook, May
-2025](https://www.bls.gov/ooh/office-and-administrative-support/secretaries-and-administrative-assistants.htm).
-Two things about that figure understate the saving rather than flatter it. Dividing by
-2,080 hours treats a ten-month school contract as cheaper per hour than it is, and a
-salary excludes the benefits an employer pays on top. Both errors make this app look
-worse, which is the direction an unverifiable assumption should point.
+The one unknown left is the one a school office can answer better than anybody else, which
+is why it is left to them: how long one of these calls takes its own staff. At three
+minutes an attempt this run is cheaper than the desk below **$0.67 a call**, on a median of
+**$48,980** for secretaries and administrative assistants in educational services. Change
+the minutes, or pass `--staff-annual`, and the ceiling moves with it.
 
 ## Three outcomes, not two
 
@@ -291,59 +276,40 @@ and has said the requirement holds even where the people on the call were team m
 playing a part and the numbers were reserved ones. That describes these calls exactly, so
 the recordings stay outside the repository.
 
-What the calls settled is in [`evidence/README.md`](evidence/README.md): one command
-producing two calls in two languages with identical extracted results, a re-run that placed
-no calls at all, an unanswered call whose three accounts of itself contradict each other,
-and this app scoring a result as `resolved` when every field in it said `"unknown"`. Each
-is a rule in the code now, and each has a test that fails when the rule is removed.
+Four things those calls settled, each now a rule with a test that fails when the rule is
+removed: language is routed and not prompted, a replay is reported as a replay, a platform
+failure that contradicts itself is reported only where its accounts agree, and a
+schema-valid result whose every field says `"unknown"` is not an answer. That last one is a
+receipt of this app getting it wrong. [`evidence/README.md`](evidence/README.md) has the
+detail.
 
-The fixtures those tests read are generated rather than recorded, which invites the obvious
-question of what stops them being whatever shape makes the tests pass. The answer is
-`tools/double_conformance.py`: the offline double is compared, path by path and type by
-type, against the recorded responses, and `evidence/api-shape.json` is the result. Writing
-that comparison found the double wrong in four ways that twenty-six existing gates had all
-missed, because all twenty-six were measured against the same wrong model.
+Two pieces of machinery hold this up now that the recordings are elsewhere.
+`tools/double_conformance.py` compares the offline double against those recordings path by
+path and type by type, which is what makes a generated fixture worth trusting; it found the
+double wrong in four ways that twenty-six existing gates had all missed, because all
+twenty-six were measured against the same wrong model. `tests/test_privacy.py` keeps a
+recording from coming back, and found two files a manual pass had missed, one of them a
+real billing id used as an example in the documentation.
 
-`tests/test_privacy.py` is what keeps a recording from coming back. It reads what git
-tracks and fails on a production receipt, a provider call id, transcript text outside a
-fixture that declares itself authored, or a number from outside a reserved range. It found
-two files a manual pass had missed, one of them a real billing id being used as an example
-in the documentation.
+### American statistics, Indian phone numbers
 
-### Why the statistics are American and the phone numbers are Indian
+The duty is documented in the US and England, so that is where the problem is argued from.
+The calls went to my own handset because publishing a recording needs a line the caller
+owns, and phoning somebody else's family to produce evidence for a code submission needs a
+consent I did not ask for. The cost of that is a sample of one cooperative speaker, stated
+in `docs/locale-is-not-only-a-hint.md`. What it bought is the matched pair, which CALL-E
+supporting Tamil in the India region made placeable at all.
 
-A reader who gets this far has noticed that the problem is argued with US and English
-figures while every receipt is a `+91` number answered in Tamil or Hindi. That is worth
-explaining rather than leaving as a seam.
-
-The statistics are American and English because that is where the duty is written down and
-enforceable: Title VI and the 2015 Dear Colleague Letter create an obligation to reach a
-family in a language it understands, and England publishes persistent-absence figures
-against a statutory duty. Those make the problem checkable by a reader.
-
-The calls are Indian and the voice is mine because a published recording needs a line the
-caller owns. Every one of these calls went to my own number, placed by me and answered by
-me, which `evidence/README.md` states plainly. Phoning somebody else's family
-to produce evidence for a code submission would need a consent I did not ask for, so I did
-not do it. What that costs is real and is stated in `docs/locale-is-not-only-a-hint.md`: a
-sample of one cooperative speaker is not a sample of families.
-
-What it buys is the part that could not have been faked. CALL-E supports Tamil in the India
-region, so a matched pair, the same absence in two languages down one code path, was
-actually placeable. That experiment is the strongest evidence here and it exists because
-the numbers are Indian, not in spite of it.
-
-None of the code knows about any of this. `dispatch/` never reads a country. Language is a
-`locale` column on the row, so the family decides it and not the deployment. The wage
-behind the break-even is one flag. Moving this from a Chennai school to a California
-district changes two inputs and no logic, which is the whole claim: the jurisdiction is
-data, and only the data is jurisdictional.
+None of the code knows any of this. `dispatch/` never reads a country, language is a
+`locale` column the family owns rather than a deployment setting, and the wage is one flag.
+Moving this from a Chennai school to a California district changes two inputs and no logic:
+the jurisdiction is data, and only the data is jurisdictional.
 
 ## Tests
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 118 tests
+python -m pytest tests/ -q          # 125 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -400,6 +366,29 @@ calls were of the second kind.
   nothing. The dispatcher therefore reports only what all three accounts agree on, that
   nobody answered, and `dispatch/scheduler.py` records why it refuses to say more.
 
+## What I would build next
+
+Four things, and each one is a limitation named above rather than a feature I fancy. In the
+order that decides whether this is usable by a real school.
+
+1. **A local number in the region being called.** The blocker, and not a language problem.
+   These calls reached an Indian handset showing a `+1` caller ID from Oakland, and a
+   parent has no reason to answer that about their child. Nothing else here matters until
+   it is solved, and it is a procurement question before it is a code one.
+
+2. **A system-of-record adapter behind the `WorkSource` protocol.** The CSV is the seam,
+   not the design. `dispatch/sources.py` already reads through a protocol, so a PowerSchool
+   or Arbor reader is one class and no change to the dispatcher.
+
+3. **Platform-side call termination.** The escape hatch is instructed and not enforced
+   because CALL-E exposes no `end_call`, no `max_turns` and no maximum duration. Filed
+   upstream as a defect report; until it is answered a prompt is the only lever, and it is
+   not binding.
+
+4. **A locale comparison that survives its own control.** A written script per language,
+   agreed before dialling, and more than one speaker. The matched pairs failed on two of
+   four because one bilingual person cannot say the same thing twice from memory.
+
 ## Attribution
 
 The supported region, calling code and language table in `calle_double/regions.py` is
@@ -407,4 +396,8 @@ transcribed from `CALLE-AI/call-e-integrations`, which is MIT licensed. Dependen
 licences and one unresolved licensing question about the `calle-ai` package are recorded
 in `THIRD-PARTY-NOTICES.md`.
 
-All phone numbers in this directory are fictional and unassignable.
+Every phone number in this repository is fictional and unassignable, and
+`tests/test_privacy.py` fails if one is not. The calls described above went to a real
+handset, mine, and no number that reached it is committed here: the receipts holding it are
+on the linked page, where it is masked. Those two sentences are both true and they are
+eighty lines apart, which was worth closing rather than leaving a reader to reconcile.

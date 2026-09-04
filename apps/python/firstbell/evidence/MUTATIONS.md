@@ -40,8 +40,13 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 30 | Commit an image rendered from the call recordings, which no text check can read | 1 |
 | 31 | Store a vendor error message unchanged, when that message quotes the number it rejected | 2 |
 | 32 | Leave the completion poll unprotected, so one failed read discards a call that was placed | 2 |
+| 33 | Put one backspace byte inside a committed source file, which no editor or diff displays | 1 |
+| 34 | Leave a real CALL-E error code in none of the three classification sets | 1 |
+| 35 | Let one dispatcher instance run twice, inheriting the first run's cancellation | 1 |
+| 36 | Accept two work items sharing an id, so one idempotency key covers both | 2 |
+| 37 | Read a service clock an hour behind ours as a definite replay rather than unknown | 1 |
 
-## Why these thirty-two
+## Why these thirty-seven
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:
@@ -65,6 +70,14 @@ would otherwise have to check by hand:
   looked weak when the mutation was at fault. Deleting the section properly fails two
   tests. The check asserts a minimum number of anchors as well as their correctness,
   because a rule that says "every citation resolves" is satisfied by having none.
+- **33 to 37** came from a review and from one self-inflicted wound. 33 is the strange
+  one: a backspace byte written into a regex by a shell heredoc, which left the file
+  parsing, the pattern compiling, and the match silently never happening, while every tool
+  that could have shown it rendered the byte as nothing. 34 to 37 are the classification,
+  reuse, duplicate-id and clock-skew defects, and the common shape is a wrong answer given
+  confidently: an unclassified error code failing silently, a second run inheriting the
+  first one's cancellation, two items sharing an idempotency key so one answer is filed
+  against both, and clock skew read as proof that no phone rang.
 - **30 to 32** are the three this project got wrong in public and had to be told about.
   30 is the one worth reading twice: a screenshot of the evidence page was committed here,
   displaying twelve real call ids and twelve real billing ids, and every privacy check
@@ -87,6 +100,18 @@ would otherwise have to check by hand:
   records actually closed is the difference between an honest ratio and a brochure. 20
   keeps could-not-compute from collapsing into a number that reads as free. 22 holds the
   wage to the same sourcing rule as the funding rate.
+
+## One thing the count includes that you should discount
+
+A mutation that adds or removes a line moves every line after it, and this README cites
+four exact line numbers that a test checks. So such a mutation trips that test as well as
+whatever it was aimed at, and the count in the third column is one higher than the number
+of tests that noticed the *behaviour*. Row 36 is the only one where this happens: of its
+two, one is the duplicate-id rule and one is the line-anchor check.
+
+The counts here were measured by applying each mutation and running the suite, not
+estimated. Four of them were written down as ones before being run, and one of those four
+was wrong, which is the whole argument for measuring in the first place.
 
 ## What is not covered
 

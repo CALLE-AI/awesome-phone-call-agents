@@ -166,7 +166,8 @@ def test_the_mutation_table_is_numbered_without_gaps():
 NUMBER_WORDS = {
     13: "thirteen", 18: "eighteen", 22: "twenty-two", 26: "twenty-six",
     27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty",
-    33: "thirty-three", 34: "thirty-four",
+    33: "thirty-three", 34: "thirty-four", 35: "thirty-five",
+    36: "thirty-six", 37: "thirty-seven", 38: "thirty-eight",
     31: "thirty-one", 32: "thirty-two",
 }
 
@@ -206,6 +207,55 @@ def test_the_readme_states_the_real_number_of_mutations():
         assert f"{other_word.capitalize()} of them" not in readme, (
             f"the README still says '{other_word.capitalize()} of them' somewhere"
         )
+
+
+def test_no_committed_text_file_carries_an_invisible_control_byte():
+    """Catch the corruption that every tool renders as nothing.
+
+    Escaped text written through a shell can arrive with the backslash consumed, so a
+    `\\b` intended for a regex becomes byte 0x08. That is a real backspace: the file
+    still parses, the regex still compiles, it silently stops matching what it was written
+    for, and `cat`, `sed` and `git diff` all display it as empty space because a terminal
+    renders a backspace by moving the cursor left.
+
+    It happened three times while this app was being written, and only this kind of check
+    would have found the third one. Tab, newline and carriage return are the only control
+    characters a text file has any business holding.
+
+    Binary files are skipped by decoding rather than by extension, so a new image format
+    needs no entry here and a `.py` full of bytes is still caught.
+    """
+    allowed = {9, 10, 13}          # tab, newline, carriage return
+    offenders = []
+    for path in _tracked_paths():
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue                # a binary file, and not this test's business
+        stray = sorted({byte for byte in data if byte < 32 and byte not in allowed})
+        if stray:
+            offenders.append(
+                f"{path.name}: {', '.join(hex(b) for b in stray)}")
+    assert not offenders, (
+        "control bytes in a committed text file, which nothing displays:\n  "
+        + "\n  ".join(sorted(offenders)))
+
+
+def _tracked_paths():
+    """Every file git tracks under this app. See tests/test_privacy.py for why git."""
+    root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=APP, capture_output=True, text=True, check=True).stdout.strip()
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--full-name", "--", str(APP)],
+        cwd=APP, capture_output=True, text=True, check=True).stdout
+    paths = [Path(root) / name for name in listing.split("\0") if name]
+    assert len(paths) > 30, f"only {len(paths)} tracked files, which cannot be this app"
+    return paths
 
 
 def test_every_file_in_evidence_is_described():

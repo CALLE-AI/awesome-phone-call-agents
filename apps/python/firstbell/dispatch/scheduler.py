@@ -128,6 +128,10 @@ class WaveDispatcher:
         self._dispatched = 0
         self._in_flight: set[str] = set()
         self._fatal: str | None = None
+        # Whether run() has already been called once. Nothing above this line resets
+        # between runs, so a second run on the same instance would silently inherit the
+        # first run's cancellation, fatal error and dispatch count. See run()'s guard.
+        self._has_run = False
 
     # -- control ---------------------------------------------------------
 
@@ -141,8 +145,54 @@ class WaveDispatcher:
 
     # -- the run ---------------------------------------------------------
 
+    @staticmethod
+    def _assert_unique_ids(items: list[WorkItem]) -> None:
+        """Refuse duplicate work-item ids instead of letting them collide silently.
+
+        Two items sharing an id would also share the default idempotency key, so the
+        second `calls.create()` would replay the first item's call: no second call
+        happens, and whatever the first call's answer was gets reported against the
+        second item too. `CsvSource` already refuses duplicate ids on the way in;
+        `run()` accepts any `WorkSource`, so the same refusal belongs here rather than
+        only in one particular loader.
+        """
+        seen: set[str] = set()
+        dupes: set[str] = set()
+        for item in items:
+            if item.id in seen:
+                dupes.add(item.id)
+            seen.add(item.id)
+        if dupes:
+            raise ValueError(
+                f"duplicate work item id(s): {', '.join(sorted(dupes))}. Two items "
+                "sharing an id would share a default idempotency key, so the second "
+                "call would replay the first and its answer would be attributed to "
+                "the wrong item."
+            )
+
     def run(self, items: Iterable[WorkItem]) -> DispatchReport:
+        # _cancel, _fatal, _dispatched and _in_flight all belong to one run and none of
+        # them is reset afterwards. Resetting them here instead was rejected: a run
+        # already in progress can be cancelled from another thread (see
+        # test_cancel_stops_new_dispatch_...), and cancel() before the *first* run is
+        # also relied on (test_cancelling_before_the_run_dispatches_nothing) to prove a
+        # pre-cancelled run dispatches nothing. A reset at the top of run() cannot tell
+        # a flag set for "cancel the run about to start" apart from a flag left over
+        # from a run that already finished, so it would either break the first case or
+        # only move the second case's ambiguity from run one to run two. Nothing in
+        # this codebase constructs one WaveDispatcher and calls run() on it twice, so
+        # refusing the second call costs nothing and removes the ambiguity outright.
+        if self._has_run:
+            raise RuntimeError(
+                "WaveDispatcher.run() was already called on this instance. Its "
+                "cancellation, fatal-error and dispatch-count state belongs to that "
+                "run, and none of it is reset, so a second run here would silently "
+                "reuse it. Construct a fresh WaveDispatcher for each run."
+            )
+        self._has_run = True
+
         items = list(items)
+        self._assert_unique_ids(items)
         report = DispatchReport()
         if self._api_responded is None:
             self._api_responded = False
@@ -194,7 +244,12 @@ class WaveDispatcher:
                                f"{redact(str(exc))}",
                     ))
 
-        report.results.sort(key=lambda r: [i.id for i in items].index(r.item.id))
+        # Built once, not once per result: the old `[i.id for i in items].index(...)`
+        # rebuilt and linear-scanned the whole id list for every single result, which
+        # is quadratic in the number of items. Ids are already guaranteed unique by
+        # _assert_unique_ids above, so this dict has exactly one position per id.
+        position = {item.id: i for i, item in enumerate(items)}
+        report.results.sort(key=lambda r: position[r.item.id])
         with self._lock:
             report.cancelled = self._cancel.is_set()
             report.cancelled_after = self._dispatched
@@ -416,8 +471,16 @@ class WaveDispatcher:
         if created.tzinfo is None:
             created = created.replace(tzinfo=timezone.utc)
         if created > started + timedelta(hours=1):
-            # The service's clock is far enough from ours that the comparison means
+            # The service's clock is far enough ahead of ours that the comparison means
             # nothing. Say so rather than reading skew as a fresh call.
+            return None
+        if created < started - timedelta(hours=1):
+            # The symmetric case. A clock far enough behind ours is just as
+            # uninformative as one far enough ahead, but reading skew in this direction
+            # as "definitely a replay" is the worse mistake of the two: it says no
+            # phone rang and nothing was billed for a call that this run may well have
+            # placed. Unknown costs a little certainty; a wrong "replayed" costs an
+            # accurate account of what the run actually did.
             return None
         # One second of slack: the service stamps the call, not our clock.
         return created >= started - timedelta(seconds=1)

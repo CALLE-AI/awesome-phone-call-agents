@@ -36,6 +36,11 @@ import pytest
 APP = Path(__file__).resolve().parent.parent
 SELF = Path(__file__).resolve()
 
+# Assertion messages here list offenders one per line. The separator is a constant
+# because a literal escape inside one of these strings has been mangled twice by the
+# tooling used to edit this file, once into a backspace byte that nothing displayed.
+NEWLINE_INDENT = "\n  "
+
 # The vendor's handle for a call: `call_` and then twenty-odd characters of base64-ish text.
 # Written to need both a length and some evidence of encoding, so that the double's own
 # `call_1` and a sentence containing the words "call_id" do not match.
@@ -436,3 +441,75 @@ def test_the_authored_fixtures_are_what_the_generator_produces(tracked):
         "a fixture under tests/data/ differs from what tools/make_shape_fixtures.py "
         "produces, so it is not the generated file it claims to be"
     )
+
+# ---------------------------------------------------------------------------
+# The credential
+# ---------------------------------------------------------------------------
+
+def test_the_api_key_reaches_no_surface_a_run_writes():
+    """A real key in the environment, and every byte the run produces is searched for it.
+
+    The key is read once, in `firstbell/cli.py`, and handed to the SDK. Nothing prints it
+    and nothing stores it, which is easy to say and easy to stop being true: a client
+    repr in an exception, a debug line, a receipt field added later. So this puts a
+    distinctive value in `CALLE_API_KEY` and greps stdout, stderr and the receipt for it,
+    including on the error path, which is where the phone-number leak lived.
+
+    Offline, deliberately. The run must not need a key at all, and if it ever starts
+    reading one on this path that is worth knowing too.
+    """
+    import os
+    import subprocess
+    import sys
+    import tempfile
+
+    sentinel = "iams_live_SENTINELdeadbeef0123456789"
+    environment = dict(os.environ, CALLE_API_KEY=sentinel)
+    receipt = Path(tempfile.mkdtemp()) / "receipt.json"
+
+    run = subprocess.run(
+        [sys.executable, "-m", "firstbell", "--work-file", "examples/absences.csv",
+         "--receipt", str(receipt)],
+        cwd=APP, env=environment, capture_output=True, text=True,
+        encoding="utf-8", errors="replace")
+    assert run.returncode == 0, run.stderr[-400:]
+
+    surfaces = {"stdout": run.stdout, "stderr": run.stderr}
+    assert receipt.exists(), "no receipt was written, so this test checked less than it says"
+    surfaces["receipt"] = receipt.read_text(encoding="utf-8")
+
+    # The error path too. That is the one that leaked a phone number, because it prints
+    # text this app did not write.
+    broken = subprocess.run(
+        [sys.executable, "-m", "firstbell", "--work-file", "no-such-file.csv"],
+        cwd=APP, env=environment, capture_output=True, text=True,
+        encoding="utf-8", errors="replace")
+    surfaces["error stdout"] = broken.stdout
+    surfaces["error stderr"] = broken.stderr
+
+    for where, body in surfaces.items():
+        assert sentinel not in body, f"the whole key appears in {where}"
+        assert "SENTINEL" not in body, f"part of the key appears in {where}"
+        assert "deadbeef" not in body, f"part of the key appears in {where}"
+
+
+def test_no_committed_file_carries_anything_shaped_like_a_key(tracked):
+    """A key pasted into a file is the other way this goes wrong.
+
+    CALL-E keys begin `iams_`. The double accepts anything for its own tests, so the
+    prefix appears in this repository on purpose, and what is forbidden is a long one:
+    a test key is a word, a real one is not.
+    """
+    key_like = re.compile(r"\biams_[A-Za-z0-9_-]{20,}\b")
+    offenders = []
+    for path in tracked:
+        if path.resolve() == SELF:
+            continue
+        body = text_of(path)
+        if body is None:
+            continue
+        for hit in set(key_like.findall(body)):
+            offenders.append(f"{path.name}: {hit[:12]}...")
+    assert not offenders, NEWLINE_INDENT.join(
+        ["these look like real API keys:"] + sorted(offenders))
+

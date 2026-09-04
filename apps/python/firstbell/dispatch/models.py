@@ -35,6 +35,14 @@ RETRYABLE_ERRORS = frozenset({
     "rate_limit_exceeded",
     "provider_unavailable",
     "internal_error",
+    # The call this request refers to has not finished initialising on the platform
+    # side. That is a clock problem, not a content problem: the identical request sent
+    # again shortly after is expected to land once the platform catches up.
+    "call_not_ready",
+    # Same shape as call_not_ready, on the goal side. Not ready yet is still a timing
+    # question, so it belongs with the codes worth trying again rather than with the
+    # ones that need a person to change something first.
+    "goal_not_ready",
 })
 
 # Error codes that mean this work item can never succeed as submitted.
@@ -49,6 +57,26 @@ PERMANENT_ERRORS = frozenset({
     "result_schema_invalid",
     "recipient_result_schema_invalid",
     "invalid_request",
+    # The goal referenced is a draft that was never published. Retrying the identical
+    # request cannot publish it; a person has to do that first.
+    "goal_not_published",
+    # The goal referenced is published but cannot run as configured (disabled,
+    # archived, or similar). A configuration problem, not a timing one, so retrying
+    # changes nothing.
+    "goal_not_executable",
+    # The request tried to override a result schema the account or goal does not allow
+    # overriding. A caller-side configuration mistake, present in every retry.
+    "schema_override_not_allowed",
+    # The variables supplied for the task or template failed validation. Bad input
+    # data, exactly like invalid_recipient, and identical on every retry.
+    "variables_invalid",
+    # The idempotency key collided with an earlier request whose body differs. This is
+    # a bug in how this caller builds keys, not in the recipient or the call content,
+    # and it will not clear until the key construction is fixed, so it belongs here
+    # rather than with the codes worth retrying. `err.code` and the vendor message both
+    # survive into the failure reason, so this reads as "idempotency_conflict" in a
+    # queue, not as an anonymous permanent failure that looks like a bad phone number.
+    "idempotency_conflict",
 })
 
 # Anything here should stop the whole run rather than the item: continuing wastes money
@@ -57,6 +85,13 @@ FATAL_ERRORS = frozenset({
     "insufficient_balance",
     "unauthorized",
     "forbidden",
+    # A call this run itself just created came back not_found. That is not a per-item
+    # data problem like invalid_phone, and it is not a timing problem retrying clears:
+    # either the platform lost track of billable state or this client is pointed at
+    # the wrong environment. Continuing to dispatch more calls into that state risks
+    # placing more billed calls this run can never account for, so it stops the run
+    # for a person to look at rather than grinding through the rest of the batch.
+    "not_found",
 })
 
 

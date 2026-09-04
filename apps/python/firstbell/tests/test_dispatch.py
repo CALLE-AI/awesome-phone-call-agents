@@ -114,6 +114,34 @@ def test_a_boolean_does_not_satisfy_an_integer_field(double):
 
 
 # --------------------------------------------------------------------------
+# Every CALL-E error code has to land somewhere, deliberately
+# --------------------------------------------------------------------------
+
+def test_every_calle_error_code_is_classified_into_exactly_one_bucket():
+    """An error code this dispatcher has never heard of falls through to a plain
+    permanent failure today, silently: nothing says the code was unrecognised.
+
+    This is the gate against that happening again. If a future SDK version adds a
+    twenty-fifth error code, this test fails the suite instead of the fallthrough
+    quietly mis-handling it in production.
+    """
+    from calle_double import API_ERROR_CODES
+    from dispatch.models import FATAL_ERRORS, PERMANENT_ERRORS, RETRYABLE_ERRORS
+
+    classified = RETRYABLE_ERRORS | PERMANENT_ERRORS | FATAL_ERRORS
+    missing = set(API_ERROR_CODES) - classified
+    assert not missing, f"unclassified CALL-E error code(s): {sorted(missing)}"
+
+    extra = classified - set(API_ERROR_CODES)
+    assert not extra, f"classified code(s) CALL-E does not define: {sorted(extra)}"
+
+    overlap = ((RETRYABLE_ERRORS & PERMANENT_ERRORS)
+               | (RETRYABLE_ERRORS & FATAL_ERRORS)
+               | (PERMANENT_ERRORS & FATAL_ERRORS))
+    assert not overlap, f"code(s) placed in more than one bucket: {sorted(overlap)}"
+
+
+# --------------------------------------------------------------------------
 # The consent gate
 # --------------------------------------------------------------------------
 
@@ -198,6 +226,22 @@ def test_cancelling_before_the_run_dispatches_nothing(double):
     assert report.results[0].resolution is Resolution.SKIPPED
 
 
+def test_a_second_run_on_the_same_dispatcher_is_refused_rather_than_silently_wrong(double):
+    """Nothing resets `_cancel`, `_fatal`, `_dispatched` or `_in_flight` between runs.
+
+    Reusing an instance that was cancelled during its first run would silently report
+    every item in a second run as skipped, with nothing to explain why. Reusing one
+    that was not cancelled would still publish a `cancelled_after` count left over from
+    the first run. Refusing reuse turns a wrong report into a clear error instead.
+    """
+    double.set_default_outcome(Outcome.answered(GOOD, TALK))
+    dispatcher = make(double)
+    dispatcher.run([WorkItem(id="a", phones=("+9155500001",))])
+
+    with pytest.raises(RuntimeError, match="already"):
+        dispatcher.run([WorkItem(id="b", phones=("+9155500002",))])
+
+
 # --------------------------------------------------------------------------
 # Idempotency and retries
 # --------------------------------------------------------------------------
@@ -260,6 +304,21 @@ def test_results_come_back_in_input_order_regardless_of_completion_order(double)
     items = [WorkItem(id=f"s{i}", phones=(f"+9155500000{i:05d}",)) for i in range(12)]
     report = make(double, concurrency=6).run(items)
     assert [r.item.id for r in report.results] == [i.id for i in items]
+
+
+def test_duplicate_work_item_ids_are_refused_rather_than_silently_reordered(double):
+    """Two items sharing an id would also share the default idempotency key, so the
+    second `create()` would replay the first item's call and the answer would be
+    attributed to the wrong person. `CsvSource` already refuses this on the way in;
+    `run()` accepts any `WorkSource`, so the same refusal belongs here too, not just
+    in one particular loader.
+    """
+    double.set_default_outcome(Outcome.answered(GOOD, TALK))
+    with pytest.raises(ValueError, match="duplicate"):
+        make(double).run([
+            WorkItem(id="a", phones=("+9155500001",)),
+            WorkItem(id="a", phones=("+9155500002",)),
+        ])
 
 
 # --------------------------------------------------------------------------
@@ -535,6 +594,20 @@ def test_provenance_is_unknown_rather_than_assumed_when_the_timestamp_is_missing
     # A service clock hours ahead of ours makes the comparison meaningless, not "fresh".
     from datetime import timedelta
     skewed = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+    assert dispatcher._was_placed_now({"created_at": skewed}) is None
+
+
+def test_a_service_clock_far_behind_ours_is_unknown_not_a_definite_replay(double):
+    """The guard for a clock running far ahead already existed. Nothing matched it on
+    the other side, so a service clock running far behind ours read as a definite
+    replay: no call placed, no phone rung. Reporting "replayed" is a claim that this
+    run made no difference, and a wrong one understates what actually happened just as
+    much as a wrong "placed" would overstate it.
+    """
+    from datetime import timedelta
+    dispatcher = make(double)
+    dispatcher._run_started_at = datetime.now(timezone.utc)
+    skewed = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
     assert dispatcher._was_placed_now({"created_at": skewed}) is None
 
 

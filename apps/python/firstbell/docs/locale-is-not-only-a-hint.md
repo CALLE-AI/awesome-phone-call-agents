@@ -4,6 +4,13 @@ CALL-E's schema documents `locale` as a **"BCP 47 hint"**. The word hint sets a 
 expectation. Ten real calls say the expectation is wrong, and they also say the failure sits
 somewhere other than where you would look for it.
 
+Ten, and then eight, and the difference between those two numbers matters enough to state
+before anything else. Ten calls bear on `locale`: the two that first suggested this, placed
+by one command in `en-IN` and `ta-IN` and coming back with identical extracted fields, and
+the eight below. The eight are the measurement, run afterwards as four matched pairs
+because two calls agreeing is an anecdote. Every count in this document after this
+paragraph refers to the eight.
+
 ## This repository already has a skill that depends on this being true
 
 [`skills/language-bridge-call`](../../../../skills/language-bridge-call/SKILL.md) places one
@@ -17,7 +24,8 @@ missing half, offered as support for that skill's premise rather than as a compe
 
 ## The measurement
 
-Eight live calls against `api.heycall-e.com`, in four matched pairs. Each pair is one
+Eight live calls against `api.heycall-e.com`, in four matched pairs. One of them ran on its
+own first, so that a mistake in the design would cost one call instead of eight. Each pair is one
 scenario answered in `en-IN` and in `ta-IN`, by the same speaker, with the same goal, the
 same schema and the same code path. Only the locale column differs.
 

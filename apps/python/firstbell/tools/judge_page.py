@@ -35,6 +35,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
@@ -132,6 +133,25 @@ def recovered_provider_ids() -> dict[str, str]:
     """
     mapping = _receipts_dir() / "provider-ids.json"
     return json.loads(mapping.read_text(encoding="utf-8")) if mapping.exists() else {}
+
+
+def build_commit() -> str:
+    """The commit this page was generated from, or a plain statement that it is unknown."""
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=APP,
+                             capture_output=True, text=True, timeout=10)
+        sha = out.stdout.strip()
+        if out.returncode or not sha:
+            return "an unknown commit"
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", str(APP)], cwd=APP,
+                               capture_output=True, text=True, timeout=10).stdout.strip()
+        return f"{sha} plus uncommitted changes" if dirty else sha
+    except (OSError, subprocess.SubprocessError):
+        return "an unknown commit"
+
+
+def build_date() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def offline_run() -> str:
@@ -400,11 +420,17 @@ def build(has_audio: bool) -> str:
         '<code>GET</code>, which places no call.</p>',
         '<h3>What is committed, and what is only served here</h3>',
         '<table class=compliance><tbody>'
-        '<tr><td>transcripts, waveform shape, structured results, call ids</td>'
+        '<tr><td>call ids, transcripts, waveform shape, structured results, the audio</td>'
+        '<td class=dim>served on this page only</td></tr>'
+        '<tr><td>the rules those calls produced, and the tests that hold them</td>'
         '<td class=ok>in the repository</td></tr>'
-        '<tr><td>the audio recordings</td><td class=dim>served on this page only, because '
-        'the contribution checklist asks contributors not to commit call recordings</td>'
-        '</tr></tbody></table>',
+        '</tbody></table>'
+        '<p class=note>Nothing on the left is in the repository. The maintainer of this '
+        'list requires committed real-call artifacts to be removed, and has said the '
+        'requirement holds even where the people on the call were team members playing a '
+        'part and the numbers were reserved ones, which describes these calls exactly. '
+        'So the recordings live here and the reasoning lives there, and '
+        '<code>tests/test_privacy.py</code> fails the build if one crosses over.</p>',
         '</div><div class=artifact>',
         '<table class=ids><thead><tr><th>API id</th><th>provider id (dashboard)</th>'
         '<th>outcome</th></tr></thead><tbody>',
@@ -506,11 +532,17 @@ def build(has_audio: bool) -> str:
     add(act("08", "Run it yourself", "".join(body)))
 
     add('</main>')
-    add('<footer><p>Generated from the committed evidence by <code>tools/judge_page.py</code>. '
-        'Nothing here is typed into the template: if the repository changes, this page changes '
-        'with it. Contrast is measured by <code>tools/check_contrast.py</code>, which reports '
-        'the pairs it could not measure so that an unmeasured pair cannot read as a pass.</p>'
-        '</footer>')
+    # The build's own provenance. The previous footer said "if the repository changes,
+    # this page changes with it", which is a claim the page cannot make about itself: a
+    # deployed copy goes stale the moment the next commit lands, and this one did, telling
+    # readers 88 tests and 18 mutations while the repository said otherwise. A commit and a
+    # date can be checked. A promise about future rebuilds cannot.
+    add(f'<footer><p>Built from <code>{build_commit()}</code> on {build_date()} by '
+        '<code>tools/judge_page.py</code>, which reads the numbers rather than being told '
+        'them. If that commit is not the tip of the branch, this page is behind it, and '
+        'you can see that for yourself rather than being told. Contrast is measured by '
+        '<code>tools/check_contrast.py</code>, which reports the pairs it could not measure '
+        'so that an unmeasured pair cannot read as a pass.</p></footer>')
 
     add(f'<script id=call-data type=application/json>{json.dumps(data, ensure_ascii=False, separators=(",", ":"))}</script>')
     add(f'<script src="{GSAP}" defer></script>')
