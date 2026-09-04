@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Thirty-seven gates broken on purpose, with how many tests noticed each one | 2 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Thirty-seven gates broken on purpose, with how many tests noticed each one | 1 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -37,6 +37,16 @@ cannot quietly rot.
   hard ceiling rather than an open loop.
 - Failures arrive as the SDK's own type, `from calle import CalleAPIError` at
   `dispatch/scheduler.py:295`, rather than as a string match on a message.
+
+## Reusable without this app
+
+The classification rule is not locked inside a Python CLI. The same three outcomes ship as
+an importable n8n workflow in
+[`plugins/firstbell-absence-calls`](../../../plugins/firstbell-absence-calls/), with the
+classifier extracted into a plain module so `node --test examples/classify.test.mjs` runs
+its fourteen tests without n8n installed, and the workflow regenerated from that module by
+a committed script so the two cannot drift apart. It ships with its schedule trigger
+disabled and a dry run that places no calls and needs no API key.
 
 ## The problem
 

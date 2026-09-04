@@ -143,16 +143,41 @@ def test_every_cited_line_number_still_says_what_the_readme_claims():
         )
 
 
-def test_the_ten_minute_reading_order_points_at_files_that_exist():
-    """Five links on the first screen. A dead one there is worse than no list."""
+def test_the_ten_minute_reading_order_is_ten_minutes_of_files_that_exist():
+    """The list on the first screen, checked for both halves of what it promises.
+
+    A dead link there is worse than no list. So is a budget the rows do not add up to: the
+    heading offers a reader ten minutes, every row states its own cost, and nothing was
+    checking that those two agree. They did not, by a minute, from the day the section was
+    written.
+
+    The count is a range rather than a number. Pinning it to exactly five meant that adding
+    a sixth file broke a test about dead links, which is not what that test is for. The
+    lower bound is what stops the list quietly emptying.
+    """
     readme = (APP / "README.md").read_text(encoding="utf-8")
-    order = readme.split("## If you have ten minutes", 1)
+    heading = "## If you have ten minutes"
+    order = readme.split(heading, 1)
     assert len(order) == 2, "the README no longer has a reading order"
     table = order[1].split("### Where CALL-E is called", 1)[0]
+
     linked = re.findall(r"\]\(([^)]+)\)", table)
-    assert len(linked) == 5, f"expected five files in the reading order, found {len(linked)}"
+    assert 4 <= len(linked) <= 8, (
+        f"the reading order has {len(linked)} entries, which is either too few to be a "
+        "reading order or too many to read in the time offered"
+    )
     for rel in linked:
         assert (APP / rel).exists(), f"the reading order points at {rel}, which does not exist"
+
+    budget = int(re.search(r"## If you have (\w+) minutes", readme).group(1)
+                 .replace("ten", "10").replace("fifteen", "15").replace("twenty", "20"))
+    stated = [int(m) for m in re.findall(r"\| (\d+) min \|", table)]
+    assert len(stated) == len(linked), (
+        f"{len(linked)} rows but {len(stated)} of them state a reading time"
+    )
+    assert sum(stated) <= budget, (
+        f"the heading offers {budget} minutes and the rows add up to {sum(stated)}"
+    )
 
 
 def test_the_mutation_table_is_numbered_without_gaps():
