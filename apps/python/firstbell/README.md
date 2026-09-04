@@ -1,6 +1,6 @@
 # firstbell
 
-**[Evidence page](https://firstbell-evidence.vercel.app)** &middot; every real call, every broken rule, and the offline run, generated from the files in this directory by `tools/judge_page.py`.
+**[Evidence page](https://firstbell-evidence.vercel.app)** &middot; every real call, every broken rule, and the offline run. Built by `tools/judge_page.py` from the call recordings, which are held outside this repository: see [`evidence/README.md`](evidence/README.md) for why.
 
 Phones the families whose absence notification went unanswered, in the language that
 family speaks, and brings back a structured reason a school office can act on. Offline by
@@ -20,7 +20,7 @@ makes, and each one can be checked without an API key.
 | --- | --- | --- | --- |
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
-| 3 | [`evidence/README.md`](evidence/README.md) | Six receipts from real calls, each with a `call_id` you can match against CALL-E's own usage page, and a plain statement of whose phone answered | 2 min |
+| 3 | [`evidence/README.md`](evidence/README.md) | What twelve real calls settled, why their receipts are on the linked page and not in this tree, and how a generated fixture can be trusted when it is not a recording | 3 min |
 | 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Twenty-nine gates broken on purpose, with how many tests noticed each one | 2 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
@@ -284,12 +284,31 @@ export CALLE_BASE_URL=http://127.0.0.1:8787
 
 ## Evidence from real calls
 
-`evidence/` holds six receipts from calls placed against `api.heycall-e.com`, each with
-`reached_production_api: true`, a real `call_id` and CALL-E's own returned transcript. One
-command producing two calls in two languages with identical results, a re-run that placed
-no calls at all, an unanswered call whose three accounts of itself disagree, and a receipt
-of this app getting it wrong before the defect was fixed. `evidence/README.md` says what
-each one is worth.
+Twelve calls were placed against `api.heycall-e.com` on 2026-09-04. Their receipts are on
+the [evidence page](https://firstbell-evidence.vercel.app) and **not in this tree**,
+because the maintainer of this list requires that committed real-call artifacts be removed
+and has said the requirement holds even where the people on the call were team members
+playing a part and the numbers were reserved ones. That describes these calls exactly, so
+the recordings stay outside the repository.
+
+What the calls settled is in [`evidence/README.md`](evidence/README.md): one command
+producing two calls in two languages with identical extracted results, a re-run that placed
+no calls at all, an unanswered call whose three accounts of itself contradict each other,
+and this app scoring a result as `resolved` when every field in it said `"unknown"`. Each
+is a rule in the code now, and each has a test that fails when the rule is removed.
+
+The fixtures those tests read are generated rather than recorded, which invites the obvious
+question of what stops them being whatever shape makes the tests pass. The answer is
+`tools/double_conformance.py`: the offline double is compared, path by path and type by
+type, against the recorded responses, and `evidence/api-shape.json` is the result. Writing
+that comparison found the double wrong in four ways that twenty-six existing gates had all
+missed, because all twenty-six were measured against the same wrong model.
+
+`tests/test_privacy.py` is what keeps a recording from coming back. It reads what git
+tracks and fails on a production receipt, a provider call id, transcript text outside a
+fixture that declares itself authored, or a number from outside a reserved range. It found
+two files a manual pass had missed, one of them a real billing id being used as an example
+in the documentation.
 
 ### Why the statistics are American and the phone numbers are Indian
 
@@ -304,7 +323,7 @@ against a statutory duty. Those make the problem checkable by a reader.
 
 The calls are Indian and the voice is mine because a published recording needs a line the
 caller owns. Every one of these calls went to my own number, placed by me and answered by
-me, which `evidence/README.md` states on the receipt itself. Phoning somebody else's family
+me, which `evidence/README.md` states plainly. Phoning somebody else's family
 to produce evidence for a code submission would need a consent I did not ask for, so I did
 not do it. What that costs is real and is stated in `docs/locale-is-not-only-a-hint.md`: a
 sample of one cooperative speaker is not a sample of families.
@@ -324,7 +343,7 @@ data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 106 tests
+python -m pytest tests/ -q          # 111 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
@@ -367,7 +386,7 @@ calls were of the second kind.
 - **In India this calls from a United States number, and that is a deployment problem.**
   CALL-E's own supported-regions table lists India as an *International* line rather than
   a Local one, and their README says the international numbers are "primarily intended for
-  testing". The live calls behind the receipts in `evidence/` arrived on an Indian mobile
+  testing". The live calls behind the linked receipts arrived on an Indian mobile
   showing a `+1` caller ID attributed to Oakland, California. A parent who is not
   expecting the call has no reason to answer an unknown American number about their child,
   and a school has every reason not to send one. The language routing works. Reaching the

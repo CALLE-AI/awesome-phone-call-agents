@@ -366,21 +366,51 @@ def test_any_work_source_substitutes_for_the_csv_one(double):
     assert report.counts()["resolved"] == 1
 
 
-# -- built from a real production response ----------------------------------
+# -- the response shapes real calls turned up -------------------------------
+#
+# Every fixture below is generated, by tools/make_shape_fixtures.py, from the offline
+# double. None of them is a recording. The recordings that first showed these shapes were
+# made against the production API on 2026-09-04 and are published as receipts on the linked
+# evidence page; they are not in this repository, because the upstream maintainer requires
+# that no real-call artifact be committed, and that holds for a call placed to the author's
+# own phone on a reserved number, which is what these were.
+#
+# The reason an authored fixture is worth trusting here is that the double is measured
+# against those recordings rather than against anybody's memory of them. See
+# tools/double_conformance.py, evidence/api-shape.json, and the gate in
+# test_the_double_emits_every_field_the_real_api_returns. Field names, types, the SIP
+# vocabulary and the zero-duration failure all come from that comparison.
 
-def _live_call() -> dict:
-    """A real CALL-E response, captured 2026-09-04, with the number replaced.
 
-    The call was placed to the author's own phone, by the author, and the conversation
-    was scripted for a demonstration, so publishing it is a deliberate act rather than a
-    leak of somebody's private call. The `provider_call_id` and the phone number are the
-    only edited fields.
+def _shape(name: str) -> dict:
+    """Load a generated fixture as the API would have returned it.
 
-    It is here because it caught a defect no synthetic fixture would have: the recipient's
-    `structured_result` is null while the task's is fully populated.
+    `_provenance` is removed on the way through. It is in the file so that nobody reading
+    `tests/data/` mistakes an authored fixture for a recording, and it is taken out here so
+    that what reaches the classifier is exactly a response body and not a response body
+    plus a note from us.
     """
-    path = Path(__file__).parent / "data" / "live-call-single-recipient.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    path = Path(__file__).parent / "data" / name
+    call = json.loads(path.read_text(encoding="utf-8"))
+    assert call.pop("_provenance", None), (
+        f"{name} has no _provenance line, so a reader cannot tell whether it was recorded "
+        "or generated. Run tools/make_shape_fixtures.py."
+    )
+    return call
+
+
+def _task_result_shape() -> dict:
+    """The result on the task, nothing on the recipient.
+
+    This is the shape that caught the first defect, and it was a real call that caught it:
+    the dispatcher read only `recipients[0].structured_result`, production had populated
+    only the task-level field, and completed Tamil calls were being queued for a human.
+
+    The offline suite could not have found it. The double had the same assumption the
+    dispatcher did, so both were wrong in the same direction and every test agreed. That is
+    fixed in the double now, and mutation 27 is the gate on it.
+    """
+    return _shape("shape-task-result-only.json")
 
 
 LIVE_SCHEMA = {
@@ -399,7 +429,7 @@ LIVE_ITEM = WorkItem(id="S-2002", phones=("+915550000002",), locale="ta-IN", reg
 
 
 def test_a_real_response_puts_the_answer_where_our_first_version_did_not_look():
-    call = _live_call()
+    call = _task_result_shape()
     assert call["recipients"][0]["structured_result"] is None, "fixture no longer models the bug"
     assert call["structured_result"]["reason_category"] == "illness"
 
@@ -413,15 +443,34 @@ def test_a_real_response_puts_the_answer_where_our_first_version_did_not_look():
     assert result.structured_result["parent_confirmed_aware"] == "yes"
 
 
-def test_the_agent_really_spoke_the_locale_it_was_given():
-    """The whole product claim, asserted against a real response rather than a promise."""
-    call = _live_call()
+def test_a_tamil_conversation_still_yields_english_enum_values():
+    """Checks our reader, and deliberately does not check the platform.
+
+    This was called `test_the_agent_really_spoke_the_locale_it_was_given`, and against a
+    recorded response that name was fair: the Tamil in the file was Tamil CALL-E had
+    produced, so asserting on it was evidence the locale had been honoured. The fixture is
+    generated now. The same assertion would show only that this project can write Tamil,
+    which nobody doubts, and keeping the old name would have turned a real claim into a
+    circular one.
+
+    What is still worth pinning down, and what this pins down, is that nothing on our side
+    assumes the conversation and the extracted values share an alphabet. The turns are in
+    Tamil, the enum values come back in English, and a reader that had quietly started
+    matching against transcript text would fail here.
+
+    The evidence that CALL-E answers in the locale it was given is on the linked evidence
+    page, where the recordings are.
+    """
+    call = _task_result_shape()
     assert call["recipients"][0]["locale"] == "ta-IN"
     turns = call["recipients"][0]["attempts"][0]["transcript_turns"]
     bot = " ".join(t["text"] for t in turns if t["speaker"] == "bot")
     tamil = [c for c in bot if "\u0b80" <= c <= "\u0bff"]
-    assert len(tamil) > 50, "the agent did not answer in Tamil, so locale was not honoured"
-    # The extraction still produced English enum values from a Tamil conversation.
+    assert len(tamil) > 50, "the fixture is meant to hold a Tamil conversation"
+    assert not any("\u0b80" <= c <= "\u0bff" for c in
+                   json.dumps(call["structured_result"], ensure_ascii=False)), (
+        "the extracted result should be in the schema's own vocabulary, not the caller's"
+    )
     assert call["structured_result"]["reason_category"] == "illness"
 
 
@@ -431,7 +480,7 @@ def test_a_task_level_result_is_not_attributed_to_one_of_many_recipients():
     Falling back there would swap a false negative for a false attribution, which is
     worse: one family's answer would be filed against another family's child.
     """
-    call = _live_call()
+    call = _task_result_shape()
     call["recipients"].append(json.loads(json.dumps(call["recipients"][0])))
     result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
     assert result.resolution is Resolution.UNDETERMINED
@@ -439,7 +488,7 @@ def test_a_task_level_result_is_not_attributed_to_one_of_many_recipients():
 
 
 def test_a_recipient_result_still_wins_over_the_task_result():
-    call = _live_call()
+    call = _task_result_shape()
     call["recipients"][0]["structured_result"] = {
         "reason_category": "transport", "expected_return": "today"}
     result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
@@ -506,15 +555,16 @@ def test_the_summary_separates_the_three_provenances():
 
 
 def test_a_real_failure_is_described_in_words_an_office_can_act_on():
-    """Captured from production, 2026-09-04, number replaced.
+    """`call_failed` on the task, raw SIP `603` on the attempt, and zero duration.
 
-    The response carries `call_failed` on the task and the raw SIP code `603` on the
-    attempt. Neither is one of the two codes this dispatcher was originally written
-    against, which is how an invented vocabulary gets found out.
+    A real call found this on 2026-09-04, and neither code was one of the two this
+    dispatcher had been written against. That is how an invented vocabulary gets found out,
+    and it is also why the double now speaks SIP on an attempt: it used to send a symbolic
+    name of its own, the dispatcher's SIP table missed it, and the same unanswered call
+    produced one message offline and a different one against production. Mutation 29 is
+    the gate, and it fails six tests.
     """
-    call = json.loads(
-        (Path(__file__).parent / "data" / "live-call-declined.json").read_text(
-            encoding="utf-8"))
+    call = _shape("shape-declined-603.json")
     assert call["failure_code"] == "call_failed"
     assert call["recipients"][0]["attempts"][0]["failure_code"] == "603"
 
@@ -548,16 +598,17 @@ def test_every_sip_code_we_claim_to_translate_actually_translates():
 
 
 def test_a_row_of_unknowns_is_not_an_answer():
-    """Captured from production, 2026-09-04, number replaced.
+    """Completed, schema-valid, and it learned nothing.
 
-    The person said they were at work and could not talk. CALL-E returned a schema-valid
-    result in which every required field was "unknown", and its own note said no reason
-    and no return date were collected. The first version of this dispatcher called that
-    resolved and closed the record.
+    A real call on 2026-09-04 produced this: the person said they were at work and could
+    not talk, and CALL-E returned a result in which every required field was "unknown",
+    with its own note saying no reason and no return date had been collected. The first
+    version of this dispatcher called that resolved and closed the record, which is a
+    school marking a child explained when nobody had explained anything.
+
+    Schema validity is not an answer. That is the rule this holds.
     """
-    call = json.loads(
-        (Path(__file__).parent / "data" / "live-call-learned-nothing.json").read_text(
-            encoding="utf-8"))
+    call = _shape("shape-all-unknown.json")
     assert call["status"] == "completed"
     result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
 
@@ -604,10 +655,10 @@ def test_the_receipt_carries_the_id_the_vendor_bills_against(double):
         {"id": "call_removed_11", "status": "completed",
          "recipients": [{"attempts": [
              {"phone": IN_A, "provider_call_id": "aaaa1111bbbb2222cccc3333dddd4444"},
-             {"phone": IN_A, "provider_call_id": "00000000000000000000000000000005"},
+             {"phone": IN_A, "provider_call_id": "bbbb2222cccc3333dddd4444eeee5555"},
          ]}]})
     assert result.call_id == "call_removed_11"
-    assert result.provider_call_id == "00000000000000000000000000000005"
+    assert result.provider_call_id == "bbbb2222cccc3333dddd4444eeee5555"
 
 
 def test_a_call_with_no_attempts_reports_no_provider_id_rather_than_crashing(double):

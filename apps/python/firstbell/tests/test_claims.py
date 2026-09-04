@@ -207,15 +207,27 @@ def test_the_readme_states_the_real_number_of_mutations():
         )
 
 
-def test_every_committed_receipt_is_described():
-    listed = (APP / "evidence" / "README.md").read_text(encoding="utf-8")
-    for receipt in sorted((APP / "evidence").glob("0*.json")):
-        assert receipt.name in listed, receipt.name + " is committed but not described"
+def test_every_file_in_evidence_is_described():
+    """Nothing sits in evidence/ without the index saying what it is.
 
+    This used to glob `0*.json`, the receipts, and it kept working right up until the
+    receipts were removed, at which point it looped over nothing and passed. The count is
+    asserted first for that reason: the check is only worth anything if it read something.
 
-def test_no_receipt_claims_production_without_naming_the_host():
-    """A receipt that says it reached production must say where, or it cannot be checked."""
-    for receipt in sorted((APP / "evidence").glob("0*.json")):
-        data = json.loads(receipt.read_text(encoding="utf-8"))
-        if data.get("reached_production_api"):
-            assert "heycall-e.com" in (data.get("api_base_url") or ""), receipt.name
+    A companion check, `test_no_receipt_claims_production_without_naming_the_host`, lived
+    here too. It required a receipt claiming production to name the host it dialled, and it
+    is gone rather than generalised, because `tests/test_privacy.py` now forbids a
+    committed file from claiming production at all. Keeping a rule about how to do
+    something correctly, next to a rule saying not to do it, is how a tree ends up with two
+    answers.
+    """
+    directory = APP / "evidence"
+    listed = (directory / "README.md").read_text(encoding="utf-8")
+    described = [p for p in sorted(directory.iterdir())
+                 if p.is_file() and p.name != "README.md"]
+    assert len(described) >= 2, (
+        f"only {len(described)} file(s) in evidence/ besides the index, which is too few "
+        "for this check to be measuring anything"
+    )
+    for path in described:
+        assert path.name in listed, f"{path.name} is committed but not described"

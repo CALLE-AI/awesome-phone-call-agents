@@ -47,10 +47,11 @@ real ids, and none of them happened just now. Without a per-item marker, a repla
 looks exactly like a fresh one.
 
 Each item carries `placed_by_this_run` as **true, false, or null**, and the summary counts
-all three separately: placed, replayed, and unknown provenance. Receipt
-[`02-idempotent-replay-no-calls.json`](../evidence/02-idempotent-replay-no-calls.json)
-reads `calls placed 0, calls replayed 2`. No phone rang and the account was not charged,
-which the vendor's usage page confirms independently of our log.
+all three separately: placed, replayed, and unknown provenance. The receipt for the replay
+run reads `calls placed 0, calls replayed 2`. No phone rang and the account was not charged,
+which the vendor's usage page confirms independently of our log. That receipt is on the
+[evidence page](https://firstbell-evidence.vercel.app) rather than in this tree, for the
+reason [`../evidence/README.md`](../evidence/README.md) gives.
 
 ## 4. Answer "unknown" rather than guessing
 
@@ -74,11 +75,17 @@ third outcome, and "could not measure" must not fold into either of the other tw
 
 ## 5. Carry the id the vendor bills against
 
-The API returns `id`, for example `call_removed_04`. CALL-E's dashboard and its
-usage page are keyed on a different value, a 32-character hex at
-`recipients[].attempts[].provider_call_id`, for example
-`00000000000000000000000000000005`. The two never appear together outside the raw response,
-and this app dropped the second one for its first twelve commits.
+The API returns `id`, a `call_` prefix followed by twenty-two characters of base64url.
+CALL-E's dashboard and its usage page are keyed on a different value, a bare
+thirty-two-character lowercase hex string at `recipients[].attempts[].provider_call_id`.
+The two never appear together outside the raw response, and this app dropped the second one
+for its first twelve commits.
+
+Both are described here rather than shown. A real one of either is a handle to a real
+conversation, and this repository commits neither: see `tests/test_privacy.py`, which fails
+if one appears. The second format is the reason that check looks for more than a `call_`
+prefix, because a bare hex string looks like nothing in particular and a scrub aimed at the
+obvious pattern goes straight past it.
 
 That omission is the whole problem in miniature. Rules 1 to 4 make a receipt internally
 honest, and internal honesty is still a run marking its own work. `provider_call_id` is the

@@ -102,7 +102,15 @@ on the row. Adding a language becomes a configuration change instead of a projec
 
 ## Verify it
 
-Every call id under `../evidence/` resolves through `GET /v1/calls/{id}`, and each carries a
-`provider_call_id` that appears on CALL-E's own usage page with its duration and charge. The
-claims above can be checked against the vendor's records, not only against ours. See
-[`receipt-provenance.md`](receipt-provenance.md).
+Every one of these calls is listed on the [evidence page](https://firstbell-evidence.vercel.app)
+with the two ids CALL-E issues for it. The API's `id` resolves through
+`GET /v1/calls/{id}`, which places no call, and the `provider_call_id` beside it appears on
+CALL-E's own usage page with the duration and the charge. So the claims above can be checked
+against the vendor's records and not only against ours.
+
+Neither id is in this repository. They identify real conversations, and
+[`../evidence/README.md`](../evidence/README.md) explains why that keeps them out of the
+tree; `../tests/test_privacy.py` is what enforces it. The reasoning, the pre-registration
+and the counts above are all here, because none of them names a call. See also
+[`receipt-provenance.md`](receipt-provenance.md) for what makes a receipt checkable in the
+first place.

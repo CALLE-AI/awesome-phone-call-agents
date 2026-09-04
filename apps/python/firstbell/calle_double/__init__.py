@@ -3,7 +3,7 @@
     from calle_double import CalleDouble, Outcome, build_client
 
     double = CalleDouble()
-    double.set_outcome("+919000000001", Outcome.no_answer())
+    double.set_outcome("+915550000001", Outcome.no_answer())
     client = build_client(double)          # a real CalleClient, dials nobody
 """
 

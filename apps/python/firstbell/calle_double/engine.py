@@ -536,7 +536,12 @@ class CalleDouble:
 
         # Nobody home on this number. Walk the fallback chain.
         attempt.status = "failed"
-        attempt.completed_at = self._now + timedelta(seconds=25)
+        # Zero duration, which is what the one recorded failure came back with: 603 and
+        # started_at equal to completed_at, for a call the operator watched ring out in
+        # full. A dispatcher that reads "the person declined" off 603 is contradicted by
+        # this timestamp, and that argument only holds if the double reproduces it.
+        # Answered attempts in the same recordings ran 35 to 110 seconds.
+        attempt.completed_at = self._now
         # The wire code, not the meaning. See ATTEMPT_SIP_CODES.
         attempt.failure_code = outcome.sip_code
         attempt.failure_message = f"calling task status=DECLINED (code {outcome.sip_code})"

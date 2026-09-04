@@ -1,18 +1,27 @@
-"""Build the evidence page from the committed evidence.
+"""Build the evidence page from the call recordings and the committed rules.
 
-Everything on the page is read out of `evidence/` and `docs/` at build time, and the offline
-demo is run for real while the page is being written. Nothing is typed into the template. A
-page written by hand drifts away from the repository the moment either changes, and the whole
-argument of this app is that a claim should carry the thing that checks it.
+Nothing on the page is typed into the template. The mutation table and the rules come out of
+`evidence/` and `docs/`, the call detail comes out of the recordings, and the offline demo is
+run for real while the page is being written. A page written by hand drifts away from the
+repository the moment either changes, and the whole argument of this app is that a claim
+should carry the thing that checks it.
 
-    python tools/judge_page.py out                      # no audio: waveforms and transcripts
-    python tools/judge_page.py out --audio-dir ../audio # with the recordings
+    python tools/judge_page.py out --receipts ../receipts
+    python tools/judge_page.py out --receipts ../receipts --audio-dir ../audio
 
-The recordings are deliberately absent from this repository. The contribution checklist asks
-contributors not to commit call recordings, so `--audio-dir` points somewhere outside it. Both
-paths are real and both are meant to look finished: without audio the page still draws every
-waveform, every transcript turn and every structured result, and says why there is nothing to
-press. Do not "improve" the no-audio path into an error state.
+Two directories, both outside this repository, and for two different reasons.
+
+`--audio-dir` is optional. The contribution checklist asks contributors not to commit call
+recordings, so the audio lives elsewhere and the page has always had a finished no-audio
+path: it still draws every waveform, every transcript turn and every structured result, and
+says why there is nothing to press. Do not "improve" that path into an error state.
+
+`--receipts` is required, and that asymmetry is deliberate. The maintainer of this list
+requires committed real-call artifacts to be removed, so the responses themselves are not in
+the tree either; `evidence/README.md` explains why that applies to calls the author placed to
+their own phone. Without them this tool has no call detail at all, and a page missing its
+real-call sections would look complete and not be. So it prints what is missing and exits 3.
+A missing audio clip degrades a page. A missing receipt would falsify one.
 
 Standard library only, so it runs anywhere the app runs.
 """
@@ -21,6 +30,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -29,6 +39,26 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
 EVIDENCE = APP / "evidence"
+# Where the call recordings are read from, set by main(). Deliberately not a path inside
+# this repository: the recordings are held outside it, for the reason evidence/README.md
+# gives, so this tool takes a directory the way it already takes --audio-dir.
+RECEIPTS: Path | None = None
+
+TROUBLE = """Nothing to build from.
+
+This page is generated from the recordings of the calls this app placed, and those are
+held outside this repository: the maintainer of this list requires that committed
+real-call artifacts be removed, and evidence/README.md explains why that applies here.
+So there is nothing in the tree for this tool to read.
+
+  the built page   https://firstbell-evidence.vercel.app
+  to build it      python tools/judge_page.py out --receipts DIR
+                   or set FIRSTBELL_RECEIPTS
+
+Everything the repository can show on its own runs without this tool:
+  python -m firstbell --work-file examples/absences.csv
+  python -m pytest tests/ -q
+  python tools/double_conformance.py --check"""
 SITE = Path(__file__).resolve().parent / "site"
 
 # Pinned, with integrity. Both are comfort layers: if either fails to arrive the page still
@@ -75,13 +105,19 @@ def esc_code(value: object) -> str:
 
 # ---- reading the evidence ---------------------------------------------------------------
 
+def _receipts_dir() -> Path:
+    if RECEIPTS is None:
+        raise SystemExit("internal: main() must set RECEIPTS before building the page")
+    return RECEIPTS
+
+
 def receipts() -> list[tuple[str, dict]]:
     return [(p.name, json.loads(p.read_text(encoding="utf-8")))
-            for p in sorted(EVIDENCE.glob("0*.json"))]
+            for p in sorted(_receipts_dir().glob("0*.json"))]
 
 
 def transcripts() -> dict:
-    return json.loads((EVIDENCE / "transcripts.json").read_text(encoding="utf-8"))
+    return json.loads((_receipts_dir() / "transcripts.json").read_text(encoding="utf-8"))
 
 
 def mutation_rows() -> list[tuple[str, str, str]]:
@@ -94,7 +130,7 @@ def recovered_provider_ids() -> dict[str, str]:
 
     It was recovered afterwards with a `GET /v1/calls/{id}`, which places no call.
     """
-    mapping = EVIDENCE / "provider-ids.json"
+    mapping = _receipts_dir() / "provider-ids.json"
     return json.loads(mapping.read_text(encoding="utf-8")) if mapping.exists() else {}
 
 
@@ -490,7 +526,26 @@ def main() -> int:
     ap.add_argument("out", nargs="?", default="out", help="output directory")
     ap.add_argument("--audio-dir", default=None,
                     help="directory holding <row-id>.m4a clips, outside this repository")
+    ap.add_argument("--receipts", default=os.environ.get("FIRSTBELL_RECEIPTS"),
+                    help="directory holding the call recordings, outside this repository")
     args = ap.parse_args()
+
+    # No recordings, no page, and no half-built one either. This tool turns recordings into
+    # a published page, and the recordings are not in this repository on purpose. Building
+    # something with the real-call sections quietly missing would put a page in front of a
+    # reader that looks complete and is not, which is the failure this whole project is
+    # about. So it says what is missing and stops.
+    global RECEIPTS
+    if not args.receipts:
+        print(TROUBLE)
+        return 3
+    RECEIPTS = Path(args.receipts).resolve()
+    if not RECEIPTS.is_dir():
+        print(f"--receipts {RECEIPTS} is not a directory")
+        return 3
+    if not sorted(RECEIPTS.glob("0*.json")):
+        print(f"--receipts {RECEIPTS} holds no receipt files matching 0*.json")
+        return 3
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
