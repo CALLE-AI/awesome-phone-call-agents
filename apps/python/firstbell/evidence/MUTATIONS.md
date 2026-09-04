@@ -21,8 +21,9 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 11 | Flag a result if *any* required field is unknown rather than *all* of them | 1 |
 | 12 | Report `placed` when the response carries no usable `created_at`, instead of reporting unknown | 1 |
 | 13 | Drop the clock-skew guard, so a service clock hours ahead reads as a freshly placed call | 1 |
+| 14 | Read `provider_call_id` off the first attempt instead of the last, so a call that fell back to a second number cites the id of the attempt that did not connect | 1 |
 
-## Why these thirteen
+## Why these fourteen
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

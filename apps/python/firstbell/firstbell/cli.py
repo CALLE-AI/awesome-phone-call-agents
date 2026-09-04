@@ -201,6 +201,7 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 "id": r.item.id,
                 "resolution": r.resolution.value,
                 "call_id": r.call_id,
+                "provider_call_id": r.provider_call_id,
                 "numbers_tried": list(r.masked_numbers),   # masked, never raw
                 "attempts": r.attempts_made,
                 # True placed, False replayed by an idempotency key, null undetermined.

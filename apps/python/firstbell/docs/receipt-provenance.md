@@ -72,6 +72,25 @@ Mutations 12 and 13 remove exactly these two, and each is caught by one test. Th
 the same one that governs outcome classification elsewhere in this app: a gate needs a
 third outcome, and "could not measure" must not fold into either of the other two.
 
+## 5. Carry the id the vendor bills against
+
+The API returns `id`, for example `call_removed_04`. CALL-E's dashboard and its
+usage page are keyed on a different value, a 32-character hex at
+`recipients[].attempts[].provider_call_id`, for example
+`00000000000000000000000000000005`. The two never appear together outside the raw response,
+and this app dropped the second one for its first twelve commits.
+
+That omission is the whole problem in miniature. Rules 1 to 4 make a receipt internally
+honest, and internal honesty is still a run marking its own work. `provider_call_id` is the
+join to the one account of a call nobody here writes: the vendor's billing record. With it,
+a reader takes a row from this app's output, finds it on CALL-E's usage page, and sees the
+charge, the duration and the hang-up type from a source with no stake in our claims.
+
+It is read from the **last** attempt, not the first. A call that fell back to a second
+number was billed under the attempt that connected, so citing the first attempt would print
+an id for a call that never happened. Mutation 14 makes exactly that change and one test
+catches it.
+
 ## What it costs
 
 Four fields and about forty lines. In exchange, every number this app publishes can be

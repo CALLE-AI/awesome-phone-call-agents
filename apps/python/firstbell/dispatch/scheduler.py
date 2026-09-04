@@ -248,7 +248,9 @@ class WaveDispatcher:
         tried = tuple(a.get("phone", "") for a in attempts)
         transcript = tuple(attempts[-1].get("transcript_turns", []) if attempts else ())
         base = dict(
-            item=item, call_id=call.get("id"), attempts_made=len(attempts),
+            item=item, call_id=call.get("id"),
+            provider_call_id=attempts[-1].get("provider_call_id") if attempts else None,
+            attempts_made=len(attempts),
             numbers_tried=tried, transcript=transcript,
             placed_by_this_run=self._was_placed_now(call),
         )

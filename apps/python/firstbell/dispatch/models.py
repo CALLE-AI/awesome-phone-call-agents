@@ -91,6 +91,10 @@ class ItemResult:
     item: WorkItem
     resolution: Resolution
     call_id: str | None = None
+    # The id CALL-E's own dashboard and usage page are keyed on. It is not the API's `id`,
+    # and without it a receipt cannot be cross-referenced against the vendor's billing
+    # record, which is the only account of a call nobody in this repository writes.
+    provider_call_id: str | None = None
     structured_result: dict[str, Any] | None = None
     failure_code: str | None = None
     reason: str = ""

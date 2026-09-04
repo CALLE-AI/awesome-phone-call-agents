@@ -586,3 +586,32 @@ def test_an_optional_field_left_unknown_does_not_condemn_the_call(double):
     report = make(double, result_schema=LIVE_SCHEMA).run(
         [WorkItem(id="S-9", phones=(IN_A,), consented=True)])
     assert report.results[0].resolution is Resolution.RESOLVED
+
+
+def test_the_receipt_carries_the_id_the_vendor_bills_against(double):
+    """CALL-E's dashboard is keyed on `provider_call_id`, not on the API's `id`.
+
+    Without it a receipt can only be checked against itself. With it, a reader can take a
+    row from this app's output to the vendor's own usage page and see the charge, which is
+    the one account of a call this project does not write.
+
+    The value is read from the *last* attempt, because a call that fell back to a second
+    number was billed under the attempt that connected.
+    """
+    dispatcher = make(double)
+    result = dispatcher._classify(
+        WorkItem(id="S-77", phones=(IN_A,), consented=True),
+        {"id": "call_removed_11", "status": "completed",
+         "recipients": [{"attempts": [
+             {"phone": IN_A, "provider_call_id": "aaaa1111bbbb2222cccc3333dddd4444"},
+             {"phone": IN_A, "provider_call_id": "00000000000000000000000000000005"},
+         ]}]})
+    assert result.call_id == "call_removed_11"
+    assert result.provider_call_id == "00000000000000000000000000000005"
+
+
+def test_a_call_with_no_attempts_reports_no_provider_id_rather_than_crashing(double):
+    result = make(double)._classify(
+        WorkItem(id="S-78", phones=(IN_A,), consented=True),
+        {"id": "call_x", "status": "failed", "recipients": [{"attempts": []}]})
+    assert result.provider_call_id is None
