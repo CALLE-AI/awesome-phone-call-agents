@@ -152,3 +152,29 @@ def test_a_live_run_against_a_double_says_so_in_the_receipt(tmp_path, monkeypatc
     assert data["reached_production_api"] is False
     assert data["api_base_url"] == f"http://127.0.0.1:{port}"
     assert len(data["items"]) == 2, "the live branch really did run the pipeline"
+
+
+def test_the_transcript_stays_out_of_the_receipt_unless_it_is_asked_for(tmp_path):
+    """What a parent said is private by default.
+
+    The repository's pull-request checklist forbids committing private transcripts, and a
+    default that quietly wrote them would put every user one `--receipt` away from
+    breaking it.
+    """
+    without = tmp_path / "a.json"
+    main(["--work-file", WORK, "--receipt", str(without)])
+    plain = json.loads(without.read_text(encoding="utf-8"))
+    assert plain["transcript_included"] is False
+    assert all("transcript" not in item for item in plain["items"])
+    assert "kaaichal" not in json.dumps(plain).lower(), "spoken words leaked into a receipt"
+
+    withit = tmp_path / "b.json"
+    main(["--work-file", WORK, "--receipt", str(withit), "--include-transcript"])
+    full = json.loads(withit.read_text(encoding="utf-8"))
+    assert full["transcript_included"] is True
+    spoken = [t for item in full["items"] for t in item.get("transcript", ())]
+    assert any(turn["speaker"] == "user" for turn in spoken)
+    assert "kaaichal" in json.dumps(full).lower(), "asked for the transcript and got none"
+    # Consent is not retroactive: a number is still masked either way.
+    unmasked = [m for m in re.findall(r"\+\d{8,15}", json.dumps(full)) if "*" not in m]
+    assert unmasked == []

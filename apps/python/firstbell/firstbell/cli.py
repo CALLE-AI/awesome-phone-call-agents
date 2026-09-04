@@ -106,6 +106,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--funding-year", type=int, default=date.today().year)
     parser.add_argument("--receipt", type=Path, default=None,
                         help="Write a JSON receipt of the run to this path.")
+    parser.add_argument("--include-transcript", action="store_true",
+                        help="Put what was actually said into the receipt. Off by "
+                             "default. Only use it when the person on the call agreed "
+                             "that this specific conversation would be published.")
     parser.add_argument("--json", action="store_true", help="Machine-readable output.")
     return parser
 
@@ -163,9 +167,18 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
     A receipt records what actually happened on one run: which calls were placed, what came
     back, and what was concluded. It is written for both modes and it says which mode it
     was, because a receipt that hides whether the calls were real would be worthless.
+
+    What it does not carry by default is the transcript. This repository's pull-request
+    checklist forbids including "call recordings, or private transcripts", and a parent
+    explaining a child's illness has said something private to a school, not to a git
+    history. `--include-transcript` exists because a demonstration call, where the caller
+    and the callee are the same consenting person, is the one case where publishing the
+    words is the point. Making that a flag rather than a default means the sensitive
+    choice has to be made on purpose.
     """
     payload = {
         "mode": mode.label,
+        "transcript_included": bool(args.include_transcript),
         "api_base_url": mode.base_url,
         "reached_production_api": mode.reached_production,
         "generated": date.today().isoformat(),
@@ -193,6 +206,7 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 "structured_result": r.structured_result,
                 "failure_code": r.failure_code,
                 "reason": r.reason,
+                **({"transcript": list(r.transcript)} if args.include_transcript else {}),
             }
             for r in report.results
         ],
