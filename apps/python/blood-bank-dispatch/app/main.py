@@ -16,7 +16,15 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from fastapi.templating import Jinja2Templates  # noqa: E402
 
 from . import db  # noqa: E402
-from .dispatch import CallTarget, spawn  # noqa: E402
+from .auth import (  # noqa: E402
+    SESSION_COOKIE,
+    allowed_destinations,
+    check_password,
+    is_authed,
+    make_token,
+    password_is_set,
+)
+from .dispatch import CallTarget, DRY_RUN, spawn  # noqa: E402
 
 BASE = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE / "app" / "templates"))
@@ -43,9 +51,65 @@ app.mount("/static", StaticFiles(directory=str(BASE / "app" / "static")), name="
 
 
 def render(request: Request, name: str, status_code: int = 200, **ctx):
+    ctx["authed"] = password_is_set() and is_authed(request)
     return templates.TemplateResponse(
         request=request, name=name, context=ctx, status_code=status_code
     )
+
+
+def mask_phone(value) -> str:
+    # Contribution-repo convention: keep the first two characters and the
+    # last four digits, e.g. +1******2671. Full numbers stay in the database
+    # and in the runtime call prompt; they must not appear in rendered views.
+    if not value:
+        return "—"
+    v = str(value)
+    if len(v) <= 6:
+        return v[0] + "*****"
+    return f"{v[:2]}{'*' * (len(v) - 6)}{v[-4:]}"
+
+
+templates.env.filters["mask"] = mask_phone
+
+
+def gate(request: Request):
+    """Return a Response to short-circuit with, or None to proceed.
+
+    Fail-safe: with APP_PASSWORD unset, mutating and result-viewing routes
+    refuse to run at all rather than standing open.
+    """
+    if not password_is_set():
+        return render(request, "disabled.html", status_code=503)
+    if not is_authed(request):
+        return RedirectResponse("/login", status_code=303)
+    return None
+
+
+@app.get("/login")
+async def login_page(request: Request):
+    if not password_is_set():
+        return render(request, "disabled.html", status_code=503)
+    return render(request, "login.html", error=None)
+
+
+@app.post("/login")
+async def login(request: Request, password: str = Form("")):
+    if not password_is_set():
+        return render(request, "disabled.html", status_code=503)
+    if not check_password(password):
+        return render(request, "login.html", status_code=401, error="Incorrect password")
+    resp = RedirectResponse("/request", status_code=303)
+    resp.set_cookie(
+        SESSION_COOKIE, make_token(), httponly=True, samesite="lax", max_age=43200
+    )
+    return resp
+
+
+@app.post("/logout")
+async def logout():
+    resp = RedirectResponse("/login", status_code=303)
+    resp.delete_cookie(SESSION_COOKIE)
+    return resp
 
 
 @app.get("/")
@@ -58,6 +122,9 @@ async def index():
 
 @app.get("/banks")
 async def banks_page(request: Request):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     banks = await db.fetch("select * from banks order by created_at desc")
     return render(request, "registry.html", banks=banks)
 
@@ -71,11 +138,15 @@ def _clean_phone(phone: str) -> str:
 
 @app.post("/banks")
 async def banks_create(
+    request: Request,
     name: str = Form(...),
     phone: str = Form(...),
     area: str = Form(""),
     notes: str = Form(""),
 ):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     name = name.strip()
     if not name:
         raise HTTPException(400, "name is required")
@@ -93,22 +164,32 @@ async def banks_create(
 
 @app.post("/banks/{bank_id}")
 async def banks_update(
+    request: Request,
     bank_id: uuidmod.UUID,
     name: str = Form(...),
-    phone: str = Form(...),
+    new_phone: str = Form(""),
     area: str = Form(""),
     notes: str = Form(""),
     active: str = Form(""),
 ):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     name = name.strip()
     if not name:
         raise HTTPException(400, "name is required")
+    # The phone is never rendered back into the form; a blank new_phone keeps
+    # the stored number unchanged.
+    row = await db.fetchrow("select phone from banks where id = $1", bank_id)
+    if row is None:
+        raise HTTPException(404, "bank not found")
+    phone = _clean_phone(new_phone) if new_phone.strip() else row["phone"]
     await db.execute(
         "update banks set name = $2, phone = $3, area = $4, notes = $5,"
         " active = $6 where id = $1",
         bank_id,
         name,
-        _clean_phone(phone),
+        phone,
         area.strip() or None,
         notes.strip() or None,
         active == "on",
@@ -117,7 +198,10 @@ async def banks_update(
 
 
 @app.post("/banks/{bank_id}/toggle")
-async def banks_toggle(bank_id: uuidmod.UUID):
+async def banks_toggle(request: Request, bank_id: uuidmod.UUID):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     await db.execute("update banks set active = not active where id = $1", bank_id)
     return RedirectResponse("/banks", status_code=303)
 
@@ -127,6 +211,9 @@ async def banks_toggle(bank_id: uuidmod.UUID):
 
 @app.get("/request")
 async def request_page(request: Request):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     banks = await db.fetch("select * from banks where active order by name")
     return render(request, "request.html", banks=banks, error=None, form={})
 
@@ -143,6 +230,9 @@ async def create_run(
     adhoc_label: str = Form(""),
     adhoc_save: str = Form(""),
 ):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     client_ip = request.client.host if request.client else "?"
     now = time.monotonic()
     window = _rate[client_ip]
@@ -187,6 +277,10 @@ async def create_run(
     adhoc_phone = adhoc_phone.strip()
     if adhoc_phone and not E164.match(adhoc_phone):
         errors.append("ad hoc number must be E.164, e.g. +15550101234")
+    if adhoc_phone and not DRY_RUN and adhoc_phone not in allowed_destinations():
+        errors.append(
+            "live mode: ad hoc numbers must be pre-authorized in ALLOWED_DESTINATIONS"
+        )
 
     total = len(bank_rows) + (1 if adhoc_phone else 0)
     if total > MAX_TARGETS:
@@ -265,6 +359,9 @@ async def _request_error(request: Request, message: str, form: dict):
 
 @app.get("/runs")
 async def runs_history(request: Request):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     runs = await db.fetch(
         """
         select r.*,
@@ -285,6 +382,9 @@ async def runs_history(request: Request):
 
 @app.get("/runs/{run_id}")
 async def run_page(request: Request, run_id: uuidmod.UUID):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     run = await db.fetchrow("select * from call_runs where id = $1", run_id)
     if run is None:
         raise HTTPException(404, "run not found")
@@ -293,6 +393,9 @@ async def run_page(request: Request, run_id: uuidmod.UUID):
 
 @app.get("/runs/{run_id}/cards")
 async def run_cards(request: Request, run_id: uuidmod.UUID):
+    blocked = gate(request)
+    if blocked:
+        return blocked
     run = await db.fetchrow("select * from call_runs where id = $1", run_id)
     if run is None:
         raise HTTPException(404, "run not found")

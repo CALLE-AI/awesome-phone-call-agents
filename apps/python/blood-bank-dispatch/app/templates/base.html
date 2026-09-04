@@ -142,14 +142,19 @@
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
   .shortlist { margin-top: 2rem; }
+  .linklike { border: none; background: none; color: var(--muted); padding: 0.2rem 0; cursor: pointer; }
+  .linklike:hover { color: var(--fg); background: none; border: none; }
 </style>
 </head>
 <body>
 <nav>
   <span class="brand">Blood Bank Dispatch</span>
+  {% if authed %}
   <a href="/request">New request</a>
   <a href="/runs">History</a>
   <a href="/banks">Registry</a>
+  <form method="post" action="/logout" style="display:inline"><button class="linklike">Logout</button></form>
+  {% endif %}
 </nav>
 {% block content %}{% endblock %}
 </body>

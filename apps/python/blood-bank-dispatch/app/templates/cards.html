@@ -1,7 +1,7 @@
 <div class="cards">
   {% for r in rows %}
   <div class="card">
-    <strong>{{ r.bank_name }}</strong> <span class="muted">{{ r.phone }}</span><br>
+    <strong>{{ r.bank_name }}</strong> <span class="muted">{{ r.phone | mask }}</span><br>
     <span class="badge {{ r.status }}">{{ r.status }}</span>
     {% if r.status == 'completed' %}
     <ul>
@@ -33,7 +33,7 @@
     {% for r in shortlist %}
     <tr>
       <td>{{ r.bank_name }}</td>
-      <td>{{ r.phone }}</td>
+      <td>{{ r.phone | mask }}</td>
       <td>{{ r.units_available }}</td>
       <td>{{ r.release_policy }}</td>
       <td>{{ (r.transport_minutes ~ ' min') if r.transport_minutes is not none else '—' }}</td>

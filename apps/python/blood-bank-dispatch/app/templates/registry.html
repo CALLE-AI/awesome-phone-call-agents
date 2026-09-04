@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Bank registry</h1>
-<p class="muted">Numbers are dialled exactly as stored, so they must be E.164 (e.g. +15550101234).</p>
+<p class="muted">Numbers are dialled exactly as stored, so they must be E.164 (e.g. +15550101234). Stored numbers are masked in views; type a new number to change one.</p>
 <form class="add-form" method="post" action="/banks">
   <input name="name" placeholder="Name" required>
   <input name="phone" placeholder="+15550101234" required>
@@ -11,11 +11,12 @@
 </form>
 <div class="table-wrap">
 <table>
-  <tr><th>Name</th><th>Phone</th><th>Area</th><th>Notes</th><th>Active</th><th></th></tr>
+  <tr><th>Name</th><th>Phone</th><th>Change phone</th><th>Area</th><th>Notes</th><th>Active</th><th></th></tr>
   {% for b in banks %}
   <tr>
     <td><input form="edit-{{ b.id }}" name="name" value="{{ b.name }}" size="14"></td>
-    <td><input form="edit-{{ b.id }}" name="phone" value="{{ b.phone }}" size="15"></td>
+    <td><code>{{ b.phone | mask }}</code></td>
+    <td><input form="edit-{{ b.id }}" name="new_phone" placeholder="leave blank to keep"></td>
     <td><input form="edit-{{ b.id }}" name="area" value="{{ b.area or '' }}" size="10"></td>
     <td><input form="edit-{{ b.id }}" name="notes" value="{{ b.notes or '' }}" size="26"></td>
     <td><input form="edit-{{ b.id }}" type="checkbox" name="active" {% if b.active %}checked{% endif %}></td>

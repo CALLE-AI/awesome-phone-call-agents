@@ -30,7 +30,7 @@
     {% for b in banks %}
     <label>
       <input type="checkbox" class="bankcheck" name="bank_ids" value="{{ b.id }}" checked>
-      {{ b.name }} — {{ b.phone }} <span class="muted">{{ b.area or '' }}</span>
+      {{ b.name }} — {{ b.phone | mask }} <span class="muted">{{ b.area or '' }}</span>
     </label>
     {% endfor %}
     {% else %}

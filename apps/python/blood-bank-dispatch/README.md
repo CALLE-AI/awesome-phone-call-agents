@@ -54,6 +54,8 @@ A real run costs one paid CALL-E call per target. Test with single-target runs w
 | `CALLE_API_KEY` | for live runs | — | CALL-E API key. Server side only; the browser gets htmx and HTML fragments, nothing else. |
 | `CALLE_BASE_URL` | no | `https://api.heycall-e.com` | Test env: `https://test-api.heycall-e.com`. |
 | `DATABASE_URL` | yes | — | asyncpg Postgres DSN. |
+| `APP_PASSWORD` | yes | — | Operator password for the web UI. **Fail-safe:** unset, the app refuses to run — mutating and result routes return 503. |
+| `ALLOWED_DESTINATIONS` | live mode | — | Comma-separated E.164 numbers that live mode may dial as ad hoc targets. Registry banks are always authorized; dry-run needs no list. |
 | `CALLE_CONCURRENCY` | no | `2` | Max simultaneous calls per run. Confirm your account concurrency cap before raising. |
 | `MAX_TARGETS` | no | `8` | Server-side cap on targets per run (each target is a paid call). |
 | `RATE_LIMIT_RUNS` | no | `6` | `POST /runs` per client IP per 10 minutes. |
@@ -87,6 +89,9 @@ Deactivate the demo banks and add real ones in the registry — nothing else cha
 
 ## Safety notes
 
+- **Authorization boundary** — the app never runs open: with no `APP_PASSWORD` set, everything except the login page returns 503. With it set, a signed, expiring session cookie (stdlib HMAC, no extra dependencies) gates every mutating and result-viewing route.
+- **Authorized destinations only** — in live mode (`DRY_RUN=0`), ad hoc numbers are rejected unless listed in `ALLOWED_DESTINATIONS`. Registry banks are authorized by the operator behind the login. Dry-run imposes no destination restrictions because it cannot place calls.
+- **Masked numbers** — every rendered view (registry, request checklist, cards, shortlist) shows phones masked to the first two characters and last four digits (`+1******2671`). Full numbers exist only in the database and in the runtime call prompt, which is the one sanctioned use. Access logs contain no numbers.
 - **Explicit intent** — calls are placed only when the operator files a request naming the targets.
 - **E.164 only** — validated on write, unique in the registry; samples use reserved fictional numbers (`+1555010...`).
 - **No credential exposure** — keys live in `.env`, read server side only.
