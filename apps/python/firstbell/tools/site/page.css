@@ -186,7 +186,8 @@ p.lede {
 }
 
 a { color: var(--link); text-underline-offset: 0.18em; text-decoration-thickness: 0.06em; }
-a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+[data-turns]:focus-visible, pre:focus-visible {
   outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px;
 }
 
@@ -267,6 +268,11 @@ canvas[data-waveform] {
   border: 0; cursor: pointer; transition: color 140ms ease, background-color 140ms ease;
 }
 .switch button[aria-pressed="true"] { background: var(--ink); color: var(--stage); }
+/* Drawn inside the button, not outside it. .switch clips its children so the two buttons
+ * share one frame, and a ring 3px outside a button that fills that frame is 3px outside
+ * the clip: tabbing to the language switch showed a two-pixel sliver and nothing else, on
+ * the control that demonstrates the whole point of the page. */
+.switch button:focus-visible { outline-offset: -3px; }
 
 /* Turns. The transcript is the evidence, so it is set to be read, not skimmed: a tight
  * measure, real leading, and only the line being spoken at full strength. */
