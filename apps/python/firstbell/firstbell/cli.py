@@ -203,6 +203,9 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
                 "call_id": r.call_id,
                 "numbers_tried": list(r.masked_numbers),   # masked, never raw
                 "attempts": r.attempts_made,
+                # True placed, False replayed by an idempotency key, null undetermined.
+                # A receipt that counted a replay as a call would overstate the cost.
+                "placed_by_this_run": r.placed_by_this_run,
                 "structured_result": r.structured_result,
                 "failure_code": r.failure_code,
                 "reason": r.reason,

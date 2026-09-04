@@ -178,3 +178,19 @@ def test_the_transcript_stays_out_of_the_receipt_unless_it_is_asked_for(tmp_path
     # Consent is not retroactive: a number is still masked either way.
     unmasked = [m for m in re.findall(r"\+\d{8,15}", json.dumps(full)) if "*" not in m]
     assert unmasked == []
+
+
+def test_the_receipt_records_whether_this_run_actually_placed_the_call(tmp_path):
+    """Evidence has to carry the thing the summary is computed from.
+
+    The field existed on the result and was left out of the receipt, so a reader auditing
+    a run could see "calls placed 2" and had nothing to check it against.
+    """
+    receipt = tmp_path / "r.json"
+    main(["--work-file", WORK, "--receipt", str(receipt)])
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    dialled = [i for i in data["items"] if i["resolution"] != "skipped"]
+    assert all("placed_by_this_run" in i for i in dialled)
+    assert all(i["placed_by_this_run"] is True for i in dialled), (
+        "a fresh offline run placed every call it made"
+    )

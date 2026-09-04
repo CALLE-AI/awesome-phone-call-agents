@@ -231,7 +231,11 @@ class CalleDouble:
         """
         self.auto_advance = auto_advance
         self.latency_seconds = latency_seconds
-        self._now = now or datetime(2026, 9, 5, 9, 0, tzinfo=timezone.utc)
+        # Real time by default. A double frozen at a fixed future date makes every
+        # timestamp it returns meaningless to a consumer comparing them against its own
+        # clock, which is exactly how a consumer tells a call it just placed from one an
+        # idempotency key replayed. Pass `now` to pin it when a test needs determinism.
+        self._now = now or datetime.now(timezone.utc)
         self._calls: dict[str, _CallTask] = {}
         self._by_idempotency: dict[str, str] = {}
         self._ids = itertools.count(1)
