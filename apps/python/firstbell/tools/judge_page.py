@@ -1,96 +1,94 @@
-"""Build a single self-contained page from the committed evidence.
+"""Build the evidence page from the committed evidence.
 
-Everything on the page is read out of `evidence/` and `docs/` at build time. Nothing is
-typed into the template. A page written by hand drifts away from the repository the moment
-either changes, and the whole argument of this app is that a claim should carry the thing
-that checks it.
+Everything on the page is read out of `evidence/` and `docs/` at build time, and the offline
+demo is run for real while the page is being written. Nothing is typed into the template. A
+page written by hand drifts away from the repository the moment either changes, and the whole
+argument of this app is that a claim should carry the thing that checks it.
 
-    python tools/judge_page.py out/index.html
+    python tools/judge_page.py out                      # no audio: waveforms and transcripts
+    python tools/judge_page.py out --audio-dir ../audio # with the recordings
 
-No dependencies beyond the standard library, so it runs anywhere the app runs.
+The recordings are deliberately absent from this repository. The contribution checklist asks
+contributors not to commit call recordings, so `--audio-dir` points somewhere outside it. Both
+paths are real and both are meant to look finished: without audio the page still draws every
+waveform, every transcript turn and every structured result, and says why there is nothing to
+press. Do not "improve" the no-audio path into an error state.
+
+Standard library only, so it runs anywhere the app runs.
 """
 from __future__ import annotations
 
+import argparse
 import html
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 APP = Path(__file__).resolve().parent.parent
 EVIDENCE = APP / "evidence"
+SITE = Path(__file__).resolve().parent / "site"
 
-CSS = """
-:root{--bg:#0b0d10;--ink:#e8eaed;--dim:#8a919b;--line:#1e242c;--ok:#7dd3a0;--warn:#f0b96e}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font:16px/1.65 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased}
-main{max-width:56rem;margin:0 auto;padding:4rem 1.5rem 6rem}
-h1{font-size:2.1rem;line-height:1.2;margin:0 0 .5rem;letter-spacing:-.02em}
-h2{font-size:1.25rem;margin:3.5rem 0 .75rem;letter-spacing:-.01em}
-h2::before{content:"";display:block;width:2.2rem;height:2px;background:var(--ok);
-  margin-bottom:1rem}
-p{margin:0 0 1rem;max-width:62ch}
-.lede{font-size:1.15rem;color:var(--dim);max-width:56ch;margin-bottom:2rem}
-code,pre{font-family:ui-monospace,Consolas,"SF Mono",monospace;font-size:.86em}
-pre{background:#070809;border:1px solid var(--line);border-radius:6px;padding:1rem 1.1rem;
-  overflow-x:auto;color:#cdd3da}
-code:not(pre code){background:#12161b;padding:.1em .35em;border-radius:3px;color:#cdd3da}
-table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem}
-th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--line);
-  vertical-align:top}
-th{color:var(--dim);font-weight:600;font-size:.8rem;text-transform:uppercase;
-  letter-spacing:.04em}
-.mono{font-family:ui-monospace,Consolas,monospace;font-size:.82rem;color:#a9b2bd;
-  word-break:break-all}
-.ok{color:var(--ok)}.warn{color:var(--warn)}.dim{color:var(--dim)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:1px;
-  background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;
-  margin:1.5rem 0}
-.cell{background:var(--bg);padding:1rem}
-.num{font-size:1.7rem;font-weight:650;color:var(--ok);font-family:ui-monospace,monospace}
-.lbl{font-size:.78rem;color:var(--dim);margin-top:.15rem;line-height:1.35}
-.note{border-left:2px solid var(--warn);padding:.15rem 0 .15rem 1rem;color:var(--dim);
-  margin:1.25rem 0}
-a{color:var(--ok)}
-footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--line);
-  color:var(--dim);font-size:.85rem}
-"""
+# Pinned, with integrity. Both are comfort layers: if either fails to arrive the page still
+# scrolls, plays and reads, which is also the reduced-motion path.
+LENIS = ("https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js",
+         "sha384-uxdRfmAAt0Y8V0FBZDwCzUKKrGqfMKZmVSbUXjJZJHYIWJmXWvzYBWZeVLJHqbTQ")
+GSAP = "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"
+SCROLLTRIGGER = "https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"
+TYPEKIT = "https://use.typekit.net/qdx4jvs.css"
+
+ACTS = [
+    ("00", "The call"),
+    ("01", "What the school knew"),
+    ("02", "Twelve comparisons"),
+    ("03", "The receipt of being wrong"),
+    ("04", "Check us against your billing"),
+    ("05", "Every rule, broken"),
+    ("06", "Three things to take"),
+    ("07", "What is not true"),
+    ("08", "Run it yourself"),
+]
+
+FIELD_LABEL = {
+    "parent_confirmed_aware": "parent_confirmed_aware",
+    "reason_category": "reason_category",
+    "expected_return": "expected_return",
+}
 
 
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
 
 
+# ---- reading the evidence ---------------------------------------------------------------
+
 def receipts() -> list[tuple[str, dict]]:
     return [(p.name, json.loads(p.read_text(encoding="utf-8")))
             for p in sorted(EVIDENCE.glob("0*.json"))]
 
 
+def transcripts() -> dict:
+    return json.loads((EVIDENCE / "transcripts.json").read_text(encoding="utf-8"))
+
+
 def mutation_rows() -> list[tuple[str, str, str]]:
     text = (EVIDENCE / "MUTATIONS.md").read_text(encoding="utf-8")
-    rows = re.findall(r"^\| (\d+) \| (.+?) \| (\d+) \|$", text, re.M)
-    return rows
+    return re.findall(r"^\| (\d+) \| (.+?) \| (\d+) \|$", text, re.M)
 
 
 def recovered_provider_ids() -> dict[str, str]:
     """Receipts written before the code recorded `provider_call_id` still have one.
 
-    It was recovered afterwards with a `GET /v1/calls/{id}`, which places no call, and
-    committed in `provider-ids.json` by `tools/recover_provider_ids.py`. Reading it back
-    from there keeps the page sourced from the repository rather than from a value typed
-    into this template.
+    It was recovered afterwards with a `GET /v1/calls/{id}`, which places no call.
     """
     mapping = EVIDENCE / "provider-ids.json"
-    if not mapping.exists():
-        return {}
-    return json.loads(mapping.read_text(encoding="utf-8"))
+    return json.loads(mapping.read_text(encoding="utf-8")) if mapping.exists() else {}
 
 
 def offline_run() -> str:
-    """Run the app for real rather than pasting output that may no longer be true."""
+    """Run the app rather than pasting output that may no longer be true."""
     done = subprocess.run(
         [sys.executable, "-m", "firstbell", "--work-file", "examples/absences.csv"],
         cwd=APP, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -105,122 +103,412 @@ def test_count() -> int:
     return int(match.group(1)) if match else 0
 
 
-def build() -> str:
+def cue_for(call: dict, marker: str) -> int:
+    """Where the hero player rests before first play.
+
+    Derived from a committed turn offset, never typed. The cue lands five seconds before the
+    turn that carries the line, so the agent's question is intelligible before the answer.
+    """
+    for turn in call["turns"]:
+        if turn["speaker"] == "user" and marker.lower() in turn["text"].lower():
+            return max(0, turn["offset_seconds"] - 5)
+    return 0
+
+
+# ---- fragments --------------------------------------------------------------------------
+
+def player_markup(ids: list[str], data: dict, cue: int, has_audio: bool) -> str:
+    """One player, switching between the calls in `ids`.
+
+    The result block renders filled at first paint and only dims during playback. Starting it
+    empty would hide committed evidence behind an interaction, and would show blank rows to
+    anyone with JavaScript off.
+    """
+    first = data["calls"][ids[0]]
+    out = [f'<div class=player data-player="{esc(",".join(ids))}" data-cue="{cue}" '
+           f'data-playing=false>']
+
+    out.append('<div class=transport>')
+    if has_audio:
+        out.append(
+            '<button class=play data-play type=button aria-label="Play this call">'
+            '<svg class=i-play viewBox="0 0 12 14" aria-hidden=true><path d="M0 0l12 7-12 7z"/></svg>'
+            '<svg class=i-pause viewBox="0 0 12 14" aria-hidden=true>'
+            '<path d="M0 0h4v14H0zM8 0h4v14H8z"/></svg></button>')
+        out.append(f'<span class=cue>Listen from {cue // 60}:{cue % 60:02d}</span>')
+    else:
+        out.append('<p class="cue no-audio">The recordings are not in this repository, '
+                   'because the contribution checklist asks contributors not to commit call '
+                   'recordings. Every word below is the transcript CALL-E returned, and the '
+                   'shape is measured from the audio.</p>')
+    out.append('<span class=switch role=group aria-label="Language">')
+    for rid in ids:
+        c = data["calls"][rid]
+        out.append(f'<button type=button data-switch="{esc(rid)}" aria-pressed=false>'
+                   f'{esc(c["locale"])}</button>')
+    out.append('</span></div>')
+
+    out.append('<div class=stage>')
+    out.append('<canvas data-waveform role=img aria-label="Waveform of the call, '
+               'click to seek"></canvas>')
+    out.append('<ol class=turns data-turns aria-live=off>')
+    for turn in first["turns"]:
+        who = "agent" if turn["speaker"] == "bot" else "parent"
+        mins, secs = divmod(int(turn["offset_seconds"]), 60)
+        out.append(
+            f'<li data-at="{turn["offset_seconds"]}" data-who="{esc(turn["speaker"])}" '
+            f'data-rel=ahead><span class=turn-at>{mins}:{secs:02d}</span>'
+            f'<span class=turn-who>{who}</span>'
+            f'<span class=turn-text lang="{esc(first["locale"])}">{esc(turn["text"])}</span></li>')
+    out.append('</ol>')
+    out.append('</div>')
+
+    out.append('<div class=result data-result data-state=in>')
+    out.append('<h3>What CALL-E returned</h3>')
+    out.append('<p class=note-free data-note>' + esc(first.get("note") or "") + '</p>')
+    out.append('<dl>')
+    for field in data["fieldOrder"]:
+        out.append(f'<dt>{esc(FIELD_LABEL[field])}</dt>'
+                   f'<dd data-field="{esc(field)}">{esc(first["structured"].get(field, "·"))}</dd>')
+    out.append('</dl>')
+    conf = first.get("confidence")
+    if conf is not None:
+        out.append(f'<p class=conf>completion confidence <b data-conf>{conf}</b></p>')
+    out.append('</div></div>')
+    return "".join(out)
+
+
+def act(num: str, title: str, body: str, classes: str = "") -> str:
+    # One reveal target per act. The hero never reveals: it is the first paint and it is
+    # already choreographed on load.
+    reveal = "" if num == "00" else " data-reveal"
+    return (f'<section class="act act-{num} {classes}" id="act-{num}" '
+            f'aria-labelledby="h-{num}"><div class=inner{reveal}>{body}</div></section>')
+
+
+# ---- the page ---------------------------------------------------------------------------
+
+def build(has_audio: bool) -> str:
+    data = transcripts()
     recs = receipts()
     muts = mutation_rows()
     recovered = recovered_provider_ids()
-    live_calls = [(name, d) for name, d in recs if d.get("reached_production_api")]
+    calls = data["calls"]
+
+    # One row per call, not one per mention. Several receipts refer to the same call: the
+    # idempotent-replay receipt names a call it deliberately did not place again. Counting
+    # mentions made the page claim more calls than were placed, which is exactly the kind of
+    # number this page exists to make checkable.
     call_rows = []
-    for name, data in recs:
-        for item in data.get("items", []):
-            if item.get("call_id"):
-                provider = (item.get("provider_call_id")
-                            or recovered.get(item["call_id"]))
-                call_rows.append((item["call_id"], provider,
-                                  item.get("resolution"), name))
+    seen: set[str] = set()
+    for name, d in recs:
+        for item in d.get("items", []):
+            cid = item.get("call_id")
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            call_rows.append((cid,
+                              item.get("provider_call_id") or recovered.get(cid),
+                              item.get("resolution"), name))
+    live = [(n, d) for n, d in recs if d.get("reached_production_api")]
+    agree = sum(p["agree"] for p in data["pairs"])
+    total = sum(p["of"] for p in data["pairs"])
 
-    parts: list[str] = []
-    add = parts.append
+    css = (SITE / "page.css").read_text(encoding="utf-8")
+    p: list[str] = []
+    add = p.append
 
-    add(f"<!doctype html><html lang=en><meta charset=utf-8>"
-        f"<meta name=viewport content='width=device-width,initial-scale=1'>"
-        f"<title>firstbell &middot; evidence</title><style>{CSS}</style><main>")
+    add('<!doctype html><html lang=en'
+        + (' data-audio=present' if has_audio else ' data-audio=absent') + '>')
+    add('<meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">')
+    add('<title>firstbell: it calls the parents who never replied</title>')
+    add('<meta name=description content="Software that telephones the families of absent '
+        'schoolchildren in the language that family speaks, and refuses to close a case it '
+        'could not get an answer to. Every claim carries the thing that checks it.">')
+    add('<link rel=preconnect href="https://use.typekit.net" crossorigin>')
+    add('<link rel=preconnect href="https://p.typekit.net" crossorigin>')
+    # The three faces that exist above the fold, fetched in parallel with the stylesheet
+    # rather than after it. Without this the heading wraps to three lines in the fallback and
+    # two in Freight Text Compressed, and the whole hero jumps when the swap lands. Measured:
+    # 0.029 of layout shift with the swap, 0.000 with the font host blocked entirely.
+    preload = SITE / "kit-preload.json"
+    if preload.exists():
+        for url in json.loads(preload.read_text(encoding="utf-8")).values():
+            add(f'<link rel=preload as=font type="font/woff2" href="{esc(url)}" crossorigin>')
+    # The kit ships font-display:auto and neither the API nor a URL parameter changes it, so
+    # it is loaded out of the render path and the page paints on metric-matched fallbacks.
+    add(f'<link rel=stylesheet href="{TYPEKIT}" media=print '
+        f'onload="this.media=\'all\';document.documentElement.classList.add(\'fonts\')">')
+    add(f'<noscript><link rel=stylesheet href="{TYPEKIT}"></noscript>')
+    add(f'<style>{css}</style>')
 
-    add("<h1>firstbell</h1>")
-    add("<p class=lede>Calls the families whose absence notification went unanswered, each "
-        "in the language that family speaks, and refuses to close a case it could not get "
-        "an answer to.</p>")
+    # ---- rail
+    add('<nav class=rail aria-label="Sections"><span class=rail-line aria-hidden=true>'
+        '<span class=rail-fill data-rail></span></span><ol>')
+    for num, title in ACTS:
+        add(f'<li><a href="#act-{num}"><span class=rail-num>{num}</span>'
+            f'<span class=rail-label>{esc(title)}</span></a></li>')
+    # The through-line: the hero call rides in the rail as a miniature once the page has
+    # left the dark, so a reader never loses the object the whole argument is about.
+    add('<canvas class=rail-wave data-rail-wave width=96 height=36 aria-hidden=true></canvas>')
+    add('</ol></nav>')
 
-    add("<div class=grid>")
-    for num, label in (
-        (test_count(), "tests"),
-        (len(muts), "rules broken on purpose to prove a test notices"),
-        (len(call_rows), "real calls, each id checkable against CALL-E&rsquo;s own billing"),
-        ("none", "CALL-E account needed to run the demo"),
-    ):
-        add(f"<div class=cell><div class=num>{esc(num)}</div><div class=lbl>{label}</div></div>")
-    add("</div>")
+    add('<main>')
 
-    add("<h2>Run the whole thing with no account</h2>")
-    add("<p>No API key, no signup, no telephone call. The local double is mounted as an "
-        "<code>httpx</code> transport underneath a real <code>calle.CalleClient</code>, so "
-        "the offline path exercises the same SDK code as the live one.</p>")
-    add("<pre>pip install -r requirements-dev.txt\n"
-        "python -m firstbell --work-file examples/absences.csv</pre>")
-    add(f"<p class=dim>Output below was produced by running that command when this page was "
-        f"built:</p><pre>{esc(offline_run())}</pre>")
+    # ---- Act 0: the call
+    hero_ids = ["S-4105", "S-4106"]
+    cue = cue_for(calls["S-4105"], "left for school")
+    body = [
+        '<p class=eyebrow>08:40. A register is taken. One child is not in it.</p>',
+        '<h1 id=h-00>It calls the parents who never replied.</h1>',
+        '<p class=lede>The school already sent a text message. Some families answer it. This '
+        'is about the ones who do not, and it is the same call in whichever language that '
+        'family speaks.</p>',
+        player_markup(hero_ids, data, cue, has_audio),
+        '<p class=hero-foot>Two real calls, placed by this software. Different languages, '
+        f'different words, the same three fields. Both are the author’s own line, '
+        'scripted and consented; the pupil names are fictional.</p>',
+    ]
+    add(act("00", "The call", "".join(body), "theatre"))
 
-    add("<h2>Three outcomes, not two</h2>")
-    add("<p><span class=ok>resolved</span> is a schema-valid answer on record. "
-        "<span class=dim>failed</span> is nobody reached. "
-        "<span class=warn>undetermined</span> is a call that connected and produced nothing "
-        "usable, and it goes to a named person. It is never counted toward a coverage "
-        "percentage, because the whole point is a child nobody has heard about.</p>")
-    add("<div class=note>This app once got that wrong on a real call. A parent refused, "
-        "CALL-E returned a schema-valid result with every required field "
-        "<code>&quot;unknown&quot;</code>, and the row was marked resolved. That receipt is "
-        "committed uncorrected, because a corrected copy would record a run that never "
-        "happened.</div>")
+    # ---- Act 1: the residue
+    body = [
+        '<div class=split><div class=claim>',
+        '<h3>01</h3><h2 id=h-01>The school knew nothing, and had no way to find out.</h2>',
+        '<p>An unanswered absence message is not information. It is an absence of '
+        'information, and it looks identical whether the child is at home with a fever or '
+        'never arrived anywhere.</p>',
+        '<p>The call above is the second kind. At '
+        f'{cue + 5} seconds a parent learns from a robot that their daughter is not at '
+        'school, having watched her leave for it that morning.</p>',
+        '</div><div class=artifact>',
+        '<div class=stat-grid>',
+    ]
+    for num, label in ((test_count(), "tests"),
+                       (len(muts), "rules broken on purpose to prove a test notices"),
+                       (len(call_rows), "real calls, every id checkable against CALL-E’s billing"),
+                       ("none", "CALL-E account needed to run the demo")):
+        body.append(f'<div class=cell><div class=num>{esc(num)}</div>'
+                    f'<div class=lbl>{label}</div></div>')
+    body.append('</div></div></div>')
+    add(act("01", "What the school knew", "".join(body)))
 
-    add("<h2>Every real call, checkable against CALL-E&rsquo;s own records</h2>")
-    add("<p>The API returns one id. CALL-E&rsquo;s dashboard and usage page are keyed on "
-        "another. Both are printed, so a reader can take any row to the vendor&rsquo;s "
-        "billing and see the charge and the duration from a source with no stake in these "
-        "claims.</p>")
-    add("<table><tr><th>API id</th><th>provider id (dashboard)</th><th>outcome</th></tr>")
+    # ---- Act 2: twelve comparisons
+    body = [
+        '<div class=split><div class=claim>',
+        '<h3>02</h3><h2 id=h-02>Twelve comparisons, written down before the phone rang.</h2>',
+        '<p>Four scenarios, each performed twice, once in English and once in Tamil. Three '
+        'enumerated fields per pair. Twelve comparisons, counted and committed before any '
+        f'call was placed, so the number could not be chosen afterwards.</p>',
+        f'<p class=result-line><b>{agree} of {total}</b> matched.</p>',
+        '<p>Then the transcripts were read. All three mismatches are the speaker saying '
+        'different things in the two calls, which a person recalling their own script from '
+        'memory will do. Extraction was faithful to what was actually said in twelve of '
+        'twelve, in both languages.</p>',
+        '<p class=dim>There is no Tamil-specific code anywhere in this app. Language is one '
+        'column in the work file and one string in the request.</p>',
+        '</div><div class=artifact>',
+        '<table class=pairs><thead><tr><th>scenario</th><th>en-IN</th><th>ta-IN</th>'
+        '<th>agreed</th></tr></thead><tbody>',
+    ]
+    for pair in data["pairs"]:
+        cls = "ok" if pair["agree"] == pair["of"] else "part"
+        body.append(f'<tr><td>{esc(pair["label"])}</td>'
+                    f'<td class=mono>{esc(pair["en"])}</td>'
+                    f'<td class=mono>{esc(pair["ta"])}</td>'
+                    f'<td class="agree {cls}">{pair["agree"]}/{pair["of"]}</td></tr>')
+    body.append('</tbody></table></div></div>')
+    add(act("02", "Twelve comparisons", "".join(body), "act-2"))
+
+    # ---- Act 3: the receipt of being wrong
+    body = [
+        '<div class=split><div class=claim>',
+        '<h3>03</h3><h2 id=h-03>This app got one wrong, and the receipt is committed '
+        'uncorrected.</h2>',
+        '<p>A parent refused to talk. CALL-E returned a schema-valid result with every '
+        'required field set to <code>"unknown"</code>, and the row was recorded as resolved. '
+        'It was not resolved. Nobody had spoken to that family about their child.</p>',
+        '<p>The receipt stays as it was written, because a corrected copy would record a run '
+        'that never happened. What changed is the code, and a test now fails if the '
+        'distinction collapses again.</p>',
+        '<p class=dim>Listen to the call it came from. The refusal is the shortest pair in '
+        'the set and its two languages agreed on all three fields.</p>',
+        '</div><div class=artifact>',
+        player_markup(["S-4107", "S-4108"], data, 0, has_audio),
+        '</div></div>',
+    ]
+    add(act("03", "The receipt of being wrong", "".join(body), "act-3"))
+
+    # ---- Act 4: check us
+    have = sum(1 for _c, pv, _r, _s in call_rows if pv)
+    body = [
+        '<div class=split><div class=claim>',
+        '<h3>04</h3><h2 id=h-04>Check us against your own billing.</h2>',
+        '<p>The API returns one identifier. CALL-E’s dashboard and usage page are keyed '
+        'on another. Both are printed here, so any row can be taken to the vendor’s own '
+        'records and checked against a source with no stake in these claims.</p>',
+        f'<p>{len(live)} of {len(recs)} committed receipts reached the production API, and '
+        f'{have} of {len(call_rows)} calls carry the provider identifier. The receipts '
+        'written before this app recorded that field had it recovered afterwards with a '
+        '<code>GET</code>, which places no call.</p>',
+        '<h3>What is committed, and what is only served here</h3>',
+        '<table class=compliance><tbody>'
+        '<tr><td>transcripts, waveform shape, structured results, call ids</td>'
+        '<td class=ok>in the repository</td></tr>'
+        '<tr><td>the audio recordings</td><td class=dim>served on this page only, because '
+        'the contribution checklist asks contributors not to commit call recordings</td>'
+        '</tr></tbody></table>',
+        '</div><div class=artifact>',
+        '<table class=ids><thead><tr><th>API id</th><th>provider id (dashboard)</th>'
+        '<th>outcome</th></tr></thead><tbody>',
+    ]
     for call_id, provider, resolution, _src in call_rows:
-        cls = {"resolved": "ok", "undetermined": "warn"}.get(resolution or "", "dim")
-        add(f"<tr><td class=mono>{esc(call_id)}</td>"
-            f"<td class={'mono' if provider else 'dim'}>"
-            f"{esc(provider) if provider else 'not recorded'}</td>"
-            f"<td class={cls}>{esc(resolution)}</td></tr>")
-    add("</table>")
-    have = sum(1 for _c, p, _r, _s in call_rows if p)
-    add(f"<p class=dim>{len(live_calls)} of {len(recs)} committed receipts reached the "
-        f"production API, and {have} of {len(call_rows)} calls carry the provider id. The "
-        f"receipts written before this app recorded that field had it recovered afterwards "
-        f"with a <code>GET</code>, which places no call; that mapping is committed in "
-        f"<code>evidence/07-locale-experiment.md</code>.</p>")
+        cls = {"resolved": "resolved", "undetermined": "undetermined"}.get(resolution or "", "failed")
+        pv = (f'<button data-copy="{esc(provider)}" title="Copy">{esc(provider)}</button>'
+              if provider else '<span class=dim>not recorded</span>')
+        body.append(f'<tr><td class=mono>{esc(call_id)}</td><td class=mono>{pv}</td>'
+                    f'<td><span class="state state-{cls}">{esc(resolution)}</span></td></tr>')
+    body.append('</tbody></table></div></div>')
+    add(act("04", "Check us against your billing", "".join(body)))
 
-    add("<h2>Every rule, broken on purpose</h2>")
-    add("<p>A test that has never been observed to fail has not been shown to test "
-        "anything. Each row is a change made to working code to check that a specific test "
-        "notices. Every one was reverted and the suite returned to green.</p>")
-    add("<table><tr><th>#</th><th>the change</th><th>tests that failed</th></tr>")
+    # ---- Act 5: mutations
+    body = [
+        '<div class=split><div class=claim>',
+        '<h3>05</h3><h2 id=h-05>Every rule, broken on purpose.</h2>',
+        '<p>A test that has never been observed to fail has not been shown to test anything. '
+        'Each row is a change made to working code to check that a specific test notices. '
+        'Every one was reverted and the suite returned to green.</p>',
+        '<div class=note>Number 18 found a live defect rather than confirming a rule. '
+        '<code>reached_production_api</code> was computed from the configured base URL alone, '
+        'so a run whose every attempt died at the transport layer would still have published '
+        'that it reached production.</div>',
+        '</div><div class=artifact>',
+        '<table class=mutations><thead><tr><th>#</th><th>the change</th>'
+        '<th>tests that failed</th></tr></thead><tbody>',
+    ]
     for num, change, caught in muts:
-        add(f"<tr><td class=dim>{esc(num)}</td><td>{esc(change)}</td>"
-            f"<td class=ok>{esc(caught)}</td></tr>")
-    add("</table>")
-    add("<div class=note>Mutation 18 found a live defect rather than confirming a rule. "
-        "<code>reached_production_api</code> was computed from the configured base URL "
-        "alone, so a run whose every attempt died at the transport layer still published "
-        "that it had reached production.</div>")
+        body.append(f'<tr><td class=dim>{esc(num)}</td><td>{esc(change)}</td>'
+                    f'<td class="mono caught">{esc(caught)}</td></tr>')
+    body.append('</tbody></table></div></div>')
+    add(act("05", "Every rule, broken", "".join(body), "act-2"))
 
-    add("<h2>What is not true</h2>")
-    add("<ul class=dim>")
-    for line in (
-        "Calls to India arrived from a US caller ID, shown as Oakland CA. A family will not "
-        "answer an unknown foreign number about their child, and nothing in this app fixes "
-        "that.",
-        "CALL-E has no cancel endpoint. Once a call is placed there is no API route to stop "
-        "it, so the concurrency cap is the only brake that exists.",
-        "The agent does not enforce its own exit. On one call it announced it was ending, "
-        "then restarted its opening disclosure.",
-        "The locale result rests on one bilingual speaker who knew what was being tested, "
-        "one language pair and one region.",
-    ):
-        add(f"<li>{line}</li>")
-    add("</ul>")
+    # ---- Act 6: take-aways
+    takes = [
+        ("Three outcomes, not two",
+         "<code>resolved</code> is an answer on record. <code>failed</code> is nobody "
+         "reached. <code>undetermined</code> is a call that connected and produced nothing "
+         "usable, and it goes to a named person. It is never counted toward a coverage "
+         "percentage, because the whole point is a child nobody has heard about."),
+        ("Record the identifier the vendor is keyed on",
+         "The id an API returns and the id its billing page shows are not always the same "
+         "one. Recording only the first makes a receipt uncheckable by anyone outside the "
+         "repository that wrote it."),
+        ("Break a rule to prove a test catches it",
+         "Eighteen deliberate changes, each reverted, each recorded with the tests that "
+         "failed. It cost an afternoon and it found a real defect that eighty-eight passing "
+         "tests had not."),
+    ]
+    body = ['<h3>06</h3><h2 id=h-06>Three things worth taking, whatever you are building.</h2>',
+            '<div class=takes>']
+    for i, (title, text) in enumerate(takes, 1):
+        body.append(f'<div class=take><div class=take-n>{i:02d}</div>'
+                    f'<h4>{esc(title)}</h4><p>{text}</p></div>')
+    body.append('</div>')
+    add(act("06", "Three things to take", "".join(body)))
 
-    add("<footer>Generated from the committed evidence by "
-        "<code>tools/judge_page.py</code>. Nothing on this page is typed into the template; "
-        "if the repository changes, this page changes with it."
-        "</footer></main></html>")
-    return "".join(parts)
+    # ---- Act 7: what is not true
+    limits = [
+        ("Calls to India arrived from a United States caller identity, shown as Oakland, "
+         "California. A family will not answer an unknown foreign number about their child.",
+         "Fixable by the operator with a local number on the account. Nothing in this app "
+         "changes it."),
+        ("CALL-E has no cancel endpoint. Once a call is placed there is no route to stop it.",
+         "The concurrency cap is the only brake that exists, so it is set low and the run "
+         "reports what was already in flight when a stop was requested."),
+        ("The agent does not enforce its own exit. On one call it announced it was ending, "
+         "then restarted its opening disclosure.",
+         "Reported to the vendor. The transcript is committed."),
+        ("The locale result rests on one bilingual speaker who knew what was being tested, "
+         "one language pair and one region.",
+         "It is a pilot, and it is written up as one. The pre-registered comparison count is "
+         "committed so nobody has to take the framing on trust."),
+    ]
+    body = ['<div class=split><div class=claim>',
+            '<h3>07</h3><h2 id=h-07>What is not true.</h2>',
+            '<p>Four limits, each with what would close it. Two of them are the '
+            'platform’s and are reported here without complaint, because a limit you '
+            'can read is worth more than a claim you cannot check.</p>',
+            '</div><div class=artifact><ul class=limits>']
+    for limit, closes in limits:
+        body.append(f'<li><p class=limit>{esc(limit)}</p>'
+                    f'<p class=closes>{esc(closes)}</p></li>')
+    body.append('</ul></div></div>')
+    add(act("07", "What is not true", "".join(body), "act-deep"))
+
+    # ---- Act 8: close
+    body = [
+        '<h3>08</h3><h2 id=h-08>Run the whole thing with no account.</h2>',
+        '<p>No API key, no signup, no telephone call. The local double is mounted as an '
+        '<code>httpx</code> transport underneath a real <code>calle.CalleClient</code>, so '
+        'the offline path exercises the same SDK code as the live one.</p>',
+        '<pre>pip install -r requirements-dev.txt\n'
+        'python -m firstbell --work-file examples/absences.csv</pre>',
+        '<p class=dim>Produced by running exactly that when this page was built:</p>',
+        f'<pre class=run>{esc(offline_run())}</pre>',
+    ]
+    add(act("08", "Run it yourself", "".join(body)))
+
+    add('</main>')
+    add('<footer><p>Generated from the committed evidence by <code>tools/judge_page.py</code>. '
+        'Nothing here is typed into the template: if the repository changes, this page changes '
+        'with it. Contrast is measured by <code>tools/check_contrast.py</code>, which reports '
+        'the pairs it could not measure so that an unmeasured pair cannot read as a pass.</p>'
+        '</footer>')
+
+    add(f'<script id=call-data type=application/json>{json.dumps(data, ensure_ascii=False, separators=(",", ":"))}</script>')
+    add(f'<script src="{GSAP}" defer></script>')
+    add(f'<script src="{SCROLLTRIGGER}" defer></script>')
+    add(f'<script src="{LENIS[0]}" defer></script>')
+    add('<script type=module src="app.js"></script>')
+    add('</html>')
+    return "".join(p)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("out", nargs="?", default="out", help="output directory")
+    ap.add_argument("--audio-dir", default=None,
+                    help="directory holding <row-id>.m4a clips, outside this repository")
+    args = ap.parse_args()
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+
+    audio = Path(args.audio_dir).resolve() if args.audio_dir else None
+    clips: list[Path] = sorted(audio.glob("*.m4a")) if audio and audio.is_dir() else []
+    if audio and not clips:
+        print(f"--audio-dir {audio} holds no .m4a files; building the no-audio page")
+    has_audio = bool(clips)
+
+    if has_audio:
+        dest = out / "audio"
+        dest.mkdir(exist_ok=True)
+        for clip in clips:
+            shutil.copy2(clip, dest / clip.name)
+
+    for asset in ("app.js", "player.js"):
+        shutil.copy2(SITE / asset, out / asset)
+
+    page = out / "index.html"
+    page.write_text(build(has_audio), encoding="utf-8", newline="\n")
+
+    total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
+    print(f"{page}  {page.stat().st_size / 1024:.1f} KB")
+    print(f"audio: {len(clips)} clips" if has_audio else "audio: none, page says why")
+    print(f"total output: {total / 1024:.0f} KB across "
+          f"{sum(1 for f in out.rglob('*') if f.is_file())} files")
+    return 0
 
 
 if __name__ == "__main__":
-    out = Path(sys.argv[1] if len(sys.argv) > 1 else "out/index.html")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(build(), encoding="utf-8", newline="\n")
-    print(f"{out} written, {out.stat().st_size / 1024:.1f} KB")
+    raise SystemExit(main())
