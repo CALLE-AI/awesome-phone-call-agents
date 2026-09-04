@@ -264,6 +264,35 @@ no calls at all, an unanswered call whose three accounts of itself disagree, and
 of this app getting it wrong before the defect was fixed. `evidence/README.md` says what
 each one is worth.
 
+### Why the statistics are American and the phone numbers are Indian
+
+A reader who gets this far has noticed that the problem is argued with US and English
+figures while every receipt is a `+91` number answered in Tamil or Hindi. That is worth
+explaining rather than leaving as a seam.
+
+The statistics are American and English because that is where the duty is written down and
+enforceable: Title VI and the 2015 Dear Colleague Letter create an obligation to reach a
+family in a language it understands, and England publishes persistent-absence figures
+against a statutory duty. Those make the problem checkable by a reader.
+
+The calls are Indian and the voice is mine because a published recording needs a line the
+caller owns. Every one of these calls went to my own number, placed by me and answered by
+me, which `evidence/README.md` states on the receipt itself. Phoning somebody else's family
+to produce evidence for a code submission would need a consent I did not ask for, so I did
+not do it. What that costs is real and is stated in `docs/locale-is-not-only-a-hint.md`: a
+sample of one cooperative speaker is not a sample of families.
+
+What it buys is the part that could not have been faked. CALL-E supports Tamil in the India
+region, so a matched pair, the same absence in two languages down one code path, was
+actually placeable. That experiment is the strongest evidence here and it exists because
+the numbers are Indian, not in spite of it.
+
+None of the code knows about any of this. `dispatch/` never reads a country. Language is a
+`locale` column on the row, so the family decides it and not the deployment. The wage
+behind the break-even is one flag. Moving this from a Chennai school to a California
+district changes two inputs and no logic, which is the whole claim: the jurisdiction is
+data, and only the data is jurisdictional.
+
 ## Tests
 
 ```bash
