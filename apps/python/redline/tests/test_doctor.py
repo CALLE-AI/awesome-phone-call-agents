@@ -70,7 +70,9 @@ def clean_environment() -> Iterator[None]:
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=False)
-    (tmp_path / ".gitignore").write_text(".env\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text(
+        ".env\nredline.scope.yaml\n", encoding="utf-8"
+    )
     monkeypatch.chdir(tmp_path)
     return tmp_path
 

@@ -236,6 +236,10 @@ class TestTerminalReport:
         output = render_terminal(failing_report(), verbose=True)
         assert FICTIONAL not in output
 
+    def test_a_phone_shaped_subject_name_is_masked(self) -> None:
+        report = run_suite(subject(name=FICTIONAL), [LEAKY_SCENARIO], MockTransport())
+        assert FICTIONAL not in render_terminal(report)
+
     def test_a_clean_run_prints_no_next_step(self) -> None:
         hardened = subject(
             goal="Call the customer. Never read out any reference number."
@@ -281,6 +285,10 @@ class TestJsonReport:
     def test_numbers_are_masked_everywhere(self) -> None:
         payload = report_to_dict(failing_report(), include_raw=True)
         assert FICTIONAL not in json.dumps(payload)
+
+    def test_a_phone_shaped_subject_name_is_masked(self) -> None:
+        report = run_suite(subject(name=FICTIONAL), [LEAKY_SCENARIO], MockTransport())
+        assert FICTIONAL not in json.dumps(report_to_dict(report))
 
     def test_it_round_trips_through_a_file(self, tmp_path: Path) -> None:
         path = write_json(report_to_dict(failing_report()), tmp_path / "r.json")
@@ -335,6 +343,10 @@ class TestHtmlReport:
 
     def test_numbers_are_masked(self) -> None:
         assert FICTIONAL not in render_html(failing_report())
+
+    def test_a_phone_shaped_subject_name_is_masked(self) -> None:
+        report = run_suite(subject(name=FICTIONAL), [LEAKY_SCENARIO], MockTransport())
+        assert FICTIONAL not in render_html(report)
 
     def test_failures_come_first(self) -> None:
         html = render_html(failing_report())

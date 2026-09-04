@@ -125,8 +125,9 @@ $ redline run --live --i-am-authorized-to-test-this-target \
    reach them, when the authorisation expires, and the exact numbers with an
    owner beside each one. There is deliberately no way to write "no expiry",
    and matching is exact — no prefixes, no ranges, no wildcards. The file holds
-   real numbers, so it is git-ignored and the repository's secret scanner
-   refuses it by name before reading a line of it.
+   real numbers. The package-local `.gitignore` excludes it, live mode refuses
+   an unignored copy inside a Git worktree, and the supplied pre-commit hook
+   rejects it by filename even after `git add -f`, without opening the file.
 4. **A confirmation per call**, showing the persona you are about to play.
    Per call, not per process: a one-off yes at startup that then dials forty
    numbers is not consent.
@@ -367,9 +368,10 @@ improvement.
   closed subset (no `$ref`, `oneOf`, `anyOf`, `allOf`, recursion or
   `additionalProperties: true`). `redline check` lints your schema against it,
   and the fix generator will not emit anything outside it.
-- **Recorded payloads** — `--transport replay` re-reads real CALL-E responses
-  from `fixtures/`, so platform behaviour can be pinned into a test suite that
-  spends no credits.
+- **Replay payloads** — `--transport replay` can read a private local CALL-E
+  response, while every fixture committed under `fixtures/calle/` is synthetic
+  and must remain so. A bundled fixture validates REDLINE's parser and checks;
+  it is not evidence of provider behaviour.
 
 The implementation follows the public [CALL-E Calls API
 contract](https://docs.heycall-e.com/api-reference/calls). Known platform issues
@@ -395,10 +397,24 @@ Nothing here is optional and none of it is configurable:
 - **Every path out is masked.** Terminal, JSON, HTML, logs and exception
   messages all go through the redactor. Masking keeps enough of a number to
   tell two recipients apart and not enough to dial either.
-- **A pre-commit hook blocks secrets from the history.** Dialable numbers
-  outside the reserved fictional ranges, private keys, bearer tokens,
-  non-example e-mail domains, and Han ideographs. Enable it with
-  `git config core.hooksPath .githooks`.
+- **Private inputs are kept out of history.** The package-local `.gitignore`
+  excludes `.env` and `redline.scope.yaml`. Live mode refuses a scope file that
+  Git could track. For the force-add case, enable the supplied filename guard
+  from this directory with `git config core.hooksPath "$PWD/.githooks"`; it
+  rejects either private input from the staged index without reading it.
+
+### Cancellation and ambiguous completion
+
+- The per-call confirmation happens before `calls.create`. Answering no stops
+  locally: no provider request is made, no credit is spent, and no phone rings.
+- After `calls.create` returns a call ID, REDLINE has no provider-side cancel
+  operation. `Ctrl-C`, closing the terminal, or a local wait timeout stops only
+  REDLINE's polling; it does not prove that CALL-E stopped the call.
+- Treat a timeout after provider acceptance as an ambiguous live operation. Do
+  not start a replacement call. Inspect the existing call in the CALL-E
+  dashboard or reconcile it through the Calls API using the returned call ID.
+  The stable idempotency key prevents an identical create request from becoming
+  a distinct call, but it is not a cancellation receipt.
 
 ---
 
@@ -475,9 +491,8 @@ $ ruff check . && ruff format --check .
 $ mypy
 ```
 
-The repository around it carries its own tooling — a secret scanner, a
-pre-commit hook, and 88 tests that keep this directory the right shape for the
-submission. Those run from the repository root and ship with nothing.
+The app carries a package-local private-file guard, and the repository validator
+plus its tests keep this directory the right shape for the official repository.
 
 Adding a scenario is a YAML file and a pull request — see
 the repository's [`CONTRIBUTING.md`](../../../CONTRIBUTING.md).

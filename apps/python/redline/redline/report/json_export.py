@@ -40,7 +40,7 @@ def report_to_dict(report: RunReport, *, include_raw: bool = False) -> dict[str,
     """
     return {
         "schema_version": SCHEMA_VERSION,
-        "subject": report.subject_name,
+        "subject": redact(report.subject_name),
         "transport": report.transport,
         "duration_seconds": round(report.duration_seconds, 3),
         "real_calls_placed": report.real_calls_placed,

@@ -176,7 +176,7 @@ def check(config: ConfigOption = Path(CONFIG_FILENAME)) -> None:
     console.print(
         Text.assemble(
             ("  ok  ", "green"),
-            (f"config valid  -  subject {loaded.subject.name!r}", ""),
+            (f"config valid  -  subject {redact(loaded.subject.name)!r}", ""),
         )
     )
     console.print(

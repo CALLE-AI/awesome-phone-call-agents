@@ -198,8 +198,7 @@ def _check_dotenv_ignored(path: Path | None) -> Check:
         return Check(
             name="env file ignored",
             status=CheckStatus.OK,
-            detail=f"git ignores {path.name}, and the pre-commit hook "
-            "refuses it by name",
+            detail=f"git ignores {path.name}",
         )
     return Check(
         name="env file ignored",

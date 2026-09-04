@@ -28,6 +28,7 @@ _NANP_LOCAL = re.compile(r"\b\(?[2-9]\d{2}\)?[\s.-]\d{3}[\s.-]\d{4}\b")
 #: Anything credential-shaped that could reach a log through an error payload.
 _CREDENTIAL = re.compile(
     r"\b(?:sk|pk|rk)[-_](?:live|test|prod)?[-_]?[A-Za-z0-9]{16,}\b"
+    r"|\biams_(?:live|test|sk)_[A-Za-z0-9_-]{8,}\b"
     r"|\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"
     r"|\bBearer\s+[A-Za-z0-9._-]{16,}\b"
 )

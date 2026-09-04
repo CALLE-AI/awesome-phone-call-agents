@@ -18,6 +18,7 @@ from typing import Any
 
 from redline import __version__
 from redline.evaluate.engine import RunReport
+from redline.redact import redact
 from redline.scenario.model import Scenario
 from redline.subject import SubjectUnderTest
 from redline.verify import Verification
@@ -41,7 +42,7 @@ def build_run_receipt(
         "schema_version": RECEIPT_SCHEMA_VERSION,
         "kind": "run",
         "tool": _tool_versions(),
-        "subject": subject.name,
+        "subject": redact(subject.name),
         "contract": _contract_hashes(subject),
         "catalogue_sha256": _catalogue_hash(scenarios),
         "evidence": _evidence_provenance(report),
@@ -59,7 +60,7 @@ def build_verification_receipt(
         "schema_version": RECEIPT_SCHEMA_VERSION,
         "kind": "verification",
         "tool": _tool_versions(),
-        "subject": verification.patch.before.name,
+        "subject": redact(verification.patch.before.name),
         "contract": {
             "before": _contract_hashes(verification.patch.before),
             "after": _contract_hashes(verification.patch.after),

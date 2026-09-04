@@ -1,8 +1,8 @@
 # REDLINE scope file -- the written authorisation for placing real calls.
 #
-# Copy this to `redline.scope.yaml` and fill it in. That file is git-ignored
-# and the repository's secret scanner refuses it by name, because it holds real
-# telephone numbers by design.
+# Copy this to `redline.scope.yaml` and fill it in. The package-local
+# `.gitignore` excludes that file, live mode refuses it if Git could track it,
+# and the supplied pre-commit hook rejects a force-added copy by filename.
 #
 # Nothing in REDLINE will place a call without it. That is not paperwork for
 # its own sake: `redline run --live` makes a stranger's phone ring and spends

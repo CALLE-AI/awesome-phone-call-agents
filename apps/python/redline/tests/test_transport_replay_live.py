@@ -88,6 +88,10 @@ class TestMasking:
         token = "sk-live-" + "b" * 24
         assert token not in redact(f"Authorization failed for {token}")
 
+    def test_calle_credentials_in_prose_are_masked(self) -> None:
+        token = "iams_live_" + "b" * 48
+        assert token not in redact(f"Authorization failed for {token}")
+
     def test_sensitive_keys_are_masked_wholesale(self) -> None:
         payload = {"phones": [FICTIONAL], "api_key": "anything at all"}
         masked = redact_payload(payload)
@@ -117,6 +121,15 @@ class TestReplayTransport:
         assert record.task_completed is True
         assert record.completion_confidence is not None
         assert record.completion_confidence.score == pytest.approx(0.93)
+
+    def test_every_shipped_fixture_is_explicitly_synthetic(self) -> None:
+        fixtures = list(self.FIXTURES.glob("*.json"))
+        assert fixtures
+        for path in fixtures:
+            document = json.loads(path.read_text(encoding="utf-8"))
+            metadata = document.get("redline_fixture", {})
+            assert metadata.get("recorded_at") == "synthetic", path.name
+            assert "synthetic" in metadata.get("note", "").lower(), path.name
 
     def test_the_transcript_survives_the_round_trip(self) -> None:
         record = self.transport().run(SUBJECT, scenario(), idempotency_key="k")
@@ -202,6 +215,11 @@ class TestLiveTransportGuards:
     def test_a_non_e164_recipient_is_refused(self) -> None:
         with pytest.raises(TransportError, match=r"strict E\.164"):
             self.build(recipient="415-555-0142", allowlist=["415-555-0142"])
+
+    def test_unicode_decimal_digits_are_not_e164(self) -> None:
+        arabic_indic = "+١٤١٥٥٥٥٠١٤٢"
+        with pytest.raises(TransportError, match=r"strict E\.164"):
+            self.build(recipient=arabic_indic, allowlist=[arabic_indic])
 
     def test_an_empty_allowlist_is_refused(self) -> None:
         with pytest.raises(TransportError, match="empty allowlist"):

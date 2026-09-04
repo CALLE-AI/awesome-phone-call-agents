@@ -111,10 +111,10 @@ def render_html(report: RunReport) -> str:
         "<!doctype html>",
         '<html lang="en"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
-        f"<title>REDLINE - {_esc(report.subject_name)}</title>",
+        f"<title>REDLINE - {_esc(redact(report.subject_name))}</title>",
         f"<style>{STYLES}</style>",
         "</head><body><main>",
-        f"<h1><span>REDLINE</span> {_esc(report.subject_name)}</h1>",
+        f"<h1><span>REDLINE</span> {_esc(redact(report.subject_name))}</h1>",
         f'<p class="meta">transport <code>{_esc(report.transport)}</code> '
         f"&middot; {report.total} scenarios &middot; "
         f"{report.real_calls_placed} real calls &middot; "

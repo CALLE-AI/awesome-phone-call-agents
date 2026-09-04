@@ -69,7 +69,7 @@ def _print_header(report: RunReport, console: Console) -> None:
         Text.assemble(
             ("REDLINE", "bold red"),
             ("  ", ""),
-            (report.subject_name, "bold"),
+            (redact(report.subject_name), "bold"),
         )
     )
 

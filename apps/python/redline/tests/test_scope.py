@@ -6,6 +6,7 @@ file carries no literal a phone-number scanner would read as dialable.
 
 from __future__ import annotations
 
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -192,6 +193,26 @@ class TestWhatMakesATarget:
         text = VALID.replace(FICTIONAL, "+" + "1415555*")
         with pytest.raises(ScopeError, match=r"E\.164"):
             load_scope(write_scope(tmp_path, text))
+
+    def test_unicode_decimal_digits_are_not_e164(self, tmp_path: Path) -> None:
+        text = VALID.replace(FICTIONAL, "+١٤١٥٥٥٥٠١٤٢")
+        with pytest.raises(ScopeError, match=r"E\.164"):
+            load_scope(write_scope(tmp_path, text))
+
+
+class TestScopeFilePrivacy:
+    def test_an_unignored_scope_inside_git_is_refused(self, tmp_path: Path) -> None:
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        path = write_scope(tmp_path, VALID)
+        with pytest.raises(ScopeError, match="not ignored"):
+            load_scope(path)
+
+    def test_an_ignored_scope_inside_git_is_allowed(self, tmp_path: Path) -> None:
+        subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+        (tmp_path / ".gitignore").write_text(
+            "redline.scope.yaml\n", encoding="utf-8"
+        )
+        assert load_scope(write_scope(tmp_path, VALID)).targets
 
 
 class TestErrorsNeverPrintANumber:

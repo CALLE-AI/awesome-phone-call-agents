@@ -30,15 +30,17 @@ wrong:
 * **An owner per number**, so a reviewer can tell a test handset from
   somebody's mobile without asking.
 
-The file holds real telephone numbers by design, so it is git-ignored and the
-repository's secret scanner refuses it by name before reading a line of it.
-:mod:`redline.scope` never prints a number unmasked. What ships instead is
+The file holds real telephone numbers by design. The package ignores it, live
+mode refuses an unignored copy inside Git, and the supplied staged-file guard
+rejects a force-added copy by filename without reading it. :mod:`redline.scope`
+never prints a number unmasked. What ships instead is
 ``redline.scope.example.yaml``, filled with standards-reserved fiction.
 """
 
 from __future__ import annotations
 
 import re
+import subprocess
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -62,7 +64,7 @@ SCOPE_FILENAME = "redline.scope.yaml"
 SCOPE_EXAMPLE_FILENAME = "redline.scope.example.yaml"
 
 #: Strict E.164, the same pattern the CALL-E contract applies to recipients.
-E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
 
 
 class ScopeError(RuntimeError):
@@ -149,6 +151,8 @@ def load_scope(path: Path, *, today: date | None = None) -> Scope:
             "will not dial a number nobody has signed for."
         )
 
+    _refuse_trackable_scope(path)
+
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as error:  # pragma: no cover - message passthrough
@@ -181,6 +185,42 @@ def load_scope(path: Path, *, today: date | None = None) -> Scope:
             "nobody agreed to."
         )
     return scope
+
+
+def _refuse_trackable_scope(path: Path) -> None:
+    """Refuse a scope file that Git could add from inside its repository.
+
+    The file intentionally contains real phone numbers and authoriser contact
+    data. A nested `.gitignore` protects normal adds; this runtime check also
+    makes a missing or broken ignore rule a live-call blocker. Files outside a
+    Git worktree are allowed because there is no public-history path to close.
+    """
+    try:
+        root = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=path.parent,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return
+    if root.returncode != 0:
+        return
+
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", "--", str(path.resolve())],
+        cwd=path.parent,
+        capture_output=True,
+        check=False,
+        timeout=10,
+    )
+    if ignored.returncode != 0:
+        raise ScopeError(
+            f"{path.name} is inside a Git worktree but is not ignored. Add "
+            f"{SCOPE_FILENAME} to the nearest .gitignore before using --live."
+        )
 
 
 # --- Field readers ------------------------------------------------------------

@@ -49,7 +49,7 @@ API_ORIGIN = "https://api.heycall-e.com"
 API_KEY_VARIABLE = "REDLINE_CALLE_API_KEY"
 
 #: Strict E.164, matching the pattern the CALL-E contract applies to recipients.
-E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
 
 ScriptHook = Callable[[Scenario, str], None]
 """Called before dialling with the scenario and the lines to read aloud."""

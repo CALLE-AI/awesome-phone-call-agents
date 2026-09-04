@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from redline.data_policy import (
@@ -19,6 +20,7 @@ from redline.transport import MockTransport
 from redline.types import Severity
 
 SECRET_CONTEXT = "PRIVATE-CUSTOMER-REFERENCE"
+FICTIONAL = "+" + "1415555" + "0142"
 
 
 def subject(goal: str = "Confirm the appointment.") -> SubjectUnderTest:
@@ -73,6 +75,11 @@ def test_receipt_contains_no_context_or_transcript() -> None:
     assert SECRET_CONTEXT not in rendered
     assert "transcript" not in rendered
     assert "static" in rendered
+
+
+def test_receipt_masks_a_phone_shaped_subject_name() -> None:
+    rendered = json.dumps(receipt_for(replace(subject(), name=FICTIONAL)))
+    assert FICTIONAL not in rendered
 
 
 def test_receipt_can_be_written(tmp_path: Path) -> None:
