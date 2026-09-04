@@ -223,8 +223,16 @@ def player_markup(ids: list[str], data: dict, cue: int, has_audio: bool) -> str:
     out.append('</span></div>')
 
     out.append('<div class=stage>')
-    out.append('<canvas data-waveform role=img aria-label="Waveform of the call, '
-               'click to seek"></canvas>')
+    # A slider, not a picture. Clicking it seeks, and seeking moves the transcript
+    # highlight with or without a recording, so it does something a keyboard has to be
+    # able to do too. player.js keeps valuenow and valuetext current.
+    secs = int(round(first.get("seconds") or 0))
+    out.append(
+        f'<canvas data-waveform role=slider tabindex=0 aria-valuemin=0 '
+        f'aria-valuemax="{secs}" aria-valuenow=0 '
+        f'aria-valuetext="0:00 of {secs // 60}:{secs % 60:02d}" '
+        f'aria-label="Playhead. Click it, or use the arrow keys, to move through the '
+        f'call."></canvas>')
     out.append('<ol class=turns data-turns aria-live=off>')
     for turn in first["turns"]:
         who = "agent" if turn["speaker"] == "bot" else "parent"

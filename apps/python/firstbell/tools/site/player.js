@@ -50,6 +50,17 @@ export class CallPlayer {
 
     // Clicking the waveform seeks, and clicking a turn seeks to that turn. To a reader those
     // are the same gesture aimed at two representations of one timeline, so both must work.
+    this.canvas.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 10 : 1;
+      let to = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') to = this.t + step;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') to = this.t - step;
+      else if (e.key === 'Home') to = 0;
+      else if (e.key === 'End') to = this.call.seconds;
+      if (to === null) return;
+      e.preventDefault();           // or the page scrolls under the reader as they seek
+      this.seek(to);
+    });
     this.canvas.addEventListener('click', (e) => {
       const r = this.canvas.getBoundingClientRect();
       this.seek(((e.clientX - r.left) / r.width) * this.call.seconds);
@@ -75,6 +86,7 @@ export class CallPlayer {
     this.renderTurns();
     this.renderResult();
     this.resize();
+    this.announce();
     // Switching language mid-listen keeps listening, because that IS the demonstration: the
     // words change completely and the result underneath them does not move.
     if (wasPlaying && !silent) this.play();
@@ -112,6 +124,22 @@ export class CallPlayer {
     if (this.audio) this.audio.currentTime = this.t;
     this.sync();
     this.draw();
+    this.announce();
+  }
+
+  /* Where the playhead is, in the words a screen reader will say. The range belongs to
+   * whichever call is selected, and the two languages are different lengths, so the
+   * maximum moves when the reader switches. */
+  announce() {
+    // Round once, then read every number off the rounded value. Rounding the seconds for
+    // valuemax and flooring them for the spoken text put "0:59 of 0:59" next to a maximum
+    // of 60 on a call of 59.6 seconds.
+    const total = Math.round(this.call.seconds);
+    const at = Math.max(0, Math.min(total, Math.round(this.t)));
+    const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    this.canvas.setAttribute('aria-valuemax', String(total));
+    this.canvas.setAttribute('aria-valuenow', String(at));
+    this.canvas.setAttribute('aria-valuetext', `${clock(at)} of ${clock(total)}`);
   }
 
   loop() {
@@ -135,7 +163,21 @@ export class CallPlayer {
       const rel = k === i ? 'now' : (k < i ? 'past' : 'ahead');
       if (nodes[k].dataset.rel !== rel) nodes[k].dataset.rel = rel;
     }
-    if (nodes[i]) nodes[i].scrollIntoView({block: 'nearest', behavior: REDUCED ? 'auto' : 'smooth'});
+    // Scroll the transcript, not the page. scrollIntoView walks every scrollable
+    // ancestor, the document included, and block:'nearest' limits how far each one moves
+    // rather than which ones move at all: following the playhead pulled the reader 142px
+    // down the page, once per turn. This moves the one box that should move.
+    const li = nodes[i];
+    if (li) {
+      const box = this.turnsEl;
+      const lr = li.getBoundingClientRect();
+      const br = box.getBoundingClientRect();
+      const delta = lr.top < br.top ? lr.top - br.top
+        : (lr.bottom > br.bottom ? lr.bottom - br.bottom : 0);
+      if (delta) {
+        box.scrollTo({ top: box.scrollTop + delta, behavior: REDUCED ? 'auto' : 'smooth' });
+      }
+    }
     if (this.onTurn) this.onTurn(this);
     if (i === turns.length - 1) this.reveal();
   }
