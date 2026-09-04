@@ -232,6 +232,7 @@ Plugins should be explicit about inputs, outbound call side effects, credential 
 | [`plugins/dify-template`](plugins/dify-template/) | Dify | Importable Dify workflow DSL template for a one-shot outbound call tool with dry-run preview, API health gating, and masked results. |
 | [`plugins/hubspot-calle`](plugins/hubspot-calle/) | HubSpot | Static HubSpot Projects app for creating CALL-E call tasks from CRM records and workflow App Cards. |
 | [`plugins/zapier-calle`](plugins/zapier-calle/) | Zapier | Zapier Platform CLI integration for outbound CALL-E calls with callback-based waiting, fail-closed dispositions, dry-run preview, and payload-derived idempotency keys. |
+| [`plugins/firstbell-absence-calls`](plugins/firstbell-absence-calls/) | n8n | Importable school-absence call wave that dials each family in that family's own language, keeps a call that connected without producing a usable answer separate from one that did, and ships with a dry run that places no calls and needs no API key. |
 
 ### Safety patterns
 

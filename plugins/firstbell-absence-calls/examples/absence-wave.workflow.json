@@ -1,0 +1,310 @@
+{
+  "name": "School absence calls, in the family's language",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## School absence calls, as a wave\n\nCalls the families whose absence notification went unanswered, each in that\nfamily's language, and keeps three outcomes apart instead of two.\n\n**Imports inactive.** Runs from the Manual Trigger. `dryRun` is true, so the\nfirst run places no calls at all.\n\n### To run it for real\n1. Set `CALL_E_API_KEY` in your n8n deployment's environment.\n2. Replace the placeholder numbers in **Absence Config**. The validator refuses\n   to dial anything starting `+91555`.\n3. Set `dryRun` to false.\n4. To schedule it, enable **Every School Morning** and activate the workflow.\n\n### To stop it\nDeactivate the workflow, or disable the schedule node. There is no cancel\nendpoint on the API, so a call already accepted will complete. The concurrency\ncap is what limits how many are in flight when you stop it.",
+        "height": 520,
+        "width": 460
+      },
+      "id": "note-Recipe overview",
+      "name": "Recipe overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Why three outcomes\n\nA call has three endings and only one closes a record:\n\n- **resolved** a usable answer came back\n- **undetermined** a conversation happened and produced nothing\n- **failed** nobody was reached\n\nThe middle one is the point. CALL-E can return `completed` with\n`structured_result: null`, and it can return every required field as\n`\"unknown\"`. Both are real conversations worth nothing, and filing them\nwith the successes is how a dashboard reports full coverage for a child\nnobody heard about.\n\n`classify.mjs` holds this rule and `node --test examples/` checks it.",
+        "height": 300,
+        "width": 420
+      },
+      "id": "note-Three outcomes note",
+      "name": "Three outcomes note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        -160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "node-manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-trigger",
+      "name": "Every School Morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        200
+      ],
+      "disabled": true,
+      "notes": "Disabled on import. Enable it and activate the workflow to make recurrence the host's job rather than a sentence in a README."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Everything an operator has to change is on this screen and nowhere else.\n//\n// The API key is deliberately absent. It is read from the CALL_E_API_KEY environment\n// variable at execution time so it never lands in workflow data, an export, or a git\n// history. See the plugin README for where to put it in your n8n deployment.\nreturn [{\n  json: {\n    schoolName: \"Redhill Primary\",\n    // Placeholder numbers. The next node refuses to run until these are replaced.\n    // +91 555 is not assignable to an Indian subscriber, so nothing here can ring.\n    students: [\n      { id: \"S-1041\", name: \"Aarav\",  phones: [\"+915550000001\"], locale: \"en-IN\", consent: true },\n      { id: \"S-1042\", name: \"Diya\",   phones: [\"+915550000002\"], locale: \"hi-IN\", consent: true },\n      { id: \"S-1043\", name: \"Kavya\",  phones: [\"+915550000003\", \"+915550000009\"], locale: \"ta-IN\", consent: true },\n      { id: \"S-1044\", name: \"Rohan\",  phones: [\"+915550000004\"], locale: \"ta-IN\", consent: true },\n      { id: \"S-1045\", name: \"Meera\",  phones: [\"+915550000005\"], locale: \"en-IN\", consent: false },\n      { id: \"S-1046\", name: \"Ishaan\", phones: [\"+915550000006\", \"+915550000007\"], locale: \"ta-IN\", consent: true },\n    ],\n    absenceDate: new Date().toISOString().slice(0, 10),\n    apiBaseUrl: \"https://api.heycall-e.com\",\n    // A wave, not a broadcast. CALL-E's own guidance is against starting every call at\n    // once, and there is no cancel endpoint, so this cap is the only brake that exists.\n    concurrency: 3,\n    maxWaitSeconds: 240,\n    dryRun: true,\n  },\n}];"
+      },
+      "id": "node-absence-config",
+      "name": "Absence Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fail before dialling, not halfway through a wave.\nconst cfg = $input.first().json;\nconst problems = [];\n\nif (!process.env.CALL_E_API_KEY && !cfg.dryRun) {\n  problems.push(\"CALL_E_API_KEY is not set. Set it in your n8n deployment, or leave dryRun true.\");\n}\n\nconst PLACEHOLDER = /^\\+91555/;\nconst e164 = /^\\+[1-9]\\d{7,14}$/;\n\nfor (const student of cfg.students || []) {\n  for (const phone of student.phones || []) {\n    if (!e164.test(phone)) {\n      problems.push(`${student.id}: ${phone} is not an E.164 number`);\n    }\n    if (PLACEHOLDER.test(phone) && !cfg.dryRun) {\n      problems.push(`${student.id}: ${phone} is a shipped placeholder. Replace it with a number you are authorised to call.`);\n    }\n  }\n  if (!Array.isArray(student.phones) || student.phones.length === 0) {\n    problems.push(`${student.id}: no phone numbers`);\n  }\n}\n\nif (problems.length > 0) {\n  throw new Error(\"Refusing to run:\\n  \" + problems.join(\"\\n  \"));\n}\n\nreturn [{ json: cfg }];"
+      },
+      "id": "node-validate-config",
+      "name": "Validate Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per student, so the loop below is a wave and not a single request.\nconst cfg = $input.first().json;\nreturn (cfg.students || []).map((student) => ({\n  json: { ...student, schoolName: cfg.schoolName, absenceDate: cfg.absenceDate,\n          apiBaseUrl: cfg.apiBaseUrl, maxWaitSeconds: cfg.maxWaitSeconds,\n          dryRun: cfg.dryRun },\n}));"
+      },
+      "id": "node-absence-rows",
+      "name": "Absence Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consent is never inferred. A row without recorded consent is refused, not defaulted,\n// and it is reported as skipped rather than folded into the failures, because no call was\n// placed and reporting one would be a lie about what this workflow did.\nconst out = [];\nfor (const item of $input.all()) {\n  if (item.json.consent === true) {\n    out.push(item);\n  } else {\n    out.push({ json: { ...item.json, resolution: \"skipped\", attempts: 0,\n                       reason: \"no recorded consent to be called\", needsAHuman: false,\n                       skip: true } });\n  }\n}\nreturn out;"
+      },
+      "id": "node-consent-gate",
+      "name": "Consent Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "node-loop-over-students",
+      "name": "Loop Over Students",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One call request for one student.\nconst row = $input.first().json;\nif (row.skip) {\n  return [{ json: row }];\n}\n\n// Derived from (student, date), so a retry after a timeout reuses the same key instead of\n// minting a fresh one. Without this a network failure double-calls a family.\nconst idempotencyKey = `absence-${row.id}-${row.absenceDate}`;\n\nreturn [{\n  json: {\n    ...row,\n    idempotencyKey,\n    request: {\n      // The whole fallback chain goes in the request. CALL-E tries them in order; the\n      // workflow does not orchestrate retries itself.\n      phones: row.phones,\n      // The language belongs to the family, not to the deployment. This is the single\n      // field that makes the recipe work outside one country.\n      locale: row.locale,\n      task: [\n        \"This is an automated call from the school attendance office.\",\n        \"You are speaking with an AI assistant, not a person.\",\n        \"You can ask to speak to a member of staff at any time and I will arrange a callback.\",\n        \"\",\n        `You are calling on behalf of ${row.schoolName} about ${row.name}, who was marked absent on ${row.absenceDate} and whose absence has not yet been explained.`,\n        \"Ask, politely and briefly: the reason for the absence, and when the student is expected back.\",\n        \"Do not give advice. Do not discuss anything except this absence. If the person is distressed, asks for a human, disputes the absence, or says anything suggesting the student may be at risk, stop asking questions, say a member of staff will call back today, and end the call politely.\",\n      ].join(\"\\n\"),\n      result_schema: {\n        type: \"object\",\n        required: [\"reason_category\", \"expected_return\"],\n        properties: {\n          reason_category: { type: \"string\", enum: [\"illness\", \"medical_appointment\", \"family_emergency\", \"religious_observance\", \"transport\", \"other\", \"unknown\"] },\n          expected_return: { type: \"string\", enum: [\"today\", \"tomorrow\", \"later_this_week\", \"longer\", \"unknown\"] },\n          parent_confirmed_aware: { type: \"string\", enum: [\"yes\", \"no\", \"unknown\"] },\n          free_text_note: { type: \"string\" },\n        },\n      },\n    },\n  },\n}];"
+      },
+      "id": "node-build-call-request",
+      "name": "Build Call Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Place the call and wait for it to finish, with a hard ceiling on the wait.\nconst row = $input.first().json;\nif (row.skip) {\n  return [{ json: row }];\n}\n\n// dryRun returns a shaped response and places no call, so the whole recipe can be run\n// once end to end before it is pointed at a real number.\nif (row.dryRun) {\n  const shapes = {\n    \"S-1041\": { status: \"completed\", structured_result: { reason_category: \"illness\", expected_return: \"tomorrow\" } },\n    \"S-1042\": { status: \"completed\", structured_result: { reason_category: \"medical_appointment\", expected_return: \"today\" } },\n    \"S-1043\": { status: \"completed\", structured_result: { reason_category: \"transport\", expected_return: \"today\" }, attempts: 2 },\n    // The two shapes that are easy to get wrong, both taken from real calls.\n    \"S-1044\": { status: \"completed\", structured_result: null },\n    \"S-1046\": { status: \"no_answer\", structured_result: null, attempts: 2 },\n  };\n  const shape = shapes[row.id] || { status: \"completed\", structured_result: null };\n  const attempts = Array.from({ length: shape.attempts || 1 }, (_, i) => ({\n    provider_call_id: `dry_${row.id}_${i + 1}`,\n  }));\n  return [{ json: { ...row, recipient: { ...shape, attempts }, placedByThisRun: false } }];\n}\n\nconst headers = {\n  Authorization: `Bearer ${process.env.CALL_E_API_KEY}`,\n  \"Idempotency-Key\": row.idempotencyKey,\n  \"Content-Type\": \"application/json\",\n};\n\nconst created = await this.helpers.httpRequest({\n  method: \"POST\",\n  url: `${row.apiBaseUrl}/v1/calls`,\n  headers,\n  body: row.request,\n  json: true,\n  timeout: 30000,\n});\n\nconst callId = created.id || created.call_id;\nconst deadline = Date.now() + (row.maxWaitSeconds || 240) * 1000;\nlet call = created;\n\nwhile (Date.now() < deadline) {\n  const terminal = [\"completed\", \"failed\", \"no_answer\", \"busy\", \"cancelled\"];\n  const recipient = (call.recipients || [])[0];\n  if (recipient && terminal.includes(recipient.status)) {\n    break;\n  }\n  await new Promise((resolve) => setTimeout(resolve, 5000));\n  call = await this.helpers.httpRequest({\n    method: \"GET\",\n    url: `${row.apiBaseUrl}/v1/calls/${callId}`,\n    headers: { Authorization: headers.Authorization },\n    json: true,\n    timeout: 30000,\n  });\n}\n\nreturn [{ json: { ...row, callId, recipient: (call.recipients || [])[0] || null,\n                  placedByThisRun: true } }];"
+      },
+      "id": "node-create-call-and-wait",
+      "name": "Create Call And Wait",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Decide what one CALL-E call actually achieved. Three outcomes, not two.\n *\n * This is the only interesting logic in the recipe and it is kept in its own file so it\n * can be tested with `node --test` before it is pasted into a workflow node. The copy\n * inside `absence-wave.workflow.json` is generated from this file, and\n * `classify.test.mjs` fails if the two ever drift apart.\n *\n * The rule it implements, and why each branch exists:\n *\n *   resolved      A result came back and at least one required field says something.\n *   undetermined  A conversation happened and produced nothing usable. Two shapes:\n *                 `structured_result` is null, or every required field is uninformative.\n *   failed        Nobody was reached on any number.\n *\n * The middle outcome is the point. A pipeline with two buckets has to file\n * \"the call connected but we learned nothing\" somewhere, and filing it with the\n * successes is how a dashboard reports full coverage for a child nobody heard about.\n *\n * Both `undetermined` shapes were found by placing real calls, not by reading the API\n * docs. The second one is the subtle one: CALL-E returns a schema-valid result with every\n * required field set to \"unknown\" when the person says \"I cannot talk now\". That is a\n * correct response to an honest enum and it is worth nothing.\n */\n\n/** Values that mean the question was asked and not answered. */\nconst UNINFORMATIVE = new Set([\"unknown\"]);\n\n/** Required by the absence schema. Only these count towards uninformative. */\nconst REQUIRED_FIELDS = [\"reason_category\", \"expected_return\"];\n\nfunction isObject(value) {\n  return value !== null && typeof value === \"object\" && !Array.isArray(value);\n}\n\n/**\n * Every required field uninformative means nothing was learned.\n *\n * `all`, not `any`. One field answered is still an answer, and treating a single unknown\n * as failure would push resolved cases back onto a person's desk for no reason.\n */\nfunction isUninformative(result) {\n  if (!isObject(result) || REQUIRED_FIELDS.length === 0) {\n    return false;\n  }\n  return REQUIRED_FIELDS.every((name) => {\n    const value = result[name];\n    return typeof value === \"string\" && UNINFORMATIVE.has(value.trim().toLowerCase());\n  });\n}\n\n/**\n * Pull the structured result for one recipient.\n *\n * Deliberately never falls back to a task-level `structured_result`. On a fan-out call\n * that fallback files one family's answer against another family's child, which is a\n * data-protection incident rather than a bug. If this recipient has no result of its own,\n * it has no result.\n */\nfunction recipientResult(recipient) {\n  if (!isObject(recipient)) {\n    return null;\n  }\n  const result = recipient.structured_result;\n  return isObject(result) ? result : null;\n}\n\n/**\n * The last attempt is the one that decides the call.\n *\n * A student with two guardian numbers may fail on the first and connect on the second.\n * Reading the first attempt would cite the id of the attempt that did not connect and\n * report a reached family as unreachable.\n */\nfunction lastAttempt(recipient) {\n  const attempts = isObject(recipient) && Array.isArray(recipient.attempts)\n    ? recipient.attempts\n    : [];\n  return attempts.length > 0 ? attempts[attempts.length - 1] : null;\n}\n\nfunction attemptCount(recipient) {\n  return isObject(recipient) && Array.isArray(recipient.attempts)\n    ? recipient.attempts.length\n    : 0;\n}\n\n/**\n * Classify one recipient of one call.\n *\n * Returns { resolution, reason, attempts, providerCallId, needsAHuman }.\n */\nfunction classifyRecipient(recipient) {\n  const attempts = attemptCount(recipient);\n  const last = lastAttempt(recipient);\n  const providerCallId = isObject(last) && typeof last.provider_call_id === \"string\"\n    ? last.provider_call_id\n    : null;\n\n  const connected = isObject(recipient) && recipient.status === \"completed\";\n\n  if (!connected) {\n    return {\n      resolution: \"failed\",\n      reason: `nobody answered after trying ${attempts} number(s)`,\n      attempts,\n      providerCallId,\n      needsAHuman: true,\n    };\n  }\n\n  const result = recipientResult(recipient);\n\n  if (result === null) {\n    return {\n      resolution: \"undetermined\",\n      reason: \"the call completed but returned no structured result\",\n      attempts,\n      providerCallId,\n      needsAHuman: true,\n    };\n  }\n\n  if (isUninformative(result)) {\n    return {\n      resolution: \"undetermined\",\n      reason: \"every required field came back unknown, so nothing was learned\",\n      attempts,\n      providerCallId,\n      needsAHuman: true,\n    };\n  }\n\n  return {\n    resolution: \"resolved\",\n    reason: \"schema-valid answer received\",\n    attempts,\n    providerCallId,\n    needsAHuman: false,\n  };\n}\n\n/**\n * Mask a number for display. Never print a family's phone number into an execution log.\n */\nfunction maskNumber(value) {\n  if (typeof value !== \"string\" || value.length < 4) {\n    return \"****\";\n  }\n  return `${value.slice(0, 3)}${\"*\".repeat(Math.max(0, value.length - 6))}${value.slice(-3)}`;\n}\n\n/**\n * Roll a wave up into the three counts plus the queue that still needs a person.\n *\n * `skipped` is separate from `failed` on purpose: a row with no recorded consent was never\n * dialled, so counting it as a failure would report a call that never happened.\n */\nfunction summariseWave(rows) {\n  const counts = { resolved: 0, undetermined: 0, failed: 0, skipped: 0 };\n  const queue = [];\n  let attemptsBilled = 0;\n  let attemptsResolved = 0;\n\n  for (const row of Array.isArray(rows) ? rows : []) {\n    const resolution = row && row.resolution;\n    if (!Object.prototype.hasOwnProperty.call(counts, resolution)) {\n      continue;\n    }\n    counts[resolution] += 1;\n    const attempts = Number.isInteger(row.attempts) ? row.attempts : 0;\n    attemptsBilled += attempts;\n    if (resolution === \"resolved\") {\n      attemptsResolved += attempts;\n    }\n    if (row.needsAHuman) {\n      queue.push({ id: row.id, reason: row.reason });\n    }\n  }\n\n  const attempted = counts.resolved + counts.undetermined + counts.failed;\n  return {\n    counts,\n    attempted,\n    attemptsBilled,\n    attemptsResolved,\n    attemptsOpen: attemptsBilled - attemptsResolved,\n    resolutionRate: attempted === 0 ? null : counts.resolved / attempted,\n    queue,\n  };\n}\n\nconst RULES = { UNINFORMATIVE, REQUIRED_FIELDS };\n\n// --- node wiring ---------------------------------------------------------------------\nconst row = $input.first().json;\nif (row.skip) {\n  return [{ json: row }];\n}\nconst verdict = classifyRecipient(row.recipient);\nreturn [{\n  json: {\n    id: row.id,\n    locale: row.locale,\n    phone: maskNumber((row.phones || [])[0]),\n    placedByThisRun: row.placedByThisRun === true,\n    ...verdict,\n  },\n}];"
+      },
+      "id": "node-classify-outcome",
+      "name": "Classify Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Decide what one CALL-E call actually achieved. Three outcomes, not two.\n *\n * This is the only interesting logic in the recipe and it is kept in its own file so it\n * can be tested with `node --test` before it is pasted into a workflow node. The copy\n * inside `absence-wave.workflow.json` is generated from this file, and\n * `classify.test.mjs` fails if the two ever drift apart.\n *\n * The rule it implements, and why each branch exists:\n *\n *   resolved      A result came back and at least one required field says something.\n *   undetermined  A conversation happened and produced nothing usable. Two shapes:\n *                 `structured_result` is null, or every required field is uninformative.\n *   failed        Nobody was reached on any number.\n *\n * The middle outcome is the point. A pipeline with two buckets has to file\n * \"the call connected but we learned nothing\" somewhere, and filing it with the\n * successes is how a dashboard reports full coverage for a child nobody heard about.\n *\n * Both `undetermined` shapes were found by placing real calls, not by reading the API\n * docs. The second one is the subtle one: CALL-E returns a schema-valid result with every\n * required field set to \"unknown\" when the person says \"I cannot talk now\". That is a\n * correct response to an honest enum and it is worth nothing.\n */\n\n/** Values that mean the question was asked and not answered. */\nconst UNINFORMATIVE = new Set([\"unknown\"]);\n\n/** Required by the absence schema. Only these count towards uninformative. */\nconst REQUIRED_FIELDS = [\"reason_category\", \"expected_return\"];\n\nfunction isObject(value) {\n  return value !== null && typeof value === \"object\" && !Array.isArray(value);\n}\n\n/**\n * Every required field uninformative means nothing was learned.\n *\n * `all`, not `any`. One field answered is still an answer, and treating a single unknown\n * as failure would push resolved cases back onto a person's desk for no reason.\n */\nfunction isUninformative(result) {\n  if (!isObject(result) || REQUIRED_FIELDS.length === 0) {\n    return false;\n  }\n  return REQUIRED_FIELDS.every((name) => {\n    const value = result[name];\n    return typeof value === \"string\" && UNINFORMATIVE.has(value.trim().toLowerCase());\n  });\n}\n\n/**\n * Pull the structured result for one recipient.\n *\n * Deliberately never falls back to a task-level `structured_result`. On a fan-out call\n * that fallback files one family's answer against another family's child, which is a\n * data-protection incident rather than a bug. If this recipient has no result of its own,\n * it has no result.\n */\nfunction recipientResult(recipient) {\n  if (!isObject(recipient)) {\n    return null;\n  }\n  const result = recipient.structured_result;\n  return isObject(result) ? result : null;\n}\n\n/**\n * The last attempt is the one that decides the call.\n *\n * A student with two guardian numbers may fail on the first and connect on the second.\n * Reading the first attempt would cite the id of the attempt that did not connect and\n * report a reached family as unreachable.\n */\nfunction lastAttempt(recipient) {\n  const attempts = isObject(recipient) && Array.isArray(recipient.attempts)\n    ? recipient.attempts\n    : [];\n  return attempts.length > 0 ? attempts[attempts.length - 1] : null;\n}\n\nfunction attemptCount(recipient) {\n  return isObject(recipient) && Array.isArray(recipient.attempts)\n    ? recipient.attempts.length\n    : 0;\n}\n\n/**\n * Classify one recipient of one call.\n *\n * Returns { resolution, reason, attempts, providerCallId, needsAHuman }.\n */\nfunction classifyRecipient(recipient) {\n  const attempts = attemptCount(recipient);\n  const last = lastAttempt(recipient);\n  const providerCallId = isObject(last) && typeof last.provider_call_id === \"string\"\n    ? last.provider_call_id\n    : null;\n\n  const connected = isObject(recipient) && recipient.status === \"completed\";\n\n  if (!connected) {\n    return {\n      resolution: \"failed\",\n      reason: `nobody answered after trying ${attempts} number(s)`,\n      attempts,\n      providerCallId,\n      needsAHuman: true,\n    };\n  }\n\n  const result = recipientResult(recipient);\n\n  if (result === null) {\n    return {\n      resolution: \"undetermined\",\n      reason: \"the call completed but returned no structured result\",\n      attempts,\n      providerCallId,\n      needsAHuman: true,\n    };\n  }\n\n  if (isUninformative(result)) {\n    return {\n      resolution: \"undetermined\",\n      reason: \"every required field came back unknown, so nothing was learned\",\n      attempts,\n      providerCallId,\n      needsAHuman: true,\n    };\n  }\n\n  return {\n    resolution: \"resolved\",\n    reason: \"schema-valid answer received\",\n    attempts,\n    providerCallId,\n    needsAHuman: false,\n  };\n}\n\n/**\n * Mask a number for display. Never print a family's phone number into an execution log.\n */\nfunction maskNumber(value) {\n  if (typeof value !== \"string\" || value.length < 4) {\n    return \"****\";\n  }\n  return `${value.slice(0, 3)}${\"*\".repeat(Math.max(0, value.length - 6))}${value.slice(-3)}`;\n}\n\n/**\n * Roll a wave up into the three counts plus the queue that still needs a person.\n *\n * `skipped` is separate from `failed` on purpose: a row with no recorded consent was never\n * dialled, so counting it as a failure would report a call that never happened.\n */\nfunction summariseWave(rows) {\n  const counts = { resolved: 0, undetermined: 0, failed: 0, skipped: 0 };\n  const queue = [];\n  let attemptsBilled = 0;\n  let attemptsResolved = 0;\n\n  for (const row of Array.isArray(rows) ? rows : []) {\n    const resolution = row && row.resolution;\n    if (!Object.prototype.hasOwnProperty.call(counts, resolution)) {\n      continue;\n    }\n    counts[resolution] += 1;\n    const attempts = Number.isInteger(row.attempts) ? row.attempts : 0;\n    attemptsBilled += attempts;\n    if (resolution === \"resolved\") {\n      attemptsResolved += attempts;\n    }\n    if (row.needsAHuman) {\n      queue.push({ id: row.id, reason: row.reason });\n    }\n  }\n\n  const attempted = counts.resolved + counts.undetermined + counts.failed;\n  return {\n    counts,\n    attempted,\n    attemptsBilled,\n    attemptsResolved,\n    attemptsOpen: attemptsBilled - attemptsResolved,\n    resolutionRate: attempted === 0 ? null : counts.resolved / attempted,\n    queue,\n  };\n}\n\nconst RULES = { UNINFORMATIVE, REQUIRED_FIELDS };\n\n// --- node wiring ---------------------------------------------------------------------\nconst rows = $input.all().map((item) => item.json);\nconst summary = summariseWave(rows);\n\nconst lines = [\n  `${summary.attempted} attempted, ${summary.counts.skipped} skipped for no consent`,\n  `resolved      ${summary.counts.resolved}   schema-valid reason on record`,\n  `undetermined  ${summary.counts.undetermined}   a call happened, no usable answer, needs a person`,\n  `failed        ${summary.counts.failed}   nobody reached on any number`,\n  `attempts billed ${summary.attemptsBilled}, of which ${summary.attemptsOpen} left somebody with work to do`,\n];\nif (summary.resolutionRate !== null) {\n  lines.push(`resolution rate ${Math.round(summary.resolutionRate * 100)}%`);\n} else {\n  lines.push(\"resolution rate not computed: nothing was attempted\");\n}\n\n// The queue is printed after the counts rather than folded into a rate, so nobody can\n// read this output and think the undetermined cases are closed.\nreturn [{ json: { summary: lines, needsAPerson: summary.queue, counts: summary.counts } }];"
+      },
+      "id": "node-wave-summary",
+      "name": "Wave Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -160
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Absence Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every School Morning": {
+      "main": [
+        [
+          {
+            "node": "Absence Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Absence Config": {
+      "main": [
+        [
+          {
+            "node": "Validate Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Config": {
+      "main": [
+        [
+          {
+            "node": "Absence Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Absence Rows": {
+      "main": [
+        [
+          {
+            "node": "Consent Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consent Gate": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Students",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Students": {
+      "main": [
+        [
+          {
+            "node": "Wave Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Call Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Call Request": {
+      "main": [
+        [
+          {
+            "node": "Create Call And Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Call And Wait": {
+      "main": [
+        [
+          {
+            "node": "Classify Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Outcome": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Students",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [],
+  "pinData": {}
+}
