@@ -20,7 +20,11 @@ def password_is_set() -> bool:
 
 
 def check_password(candidate: str) -> bool:
-    return secrets.compare_digest(candidate.strip(), os.environ.get("APP_PASSWORD", "").strip())
+    # compare_digest rejects non-ASCII str inputs; compare bytes instead so a
+    # malformed login attempt returns 401 rather than a 500.
+    stored = os.environ.get("APP_PASSWORD", "").strip().encode("utf-8")
+    attempt = str(candidate or "").strip().encode("utf-8")
+    return secrets.compare_digest(attempt, stored)
 
 
 def _key() -> bytes:
