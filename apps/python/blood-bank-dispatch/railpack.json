@@ -4,11 +4,6 @@
   "packages": {
     "python": "3.12"
   },
-  "steps": {
-    "install": {
-      "commands": ["pip install -r requirements.txt"]
-    }
-  },
   "deploy": {
     "startCommand": "sh -c 'python migrate.py && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT'",
     "variables": {
