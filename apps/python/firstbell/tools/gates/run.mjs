@@ -783,6 +783,133 @@ async function gateKeyboard(browser, url) {
     { orphans, unnamed, kinds: [...kinds.keys()], blind: blind.map(([k, why]) => `${k}: ${why}`) });
 }
 
+/** Read everything the stylesheet decided and everything the script wrote. */
+const VIEWPORT_PROBE = () => {
+  const hero = document.querySelector(".act-00");
+  const inner = hero && hero.querySelector(".inner");
+  const rail = document.querySelector(".rail");
+  const fill = document.querySelector("[data-rail]");
+  const num = (v) => Number(v) || 0;
+  const railShown = rail ? getComputedStyle(rail).display !== "none" : false;
+  return {
+    width: window.innerWidth,
+    scrollY: Math.round(window.scrollY),
+    // Decided by CSS at the current width. Neither of these is written by app.js.
+    sticky: hero ? getComputedStyle(hero).position === "sticky" : false,
+    railShown,
+    // Written by app.js.
+    inlineTop: hero ? hero.style.top : "",
+    wantTop: hero ? Math.min(0, window.innerHeight - hero.offsetHeight) : 0,
+    opacity: inner ? num(getComputedStyle(inner).opacity) : 1,
+    shiftY: inner ? num(new DOMMatrixReadOnly(getComputedStyle(inner).transform).f) : 0,
+    fillY: fill && railShown
+      ? num(new DOMMatrixReadOnly(getComputedStyle(fill).transform).d)
+      : null,
+  };
+};
+
+const VIEWPORT_WIDE = { width: 1440, height: 900 };
+const VIEWPORT_NARROW = { width: 800, height: 900 };
+// Taller and wider, but on the same side of the breakpoint, so the curtain stays on and
+// the hero's resting position has to follow the new window height.
+const VIEWPORT_TALLER = { width: 1600, height: 1100 };
+
+/**
+ * The curtain and the rail agree with the stylesheet at whatever width the window is now.
+ *
+ * Three sessions: one that starts narrow and is widened, one that starts wide and is
+ * narrowed, and one that never moves, which is the control the other two are read
+ * against. Each is sampled at the top of the page, one and a half screens down where the
+ * curtain has closed, and at the foot.
+ */
+async function gateViewport(browser, url) {
+  const stops = [];
+  const problems = [];
+
+  for (const [label, first, second] of [
+    ["widened", VIEWPORT_NARROW, VIEWPORT_WIDE],
+    ["narrowed", VIEWPORT_WIDE, VIEWPORT_NARROW],
+    ["reshaped", VIEWPORT_WIDE, VIEWPORT_TALLER],
+    ["unmoved", VIEWPORT_WIDE, VIEWPORT_WIDE],
+  ]) {
+    const page = await browser.newPage();
+    await page.setViewport(first);
+    await page.goto(url, { waitUntil: "networkidle0" });
+    await new Promise((r) => setTimeout(r, 350));
+    await page.setViewport(second);
+    // A resize handler that reads layout needs a frame to run in before it is judged.
+    await new Promise((r) => setTimeout(r, 450));
+
+    const seen = [];
+    for (const [where, to] of [["top", 0], ["past the curtain", 1.4], ["foot", null]]) {
+      await page.evaluate((mult) => {
+        window.scrollTo(0, mult === null
+          ? document.documentElement.scrollHeight
+          : window.innerHeight * mult);
+      }, to);
+      await settleScroll(page);
+      const s = await page.evaluate(VIEWPORT_PROBE);
+      s.case = label;
+      s.where = where;
+      seen.push(s);
+      stops.push(s);
+
+      const at = `${label}, ${where}`;
+      if (s.sticky) {
+        // A sticky box taller than the window strands everything below the fold unless it
+        // is held at the bottom instead of the top.
+        const got = Math.round(parseFloat(s.inlineTop));
+        if (!s.inlineTop) {
+          problems.push(`${at}: the hero is sticky with no resting position, so its lower half is unreachable`);
+        } else if (Math.abs(got - Math.round(s.wantTop)) > 1) {
+          problems.push(`${at}: the hero rests at ${got}px where ${Math.round(s.wantTop)}px reaches its last line`);
+        }
+      } else {
+        // Nothing is pinning it, so nothing should be dimming or shifting it either.
+        if (s.opacity < 0.999) {
+          problems.push(`${at}: the hero is not sticky yet sits at ${s.opacity.toFixed(3)} opacity, faded for a pin that is not holding it`);
+        }
+        if (Math.abs(s.shiftY) > 0.5) {
+          problems.push(`${at}: the hero is not sticky yet is shifted ${s.shiftY.toFixed(1)}px`);
+        }
+      }
+
+      if (s.railShown && s.fillY !== null) {
+        if (where === "top" && s.fillY > 0.02) {
+          problems.push(`${at}: the rail reads ${(s.fillY * 100).toFixed(0)}% at the top of the page`);
+        }
+        if (where === "foot" && s.fillY < 0.98) {
+          problems.push(`${at}: the rail reads ${(s.fillY * 100).toFixed(0)}% at the foot of the page`);
+        }
+      }
+    }
+
+    // The fill has to climb, not merely hit its ends.
+    const shown = seen.filter((s) => s.fillY !== null);
+    for (let i = 1; i < shown.length; i += 1) {
+      if (shown[i].fillY < shown[i - 1].fillY - 0.001) {
+        problems.push(`${label}: the rail fell from ${shown[i - 1].fillY.toFixed(3)} to ${shown[i].fillY.toFixed(3)} on the way down`);
+      }
+    }
+    await page.close();
+  }
+
+  if (!stops.some((s) => s.sticky) && !stops.some((s) => s.railShown)) {
+    record("viewport", "COULD-NOT-MEASURE",
+      "neither the curtain nor the rail was present at any width, so nothing here was exercised",
+      { stops });
+    return;
+  }
+
+  const unique = [...new Set(problems)];
+  record("viewport", unique.length === 0 ? "PASS" : "FAIL",
+    unique.length === 0
+      ? "the curtain and the rail match the stylesheet across the breakpoint in both "
+        + "directions, and after a resize that stays on the desktop side, without a reload"
+      : unique.slice(0, 4).join(". "),
+    { stops, problems: unique });
+}
+
 async function shoot(browser, url) {
   await mkdir(SHOTS, { recursive: true });
   const viewports = [
@@ -888,6 +1015,7 @@ async function main() {
     await gateRail(browser, url);
     await gateContrast(browser, url);
     await gateKeyboard(browser, url);
+    await gateViewport(browser, url);
     await shoot(browser, url);
   } finally {
     await browser.close();

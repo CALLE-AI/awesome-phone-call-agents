@@ -113,7 +113,7 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The ten browser gates
+## The eleven browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
@@ -129,11 +129,31 @@ because they fail as a gate rather than as a count of tests.
 | Let `.switch` clip the focus ring again, which is how it shipped until this was fixed | `keyboard` FAIL, `button its ring is clipped by span.switch (overflow hidden/hidden)` |
 | Put the playhead back to role=img with no tabindex, which is how it shipped until this was fixed | `keyboard` FAIL, `2 pointer target(s) the keyboard cannot reach` |
 | Strip the playhead's aria-label | `keyboard` FAIL, `2 control(s) with no accessible name` |
+| Read the breakpoint once at parse time instead of asking it live, which is how it shipped until this was fixed | `viewport` FAIL in both directions: `widened, foot: the rail reads 0% at the foot of the page` and `narrowed, past the curtain: the hero is not sticky yet sits at 0.491 opacity, faded for a pin that is not holding it` |
+| Stop recomputing the hero's resting position on resize | `viewport` FAIL, `reshaped, top: the hero rests at -332px where -186px reaches its last line` |
 
-Seven of those eight are the state this page was actually in, not a change invented to
-trip a gate. The CLS failure, the long task, the rail, the dimmed transcript, the clipped
-focus ring and the playhead no keyboard could reach were all found this way, and all of
-them are fixed.
+Eight of those ten are the state this page was actually in, not a change invented to trip
+a gate. The CLS failure, the long task, the rail, the dimmed transcript, the clipped focus
+ring, the playhead no keyboard could reach and the frozen breakpoint were all found this
+way, and all of them are fixed.
+
+The `viewport` gate exists because two defects in a row came from geometry decided once and
+then relied on for the rest of the session: a resting position computed at wiring, and a
+media query read at parse time while the stylesheet went on asking it at every width. The
+other ten gates load at one size and stay there, so neither was visible to any of them.
+
+Its oracle is the stylesheet. Whether the hero computes to `position: sticky`, and whether
+the rail computes to a display other than `none`, are decided by CSS alone at whatever
+width is current; everything the gate asserts is a consequence the script owns. The code
+runs the other way round, asking the query and writing the consequence, which is what lets
+the two disagree.
+
+The second mutation above is worth the space it takes. The gate passed it at first. Its
+three cases all stepped over the breakpoint, and turning the sticky rule on recomputes the
+resting position as part of the transition while turning it off deletes it, so no case ever
+reached the check that the hero can still scroll to its last line. A fourth case that
+resizes from 1440x900 to 1600x1100, staying on the desktop side throughout, was the repair,
+and it is the gate that was wrong rather than the page that was right.
 
 The `keyboard` gate is worth one note on how it measures. `:focus-visible` is a heuristic
 and a browser can decline it for focus a script assigned, so the gate presses Tab rather

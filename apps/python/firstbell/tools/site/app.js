@@ -178,18 +178,21 @@ function wireRail() {
  * The listener is passive and coalesced into one frame, and neither element is written
  * unless its value moved: a transform write on a promoted layer costs a raster whether or
  * not the new value differs from the old one. */
+/* The one condition under which the curtain exists, written exactly as the stylesheet
+ * writes it. Both halves have to be asked live: DESKTOP was read once at parse time, so
+ * a window dragged across 960px left the script and the sheet disagreeing until reload.
+ * Widened, the rail appeared with an empty progress bar that never filled; narrowed, the
+ * sticky rule stopped applying while the scrub kept running, leaving the hero faded to
+ * 0.400 for a pin that was no longer holding it. */
+const CURTAIN_Q = matchMedia('(min-width: 60rem) and (prefers-reduced-motion: no-preference)');
+
 function wireScrubbed() {
-  if (REDUCED || !DESKTOP) return;
   const hero = document.querySelector('.act-00');
   const inner = hero && hero.querySelector('.inner');
   const next = document.querySelector('.act-01');
   const fill = document.querySelector('[data-rail]');
   const curtain = inner && next;
   if (!curtain && !fill) return;
-
-  // Tells the stylesheet the curtain is wired, so a reader with JavaScript off gets the
-  // hero they had before rather than a sticky one that never fades.
-  if (curtain) document.documentElement.dataset.curtain = 'on';
 
   /* Where the hero comes to rest.
    *
@@ -203,14 +206,40 @@ function wireScrubbed() {
   const rest = () => {
     if (curtain) hero.style.top = Math.min(0, window.innerHeight - hero.offsetHeight) + 'px';
   };
-  rest();
 
   let queued = false;
+  let on = false;
   let lastCurtain = -1;
   let lastRail = -1;
 
+  // Everything this function writes, taken back off. The stylesheet holds the resting
+  // values for all of them, so removing the property is the whole undo.
+  const clear = () => {
+    if (curtain) {
+      delete document.documentElement.dataset.curtain;
+      hero.style.removeProperty('top');
+      inner.style.removeProperty('transform');
+      inner.style.removeProperty('opacity');
+      inner.style.removeProperty('will-change');
+    }
+    if (fill) fill.style.removeProperty('transform');
+    lastCurtain = -1;
+    lastRail = -1;
+  };
+
   const frame = () => {
     queued = false;
+    if (!CURTAIN_Q.matches) {
+      if (on) { on = false; clear(); }
+      return;
+    }
+    if (!on) {
+      on = true;
+      // Tells the stylesheet the curtain is wired, so a reader with JavaScript off gets
+      // the hero they had before rather than a sticky one that never fades.
+      if (curtain) document.documentElement.dataset.curtain = 'on';
+      rest();
+    }
     const y = window.scrollY;
 
     if (curtain) {
@@ -251,13 +280,16 @@ function wireScrubbed() {
   // leaves the progress where it was skips the write and the page keeps the old numbers.
   // rest() reads a layout height, which is why it is here and not in frame().
   const onResize = () => {
-    rest();
+    if (CURTAIN_Q.matches) rest();
     lastCurtain = -1;
     lastRail = -1;
     onScroll();
   };
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onResize, { passive: true });
+  // A width change fires resize as well, so this is here for the other half of the query:
+  // turning reduced motion on mid-session does not resize anything.
+  CURTAIN_Q.addEventListener('change', onResize);
   frame();
 }
 
