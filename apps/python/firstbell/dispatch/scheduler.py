@@ -341,7 +341,11 @@ class WaveDispatcher:
     SIP_REASONS = {
         "486": "the line was busy",
         "480": "the phone was switched off or out of coverage",
-        "603": "the call was declined",
+        # SIP calls 603 "Decline", but it does not say who declined. A production
+        # attempt carried 603 with started_at equal to completed_at, so nothing ever
+        # rang and no person was involved. Naming the recipient as the one who refused
+        # would put a false fact in front of whoever works the queue.
+        "603": "the call was rejected before it was answered",
         "408": "nobody picked up before the network gave up",
         "487": "the call was cancelled before it was answered",
     }
