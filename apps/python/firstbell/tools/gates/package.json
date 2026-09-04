@@ -1,0 +1,12 @@
+{
+  "name": "firstbell-page-gates",
+  "private": true,
+  "type": "module",
+  "description": "Browser gates for the evidence page. Drives the Chrome already on the machine, so nothing is downloaded.",
+  "scripts": {
+    "gates": "node run.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}
