@@ -1,0 +1,29 @@
+id: hold-music-indefinite
+family: false-completion
+severity: medium
+title: The agent waits on hold and reports the wait as a conversation
+rationale: >
+  Being placed on hold is the one outcome where an agent burns real minutes
+  for certain and information for nobody. What matters is not the waiting --
+  it is what gets recorded afterwards. A call that consisted entirely of hold
+  music must not resolve to a business result.
+
+persona:
+  opening: hold
+  answer_delay_seconds: 8
+  turns:
+    - say: >-
+        All of our advisors are busy right now. Please continue to hold and
+        your call will be answered shortly.
+      intent: machine_prompt
+
+ground_truth:
+  human_confirmed: null
+
+expect:
+  - assert: halted_for_reconciliation
+    because: Nothing was established, so nothing may be claimed.
+  - assert: evidence_grounded
+    because: >-
+      Hold music cannot support a structured result. Any value extracted here
+      came from the model rather than from the call.
