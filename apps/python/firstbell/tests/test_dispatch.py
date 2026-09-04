@@ -7,7 +7,9 @@ right when driven through that fake.
 
 from __future__ import annotations
 
+import json
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -359,3 +361,83 @@ def test_any_work_source_substitutes_for_the_csv_one(double):
     double.set_default_outcome(Outcome.answered(GOOD, TALK))
     report = make(double).run(source.items())
     assert report.counts()["resolved"] == 1
+
+
+# -- built from a real production response ----------------------------------
+
+def _live_call() -> dict:
+    """A real CALL-E response, captured 2026-09-04, with the number replaced.
+
+    The call was placed to the author's own phone, by the author, and the conversation
+    was scripted for a demonstration, so publishing it is a deliberate act rather than a
+    leak of somebody's private call. The `provider_call_id` and the phone number are the
+    only edited fields.
+
+    It is here because it caught a defect no synthetic fixture would have: the recipient's
+    `structured_result` is null while the task's is fully populated.
+    """
+    path = Path(__file__).parent / "data" / "live-call-single-recipient.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+LIVE_SCHEMA = {
+    "type": "object",
+    "required": ["reason_category", "expected_return"],
+    "properties": {
+        "reason_category": {"type": "string",
+                            "enum": ["illness", "transport", "other", "unknown"]},
+        "expected_return": {"type": "string",
+                            "enum": ["today", "tomorrow", "later_this_week", "unknown"]},
+        "parent_confirmed_aware": {"type": "string", "enum": ["yes", "no", "unknown"]},
+        "free_text_note": {"type": "string"},
+    },
+}
+LIVE_ITEM = WorkItem(id="S-2002", phones=("+915550000002",), locale="ta-IN", region="IN")
+
+
+def test_a_real_response_puts_the_answer_where_our_first_version_did_not_look():
+    call = _live_call()
+    assert call["recipients"][0]["structured_result"] is None, "fixture no longer models the bug"
+    assert call["structured_result"]["reason_category"] == "illness"
+
+    result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
+
+    assert result.resolution is Resolution.RESOLVED, (
+        "a completed Tamil call with a schema-valid task-level result was being sent to a "
+        "human because only the per-recipient field was read"
+    )
+    assert result.structured_result["expected_return"] == "tomorrow"
+    assert result.structured_result["parent_confirmed_aware"] == "yes"
+
+
+def test_the_agent_really_spoke_the_locale_it_was_given():
+    """The whole product claim, asserted against a real response rather than a promise."""
+    call = _live_call()
+    assert call["recipients"][0]["locale"] == "ta-IN"
+    turns = call["recipients"][0]["attempts"][0]["transcript_turns"]
+    bot = " ".join(t["text"] for t in turns if t["speaker"] == "bot")
+    tamil = [c for c in bot if "\u0b80" <= c <= "\u0bff"]
+    assert len(tamil) > 50, "the agent did not answer in Tamil, so locale was not honoured"
+    # The extraction still produced English enum values from a Tamil conversation.
+    assert call["structured_result"]["reason_category"] == "illness"
+
+
+def test_a_task_level_result_is_not_attributed_to_one_of_many_recipients():
+    """With fan-out the task result belongs to nobody in particular.
+
+    Falling back there would swap a false negative for a false attribution, which is
+    worse: one family's answer would be filed against another family's child.
+    """
+    call = _live_call()
+    call["recipients"].append(json.loads(json.dumps(call["recipients"][0])))
+    result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
+    assert result.resolution is Resolution.UNDETERMINED
+    assert result.structured_result is None
+
+
+def test_a_recipient_result_still_wins_over_the_task_result():
+    call = _live_call()
+    call["recipients"][0]["structured_result"] = {
+        "reason_category": "transport", "expected_return": "today"}
+    result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
+    assert result.structured_result["reason_category"] == "transport"

@@ -258,7 +258,7 @@ class WaveDispatcher:
             return ItemResult(**base, resolution=Resolution.FAILED, failure_code=code,
                               reason=self._describe_failure(code, tried))
 
-        result = recipient.get("structured_result")
+        result = self._result_for(call, recipient, len(recipients))
         if result is None:
             # Answered, talked, and still no usable answer. This is the outcome that
             # naive code loses, and it is exactly the one a person has to pick up.
@@ -273,6 +273,28 @@ class WaveDispatcher:
 
         return ItemResult(**base, resolution=Resolution.RESOLVED, structured_result=result,
                           reason="schema-valid answer received")
+
+    @staticmethod
+    def _result_for(call: dict[str, Any], recipient: dict[str, Any],
+                    recipient_count: int) -> dict[str, Any] | None:
+        """Where the answer actually is.
+
+        The API carries `structured_result` in two places: once per recipient, and once
+        on the task as "the whole-task result". A real single-recipient call to production
+        came back with the per-recipient field null and the task-level field fully
+        populated, so code that reads only the recipient concludes the call produced
+        nothing and routes a completed conversation to a human. That is a silent false
+        negative, and it is the worst kind, because the fallback path is indistinguishable
+        from a genuine failure.
+
+        The fallback is deliberately restricted to a single recipient. With a fan-out,
+        the task-level result belongs to no particular person, and guessing which one it
+        describes would trade a false negative for a false attribution.
+        """
+        result = recipient.get("structured_result")
+        if result is not None or recipient_count != 1:
+            return result
+        return call.get("structured_result")
 
     @staticmethod
     def _describe_failure(code: str | None, tried: Sequence[str]) -> str:
