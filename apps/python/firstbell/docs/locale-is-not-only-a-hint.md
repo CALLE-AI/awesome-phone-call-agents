@@ -1,36 +1,8 @@
 # What `locale` actually does
 
 CALL-E's schema documents `locale` as a **"BCP 47 hint"**. The word hint sets a low
-expectation, and the expectation is wrong in a way worth writing down, because it changes
-how you build anything that has to reach people who do not share a language.
-
-## What was measured
-
-Two rows of one work file, one command, one code path. The only difference between them is
-one column.
-
-| | S-3001 | S-3002 |
-|---|---|---|
-| `locale` | `en-IN` | `ta-IN` |
-| goal, schema, prompt | identical | identical |
-| conversation | fluent English | fluent Tamil |
-
-Both calls were placed against `api.heycall-e.com` on 2026-09-04. The receipt is
-[`../evidence/01-two-languages-one-command.json`](../evidence/01-two-languages-one-command.json)
-and both call ids are in it.
-
-The structured results came back:
-
-| field | `en-IN` | `ta-IN` |
-|---|---|---|
-| `parent_confirmed_aware` | `yes` | `yes` |
-| `reason_category` | `illness` | `illness` |
-| `expected_return` | `tomorrow` | `tomorrow` |
-| `free_text_note` | "Fever since last night. No additional information to add." | "Student has had fever since last night." |
-
-**Every enumerated field is identical. Only the free-text note differs.** The agent held a
-whole conversation in Tamil, including a follow-up question and a closing, and the
-downstream code could not tell which language the call had been in.
+expectation. Ten real calls say the expectation is wrong, and they also say the failure sits
+somewhere other than where you would look for it.
 
 ## This repository already has a skill that depends on this being true
 
@@ -40,39 +12,97 @@ outcome from both. Its whole premise is that CALL-E holds a real conversation in
 recipient's language and still returns a result the caller's code can read.
 
 That skill is well scoped and its safety boundaries are good. What it does not have is
-evidence: its preview "does not dial", and its fixtures are fixtures. The measurement below
-is the missing half. It is offered as support for that skill's premise, not as a competing
-claim.
+evidence: its preview "does not dial", and its fixtures are fixtures. What follows is the
+missing half, offered as support for that skill's premise rather than as a competing claim.
 
-## What that means if you are building
+## The measurement
 
-You do not need per-language prompts, per-language schemas, per-language result parsing, or
-a translation step before you can act on an answer. One goal, one schema, and a locale
-column on the row. The language becomes data, not a branch.
+Eight live calls against `api.heycall-e.com`, in four matched pairs. Each pair is one
+scenario answered in `en-IN` and in `ta-IN`, by the same speaker, with the same goal, the
+same schema and the same code path. Only the locale column differs.
 
-That is the difference between supporting one more language being a configuration change
-and being a project. For any workflow with a legal or practical duty to reach people in
-their own language, it is the whole cost model.
+The comparison was **written down before any call was placed**: three enumerated fields
+across four pairs, twelve comparisons. `free_text_note` was excluded in advance because it
+is prose and code should not depend on it. No pair was dropped afterwards and no field was
+added.
+
+| Pair | Scenario |
+|---|---|
+| 1 | Illness, returning soon |
+| 2 | Family emergency, no return date |
+| 3 | Parent did not know about the absence |
+| 4 | Refusal: "I'm at work, I can't talk now" |
+
+## The result, and the part that matters
+
+**Nine of twelve matched. Three did not.** Reading the transcripts accounts for all three
+without a single extraction error.
+
+| Pair | Field | What the two calls actually contained |
+|---|---|---|
+| 1 | `expected_return` | English: "she will be back tomorrow" gives `tomorrow`. Tamil: "if the fever gets better we'll come", **no date offered**, gives `unknown`. Both correct |
+| 2 | `expected_return` | English: "I don't know when" gives `unknown`. Tamil: "maybe a couple of days" gives `later_this_week`. Both correct |
+| 2 | `reason_category` | The speaker said *family emergency* in both. The Tamil transcript records **"family annual"**. From a transcript that says nothing, `other` is the right answer |
+
+So the honest headline is not nine of twelve:
+
+> **Extraction was faithful to the transcript in twelve of twelve, in both languages. Two of
+> the three mismatches are the speaker saying different things, and one is transcription.**
+
+## Where the failure actually lives
+
+Two transcription errors turned up across these calls, one in each language:
+
+| Locale | Said | Transcribed | Extracted |
+|---|---|---|---|
+| `en-IN` | "high fever" | "5 fevers" | `reason_category: illness`, correct |
+| `ta-IN` | "family emergency" | "family annual" | `reason_category: other`, correct given the text |
+
+Both times the structured result was right and the transcript was wrong. Whatever performs
+the extraction is not naively reading the ASR output.
+
+**This is the operational point.** Build on `transcript_turns[]` and you will one day print
+"5 fevers" to a school office as a parent's own words. Build on the structured result and
+you will not. Treat the transcript as a display artefact and the structured result as the
+data, which is the opposite of the intuition most people start with.
+
+## The safety rule holds across languages
+
+Pairs 3 and 4 agreed on all six comparisons.
+
+- **The refusal returned every required field as `unknown` in both English and Tamil.** The
+  rule this app added after a refusal was once scored `resolved` is therefore not
+  language-dependent. See [`proving-a-gate-fires.md`](proving-a-gate-fires.md), mutation 10.
+- **`parent_confirmed_aware: no` came back correctly in both**, which is the safeguarding
+  case: a parent who did not know their child was absent at all.
+
+Of everything measured here, that is the result worth having. A safety rule that works in
+the language the app was written in and quietly fails in the other one is worse than no rule
+at all, because it fails exactly where nobody is checking.
+
+## What this removes from a multilingual build
+
+No per-language prompts, no per-language schemas, no per-language result parsing, no
+translation step before you can act on an answer. One goal, one schema, and a locale column
+on the row. Adding a language becomes a configuration change instead of a project.
 
 ## Where this evidence stops
 
-Be precise about what two calls can support.
+- **One speaker, bilingual, who knew what was being tested.** The largest remaining
+  confound, and not fixable here.
+- **The matched-pair control failed twice.** A bilingual person cannot reliably say the same
+  thing twice from memory, which is exactly how pairs 1 and 2 diverged. A stronger version
+  needs a written script per language, agreed before dialling, or different speakers.
+- **One language pair, one region.** Nothing here speaks to a language CALL-E is weaker in,
+  and Tamil is not low-resource.
+- **Language is not the biggest obstacle anyway.** These calls to India arrived from a US
+  caller ID, shown as Oakland CA. A family will not answer an unknown foreign number about
+  their child. Reaching people is a routing problem before it is a language problem, and
+  this app cannot solve the routing half.
 
-- **n = 2, one language pair, one region.** English and Tamil, both `-IN`, one provider
-  route. Nothing here says anything about a language CALL-E is weaker in.
-- **The same person answered both calls and gave the same answer.** That is the honest
-  limit of the result. It shows the extraction agreed across two languages *for the same
-  information*; it is not evidence that extraction is language-independent in general. A
-  proper version of this test needs different speakers giving different answers.
-- **The free-text field is not stable and should not be compared.** It is prose, it
-  differed, and code should not depend on it.
-- **Language is not the biggest obstacle.** Calls to India arrived from a US caller ID
-  (shown as Oakland CA). A family will not answer an unknown foreign number about their
-  child, and no amount of language support fixes that. Reaching people is a routing problem
-  before it is a language problem, and this app cannot solve the routing half.
+## Verify it
 
-## Why the hint framing is worth reporting
-
-A developer reading "hint" reasonably assumes best-effort pronunciation, and builds a
-translation layer they do not need. The observed behaviour is much stronger than the
-documentation promises, and under-promising costs adopters real work.
+Every call id under `../evidence/` resolves through `GET /v1/calls/{id}`, and each carries a
+`provider_call_id` that appears on CALL-E's own usage page with its duration and charge. The
+claims above can be checked against the vendor's records, not only against ours. See
+[`receipt-provenance.md`](receipt-provenance.md).
