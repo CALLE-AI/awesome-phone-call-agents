@@ -58,38 +58,73 @@
 
   /* Type. Loaded non-render-blocking, so every stack names a fallback that is already on the
    * reader's machine and the page paints before the kit arrives. */
-  --display: "freighttextcmp-pro", "Freight Text Pro", var(--serif-fb);
-  --serif:   "freight-text-pro", var(--serif-fb);
-  --ui:      "neue-haas-grotesk-text", var(--sans-fb);
-  --ui-display: "neue-haas-grotesk-display", var(--sans-fb);
-  --mono:    "azeret-mono", "source-code-pro", var(--mono-fb);
-  --tamil:   "adapter-tamil-text", "Nirmala UI", "Latha", var(--sans-fb);
+  --display: "freighttextcmp-pro", "display-fallback", Georgia, serif;
+  --serif:   "freight-text-pro", "serif-fallback", Georgia, serif;
+  --ui:      "neue-haas-grotesk-text", "ui-fallback", Arial, sans-serif;
+  --ui-display: "neue-haas-grotesk-display", "ui-display-fallback", Arial, sans-serif;
+  --mono:    "azeret-mono", "mono-fallback", Consolas, monospace;
+  --tamil:   "adapter-tamil-text", "Nirmala UI", "Latha", "ui-fallback", Arial, sans-serif;
 
-  --serif-fb: "serif-fallback", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --sans-fb:  "sans-fallback", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --mono-fb:  "mono-fallback", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* Every stack runs real face, then the fallback corrected to that face, then the bare
+   * local the correction was measured against. Nothing uncorrected sits between the first
+   * two any more. The stacks used to name "Freight Text Pro" and "source-code-pro" ahead
+   * of the fallback, so a reader with either installed got an uncorrected face, and
+   * Freight Text Pro is not even the width of the compressed grade it stood in for. */
 
-  --measure: 62ch;
-  --measure-tight: 54ch;
+  /* Measured in em, never in ch. ch is the advance width of a zero, and size-adjust
+   * corrects mean advance width, so even a metric-matched fallback resolves ch wrong: by
+   * 1.4% for the serif and 15.7% for the UI face, which rewrapped paragraphs the moment
+   * the kit landed and moved everything below them. em depends on font-size alone. Each
+   * value is the ch width it replaces resolved against the real face, so the page still
+   * renders at the width it did before. */
+  --measure: 34.72em;          /* 62 characters of Freight Text Pro */
+  --measure-tight: 30.24em;    /* 54 of them */
+  --measure-ui: 41.35em;       /* 62 characters of Neue Haas Grotesk Text */
+  --measure-ui-tight: 36.02em; /* 54 of them */
   --gutter: clamp(1.25rem, 4vw, 3.5rem);
 }
 
-/* The swap must not move the first screen. These are the metric corrections for the two
- * faces that appear above the fold, measured against their fallbacks. */
+/* The swap must not move the page. One corrected fallback per real face.
+ *
+ * There were three fallbacks for five faces, and one family cannot correct two faces at
+ * once: "serif-fallback" stood in for both Freight Text Pro and Freight Text Compressed,
+ * which need 92.5% and 77.4%, so the compressed headline face ran 22 points wrong.
+ * "sans-fallback" covered both Neue Haas grades the same way.
+ *
+ * size-adjust is the ratio of real to fallback mean advance width over a sample of the
+ * page own running text. Ascent and descent are the real face bounding box divided by
+ * that size-adjust, because size-adjust has already scaled the em the override resolves
+ * against. Every number was measured from the loaded kit in Chrome, not read off a
+ * vendor table.
+ *
+ * Each src names a single local, so the correction is one fixed number rather than
+ * whichever of several locals a given machine resolves first. Georgia and Arial ship on
+ * both macOS and Windows. Consolas does not, so the mono fallback names Menlo second and
+ * is approximate there; it sets no width anything else depends on. */
 @font-face {
-  font-family: "serif-fallback";
-  src: local("Iowan Old Style"), local("Palatino Linotype"), local("Georgia");
-  size-adjust: 96.5%; ascent-override: 92%; descent-override: 24%; line-gap-override: 0%;
+  font-family: "display-fallback";      /* freighttextcmp-pro */
+  src: local("Georgia");
+  size-adjust: 77.4%; ascent-override: 122.81%; descent-override: 34.9%; line-gap-override: 0%;
 }
 @font-face {
-  font-family: "mono-fallback";
-  src: local("Consolas"), local("Menlo"), local("DejaVu Sans Mono");
-  size-adjust: 109%; ascent-override: 97%; descent-override: 37%; line-gap-override: 0%;
+  font-family: "serif-fallback";        /* freight-text-pro */
+  src: local("Georgia");
+  size-adjust: 92.5%; ascent-override: 105.89%; descent-override: 28.9%; line-gap-override: 0%;
 }
 @font-face {
-  font-family: "sans-fallback";
-  src: local("Helvetica Neue"), local("Arial");
-  size-adjust: 97%; ascent-override: 95%; descent-override: 22%; line-gap-override: 0%;
+  font-family: "ui-fallback";           /* neue-haas-grotesk-text */
+  src: local("Arial");
+  size-adjust: 103.7%; ascent-override: 94.28%; descent-override: 23.63%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "ui-display-fallback";   /* neue-haas-grotesk-display */
+  src: local("Arial");
+  size-adjust: 89.5%; ascent-override: 99.39%; descent-override: 24.29%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: "mono-fallback";         /* azeret-mono */
+  src: local("Consolas"), local("Menlo");
+  size-adjust: 118.2%; ascent-override: 93.47%; descent-override: 18.61%; line-gap-override: 0%;
 }
 
 /* ---- base ---------------------------------------------------------------------------- */
@@ -235,7 +270,7 @@ canvas[data-waveform] {
   max-height: 22rem; overflow-y: auto;
   font-family: var(--ui);
   font-size: 0.9375rem; line-height: 1.55;
-  max-width: var(--measure-tight);
+  max-width: var(--measure-ui-tight);
   scrollbar-width: thin;
 }
 .turns li {
@@ -415,7 +450,7 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 }
 .hero-foot {
   font-family: var(--ui); font-size: 0.8125rem; color: var(--ink-3);
-  max-width: 62ch; margin-top: 1.75rem;
+  max-width: var(--measure-ui); margin-top: 1.75rem;
 }
 
 /* Act 1 rides over the pinned hero, so it needs its own ground and an edge. */
@@ -472,16 +507,16 @@ footer { padding: 3rem var(--gutter) 5rem; color: var(--ink-3); font-family: var
 .limits { list-style: none; margin: 0; padding: 0; }
 .limits li { padding: 1.1rem 0; border-top: 1px solid var(--line); }
 .limits li:first-child { border-top: 0; }
-.limit { margin: 0 0 0.4rem; max-width: 60ch; }
+.limit { margin: 0 0 0.4rem; max-width: 33.60em; }
 .closes {
   margin: 0; font-family: var(--ui); font-size: 0.875rem; color: var(--ink-3);
-  max-width: 60ch;
+  max-width: 40.02em;
 }
 
 /* ---- player extras -------------------------------------------------------------------- */
 .stage { min-width: 0; }
 .cue { font-family: var(--ui); font-size: 0.875rem; color: var(--ink-2); }
-.cue.no-audio { max-width: 46ch; margin: 0; font-size: 0.8125rem; color: var(--ink-3); }
+.cue.no-audio { max-width: 30.68em; margin: 0; font-size: 0.8125rem; color: var(--ink-3); }
 .note-free {
   font-family: var(--ui); font-size: 0.9375rem; line-height: 1.5; color: var(--ink);
   margin: 0 0 1rem; max-width: none;
