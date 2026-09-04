@@ -32,6 +32,18 @@ The structured results came back:
 whole conversation in Tamil, including a follow-up question and a closing, and the
 downstream code could not tell which language the call had been in.
 
+## This repository already has a skill that depends on this being true
+
+[`skills/language-bridge-call`](../../../../skills/language-bridge-call/SKILL.md) places one
+call in the recipient's language and one back in the requester's, and returns a structured
+outcome from both. Its whole premise is that CALL-E holds a real conversation in the
+recipient's language and still returns a result the caller's code can read.
+
+That skill is well scoped and its safety boundaries are good. What it does not have is
+evidence: its preview "does not dial", and its fixtures are fixtures. The measurement below
+is the missing half. It is offered as support for that skill's premise, not as a competing
+claim.
+
 ## What that means if you are building
 
 You do not need per-language prompts, per-language schemas, per-language result parsing, or

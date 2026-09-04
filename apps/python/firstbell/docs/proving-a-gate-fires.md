@@ -52,6 +52,20 @@ rule that failed. Each was a case the design had not imagined, and each was foun
 placing a call rather than by reasoning about the API. A green mutation table is a floor,
 not a result.
 
+## The bug class this is aimed at
+
+Pull request #69 in this repository fixed `apps/typescript/call-on-behalf`, which treated a
+definite 4xx on a retried create as proof that no call had been placed. It is not proof: a
+401, 402 or 400 is decided before the idempotency lookup ever runs, so the app could report
+"nothing was said on your behalf" while a call was live on a clinic's line giving somebody's
+name and date of birth.
+
+That is a rule that was wrong, in code that had tests, in an app good enough to be merged.
+No ordinary test would have caught it, because every ordinary test exercises the honest
+path. A mutation would: remove the branch that distinguishes a definite failure from an
+unknown one, and ask which test notices. If the answer is none, the rule was never
+protected, and that is knowable before a call goes out rather than after.
+
 ## Worked example
 
 Thirteen rules, each broken and reverted, with the number of tests that caught it, are in
