@@ -38,6 +38,14 @@ Open `http://localhost:8000` → New request. With the default `DRY_RUN=1`, fili
 
 A real run costs one paid CALL-E call per target. Test with single-target runs while building; save full fan-outs for integration checks and recording.
 
+## Deploy on Railway
+
+`railpack.json` in this folder makes the app deployable on Railway with no extra config:
+
+1. Create a Railway project from your GitHub repo and set the **root directory** to `apps/python/blood-bank-dispatch`, then provision a **Postgres** database in the same project — Railway injects `DATABASE_URL` automatically.
+2. Deploy. The start command runs `migrate.py` (idempotent) before launching uvicorn.
+3. The app boots in no-call mode (`DRY_RUN=1`). For live calls, set `CALLE_API_KEY` and `DRY_RUN=0` in the service's variables.
+
 ## Environment variables
 
 | Variable | Required | Default | Purpose |

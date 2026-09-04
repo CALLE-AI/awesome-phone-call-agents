@@ -1,6 +1,7 @@
 -- Blood Bank Dispatch — initial schema (mirrors CALLE_BUILD.md §4)
+-- Idempotent: safe to re-run on every deploy (Railpack start command runs it).
 
-create table banks (
+create table if not exists banks (
   id            uuid primary key default gen_random_uuid(),
   name          text not null,
   phone         text not null unique,   -- E.164, validated on write
@@ -10,7 +11,7 @@ create table banks (
   created_at    timestamptz not null default now()
 );
 
-create table call_runs (
+create table if not exists call_runs (
   id            uuid primary key default gen_random_uuid(),
   blood_group   text not null check (blood_group in ('A', 'B', 'AB', 'O')),
   rhesus        text not null check (rhesus in ('positive', 'negative')),
@@ -22,7 +23,7 @@ create table call_runs (
   completed_at  timestamptz
 );
 
-create table call_results (
+create table if not exists call_results (
   id                  uuid primary key default gen_random_uuid(),
   run_id              uuid not null references call_runs(id) on delete cascade,
   bank_id             uuid references banks(id),   -- null for ad hoc numbers
@@ -51,7 +52,7 @@ create table call_results (
 );
 
 -- The polled endpoint filters on run_id; FKs are not auto-indexed in Postgres.
-create index call_results_run_id_idx on call_results(run_id);
+create index if not exists call_results_run_id_idx on call_results(run_id);
 
 create or replace function touch_updated_at() returns trigger as $$
 begin
@@ -60,6 +61,7 @@ begin
 end;
 $$ language plpgsql;
 
+drop trigger if exists call_results_touch_updated_at on call_results;
 create trigger call_results_touch_updated_at
   before update on call_results
   for each row execute function touch_updated_at();
