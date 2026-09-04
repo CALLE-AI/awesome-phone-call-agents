@@ -113,7 +113,7 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The nine browser gates
+## The ten browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
@@ -126,10 +126,23 @@ because they fail as a gate rather than as a count of tests.
 | Let the rail listen only for acts arriving and not for acts leaving, which is how it worked until this was fixed | `rail` FAIL, `at 0px it marks act-01, expected act-00` |
 | Serve the page with the font host reachable but the kit unparsed | `cdn loss` reports what it aborted and how many acts survived |
 | Leave the transcript dimmed with nothing to play, which is how it shipped until this was fixed | `contrast` FAIL, 21 of 285 runs under AA, naming the opacity: `1.75 needs 4.5 (12px, painted at 0.42)` |
+| Let `.switch` clip the focus ring again, which is how it shipped until this was fixed | `keyboard` FAIL, `button its ring is clipped by span.switch (overflow hidden/hidden)` |
+| Put the playhead back to role=img with no tabindex, which is how it shipped until this was fixed | `keyboard` FAIL, `2 pointer target(s) the keyboard cannot reach` |
+| Strip the playhead's aria-label | `keyboard` FAIL, `2 control(s) with no accessible name` |
 
-Four of those five are the state this page was actually in, not a change invented to trip
-a gate: the CLS failure, the long task, the rail and the dimmed transcript were all found
-this way, and all four are fixed.
+Seven of those eight are the state this page was actually in, not a change invented to
+trip a gate. The CLS failure, the long task, the rail, the dimmed transcript, the clipped
+focus ring and the playhead no keyboard could reach were all found this way, and all of
+them are fixed.
+
+The `keyboard` gate is worth one note on how it measures. `:focus-visible` is a heuristic
+and a browser can decline it for focus a script assigned, so the gate presses Tab rather
+than calling `focus()`; measuring the other way reported two of three controls as having
+no indicator when they were fine. And it checks whether the ring's rectangle fits inside
+every ancestor that clips, rather than reading `outline-width`. The language switch had
+`outline: 2px solid` in the stylesheet and a two-pixel sliver on the screen, because
+`.switch` sets `overflow: hidden` so its two buttons share one frame and the ring is drawn
+outside a button that fills it.
 
 The `contrast` gate found the two worst things on this list, and they are the same bug
 twice. The transcript dims every line that is not the one being spoken; the result panel

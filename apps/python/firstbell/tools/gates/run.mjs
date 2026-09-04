@@ -678,6 +678,111 @@ async function gateContrast(browser, url) {
         need: f.need, px: f.px, alpha: f.alpha, text: f.text })) });
 }
 
+const FOCUSABLE = "a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])";
+
+/**
+ * Everything a pointer can do, a keyboard can do, and focus is visible when it lands.
+ */
+async function gateKeyboard(browser, url) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+  await page.goto(url, { waitUntil: "networkidle0" });
+  await new Promise((r) => setTimeout(r, 400));
+
+  // 1. Pointer targets with no keyboard path.
+  const orphans = await page.evaluate((sel) => {
+    const out = [];
+    for (const el of document.querySelectorAll("body *")) {
+      const cs = getComputedStyle(el);
+      const clickable = cs.cursor === "pointer"
+        || /\bclick\b|\btap\b|\bseek\b/i.test(el.getAttribute("aria-label") || "")
+        || el.hasAttribute("onclick");
+      if (!clickable || el.matches(sel) || el.closest(sel)) continue;
+      out.push(el.tagName.toLowerCase()
+        + (typeof el.className === "string" && el.className.trim() ? "." + el.className.trim() : "")
+        + ` ("${(el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 34)}")`);
+    }
+    return out;
+  }, FOCUSABLE);
+
+  // 2. Controls with no accessible name.
+  const unnamed = await page.evaluate((sel) => {
+    const named = (el) => {
+      const by = el.getAttribute("aria-labelledby");
+      const ref = by && document.getElementById(by);
+      return (el.getAttribute("aria-label") || (ref && ref.textContent) || el.textContent
+        || el.getAttribute("title") || "").trim();
+    };
+    return [...document.querySelectorAll(sel)]
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 || r.height > 0; })
+      .filter((el) => !named(el))
+      .map((el) => el.tagName.toLowerCase()
+        + (typeof el.className === "string" && el.className.trim() ? "." + el.className.trim() : ""));
+  }, FOCUSABLE);
+
+  // 3. Focus indicators, under real Tab presses.
+  const kinds = new Map();
+  for (let i = 0; i < 60; i += 1) {
+    await page.keyboard.press("Tab");
+    const row = await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return null;
+      const cs = getComputedStyle(el);
+      const kind = el.tagName.toLowerCase()
+        + (typeof el.className === "string" && el.className.trim()
+          ? "." + el.className.trim().split(/\s+/)[0] : "")
+        + (el.getAttribute("role") ? `[${el.getAttribute("role")}]` : "");
+      if (!el.matches(":focus-visible")) return { kind, why: "no :focus-visible ring at all" };
+      const width = parseFloat(cs.outlineWidth) || 0;
+      if (width === 0 || cs.outlineStyle === "none") return { kind, why: "outline-width is 0" };
+
+      // How far outside the border box the ring is drawn. Negative offsets draw inside,
+      // where nothing can clip them.
+      const grow = (parseFloat(cs.outlineOffset) || 0) + width;
+      if (grow <= 0) return { kind, why: null };
+      const r = el.getBoundingClientRect();
+      const ring = { top: r.top - grow, left: r.left - grow,
+        bottom: r.bottom + grow, right: r.right + grow };
+      for (let n = el.parentElement; n && n !== document.documentElement; n = n.parentElement) {
+        const ncs = getComputedStyle(n);
+        if (ncs.overflowX === "visible" && ncs.overflowY === "visible") continue;
+        const nb = n.getBoundingClientRect();
+        const visible = Math.max(0, Math.min(ring.bottom, nb.bottom) - Math.max(ring.top, nb.top))
+          * Math.max(0, Math.min(ring.right, nb.right) - Math.max(ring.left, nb.left));
+        const whole = (ring.bottom - ring.top) * (ring.right - ring.left);
+        // The ring is a frame, so its area is mostly the element. Losing any of the band
+        // outside the element is what matters, and that is what this catches.
+        if (visible < whole - 1) {
+          return { kind, why: `its ring is clipped by ${n.tagName.toLowerCase()}`
+            + (typeof n.className === "string" && n.className.trim() ? "." + n.className.trim().split(/\s+/)[0] : "")
+            + ` (overflow ${ncs.overflowX}/${ncs.overflowY})` };
+        }
+      }
+      return { kind, why: null };
+    });
+    if (row && !kinds.has(row.kind)) kinds.set(row.kind, row.why);
+  }
+  await page.close();
+
+  if (kinds.size === 0) {
+    record("keyboard", "COULD-NOT-MEASURE", "tabbing reached no control at all");
+    return;
+  }
+  const blind = [...kinds.entries()].filter(([, why]) => why);
+  const parts = [];
+  if (orphans.length) parts.push(`${orphans.length} pointer target(s) the keyboard cannot reach: ${orphans.slice(0, 3).join(", ")}`);
+  if (unnamed.length) parts.push(`${unnamed.length} control(s) with no accessible name: ${unnamed.slice(0, 3).join(", ")}`);
+  if (blind.length) parts.push(`${blind.length} control kind(s) with no visible focus: `
+    + blind.slice(0, 3).map(([k, why]) => `${k} ${why}`).join("; "));
+
+  record("keyboard", parts.length === 0 ? "PASS" : "FAIL",
+    parts.length === 0
+      ? `every pointer target is reachable by Tab, all controls are named, and each of the `
+        + `${kinds.size} control kinds shows an unclipped focus ring`
+      : parts.join(". "),
+    { orphans, unnamed, kinds: [...kinds.keys()], blind: blind.map(([k, why]) => `${k}: ${why}`) });
+}
+
 async function shoot(browser, url) {
   await mkdir(SHOTS, { recursive: true });
   const viewports = [
@@ -782,6 +887,7 @@ async function main() {
     await gateCdnLoss(browser, url);
     await gateRail(browser, url);
     await gateContrast(browser, url);
+    await gateKeyboard(browser, url);
     await shoot(browser, url);
   } finally {
     await browser.close();
