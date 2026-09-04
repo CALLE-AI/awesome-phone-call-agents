@@ -226,7 +226,13 @@ export class CallPlayer {
     if (note) note.textContent = this.call.note || '';
     const conf = this.resultEl.querySelector('[data-conf]');
     if (conf && this.call.confidence != null) conf.textContent = this.call.confidence;
-    this.resultEl.dataset.state = 'out';
+    // Dimmed only while there is a recording that could end. The panel is a curtain
+    // over a result that arrives when the call finishes, and with no audio nothing
+    // ever finishes, so it would stay at 0.35 for good: 1.7 against its own ground,
+    // on the one artifact that shows what CALL-E returned. The server sends this
+    // markup as 'in', so leaving it 'out' also meant a reader with JavaScript off
+    // could read it and a reader with JavaScript on could not.
+    this.resultEl.dataset.state = this.audioBase ? 'out' : 'in';
     this.resultEl.querySelectorAll('[data-field]').forEach((el) => {
       const v = s[el.dataset.field];
       el.textContent = (v === undefined || v === null) ? '·' : v;
