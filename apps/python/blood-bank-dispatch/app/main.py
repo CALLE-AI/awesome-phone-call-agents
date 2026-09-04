@@ -31,7 +31,7 @@ from .auth import (  # noqa: E402
     password_is_set,
 )
 from .dispatch import CallTarget, DRY_RUN, spawn  # noqa: E402
-from .util import mask_phone  # noqa: E402
+from .util import mask_phone, sanitize_label  # noqa: E402
 
 BASE = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE / "app" / "templates"))
@@ -346,7 +346,8 @@ async def create_run(
             )
 
         if adhoc_phone:
-            label = adhoc_label.strip() or adhoc_phone
+            # Display name must never be (or contain) the raw destination.
+            label = sanitize_label(adhoc_label, adhoc_phone)
             key = f"run:{run['id']}:number:{adhoc_phone}:v1"
             result = await conn.fetchrow(
                 "insert into call_results"

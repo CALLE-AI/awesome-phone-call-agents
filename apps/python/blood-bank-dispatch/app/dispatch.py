@@ -262,6 +262,9 @@ async def _store_result(target: CallTarget, call: dict) -> None:
     completion = call.get("completion_confidence")
     if isinstance(completion, dict):
         confidence = completion.get("score")
+    # Failure text is rendered on failed cards; scrub the destination from it.
+    if error and target.phone:
+        error = str(error).replace(target.phone, mask_phone(target.phone))
     log.info("target %s -> %s (confidence %s)", target.name, row_status, confidence)
 
     await db.execute(
