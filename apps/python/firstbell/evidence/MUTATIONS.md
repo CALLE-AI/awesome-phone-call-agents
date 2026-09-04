@@ -25,8 +25,9 @@ Reproduce any of them by making the change and running `python -m pytest tests/ 
 | 15 | Change the test count stated in the README, which is what a reader runs and compares | 1 |
 | 16 | Blank `api_base_url` on a receipt that still claims `reached_production_api` | 1 |
 | 17 | Commit a receipt that no line of `evidence/README.md` describes | 1 |
+| 18 | Compute `reached_production_api` from the configured base URL alone, so a run that exchanged no bytes with CALL-E still reports that it reached production | 1 |
 
-## Why these seventeen
+## Why these eighteen
 
 They are not a sample. They are every rule in this app that decides something a person
 would otherwise have to check by hand:

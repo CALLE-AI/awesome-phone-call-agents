@@ -161,6 +161,7 @@ def _client_and_mode(args: argparse.Namespace):
 
 
 def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
+                   api_responded: bool | None = None,
                    summary, args: argparse.Namespace) -> None:
     """Evidence, not a claim.
 
@@ -180,7 +181,13 @@ def _write_receipt(path: Path, *, report: DispatchReport, mode: RunMode,
         "mode": mode.label,
         "transcript_included": bool(args.include_transcript),
         "api_base_url": mode.base_url,
-        "reached_production_api": mode.reached_production,
+        # Two different facts, and one field carried both. Targeting is known from
+        # configuration before anything is sent. Reaching is only knowable from an
+        # answer, and a run whose every attempt dies at the transport layer reached
+        # nothing at all.
+        "production_api_targeted": mode.reached_production,
+        "reached_production_api": (None if api_responded is None
+                                   else mode.reached_production and api_responded),
         "generated": date.today().isoformat(),
         "work_file": str(args.work_file),
         "concurrency": args.concurrency,
@@ -257,7 +264,8 @@ def main(argv: list[str] | None = None) -> int:
         _print_human(report, summary)
 
     if args.receipt:
-        _write_receipt(args.receipt, report=report, mode=mode, summary=summary, args=args)
+        _write_receipt(args.receipt, report=report, mode=mode, summary=summary, args=args,
+                       api_responded=dispatcher.api_responded)
         print(f"\nReceipt written to {args.receipt}")
 
     return 1 if report.fatal_error else 0

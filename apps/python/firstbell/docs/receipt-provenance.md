@@ -12,7 +12,7 @@ number computed from it is unsupported.
 Four rules make a receipt unable to lie about its own origin. Each one is broken on purpose
 in [`../evidence/MUTATIONS.md`](../evidence/MUTATIONS.md).
 
-## 1. Reserve the word "live" for the real host, by hostname
+## 1. Do not let one field carry both the intention and the outcome
 
 Not "a base URL was configured". Not "the live flag was passed". The receipt says `live`
 only when the host actually dialled was the production API.

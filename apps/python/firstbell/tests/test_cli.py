@@ -194,3 +194,37 @@ def test_the_receipt_records_whether_this_run_actually_placed_the_call(tmp_path)
     assert all(i["placed_by_this_run"] is True for i in dialled), (
         "a fresh offline run placed every call it made"
     )
+
+
+def test_the_receipt_separates_targeting_the_api_from_reaching_it(tmp_path):
+    """Mutation 18 found this hole: the dispatcher property was tested, the receipt was not.
+
+    A receipt is the artefact a reader keeps. Testing the value inside the process while
+    leaving the written field unprotected means the rule can be correct everywhere except
+    the one place anybody looks.
+    """
+    from types import SimpleNamespace
+
+    from firstbell.cli import RunMode, _write_receipt
+    from firstbell.domain import summarise
+    from dispatch.models import DispatchReport
+
+    production = RunMode(live=True, base_url="https://api.heycall-e.com")
+    out = tmp_path / "r.json"
+
+    args = SimpleNamespace(include_transcript=False, work_file=tmp_path / "w.csv",
+                           concurrency=1)
+
+    def payload(api_responded):
+        _write_receipt(out, report=DispatchReport(), mode=production,
+                       summary=summarise([]), args=args, api_responded=api_responded)
+        return json.loads(out.read_text(encoding="utf-8"))
+
+    # Targeting is knowable from configuration in every case.
+    for answered in (True, False, None):
+        assert payload(answered)["production_api_targeted"] is True
+
+    # Reaching is not. Nothing answered means nothing was reached, however it was configured.
+    assert payload(True)["reached_production_api"] is True
+    assert payload(False)["reached_production_api"] is False
+    assert payload(None)["reached_production_api"] is None

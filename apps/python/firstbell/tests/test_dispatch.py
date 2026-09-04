@@ -615,3 +615,49 @@ def test_a_call_with_no_attempts_reports_no_provider_id_rather_than_crashing(dou
         WorkItem(id="S-78", phones=(IN_A,), consented=True),
         {"id": "call_x", "status": "failed", "recipients": [{"attempts": []}]})
     assert result.provider_call_id is None
+
+
+def test_a_run_that_never_got_an_answer_does_not_claim_it_reached_the_api(double):
+    """`reached_production_api` was derived from configuration and named for an outcome.
+
+    A live run whose every attempt dies at the transport layer never exchanges a byte with
+    CALL-E, yet the old field still published that production had been reached. That is the
+    overstatement `docs/receipt-provenance.md` exists to prevent, in the implementation of
+    the rule itself.
+
+    Three states, matching `placed_by_this_run`: True when the API answered anything at all,
+    including an error, False when nothing was attempted, None before a run.
+    """
+    dispatcher = make(double)
+    assert dispatcher.api_responded is None, "a dispatcher that has not run knows nothing"
+
+    dispatcher.run([WorkItem(id="S-80", phones=(IN_A,), consented=True)])
+    assert dispatcher.api_responded is True, "the double answered, so the API answered"
+
+
+def test_an_api_error_still_counts_as_the_api_answering(double):
+    """A 401 is a response. It proves the host is there and rejected us."""
+    double.fail_next_request(code="unauthorized", message="Invalid or missing API key.", status_code=401)
+    dispatcher = make(double)
+    dispatcher.run([WorkItem(id="S-81", phones=(IN_A,), consented=True)])
+    assert dispatcher.api_responded is True
+
+
+def test_a_run_that_reaches_nothing_says_so(double):
+    """The defect this whole field exists for: the network is down and nothing answers.
+
+    Before the fix, `reached_production_api` was computed from the base URL alone, so a run
+    that exchanged no bytes with CALL-E still published that it had reached production. The
+    only honest answer here is False.
+    """
+    class NeverAnswers:
+        def __getattr__(self, _name):
+            raise ConnectionError("connection refused")
+
+    dispatcher = WaveDispatcher(
+        NeverAnswers(), task_builder=lambda i: "x", result_schema=SCHEMA,
+        poll_interval_seconds=0, sleep=lambda _s: None)
+    report = dispatcher.run([WorkItem(id="S-82", phones=(IN_A,), consented=True)])
+
+    assert dispatcher.api_responded is False, "nothing answered, so nothing was reached"
+    assert report.results[0].resolution is not Resolution.RESOLVED

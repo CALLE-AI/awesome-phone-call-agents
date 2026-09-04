@@ -98,6 +98,11 @@ class WaveDispatcher:
         self._uninformative = frozenset(v.strip().lower() for v in uninformative_values)
         self._idempotency_key = idempotency_key or (lambda item: item.id)
         self._retry = retry or RetryPolicy()
+        # None until a run happens, then True if CALL-E answered anything at all. An
+        # error response still counts: a 401 proves the host is there and rejected us.
+        # Configuration cannot tell us this, and the field that used to imply it was
+        # computed from a base URL alone.
+        self._api_responded: bool | None = None
         self._webhook_url = webhook_url
         self._poll_interval = poll_interval_seconds
         self._call_timeout = call_timeout_seconds
@@ -124,6 +129,8 @@ class WaveDispatcher:
     def run(self, items: Iterable[WorkItem]) -> DispatchReport:
         items = list(items)
         report = DispatchReport()
+        if self._api_responded is None:
+            self._api_responded = False
 
         callable_items: list[WorkItem] = []
         for item in items:
@@ -213,6 +220,7 @@ class WaveDispatcher:
                     idempotency_key=key,
                 )
             except CalleAPIError as err:
+                self._api_responded = True
                 last = f"{err.code}: {err}"
                 if err.code in FATAL_ERRORS:
                     with self._lock:
@@ -242,6 +250,7 @@ class WaveDispatcher:
     # -- the only place a meaning is assigned ----------------------------
 
     def _classify(self, item: WorkItem, call: dict[str, Any]) -> ItemResult:
+        self._api_responded = True
         recipients = call.get("recipients") or [{}]
         recipient = recipients[0]
         attempts = recipient.get("attempts") or []
@@ -347,6 +356,11 @@ class WaveDispatcher:
             return None
         # One second of slack: the service stamps the call, not our clock.
         return created >= started - timedelta(seconds=1)
+
+    @property
+    def api_responded(self) -> bool | None:
+        """Did CALL-E answer this run? None before a run, False if nothing came back."""
+        return self._api_responded
 
     @staticmethod
     def _result_for(call: dict[str, Any], recipient: dict[str, Any],
