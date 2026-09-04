@@ -113,7 +113,7 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The eight browser gates
+## The nine browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
@@ -125,10 +125,29 @@ because they fail as a gate rather than as a count of tests.
 | Ship one shared fallback family for two real faces, which is how the page was built until this was fixed | `cls` FAIL at 0.00961 against a 0.001 ceiling, naming `span.switch` and a node that had been removed |
 | Let the rail listen only for acts arriving and not for acts leaving, which is how it worked until this was fixed | `rail` FAIL, `at 0px it marks act-01, expected act-00` |
 | Serve the page with the font host reachable but the kit unparsed | `cdn loss` reports what it aborted and how many acts survived |
+| Leave the transcript dimmed with nothing to play, which is how it shipped until this was fixed | `contrast` FAIL, 21 of 285 runs under AA, naming the opacity: `1.75 needs 4.5 (12px, painted at 0.42)` |
 
-Three of those four are the state this page was actually in, not a change invented to trip
-a gate: the CLS failure, the long task and the rail were all found this way, and all three
-are fixed.
+Four of those five are the state this page was actually in, not a change invented to trip
+a gate: the CLS failure, the long task, the rail and the dimmed transcript were all found
+this way, and all four are fixed.
+
+The `contrast` gate found the two worst things on this list, and they are the same bug
+twice. The transcript dims every line that is not the one being spoken; the result panel
+stays behind a curtain until the call it belongs to ends. Neither event can happen now the
+recordings are out of the repository, so the transcript sat at 0.42 opacity and the
+structured result at 0.35, permanently, at 1.07 and 1.74 against their own grounds. Those
+are the two artifacts this page exists to show. Both were sent by the server at full
+strength and dimmed afterwards by script, so a reader with JavaScript switched off could
+read them and a reader with it on could not.
+
+Three things decide whether a contrast checker measures anything. Colours must go through
+the browser rather than a parser, because this page is authored in `oklch()` and a checker
+that reads `rgb()` skips every one of those and calls the remainder a clean sweep. Opacity
+must count as part of the colour, or neither defect above is visible at all. And the
+backdrop must come from a hit test rather than from walking parents, because the rail is
+fixed and floats over whichever section is under it. Getting the third one wrong produced
+a ratio of exactly 1.00 on every affected element, which is what that number means when
+you see it: the probe compared a colour with itself.
 
 The `rail` gate is the one to read if you only read one. The page decides which act you
 are in by hit-testing what is painted at the middle of the viewport. The gate decides by

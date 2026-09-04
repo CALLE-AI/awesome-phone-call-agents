@@ -506,6 +506,178 @@ async function gateRail(browser, url) {
     { checked, wrong });
 }
 
+/** Collected in the page: every text run, its painted colour and its painted ground. */
+const CONTRAST_PROBE = () => {
+  const cx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  const seen = new Map();
+  const paint = (css) => {
+    if (seen.has(css)) return seen.get(css);
+    let v = null;
+    if (css && css !== "none" && css !== "transparent") {
+      cx.clearRect(0, 0, 1, 1);
+      cx.fillStyle = "rgba(0, 0, 0, 0)";
+      cx.fillStyle = css;
+      cx.fillRect(0, 0, 1, 1);
+      const d = cx.getImageData(0, 0, 1, 1).data;
+      v = [d[0], d[1], d[2], d[3] / 255];
+    }
+    seen.set(css, v);
+    return v;
+  };
+  const lin = (c) => { const s = c / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3]));
+
+  // Everything behind this element at this point, nearest first, whether or not it is a
+  // relative of it. elementsFromPoint answers about painting; parentElement answers about
+  // markup, and for anything fixed or sticky those are different questions.
+  const groundAt = (el, x, y) => {
+    const stack = document.elementsFromPoint(x, y);
+    const start = stack.indexOf(el);
+    // If the element is not in the stack the point is not over it, and the stack is then
+    // a list of what is in FRONT of it. Reading a ground out of that answers with the
+    // colour of whatever is covering the element: light text on a dark band came back as
+    // light on light, ratio exactly 1.00, for every one of them. Walk the ancestors
+    // instead, and say so when even that finds nothing.
+    const behind = start >= 0
+      ? stack.slice(start + 1)
+      : (() => { const up = []; for (let n = el.parentElement; n; n = n.parentElement) up.push(n); return up; })();
+    let acc = null;
+    for (const node of behind) {
+      const c = paint(getComputedStyle(node).backgroundColor);
+      if (!c || c[3] === 0) continue;
+      acc = acc ? over(acc.concat(1), c).concat(1) : c;
+      if (c[3] >= 1) return acc.slice(0, 3);
+    }
+    const root = paint(getComputedStyle(document.documentElement).backgroundColor);
+    if (root && root[3] >= 1) return acc ? over(acc.concat(1), root) : root.slice(0, 3);
+    return null;
+  };
+
+  const rows = [];
+  for (const el of document.querySelectorAll("body *")) {
+    const own = [...el.childNodes]
+      .filter((n) => n.nodeType === 3 && n.textContent.trim())
+      .map((n) => n.textContent.trim()).join(" ");
+    if (!own) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility !== "visible" || cs.display === "none") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    const x = Math.round(r.x + r.width / 2);
+    const y = Math.round(r.y + r.height / 2);
+    if (x < 1 || y < 1 || x > innerWidth - 1 || y > innerHeight - 1) continue;
+
+    // Inside a box that scrolls, a rect is where the element would be, not where it is
+    // painted. The transcript is a 22rem list with its own scrollbar, so its lower rows
+    // report positions on screen while nothing of them is drawn there. Measuring those
+    // returns the ground twice and calls it a contrast failure. This gate cannot scroll an
+    // inner box, so it says it could not measure them rather than that they are wrong.
+    let clipped = false;
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      const ncs = getComputedStyle(n);
+      if (ncs.overflowY === "visible" && ncs.overflowX === "visible") continue;
+      const nb = n.getBoundingClientRect();
+      if (r.bottom <= nb.top + 1 || r.top >= nb.bottom - 1
+          || r.right <= nb.left + 1 || r.left >= nb.right - 1) { clipped = true; break; }
+    }
+    if (clipped) continue;
+
+    let alpha = 1;
+    for (let n = el; n && n !== document.documentElement.parentNode; n = n.parentElement) {
+      alpha *= Number(getComputedStyle(n).opacity);
+    }
+    const label = el.tagName.toLowerCase() + (typeof el.className === "string" && el.className.trim()
+      ? "." + el.className.trim().split(/\s+/).join(".") : "");
+    const key = `${label}|${own.slice(0, 30)}`;
+    const fg = paint(cs.color);
+    const bg = groundAt(el, x, y);
+    if (!fg || !bg) { rows.push({ key, label, text: own.slice(0, 34), unmeasured: true }); continue; }
+
+    // The element is painted at `alpha` of its own colour over whatever is behind it, so
+    // that composite is the colour a reader sees and the one the ratio is about.
+    const solid = over(fg, bg);
+    const shown = [0, 1, 2].map((i) => solid[i] * alpha + bg[i] * (1 - alpha));
+    const [hi, lo] = [lum(shown), lum(bg)].sort((a, b) => b - a);
+    const px = parseFloat(cs.fontSize);
+    const weight = Number(cs.fontWeight) || 400;
+    rows.push({
+      key, label, text: own.slice(0, 34), unmeasured: false,
+      ratio: (hi + 0.05) / (lo + 0.05),
+      need: (px >= 24 || (px >= 18.66 && weight >= 700)) ? 3 : 4.5,
+      px: Math.round(px * 10) / 10, weight, alpha: Math.round(alpha * 100) / 100,
+      colour: cs.color,
+    });
+  }
+  return rows;
+};
+
+/**
+ * Every run of text must clear its WCAG AA ratio in at least one resting state.
+ *
+ * Best of two passes, at the top of the page and after a full scroll, because several
+ * things here are legitimately mid-fade at some scroll positions and judging those would
+ * report the curtain closing as a defect. Anything that fails in both states fails in
+ * every state a reader can stop at, which is the property worth gating.
+ */
+async function gateContrast(browser, url) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+  await page.goto(url, { waitUntil: "networkidle0" });
+  await page.evaluate(() => document.fonts.ready).catch(() => {});
+  await new Promise((r) => setTimeout(r, 400));
+
+  const best = new Map();
+  const absorb = (rows) => {
+    for (const row of rows) {
+      const had = best.get(row.key);
+      if (row.unmeasured) { if (!had) best.set(row.key, row); continue; }
+      if (!had || had.unmeasured || row.ratio > had.ratio) best.set(row.key, row);
+    }
+  };
+
+  // Only elements whose centre is on screen can be hit-tested for a ground, so the page
+  // is walked a viewport at a time. Two passes reached 47 runs of nearly six hundred, and
+  // a gate that judges a twelfth of the page is not measuring the page.
+  const height = await page.evaluate(() => window.innerHeight);
+  const total = await page.evaluate(() => document.documentElement.scrollHeight);
+  absorb(await page.evaluate(CONTRAST_PROBE));
+  // Half a viewport at a time. A full step leaves elements that are only ever centred
+  // between two stops unsampled, and an element sampled once, part way through its own
+  // fade, is judged on that one reading.
+  for (let y = 0; y < total; y += Math.round(height / 2)) {
+    await page.evaluate((to) => window.scrollTo(0, to), y);
+    await settleScroll(page);
+    // Longer than the 240ms reveal transition, or the gate reads an element part way
+    // into its own fade and calls that a contrast failure.
+    await new Promise((r) => setTimeout(r, 600));
+    absorb(await page.evaluate(CONTRAST_PROBE));
+  }
+  await page.close();
+
+  const rows = [...best.values()];
+  const unmeasured = rows.filter((r) => r.unmeasured);
+  const measured = rows.filter((r) => !r.unmeasured);
+  if (measured.length < 50) {
+    record("contrast", "COULD-NOT-MEASURE",
+      `only ${measured.length} text runs resolved to a colour and a ground`);
+    return;
+  }
+  const fails = measured.filter((r) => r.ratio < r.need).sort((a, b) => a.ratio - b.ratio);
+  const worst = Math.min(...measured.map((r) => r.ratio));
+  record("contrast", fails.length === 0 ? "PASS" : "FAIL",
+    fails.length === 0
+      ? `all ${measured.length} text runs clear WCAG AA; the closest is ${worst.toFixed(2)}, `
+        + `and ${unmeasured.length} could not be resolved to a colour and a ground`
+      : `${fails.length} of ${measured.length} text runs are below WCAG AA: `
+        + fails.slice(0, 4).map((f) => `${f.label} ${f.ratio.toFixed(2)} needs ${f.need} `
+          + `(${f.px}px, painted at ${f.alpha} of ${f.colour}) "${f.text}"`).join("; "),
+    { measured: measured.length, unmeasured: unmeasured.length,
+      worst: Number(worst.toFixed(2)),
+      fails: fails.slice(0, 12).map((f) => ({ label: f.label, ratio: Number(f.ratio.toFixed(2)),
+        need: f.need, px: f.px, alpha: f.alpha, text: f.text })) });
+}
+
 async function shoot(browser, url) {
   await mkdir(SHOTS, { recursive: true });
   const viewports = [
@@ -609,6 +781,7 @@ async function main() {
     await gateNoJs(browser, url);
     await gateCdnLoss(browser, url);
     await gateRail(browser, url);
+    await gateContrast(browser, url);
     await shoot(browser, url);
   } finally {
     await browser.close();
