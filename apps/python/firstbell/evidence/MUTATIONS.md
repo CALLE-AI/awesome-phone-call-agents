@@ -113,7 +113,7 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
-## The seven browser gates
+## The eight browser gates
 
 `tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
 gate nobody has watched fail is a gate nobody has tested. These are not in the table above
@@ -123,10 +123,26 @@ because they fail as a gate rather than as a count of tests.
 |---|---|
 | Append a 120 ms busy loop to the built `app.js` | `long tasks` FAIL, 131, 129, 129, 129, 129 ms, and it named the phase: `131 ms at 137 ms during load` |
 | Ship one shared fallback family for two real faces, which is how the page was built until this was fixed | `cls` FAIL at 0.00961 against a 0.001 ceiling, naming `span.switch` and a node that had been removed |
+| Let the rail listen only for acts arriving and not for acts leaving, which is how it worked until this was fixed | `rail` FAIL, `at 0px it marks act-01, expected act-00` |
 | Serve the page with the font host reachable but the kit unparsed | `cdn loss` reports what it aborted and how many acts survived |
 
-Two of those three are the state this page was actually in, not a change invented to trip a
-gate: the CLS failure and the long task were both found by the gates and both are fixed.
+Three of those four are the state this page was actually in, not a change invented to trip
+a gate: the CLS failure, the long task and the rail were all found this way, and all three
+are fixed.
+
+The `rail` gate is the one to read if you only read one. The page decides which act you
+are in by hit-testing what is painted at the middle of the viewport. The gate decides by
+measuring each act's document offset once at the top of the page and doing arithmetic. If
+the gate asked the page's question it would agree with the page by construction and pass
+whatever the page did, which is the failure mode that let this bug live: nothing measured
+the rail at all, so it was right on the way down and wrong on the way back for as long as
+the rail has existed.
+
+The `screenshots` gate now checks what is in the file rather than counting files. It had
+been writing `desktop-act-00.png` as a picture of acts 01 and 02 since the shots began,
+under the old pinned hero and under the CSS sticky one, because the capture loop ran from
+the bottom of the page and `scrollIntoView` does nothing to an element already on screen.
+Eighteen files existed, so the gate passed.
 
 Two gates are worth reading for how they are wrong rather than for what they catch. `cls`
 takes five samples and judges the worst, because the same build measured 0.00133 and

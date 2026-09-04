@@ -416,6 +416,96 @@ async function settleScroll(page) {
   })).catch(() => {});
 }
 
+/**
+ * The rail names the act the reader is in, scrolling down and back up.
+ *
+ * Scrolling to the bottom and back to the top used to leave it marking act 2, because the
+ * observer behind it only listened for acts arriving, and the sticky first act never
+ * leaves the middle of the viewport, so it never arrives a second time.
+ *
+ * The expected answer here is computed from each act's document offset, measured once at
+ * the top of the page where nothing is stuck, and compared against the viewport midpoint
+ * in document coordinates. That is arithmetic the page does not do: the page hit-tests
+ * what is painted. Two different routes to the same answer, which is the only way this
+ * gate can disagree with the page.
+ */
+async function gateRail(browser, url) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+  await page.goto(url, { waitUntil: "networkidle0" });
+
+  const present = await page.evaluate(() => {
+    const rail = document.querySelector(".rail");
+    if (!rail) return false;
+    return getComputedStyle(rail).display !== "none"
+      && document.querySelectorAll(".rail a[href^='#']").length > 0;
+  });
+  if (!present) {
+    await page.close();
+    record("rail", "COULD-NOT-MEASURE",
+      "no rail is rendered at 1440px, so there was nothing to check");
+    return;
+  }
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await settleScroll(page);
+  const map = await page.evaluate(() => {
+    const links = [...document.querySelectorAll(".rail a[href^='#']")];
+    return {
+      height: window.innerHeight,
+      docHeight: document.documentElement.scrollHeight,
+      acts: links.map((a) => {
+        const el = document.querySelector(a.getAttribute("href"));
+        const r = el.getBoundingClientRect();
+        return { id: el.id, top: Math.round(r.top + window.scrollY), height: Math.round(r.height) };
+      }),
+    };
+  });
+
+  const expected = (y) => {
+    const mid = y + map.height / 2;
+    let found = null;
+    for (const a of map.acts) if (a.top <= mid && mid < a.top + a.height) found = a.id;
+    return found;
+  };
+
+  // Down the page and back up. The way back is the half that was broken.
+  const stops = [];
+  const bottom = map.docHeight - map.height;
+  for (let i = 0; i <= 8; i += 1) stops.push(Math.round((bottom * i) / 8));
+  for (let i = 7; i >= 0; i -= 1) stops.push(Math.round((bottom * i) / 8));
+
+  const wrong = [];
+  let checked = 0;
+  for (const y of stops) {
+    await page.evaluate((to) => window.scrollTo(0, to), y);
+    await settleScroll(page);
+    await new Promise((r) => setTimeout(r, 120));
+    const seen = await page.evaluate(() => {
+      const cur = [...document.querySelectorAll(".rail a[href^='#']")]
+        .find((a) => a.getAttribute("aria-current") === "true");
+      return { marked: cur ? cur.getAttribute("href").slice(1) : null,
+               y: Math.round(window.scrollY) };
+    });
+    const want = expected(seen.y);
+    if (want === null) continue;   // a midpoint in no act at all is not this gate's business
+    checked += 1;
+    if (seen.marked !== want) wrong.push(`at ${seen.y}px it marks ${seen.marked || "nothing"}, expected ${want}`);
+  }
+  await page.close();
+
+  if (checked < stops.length / 2) {
+    record("rail", "COULD-NOT-MEASURE",
+      `only ${checked} of ${stops.length} scroll positions landed inside an act`);
+    return;
+  }
+  record("rail", wrong.length === 0 ? "PASS" : "FAIL",
+    wrong.length === 0
+      ? `the rail names the right act at all ${checked} scroll positions, down the page and back up`
+      : `${wrong.length} of ${checked} positions name the wrong act: ${wrong.slice(0, 3).join("; ")}`,
+    { checked, wrong });
+}
+
 async function shoot(browser, url) {
   await mkdir(SHOTS, { recursive: true });
   const viewports = [
@@ -423,29 +513,71 @@ async function shoot(browser, url) {
     { label: "mobile", width: 390, height: 844 },
   ];
   let written = 0;
+  const wrong = [];
   for (const vp of viewports) {
     const page = await browser.newPage();
     await page.setViewport({ width: vp.width, height: vp.height });
     await page.goto(url, { waitUntil: "networkidle0" });
     await fullScroll(page);
+
+    // Measure every act's document offset from the top of the page, which is the one
+    // scroll position where nothing is stuck. A sticky element reports its *painted*
+    // offset, so asking act 0 where it lives while it is pinned to the top of act 8
+    // answers 8260 rather than 0.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await settleScroll(page);
+    const offsets = await page.evaluate((ids) => {
+      const out = {};
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) out[id] = Math.round(el.getBoundingClientRect().top + window.scrollY);
+      }
+      return out;
+    }, ACTS);
+
     for (const id of ACTS) {
       const el = await page.$(`#${id}`);
-      if (!el) continue;
-      await el.scrollIntoView().catch(() => {});
-      // Wait for the scroll to stop rather than for a fixed 250ms. Lenis eases, so a
+      if (!el || offsets[id] === undefined) continue;
+      // Scroll to where the act lives rather than asking the browser to bring it into
+      // view. scrollIntoView does nothing to an element that is already on screen, and a
+      // pinned hero is always on screen.
+      await page.evaluate((y) => window.scrollTo(0, y), offsets[id]);
+      // Then wait for the scroll to stop rather than for a fixed 250ms. Lenis eases, so a
       // fixed wait captures at whatever fraction of a pixel it had reached, and two
       // builds with byte-identical layout produced screenshots that differed on every
       // glyph edge. Settling first makes the shot a function of the final position only.
       await settleScroll(page);
       await new Promise((r) => setTimeout(r, 300));
+
+      // What is actually painted in the middle of this act? If the answer is a different
+      // act, the file about to be written would carry a name that is not true.
+      const showing = await page.evaluate((sel) => {
+        const el = document.getElementById(sel);
+        const r = el.getBoundingClientRect();
+        const cx = Math.min(window.innerWidth - 2, Math.max(2, r.x + r.width / 2));
+        const cy = Math.min(window.innerHeight - 2, Math.max(2, r.y + r.height / 2));
+        const hit = document.elementFromPoint(cx, cy);
+        const owner = hit && hit.closest("section[id^='act-']");
+        return owner ? owner.id : "(nothing)";
+      }, id);
+      if (showing !== id) {
+        wrong.push(`${vp.label}-${id} shows ${showing}`);
+        continue;
+      }
+
       await el.screenshot({ path: join(SHOTS, `${vp.label}-${id}.png`) }).catch(() => {});
       written += 1;
     }
     await page.close();
   }
-  record("screenshots", written === ACTS.length * 2 ? "PASS" : "COULD-NOT-MEASURE",
-    `${written} of ${ACTS.length * 2} act screenshots written to tools/gates/shots/`,
-    { written });
+  const all = ACTS.length * 2;
+  record("screenshots", written === all ? "PASS" : "COULD-NOT-MEASURE",
+    written === all
+      ? `${written} of ${all} act screenshots written to tools/gates/shots/, each verified `
+        + "to be showing the act it is named after"
+      : `${written} of ${all} act screenshots written; ${wrong.length} skipped because the `
+        + `named act was not what is painted there: ${wrong.join(", ")}`,
+    { written, wrong });
 }
 
 async function main() {
@@ -476,6 +608,7 @@ async function main() {
     await gateReducedMotion(browser, url);
     await gateNoJs(browser, url);
     await gateCdnLoss(browser, url);
+    await gateRail(browser, url);
     await shoot(browser, url);
   } finally {
     await browser.close();
