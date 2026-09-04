@@ -523,16 +523,18 @@ def test_a_real_failure_is_described_in_words_an_office_can_act_on():
     assert result.resolution is Resolution.FAILED
     assert result.resolution.needs_a_human
     assert result.failure_code == "call_failed", "the symbolic code is the useful one"
-    assert result.reason == "the call was rejected before it was answered after trying 1 number(s)", (
+    assert result.reason == "nobody answered after trying 1 number(s)", (
         f"a queue row reading {result.reason!r} makes an administrator look up a SIP code"
     )
     assert "603" not in result.reason
     # started_at == completed_at: nothing rang, so no person refused this call.
     att = call["recipients"][0]["attempts"][0]
     assert att["started_at"] == att["completed_at"]
-    assert "declined" not in result.reason, (
-        "603 does not identify who declined, and the operator reported letting it ring"
-    )
+    for word in ("declined", "rejected", "hung up"):
+        assert word not in result.reason, (
+            f"{word!r} asserts something about a call the platform mis-reported: it sent "
+            "603 Decline and zero duration for a call the operator watched ring out"
+        )
 
 
 def test_every_sip_code_we_claim_to_translate_actually_translates():

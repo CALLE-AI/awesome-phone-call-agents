@@ -213,6 +213,22 @@ observed to fail has not been shown to test anything.
   somebody else's database.
 - **The offline run is a double, not a recording.** It reproduces the API's shape and
   failure modes. It does not reproduce what a real parent says.
+- **In India this calls from a United States number, and that is a deployment problem.**
+  CALL-E's own supported-regions table lists India as an *International* line rather than
+  a Local one, and their README says the international numbers are "primarily intended for
+  testing". The live calls behind the receipts in `evidence/` arrived on an Indian mobile
+  showing a `+1` caller ID attributed to Oakland, California. A parent who is not
+  expecting the call has no reason to answer an unknown American number about their child,
+  and a school has every reason not to send one. The language routing works. Reaching the
+  family from a number they recognise is a separate problem this app cannot solve, and
+  anyone piloting it in India should read that as the blocker before the pilot rather than
+  after it.
+- **One failed call arrived with three incompatible accounts of itself.** The platform
+  returned SIP `603 Decline` and a `failure_message` naming the user as having hung up.
+  The attempt's `started_at` and `completed_at` were the same second, which says the call
+  never rang. The operator was holding the phone, watched it ring in full, and touched
+  nothing. The dispatcher therefore reports only what all three accounts agree on, that
+  nobody answered, and `dispatch/scheduler.py` records why it refuses to say more.
 
 ## Attribution
 

@@ -341,11 +341,19 @@ class WaveDispatcher:
     SIP_REASONS = {
         "486": "the line was busy",
         "480": "the phone was switched off or out of coverage",
-        # SIP calls 603 "Decline", but it does not say who declined. A production
-        # attempt carried 603 with started_at equal to completed_at, so nothing ever
-        # rang and no person was involved. Naming the recipient as the one who refused
-        # would put a false fact in front of whoever works the queue.
-        "603": "the call was rejected before it was answered",
+        # SIP calls 603 "Decline". Do not repeat that word to an office.
+        #
+        # A production attempt returned 603 with failure_message "calling task
+        # status=DECLINED (Hangup by: user)" and started_at equal to completed_at. The
+        # operator holding the phone reported that it rang in full and that they touched
+        # nothing. So the platform said the person declined, the timestamps said the call
+        # never rang, and the truth was that it rang out unanswered. Three accounts, and
+        # only one of them can be checked.
+        #
+        # What survives all three readings is that nobody was reached, which is also the
+        # only part the office can act on. Anything more specific would be a guess dressed
+        # up as a record.
+        "603": "nobody answered",
         "408": "nobody picked up before the network gave up",
         "487": "the call was cancelled before it was answered",
     }
