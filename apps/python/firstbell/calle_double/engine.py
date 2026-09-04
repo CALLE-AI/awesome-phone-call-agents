@@ -178,6 +178,7 @@ class _CallTask:
     webhook_url: str | None
     idempotency_key: str | None
     request_fingerprint: str
+    created_at: str = ""
     status: str = "queued"
     events: list[dict[str, Any]] = field(default_factory=list)
     canceled: bool = False
@@ -187,6 +188,10 @@ class _CallTask:
         return {
             "id": self.id,
             "object": "call_task",
+            # The real API returns this and a consumer can use it to tell a call it just
+            # placed from one an idempotency key replayed. A double that omitted it would
+            # make that distinction untestable offline.
+            "created_at": self.created_at,
             "status": self.status,
             "task": self.task,
             "task_completed": self.status == "completed" and bool(done),
@@ -376,6 +381,7 @@ class CalleDouble:
             webhook_url=webhook_url,
             idempotency_key=idempotency_key,
             request_fingerprint=fingerprint,
+            created_at=_iso(self._now) or "",
         )
         self._calls[call.id] = call
         if idempotency_key is not None:

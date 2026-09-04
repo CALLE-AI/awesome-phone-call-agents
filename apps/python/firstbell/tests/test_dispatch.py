@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import threading
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,7 @@ import pytest
 from calle_double import CalleDouble, Outcome, build_client
 from dispatch import (
     Cancelled,
+    ItemResult,
     DispatchReport,
     Resolution,
     RetryPolicy,
@@ -441,3 +444,62 @@ def test_a_recipient_result_still_wins_over_the_task_result():
         "reason_category": "transport", "expected_return": "today"}
     result = make(CalleDouble(), result_schema=LIVE_SCHEMA)._classify(LIVE_ITEM, call)
     assert result.structured_result["reason_category"] == "transport"
+
+
+# -- placed, replayed, or unknown -------------------------------------------
+
+def test_a_replayed_call_is_not_counted_as_a_call_this_run_placed():
+    """Running the same wave twice must not report four calls.
+
+    Production proved this the hard way: a second run reused the same idempotency key,
+    CALL-E returned the original call unchanged, no phone rang, nothing was billed, and
+    the tool still reported the call as placed.
+    """
+    # The double stamps calls with its own clock, so start it level with ours and let
+    # real time pass between the runs. That is the production sequence in miniature.
+    double = CalleDouble(latency_seconds=0.004, now=datetime.now(timezone.utc))
+    double.set_outcome(IN_A, Outcome.answered(GOOD, TALK))
+    items = [WorkItem(id="S-1", phones=(IN_A,), consented=True)]
+    key = default_idempotency_key("attendance", "2026-09-14")
+
+    first = make(double, idempotency_key=key).run(items)
+    assert first.results[0].placed_by_this_run is True
+    assert len(double.dialled) == 1
+
+    time.sleep(1.2)   # longer than the one second of clock slack the check allows
+    second = make(double, idempotency_key=key).run(items)
+    assert second.results[0].call_id == first.results[0].call_id, "not a replay"
+    assert second.results[0].placed_by_this_run is False
+    assert len(double.dialled) == 1, "the double dialled again, so this proves nothing"
+
+
+def test_provenance_is_unknown_rather_than_assumed_when_the_timestamp_is_missing(double):
+    """An unknown quietly rounded to "placed" is the error this project exists to avoid."""
+    dispatcher = make(double)
+    dispatcher._run_started_at = datetime.now(timezone.utc)
+    assert dispatcher._was_placed_now({"created_at": None}) is None
+    assert dispatcher._was_placed_now({"created_at": "not a timestamp"}) is None
+    assert dispatcher._was_placed_now({}) is None
+    # A naive timestamp is read as UTC rather than discarded.
+    assert dispatcher._was_placed_now(
+        {"created_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat()}) is True
+    # A service clock hours ahead of ours makes the comparison meaningless, not "fresh".
+    from datetime import timedelta
+    skewed = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+    assert dispatcher._was_placed_now({"created_at": skewed}) is None
+
+
+def test_the_summary_separates_the_three_provenances():
+    from firstbell.domain import summarise
+    made = ItemResult(item=WorkItem(id="a", phones=(IN_A,)), resolution=Resolution.RESOLVED,
+                      attempts_made=2, placed_by_this_run=True)
+    replay = ItemResult(item=WorkItem(id="b", phones=(IN_A,)), resolution=Resolution.RESOLVED,
+                        attempts_made=1, placed_by_this_run=False)
+    dunno = ItemResult(item=WorkItem(id="c", phones=(IN_A,)), resolution=Resolution.FAILED,
+                       attempts_made=3, placed_by_this_run=None)
+    s = summarise([made, replay, dunno], live=True)
+    assert (s.calls_placed, s.calls_replayed, s.calls_unknown_provenance) == (2, 1, 3)
+    text = "\n".join(s.lines())
+    assert "calls placed         2" in text
+    assert "calls replayed       1" in text
+    assert "provenance unknown   3" in text

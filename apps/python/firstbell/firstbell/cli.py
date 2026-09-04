@@ -244,11 +244,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     report = dispatcher.run(items)
 
-    calls_placed = len(double.dialled) if double is not None else sum(
-        r.attempts_made for r in report.results
-    )
-    summary = summarise(report.results, calls_placed=calls_placed,
-                        live=mode.reached_production, rate=rate)
+    summary = summarise(report.results, live=mode.reached_production, rate=rate)
 
     if args.json:
         print(json.dumps({"counts": report.counts(),

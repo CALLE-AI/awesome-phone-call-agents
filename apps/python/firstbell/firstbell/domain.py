@@ -115,6 +115,8 @@ class ImpactSummary:
     failed: int
     skipped_no_consent: int
     calls_placed: int
+    calls_replayed: int = 0
+    calls_unknown_provenance: int = 0
     live: bool = False
     rate: FundingRate | None = None
     resolved_by_language: dict[str, int] = field(default_factory=dict)
@@ -152,8 +154,18 @@ class ImpactSummary:
             f"  failed               {self.failed}   nobody reached on any number",
             f"  skipped, no consent  {self.skipped_no_consent}",
             f"  calls placed         {self.calls_placed}{'' if self.live else '   (no telephone call was placed)'}",
-            f"  resolution rate      {self.resolution_rate:.0%}",
         ]
+        if self.calls_replayed:
+            out.append(
+                f"  calls replayed       {self.calls_replayed}   idempotency key already "
+                "used, so no call was made"
+            )
+        if self.calls_unknown_provenance:
+            out.append(
+                f"  provenance unknown   {self.calls_unknown_provenance}   the response "
+                "carried no usable created_at"
+            )
+        out.append(f"  resolution rate      {self.resolution_rate:.0%}")
 
         # The headline this project is entitled to claim. It needs no external source,
         # because it is counted from what this run actually did. The legal duty it speaks
@@ -196,8 +208,18 @@ class ImpactSummary:
         return out
 
 
-def summarise(results: list[ItemResult], *, calls_placed: int, live: bool = False,
-              rate: FundingRate | None = None) -> ImpactSummary:
+def summarise(results: list[ItemResult], *, calls_placed: int | None = None,
+              live: bool = False, rate: FundingRate | None = None) -> ImpactSummary:
+    """`calls_placed` is derived unless a caller overrides it.
+
+    A call an idempotency key replayed was not placed by this run, was not billed, and
+    made nobody's phone ring. Counting it as placed would overstate both the cost and the
+    number of people disturbed, which is the kind of small dishonesty that is never
+    noticed and never forgiven.
+    """
+    buckets = {True: 0, False: 0, None: 0}
+    for r in results:
+        buckets[r.placed_by_this_run] += r.attempts_made
     counts = {r: 0 for r in Resolution}
     resolved_by_language: dict[str, int] = {}
     open_by_language: dict[str, int] = {}
@@ -214,7 +236,9 @@ def summarise(results: list[ItemResult], *, calls_placed: int, live: bool = Fals
         undetermined=counts[Resolution.UNDETERMINED],
         failed=counts[Resolution.FAILED],
         skipped_no_consent=counts[Resolution.SKIPPED],
-        calls_placed=calls_placed,
+        calls_placed=buckets[True] if calls_placed is None else calls_placed,
+        calls_replayed=buckets[False],
+        calls_unknown_provenance=buckets[None],
         live=live,
         rate=rate,
         resolved_by_language=resolved_by_language,

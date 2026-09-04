@@ -28,6 +28,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Sequence
 
@@ -137,6 +138,10 @@ class WaveDispatcher:
         if not callable_items:
             return report
 
+        # Anything the service says it created before this moment was not created by this
+        # run. That is how an idempotent replay is told apart from a fresh call.
+        self._run_started_at = datetime.now(timezone.utc)
+
         with ThreadPoolExecutor(max_workers=self._concurrency) as pool:
             futures = {pool.submit(self._handle, item): item for item in callable_items}
             for future, item in futures.items():
@@ -243,6 +248,7 @@ class WaveDispatcher:
         base = dict(
             item=item, call_id=call.get("id"), attempts_made=len(attempts),
             numbers_tried=tried, transcript=transcript,
+            placed_by_this_run=self._was_placed_now(call),
         )
 
         status = call.get("status")
@@ -273,6 +279,34 @@ class WaveDispatcher:
 
         return ItemResult(**base, resolution=Resolution.RESOLVED, structured_result=result,
                           reason="schema-valid answer received")
+
+    def _was_placed_now(self, call: dict[str, Any]) -> bool | None:
+        """Did this run place this call, or did an idempotency key replay an older one?
+
+        It matters for anything that counts calls, because a replayed call is not billed
+        and no phone rang. Reporting it as placed would overstate both the cost and the
+        number of people who were actually disturbed.
+
+        Returns None rather than guessing when the response carries no usable timestamp.
+        An unknown that is quietly rounded to "placed" is the same class of error this
+        whole project exists to avoid.
+        """
+        started = getattr(self, "_run_started_at", None)
+        raw = call.get("created_at")
+        if started is None or not raw:
+            return None
+        try:
+            created = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created > started + timedelta(hours=1):
+            # The service's clock is far enough from ours that the comparison means
+            # nothing. Say so rather than reading skew as a fresh call.
+            return None
+        # One second of slack: the service stamps the call, not our clock.
+        return created >= started - timedelta(seconds=1)
 
     @staticmethod
     def _result_for(call: dict[str, Any], recipient: dict[str, Any],

@@ -97,6 +97,10 @@ class ItemResult:
     attempts_made: int = 0
     numbers_tried: tuple[str, ...] = ()
     transcript: tuple[dict[str, Any], ...] = ()
+    # True: this run placed the call. False: an idempotency key replayed an earlier one,
+    # so no call was made and nothing was billed. None: the response carried no usable
+    # created_at, so we do not know, and saying "placed" would be a guess.
+    placed_by_this_run: bool | None = None
 
     @property
     def masked_numbers(self) -> tuple[str, ...]:
