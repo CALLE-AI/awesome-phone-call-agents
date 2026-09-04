@@ -113,6 +113,29 @@ The counts here were measured by applying each mutation and running the suite, n
 estimated. Four of them were written down as ones before being run, and one of those four
 was wrong, which is the whole argument for measuring in the first place.
 
+## The seven browser gates
+
+`tools/gates/run.mjs` measures the reviewer page in Chrome, and the rule is the same: a
+gate nobody has watched fail is a gate nobody has tested. These are not in the table above
+because they fail as a gate rather than as a count of tests.
+
+| The change | What the gate said |
+|---|---|
+| Append a 120 ms busy loop to the built `app.js` | `long tasks` FAIL, 131, 129, 129, 129, 129 ms, and it named the phase: `131 ms at 137 ms during load` |
+| Ship one shared fallback family for two real faces, which is how the page was built until this was fixed | `cls` FAIL at 0.00961 against a 0.001 ceiling, naming `span.switch` and a node that had been removed |
+| Serve the page with the font host reachable but the kit unparsed | `cdn loss` reports what it aborted and how many acts survived |
+
+Two of those three are the state this page was actually in, not a change invented to trip a
+gate: the CLS failure and the long task were both found by the gates and both are fixed.
+
+Two gates are worth reading for how they are wrong rather than for what they catch. `cls`
+takes five samples and judges the worst, because the same build measured 0.00133 and
+0.00961 and 0.00005 on consecutive runs, and one sample of that is a coin toss. `long
+tasks` did take one sample: it reported a task of 133 ms and, an hour later on identical
+code, none, so it passed and failed the same commit. It takes five now. Its message also
+used to say every task it found happened "during a full scroll after load" while it was
+collecting buffered entries from the load itself, which is where the one real task was.
+
 ## What is not covered
 
 Mutation testing shows a test notices a change. It does not show the test is testing the

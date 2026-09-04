@@ -241,30 +241,74 @@ async function measureCls(page, url) {
   return { cls, shifts };
 }
 
-async function gateLongTasks(page, url) {
-  await page.goto(url, { waitUntil: "networkidle0" });
-  const supported = await page.evaluate(() => {
-    window.__long = [];
-    try {
-      new PerformanceObserver((list) => {
-        for (const e of list.getEntries()) window.__long.push(Math.round(e.duration));
-      }).observe({ type: "longtask", buffered: true });
-      return true;
-    } catch {
-      return false;
+/**
+ * Measure long tasks several times and gate on the worst run.
+ *
+ * This gate used to take one sample. The task it was catching, GSAP and ScrollTrigger
+ * parsing, appeared in six runs out of eight and was absent in the other two, so the gate
+ * passed or failed on which of those it happened to draw, and it did both within an hour
+ * on identical code. It runs the same number of times as the CLS gate now and reports
+ * every sample, for the same reason.
+ *
+ * It also separates load from scroll. The observer takes buffered entries, so it always
+ * saw tasks from before the scroll began, while the message claimed everything it found
+ * happened during the scroll after load. Which phase a task came from is the first thing
+ * you need to know to fix it.
+ */
+async function gateLongTasks(browser, url) {
+  const samples = [];
+  let worstTasks = [];
+  for (let run = 0; run < CLS_RUNS; run += 1) {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1440, height: 900 });
+    const supported = await page.evaluate(() => true).catch(() => false);
+    if (!supported) {
+      await page.close();
+      record("long tasks", "COULD-NOT-MEASURE", "the page could not be evaluated");
+      return;
     }
-  });
-  if (!supported) {
-    record("long tasks", "COULD-NOT-MEASURE", "this browser does not expose longtask entries");
-    return;
+    let ok = true;
+    await page.evaluateOnNewDocument(() => {
+      window.__long = [];
+      try {
+        new PerformanceObserver((list) => {
+          for (const e of list.getEntries()) {
+            window.__long.push({ d: Math.round(e.duration), at: Math.round(e.startTime) });
+          }
+        }).observe({ type: "longtask", buffered: true });
+        window.__longOk = true;
+      } catch {
+        window.__longOk = false;
+      }
+    });
+    await page.goto(url, { waitUntil: "networkidle0" });
+    const loadEnd = await page.evaluate(() => {
+      const nav = performance.getEntriesByType("navigation")[0];
+      return Math.round(nav ? nav.loadEventEnd : 0);
+    });
+    ok = await page.evaluate(() => window.__longOk === true);
+    if (!ok) {
+      await page.close();
+      record("long tasks", "COULD-NOT-MEASURE", "this browser does not expose longtask entries");
+      return;
+    }
+    await fullScroll(page);
+    const long = await page.evaluate(() => window.__long.filter((t) => t.d > 50));
+    await page.close();
+    const tagged = long.map((t) => ({ ...t, phase: t.at <= loadEnd ? "load" : "scroll" }));
+    const worstHere = tagged.length ? Math.max(...tagged.map((t) => t.d)) : 0;
+    if (worstHere >= Math.max(0, ...samples)) worstTasks = tagged;
+    samples.push(worstHere);
   }
-  await fullScroll(page);
-  const long = await page.evaluate(() => window.__long.filter((d) => d > 50));
-  record("long tasks", long.length === 0 ? "PASS" : "FAIL",
-    long.length === 0
-      ? "no task over 50 ms during a full scroll after load"
-      : `${long.length} task(s) over 50 ms: ${long.join(", ")} ms`,
-    { longTasks: long });
+  const worst = Math.max(...samples);
+  const blame = worstTasks.length
+    ? ` Worst run: ${worstTasks.map((t) => `${t.d} ms at ${t.at} ms during ${t.phase}`).join("; ")}.`
+    : "";
+  record("long tasks", worst === 0 ? "PASS" : "FAIL",
+    `longest task in each of ${CLS_RUNS} loads with a full scroll: `
+    + `${samples.map((s) => `${s} ms`).join(", ")}, against a 50 ms ceiling.`
+    + blame,
+    { longTaskWorst: worst, longTaskSamples: samples, longTasks: worstTasks });
 }
 
 async function gateReducedMotion(browser, url) {
@@ -348,6 +392,30 @@ async function gateCdnLoss(browser, url) {
     { blocked: blocked.length, visible: visible.length, errors });
 }
 
+/**
+ * Resolve once the page has stopped scrolling, or after a bounded number of frames.
+ *
+ * The bound matters: a page that never settles must not hang the gate, and returning
+ * after it is a measurement worth taking rather than an error, because the caller's
+ * fixed wait follows anyway.
+ */
+async function settleScroll(page) {
+  await page.evaluate(() => new Promise((resolve) => {
+    let last = -1;
+    let still = 0;
+    let frames = 0;
+    const tick = () => {
+      const y = Math.round(window.scrollY * 100) / 100;
+      still = y === last ? still + 1 : 0;
+      last = y;
+      frames += 1;
+      if (still >= 5 || frames > 180) resolve();
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  })).catch(() => {});
+}
+
 async function shoot(browser, url) {
   await mkdir(SHOTS, { recursive: true });
   const viewports = [
@@ -364,7 +432,12 @@ async function shoot(browser, url) {
       const el = await page.$(`#${id}`);
       if (!el) continue;
       await el.scrollIntoView().catch(() => {});
-      await new Promise((r) => setTimeout(r, 250));
+      // Wait for the scroll to stop rather than for a fixed 250ms. Lenis eases, so a
+      // fixed wait captures at whatever fraction of a pixel it had reached, and two
+      // builds with byte-identical layout produced screenshots that differed on every
+      // glyph edge. Settling first makes the shot a function of the final position only.
+      await settleScroll(page);
+      await new Promise((r) => setTimeout(r, 300));
       await el.screenshot({ path: join(SHOTS, `${vp.label}-${id}.png`) }).catch(() => {});
       written += 1;
     }
@@ -399,10 +472,7 @@ async function main() {
   try {
     await gateWeight();
     await gateCls(browser, url);
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1440, height: 900 });
-    await gateLongTasks(page, url);
-    await page.close();
+    await gateLongTasks(browser, url);
     await gateReducedMotion(browser, url);
     await gateNoJs(browser, url);
     await gateCdnLoss(browser, url);
