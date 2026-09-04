@@ -1,0 +1,11 @@
+node_modules/
+dist/
+data/*.json
+.env
+.env.*
+!.env.example
+*.log
+.vite/
+graphify-out/
+
+.vercel
