@@ -150,6 +150,15 @@ than the API has.
   says a staff member will call back today, and ends the call. No medical, legal or
   financial advice is given on any path.
 - **No recurring schedule is created.** One invocation places one wave and exits.
+- **The escape hatch is instructed, not enforced, and that limit belongs to the platform.**
+  The task tells the agent to stop and promise a staff callback if the person is
+  distressed, asks for a human, or says anything suggesting the child may be at risk. On a
+  live call the agent produced that line correctly and then, after a pause, restarted its
+  opening disclosure instead of hanging up, and the person on the phone had to end the call
+  themselves. CALL-E exposes no `end_call`, no `max_turns` and no maximum duration, so the
+  prompt is the only lever available and it is not binding. Anyone deploying this near
+  vulnerable people should know that before they do, and it is filed as a defect report
+  rather than left as a footnote.
 
 ## Live mode
 
