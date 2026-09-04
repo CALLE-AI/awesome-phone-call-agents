@@ -1,6 +1,18 @@
-# One E.164 number per line. Copy this file to authorized_numbers.txt
-# (kept out of version control) and list only numbers you've actually
-# confirmed consent for. --confirm alone is not enough to place a call
-# to a number that isn't listed here — see references/safety.md.
-+12025550147
-+14155550188
+# authorized_numbers.example.txt
+#
+# Example template for a host-maintained record of recipients who have
+# a verified, existing appointment with the business. This file is not
+# read automatically by scripts/place_confirmation_calls.py — it's a
+# starting pattern hosts can adopt to cross-check new appointment rows
+# against before adding them to an appointments.csv batch, per the
+# recipient-sourcing rule in references/safety.md.
+#
+# Format: one recipient per line —
+#   phone (E.164), recipient_name, verified_appointment_source
+#
+# Lines starting with # are comments and should be ignored by any
+# tooling a host builds around this template.
+
++14155550101, Alex Rivera, booked via Sunrise Clinic front desk 2026-09-01
++919812345670, Priya Nair, booked via workshop intake form 2026-09-02
++6591234567, Wei Tan, booked via salon booking widget 2026-09-03

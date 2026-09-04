@@ -1,112 +1,63 @@
 # Examples
 
-These examples show how to use `appointment-call-confirm` end to end.
-Phone numbers use the NANP-reserved fictional block (555-0100 through
-555-0199), which is reserved by the North American Numbering Plan
-Administrator specifically for non-working, fictional use — safe to
-publish in documentation and never assigned to a real subscriber.
+## 1. Dry run (no calls placed)
 
-## Dry-run a batch (default — no call is placed, no dependencies needed)
+```bash
+export CALLE_API_KEY=calle_live_xxxxxxxx
+python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv --dry-run
+```
 
-Input CSV (`assets/sample_appointments.csv` shape):
+Sample output:
+
+```
+Appointment batch (3 recipients) — DRY RUN, no calls will be placed:
+
+1. Alex Rivera   +1415•••••01   2026-09-08T15:00:00-04:00   annual checkup with Dr. Rao
+2. Priya Nair    +9198••••••70   2026-09-08T11:30:00+05:30   car pickup for invoice #4021
+3. Wei Tan       +6591••••67   2026-09-08T09:00:00+08:00   haircut appointment
+
+Type CONFIRM to place these 3 calls, or anything else to cancel:
+```
+
+## 2. Real run after approval
+
+```bash
+python scripts/place_confirmation_calls.py --in assets/sample_appointments.csv --out results.csv
+```
+
+Each recipient is called serially, polled to a terminal state, and written to
+`results.csv`:
+
+```csv
+recipient_name,phone_masked,appointment_time,call_id,status,requested_new_time
+Alex Rivera,+1415•••••01,2026-09-08T15:00:00-04:00,call_8f2a1c,confirmed,
+Priya Nair,+9198••••••70,2026-09-08T11:30:00+05:30,call_9b7e40,needs_reschedule,2026-09-09T11:30:00+05:30
+Wei Tan,+6591••••67,2026-09-08T09:00:00+08:00,call_31dd2f,no_answer,
+```
+
+Batch summary printed at the end:
+
+```
+1 confirmed, 1 to reschedule, 0 declined, 1 no answer, 0 failed
+```
+
+## 3. Minimal appointments.csv format
 
 ```csv
 recipient_name,phone,appointment_time,context,business_name
-Alex Rivera,+12025550147,2026-09-05T15:00:00-04:00,annual checkup with Dr. Lee,Sunrise Clinic
-Priya Nair,+14155550188,2026-09-05T17:30:00-04:00,brake inspection,Fast Lane Auto
+Alex Rivera,+14155550101,2026-09-08T15:00:00-04:00,annual checkup with Dr. Rao,Sunrise Clinic
 ```
 
-Command — no `pip install` required for this step:
+`region` and `locale` are optional columns — `region` is inferred from the
+phone's country code when omitted (see `references/result-schema.md`).
 
-```bash
-python3 scripts/place_confirmation_calls.py --in assets/sample_appointments.csv
-```
+## 4. Maintaining a pre-approved recipient list
 
-Expected output — the full batch is printed with masked numbers, and
-no call is placed without `--confirm`:
-
-```text
-DRY RUN — 2 appointment(s). No calls will be placed.
-- Alex Rivera   +1202•••47   2026-09-05T15:00:00-04:00   region=US   "annual checkup with Dr. Lee"
-- Priya Nair    +1415•••88   2026-09-05T17:30:00-04:00   region=US   "brake inspection"
-Re-run with --confirm (and --authorized-numbers) to actually place these 2 call(s).
-```
-
-## Place the batch for real
-
-Live calls need the one real dependency, and an explicit
-authorized-numbers file separate from `--confirm` (see
-`references/safety.md` for why these are two separate gates):
-
-```bash
-pip install -r requirements.txt
-
-cp assets/authorized_numbers.example.txt authorized_numbers.txt
-# edit authorized_numbers.txt to contain only numbers you've confirmed
-# consent for — this file is intentionally not checked into git
-
-export CALLE_API_KEY=your_calle_key
-python3 scripts/place_confirmation_calls.py \
-  --in assets/sample_appointments.csv \
-  --authorized-numbers authorized_numbers.txt \
-  --out results.csv \
-  --confirm
-```
-
-Each recipient is called serially — one call in flight at a time —
-through CALL-E's `POST /v1/calls` with the shared `result_schema`
-(see `references/result-schema.md`), then polled to a terminal status
-via `GET /v1/calls/{call_id}` before moving to the next recipient.
-
-Expected per-recipient output line:
-
-```text
-Alex Rivera  +1202•••47  call_8fQmz2... -> confirmed
-Priya Nair   +1415•••88  call_9kRtn4... -> needs_reschedule (requested: 2026-09-06T09:00:00-04:00)
-```
-
-## Rejected result — never guessed into a confirmation
-
-If CALL-E's `structured_result` doesn't cleanly match one of the
-`result_schema` enum values (ambiguous conversation, call cut short,
-etc.), the skill reports it honestly instead of inferring an outcome:
-
-```text
-Priya Nair  +1415•••88  call_2xVfQ1... -> unclear
-  "A live person answered but the call ended before a clear yes or no."
-```
-
-## Not in the authorized-numbers file — never called
-
-```text
-Priya Nair  +1415•••88  HALTED: +1415•••88 is not listed in
-authorized_numbers.txt.
-Batch halted before this call was placed. Nothing was dialed for this
-recipient or anyone listed after them.
-```
-
-## Uncertain provider outcome — batch halts, doesn't guess or continue
-
-A local/network error, a missing call id, or a poll that times out
-before reaching a terminal status all mean the same thing: this
-script doesn't actually know what CALL-E did. Rather than guess (and
-risk calling the next recipient while an earlier call's true state is
-unknown), the batch halts immediately and writes out whatever results
-it has confirmed so far:
-
-```text
-Priya Nair  +1415•••88  HALTED: could not reach CALL-E (outcome
-unknown — do not assume this call was not created): ConnectionError
-
-Batch halted — the create-call response was ambiguous, so whether
-this call actually went out is unknown. Check the CALL-E dashboard or
-GET /v1/calls with this recipient's number before re-running, to
-avoid dialing them twice. Nobody after this recipient was called.
-```
-
-## Rejected number — reported, not silently retried
-
-```text
-Priya Nair  +1415•••88  HALTED: refusing to call: +1415•••88 has 11
-digits, which doesn't match the expected length for region SG (10)
-```
+`assets/authorized_numbers.example.txt` shows a simple format hosts can use
+to track which numbers have an existing, verified appointment on file before
+they're ever added to an `appointments.csv` batch. This is a manual/host-side
+record — a starting template if you want to keep an audit trail of "who is
+allowed to be on tomorrow's confirmation-call list" separately from the
+appointment data itself — not a flag this script reads automatically. Cross-
+check new rows against it before running a batch, per the sourcing rule in
+`references/safety.md`.

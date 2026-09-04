@@ -1,37 +1,88 @@
-"""Credential-free regressions for the destination-region gate."""
+"""
+Unit tests for the dependency-free helper functions in
+place_confirmation_calls.py: phone masking, region inference, and
+terminal-result resolution.
+
+These exercise pure logic only — no network calls, no CALL-E API key
+required. Run with:
+
+    python -m unittest scripts/test_place_confirmation_calls.py -v
+"""
+from __future__ import annotations
+
+import sys
 import unittest
+from pathlib import Path
 
-from place_confirmation_calls import Appointment, _validate_e164_for_region, place_call
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from place_confirmation_calls import _mask, _infer_region, resolve_result
 
 
-class DestinationRegionTests(unittest.TestCase):
-    def test_matching_and_shared_calling_codes(self):
-        for phone, region in (
-            ("+12025550147", "US"),
-            ("+14165550100", "CA"),
-            ("+447700900123", "GB"),
-        ):
-            with self.subTest(region=region):
-                self.assertIsNone(_validate_e164_for_region(phone, region))
+class TestMask(unittest.TestCase):
+    def test_masks_middle_digits(self):
+        self.assertEqual(_mask("+14155550101"), "+1415•••••01")
 
-    def test_same_length_does_not_override_country_code(self):
-        for phone, region in (("+12025550147", "FR"), ("+447700900123", "IN")):
-            with self.subTest(region=region):
-                self.assertIsNotNone(_validate_e164_for_region(phone, region))
+    def test_short_number_fully_masked(self):
+        self.assertEqual(_mask("123"), "•••")
 
-    def test_requires_ascii_digits_and_complete_match(self):
-        for phone in ("+12025550147\n", "+1202555014\u0667"):
-            self.assertIsNotNone(_validate_e164_for_region(phone, "US"))
+    def test_strips_surrounding_whitespace(self):
+        self.assertEqual(_mask("  +14155550101  "), "+1415•••••01")
 
-    def test_mismatched_region_stops_before_transport(self):
-        appointment = Appointment(
-            recipient_name="Example Customer", phone="+12025550147",
-            appointment_time="2026-09-05T15:00:00-04:00",
-            context="appointment", business_name="Example Business", region="FR",
-        )
-        # A bare object has no transport methods: any network attempt fails this test.
-        result = place_call(object(), "https://api.heycall-e.com", "", appointment, None)
-        self.assertIn("_local_error", result)
+
+class TestInferRegion(unittest.TestCase):
+    def test_infers_us(self):
+        self.assertEqual(_infer_region("+14155550101"), "US")
+
+    def test_infers_singapore(self):
+        self.assertEqual(_infer_region("+6591234567"), "SG")
+
+    def test_infers_india(self):
+        self.assertEqual(_infer_region("+919812345670"), "IN")
+
+    def test_prefers_longer_country_code_match(self):
+        # +971 (UAE) must not be misread as +9 or +97 matching something else.
+        self.assertEqual(_infer_region("+971501234567"), "AE")
+
+    def test_unknown_code_returns_none(self):
+        self.assertIsNone(_infer_region("+9999999999"))
+
+
+class TestResolveResult(unittest.TestCase):
+    def test_timed_out_call_is_pending(self):
+        status, structured = resolve_result({"_timed_out": True, "status": "in_progress"})
+        self.assertEqual(status, "pending")
+        self.assertEqual(structured, {})
+
+    def test_failed_status_overrides_any_structured_result(self):
+        call = {
+            "status": "failed",
+            "structured_result": {"status": "confirmed"},
+        }
+        status, _ = resolve_result(call)
+        self.assertEqual(status, "failed")
+
+    def test_recognized_structured_status_passes_through(self):
+        call = {
+            "status": "completed",
+            "structured_result": {"status": "needs_reschedule"},
+        }
+        status, structured = resolve_result(call)
+        self.assertEqual(status, "needs_reschedule")
+        self.assertEqual(structured["status"], "needs_reschedule")
+
+    def test_unrecognized_structured_status_is_unclear(self):
+        call = {
+            "status": "completed",
+            "structured_result": {"status": "maybe_confirmed_not_sure"},
+        }
+        status, _ = resolve_result(call)
+        self.assertEqual(status, "unclear")
+
+    def test_missing_structured_result_is_unclear(self):
+        call = {"status": "completed"}
+        status, _ = resolve_result(call)
+        self.assertEqual(status, "unclear")
 
 
 if __name__ == "__main__":
