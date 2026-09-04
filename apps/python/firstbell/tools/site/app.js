@@ -246,8 +246,18 @@ function wireScrubbed() {
     queued = true;
     requestAnimationFrame(frame);
   };
+  // Resize changes the geometry both of these are computed from, so the resting position
+  // is recomputed and the cached progress thrown away. Without the reset, a resize that
+  // leaves the progress where it was skips the write and the page keeps the old numbers.
+  // rest() reads a layout height, which is why it is here and not in frame().
+  const onResize = () => {
+    rest();
+    lastCurtain = -1;
+    lastRail = -1;
+    onScroll();
+  };
   addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', onScroll, { passive: true });
+  addEventListener('resize', onResize, { passive: true });
   frame();
 }
 
