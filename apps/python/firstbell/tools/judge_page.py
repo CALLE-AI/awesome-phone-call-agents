@@ -299,6 +299,9 @@ def build(has_audio: bool) -> str:
     add('<meta name=description content="Software that telephones the families of absent '
         'schoolchildren in the language that family speaks, and refuses to close a case it '
         'could not get an answer to. Every claim carries the thing that checks it.">')
+    # Without this the browser asks for /favicon.ico on every load and the server answers
+    # 404. An empty data URI answers it with nothing, from the document, costing no request.
+    add('<link rel=icon href="data:,">')
     add('<link rel=preconnect href="https://use.typekit.net" crossorigin>')
     add('<link rel=preconnect href="https://p.typekit.net" crossorigin>')
     # The three faces that exist above the fold, fetched in parallel with the stylesheet
