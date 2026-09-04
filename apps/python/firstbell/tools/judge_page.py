@@ -62,10 +62,19 @@ Everything the repository can show on its own runs without this tool:
   python tools/double_conformance.py --check"""
 SITE = Path(__file__).resolve().parent / "site"
 
-# Pinned, with integrity. Both are comfort layers: if either fails to arrive the page still
-# scrolls, plays and reads, which is also the reduced-motion path.
+# The only script this page loads from outside its own directory, pinned to a version and
+# to the bytes of that version.
+#
+# The hash is the sha384 of what jsdelivr actually serves at that URL, recomputed rather
+# than trusted: the value that used to sit here matched no file, and the tag below never
+# wrote an integrity attribute, so nothing had ever checked it. Had it been emitted the
+# browser would have refused the script.
+#
+# If those bytes ever change the browser refuses it and the page falls back to native
+# scrolling, which is the state a reader already gets with JavaScript off or reduced
+# motion asked for. Failing closed costs this page nothing, which is why it fails closed.
 LENIS = ("https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js",
-         "sha384-uxdRfmAAt0Y8V0FBZDwCzUKKrGqfMKZmVSbUXjJZJHYIWJmXWvzYBWZeVLJHqbTQ")
+         "sha384-tKsJDT6PlUI0pSBt9/sBKJluKgA19/a6mBrDsZaXotLB4ZYfMGM6xt6/WgGpYhTm")
 TYPEKIT = "https://use.typekit.net/qdx4jvs.css"
 
 ACTS = [
@@ -543,7 +552,8 @@ def build(has_audio: bool) -> str:
         'so that an unmeasured pair cannot read as a pass.</p></footer>')
 
     add(f'<script id=call-data type=application/json>{json.dumps(data, ensure_ascii=False, separators=(",", ":"))}</script>')
-    add(f'<script src="{LENIS[0]}" defer></script>')
+    add(f'<script src="{LENIS[0]}" integrity="{LENIS[1]}" '
+        f'crossorigin=anonymous defer></script>')
     add('<script type=module src="app.js"></script>')
     add('</html>')
     return "".join(p)
