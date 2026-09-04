@@ -725,12 +725,12 @@ def test_the_receipt_carries_the_id_the_vendor_bills_against(double):
     dispatcher = make(double)
     result = dispatcher._classify(
         WorkItem(id="S-77", phones=(IN_A,), consented=True),
-        {"id": "call_removed_11", "status": "completed",
+        {"id": "call_notARealId", "status": "completed",
          "recipients": [{"attempts": [
              {"phone": IN_A, "provider_call_id": "aaaa1111bbbb2222cccc3333dddd4444"},
              {"phone": IN_A, "provider_call_id": "bbbb2222cccc3333dddd4444eeee5555"},
          ]}]})
-    assert result.call_id == "call_removed_11"
+    assert result.call_id == "call_notARealId"
     assert result.provider_call_id == "bbbb2222cccc3333dddd4444eeee5555"
 
 

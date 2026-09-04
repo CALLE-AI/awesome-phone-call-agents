@@ -85,7 +85,6 @@ AUTHORED_FIXTURES = "tests/data/shape-"
 PLACEHOLDER_IDS = frozenset({
     "aaaa1111bbbb2222cccc3333dddd4444",
     "bbbb2222cccc3333dddd4444eeee5555",
-    "call_removed_11",
 })
 
 
