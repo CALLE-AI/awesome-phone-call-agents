@@ -1,0 +1,8 @@
+{
+  "run_id": "run_mcp_busy",
+  "status": "BUSY",
+  "activity": [{ "ts": "10:00:03", "message": "Dialing" }],
+  "summary": "Fixture run ending in BUSY.",
+  "transcript": null,
+  "next_step": null
+}

@@ -1,0 +1,11 @@
+{
+  "id": "call_fixture_003",
+  "object": "call_task",
+  "status": "failed",
+  "structured_result": null,
+  "task_completed": null,
+  "completion_confidence": null,
+  "failure_code": "carrier_rejected_17",
+  "failure_message": "The carrier rejected the call.",
+  "result_schema_requested": true
+}
