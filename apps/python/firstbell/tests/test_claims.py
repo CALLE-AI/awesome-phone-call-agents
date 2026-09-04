@@ -163,6 +163,49 @@ def test_the_mutation_table_is_numbered_without_gaps():
     assert ids == list(range(1, len(ids) + 1)), "mutation ids are not 1..n: " + str(ids)
 
 
+NUMBER_WORDS = {
+    13: "thirteen", 18: "eighteen", 22: "twenty-two", 26: "twenty-six",
+    27: "twenty-seven", 28: "twenty-eight", 30: "thirty",
+}
+
+
+def test_the_readme_states_the_real_number_of_mutations():
+    """The third count in this README to go stale, and the first one caught from outside.
+
+    A blind reviewer found "Twenty-two gates" and "Thirteen of them" in a file whose own
+    mutation table had twenty-six rows. The test-count gate next door had been passing the
+    whole time, which is the trap: a checked number sitting beside an unchecked one makes
+    the unchecked one look checked.
+
+    Only the count that is actually written down is asserted. The prose no longer states a
+    second one, so there is nothing else here to keep in step.
+    """
+    table = (APP / "evidence" / "MUTATIONS.md").read_text(encoding="utf-8")
+    rows = len([ln for ln in table.splitlines() if re.match(r"^\| \d+ ", ln)])
+    assert rows > 0, "no numbered rows found in MUTATIONS.md"
+
+    word = NUMBER_WORDS.get(rows)
+    assert word, f"add {rows} to NUMBER_WORDS so this gate can keep checking"
+
+    readme = (APP / "README.md").read_text(encoding="utf-8")
+    assert f"{word.capitalize()} gates broken on purpose" in readme, (
+        f"MUTATIONS.md has {rows} rows, so the README should say "
+        f"'{word.capitalize()} gates broken on purpose'"
+    )
+
+    # And no other spelled-out count may appear beside the word "gates", which is how the
+    # stale "Thirteen of them" survived several edits.
+    for other, other_word in NUMBER_WORDS.items():
+        if other == rows:
+            continue
+        assert f"{other_word.capitalize()} gates" not in readme, (
+            f"the README still says '{other_word.capitalize()} gates' somewhere"
+        )
+        assert f"{other_word.capitalize()} of them" not in readme, (
+            f"the README still says '{other_word.capitalize()} of them' somewhere"
+        )
+
+
 def test_every_committed_receipt_is_described():
     listed = (APP / "evidence" / "README.md").read_text(encoding="utf-8")
     for receipt in sorted((APP / "evidence").glob("0*.json")):

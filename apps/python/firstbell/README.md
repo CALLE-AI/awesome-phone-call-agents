@@ -21,7 +21,7 @@ makes, and each one can be checked without an API key.
 | 1 | [`dispatch/models.py`](dispatch/models.py) | The one idea: a call has three endings, and `Resolution.needs_a_human` is why the middle one cannot be filed with the successes | 2 min |
 | 2 | [`dispatch/scheduler.py`](dispatch/scheduler.py) | Where CALL-E is actually called, how the fallback chain and idempotency key are built, and what cancellation can and cannot mean | 3 min |
 | 3 | [`evidence/README.md`](evidence/README.md) | Six receipts from real calls, each with a `call_id` you can match against CALL-E's own usage page, and a plain statement of whose phone answered | 2 min |
-| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Twenty-two gates broken on purpose, with how many tests noticed each one | 2 min |
+| 4 | [`evidence/MUTATIONS.md`](evidence/MUTATIONS.md) | Twenty-six gates broken on purpose, with how many tests noticed each one | 2 min |
 | 5 | [`docs/locale-is-not-only-a-hint.md`](docs/locale-is-not-only-a-hint.md) | The two-language experiment, pre-registered, including the three comparisons that did not match and why | 1 min |
 
 ### Where CALL-E is called at runtime
@@ -324,18 +324,18 @@ data, and only the data is jurisdictional.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q          # 102 tests
+python -m pytest tests/ -q          # 103 tests
 ```
 
 The suite covers the double's fidelity to the documented API, the dispatcher's
 classification and cancellation, consent, masking, and the live branch end to end against
 the double's HTTP server so that branch is not dead code.
 
-Each gate was checked by breaking it on purpose and confirming it fails. Thirteen of them,
-listed one by one in `evidence/MUTATIONS.md` with the change made and the number of tests
-that caught it: removing the concurrency cap fails 4, disabling the consent check fails 3,
-dropping one real error code from the double fails 3, and matching the production host by
-substring instead of hostname passes a look-alike domain and fails the mode test.
+Each gate was checked by breaking it on purpose and confirming it fails. Every one is
+listed in `evidence/MUTATIONS.md` with the change made and the number of tests that caught
+it: removing the concurrency cap fails 4, disabling the consent check fails 3, dropping one
+real error code from the double fails 3, and matching the production host by substring
+instead of hostname passes a look-alike domain and fails the mode test.
 
 A gate that has never been observed to fail has not been shown to test anything. What
 mutation testing does not cover is written down in that file too: it shows a test notices a
